@@ -1,6 +1,6 @@
 # Myne Account Number Scheme v0.1
 
-> **Status: skeleton.** This document fills in the details summarized in `spec/protocol.md` §8. The format and normalization rules below are normative. The Damm-32 quasigroup table is referenced but not yet inlined; it will be added before v1.0 ship.
+> **Status: skeleton.** This document fills in the details summarized in `protocol.md` §8. The format and normalization rules below are normative. The Damm-32 quasigroup table is referenced but not yet inlined; it will be added before v1.0 ship.
 
 ---
 
@@ -8,7 +8,7 @@
 
 The account number is Myne's primary user identifier — a Mullvad-style self-generated value that replaces email at signup. It serves three roles:
 
-- **Vault binding** — the SHA-256 hash of the canonical form is mixed into both Argon2id salts (`spec/protocol.md` §3.1) so vault keys cannot be precomputed across accounts.
+- **Vault binding** — the SHA-256 hash of the canonical form is mixed into both Argon2id salts (`protocol.md` §3.1) so vault keys cannot be precomputed across accounts.
 - **Sync entitlement token** (Phase 2+) — when the sync server exists, the account number is the bearer token for hosted-sync access. The server stores only a hash; the raw number is never persisted server-side after registration.
 - **User-facing identifier** — what the user writes down, hands to a self-host operator, or types when restoring on a new device.
 
@@ -118,7 +118,7 @@ The 16-byte hash is stored in `vault.meta` (§9.3 of the protocol spec) and bind
 
 ## 8. Anti-abuse considerations (Phase 2+, not v0.1)
 
-- Per-IP rate limiting on registration is **not viable** under the no-IP-logging commitment (`threat-model.md` §2 AS14). Anti-abuse must be per-account or per-device-attestation.
+- Per-IP rate limiting on registration is **not viable** under the no-IP-logging commitment (`../threat-model.md` §2 AS14). Anti-abuse must be per-account or per-device-attestation.
 - Captcha at registration acceptable.
 - "No-email" model means a single attacker can churn through arbitrary numbers of free accounts. Rate-limiting per account, not per-creator, is the operational reality. Storage quotas on free accounts are the primary defense; Privacy Pass / KVAC tokens may be considered in `appname-v005`.
 
