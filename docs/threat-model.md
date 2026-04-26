@@ -142,7 +142,7 @@ Items that are acknowledged as imperfect today and will be revisited. Captured h
 - **No plausibly-deniable encryption.** Coercion (A12) reveals the data. v1 makes no attempt at deniability; consider in v2+ only with caution — partial deniability schemes are easy to misimplement and easy to claim falsely.
 - **Self-host operator log policy is out of our control.** The protocol prevents the server from seeing plaintext, but a malicious self-host operator can still log connection IPs, retain old ciphertexts after deletion, or correlate metadata. Self-host documentation will explicitly state which operator behaviors are *protocol-level* (cannot be done) versus *policy-level* (must be enforced by the operator).
 - **Argon2id parameters on low-end mobile.** `m=64 MiB, t=5` is heavy on a low-end Android device. Either accept slow logins on low-end phones or ship per-device parameter profiles encoded in the encrypted blob. Decision deferred until mobile work begins.
-- **Tauri supply-chain surface.** Tauri's Cargo dependency tree is materially smaller than Electron's npm tree was, but transitive crate compromise (A8) remains feasible. Cargo lockfile pinning, `cargo-vet` or `cargo-audit` in CI, and a deliberately small direct-dependency surface are the response. The UI layer (Next.js inside the Tauri WebView) still pulls npm packages, but the security-critical crypto path lives in the Rust core and is isolated from the WebView via the IPC boundary.
+- **Tauri supply-chain surface.** Tauri's Cargo dependency tree is materially smaller than Electron's npm tree was, but transitive crate compromise (A8) remains feasible. Cargo lockfile pinning, `cargo-vet` or `cargo-audit` in CI, and a deliberately small direct-dependency surface are the response. The UI layer (React inside the Tauri WebView, bundled by Vite at build time) still pulls npm packages, but the security-critical crypto path lives in the Rust core and is isolated from the WebView via the IPC boundary. Choosing Vite + React over Next.js (`decisions.md` 2026-04-26) shrinks the direct-npm-dependency surface roughly tenfold.
 
 ## 8. Comparison vs. Adjacent Products
 
@@ -197,6 +197,6 @@ A snapshot of choices made during the v0.1 draft. Mirrored to `decisions.md`.
 **Open risks**
 
 - Code-signing key compromise (TB8) is the single largest unmitigated risk against A9. Hardware-backed keys + separation of build and signing reduces but does not eliminate.
-- Tauri's Cargo dependency surface plus the Next.js UI layer's npm dependencies together form a non-trivial supply-chain attack surface; transitive compromise (A8) remains feasible despite hash pinning.
+- Tauri's Cargo dependency surface plus the React UI layer's npm dependencies together form a non-trivial supply-chain attack surface; transitive compromise (A8) remains feasible despite hash pinning. The Vite + React choice (`decisions.md` 2026-04-26) keeps the npm side as small as practical, but it does not eliminate the surface.
 - The "no formal audit" gap will widen if Notesnook publishes one before Myne does. Accept the risk; the compensating controls are the response.
 - Self-host operator log policy is outside the protocol — documentation must surface the protocol-level vs. policy-level distinction so users understand which guarantees follow them when they switch operators.
