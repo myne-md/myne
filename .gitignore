@@ -33,3 +33,5 @@ dist-ssr/
 /myne-website/
 /operations/
 /agent-tooling/
+
+/.claude/
