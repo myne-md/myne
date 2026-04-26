@@ -32,6 +32,7 @@ cargo test --test <integration-file>    # one integration test file
 ./workspace/setup.sh        # clone every companion in workspace/manifest.txt INTO this repo
 ./workspace/pull-all.sh     # git pull --ff-only on main + every nested companion
 ./workspace/status-all.sh   # one-line git status per repo
+./workspace/link-skills.sh  # symlink agent-tooling/skills/* into .claude/skills/
 ```
 
 Vite is configured (in `vite.config.ts`) to ignore `src-tauri/**` from its watcher and to keep `clearScreen: false` so Rust errors are not hidden — keep both when editing the config.
