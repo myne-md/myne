@@ -68,6 +68,7 @@ The full Myne project spans multiple repos under the [`myne-md`](https://github.
 | [`myne-mobile`](https://github.com/myne-md/myne-mobile) | React Native iOS + Android (Phase 3) |
 | [`myne-website`](https://github.com/myne-md/myne-website) | Marketing site (myne.md) |
 | [`operations`](https://github.com/example-org/operations) | Internal ops & infrastructure (private) |
+| [`agent-tooling`](https://github.com/example-org/agent-tooling) | Internal AI / agent definitions and tooling (private) |
 
 ## Setting up a local dev workspace
 
@@ -77,7 +78,7 @@ cd myne
 ./workspace/setup.sh
 ```
 
-`setup.sh` clones every companion repo (`myne-test-vectors`, `myne-server`, `myne-web`, `myne-mobile`, `myne-website`, `operations`) **into** this `myne/` directory as nested folders. The main repo's `.gitignore` excludes them so they do not show up as untracked.
+`setup.sh` clones every companion repo (`myne-test-vectors`, `myne-server`, `myne-web`, `myne-mobile`, `myne-website`, `operations`, `agent-tooling`) **into** this `myne/` directory as nested folders. The main repo's `.gitignore` excludes them so they do not show up as untracked.
 
 Daily commands:
 
