@@ -3,7 +3,21 @@
 *.swo
 *.bak
 .idea/
-.vscode/
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Node / Vite build output
+node_modules/
+dist/
+dist-ssr/
+*.local
 
 # Companion repos cloned by workspace/setup.sh as nested directories.
 # Each carries its own .git and is tracked by GitHub separately under myne-md.

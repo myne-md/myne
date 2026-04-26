@@ -2,11 +2,11 @@
 
 > Open-source, end-to-end-encrypted markdown notes — local-first, with optional zero-knowledge sync. Plain markdown files after decryption, backlinks and graph as first-class features, no email at signup.
 
-This is the **main repository** for the Myne project. It will hold the desktop client (Tauri + Next.js + Rust) and the canonical Rust crypto protocol crate as soon as Phase 1 implementation begins. The complete v0.1 specification, threat model, and decisions log are already here under [`docs/`](docs/).
+This is the **main repository** for the Myne project. It holds the desktop client (Tauri + Vite + React + Rust) and will hold the canonical Rust crypto protocol crate when its implementation begins. The complete v0.1 specification, threat model, and decisions log are already here under [`docs/`](docs/).
 
 ## Status
 
-**Pre-alpha.** No implementation has shipped yet. The v0.1 specification is complete; the Tauri desktop client (Phase 1) starts next. See [`docs/vision.md`](docs/vision.md) for the phased plan.
+**Pre-alpha.** No implementation has shipped yet. The v0.1 specification is complete; the Tauri desktop client (Phase 1) scaffold has just been initialised — Tauri 2 + Vite + React + TypeScript on the UI, Rust core in [`src-tauri/`](src-tauri/). See [`docs/vision.md`](docs/vision.md) for the phased plan.
 
 ## What v0.1 commits to
 
@@ -32,20 +32,29 @@ All specifications live under [`docs/`](docs/):
 
 The threat model is normative for what users may rely on; marketing copy must not exceed its guarantees.
 
-## Repository layout (planned, post-Phase-1-start)
+## Repository layout
 
 ```
 myne/
 ├── docs/                ← specifications, vision, threat-model, glossary, decisions
-├── protocol/            ← Rust crypto protocol crate (Phase 1)
-├── apps/
-│   └── desktop/         ← Tauri (Rust) + Next.js (React) desktop client (Phase 1)
+├── src/                 ← React UI (Phase 1 desktop client front-end)
+├── src-tauri/           ← Tauri 2 + Rust desktop core (Phase 1)
+├── public/              ← static assets bundled into the WebView
+├── protocol/            ← Rust crypto protocol crate (Phase 1; lands when crate implementation begins)
 ├── workspace/           ← scripts for cloning siblings & cross-repo operations
+├── index.html
+├── package.json         ← pnpm + Vite + React + TS toolchain
+├── vite.config.ts
+├── tsconfig.json
+├── tsconfig.node.json
+├── .nvmrc               ← pinned Node version (reproducible builds)
 ├── LICENSE
 └── README.md
 ```
 
-`docs/` and `workspace/` exist today; the rest lands when Phase 1 implementation begins.
+The desktop client lives at the repository root, not in an `apps/` subfolder, because mobile, web, and website clients all live in dedicated companion repos (see below) — a one-child `apps/desktop/` would just be unnecessary nesting. The Rust crypto protocol crate, when its implementation begins, lands as a sibling Cargo workspace member at `protocol/`. Together with `src-tauri/`, they share a single root `Cargo.lock` for a single auditable lockfile per the threat model's hash-pinning commitment.
+
+`docs/`, `workspace/`, the Tauri scaffold, and pinned toolchain files exist today; `protocol/` lands when crate implementation begins.
 
 ## Companion repositories
 

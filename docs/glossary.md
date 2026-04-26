@@ -430,7 +430,7 @@ Used in: `spec/protocol.md` §2.2
 
 ### **libsodium-js** &nbsp; 🛠️ *Tooling*
 
-WebAssembly-compiled JavaScript port of libsodium. Used in the Phase 3 Next.js web client and in the Phase 3 React Native mobile clients (via `react-native-libsodium`). Provides Argon2id, XChaCha20-Poly1305, HKDF, and the other primitives the protocol requires.
+WebAssembly-compiled JavaScript port of libsodium. Used in the Phase 3 web client (bundler choice deferred to Phase 3 start; framework is React) and in the Phase 3 React Native mobile clients (via `react-native-libsodium`). Provides Argon2id, XChaCha20-Poly1305, HKDF, and the other primitives the protocol requires.
 
 Used in: `spec/protocol.md` §5.1.4
 
@@ -569,6 +569,13 @@ Used in: `spec/protocol.md` §1.3
 The single-byte field at offset 4 of every Myne on-disk file (per-note `.myn` and `vault.meta`). v0.1 = `0x01`. Bound into the AAD of every AEAD operation so that any version downgrade fails the tag check.
 
 Used in: `spec/protocol.md` §1.3, §10
+
+### **React** &nbsp; 🛠️ *Tooling*
+
+The UI library used for the Phase 1 desktop client UI inside the Tauri WebView, and the planned UI library for the Phase 3 web and mobile clients (the latter via React Native). React 19 with TypeScript per the scaffold. Chosen for the maturity of its CodeMirror 6 (`@uiw/react-codemirror`) and Cytoscape.js (`react-cytoscapejs`) integrations — the two largest UI dependencies in the Phase 1 scope. Shared React components are anticipated to live in a future `packages/ui/` workspace member when Phase 3 web work begins, decoupling the desktop UI bundler from the web bundler.
+
+Used in: `decisions.md`; `threat-model.md` §7
+Reference: https://react.dev
 
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
@@ -709,6 +716,13 @@ Used in: `spec/protocol.md` §9.1
 The single binary file holding vault-level cryptographic state. Magic bytes `MYV1` for v0.1. Layout per `spec/protocol.md` §9.3: protocol version, account_number_hash, the 11-byte canonical KDF parameters block, both salt-randomness fields (`random_salt_password_16`, `random_salt_recovery_16`), nonces and ciphertexts for both wrapped root-key copies (`enc_root_key_password`, `enc_root_key_recovery`), and the items_key_id, items_key_nonce, and `enc_items_key`. `vault.meta` plus the `.myn` files are the only artifacts that leave the device in any future sync scenario; both are opaque ciphertext plus a small public header.
 
 Used in: `spec/protocol.md` §9.3
+
+### **Vite** &nbsp; 🛠️ *Tooling*
+
+The build tool and dev server used by the Phase 1 desktop client to bundle the React UI before Tauri ships it as a static asset bundle. Chosen over Next.js (`decisions.md` 2026-04-26) because Tauri ships a static bundle — Next.js's SSR / RSC / API-route value is architecturally unused, while its ~10× larger transitive npm dependency footprint vs Vite is paid in full. The smaller direct-npm-dependency surface aligns with the threat-model §7 "deliberately small direct-dependency surface" commitment for A8/TB9.
+
+Used in: `decisions.md`; `threat-model.md` §7
+Reference: https://vite.dev
 
 ### **wikilinks** &nbsp; 📦 *Product*
 
