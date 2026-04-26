@@ -1,0 +1,15 @@
+.DS_Store
+*.swp
+*.swo
+*.bak
+.idea/
+.vscode/
+
+# Companion repos cloned by workspace/setup.sh as nested directories.
+# Each carries its own .git and is tracked by GitHub separately under myne-md.
+/myne-test-vectors/
+/myne-server/
+/myne-web/
+/myne-mobile/
+/myne-website/
+/myne-ops/
