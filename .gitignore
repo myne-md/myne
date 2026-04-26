@@ -33,3 +33,5 @@ dist-ssr/
 /myne-website/
 /myne-ops/
 /myne-agents/
+
+/.claude/
