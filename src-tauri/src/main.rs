@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    myne_scratch_lib::run()
+    myne_desktop_lib::run()
 }
