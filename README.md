@@ -47,9 +47,9 @@ myne/
 
 `docs/` and `workspace/` exist today; the rest lands when Phase 1 implementation begins.
 
-## Sibling repositories
+## Companion repositories
 
-The full Myne project spans multiple repos under the [`myne-md`](https://github.com/myne-md) GitHub organization. The main repo (this one) holds the desktop client + protocol crate; deployment-specific code lives in siblings.
+The full Myne project spans multiple repos under the [`myne-md`](https://github.com/myne-md) GitHub organization. The main repo (this one) holds the desktop client + protocol crate + specifications. Deployment-specific code lives in companion repos that, when cloned via `workspace/setup.sh`, live as nested directories inside this one.
 
 | Repo | What it is |
 |---|---|
@@ -63,18 +63,19 @@ The full Myne project spans multiple repos under the [`myne-md`](https://github.
 ## Setting up a local dev workspace
 
 ```bash
-mkdir -p ~/Documents/myne && cd ~/Documents/myne
 gh repo clone myne-md/myne
 cd myne
-./workspace/setup.sh    # clone every sibling listed in workspace/manifest.txt
+./workspace/setup.sh
 ```
 
-After `setup.sh`, every sibling lives next to the `myne` repo as a sibling directory. Daily commands:
+`setup.sh` clones every companion repo (`myne-test-vectors`, `myne-server`, `myne-web`, `myne-mobile`, `myne-website`, `operations`) **into** this `myne/` directory as nested folders. The main repo's `.gitignore` excludes them so they do not show up as untracked.
 
-- `./workspace/pull-all.sh` — `git pull --ff-only` across the main repo and every sibling
+Daily commands:
+
+- `./workspace/pull-all.sh` — `git pull --ff-only` across the main repo and every nested companion
 - `./workspace/status-all.sh` — one-line `git status` summary per repo
 
-See [`workspace/README.md`](workspace/README.md) for full details.
+See [`workspace/README.md`](workspace/README.md) for the full layout and command reference.
 
 ## Contributing
 
