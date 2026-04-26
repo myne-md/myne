@@ -14,7 +14,7 @@ This specification defines the **at-rest** encryption protocol for notes stored 
 - The key hierarchy from root key to per-note encryption keys.
 - The format of an encrypted note blob on disk.
 - The BIP39 recovery-phrase derivation that wraps the root key.
-- The format of the user's account-number identifier (full details in `spec/account-number.md`).
+- The format of the user's account-number identifier (full details in `account-number.md`).
 - The protocol-version-byte commitment that anchors forward-compatibility for `appname-v005`.
 
 Out of scope (see §11):
@@ -43,7 +43,7 @@ This specification is identified as **`myne-protocol-v0.1`**. The protocol versi
 
 ## 2. Cryptographic Primitives
 
-> **Conflict-points marked.** Five primitive choices below are flagged as `[DEFERRED]`: the v0.1 baseline is the prior decision in `decisions.md`, but the user has marked these as subject to revision before v1.0 ship, with the `appname-v005` research as the alternative under consideration.
+> **Conflict-points marked.** Five primitive choices below are flagged as `[DEFERRED]`: the v0.1 baseline is the prior decision in `../decisions.md`, but the user has marked these as subject to revision before v1.0 ship, with the `appname-v005` research as the alternative under consideration.
 
 | Role | v0.1 baseline | `[DEFERRED]` alternative under review |
 |---|---|---|
@@ -56,7 +56,7 @@ This specification is identified as **`myne-protocol-v0.1`**. The protocol versi
 
 **Library**: libsodium across the stack — Rust bindings (`libsodium-sys-stable` or `sodiumoxide`) on the desktop client, Go stdlib + `golang.org/x/crypto` on the server when it ships in Phase 2, libsodium-js for the Phase 3 web client. RustCrypto (`hkdf`, `chacha20poly1305`, `argon2`) is acceptable as a fallback if libsodium bindings prove inadequate, but the libsodium primitive remains canonical. No custom primitive implementation. Standard Notes 004's choice of libsodium-only is preserved.
 
-The five `[DEFERRED]` items above will be resolved in dedicated decision sessions and recorded in `decisions.md`. This v0.1 specification will be revised in place if any deferred decision changes the baseline.
+The five `[DEFERRED]` items above will be resolved in dedicated decision sessions and recorded in `../decisions.md`. This v0.1 specification will be revised in place if any deferred decision changes the baseline.
 
 ---
 
@@ -203,7 +203,7 @@ The three levels are:
 
 **Why three levels and not two:** when the user changes their master password, the new `root_key` produces a new `itemsKey_wrap_key`. The persistent `itemsKey` is decrypted with the old wrap key and re-encrypted under the new one — a single AEAD operation. None of the per-note `item_key` material is touched, and none of the note ciphertexts are re-encrypted. This is essential for vaults of non-trivial size.
 
-**Forward-compatibility for `appname-v005` epoch-key model.** The research roadmap (`spec/protocol-v005-roadmap.md`, to be written) describes per-epoch `itemsKey` rotation that gives notes forward secrecy: each `EK_e` is derived for an epoch, used to wrap a generation of `item_key` material, then deleted on rotation, after which the corresponding ciphertexts become unrecoverable. To allow this evolution without a wire-format break, the v0.1 context-string registry (§3.4) reserves the prefix `"myne.v005 epoch-"` for future epoch-key derivations, and the per-note blob format (§9) carries an `itemsKey_id` field whose semantics extend cleanly from "the singleton v0.1 itemsKey" to "the v005 itemsKey for epoch e".
+**Forward-compatibility for `appname-v005` epoch-key model.** The research roadmap (`protocol-v005-roadmap.md`, to be written) describes per-epoch `itemsKey` rotation that gives notes forward secrecy: each `EK_e` is derived for an epoch, used to wrap a generation of `item_key` material, then deleted on rotation, after which the corresponding ciphertexts become unrecoverable. To allow this evolution without a wire-format break, the v0.1 context-string registry (§3.4) reserves the prefix `"myne.v005 epoch-"` for future epoch-key derivations, and the per-note blob format (§9) carries an `itemsKey_id` field whose semantics extend cleanly from "the singleton v0.1 itemsKey" to "the v005 itemsKey for epoch e".
 
 In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The reservation is purely structural.
 
@@ -248,7 +248,7 @@ The complete parameter set is stored in `vault.meta` (§9.3). Storing parameters
 
 1. **Parameter upgrade without format break**: if hardware advances make stronger parameters affordable, a future minor revision MAY raise the baseline; existing vaults continue to open with their original parameters until the user changes their password (which generates a fresh wrap with the new defaults).
 2. **Per-platform calibration without forking the format**: Phase 3 mobile ports MAY ship vaults with reduced parameters where the device cannot afford 256 MiB. The protocol does not require the same parameters across platforms; it requires the same parameters across the *two Argon2id call sites within a single vault*.
-3. **Auditor transparency**: the parameters used to lock the vault are inspectable in `vault.meta` without running the client, supporting the compensating-controls plan in `threat-model.md` §6.
+3. **Auditor transparency**: the parameters used to lock the vault are inspectable in `vault.meta` without running the client, supporting the compensating-controls plan in `../threat-model.md` §6.
 
 ### 4.3 AAD binding of parameters
 
@@ -403,7 +403,7 @@ NFKD is applied so that visually-identical phrases entered with different keyboa
 
 ## 8. Account Number Scheme
 
-This section summarizes the account-number format used by the protocol. Full generation, display, parsing, and validation rules are specified in `spec/account-number.md`.
+This section summarizes the account-number format used by the protocol. Full generation, display, parsing, and validation rules are specified in `account-number.md`.
 
 ### 8.1 Format
 
@@ -445,7 +445,7 @@ This hash is stored in `vault.meta` (§9.3) and used as a salt component in both
 
 ### 8.4 What this section does NOT cover
 
-- Algorithmic details of Damm-32 (the 32×32 quasigroup table) → `spec/account-number.md`.
+- Algorithmic details of Damm-32 (the 32×32 quasigroup table) → `account-number.md`.
 - Server-side anti-abuse for account-number creation (rate limiting, captchas) → out of scope for v0.1; relevant when sync server ships in Phase 2.
 - Anonymous-credential wrappers (KVAC, Privacy Pass) — `appname-v005` may layer these on top of the account number for sync-server entitlement; the account-number format itself does not change.
 
@@ -590,7 +590,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Major version | Per-note magic | Vault-meta magic | AAD prefix          | Context prefix         | Status |
 |---|---|---|---|---|---|
 | v0.1 | `MY01` | `MYV1` | `"myne.v0.1|"`  | `"myne.v0.1 …"`    | This document. Active. |
-| v005 | `NT05` | `NTV5` | `"myne.v005|"` | `"myne.v005 …"`   | Reserved. See `spec/protocol-v005-roadmap.md` (TBD). |
+| v005 | `NT05` | `NTV5` | `"myne.v005|"` | `"myne.v005 …"`   | Reserved. See `protocol-v005-roadmap.md` (TBD). |
 
 ### 10.4 Migration procedure (cross-major)
 
@@ -670,18 +670,18 @@ Items deliberately not addressed by this specification. Each entry names where i
 
 | Item | Where it lives |
 |---|---|
-| Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2 sync server; `spec/sync-protocol.md` (TBD) |
-| Sync wire format, conflict resolution, version vectors | Phase 2; `spec/sync-protocol.md` (TBD) |
-| Multi-device coordination, device key management | Phase 2+; `appname-v005` adopts MLS; `spec/protocol-v005-roadmap.md` (TBD) |
-| Inter-user note sharing, prekey bundles, per-recipient wrapping | Phase 4+; `spec/protocol-v005-roadmap.md` (TBD) |
-| Real-time collaborative editing, CRDT integration | Phase 4+; `spec/protocol-v005-roadmap.md` (TBD) |
+| Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2 sync server; `sync-protocol.md` (TBD) |
+| Sync wire format, conflict resolution, version vectors | Phase 2; `sync-protocol.md` (TBD) |
+| Multi-device coordination, device key management | Phase 2+; `appname-v005` adopts MLS; `protocol-v005-roadmap.md` (TBD) |
+| Inter-user note sharing, prekey bundles, per-recipient wrapping | Phase 4+; `protocol-v005-roadmap.md` (TBD) |
+| Real-time collaborative editing, CRDT integration | Phase 4+; `protocol-v005-roadmap.md` (TBD) |
 | Post-quantum primitives (ML-KEM-768 hybrid wrap, ML-DSA signatures) | `appname-v005` |
 | Group key agreement (MLS, RFC 9420) | `appname-v005` |
 | Key Transparency (CONIKS / Trillian-based identity log) | `appname-v005` |
 | OPAQUE aPAKE for server authentication | `appname-v005` |
 | OHTTP relay/gateway transport, traffic-analysis defense | `appname-v005` |
 | Anonymous credentials (KVAC, Privacy Pass) for sync entitlement | `appname-v005` |
-| Plugin sandboxing, capability-scoped plugin API | Possibly never; `vision.md` §what-myne-is-not |
+| Plugin sandboxing, capability-scoped plugin API | Possibly never; `../vision.md` §what-myne-is-not |
 | Attachment encryption, chunked AEAD, Merkle manifests | Phase 1.5 or later; future spec extension |
 | Encrypted search index format (FTS5 inside encrypted SQLite) | Phase 1.5 or later; client-internal, not in this spec |
 | Bidirectional links, graph view rendering | Out of scope for the cryptographic protocol; client UI concern |
@@ -692,15 +692,15 @@ Items deliberately not addressed by this specification. Each entry names where i
 
 This is not a deferral wishlist. Each item is either out of scope for the v0.1 cryptographic core or out of scope for the protocol entirely (UI, indexing, etc.). Items that are deferred to `appname-v005` are documented in the research roadmap, which also captures the user's reasoning for keeping each one out of v0.1.
 
-The matching threat-model section (`threat-model.md` §5 "NOT Protected Against") names what user-facing failure modes v0.1 does and does not defend against. This protocol spec is the architectural counterpart of that document.
+The matching threat-model section (`../threat-model.md` §5 "NOT Protected Against") names what user-facing failure modes v0.1 does and does not defend against. This protocol spec is the architectural counterpart of that document.
 
 ## 12. Decisions Log
 
-A snapshot of choices made during the v0.1 draft. Mirrored to `decisions.md`.
+A snapshot of choices made during the v0.1 draft. Mirrored to `../decisions.md`.
 
 **Resolved (v0.1)**
 
-- **Doc strategy is Option C**: ship `spec/protocol.md` v0.1 (this document) alongside a separate `spec/protocol-v005-roadmap.md` (to be authored from the user's research). v0.1 is the implementation target; v005 is the long-term aspirational reference.
+- **Doc strategy is Option C**: ship `protocol.md` v0.1 (this document) alongside a separate `protocol-v005-roadmap.md` (to be authored from the user's research). v0.1 is the implementation target; v005 is the long-term aspirational reference.
 - **Subkey derivation pattern: `derive_key(root_key, context_string)` with context strings drawn from a registered table (§3.4)**. Adding a new subkey role in a minor revision does not require a protocol bump. Concrete primitive (HKDF-SHA-256 vs BLAKE3 derive_key) is `[DEFERRED]`.
 - **Three-level note wrapping**: `itemsKey_wrap_key → itemsKey → item_key → plaintext`. Password rotation re-wraps a single 32-byte itemsKey; no per-note re-encryption.
 - **Forward-compat reservation for v005 epoch keys**: the context-string registry reserves the prefix `"myne.v005 epoch-"`; the `items_key_id` field in v0.1 is structurally compatible with v005's epoch identifier. No epoch rotation in v0.1.
@@ -718,7 +718,7 @@ A snapshot of choices made during the v0.1 draft. Mirrored to `decisions.md`.
 - **Subkey derivation: HKDF-SHA-256 with single canonical helper** (resolved 2026-04-26). libsodium-native, MLS-aligned for v005, audit history mature. The helper-only access pattern (§3.2.1) collapses BLAKE3's "structural context binding" advantage into a codebase-level discipline at no cost.
 - **AEAD wrapper: XChaCha20-Poly1305 + CTX commitment with SHA-256 outer hash** (resolved 2026-04-26). Defends against partitioning-oracle attacks (Len–Grubbs–Ristenpart, USENIX 2021). Tag fields grow from 16 to 32 bytes on disk. Canonical encoding `K[32] || N[24] || len(AD)[4 BE] || AD || T[16]` eliminates concatenation ambiguity (Chan & Rogaway 2022).
 - **Server-auth deliberately deferred to Phase 2 with intent declaration** (resolved 2026-04-26). v0.1 derives but does not use the `server-auth` subkey. Phase 2 will choose between Option A (simple verifier) and Option B (OPAQUE aPAKE) using criteria documented in §11.1. v005 canonicalizes OPAQUE; Option A in Phase 2 would be transitional only. This is not a decision dodge — it is a discipline of "decide at the right time, not the earliest time".
-- **Stack realignment: Tauri (Rust core) + Next.js UI for desktop** (resolved 2026-04-26). Supersedes the prior `decisions.md` Electron baseline. Crypto core in Rust (libsodium bindings + RustCrypto fallback). Server remains Go. Phase 3 mobile path (RN with Rust bridge vs Tauri Mobile) deferred to Phase 3 start. Trade: ~1–2 month delay to Phase 1 ship for Rust ramp-up; gains: structural memory hygiene (`zeroize`/`secrecy`/`subtle` crates), smaller TCB and binary, easier reproducible builds, audit-story upgrade, native MLS/PQ primitive availability for v005.
+- **Stack realignment: Tauri (Rust core) + Next.js UI for desktop** (resolved 2026-04-26). Supersedes the prior `../decisions.md` Electron baseline. Crypto core in Rust (libsodium bindings + RustCrypto fallback). Server remains Go. Phase 3 mobile path (RN with Rust bridge vs Tauri Mobile) deferred to Phase 3 start. Trade: ~1–2 month delay to Phase 1 ship for Rust ramp-up; gains: structural memory hygiene (`zeroize`/`secrecy`/`subtle` crates), smaller TCB and binary, easier reproducible builds, audit-story upgrade, native MLS/PQ primitive availability for v005.
 
 **All deferred conflict-points resolved.** v0.1 specification is complete.
 
@@ -726,8 +726,8 @@ Each deferred item has a v0.1 baseline that is internally consistent with this s
 
 **Open risks**
 
-- **Damm-32 quasigroup table is not yet inlined** in `spec/account-number.md`; must be selected from a published source and frozen before v1.0 ship.
-- **No formal verification model** (Tamarin / ProVerif) accompanies v0.1. The compensating-controls plan (`threat-model.md` §6) is the v1.0 substitute. Formal verification is an `appname-v005` deliverable.
-- **No external cryptographer review** has occurred at draft time. Plan: pre-launch informal review by at least one independent reviewer per `threat-model.md` §6.
+- **Damm-32 quasigroup table is not yet inlined** in `account-number.md`; must be selected from a published source and frozen before v1.0 ship.
+- **No formal verification model** (Tamarin / ProVerif) accompanies v0.1. The compensating-controls plan (`../threat-model.md` §6) is the v1.0 substitute. Formal verification is an `appname-v005` deliverable.
+- **No external cryptographer review** has occurred at draft time. Plan: pre-launch informal review by at least one independent reviewer per `../threat-model.md` §6.
 - **Migration tool from v0.1 to v005 has not been written**. The §10.4 procedure describes the intent; concrete code lands when v005 work begins.
 - **Mobile parameter profile** for Argon2id is not specified in v0.1; the spec assumes desktop-class memory. Phase 3 must add a profile.
