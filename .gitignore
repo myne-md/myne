@@ -19,6 +19,11 @@ dist/
 dist-ssr/
 *.local
 
+# Stray empty files seen at repo root after running `pnpm tauri dev`.
+# Anchored to root so they don't shadow legitimate paths in subdirectories.
+/tauri
+/myne@*
+
 # Companion repos cloned by workspace/setup.sh as nested directories.
 # Each carries its own .git and is tracked by GitHub separately under myne-md.
 /myne-test-vectors/
