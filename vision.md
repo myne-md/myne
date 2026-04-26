@@ -1,0 +1,105 @@
+# Myne — Vision
+
+## Tagline
+
+Myne is the only open-source markdown notes app where your files stay plaintext-readable after decryption, where backlinks and graph are first-class, where signup requires no email, and where the same code runs on our hosted sync or your own server.
+
+
+## The Problem
+
+Privacy-aware users who want Obsidian-like flexibility face an impossible choice today. Either they self-censor inside Obsidian — keeping sensitive thoughts out of the app entirely because notes sit in plaintext on disk (a recurring forum sentiment: *"I will only use Obsidian for superficial information"*) — or they duct-tape together Obsidian + Cryptomator + Syncthing, a fragile three-tool stack where mobile barely works, IndexedDB caches leak plaintext outside the encrypted volume, and performance collapses on large vaults. The encrypted-first alternatives don't fix it either: Standard Notes paywalls markdown and has no backlinks or graph; Notesnook is rich-text-first and stores notes in its own format rather than plain markdown files; Joplin's E2EE is off by default, leaks timestamps, and its plugin ecosystem doesn't work on mobile; Logseq deprecated on-disk encryption entirely. There is no app that combines real built-in encryption with Obsidian-grade markdown flexibility — and the workarounds force users to choose between privacy and the way they actually want to think.
+
+## Target User
+
+**Primary** — the technical Obsidian power user who currently routes around Obsidian's lack of native E2EE. They run Obsidian + Cryptomator + Syncthing, pay for Obsidian Sync uneasily, or self-censor inside the app entirely. They read r/PrivacyGuides, have self-hosted at least one service, can manage a master password and a 24-word recovery phrase. They want Obsidian-grade flexibility without the privacy compromise — and they will read the protocol spec before they install.
+
+**Secondary** — everyone else, including users who don't actively think about privacy. Myne has no plaintext mode and no opt-in encryption toggle. Built-in privacy is the default for every user, not a feature surfaced to a niche. A casual user who picks Myne because it looks like a clean, fast markdown notes app gets the same zero-knowledge guarantees as the threat-model expert without ever opening the settings. Privacy is not what the app sells; privacy is what the app *is*.
+
+## The Wedge
+
+Myne is the only encrypted notes app where the entire stack — protocol, client, sync server — is open source, and where your notes stay plain markdown after decryption. If you stop trusting us, you self-host. If you stop using us, you walk away with your files into any editor on your machine. There is no proprietary format, no migration tool required, no lock-in.
+
+## Success Criteria
+
+Tiered, with both numbers and qualitative outcomes.
+
+**Minimum success — the personal-utility floor.**
+- I dogfood Myne daily for at least 6 months without losing a note.
+- v1.0 desktop ships within 9–12 months of project start.
+- Protocol spec and threat model are public on day one of v1.0.
+
+**Modest success — community validation, year 1.**
+- 1,000+ GitHub stars within the first year of public release.
+- A few dozen self-hosted instances run by people we don't know.
+- 50–100 paying users on hosted sync.
+- At least one r/PrivacyGuides forum thread recommending Myne unprompted.
+
+**Stretch success — sustainable small business, year 2–3.**
+- 5,000–10,000 GitHub stars.
+- Listed on privacyguides.org's notebooks recommendation page.
+- 1,000+ paying users on hosted sync — enough to fund continued development without external capital.
+- Mobile and web clients shipped.
+- Protocol spec reviewed informally by at least one external cryptographer or security researcher without a serious flaw being found.
+- Community-contributed translations in 3+ languages.
+
+**What success deliberately is not**: VC funding, hyper-growth, mass-market adoption, or feature parity with Notion. Myne aims to be a small, profitable, independent tool that outlasts the founders' attention span by being open enough that someone else can pick it up.
+
+## What Myne Is Not
+
+The list of explicit non-goals is longer than usual because privacy products die from scope creep more than from missing features. These are not "maybe later" — they are commitments the team makes to itself.
+
+- **No VC funding, no acqui-hire exit.** Myne will not raise venture capital. The Skiff shutdown in 2024 is the canonical cautionary tale: VC pressure forced a Notion acquisition, the product was killed inside 12 months, and 2 million users lost their notes home. Bootstrapped, profitable, slow growth is the only path that aligns with a privacy promise.
+- **No proprietary format.** Notes are plain markdown after decryption. No custom block model, no internal database that "owns" your content, no export tool needed. If Myne disappears, your files are already in the format every editor understands.
+- **No real-time collaborative editing in v1.** Single-user multi-device sync is the v1 commitment. Real-time co-editing requires a CRDT (Yjs) and a substantially different sync architecture; it lands in Phase 4 at the earliest, not before the rest of the product is solid.
+- **No plugin ecosystem in v1.** Obsidian's plugin model is its biggest strength and the largest privacy hole — plugins can read, write, and exfiltrate the entire vault. Myne will not ship a plugin API in v1, possibly never. If it lands, it will be sandboxed and capability-scoped from the first design — not bolted on after the fact.
+- **No mobile in Phase 1.** Tauri (Rust core) desktop is the v1 target. React Native iOS and Android come in Phase 3, after the desktop client and sync server are stable. Trying to ship four platforms with two people is the silent killer in this category (Turtl, Laverna).
+- **No feature paywall in the local app.** Everything that runs locally — editor, links, graph, search, encrypted storage — is free. The paid tier is exclusively the hosted sync convenience. Standard Notes paywalling markdown rendering is the explicit anti-pattern. Users who self-host pay nothing and lose nothing.
+- **No email at signup. No email recovery.** Account identity is a self-generated number; recovery is a 24-word phrase the user holds. If both are lost, the data is gone — and we cannot help. This is a hard line. Adding email recovery later would silently invalidate the zero-knowledge claim.
+- **No closed-source components.** Client, sync server, protocol spec, build pipeline — all open source. "Open core" is not the model. There will be no proprietary "enterprise" build with extra features.
+- **No Notion-style feature creep.** No databases, no kanban boards, no calendar, no whiteboard, no embedded apps. Markdown notes, files on disk, bidirectional links, graph. That is the entire product surface. Users who want a database can keep their database and link to it from a note.
+
+## Phase 1 Scope
+
+**What v1.0 is.** A single-user Tauri (Rust core) desktop app:
+
+- Encrypted markdown blobs on disk — one ciphertext file per note
+- Master password derived via Argon2id; BIP39 24-word recovery phrase wrapping the root key
+- CodeMirror 6 editor with live markdown and `[[wikilinks]]`
+- Full-text search across decrypted notes
+- Backlinks pane ("which notes link here")
+- Minimal graph view (Cytoscape.js, separate panel, lazy-loaded)
+- Obsidian vault importer (`.md` files, YAML frontmatter, `[[wikilinks]]`)
+
+**Definition of done.** v1.0 ships when a real user can install the desktop app, generate a recovery phrase, write notes for 30 days, deliberately lose their password, recover the vault from the phrase, and at no point have plaintext touched the disk outside the in-memory editor session.
+
+Everything else — sync server, mobile, web, sharing, real-time collaboration, plugin API — is explicitly out of scope for v1.0 and lives in later phases.
+
+---
+
+## Decisions Log
+
+A record of the choices made while drafting this document, captured for the next reader.
+
+**Resolved**
+- **Project name kept as Myne** for now (placeholder, not branding-final).
+- **Tagline retained from the project-advisor evaluation** with the explicit "Mullvad-style" reference removed; the no-email property is preserved in plain language.
+- **Problem framing combines self-censorship + workaround stack + critique of existing E2EE apps.** All three are load-bearing; dropping any one weakens the case.
+- **Two personas, with privacy as default for both.** Primary is the technical Obsidian power user; secondary is everyone else, who gets E2EE without opting in. There is no plaintext mode.
+- **Wedge is portability + open source full stack** (alternatives `b` + `c`) rather than competitor takedown or trust-only framing.
+- **Success criteria tiered (Minimum / Modest / Stretch)** with both numerical and qualitative outcomes. Numbers anchored on the audience-sizing analysis (5k–30k global power users) and the Notesnook benchmark (~14k stars in ~2 years OSS).
+- **Anti-features include nine commitments**, deliberately longer than typical because the team treats scope creep as the primary failure mode for privacy products.
+- **Phase 1 includes a minimal graph view** (lazy-loaded Cytoscape panel) — the wedge sentence promises graph as first-class, and v1 has to credibly back that.
+- **Definition of done is the recovery flow drill**: lose the password, recover from the phrase, plaintext never on disk. Recovery is the highest-risk piece of the project; the DoD reflects that.
+
+**Deliberately deferred**
+- AI features. The category was raised and rejected for v1; reconsider only if the answer is a fully local LLM with no provider call.
+- Real-time collaboration (CRDT, Yjs) — Phase 4 at the earliest.
+- Plugin API — possibly never; if it lands, sandboxed and capability-scoped from the first design.
+- Mobile — Phase 3.
+- Sync server, hosted account, paid tier — Phase 2.
+
+**Open risks to revisit**
+- Recovery-phrase-only model: Standard Notes and Bitwarden both bleed users at this exact step. Worth checking 12 months in whether the team holds the line or quietly adds an encrypted recovery file as a compensating control.
+- Graph view in v1: tension with the "tight Phase 1" goal. If the implementation slips, demote graph to v1.1 rather than slipping the v1 ship date.
+- Audience size: 5k–30k global power users is the inferred ceiling. If the year-1 numbers fall short of the modest-success tier, revisit positioning rather than expanding scope.
+
