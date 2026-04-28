@@ -69,13 +69,13 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     let unlisten: (() => void) | null = null;
     const win = getCurrentWindow();
     win
       .onCloseRequested(async (event) => {
         if (!isSensitiveStep(stepRef.current)) return;
-        event.preventDefault();
-        let proceed = false;
+        let proceed: boolean;
         try {
           proceed = await dialogConfirm(
             "Closing will discard your recovery phrase. Continue closing?",
@@ -87,20 +87,19 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
           );
         } catch (e) {
           logErrorKind(e, "close-confirm-failed");
+          event.preventDefault();
+          return;
         }
-        if (proceed) {
-          try {
-            await win.close();
-          } catch (e) {
-            logErrorKind(e, "window-close-failed");
-          }
-        }
+        // Calling close() here would recursively re-fire onCloseRequested.
+        if (!proceed) event.preventDefault();
       })
       .then((fn) => {
-        unlisten = fn;
+        if (cancelled) fn();
+        else unlisten = fn;
       })
       .catch((e: unknown) => logErrorKind(e, "close-listener-failed"));
     return () => {
+      cancelled = true;
       if (unlisten) unlisten();
     };
   }, []);
