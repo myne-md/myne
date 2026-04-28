@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../components/primitives/Button";
 import { Input } from "../components/primitives/Input";
 import { Icon } from "../components/primitives/Icon";
+import { PasswordStrength } from "../components/PasswordStrength";
 
 interface CreateVaultProps {
   onBack: () => void;
@@ -9,17 +10,86 @@ interface CreateVaultProps {
 }
 
 const MIN_PASSWORD_LEN = 12;
+const MIN_ZXCVBN_SCORE = 3;
+
+type ZxcvbnScore = 0 | 1 | 2 | 3 | 4;
+
+interface ZxcvbnResult {
+  score: ZxcvbnScore;
+  feedback: {
+    warning: string;
+    suggestions: string[];
+  };
+}
+
+type ZxcvbnFn = (password: string) => ZxcvbnResult;
 
 export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [zxcvbnFn, setZxcvbnFn] = useState<ZxcvbnFn | null>(null);
+  const [result, setResult] = useState<ZxcvbnResult | null>(null);
+
+  // Lazy-load zxcvbn-ts: ~140KB gzip stays out of the Welcome bundle and
+  // arrives as a separate chunk when the user first lands on this screen.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [core, common, en] = await Promise.all([
+        import("@zxcvbn-ts/core"),
+        import("@zxcvbn-ts/language-common"),
+        import("@zxcvbn-ts/language-en"),
+      ]);
+      core.zxcvbnOptions.setOptions({
+        translations: en.translations,
+        graphs: common.adjacencyGraphs,
+        dictionary: { ...common.dictionary, ...en.dictionary },
+      });
+      if (!cancelled) {
+        setZxcvbnFn(() => core.zxcvbn as unknown as ZxcvbnFn);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!zxcvbnFn || password.length === 0) {
+      setResult(null);
+      return;
+    }
+    setResult(zxcvbnFn(password));
+  }, [password, zxcvbnFn]);
 
   const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LEN;
   const mismatch = confirm.length > 0 && confirm !== password;
   const ready =
-    password.length >= MIN_PASSWORD_LEN && password === confirm;
+    password.length >= MIN_PASSWORD_LEN &&
+    password === confirm &&
+    result !== null &&
+    result.score >= MIN_ZXCVBN_SCORE;
+
+  type CaptionTone = "muted" | "danger" | "pending";
+  let passwordCaption: string | undefined;
+  let passwordTone: CaptionTone = "muted";
+  let showStrength = false;
+
+  if (password.length === 0) {
+    passwordCaption =
+      "Used as input to Argon2id (m=256 MiB, t=3, p=2). Choose something you can remember; you cannot reset it.";
+    passwordTone = "muted";
+  } else if (tooShort) {
+    passwordCaption = `Use at least ${MIN_PASSWORD_LEN} characters.`;
+    passwordTone = "danger";
+  } else if (!result) {
+    passwordCaption = "Checking strength…";
+    passwordTone = "pending";
+  } else {
+    showStrength = true;
+  }
 
   return (
     <div
@@ -93,13 +163,17 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
           onToggleShow={() => setShowPassword((s) => !s)}
           invalid={tooShort}
           autoFocus
-          caption={
-            tooShort
-              ? `Use at least ${MIN_PASSWORD_LEN} characters.`
-              : `Used as input to Argon2id (m=256 MiB, t=3, p=2). Choose something you can remember; you cannot reset it.`
-          }
-          captionTone={tooShort ? "danger" : "muted"}
+          caption={passwordCaption}
+          captionTone={passwordTone}
         />
+
+        {showStrength && result && (
+          <PasswordStrength
+            score={result.score}
+            warning={result.feedback.warning || undefined}
+            suggestion={result.feedback.suggestions[0]}
+          />
+        )}
 
         <PasswordField
           label="Confirm master password"
@@ -135,7 +209,7 @@ interface PasswordFieldProps {
   invalid?: boolean;
   autoFocus?: boolean;
   caption?: string;
-  captionTone?: "muted" | "danger";
+  captionTone?: "muted" | "danger" | "pending";
 }
 
 function PasswordField({
@@ -149,6 +223,10 @@ function PasswordField({
   caption,
   captionTone = "muted",
 }: PasswordFieldProps) {
+  const captionColor =
+    captionTone === "danger" ? "var(--danger)" : "var(--fg-3)";
+  const captionFontStyle = captionTone === "pending" ? "italic" : "normal";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <label
@@ -198,8 +276,8 @@ function PasswordField({
         <div
           style={{
             fontSize: 12,
-            color:
-              captionTone === "danger" ? "var(--danger)" : "var(--fg-3)",
+            color: captionColor,
+            fontStyle: captionFontStyle,
           }}
         >
           {caption}
