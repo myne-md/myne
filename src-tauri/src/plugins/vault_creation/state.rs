@@ -8,6 +8,7 @@
 use super::error::AppError;
 use protocol::{AccountNumber, KdfParams, RecoveryPhrase, AEAD_KEY_LEN, ARGON2_SALT_LEN};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
@@ -41,6 +42,15 @@ pub const TOMBSTONE_RETENTION_SECS: u64 = 3600;
 /// and `tombstones` recording recently-evicted tokens. Critical
 /// sections are short (insert / remove / scan); no `await` while
 /// holding either lock.
+///
+/// `in_flight` is an atomic counter that includes both materialized
+/// sessions and outstanding [`SlotReservation`]s — a session that is
+/// in the middle of its Argon2id derivation has reserved its slot but
+/// has not yet been inserted into `sessions`. The counter is the
+/// authoritative cap for `MAX_CONCURRENT_SESSIONS`; the older
+/// `count() < MAX` fast-path was racy under burst-`begin` traffic
+/// (multiple callers could each see "below cap" and all start
+/// 256 MiB Argon2id work, blowing past the cap).
 #[derive(Default)]
 pub struct VaultCreationState {
     sessions: Mutex<HashMap<Uuid, VaultCreationSession>>,
@@ -48,6 +58,37 @@ pub struct VaultCreationState {
     /// instant of eviction; entries older than `TOMBSTONE_RETENTION_SECS`
     /// are pruned by every `evict_*` call.
     tombstones: Mutex<HashMap<Uuid, Instant>>,
+    /// Reserved + materialized session slots. Bumped by [`Self::try_reserve`]
+    /// before `spawn_blocking` Argon2id work starts; decremented by the
+    /// reservation's `Drop` (early-exit) or by [`Self::take`] /
+    /// [`Self::take_ignore_status`] / [`Self::evict_older_than`] when a
+    /// materialized session leaves the map.
+    in_flight: AtomicUsize,
+}
+
+/// RAII handle to a reserved session slot.
+///
+/// Returned by [`VaultCreationState::try_reserve`]. While alive the
+/// reservation occupies one slot of [`MAX_CONCURRENT_SESSIONS`].
+///
+/// - If dropped without [`VaultCreationState::commit_reservation`],
+///   the slot is released (counter decremented). This covers every
+///   early-exit path in `begin` (Argon2id error, JoinFailure, panic
+///   inside `spawn_blocking`).
+/// - If consumed by `commit_reservation`, the slot is materialized as
+///   a session entry in the map and Drop becomes a no-op.
+#[must_use = "dropping releases the reservation; pass to commit_reservation to materialize a session"]
+pub struct SlotReservation<'a> {
+    state: &'a VaultCreationState,
+    consumed: bool,
+}
+
+impl Drop for SlotReservation<'_> {
+    fn drop(&mut self) {
+        if !self.consumed {
+            self.state.in_flight.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
 }
 
 /// Lookup outcome for a session token.
@@ -69,20 +110,102 @@ pub enum SessionLookup {
 }
 
 impl VaultCreationState {
-    /// Number of in-flight (non-tombstoned) sessions.
+    /// Number of materialized (inserted) sessions in the map. Does not
+    /// include outstanding [`SlotReservation`]s; for the cap-relevant
+    /// total use [`Self::in_flight_count`]. Diagnostic accessor used
+    /// by the unit tests below; production paths reserve via
+    /// [`Self::try_reserve`] and don't need to peek at the count.
+    #[allow(dead_code)]
     pub fn count(&self) -> usize {
         self.sessions.lock().expect("session map poisoned").len()
     }
 
+    /// Total reserved + materialized slots. This is the value bounded
+    /// by [`MAX_CONCURRENT_SESSIONS`]. Diagnostic accessor used by the
+    /// unit tests below; production paths rely on [`Self::try_reserve`]'s
+    /// CAS arm to enforce the cap without ever reading the counter
+    /// from outside.
+    #[allow(dead_code)]
+    pub fn in_flight_count(&self) -> usize {
+        self.in_flight.load(Ordering::SeqCst)
+    }
+
+    /// Reserve one slot of [`MAX_CONCURRENT_SESSIONS`] before kicking
+    /// off Argon2id work. The returned [`SlotReservation`] holds the
+    /// slot until either dropped (releases) or passed to
+    /// [`Self::commit_reservation`] (materialized as a session).
+    ///
+    /// CAS loop ensures multiple concurrent callers cannot all observe
+    /// "below cap" and all reserve — exactly one caller wins each slot.
+    pub fn try_reserve(&self) -> Result<SlotReservation<'_>, AppError> {
+        let mut current = self.in_flight.load(Ordering::SeqCst);
+        loop {
+            if current >= MAX_CONCURRENT_SESSIONS {
+                return Err(AppError::TooManyConcurrentSessions);
+            }
+            match self.in_flight.compare_exchange(
+                current,
+                current + 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => {
+                    return Ok(SlotReservation {
+                        state: self,
+                        consumed: false,
+                    });
+                }
+                Err(actual) => current = actual,
+            }
+        }
+    }
+
+    /// Materialize a [`SlotReservation`] into a live session entry.
+    /// The reservation is consumed (its `Drop` becomes a no-op) so the
+    /// slot stays accounted for until `take` / `take_ignore_status` /
+    /// `evict_older_than` removes the session.
+    pub fn commit_reservation(
+        &self,
+        mut reservation: SlotReservation<'_>,
+        token: Uuid,
+        session: VaultCreationSession,
+    ) {
+        debug_assert!(std::ptr::eq(reservation.state, self));
+        self.sessions
+            .lock()
+            .expect("session map poisoned")
+            .insert(token, session);
+        reservation.consumed = true;
+    }
+
     /// Insert `session` under `token` if and only if the cap allows.
     ///
-    /// The check + insert run under a single lock acquire, eliminating
-    /// the TOCTOU race that a separate `count()` then `insert()` would
-    /// have.
+    /// The check + insert run under a single lock acquire, plus the
+    /// `in_flight` atomic is bumped so the slot is accounted for
+    /// against [`MAX_CONCURRENT_SESSIONS`]. Production code paths
+    /// prefer the [`Self::try_reserve`] + [`Self::commit_reservation`]
+    /// pair which reserves the slot up-front; this method exists for
+    /// commit retry-on-failure (which already holds an accounted slot
+    /// indirectly via the take→re-insert path) and for tests.
     pub fn try_insert(&self, token: Uuid, session: VaultCreationSession) -> Result<(), AppError> {
         let mut map = self.sessions.lock().expect("session map poisoned");
-        if map.len() >= MAX_CONCURRENT_SESSIONS {
-            return Err(AppError::TooManyConcurrentSessions);
+        // CAS-style bump: only commit the increment if we actually
+        // get to insert. This avoids leaking a slot when the cap arm
+        // fires.
+        let mut current = self.in_flight.load(Ordering::SeqCst);
+        loop {
+            if map.len() >= MAX_CONCURRENT_SESSIONS || current >= MAX_CONCURRENT_SESSIONS {
+                return Err(AppError::TooManyConcurrentSessions);
+            }
+            match self.in_flight.compare_exchange(
+                current,
+                current + 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => break,
+                Err(actual) => current = actual,
+            }
         }
         map.insert(token, session);
         Ok(())
@@ -97,6 +220,7 @@ impl VaultCreationState {
             .expect("session map poisoned")
             .remove(&token)
         {
+            self.in_flight.fetch_sub(1, Ordering::SeqCst);
             return SessionLookup::Found(Box::new(s));
         }
         if self
@@ -114,10 +238,15 @@ impl VaultCreationState {
     /// Same as [`Self::take`] but treats `Expired` and `NotFound`
     /// identically — both yield `None`. Used by `cancel` (idempotent).
     pub fn take_ignore_status(&self, token: Uuid) -> Option<VaultCreationSession> {
-        self.sessions
+        let removed = self
+            .sessions
             .lock()
             .expect("session map poisoned")
-            .remove(&token)
+            .remove(&token);
+        if removed.is_some() {
+            self.in_flight.fetch_sub(1, Ordering::SeqCst);
+        }
+        removed
     }
 
     /// Evict all sessions with `created_at < cutoff`. Returns the
@@ -141,6 +270,10 @@ impl VaultCreationState {
                 false
             }
         });
+
+        if evicted > 0 {
+            self.in_flight.fetch_sub(evicted, Ordering::SeqCst);
+        }
 
         // Prune ancient tombstones.
         let tombstone_cutoff = now - Duration::from_secs(TOMBSTONE_RETENTION_SECS);
@@ -316,6 +449,116 @@ mod tests {
             .evict_older_than(Instant::now() - Duration::from_secs(TOMBSTONE_RETENTION_SECS * 100));
         assert_eq!(evicted, 0);
         assert_eq!(state.count(), 1);
+    }
+
+    #[test]
+    fn try_reserve_succeeds_below_cap() {
+        let state = VaultCreationState::default();
+        let mut held = Vec::new();
+        for _ in 0..MAX_CONCURRENT_SESSIONS {
+            held.push(state.try_reserve().expect("under cap"));
+        }
+        assert_eq!(state.in_flight_count(), MAX_CONCURRENT_SESSIONS);
+        // Drop reservations explicitly so the next test asserts the
+        // post-drop state when held goes out of scope.
+        drop(held);
+        assert_eq!(state.in_flight_count(), 0);
+    }
+
+    #[test]
+    fn try_reserve_rejects_at_cap() {
+        let state = VaultCreationState::default();
+        let mut held = Vec::new();
+        for _ in 0..MAX_CONCURRENT_SESSIONS {
+            held.push(state.try_reserve().unwrap());
+        }
+        let result = state.try_reserve();
+        assert!(matches!(result, Err(AppError::TooManyConcurrentSessions)));
+        assert_eq!(state.in_flight_count(), MAX_CONCURRENT_SESSIONS);
+        drop(held);
+    }
+
+    #[test]
+    fn dropping_unconsumed_reservation_releases_slot() {
+        let state = VaultCreationState::default();
+        {
+            let _r = state.try_reserve().unwrap();
+            assert_eq!(state.in_flight_count(), 1);
+        }
+        assert_eq!(state.in_flight_count(), 0);
+    }
+
+    #[test]
+    fn commit_reservation_keeps_slot_until_take() {
+        let state = VaultCreationState::default();
+        let token = Uuid::new_v4();
+        let reservation = state.try_reserve().unwrap();
+        state.commit_reservation(reservation, token, fixture_session());
+        // Materialized session: slot remains accounted for.
+        assert_eq!(state.in_flight_count(), 1);
+        assert_eq!(state.count(), 1);
+        // Removing the session releases the slot.
+        assert!(matches!(state.take(token), SessionLookup::Found(_)));
+        assert_eq!(state.in_flight_count(), 0);
+        assert_eq!(state.count(), 0);
+    }
+
+    #[test]
+    fn take_decrements_in_flight() {
+        let state = VaultCreationState::default();
+        let token = Uuid::new_v4();
+        state.try_insert(token, fixture_session()).unwrap();
+        assert_eq!(state.in_flight_count(), 1);
+        let _ = state.take(token);
+        assert_eq!(state.in_flight_count(), 0);
+    }
+
+    #[test]
+    fn take_ignore_status_decrements_in_flight_only_when_present() {
+        let state = VaultCreationState::default();
+        let token = Uuid::new_v4();
+        state.try_insert(token, fixture_session()).unwrap();
+        assert!(state.take_ignore_status(token).is_some());
+        assert_eq!(state.in_flight_count(), 0);
+        // Calling again on an unknown token must not under-flow.
+        assert!(state.take_ignore_status(token).is_none());
+        assert_eq!(state.in_flight_count(), 0);
+    }
+
+    #[test]
+    fn evict_older_than_decrements_in_flight() {
+        let state = VaultCreationState::default();
+        let now = Instant::now();
+        for _ in 0..3 {
+            state
+                .try_insert(
+                    Uuid::new_v4(),
+                    fixture_session_at(now - Duration::from_secs(3600)),
+                )
+                .unwrap();
+        }
+        assert_eq!(state.in_flight_count(), 3);
+        let evicted = state.evict_older_than(now - Duration::from_secs(600));
+        assert_eq!(evicted, 3);
+        assert_eq!(state.in_flight_count(), 0);
+    }
+
+    #[test]
+    fn try_insert_after_take_succeeds_at_cap_boundary() {
+        // Models the commit-retry restoration path: take(), do work,
+        // on failure try_insert() back. Ensures no slot leaks across
+        // the take→re-insert cycle.
+        let state = VaultCreationState::default();
+        let token = Uuid::new_v4();
+        state.try_insert(token, fixture_session()).unwrap();
+        let session = match state.take(token) {
+            SessionLookup::Found(b) => *b,
+            _ => panic!("just inserted"),
+        };
+        assert_eq!(state.in_flight_count(), 0);
+        // Re-insert under the same token must succeed.
+        state.try_insert(token, session).unwrap();
+        assert_eq!(state.in_flight_count(), 1);
     }
 
     #[test]
