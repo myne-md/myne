@@ -1,333 +1,260 @@
+// Vault-creation orchestrator. Mounts when App.tsx stage transitions to
+// "create-vault"; owns the entire vault-creation state machine via
+// useReducer; mounts the active step component based on state.step.
+//
+// Implements design session 2026-04-28-vault-creation-frontend.md:
+//   - Q2 state machine + secret-material scope encapsulation (phrase /
+//     accountNumber / sessionToken live in this component's reducer
+//     state and never leak to App.tsx).
+//   - Q6 begin invocation as a useEffect on `state.step === "encrypting"`
+//     (Argon2id × 2 inside spawn_blocking on the Rust side).
+//   - Q7 error routing: AppError → mapAppErrorToUserMessage → BEGIN_ERR
+//     (inline banner) or SESSION_LOST (dedicated screen).
+//   - Q8.2 onCloseRequested prompt for sensitive steps (phrase / confirm /
+//     account); membership decided via isSensitiveStep() in reducer.ts.
+//   - Q8.3 useRef + empty-deps cleanup pattern (cancel(token) only on
+//     real unmount; React 18 StrictMode dev double-invoke is a no-op
+//     because the ref only carries a token after BEGIN_OK).
+//
+// Backend dependencies (per backend-vault-creation/rfc.md):
+//   - vault-creation:begin   — wired below.
+//   - vault-creation:commit  — wired below.
+//   - vault-creation:cancel  — wired here (cleanup + PhraseStep Back).
+
+import { useEffect, useReducer, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
 import {
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
-import { Button } from "../components/primitives/Button";
-import { Input } from "../components/primitives/Input";
-import { Icon } from "../components/primitives/Icon";
-import { PasswordStrength } from "../components/PasswordStrength";
-import { generatePassword } from "../lib/password-generator";
+  vaultCreationReducer,
+  initialState,
+  isSensitiveStep,
+  type Step,
+} from "./vault-creation";
+import { PasswordStep } from "./vault-creation/PasswordStep";
+import { EncryptingStep } from "./vault-creation/EncryptingStep";
+import { PhraseStep } from "./vault-creation/PhraseStep";
+import { ConfirmStep } from "./vault-creation/ConfirmStep";
+import { AccountStep } from "./vault-creation/AccountStep";
+import { ReadyStep } from "./vault-creation/ReadyStep";
+import { SessionLostStep } from "./vault-creation/SessionLostStep";
+import { mapAppErrorToUserMessage } from "../lib/vault-creation-errors";
+import { isAppError, logErrorKind } from "../lib/vault-creation-logging";
+import type { BeginResult } from "../types/protocol-error";
 
 interface CreateVaultProps {
   onBack: () => void;
-  onContinue?: () => void;
 }
 
-const MIN_PASSWORD_LEN = 12;
-const MIN_ZXCVBN_SCORE = 3;
-const SUGGESTED_PASSWORD_LEN = 24;
+export function CreateVault({ onBack }: CreateVaultProps) {
+  const [state, dispatch] = useReducer(vaultCreationReducer, initialState);
 
-type ZxcvbnScore = 0 | 1 | 2 | 3 | 4;
-
-interface ZxcvbnResult {
-  score: ZxcvbnScore;
-  feedback: {
-    warning: string;
-    suggestions: string[];
-  };
-}
-
-type ZxcvbnFn = (password: string) => ZxcvbnResult;
-
-type CaptionTone = "muted" | "danger" | "pending";
-
-export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [zxcvbnFn, setZxcvbnFn] = useState<ZxcvbnFn | null>(null);
-
-  // Lazy-load zxcvbn-ts: ~140KB gzip stays out of the Welcome bundle and
-  // arrives as a separate chunk when the user first lands on this screen.
+  const sessionTokenRef = useRef<string | null>(null);
+  const stepRef = useRef<Step>(state.step);
   useEffect(() => {
+    sessionTokenRef.current = state.sessionToken;
+    stepRef.current = state.step;
+  });
+
+  useEffect(() => {
+    return () => {
+      const token = sessionTokenRef.current;
+      if (token) {
+        invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
+          (e: unknown) => logErrorKind(e, "cancel-failed"),
+        );
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    const win = getCurrentWindow();
+    win
+      .onCloseRequested(async (event) => {
+        if (!isSensitiveStep(stepRef.current)) return;
+        event.preventDefault();
+        let proceed = false;
+        try {
+          proceed = await dialogConfirm(
+            "Closing will discard your recovery phrase. Continue closing?",
+            {
+              title: "Discard vault creation?",
+              okLabel: "Close anyway",
+              cancelLabel: "Cancel",
+            },
+          );
+        } catch (e) {
+          logErrorKind(e, "close-confirm-failed");
+        }
+        if (proceed) {
+          try {
+            await win.close();
+          } catch (e) {
+            logErrorKind(e, "window-close-failed");
+          }
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch((e: unknown) => logErrorKind(e, "close-listener-failed"));
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  // Captured password sits here only between PasswordStep submit and
+  // BEGIN_OK / BEGIN_ERR resolution. Cleared on both paths so a stale
+  // password cannot ride along into a later begin attempt.
+  const passwordRef = useRef<string | null>(null);
+
+  const handlePasswordSubmit = (password: string) => {
+    passwordRef.current = password;
+    dispatch({ type: "BEGIN_REQUESTED" });
+  };
+
+  const handlePhraseBack = () => {
+    const token = sessionTokenRef.current;
+    if (token) {
+      invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
+        (e: unknown) => logErrorKind(e, "cancel-failed"),
+      );
+    }
+    dispatch({ type: "RESET_TO_PASSWORD" });
+  };
+
+  useEffect(() => {
+    if (state.step !== "encrypting") return;
+    const password = passwordRef.current;
+    if (!password) return;
     let cancelled = false;
     (async () => {
-      const [core, common, en] = await Promise.all([
-        import("@zxcvbn-ts/core"),
-        import("@zxcvbn-ts/language-common"),
-        import("@zxcvbn-ts/language-en"),
-      ]);
-      core.zxcvbnOptions.setOptions({
-        translations: en.translations,
-        graphs: common.adjacencyGraphs,
-        dictionary: { ...common.dictionary, ...en.dictionary },
-      });
-      if (!cancelled) {
-        setZxcvbnFn(() => core.zxcvbn as unknown as ZxcvbnFn);
+      try {
+        const result = await invoke<BeginResult>(
+          "plugin:vault-creation|begin",
+          { password },
+        );
+        if (cancelled) return;
+        passwordRef.current = null;
+        dispatch({
+          type: "BEGIN_OK",
+          phrase: result.phrase,
+          accountNumber: result.account_number,
+          sessionToken: result.session_token,
+        });
+      } catch (e) {
+        if (cancelled) return;
+        passwordRef.current = null;
+        if (!isAppError(e)) {
+          logErrorKind(e, "begin-unknown-error");
+          dispatch({ type: "BEGIN_ERR", error: GENERIC_ERROR });
+          return;
+        }
+        logErrorKind(e, "begin");
+        const message = mapAppErrorToUserMessage(e);
+        if (message.displayMode === "dedicated") {
+          dispatch({ type: "SESSION_LOST", error: message });
+        } else {
+          dispatch({ type: "BEGIN_ERR", error: message });
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [state.step]);
 
-  const result = useMemo(
-    () => (zxcvbnFn && password ? zxcvbnFn(password) : null),
-    [password, zxcvbnFn],
-  );
+  useEffect(() => {
+    if (state.step !== "committing") return;
+    const token = sessionTokenRef.current;
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await invoke("plugin:vault-creation|commit", { sessionToken: token });
+        if (cancelled) return;
+        sessionTokenRef.current = null;
+        dispatch({ type: "COMMIT_OK" });
+      } catch (e) {
+        if (cancelled) return;
+        if (!isAppError(e)) {
+          logErrorKind(e, "commit-unknown-error");
+          dispatch({ type: "COMMIT_ERR", error: GENERIC_ERROR });
+          return;
+        }
+        logErrorKind(e, "commit");
+        const message = mapAppErrorToUserMessage(e);
+        if (message.displayMode === "dedicated") {
+          sessionTokenRef.current = null;
+          dispatch({ type: "SESSION_LOST", error: message });
+        } else {
+          dispatch({ type: "COMMIT_ERR", error: message });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.step]);
 
-  const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LEN;
-  const mismatch = confirm.length > 0 && confirm !== password;
-  const ready =
-    password.length >= MIN_PASSWORD_LEN &&
-    password === confirm &&
-    result !== null &&
-    result.score >= MIN_ZXCVBN_SCORE;
-
-  let passwordCaption: string | undefined;
-  let passwordTone: CaptionTone = "muted";
-  let showStrength = false;
-
-  if (password.length === 0) {
-    passwordCaption =
-      "Used as input to Argon2id (m=256 MiB, t=3, p=2). Choose something you can remember; you cannot reset it.";
-    passwordTone = "muted";
-  } else if (tooShort) {
-    passwordCaption = `Use at least ${MIN_PASSWORD_LEN} characters.`;
-    passwordTone = "danger";
-  } else if (!result) {
-    passwordCaption = "Checking strength…";
-    passwordTone = "pending";
-  } else {
-    showStrength = true;
+  switch (state.step) {
+    case "password":
+      return (
+        <PasswordStep
+          error={state.error}
+          onBack={onBack}
+          onSubmit={handlePasswordSubmit}
+        />
+      );
+    case "encrypting":
+      return <EncryptingStep />;
+    case "phrase":
+      return (
+        <PhraseStep
+          phrase={state.phrase ?? []}
+          revealed={state.phraseRevealed}
+          dispatch={dispatch}
+          onCancelSession={handlePhraseBack}
+        />
+      );
+    case "confirm":
+      return (
+        <ConfirmStep
+          phrase={state.phrase ?? []}
+          positions={state.confirmPositions ?? [1, 1, 1, 1]}
+          inputs={state.confirmInputs}
+          dispatch={dispatch}
+        />
+      );
+    case "account":
+    case "committing":
+      return (
+        <AccountStep
+          accountNumber={state.accountNumber ?? ""}
+          acknowledged={state.accountAcknowledged}
+          committing={state.step === "committing"}
+          error={state.error}
+          dispatch={dispatch}
+        />
+      );
+    case "ready":
+      return <ReadyStep />;
+    case "session-lost":
+      // SESSION_LOST is the only path into this step and always carries
+      // an error; the non-null assertion is type-safe per the reducer.
+      return <SessionLostStep error={state.error!} dispatch={dispatch} />;
+    default: {
+      const _exhaustive: never = state.step;
+      void _exhaustive;
+      return null;
+    }
   }
-
-  const handleSuggest = () => {
-    const generated = generatePassword(SUGGESTED_PASSWORD_LEN);
-    setPassword(generated);
-    setConfirm(generated);
-    setShowPassword(true);
-    setShowConfirm(true);
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--bg-1)",
-        padding: 24,
-      }}
-    >
-      <div
-        style={{
-          width: 420,
-          display: "flex",
-          flexDirection: "column",
-          gap: 20,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Icon name="lock" size={20} />
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--fg-3)",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              fontWeight: 600,
-            }}
-          >
-            Step 1 of 2 — master password
-          </div>
-        </div>
-
-        <div
-          style={{
-            fontSize: 28,
-            fontWeight: 600,
-            letterSpacing: "-0.015em",
-            lineHeight: 1.2,
-            color: "var(--fg-display)",
-          }}
-        >
-          Create vault
-        </div>
-
-        <div
-          style={{
-            padding: 12,
-            background: "var(--paper-2)",
-            border: "1px solid var(--line-1)",
-            borderRadius: 6,
-            fontSize: 13,
-            lineHeight: 1.6,
-            color: "var(--fg-2)",
-          }}
-        >
-          Myne does not store your password or recovery phrase.{" "}
-          <strong style={{ color: "var(--fg-1)" }}>
-            If you lose both your password and recovery phrase, your notes are
-            unrecoverable. We cannot help.
-          </strong>
-        </div>
-
-        <PasswordField
-          label="Master password"
-          value={password}
-          onChange={setPassword}
-          show={showPassword}
-          onToggleShow={() => setShowPassword((s) => !s)}
-          invalid={tooShort}
-          caption={passwordCaption}
-          captionTone={passwordTone}
-          autoFocus
-          labelTrailing={
-            <button
-              type="button"
-              onClick={handleSuggest}
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--accent)",
-                background: "none",
-                border: 0,
-                padding: 0,
-                cursor: "pointer",
-              }}
-            >
-              Suggest password
-            </button>
-          }
-        />
-
-        {showStrength && result && (
-          <PasswordStrength
-            score={result.score}
-            warning={result.feedback.warning || undefined}
-            suggestion={result.feedback.suggestions[0]}
-          />
-        )}
-
-        <PasswordField
-          label="Confirm master password"
-          value={confirm}
-          onChange={setConfirm}
-          show={showConfirm}
-          onToggleShow={() => setShowConfirm((s) => !s)}
-          invalid={mismatch}
-          caption={mismatch ? "Passwords do not match." : undefined}
-          captionTone="danger"
-        />
-
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <Button variant="ghost" onClick={onBack} icon="arrow-left">
-            Back
-          </Button>
-          <div style={{ flex: 1 }} />
-          <Button
-            variant="primary"
-            onClick={onContinue}
-            disabled={!onContinue || !ready}
-          >
-            Generate recovery phrase
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
-interface PasswordFieldProps {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-  show: boolean;
-  onToggleShow: () => void;
-  invalid?: boolean;
-  caption?: string;
-  captionTone?: CaptionTone;
-  autoFocus?: boolean;
-  labelTrailing?: ReactNode;
-}
-
-const labelStyle: CSSProperties = {
-  fontSize: 12,
-  color: "var(--fg-3)",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  fontWeight: 600,
-};
-
-function PasswordField({
-  label,
-  value,
-  onChange,
-  show,
-  onToggleShow,
-  invalid,
-  caption,
-  captionTone = "muted",
-  autoFocus,
-  labelTrailing,
-}: PasswordFieldProps) {
-  const captionColor =
-    captionTone === "danger" ? "var(--danger)" : "var(--fg-3)";
-  const captionFontStyle = captionTone === "pending" ? "italic" : "normal";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <label style={labelStyle}>{label}</label>
-        {labelTrailing}
-      </div>
-      <div style={{ position: "relative" }}>
-        <Input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          invalid={invalid}
-          autoFocus={autoFocus}
-          autoComplete="new-password"
-          spellCheck={false}
-          style={{ paddingRight: 36 }}
-        />
-        <button
-          type="button"
-          onClick={onToggleShow}
-          aria-label={show ? "Hide password" : "Show password"}
-          style={{
-            position: "absolute",
-            right: 8,
-            top: 7,
-            background: "none",
-            border: 0,
-            color: "var(--fg-3)",
-            cursor: "pointer",
-            padding: 4,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon name={show ? "eye-off" : "eye"} size={14} />
-        </button>
-      </div>
-      {caption && (
-        <div
-          style={{
-            fontSize: 12,
-            color: captionColor,
-            fontStyle: captionFontStyle,
-          }}
-        >
-          {caption}
-        </div>
-      )}
-    </div>
-  );
-}
+const GENERIC_ERROR = {
+  title: "Something went wrong",
+  body: "Try again.",
+  primaryAction: "retry",
+  displayMode: "inline",
+} as const;

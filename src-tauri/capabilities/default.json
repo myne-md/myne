@@ -8,6 +8,15 @@
     "opener:default",
     "allow-begin",
     "allow-commit",
-    "allow-cancel"
+    "allow-cancel",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-clear",
+    "dialog:allow-save",
+    "dialog:allow-confirm",
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [{ "path": "$HOME/**" }]
+    }
   ]
 }

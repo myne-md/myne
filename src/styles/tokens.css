@@ -215,6 +215,50 @@ body {
   }
 }
 
+/* -- Spinner ----------------------------------------------------------------
+   Used by <Spinner /> primitive. Border-top accent + linear rotation.
+   The reduced-motion media query above zeroes the animation duration, leaving
+   a static ring — honest work-in-progress indicator without rotation. */
+
+@keyframes myne-spinner-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.myne-spinner {
+  animation: myne-spinner-rotate 800ms linear infinite;
+}
+
+/* -- Focus ring -------------------------------------------------------------
+   Global :focus-visible visualization for all interactive elements. Keyboard
+   focus shows the --ring shadow; mouse focus does not (per :focus-visible
+   semantics). Element-specific styles (e.g. Input's own focused box-shadow)
+   coexist — both render box-shadow, the most-recent wins by inline-style
+   specificity. */
+
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-2);
+}
+
+/* Step headings receive programmatic focus on mount (orchestrator focus
+   management). They are visually unchanged; the ring is the only signal. */
+.vc-step-heading:focus {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-2);
+}
+.vc-step-heading:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
 /* =========================================================================
    Semantic type styles -- apply via class names, not by tag.
    ========================================================================= */
