@@ -5,9 +5,7 @@
 //! - [`cancel`] → drop a session (Task 14).
 
 use super::error::AppError;
-use super::state::{
-    SessionLookup, VaultCreationSession, VaultCreationState, MAX_CONCURRENT_SESSIONS,
-};
+use super::state::{SessionLookup, VaultCreationSession, VaultCreationState};
 use protocol::{
     KdfParams, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, DEFAULT_V0_1_KDF_PARAMS,
     VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
@@ -38,29 +36,35 @@ pub struct BeginResult {
 
 /// Begin a vault-creation session.
 ///
-/// Fast-rejects with [`AppError::TooManyConcurrentSessions`] if the
-/// session map is already at [`MAX_CONCURRENT_SESSIONS`]. Otherwise
-/// dispatches the expensive work (Argon2id × 2 at v0.1 baseline,
-/// ~2–3 seconds total) to a `tokio::task::spawn_blocking` worker so
-/// the async runtime's threads stay free for other Tauri IPC traffic.
+/// Reserves one of [`MAX_CONCURRENT_SESSIONS`] slots **before**
+/// dispatching the expensive work (Argon2id × 2 at v0.1 baseline,
+/// ~2–3 seconds total, ~256 MiB per derivation). The reservation is
+/// an atomic CAS so concurrent burst-`begin` callers cannot all
+/// observe "below cap" and all start derivations — exactly one
+/// caller per slot wins, and the cap functions as a hard memory
+/// guard rather than an advisory hint.
 ///
-/// On success: inserts the session under a fresh UUID and returns the
-/// 24-word phrase (cloned), the account number's display form, and
-/// the session token. `root_key` and the wrap keys remain in the
-/// session — they NEVER cross the IPC boundary.
+/// On success: materializes the reservation as a session entry under
+/// a fresh UUID and returns the 24-word phrase (cloned), the account
+/// number's display form, and the session token. `root_key` and the
+/// wrap keys remain in the session — they NEVER cross the IPC
+/// boundary.
+///
+/// On failure (Argon2id error, JoinFailure, panic): the
+/// [`SlotReservation`]'s `Drop` releases the slot.
 #[tauri::command]
 pub async fn begin(
     password: String,
     state: State<'_, VaultCreationState>,
 ) -> Result<BeginResult, AppError> {
-    // Fast-path cap check before kicking off ~2 seconds of Argon2id
-    // work. The authoritative re-check happens inside `try_insert`
-    // under the lock; this only avoids wasting CPU on a doomed call.
-    if state.count() >= MAX_CONCURRENT_SESSIONS {
-        return Err(AppError::TooManyConcurrentSessions);
-    }
+    // Reserve a slot atomically before kicking off ~2 seconds of
+    // Argon2id work. If the cap is already saturated, fail fast
+    // without consuming any memory.
+    let reservation = state.try_reserve()?;
 
-    // Heavy work off the runtime worker pool.
+    // Heavy work off the runtime worker pool. If anything in here
+    // fails, the `?` early-exit drops `reservation`, releasing the
+    // slot via SlotReservation::drop.
     let session =
         tokio::task::spawn_blocking(move || build_session(&password, DEFAULT_V0_1_KDF_PARAMS))
             .await
@@ -74,8 +78,11 @@ pub async fn begin(
     let account_number = session.account.display.clone();
     let token = Uuid::new_v4();
 
-    // Authoritative cap check + insert under one lock.
-    state.try_insert(token, session)?;
+    // Materialize the reservation as a live session entry. The
+    // reservation is consumed (its Drop is suppressed); the slot
+    // stays accounted for until `commit` / `cancel` / TTL eviction
+    // removes the session.
+    state.commit_reservation(reservation, token, session);
 
     Ok(BeginResult {
         phrase,
@@ -129,12 +136,20 @@ pub(crate) fn build_session(
 /// 1. Parse `session_token` (`SessionNotFound` on parse error).
 /// 2. `state.take(token)` consumes the session (`SessionNotFound` /
 ///    `SessionExpired` on absent / TTL-evicted).
-/// 3. Resolve `vault_dir` and ensure it exists.
+/// 3. Resolve `vault_dir` and ensure it exists. If this fails, the
+///    session is restored under the same token so the frontend can
+///    retry — the failure is recoverable (permissions can be fixed,
+///    disk pressure can subside).
 /// 4. In a `spawn_blocking` worker: AEAD-wrap `root_key` twice, derive
 ///    `itemsKey_wrap_key` via `derive_subkey`, generate `itemsKey` +
 ///    its UUIDv7, AEAD-wrap `itemsKey`, build [`protocol::VaultMeta`],
-///    serialize 345 bytes, atomic-write.
-/// 5. Drop the session — every Zeroizing field wipes.
+///    serialize 345 bytes, atomic-write. The worker takes the session
+///    by value but returns it back inside the `Err` arm so the outer
+///    code can re-insert on a recoverable failure (filesystem error,
+///    rare CSPRNG failure during itemsKey generation, etc.).
+/// 5. On success: drop the session — every Zeroizing field wipes.
+///    On worker failure: re-insert the session under the same token
+///    so the next `commit` invocation with that token can retry.
 #[tauri::command]
 pub async fn commit<R: Runtime>(
     session_token: String,
@@ -148,17 +163,42 @@ pub async fn commit<R: Runtime>(
         SessionLookup::NotFound => return Err(AppError::SessionNotFound),
     };
 
-    let vault_path = crate::paths::vault_dir(&app)?.join("vault.meta");
+    let vault_path = match crate::paths::vault_dir(&app) {
+        Ok(dir) => dir.join("vault.meta"),
+        Err(e) => {
+            // Path resolution failed (app_data_dir lookup or
+            // create_dir_all on the vault subfolder). Restore the
+            // session so the frontend can retry once the underlying
+            // condition is fixed (e.g. write permission granted on
+            // the data dir).
+            let _ = state.try_insert(token, session);
+            return Err(e);
+        }
+    };
 
-    tokio::task::spawn_blocking(move || -> Result<(), AppError> {
-        let bytes = build_and_serialize_vault_meta(session)?;
-        crate::atomic_write::atomic_write(&vault_path, &bytes)?;
-        Ok(())
-    })
-    .await
-    .map_err(|_| AppError::JoinFailure)??;
+    let outcome: Result<(), (AppError, VaultCreationSession)> =
+        tokio::task::spawn_blocking(move || match build_and_serialize_vault_meta(&session) {
+            Err(e) => Err((e, session)),
+            Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes) {
+                Err(e) => Err((AppError::from(e), session)),
+                Ok(()) => Ok(()),
+            },
+        })
+        .await
+        .map_err(|_| AppError::JoinFailure)?;
 
-    Ok(())
+    match outcome {
+        Ok(()) => Ok(()),
+        Err((err, session)) => {
+            // Re-insert under the same token so the frontend's retry
+            // (sending the same token to a follow-up `commit` call)
+            // works. `try_insert` cannot exceed the cap here: this
+            // task was already accounted for and was just removed by
+            // `state.take` above.
+            let _ = state.try_insert(token, session);
+            Err(err)
+        }
+    }
 }
 
 /// Cancel a vault-creation session.
@@ -182,8 +222,11 @@ pub fn cancel(session_token: String, state: State<'_, VaultCreationState>) -> Re
 /// `kdf_params`) produce the 345-byte serialized `vault.meta`. Tests
 /// instantiate this directly to verify the pipeline without going
 /// through Tauri.
+///
+/// Borrows the session immutably so a failed `atomic_write` can
+/// return the session to the caller for retry-on-failure.
 pub(crate) fn build_and_serialize_vault_meta(
-    session: VaultCreationSession,
+    session: &VaultCreationSession,
 ) -> Result<[u8; protocol::VAULT_META_LEN], AppError> {
     // Wrap root_key under password_wrap_key.
     let aad_pw = protocol::aad_password_wrap(&session.kdf_params);
@@ -313,6 +356,21 @@ mod tests {
         assert!(json.contains("\"phrase\""));
         assert!(json.contains("\"account_number\""));
         assert!(json.contains("\"session_token\""));
+    }
+
+    #[test]
+    fn build_and_serialize_does_not_consume_session() {
+        // Regression: previously `build_and_serialize_vault_meta` took
+        // the session by value, so a failed atomic_write could not be
+        // retried with the same session. The borrow signature lets
+        // commit re-insert the session under its token on failure.
+        let session = build_session("any password", FAST_TEST_KDF).unwrap();
+        let bytes_a = build_and_serialize_vault_meta(&session).expect("first call");
+        let bytes_b = build_and_serialize_vault_meta(&session).expect("second call");
+        assert_eq!(bytes_a.len(), bytes_b.len());
+        // Different bytes per call: nonces and items_key_id come from
+        // the CSPRNG inside the helper, not from the session.
+        assert_ne!(bytes_a, bytes_b);
     }
 
     #[test]
