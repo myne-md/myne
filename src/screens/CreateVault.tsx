@@ -44,9 +44,10 @@ import type { BeginResult } from "../types/protocol-error";
 
 interface CreateVaultProps {
   onBack: () => void;
+  onComplete: () => void;
 }
 
-export function CreateVault({ onBack }: CreateVaultProps) {
+export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
   const [state, dispatch] = useReducer(vaultCreationReducer, initialState);
 
   const sessionTokenRef = useRef<string | null>(null);
@@ -239,7 +240,7 @@ export function CreateVault({ onBack }: CreateVaultProps) {
         />
       );
     case "ready":
-      return <ReadyStep />;
+      return <ReadyStep onDone={onComplete} />;
     case "session-lost":
       // SESSION_LOST is the only path into this step and always carries
       // an error; the non-null assertion is type-safe per the reducer.
