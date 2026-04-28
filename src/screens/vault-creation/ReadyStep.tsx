@@ -6,10 +6,14 @@
 //   - "Show vault folder" → @tauri-apps/plugin-opener opens OS file
 //     manager at app_data_dir/vault/ (built via @tauri-apps/api/path
 //     `appDataDir()` + `join("vault")`).
-//   - "Done" → getCurrentWindow().close(). Returning to Welcome was
-//     rejected because it would let the user re-trigger Create-new-vault
-//     and overwrite the just-written vault.meta — a vault-unlock concern
-//     out of this PRD's scope.
+//   - "Done" → calls the `onDone` callback prop. The orchestrator
+//     (<CreateVault>) wires it through to App.tsx, which transitions
+//     the stage to the terminal `editor` screen. Originally this called
+//     `getCurrentWindow().close()`; revised by
+//     agent-tooling/features/empty-editor-shell/prd.md (2026-04-28).
+//     Vault-detected Welcome and lock/relock semantics remain a future
+//     vault-unlock feature — until then, the editor is terminal and
+//     there is no path back to Welcome from inside it.
 //
 // Window-close prompt (Task 12) explicitly excludes ReadyStep — vault
 // is committed, no progress to discard.
@@ -18,11 +22,14 @@ import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { logErrorKind } from "../../lib/vault-creation-logging";
 import { StepHeading, StepLayout } from "./step-shell";
 
-export function ReadyStep() {
+interface ReadyStepProps {
+  onDone: () => void;
+}
+
+export function ReadyStep({ onDone }: ReadyStepProps) {
   const handleShowVaultFolder = async () => {
     try {
       const base = await appDataDir();
@@ -30,14 +37,6 @@ export function ReadyStep() {
       await openPath(dir);
     } catch (e) {
       logErrorKind(e, "show-vault-folder-failed");
-    }
-  };
-
-  const handleDone = async () => {
-    try {
-      await getCurrentWindow().close();
-    } catch (e) {
-      logErrorKind(e, "window-close-failed");
     }
   };
 
@@ -67,7 +66,7 @@ export function ReadyStep() {
         <Button variant="ghost" icon="folder" onClick={handleShowVaultFolder}>
           Show vault folder
         </Button>
-        <Button variant="primary" onClick={handleDone}>
+        <Button variant="primary" onClick={onDone}>
           Done
         </Button>
       </div>

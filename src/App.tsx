@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Welcome } from "./screens/Welcome";
 import { CreateVault } from "./screens/CreateVault";
+import { Editor } from "./screens/Editor";
 
-type Stage = "welcome" | "create-vault";
+type Stage = "welcome" | "create-vault" | "editor";
 
 function App() {
   const [stage, setStage] = useState<Stage>("welcome");
@@ -11,7 +12,16 @@ function App() {
     return <Welcome onCreateVault={() => setStage("create-vault")} />;
   }
 
-  return <CreateVault onBack={() => setStage("welcome")} />;
+  if (stage === "create-vault") {
+    return (
+      <CreateVault
+        onBack={() => setStage("welcome")}
+        onComplete={() => setStage("editor")}
+      />
+    );
+  }
+
+  return <Editor />;
 }
 
 export default App;
