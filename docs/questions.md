@@ -47,3 +47,25 @@ The account number is documented as a **bearer token** for hosted sync (Phase 2+
 This is also why the spec says to treat account numbers "like cash" — write them down, do not paste them into untrusted forms — even though losing one does not, by itself, leak any note contents.
 
 Related: `spec/account-number.md` §1, §2, §7; `spec/protocol.md` §3.1; `threat-model.md` §2 AS9, §3 TB5.
+
+### Q: Where are encrypted notes stored — is there a database?
+
+Short answer: **no database in v0.1; encrypted notes live as plain files in a directory on the user's filesystem.**
+
+A Myne vault is a regular folder with two kinds of files:
+
+- `vault.meta` — a single file holding vault-level state: the wrapped `itemsKey`, the two Argon2id salts, the protocol version, the Argon2id parameter block, the password and recovery wraps of `root_key`, and the account-number hash. Magic bytes `MYV1`.
+- `notes/<item_id>.myn` — one encrypted blob per note. Magic bytes `MY01`. Fixed-offset binary header (nonce, item_id, itemsKey_id, …) followed by XChaCha20-Poly1305 ciphertext wrapped in a CTX commitment tag.
+
+The on-disk format is binary with fixed offsets and big-endian integers — no JSON envelope, no SQLite container.
+
+**Why not a database?** Two reasons grounded in vision and protocol commitments:
+
+1. `vision.md` commits to "your notes stay plain markdown after decryption" and "no proprietary format, no migration tool required." A SQLite or similar container would re-introduce a proprietary file the user cannot open with a normal editor after decryption.
+2. Per-note files make the unit of sync identical to the unit of encryption — each `.myn` is what travels to the server (Phase 2+) and what the per-note version counter is attached to. A single database file would make conflict resolution and partial sync significantly harder.
+
+**What about search?** A future Phase 1.5 client may add an internal encrypted SQLite + FTS5 index for full-text search. That is **client-internal**, not part of the protocol, and stays at-rest encrypted on disk. The `.myn` files remain the source of truth.
+
+**What leaves the device?** Only `vault.meta` and `.myn` files, both opaque ciphertext plus a small public header (magic, version, IDs, nonces, salts, account-hash). No plaintext content, titles, structure, links, or user-meaningful timestamps ever leave the client.
+
+Related: `spec/protocol.md` §9 (vault layout, per-note blob format, vault.meta format), §9.4 (what is plaintext on disk and why); `vision.md` (anti-features, "plain markdown after decryption").
