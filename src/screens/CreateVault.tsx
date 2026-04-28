@@ -3,6 +3,7 @@ import { Button } from "../components/primitives/Button";
 import { Input } from "../components/primitives/Input";
 import { Icon } from "../components/primitives/Icon";
 import { PasswordStrength } from "../components/PasswordStrength";
+import { generatePassword } from "../lib/password-generator";
 
 interface CreateVaultProps {
   onBack: () => void;
@@ -11,6 +12,7 @@ interface CreateVaultProps {
 
 const MIN_PASSWORD_LEN = 12;
 const MIN_ZXCVBN_SCORE = 3;
+const SUGGESTED_PASSWORD_LEN = 24;
 
 type ZxcvbnScore = 0 | 1 | 2 | 3 | 4;
 
@@ -91,6 +93,14 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
     showStrength = true;
   }
 
+  const handleSuggest = () => {
+    const generated = generatePassword(SUGGESTED_PASSWORD_LEN);
+    setPassword(generated);
+    setConfirm(generated);
+    setShowPassword(true);
+    setShowConfirm(true);
+  };
+
   return (
     <div
       style={{
@@ -155,17 +165,88 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
           </strong>
         </div>
 
-        <PasswordField
-          label="Master password"
-          value={password}
-          onChange={setPassword}
-          show={showPassword}
-          onToggleShow={() => setShowPassword((s) => !s)}
-          invalid={tooShort}
-          autoFocus
-          caption={passwordCaption}
-          captionTone={passwordTone}
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <label
+              style={{
+                fontSize: 12,
+                color: "var(--fg-3)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                fontWeight: 600,
+              }}
+            >
+              Master password
+            </label>
+            <button
+              type="button"
+              onClick={handleSuggest}
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--accent)",
+                background: "none",
+                border: 0,
+                padding: 0,
+                cursor: "pointer",
+              }}
+            >
+              Suggest password
+            </button>
+          </div>
+          <div style={{ position: "relative" }}>
+            <Input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              invalid={tooShort}
+              autoFocus
+              autoComplete="new-password"
+              spellCheck={false}
+              style={{ paddingRight: 36 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: 7,
+                background: "none",
+                border: 0,
+                color: "var(--fg-3)",
+                cursor: "pointer",
+                padding: 4,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name={showPassword ? "eye-off" : "eye"} size={14} />
+            </button>
+          </div>
+          {passwordCaption && (
+            <div
+              style={{
+                fontSize: 12,
+                color:
+                  passwordTone === "danger" ? "var(--danger)" : "var(--fg-3)",
+                fontStyle: passwordTone === "pending" ? "italic" : "normal",
+              }}
+            >
+              {passwordCaption}
+            </div>
+          )}
+        </div>
 
         {showStrength && result && (
           <PasswordStrength
@@ -207,7 +288,6 @@ interface PasswordFieldProps {
   show: boolean;
   onToggleShow: () => void;
   invalid?: boolean;
-  autoFocus?: boolean;
   caption?: string;
   captionTone?: "muted" | "danger" | "pending";
 }
@@ -219,7 +299,6 @@ function PasswordField({
   show,
   onToggleShow,
   invalid,
-  autoFocus,
   caption,
   captionTone = "muted",
 }: PasswordFieldProps) {
@@ -246,7 +325,6 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           invalid={invalid}
-          autoFocus={autoFocus}
           autoComplete="new-password"
           spellCheck={false}
           style={{ paddingRight: 36 }}
