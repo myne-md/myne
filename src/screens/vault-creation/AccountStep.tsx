@@ -22,18 +22,14 @@
 //
 // Spec: account-number.md § 7 (bearer-token semantics, "treat like cash").
 
-import { useEffect, useState, type Dispatch } from "react";
-import {
-  writeText as clipboardWriteText,
-  readText as clipboardReadText,
-  clear as clipboardClear,
-} from "@tauri-apps/plugin-clipboard-manager";
-import { save as dialogSave } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { useEffect, useRef, useState, type Dispatch } from "react";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
-import { logErrorKind } from "../../lib/vault-creation-logging";
+import {
+  copySecretToClipboard,
+  saveSecretAsTextFile,
+} from "../../lib/secret-export";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
 import type { Action, ErrorState } from "./reducer";
 
@@ -44,8 +40,6 @@ interface AccountStepProps {
   error: ErrorState | null;
   dispatch: Dispatch<Action>;
 }
-
-const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
 
 export function AccountStep({
   accountNumber,
@@ -60,44 +54,25 @@ export function AccountStep({
     if (committing) setCopied(false);
   }, [committing]);
 
+  // Cancel any pending clipboard auto-clear on unmount so the timer's
+  // closure (which captures the bearer-token account number) is released.
+  const cancelAutoClearRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      cancelAutoClearRef.current?.();
+    },
+    [],
+  );
+
   const handleCopy = async () => {
-    try {
-      await clipboardWriteText(accountNumber);
-      setCopied(true);
-    } catch (e) {
-      logErrorKind(e, "clipboard-write-failed");
-      return;
-    }
-    setTimeout(async () => {
-      try {
-        const current = await clipboardReadText();
-        if (current === accountNumber) {
-          await clipboardClear();
-        }
-      } catch (e) {
-        logErrorKind(e, "clipboard-auto-clear-failed");
-      }
-    }, CLIPBOARD_AUTO_CLEAR_MS);
+    cancelAutoClearRef.current?.();
+    const cancel = await copySecretToClipboard(accountNumber);
+    cancelAutoClearRef.current = cancel;
+    if (cancel) setCopied(true);
   };
 
-  const handleSave = async () => {
-    let path: string | null;
-    try {
-      path = await dialogSave({
-        defaultPath: "myne-account-number.txt",
-        filters: [{ name: "Text", extensions: ["txt"] }],
-      });
-    } catch (e) {
-      logErrorKind(e, "dialog-save-failed");
-      return;
-    }
-    if (!path) return;
-    try {
-      await writeTextFile(path, accountNumber);
-    } catch (e) {
-      logErrorKind(e, "fs-write-failed");
-    }
-  };
+  const handleSave = () =>
+    saveSecretAsTextFile("myne-account-number.txt", accountNumber);
 
   return (
     <StepLayout width={480}>

@@ -17,17 +17,13 @@
 //
 // Spec: protocol.md § 7 (BIP-39 24-word, English wordlist) + § 7.5.
 
-import { useEffect, useMemo, type Dispatch } from "react";
-import {
-  writeText as clipboardWriteText,
-  readText as clipboardReadText,
-  clear as clipboardClear,
-} from "@tauri-apps/plugin-clipboard-manager";
-import { save as dialogSave } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { useEffect, useMemo, useRef, type Dispatch } from "react";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
-import { logErrorKind } from "../../lib/vault-creation-logging";
+import {
+  copySecretToClipboard,
+  saveSecretAsTextFile,
+} from "../../lib/secret-export";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
 import type { Action } from "./reducer";
 
@@ -37,8 +33,6 @@ interface PhraseStepProps {
   dispatch: Dispatch<Action>;
   onCancelSession: () => void;
 }
-
-const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
 
 export function PhraseStep({
   phrase,
@@ -55,45 +49,23 @@ export function PhraseStep({
 
   const phraseString = useMemo(() => phrase.join(" "), [phrase]);
 
+  // Cancel any pending clipboard auto-clear on unmount so the timer's
+  // closure (which captures the 24-word phrase) is released promptly.
+  const cancelAutoClearRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      cancelAutoClearRef.current?.();
+    },
+    [],
+  );
+
   const handleCopy = async () => {
-    try {
-      await clipboardWriteText(phraseString);
-    } catch (e) {
-      logErrorKind(e, "clipboard-write-failed");
-      return;
-    }
-    // Auto-clear: only clear if the clipboard still contains exactly
-    // what we wrote (the user may have copied something else).
-    setTimeout(async () => {
-      try {
-        const current = await clipboardReadText();
-        if (current === phraseString) {
-          await clipboardClear();
-        }
-      } catch (e) {
-        logErrorKind(e, "clipboard-auto-clear-failed");
-      }
-    }, CLIPBOARD_AUTO_CLEAR_MS);
+    cancelAutoClearRef.current?.();
+    cancelAutoClearRef.current = await copySecretToClipboard(phraseString);
   };
 
-  const handleSave = async () => {
-    let path: string | null;
-    try {
-      path = await dialogSave({
-        defaultPath: "myne-recovery-phrase.txt",
-        filters: [{ name: "Text", extensions: ["txt"] }],
-      });
-    } catch (e) {
-      logErrorKind(e, "dialog-save-failed");
-      return;
-    }
-    if (!path) return;
-    try {
-      await writeTextFile(path, phraseString);
-    } catch (e) {
-      logErrorKind(e, "fs-write-failed");
-    }
-  };
+  const handleSave = () =>
+    saveSecretAsTextFile("myne-recovery-phrase.txt", phraseString);
 
   return (
     <StepLayout width={600}>
