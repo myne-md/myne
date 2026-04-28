@@ -5,12 +5,13 @@ import {
   type ReactNode,
 } from "react";
 import { Icon } from "./Icon";
+import type { IconName } from "../../lib/icons";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
-  icon?: string;
+  icon?: IconName;
   children?: ReactNode;
 }
 

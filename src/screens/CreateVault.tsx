@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { Button } from "../components/primitives/Button";
 import { Input } from "../components/primitives/Input";
 import { Icon } from "../components/primitives/Icon";
@@ -7,7 +13,7 @@ import { generatePassword } from "../lib/password-generator";
 
 interface CreateVaultProps {
   onBack: () => void;
-  onContinue: () => void;
+  onContinue?: () => void;
 }
 
 const MIN_PASSWORD_LEN = 12;
@@ -26,13 +32,14 @@ interface ZxcvbnResult {
 
 type ZxcvbnFn = (password: string) => ZxcvbnResult;
 
+type CaptionTone = "muted" | "danger" | "pending";
+
 export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [zxcvbnFn, setZxcvbnFn] = useState<ZxcvbnFn | null>(null);
-  const [result, setResult] = useState<ZxcvbnResult | null>(null);
 
   // Lazy-load zxcvbn-ts: ~140KB gzip stays out of the Welcome bundle and
   // arrives as a separate chunk when the user first lands on this screen.
@@ -58,13 +65,10 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!zxcvbnFn || password.length === 0) {
-      setResult(null);
-      return;
-    }
-    setResult(zxcvbnFn(password));
-  }, [password, zxcvbnFn]);
+  const result = useMemo(
+    () => (zxcvbnFn && password ? zxcvbnFn(password) : null),
+    [password, zxcvbnFn],
+  );
 
   const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LEN;
   const mismatch = confirm.length > 0 && confirm !== password;
@@ -74,7 +78,6 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
     result !== null &&
     result.score >= MIN_ZXCVBN_SCORE;
 
-  type CaptionTone = "muted" | "danger" | "pending";
   let passwordCaption: string | undefined;
   let passwordTone: CaptionTone = "muted";
   let showStrength = false;
@@ -165,26 +168,17 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
           </strong>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <label
-              style={{
-                fontSize: 12,
-                color: "var(--fg-3)",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                fontWeight: 600,
-              }}
-            >
-              Master password
-            </label>
+        <PasswordField
+          label="Master password"
+          value={password}
+          onChange={setPassword}
+          show={showPassword}
+          onToggleShow={() => setShowPassword((s) => !s)}
+          invalid={tooShort}
+          caption={passwordCaption}
+          captionTone={passwordTone}
+          autoFocus
+          labelTrailing={
             <button
               type="button"
               onClick={handleSuggest}
@@ -201,52 +195,8 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
             >
               Suggest password
             </button>
-          </div>
-          <div style={{ position: "relative" }}>
-            <Input
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              invalid={tooShort}
-              autoFocus
-              autoComplete="new-password"
-              spellCheck={false}
-              style={{ paddingRight: 36 }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((s) => !s)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              style={{
-                position: "absolute",
-                right: 8,
-                top: 7,
-                background: "none",
-                border: 0,
-                color: "var(--fg-3)",
-                cursor: "pointer",
-                padding: 4,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Icon name={showPassword ? "eye-off" : "eye"} size={14} />
-            </button>
-          </div>
-          {passwordCaption && (
-            <div
-              style={{
-                fontSize: 12,
-                color:
-                  passwordTone === "danger" ? "var(--danger)" : "var(--fg-3)",
-                fontStyle: passwordTone === "pending" ? "italic" : "normal",
-              }}
-            >
-              {passwordCaption}
-            </div>
-          )}
-        </div>
+          }
+        />
 
         {showStrength && result && (
           <PasswordStrength
@@ -272,7 +222,11 @@ export function CreateVault({ onBack, onContinue }: CreateVaultProps) {
             Back
           </Button>
           <div style={{ flex: 1 }} />
-          <Button variant="primary" onClick={onContinue} disabled={!ready}>
+          <Button
+            variant="primary"
+            onClick={onContinue}
+            disabled={!onContinue || !ready}
+          >
             Generate recovery phrase
           </Button>
         </div>
@@ -289,8 +243,18 @@ interface PasswordFieldProps {
   onToggleShow: () => void;
   invalid?: boolean;
   caption?: string;
-  captionTone?: "muted" | "danger" | "pending";
+  captionTone?: CaptionTone;
+  autoFocus?: boolean;
+  labelTrailing?: ReactNode;
 }
+
+const labelStyle: CSSProperties = {
+  fontSize: 12,
+  color: "var(--fg-3)",
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  fontWeight: 600,
+};
 
 function PasswordField({
   label,
@@ -301,6 +265,8 @@ function PasswordField({
   invalid,
   caption,
   captionTone = "muted",
+  autoFocus,
+  labelTrailing,
 }: PasswordFieldProps) {
   const captionColor =
     captionTone === "danger" ? "var(--danger)" : "var(--fg-3)";
@@ -308,23 +274,24 @@ function PasswordField({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <label
+      <div
         style={{
-          fontSize: 12,
-          color: "var(--fg-3)",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          fontWeight: 600,
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
         }}
       >
-        {label}
-      </label>
+        <label style={labelStyle}>{label}</label>
+        {labelTrailing}
+      </div>
       <div style={{ position: "relative" }}>
         <Input
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           invalid={invalid}
+          autoFocus={autoFocus}
           autoComplete="new-password"
           spellCheck={false}
           style={{ paddingRight: 36 }}
