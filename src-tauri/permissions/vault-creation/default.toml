@@ -1,20 +1,12 @@
 # Permissions for the in-app `vault-creation` Tauri plugin.
-#
-# **Naming note (Tauri 2 in-app plugins).** Tauri 2's `tauri-build`
-# discovers TOML files under `src-tauri/permissions/<dir>/*.toml` but
-# does NOT prefix the resulting permission identifiers with the
-# `<dir>` name — they are exposed at the app level as bare
-# `allow-begin`, `allow-commit`, `allow-cancel`. The directory exists
-# only to keep the per-plugin file layout grouped on disk; the
-# capability file references them without any plugin prefix.
-# When the plugin is later extracted to a separate crate (Phase 2+
-# `vault-unlock` etc. follow this pattern), the permissions will
-# automatically pick up the `<crate-name>:` prefix.
+# Picked up under the `vault-creation:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `vault-creation:default` (or `vault-creation:allow-<cmd>`).
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the vault-creation plugin — allows begin, commit, and cancel."
+description = "Default permission set for the vault-creation plugin."
 permissions = ["allow-begin", "allow-commit", "allow-cancel"]
 
 [[permission]]
