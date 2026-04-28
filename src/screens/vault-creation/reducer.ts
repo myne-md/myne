@@ -207,7 +207,13 @@ export function vaultCreationReducer(
     case "COMMIT_REQUESTED":
       return { ...state, step: "committing", error: null };
     case "COMMIT_OK":
-      return { ...state, step: "ready", error: null };
+      // Drop every reference to the recovery phrase, account number,
+      // session token, and confirmation inputs. ReadyStep reads none
+      // of them. Without this reset the secret material would sit in
+      // the React tree until the user clicks "Done"; minimising the
+      // residence window narrows the local-memory exposure surface
+      // (TB1).
+      return { ...initialState, step: "ready" };
     case "COMMIT_ERR":
       return { ...state, step: "account", error: action.error };
     case "RESET_TO_PASSWORD":
