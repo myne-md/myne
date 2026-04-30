@@ -51,10 +51,12 @@ This specification is identified as **`myne-protocol-v0.1`**. The protocol versi
 | Subkey derivation | **HKDF-SHA-256** with registered context strings via single canonical helper (§3.2) | (resolved 2026-04-26 — see §12) |
 | AEAD | XChaCha20-Poly1305 (RFC 8439 + extended-nonce variant), 256-bit key, 192-bit random nonce | XChaCha20-Poly1305 + CTX commitment outer hash (research §2.3) |
 | Recovery phrase | BIP-39 24 words (256-bit entropy), library `@scure/bip39` | (no alternative under review) |
-| Hashing | SHA-256 (per libsodium / WebCrypto availability) | BLAKE3 (research §2.4) |
-| RNG | OS CSPRNG via libsodium `randombytes_buf` | (no alternative under review) |
+| Hashing | SHA-256 (RustCrypto `sha2`; libsodium / WebCrypto on other clients) | BLAKE3 (research §2.4) |
+| RNG | OS CSPRNG (RustCrypto `getrandom` on the Rust client; libsodium `randombytes_buf` on libsodium clients) | (no alternative under review) |
 
-**Library**: libsodium across the stack — Rust bindings (`libsodium-sys-stable` or `sodiumoxide`) on the desktop client, Go stdlib + `golang.org/x/crypto` on the server when it ships in Phase 2, libsodium-js for the Phase 3 web client. RustCrypto (`hkdf`, `chacha20poly1305`, `argon2`) is acceptable as a fallback if libsodium bindings prove inadequate, but the libsodium primitive remains canonical. No custom primitive implementation. Standard Notes 004's choice of libsodium-only is preserved.
+**Library.** Rust desktop client: **RustCrypto stack** — `hkdf` (RFC 5869), `argon2` (RFC 9106), `chacha20poly1305` (RFC 8439 + extended-nonce variant), `sha2`, with `zeroize` for memory hygiene and `getrandom` for OS CSPRNG. The `protocol/` crate is `#![no_std]` + `extern crate alloc;`. Other clients use libsodium-equivalent APIs at the byte level: Go server uses `golang.org/x/crypto` when it ships in Phase 2; iOS/Android (Phase 3) use native libsodium bindings; the Phase 3 web client's primitive provider is decided at Phase 3 start. **No custom primitive implementations on any client.** Cross-implementation byte-level compatibility is validated by the `myne-test-vectors/` companion repo — RustCrypto and libsodium emit identical bytes for the same inputs because both implement the published RFCs and the CTX commitment construction (§5.1) is a thin SHA-256 wrapper on top.
+
+The `chacha20poly1305` RustCrypto crate received an NCC Group audit (Feb 2020, no significant findings); `vodozemac` (Matrix Olm/Megolm in pure Rust on RustCrypto primitives) received a Least Authority audit (Mar 2022, no significant findings); `age`/`rage` ships exclusively on RustCrypto. These audit and prod-deployment evidences anchor the audit-substitute story (`../threat-model.md` §6) for the Rust side. See `../decisions.md` "2026-04-28 — Rust-side primitives: RustCrypto stack as primary".
 
 The five `[DEFERRED]` items above will be resolved in dedicated decision sessions and recorded in `../decisions.md`. This v0.1 specification will be revised in place if any deferred decision changes the baseline.
 
@@ -330,6 +332,9 @@ Both AEAD operations carry an AAD with the structure:
 ```
 AAD_prefix = "myne.v0.1|"               (10 ASCII bytes, including pipe)
 
+AAD_wrap_items_key =
+  AAD_prefix || protocol_version (1 B) || items_key_id (16 B)
+
 AAD_wrap_item_key =
   AAD_prefix || protocol_version (1 B) || items_key_id (16 B) || note_uuid (16 B)
 
@@ -337,7 +342,11 @@ AAD_encrypt_content =
   AAD_prefix || protocol_version (1 B) || items_key_id (16 B) || note_uuid (16 B) || content_type
 ```
 
-`content_type` is a length-prefixed UTF-8 string. In v0.1 it is always `"text/markdown"`. The field is included so v005 can introduce attachments and other content types without breaking the AAD layout.
+`AAD_wrap_items_key` is the AAD bound into the AEAD wrap of the singleton v0.1 `itemsKey` (`vault.meta` §9.3 offset 281). It is distinct from `AAD_wrap_item_key`, which binds the per-note `item_key` wrap and additionally carries the per-note UUID. The singleton `itemsKey` has no per-note UUID, so the AAD reduces accordingly.
+
+**Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
+
+`content_type` in v0.1 is always `"text/markdown"`. The field is included so v005 can introduce attachments and other content types without breaking the AAD layout.
 
 The `AAD_password_wrap` and `AAD_recovery_wrap` AADs (defined in §3.1) additionally carry the canonical KDF parameters block (§4.3), so any tampering with the stored Argon2id parameters invalidates the wrap.
 
