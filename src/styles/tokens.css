@@ -21,7 +21,6 @@
    added under public/fonts/. The system stack below substitutes meanwhile.
    ------------------------------------------------------------------------ */
 
-/*
 @font-face {
   font-family: "Inter";
   font-style: normal;
@@ -37,7 +36,6 @@
   font-display: swap;
   src: url("/fonts/JetBrainsMono.woff2") format("woff2");
 }
-*/
 
 :root {
   /* -- Type families --------------------------------------------------- */
