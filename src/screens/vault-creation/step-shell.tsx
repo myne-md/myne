@@ -83,6 +83,12 @@ interface StepHeadingProps {
 export function StepHeading({ centered, children }: StepHeadingProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (
+      import.meta.env.DEV &&
+      new URLSearchParams(location.search).get("test-no-autofocus") === "true"
+    ) {
+      return;
+    }
     ref.current?.focus({ preventScroll: true });
   }, []);
   return (

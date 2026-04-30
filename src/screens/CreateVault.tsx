@@ -25,6 +25,13 @@ import { useEffect, useReducer, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
+
+// Dev guard: Vite-only browser runs (Playwright, plain `pnpm dev`) have no
+// Tauri IPC bridge; the @tauri-apps APIs throw on first access. This flag
+// short-circuits Tauri-touching effects so the UI still renders for design
+// review. In production / `pnpm tauri dev`, __TAURI_INTERNALS__ is set.
+const HAS_TAURI =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 import {
   vaultCreationReducer,
   initialState,
@@ -57,8 +64,72 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
     stepRef.current = state.step;
   });
 
+  // Dev-only: walk the reducer to a target step via ?test-step=<step> so
+  // Playwright can capture every screen without going through real Tauri
+  // invoke calls (which don't exist in a browser). Tree-shaken from prod
+  // builds via the import.meta.env.DEV guard.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const target = new URLSearchParams(location.search).get("test-step");
+    if (!target) return;
+    const MOCK_PHRASE = [
+      "abandon", "ability", "able", "about", "above", "absent",
+      "absorb", "abstract", "absurd", "abuse", "access", "accident",
+      "account", "accuse", "achieve", "acid", "acoustic", "acquire",
+      "across", "act", "action", "actor", "actress", "actual",
+    ];
+    const MOCK_ACCOUNT = "MY-4K7P-N3RM-9QXC-VBHT-2";
+    const MOCK_TOKEN = "test-session-token-uuid";
+    const MOCK_SESSION_LOST = {
+      title: "Session expired",
+      body: "For your security, vault creation times out after 10 minutes. Start over.",
+      primaryAction: "restart",
+      displayMode: "dedicated",
+    } as const;
+    const beginOk = () =>
+      dispatch({
+        type: "BEGIN_OK",
+        phrase: MOCK_PHRASE,
+        accountNumber: MOCK_ACCOUNT,
+        sessionToken: MOCK_TOKEN,
+      });
+    if (target === "encrypting") {
+      dispatch({ type: "BEGIN_REQUESTED" });
+    } else if (target === "phrase") {
+      beginOk();
+    } else if (target === "confirm") {
+      beginOk();
+      dispatch({ type: "PHRASE_REVEALED" });
+      dispatch({ type: "PHRASE_ACKED" });
+    } else if (target === "account") {
+      beginOk();
+      dispatch({ type: "PHRASE_REVEALED" });
+      dispatch({ type: "PHRASE_ACKED" });
+      dispatch({ type: "PHRASE_CONFIRMED" });
+    } else if (target === "committing") {
+      beginOk();
+      dispatch({ type: "PHRASE_REVEALED" });
+      dispatch({ type: "PHRASE_ACKED" });
+      dispatch({ type: "PHRASE_CONFIRMED" });
+      dispatch({ type: "ACCOUNT_ACK_TOGGLED", checked: true });
+      dispatch({ type: "COMMIT_REQUESTED" });
+    } else if (target === "ready") {
+      beginOk();
+      dispatch({ type: "PHRASE_REVEALED" });
+      dispatch({ type: "PHRASE_ACKED" });
+      dispatch({ type: "PHRASE_CONFIRMED" });
+      dispatch({ type: "ACCOUNT_ACK_TOGGLED", checked: true });
+      dispatch({ type: "COMMIT_REQUESTED" });
+      dispatch({ type: "COMMIT_OK" });
+    } else if (target === "session-lost") {
+      dispatch({ type: "SESSION_LOST", error: MOCK_SESSION_LOST });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     return () => {
+      if (!HAS_TAURI) return;
       const token = sessionTokenRef.current;
       if (token) {
         invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
@@ -69,6 +140,7 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
   }, []);
 
   useEffect(() => {
+    if (!HAS_TAURI) return;
     let cancelled = false;
     let unlisten: (() => void) | null = null;
     const win = getCurrentWindow();
@@ -115,16 +187,19 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
   };
 
   const handlePhraseBack = () => {
-    const token = sessionTokenRef.current;
-    if (token) {
-      invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
-        (e: unknown) => logErrorKind(e, "cancel-failed"),
-      );
+    if (HAS_TAURI) {
+      const token = sessionTokenRef.current;
+      if (token) {
+        invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
+          (e: unknown) => logErrorKind(e, "cancel-failed"),
+        );
+      }
     }
     dispatch({ type: "RESET_TO_PASSWORD" });
   };
 
   useEffect(() => {
+    if (!HAS_TAURI) return;
     if (state.step !== "encrypting") return;
     const password = passwordRef.current;
     if (!password) return;
@@ -166,6 +241,7 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
   }, [state.step]);
 
   useEffect(() => {
+    if (!HAS_TAURI) return;
     if (state.step !== "committing") return;
     const token = sessionTokenRef.current;
     if (!token) return;
