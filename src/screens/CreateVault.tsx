@@ -1,0 +1,260 @@
+// Vault-creation orchestrator. Mounts when App.tsx stage transitions to
+// "create-vault"; owns the entire vault-creation state machine via
+// useReducer; mounts the active step component based on state.step.
+//
+// Implements design session 2026-04-28-vault-creation-frontend.md:
+//   - Q2 state machine + secret-material scope encapsulation (phrase /
+//     accountNumber / sessionToken live in this component's reducer
+//     state and never leak to App.tsx).
+//   - Q6 begin invocation as a useEffect on `state.step === "encrypting"`
+//     (Argon2id × 2 inside spawn_blocking on the Rust side).
+//   - Q7 error routing: AppError → mapAppErrorToUserMessage → BEGIN_ERR
+//     (inline banner) or SESSION_LOST (dedicated screen).
+//   - Q8.2 onCloseRequested prompt for sensitive steps (phrase / confirm /
+//     account); membership decided via isSensitiveStep() in reducer.ts.
+//   - Q8.3 useRef + empty-deps cleanup pattern (cancel(token) only on
+//     real unmount; React 18 StrictMode dev double-invoke is a no-op
+//     because the ref only carries a token after BEGIN_OK).
+//
+// Backend dependencies (per backend-vault-creation/rfc.md):
+//   - vault-creation:begin   — wired below.
+//   - vault-creation:commit  — wired below.
+//   - vault-creation:cancel  — wired here (cleanup + PhraseStep Back).
+
+import { useEffect, useReducer, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
+import {
+  vaultCreationReducer,
+  initialState,
+  isSensitiveStep,
+  type Step,
+} from "./vault-creation";
+import { PasswordStep } from "./vault-creation/PasswordStep";
+import { EncryptingStep } from "./vault-creation/EncryptingStep";
+import { PhraseStep } from "./vault-creation/PhraseStep";
+import { ConfirmStep } from "./vault-creation/ConfirmStep";
+import { AccountStep } from "./vault-creation/AccountStep";
+import { ReadyStep } from "./vault-creation/ReadyStep";
+import { SessionLostStep } from "./vault-creation/SessionLostStep";
+import { mapAppErrorToUserMessage } from "../lib/vault-creation-errors";
+import { isAppError, logErrorKind } from "../lib/vault-creation-logging";
+import type { BeginResult } from "../types/protocol-error";
+
+interface CreateVaultProps {
+  onBack: () => void;
+  onComplete: () => void;
+}
+
+export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
+  const [state, dispatch] = useReducer(vaultCreationReducer, initialState);
+
+  const sessionTokenRef = useRef<string | null>(null);
+  const stepRef = useRef<Step>(state.step);
+  useEffect(() => {
+    sessionTokenRef.current = state.sessionToken;
+    stepRef.current = state.step;
+  });
+
+  useEffect(() => {
+    return () => {
+      const token = sessionTokenRef.current;
+      if (token) {
+        invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
+          (e: unknown) => logErrorKind(e, "cancel-failed"),
+        );
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | null = null;
+    const win = getCurrentWindow();
+    win
+      .onCloseRequested(async (event) => {
+        if (!isSensitiveStep(stepRef.current)) return;
+        let proceed: boolean;
+        try {
+          proceed = await dialogConfirm(
+            "Closing will discard your recovery phrase. Continue closing?",
+            {
+              title: "Discard vault creation?",
+              okLabel: "Close anyway",
+              cancelLabel: "Cancel",
+            },
+          );
+        } catch (e) {
+          logErrorKind(e, "close-confirm-failed");
+          event.preventDefault();
+          return;
+        }
+        // Calling close() here would recursively re-fire onCloseRequested.
+        if (!proceed) event.preventDefault();
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      })
+      .catch((e: unknown) => logErrorKind(e, "close-listener-failed"));
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  // Captured password sits here only between PasswordStep submit and
+  // BEGIN_OK / BEGIN_ERR resolution. Cleared on both paths so a stale
+  // password cannot ride along into a later begin attempt.
+  const passwordRef = useRef<string | null>(null);
+
+  const handlePasswordSubmit = (password: string) => {
+    passwordRef.current = password;
+    dispatch({ type: "BEGIN_REQUESTED" });
+  };
+
+  const handlePhraseBack = () => {
+    const token = sessionTokenRef.current;
+    if (token) {
+      invoke("plugin:vault-creation|cancel", { sessionToken: token }).catch(
+        (e: unknown) => logErrorKind(e, "cancel-failed"),
+      );
+    }
+    dispatch({ type: "RESET_TO_PASSWORD" });
+  };
+
+  useEffect(() => {
+    if (state.step !== "encrypting") return;
+    const password = passwordRef.current;
+    if (!password) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await invoke<BeginResult>(
+          "plugin:vault-creation|begin",
+          { password },
+        );
+        if (cancelled) return;
+        passwordRef.current = null;
+        dispatch({
+          type: "BEGIN_OK",
+          phrase: result.phrase,
+          accountNumber: result.account_number,
+          sessionToken: result.session_token,
+        });
+      } catch (e) {
+        if (cancelled) return;
+        passwordRef.current = null;
+        if (!isAppError(e)) {
+          logErrorKind(e, "begin-unknown-error");
+          dispatch({ type: "BEGIN_ERR", error: GENERIC_ERROR });
+          return;
+        }
+        logErrorKind(e, "begin");
+        const message = mapAppErrorToUserMessage(e);
+        if (message.displayMode === "dedicated") {
+          dispatch({ type: "SESSION_LOST", error: message });
+        } else {
+          dispatch({ type: "BEGIN_ERR", error: message });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.step]);
+
+  useEffect(() => {
+    if (state.step !== "committing") return;
+    const token = sessionTokenRef.current;
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await invoke("plugin:vault-creation|commit", { sessionToken: token });
+        if (cancelled) return;
+        sessionTokenRef.current = null;
+        dispatch({ type: "COMMIT_OK" });
+      } catch (e) {
+        if (cancelled) return;
+        if (!isAppError(e)) {
+          logErrorKind(e, "commit-unknown-error");
+          dispatch({ type: "COMMIT_ERR", error: GENERIC_ERROR });
+          return;
+        }
+        logErrorKind(e, "commit");
+        const message = mapAppErrorToUserMessage(e);
+        if (message.displayMode === "dedicated") {
+          sessionTokenRef.current = null;
+          dispatch({ type: "SESSION_LOST", error: message });
+        } else {
+          dispatch({ type: "COMMIT_ERR", error: message });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.step]);
+
+  switch (state.step) {
+    case "password":
+      return (
+        <PasswordStep
+          error={state.error}
+          onBack={onBack}
+          onSubmit={handlePasswordSubmit}
+        />
+      );
+    case "encrypting":
+      return <EncryptingStep />;
+    case "phrase":
+      return (
+        <PhraseStep
+          phrase={state.phrase ?? []}
+          revealed={state.phraseRevealed}
+          dispatch={dispatch}
+          onCancelSession={handlePhraseBack}
+        />
+      );
+    case "confirm":
+      return (
+        <ConfirmStep
+          phrase={state.phrase ?? []}
+          positions={state.confirmPositions ?? [1, 1, 1, 1]}
+          inputs={state.confirmInputs}
+          dispatch={dispatch}
+        />
+      );
+    case "account":
+    case "committing":
+      return (
+        <AccountStep
+          accountNumber={state.accountNumber ?? ""}
+          acknowledged={state.accountAcknowledged}
+          committing={state.step === "committing"}
+          error={state.error}
+          dispatch={dispatch}
+        />
+      );
+    case "ready":
+      return <ReadyStep onDone={onComplete} />;
+    case "session-lost":
+      // SESSION_LOST is the only path into this step and always carries
+      // an error; the non-null assertion is type-safe per the reducer.
+      return <SessionLostStep error={state.error!} dispatch={dispatch} />;
+    default: {
+      const _exhaustive: never = state.step;
+      void _exhaustive;
+      return null;
+    }
+  }
+}
+
+const GENERIC_ERROR = {
+  title: "Something went wrong",
+  body: "Try again.",
+  primaryAction: "retry",
+  displayMode: "inline",
+} as const;

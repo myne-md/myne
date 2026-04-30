@@ -632,6 +632,12 @@ A generic term referring to whatever value is sent to the sync server for authen
 
 Used in: `spec/protocol.md` §1.1, §11.1
 
+### **session token** &nbsp; 🗝️ *Key/identifier*
+
+An opaque UUIDv4 identifying an in-flight vault-creation session held in the Tauri-managed `VaultCreationState` map between the `begin` and `commit` IPC calls. The session token is **not a secret** — it is a bearer reference to the session row, which contains the actual secret material (`root_key`, password and recovery wrap keys, recovery phrase, account number). Sessions live at most 10 minutes (`SESSION_TTL_SECS`); evicted tokens are tombstoned for up to 1 hour so a subsequent `commit` returns `SessionExpired` instead of the generic `SessionNotFound`.
+
+Used in: `decisions.md` 2026-04-28 "Vault creation flow: backend session pattern", "Vault creation session TTL"
+
 ### **SHA-256** &nbsp; 🔐 *Primitive*
 
 The 256-bit Secure Hash Algorithm 2 (FIPS 180-4). Used in Myne for: salt construction (§3.1), the CTX commitment outer hash (§5.1), the account-number hash (§8), and HMAC underlying HKDF-SHA-256 (§3.2).
@@ -711,6 +717,12 @@ A user's encrypted note collection — the unit of Myne's data model. Concretely
 
 Used in: `spec/protocol.md` §9.1
 
+### **vault creation session** &nbsp; 📦 *Product*
+
+The backend-resident state held between the `begin` and `commit` IPC calls of the vault-creation flow. A `VaultCreationSession` (Rust struct in `src-tauri/src/plugins/vault_creation/state.rs`) carries the freshly generated `account_number`, `recovery_phrase`, `root_key`, two Argon2id salts, the cached password and recovery wrap keys, the chosen `KdfParams`, and a `created_at: Instant` timestamp. Lives in a `Mutex<HashMap<Uuid, VaultCreationSession>>` indexed by **session token**. Bounded by `MAX_CONCURRENT_SESSIONS = 4` and `SESSION_TTL_SECS = 600` (10 minutes); evicted by a background `tokio::time::interval(60s)` task whose evicted tokens land in a parallel **tombstone** map for up to `TOMBSTONE_RETENTION_SECS = 3600` (1 hour). `root_key` and the wrap keys never cross the IPC boundary — they live only in this session until `commit` consumes it.
+
+Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
+
 ### **vault.meta** &nbsp; 📦 *Product* (deep entry)
 
 The single binary file holding vault-level cryptographic state. Magic bytes `MYV1` for v0.1. Layout per `spec/protocol.md` §9.3: protocol version, account_number_hash, the 11-byte canonical KDF parameters block, both salt-randomness fields (`random_salt_password_16`, `random_salt_recovery_16`), nonces and ciphertexts for both wrapped root-key copies (`enc_root_key_password`, `enc_root_key_recovery`), and the items_key_id, items_key_nonce, and `enc_items_key`. `vault.meta` plus the `.myn` files are the only artifacts that leave the device in any future sync scenario; both are opaque ciphertext plus a small public header.
@@ -729,6 +741,12 @@ Reference: https://vite.dev
 The `[[note name]]` syntax for inline links between notes. Myne v0.1 supports wikilink parsing in CodeMirror, displays a backlinks pane, and renders the link graph in the lazy-loaded graph view.
 
 Used in: `vision.md` Phase 1 Scope
+
+### **wrap key cache** &nbsp; 🗝️ *Key/identifier*
+
+The two 32-byte Argon2id outputs (`password_wrap_key`, `recovery_wrap_key`) derived from the master password and recovery phrase respectively, cached on a **vault creation session** between `begin` and `commit`. Argon2id at the v0.1 baseline (`m_kib = 262_144`, `t = 3`, `p = 2`) takes ~1–2 seconds per call; deriving once at `begin` time and reusing at `commit` time eliminates a second ~2-second pass through the recovery-phrase Argon2id. The wrap keys are `Zeroizing<[u8; 32]>`; they are wiped when the session is dropped (commit, cancel, or TTL eviction).
+
+Used in: `decisions.md` 2026-04-28 "Vault creation flow"
 
 ### **X25519** &nbsp; 🔐 *Primitive*
 

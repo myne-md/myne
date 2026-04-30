@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-**Pre-alpha.** No application logic has shipped. What exists today: the v0.1 specifications under `docs/`, the Tauri 2 + Vite + React + TypeScript scaffold (`src/`, `src-tauri/`, `public/`, `index.html`, `package.json`, `vite.config.ts`), the workspace setup scripts (`workspace/`), and pinned toolchain files. The Rust crypto protocol crate lives at `protocol/` once it is implemented; that directory does not exist yet.
+**Pre-alpha.** No application logic has shipped. What exists today: the v0.1 specifications under `docs/`, the Tauri 2 + Vite + React + TypeScript scaffold (`src/`, `src-tauri/`, `public/`, `index.html`, `package.json`, `vite.config.ts`), the Rust crypto crate scaffold (`protocol/` — `#![no_std]` + `alloc`, RustCrypto stack, modules currently stubs), the Cargo workspace at the repo root (`Cargo.toml` + shared `Cargo.lock`), the workspace setup scripts (`workspace/`), and pinned toolchain files.
 
 The desktop scaffold deliberately lives at the **repository root**, not under `apps/desktop/` — there is only one in-repo client (Phase 1 desktop) and the protocol crate; everything else (mobile, web, server, website, ops, test vectors) is a companion repo. See `docs/decisions.md` "Desktop scaffold lives at repository root".
 
 ## Common commands
 
-This is a Tauri 2 app driven by **pnpm** (Tauri's `beforeDevCommand` / `beforeBuildCommand` invoke `pnpm dev` / `pnpm build`). The pinned Node version is in `.nvmrc` (25.9.0); the pinned Rust toolchain is in `src-tauri/rust-toolchain.toml` (1.90.0, profile `minimal`, with `rustfmt` + `clippy`). CI and reproducible-build instructions read these files — do not bypass them.
+This is a Tauri 2 app driven by **pnpm** (Tauri's `beforeDevCommand` / `beforeBuildCommand` invoke `pnpm dev` / `pnpm build`). The pinned Node version is in `.nvmrc` (25.9.0); the pinned Rust toolchain is in `rust-toolchain.toml` at the repo root (1.90.0, profile `minimal`, with `rustfmt` + `clippy`). CI and reproducible-build instructions read these files — do not bypass them.
 
 ```bash
 # UI / desktop
@@ -20,13 +20,14 @@ pnpm dev                # Vite only — port is fixed via strictPort, fails if 1
 pnpm build              # tsc (typecheck) + vite build → ../dist/ (consumed by Tauri)
 pnpm tauri build        # production desktop bundle
 
-# Rust core (run inside src-tauri/)
-cargo check
-cargo clippy --all-targets -- -D warnings
-cargo fmt
-cargo test                              # whole crate
-cargo test <name>                       # single test by name substring
-cargo test --test <integration-file>    # one integration test file
+# Rust workspace (run from repo root)
+cargo check                                       # whole workspace
+cargo check -p protocol                           # protocol crate only
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt                                          # format whole workspace
+cargo test --workspace                            # all tests
+cargo test -p protocol <name>                     # one test by name in the protocol crate
+cargo test --test <integration-file>              # one integration test file
 
 # Multi-repo workspace
 ./workspace/setup.sh        # clone every companion in workspace/manifest.txt INTO this repo
@@ -49,17 +50,20 @@ myne/
 ├── src/                 ← React UI (single page, Tauri WebView)
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
+├── protocol/            ← Rust crypto crate (#![no_std] + alloc, RustCrypto stack)
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
+├── Cargo.toml           ← Cargo workspace root (members: src-tauri, protocol)
+├── Cargo.lock           ← single shared lockfile (TB9 audit anchor)
+├── rust-toolchain.toml  ← pinned Rust toolchain (single canonical location)
 ├── index.html           ← Vite entry
 ├── package.json         ← pnpm + Vite + React 19 + TS toolchain
 ├── vite.config.ts       ← Tauri-aware Vite config (port 1420, ignores src-tauri)
 ├── tsconfig.json        ← strict mode + noUnusedLocals/Parameters
-├── .nvmrc               ← pinned Node (reproducible builds)
-└── (protocol/)          ← future Rust crypto crate; lands as a Cargo workspace sibling
+└── .nvmrc               ← pinned Node (reproducible builds)
 ```
 
-The Rust crypto protocol crate, when its implementation begins, lands as a sibling of `src-tauri/` so the repo becomes a single Cargo workspace at root with **one shared `Cargo.lock`** — this is required for the hash-pinned-lockfile audit story (see `docs/threat-model.md` §3 TB9).
+The repo is a single Cargo workspace at root with **one shared `Cargo.lock`** — required for the hash-pinned-lockfile audit story (see `docs/threat-model.md` §3 TB9). The `protocol/` crate is `#![no_std]` + `extern crate alloc;` so Phase 3 wasm-reuse (if chosen) does not require a refactor.
 
 ### Companion repositories (cloned inside this repo)
 
@@ -100,10 +104,10 @@ All subkey derivations MUST go through a single canonical helper (`DeriveSubkey(
 ### Crypto primitives baseline
 
 - **KDF**: Argon2id `m=256 MiB, t=3, p=2`, version 1.3. Parameters are **stored in `vault.meta`** (canonical 11-byte block) and bound into both `AAD_password_wrap` and `AAD_recovery_wrap` — defeats parameter-downgrade.
-- **Subkey derivation**: HKDF-SHA-256 (RFC 5869) via libsodium-native API.
+- **Subkey derivation**: HKDF-SHA-256 (RFC 5869) via the RustCrypto `hkdf` crate (Rust client); libsodium-equivalent on other clients.
 - **AEAD**: XChaCha20-Poly1305 wrapped in CTX commitment (Chan & Rogaway, ESORICS 2022): `T' = SHA-256(K[32] || N[24] || len(AD)[4 BE] || AD || T[16])`. On-disk tag fields are 32 bytes (the CTX commitment), not 16 (the Poly1305 tag is recomputed at decrypt and discarded).
 - **Recovery phrase**: BIP-39 24 words → fed **directly** to Argon2id (BIP-39's PBKDF2-HMAC-SHA512-2048 is **not** used; BIP-39 here is encoding-only for 256-bit entropy).
-- **Library**: libsodium across the stack. RustCrypto (`hkdf`, `chacha20poly1305`, `argon2`) is the only acceptable fallback. No custom primitive implementations.
+- **Library (Rust desktop)**: **RustCrypto stack** — `hkdf`, `argon2`, `chacha20poly1305`, `sha2`, plus `zeroize` for memory hygiene and `getrandom` for OS CSPRNG. The `protocol/` crate is `#![no_std]` + `extern crate alloc;`. Other clients use libsodium-equivalent APIs at the byte level (Go server `golang.org/x/crypto`; mobile iOS/Android native libsodium; Phase 3 web's primitive provider deferred to Phase 3 start). Cross-implementation byte-level compatibility is validated by `myne-test-vectors/`. Audit anchors: `chacha20poly1305` NCC Group (Feb 2020, no significant findings), `vodozemac` Least Authority (Mar 2022, no significant findings), `age`/`rage` prod use. **No custom primitive implementations on any client.** See `docs/decisions.md` "2026-04-28 — Rust-side primitives: RustCrypto stack as primary".
 
 ### Hard architectural commitments (don't quietly walk these back)
 
