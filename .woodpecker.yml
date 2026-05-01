@@ -1,10 +1,10 @@
-# Woodpecker CI — DIAGNOSTIC MINIMAL VERSION
+# Woodpecker CI — DIAGNOSTIC MINIMAL VERSION (round 2)
 # Original config preserved at commit ddb9085; restore via:
 #   git show ddb9085:.woodpecker.yml > .woodpecker.yml
 #
-# Purpose: prove Woodpecker can reach the repo, trigger on push, clone, and run a single step.
-# If THIS pipeline also shows "step canceled" → repo not activated, webhook missing, or runner unavailable.
-# If THIS works → the original 6-step pipeline has a syntax/depends_on/image issue, debug from there.
+# Round 1 failed: "cannot unmarshal map[echo Branch:$CI_COMMIT_BRANCH]"
+# → Woodpecker template engine choked on `:` inside echo strings even when quoted.
+# → Removed all `:` from command output; switched env var to ${VAR} form.
 
 when:
   - event: push
@@ -13,10 +13,8 @@ steps:
   hello:
     image: alpine
     commands:
-      - echo "✓ Woodpecker reachable; runner online; alpine pull OK"
-      - echo "Branch: $CI_COMMIT_BRANCH"
-      - echo "Commit: $CI_COMMIT_SHA"
-      - echo "--- Repo files (clone OK?): ---"
+      - echo woodpecker reachable
+      - echo runner online
+      - echo alpine pull OK
       - ls -la
-      - echo "--- .woodpecker.yml head: ---"
       - head -10 .woodpecker.yml
