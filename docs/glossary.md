@@ -52,7 +52,7 @@ Used in: `spec/protocol.md` §5.2
 
 ### **AAD prefix** &nbsp; 📋 *Protocol*
 
-The 14-byte ASCII string `"myne.v0.1|"` (including the trailing pipe) that begins every AAD in this protocol version. v005 will use `"myne.v005|"`. The prefix domain-separates protocol versions at the AEAD tag level — a v005 client cannot accidentally decrypt a v0.1 blob.
+The 10-byte ASCII string `"myne.v0.1|"` (including the trailing pipe) that begins every AAD in this protocol version. v005 will use `"myne.v005|"`. The prefix domain-separates protocol versions at the AEAD tag level — a v005 client cannot accidentally decrypt a v0.1 blob.
 
 Used in: `spec/protocol.md` §5.2
 
