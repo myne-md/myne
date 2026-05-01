@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-01T00:00:00Z",
+  "title": "Design System: Myne",
+  "canonicalSource": {
+    "kind": "penpot",
+    "page": "4 — Desktop UI Kit",
+    "note": "Penpot is the canonical design source via the penpot MCP server. Token values in DESIGN.md and DESIGN.json are extracted from docs/design/colors_and_type.css, which is the code-side projection of the Penpot canon. When Penpot and these values disagree, Penpot wins; update the projection. Diff workflow lives at docs/dev/penpot-design-diff.md."
+  },
+  "extensions": {
+    "colorMeta": {
+      "iron-blue": {
+        "role": "primary",
+        "displayName": "Iron Blue",
+        "canonical": "#2c4a7a",
+        "tonalRamp": ["#0e1828", "#15233a", "#1b2e4d", "#233b62", "#2c4a7a", "#5a76a3", "#8aa4d0", "#c0cee2"]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#fbfbfa",
+        "tonalRamp": ["#0b0b09", "#1a1a17", "#3a3934", "#6b6a64", "#a3a29c", "#c8c7c1", "#e3e2dd", "#f4f4f2", "#fbfbfa"]
+      },
+      "ink-primary": {
+        "role": "neutral",
+        "displayName": "Warm-Black Ink",
+        "canonical": "#1a1a17",
+        "tonalRamp": ["#0b0b09", "#1a1a17", "#3a3934", "#6b6a64", "#a3a29c", "#c8c7c1", "#e3e2dd", "#f4f4f2"]
+      },
+      "brick-danger": {
+        "role": "state-danger",
+        "displayName": "Brick Red",
+        "canonical": "#8a2a23",
+        "tonalRamp": ["#3a0f0c", "#591711", "#8a2a23", "#a44a44", "#bd6b66", "#d39994", "#e6c0bc", "#f5e7e5"]
+      },
+      "ochre-warning": {
+        "role": "state-warning",
+        "displayName": "Ochre",
+        "canonical": "#8a6a1f",
+        "tonalRamp": ["#3a2c0c", "#5a4514", "#8a6a1f", "#a48648", "#bda36c", "#d3bf94", "#e6d5b8", "#f5efde"]
+      },
+      "forest-success": {
+        "role": "state-success",
+        "displayName": "Forest Green",
+        "canonical": "#2f6048",
+        "tonalRamp": ["#0f2419", "#1a3b29", "#2f6048", "#4d7e64", "#6e9a82", "#94b6a3", "#c0d2c5", "#e3eee8"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headlines on marketing-adjacent surfaces only." },
+      "headline": { "displayName": "Headline", "purpose": "Welcome screen sections, vault-creation step headings." },
+      "title": { "displayName": "Title", "purpose": "In-app page titles, modal headings." },
+      "body": { "displayName": "Body", "purpose": "Desktop client default at 14px. Sustained reading." },
+      "body-large": { "displayName": "Body Large", "purpose": "Onboarding copy and recovery-flow prose where the message must land carefully." },
+      "caption": { "displayName": "Caption", "purpose": "Captions, helper text, status text in ink-tertiary." },
+      "label": { "displayName": "Label / Eyebrow", "purpose": "The only uppercase role in the system. Used for eyebrow tags above primary blocks." },
+      "mono": { "displayName": "Mono", "purpose": "Code spans, fingerprints, file paths. Never used for prose." },
+      "mono-large": { "displayName": "Mono Large", "purpose": "Recovery-phrase word display." },
+      "account-number": { "displayName": "Account Number", "purpose": "Signature treatment for MY-XXXX-XXXX-XXXX-XXXX-X. Always non-breaking hyphens, user-select all, slashed zero on." }
+    },
+    "shadows": [
+      { "name": "shadow-1", "value": "0 1px 0 rgba(11,11,9,0.04), 0 1px 2px rgba(11,11,9,0.06)", "purpose": "Tooltips only." },
+      { "name": "shadow-2", "value": "0 2px 4px rgba(11,11,9,0.06), 0 4px 12px rgba(11,11,9,0.08)", "purpose": "Dropdown menus, toasts." },
+      { "name": "shadow-3", "value": "0 8px 16px rgba(11,11,9,0.08), 0 16px 40px rgba(11,11,9,0.12)", "purpose": "Command palette and modal dialogs only." },
+      { "name": "shadow-1-dark", "value": "0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5)", "purpose": "Tooltips, dark theme." },
+      { "name": "shadow-2-dark", "value": "0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5)", "purpose": "Dropdown menus and toasts, dark theme." },
+      { "name": "shadow-3-dark", "value": "0 8px 16px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6)", "purpose": "Command palette and modal dialogs, dark theme." }
+    ],
+    "motion": [
+      { "name": "duration-fast", "value": "120ms", "purpose": "Hover and focus micro-transitions." },
+      { "name": "duration-base", "value": "180ms", "purpose": "UI transitions: panel open, palette show." },
+      { "name": "duration-slow", "value": "260ms", "purpose": "Modal enter and substantial state changes." },
+      { "name": "ease-standard", "value": "cubic-bezier(0.2, 0, 0, 1)", "purpose": "Entrances and standard transitions." },
+      { "name": "ease-out", "value": "cubic-bezier(0, 0, 0.2, 1)", "purpose": "Exits." }
+    ],
+    "focus": [
+      { "name": "ring", "value": "0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent)", "purpose": "Standard focus-visible ring: 2px iron-blue stroke with 1px paper offset. Always visible, never removed." },
+      { "name": "ring-inset", "value": "inset 0 0 0 2px var(--accent)", "purpose": "Inset variant for tight rows where an outer ring would clip." }
+    ],
+    "breakpoints": [
+      { "name": "desktop", "value": "1280px", "purpose": "Penpot canvas viewport; Playwright viewport for diff harness." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The iron-blue workhorse for submit, confirm, and continue actions. Used for the only call-to-action in any region.",
+      "html": "<button class=\"ds-btn-primary\">Create new vault</button>",
+      "css": ".ds-btn-primary { background: #2c4a7a; color: #ffffff; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; line-height: 1.5; padding: 10px 16px; border: 0; border-radius: 6px; cursor: pointer; transition: background 120ms cubic-bezier(0.2,0,0,1); } .ds-btn-primary:hover { background: #233b62; } .ds-btn-primary:active { background: #1b2e4d; box-shadow: inset 0 1px 2px rgba(11,11,9,0.12); } .ds-btn-primary:focus-visible { outline: 0; box-shadow: 0 0 0 2px #fbfbfa, 0 0 0 4px #2c4a7a; } .ds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Warm-paper button with hairline border. Used for neutral or destructive secondary actions.",
+      "html": "<button class=\"ds-btn-secondary\">Sign in to existing vault</button>",
+      "css": ".ds-btn-secondary { background: #fbfbfa; color: #1a1a17; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; line-height: 1.5; padding: 10px 16px; border: 1px solid #e3e2dd; border-radius: 6px; cursor: pointer; transition: background 120ms cubic-bezier(0.2,0,0,1); } .ds-btn-secondary:hover { background: #ecebe7; } .ds-btn-secondary:focus-visible { outline: 0; box-shadow: 0 0 0 2px #fbfbfa, 0 0 0 4px #2c4a7a; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Default text field with hairline border and an iron-blue focus ring (the border itself does not change color on focus).",
+      "html": "<input class=\"ds-input-text\" type=\"text\" placeholder=\"Master password\" />",
+      "css": ".ds-input-text { background: #fbfbfa; color: #1a1a17; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; padding: 8px 12px; border: 1px solid #c8c7c1; border-radius: 3px; transition: border-color 120ms cubic-bezier(0.2,0,0,1); } .ds-input-text::placeholder { color: #6b6a64; } .ds-input-text:focus-visible { outline: 0; box-shadow: 0 0 0 2px #fbfbfa, 0 0 0 4px #2c4a7a; } .ds-input-text:disabled { opacity: 0.4; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat warm-paper card with a hairline border. Never floats. Never has a colored left-border accent.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-eyebrow\">Recovery phrase</div><div class=\"ds-card-body\">Twenty-four words, written down once.</div></div>",
+      "css": ".ds-card { background: #f4f4f2; color: #1a1a17; border: 1px solid #e3e2dd; border-radius: 6px; padding: 16px; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; } .ds-card-eyebrow { font-size: 11px; font-weight: 600; line-height: 1.5; letter-spacing: 0.08em; text-transform: uppercase; color: #6b6a64; margin-bottom: 8px; } .ds-card-body { font-size: 14px; line-height: 1.5; color: #1a1a17; }"
+    },
+    {
+      "name": "Account Number",
+      "kind": "custom",
+      "refersTo": "account-number-chip",
+      "description": "Signature crypto-identifier rendering. Always JetBrains Mono medium 16px with slashed zero on, non-breaking hyphens, full-value selection.",
+      "html": "<span class=\"ds-account-number\">MY‑4KQR‑9PXJ‑7ZTM‑2VHN‑5</span>",
+      "css": ".ds-account-number { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 16px; font-weight: 500; line-height: 1.4; letter-spacing: 0.04em; font-feature-settings: 'ss02', 'zero', 'calt'; color: #1a1a17; background: #f4f4f2; padding: 4px 8px; border-radius: 3px; white-space: nowrap; user-select: all; cursor: text; }"
+    },
+    {
+      "name": "Sidebar Item",
+      "kind": "nav",
+      "refersTo": "sidebar-item",
+      "description": "32px-tall sidebar row. Iron-blue-soft background is the only place iron-blue appears as a fill outside of primary buttons.",
+      "html": "<a class=\"ds-sidebar-item ds-sidebar-item--active\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"/><path d=\"M14 2v6h6\"/></svg><span>Architecture notes</span></a>",
+      "css": ".ds-sidebar-item { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 8px 12px; border-radius: 3px; background: #fbfbfa; color: #3a3934; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1; text-decoration: none; transition: background 120ms cubic-bezier(0.2,0,0,1), color 120ms cubic-bezier(0.2,0,0,1); } .ds-sidebar-item:hover { background: #ecebe7; color: #1a1a17; } .ds-sidebar-item--active { background: #e8edf5; color: #2c4a7a; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "State communicated by an icon and label, never by the pill background. The pill itself stays neutral.",
+      "html": "<span class=\"ds-status-pill\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#8a2a23\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 8v4\"/><path d=\"M12 16h.01\"/></svg><span>Sync error</span></span>",
+      "css": ".ds-status-pill { display: inline-flex; align-items: center; gap: 6px; background: #f4f4f2; color: #6b6a64; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 13px; line-height: 1.5; padding: 2px 10px; border-radius: 999px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Paper and Terminal",
+    "overview": "The reference points are a printed page and a Unix terminal, not a SaaS dashboard. The surface is warm off-white paper (#fbfbfa) with warm-shifted near-black ink (#1a1a17). The cryptographic identifiers (account numbers, recovery-phrase words, key fingerprints) render in JetBrains Mono with the slashed zero turned on, because a person will read them aloud, type them by hand, and compare them against another device. The two registers (writerly paper, exact terminal) live in the same window without one swallowing the other.\n\nThe system is monochrome by default. More than 90% of any screen is neutral. There is exactly one accent color, an iron-blue #2c4a7a lifted toward sky tones in dark mode (#8aa4d0), and it is used only for focus rings, primary actions, links, and the active selection in the sidebar. State colors (a brick-red danger, a forest-green success, an ochre warning) are muted enough to read as information rather than alarm. The product is built to be lived in for hours: comfortable density, zero looping animations, no marching ants on the focus border, no pulsing status indicators. A user who has been writing for an hour should not have noticed the chrome.\n\nThe system explicitly rejects the privacy-product visual canon. There is no lock icon, no shield icon, no green checkmark badge. The Myne mark is a minimal M glyph, not a padlock. There is no glassmorphism, no backdrop-filter, no gradient on text or backgrounds. There are no cards with a colored left-border accent, no hero-metric template, no identical card grids, no stock photography of people. The visual surface for a privacy product should not telegraph that the product is about privacy; that conflation is what the system refuses.",
+    "keyCharacteristics": [
+      "Warm-paper light theme (#fbfbfa) with a dim-paper dark theme (#121210); both first-class.",
+      "One accent (iron-blue) used on roughly 5% of any screen; never decorative, never gradient.",
+      "Inter Variable for UI sans, JetBrains Mono Variable for cryptographic identifiers (slashed zero on, ss02 + zero + calt).",
+      "1px hairlines (#e3e2dd) for every divider; 2px borders are forbidden.",
+      "Flat at rest. Shadows live only on overlays (command palette, dropdowns, toasts, tooltips), never on the editor surface or on cards.",
+      "Restrained motion: 120/180/260ms, exponential ease-out only, prefers-reduced-motion disables transitions globally."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Iron-blue is the only chromatic color in any UI region except a state surface. Anywhere you reach for 'another color for visual interest', you are wrong; reach for typography, density, or whitespace instead.", "section": "colors" },
+      { "name": "The Anti-Privacy-Theme Rule", "body": "No lock icon, no shield icon, no green checkmark badge anywhere on the product surface. Encryption status is communicated typographically (a small caption 'Encrypted, synced 12s ago' in ink-tertiary), never with chrome.", "section": "colors" },
+      { "name": "The Warm-Black Rule", "body": "Use #1a1a17, never #000. Use #fbfbfa, never #fff. The 1% chroma toward warm shifts the surface from 'screen' to 'paper' and is the single most identity-defining choice in the system.", "section": "colors" },
+      { "name": "The Mono-for-Crypto Rule", "body": "Every value a human types or compares by eye, account numbers, recovery-phrase words, key fingerprints, hash prefixes, file paths, renders in JetBrains Mono with ss02 and zero on. Sans-serif is forbidden for these identifiers because the slashed zero is load-bearing for hand-typed Crockford-base32.", "section": "typography" },
+      { "name": "The Sentence-Case Rule", "body": "Buttons, headings, menu items, modal titles: sentence case. 'Save note', not 'Save Note'. Title case is reserved for proper nouns (Myne, Argon2id, BIP-39, XChaCha20-Poly1305, Crockford-base32, Tauri). Acronyms stay in caps (E2EE, AEAD, KDF, AAD).", "section": "typography" },
+      { "name": "The No-Hype-Words Rule", "body": "'Military-grade', 'bank-level', 'unbreakable', 'ultra-secure', 'next-gen': forbidden in every type role. The threat model speaks for the product; marketing language inserted into the type system would expose the system as advertising rather than tooling.", "section": "typography" },
+      { "name": "The Flat-Editor Rule", "body": "The editor surface and any pane inside the editor (sidebar, backlinks pane, status bar) carry no shadow. Adding a shadow to a pane is a category error; the editor is paper, and paper does not float over itself.", "section": "elevation" },
+      { "name": "The No-Glass Rule", "body": "No backdrop-filter, no filter: blur(), no vibrancy, no glassmorphism. Tauri 2 supports it on macOS; the system declines on purpose. The only translucent surface in the entire product is the modal scrim, and it has no blur.", "section": "elevation" },
+      { "name": "The No-Card-Stripe Rule", "body": "A card is never communicated by a colored left-border accent. Cards earn distinction from the --paper-2 fill and the --line-1 hairline only. If a card needs to communicate state, an eyebrow label inside does the work.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do treat Penpot as the canonical design source. Every screen ships from Penpot to code, never the reverse. When code and Penpot disagree, run scripts/penpot-diff.sh and fix the side that is wrong.",
+      "Do use OKLCH-style descriptive names in token discussions ('warm paper', 'iron blue', 'brick danger') rather than hex-code references in copy. The hex values are normative; the names are what humans use.",
+      "Do render every cryptographic identifier (account numbers, recovery-phrase words, key fingerprints, hash prefixes) in JetBrains Mono with ss02 and zero features on.",
+      "Do use the standard 2px iron-blue ring with a 1px paper offset for :focus-visible on every interactive element. The ring is always visible; never removed.",
+      "Do use sentence case everywhere. 'Save note', not 'Save Note'. Title case is reserved for proper nouns (Myne, Argon2id, BIP-39, XChaCha20-Poly1305, Crockford-base32, Tauri).",
+      "Do communicate state with an icon plus a text label, never with color alone.",
+      "Do keep motion under 260ms with exponential ease-out cubic curves. Disable transitions globally under prefers-reduced-motion.",
+      "Do ship border-radius: 6px on buttons and cards as the workhorse; 3px on inputs and chips; 10px on the command palette and modals; pill on status pills.",
+      "Do keep neutrals warm-shifted: #fbfbfa not #fff, #1a1a17 not #000. The 1% chroma is identity-defining."
+    ],
+    "donts": [
+      "Don't use a lock icon, shield icon, or green checkmark badge anywhere on the product surface. The Myne mark is not a padlock; encryption status is typography, not chrome.",
+      "Don't ship a card with a colored left-border accent. Banned outright; full border or nothing.",
+      "Don't use backdrop-filter, filter: blur(), vibrancy, or glassmorphism on any surface. The only translucent element in the product is the modal scrim, and it has no blur.",
+      "Don't apply gradients to text or backgrounds. Single solid colors only; emphasis via weight and size.",
+      "Don't ship a hero-metric SaaS template (big number + small label + supporting stats + gradient accent). Cliché, banned.",
+      "Don't ship identical card grids of 'icon + heading + paragraph' repeated endlessly.",
+      "Don't ship stock photography of people: hands on keyboards, 'diverse team in glass conference room', smiling laptop owners. None of it.",
+      "Don't use emoji as iconography in the product. Lucide stroke icons only, currentColor.",
+      "Don't write 'military-grade', 'bank-level', 'unbreakable', 'ultra-secure', 'next-gen' anywhere in the type system. Hype words are forbidden across every surface.",
+      "Don't write 'Welcome back, friend!' or 'Connecting securely...' copy. The voice is 'careful engineer to careful engineer', not privacy salesperson.",
+      "Don't use looping animations: no pulsing encrypted-status indicator, no marching-ants focus border, no spring physics, no bouncing easings. The product is calm, never twitchy.",
+      "Don't add a shadow to the editor surface or to a pane inside the editor. Shadows are reserved for transient overlays (command palette, dropdowns, toasts, tooltips).",
+      "Don't use #000 or #fff literally. Always tint toward the warm neutral ramp.",
+      "Don't reach for a modal as the first interaction pattern. Inline and progressive alternatives first; modals only when there is genuinely no other shape."
+    ]
+  }
+}
