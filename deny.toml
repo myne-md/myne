@@ -1,0 +1,87 @@
+# cargo-deny configuration — Myne workspace
+# Run via: cargo deny check
+# Policy doc: docs/dependency-policy.md
+# Threat model: docs/threat-model.md §6, TB9
+
+[graph]
+# Check all targets to catch platform-specific deps
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+# ─────────────────────────────────────────────────────────────────────
+# Advisories — vulnerability + unmaintained checks
+# ─────────────────────────────────────────────────────────────────────
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+ignore = []
+# Fail on any unmaintained / unsound advisory by default; add specific ignores
+# with rationale + tracking issue if absolutely necessary.
+
+# ─────────────────────────────────────────────────────────────────────
+# Licenses — allow-list per docs/dependency-policy.md
+# AGPL-3.0-or-later workspace; permissive + weak-copyleft + GPL-compat allowed
+# ─────────────────────────────────────────────────────────────────────
+[licenses]
+version = 2
+allow = [
+    "AGPL-3.0",
+    "AGPL-3.0-or-later",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.93
+
+# Specific overrides for crates with non-standard license declarations
+exceptions = []
+
+# ─────────────────────────────────────────────────────────────────────
+# Bans — duplicate versions, wildcard, unwanted crates
+# ─────────────────────────────────────────────────────────────────────
+[bans]
+multiple-versions = "warn"  # surface duplicate transitives but don't block
+wildcards = "deny"           # no `*` versions in Cargo.toml
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+# Crates we explicitly forbid (with rationale)
+deny = [
+    # Add entries as: { name = "foo", reason = "why forbidden" }
+]
+
+# Crates we explicitly skip multiple-version warnings for
+skip = []
+
+# Skip transitive duplicates that are unavoidable upstream
+skip-tree = []
+
+# ─────────────────────────────────────────────────────────────────────
+# Sources — only crates.io + git deps with pinned commit hash
+# ─────────────────────────────────────────────────────────────────────
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+# Git deps must be added explicitly to `allow-git` with a pinned commit hash
+# in the corresponding Cargo.toml `rev = "..."` field.
+
+[sources.allow-org]
+github = []
