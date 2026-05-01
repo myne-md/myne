@@ -9,6 +9,18 @@ Subdirectory CLAUDE.md files cover their own domain in depth — they lazy-load 
 - `docs/CLAUDE.md` — spec authoring rules (decisions.md append-only, glossary discipline)
 - `myne-agents/CLAUDE.md` — agent + skill + feature/session/plan layout
 
+## Design context (pointer)
+
+Three files at the repo root carry the visual + strategic system. Read in this order before designing any UI:
+
+1. `PRODUCT.md` — strategy: register, users, voice, brand personality, anti-references, design principles. Cross-client (desktop + future mobile + web). Read before any new screen.
+2. `DESIGN.md` + `DESIGN.json` — visual system in [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/format/). Frontmatter is the machine-readable token layer; `DESIGN.json` carries the live-panel components, tonal ramps, shadow + motion + focus extensions.
+3. `docs/design/` — the **code-side projection** of the design canon: `README.md` (voice + tactical rules), `colors_and_type.css` (CSS variable source), `ui_kits/desktop/` (JSX primitives), `preview/` (token specimen tabs).
+
+**Penpot is the canonical design source**, connected via the `penpot` MCP server (page `4 — Desktop UI Kit`, screens 1280×800). Workflow is **Penpot → revise in Penpot → implement in code**, never the reverse. When code and Penpot disagree, Penpot wins by default and the projection gets updated; a Playwright + Penpot diff harness at `scripts/penpot-diff.sh` (procedure: `docs/dev/penpot-design-diff.md`) names the side that is wrong with RMSE + SSIM + per-region scores. Sapma artefaktları `manual-fixes-needed.md`'ye düşer. The `penpot-sync` skill automates this loop.
+
+`/impeccable` commands (craft, polish, audit, etc.) read `PRODUCT.md` + `DESIGN.md` automatically. Do not duplicate their content into other docs.
+
 ## Project status
 
 **Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately — there is one in-repo client; mobile/web/server/website/ops/test-vectors are companion repos. See `docs/decisions.md` "Desktop scaffold lives at repository root".
