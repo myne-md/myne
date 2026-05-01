@@ -1,69 +1,22 @@
-# Woodpecker CI — Myne main repo
-# Self-hosted Woodpecker via Forgejo mirror of GitHub.
-# Decision: docs/decisions.md "2026-05-01 — CI: self-hosted Woodpecker via Forgejo mirror"
-# Plan: myne-agents/features/phase-1-plan/shared.md §C2
+# Woodpecker CI — DIAGNOSTIC MINIMAL VERSION
+# Original config preserved at commit ddb9085; restore via:
+#   git show ddb9085:.woodpecker.yml > .woodpecker.yml
 #
-# Notes:
-# - Each step runs in its own container; installed packages do NOT inherit between steps.
-# - Linux runner only; macOS + Windows checked manually before release (revisit at v1.0).
-# - Future: cache cargo + pnpm artifacts; pre-build a custom image with rust + node + Tauri sysdeps.
+# Purpose: prove Woodpecker can reach the repo, trigger on push, clone, and run a single step.
+# If THIS pipeline also shows "step canceled" → repo not activated, webhook missing, or runner unavailable.
+# If THIS works → the original 6-step pipeline has a syntax/depends_on/image issue, debug from there.
 
 when:
   - event: push
-    branch: [develop, main]
-  - event: pull_request
 
 steps:
-  # ─── Rust formatting ─────────────────────────────────────────
-  cargo-fmt:
-    image: rust:1.90.0-slim
+  hello:
+    image: alpine
     commands:
-      - rustup component add rustfmt
-      - cargo fmt --all -- --check
-
-  # ─── Rust lint ───────────────────────────────────────────────
-  cargo-clippy:
-    image: rust:1.90.0-slim
-    commands:
-      - rustup component add clippy
-      - cargo clippy --workspace --all-targets -- -D warnings
-
-  # ─── Rust tests ──────────────────────────────────────────────
-  cargo-test:
-    image: rust:1.90.0-slim
-    commands:
-      - cargo test --workspace --no-fail-fast
-
-  # ─── Rust supply-chain audit ─────────────────────────────────
-  cargo-deny:
-    image: rust:1.90.0-slim
-    commands:
-      - cargo install --locked cargo-deny
-      - cargo deny check
-
-  # ─── TypeScript typecheck + Vite build ───────────────────────
-  pnpm-build:
-    image: node:25-slim
-    commands:
-      - corepack enable
-      - corepack prepare pnpm@9 --activate
-      - pnpm install --frozen-lockfile
-      - pnpm build
-
-  # ─── Tauri compile-gate ──────────────────────────────────────
-  # Verifies the Tauri Rust+TS compile path on Linux.
-  # Does NOT produce a signed bundle — release pipeline (Plan 1 §C-launch) handles cross-platform signed builds.
-  tauri-compile:
-    image: rust:1.90.0-slim
-    depends_on: [cargo-clippy, pnpm-build]
-    commands:
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
-      - corepack enable
-      - corepack prepare pnpm@9 --activate
-      - pnpm install --frozen-lockfile
-      - pnpm tauri build --no-bundle
-
-  # ─── (deferred) Vector verification ──────────────────────────
-  # Will pull myne-test-vectors and re-run Lane D vectors against current Rust impl.
-  # Wire when D1 (vector schema) lands — see myne-agents/features/phase-1-plan/omer.md §D1.
+      - echo "✓ Woodpecker reachable; runner online; alpine pull OK"
+      - echo "Branch: $CI_COMMIT_BRANCH"
+      - echo "Commit: $CI_COMMIT_SHA"
+      - echo "--- Repo files (clone OK?): ---"
+      - ls -la
+      - echo "--- .woodpecker.yml head: ---"
+      - head -10 .woodpecker.yml
