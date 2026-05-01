@@ -19,9 +19,33 @@ version = 2
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
-ignore = []
 # Fail on any unmaintained / unsound advisory by default; add specific ignores
 # with rationale + tracking issue if absolutely necessary.
+#
+# All entries below are unmaintained-status advisories on transitive crates
+# pulled in by Tauri 2.10.x (GTK3 bindings, urlpattern → rust-unic, fxhash, etc.).
+# They have no safe upgrade path until Tauri itself migrates off them; revisit
+# when Tauri 3.x lands or when individual crates publish replacements.
+# Tracking: https://github.com/rustsec/advisory-db/issues/2414 (rust-unic)
+ignore = [
+    "RUSTSEC-2024-0370",  # proc-macro-error unmaintained (tauri build chain)
+    "RUSTSEC-2024-0411",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0412",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0413",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0414",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0415",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0416",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0417",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0418",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0419",  # gtk-rs GTK3 bindings unmaintained
+    "RUSTSEC-2024-0420",  # fxhash unmaintained
+    "RUSTSEC-2025-0057",  # transitive (Tauri); no upgrade path
+    "RUSTSEC-2025-0075",  # transitive (Tauri); no upgrade path
+    "RUSTSEC-2025-0080",  # transitive (Tauri); no upgrade path
+    "RUSTSEC-2025-0081",  # transitive (Tauri); no upgrade path
+    "RUSTSEC-2025-0098",  # unic-ucd-version (rust-unic) unmaintained; via urlpattern
+    "RUSTSEC-2025-0100",  # unic-ucd-ident (rust-unic) unmaintained; via urlpattern
+]
 
 # ─────────────────────────────────────────────────────────────────────
 # Licenses — allow-list per docs/dependency-policy.md
@@ -42,6 +66,7 @@ allow = [
     "MIT",
     "MIT-0",
     "MPL-2.0",
+    "Unicode-3.0",
     "Unicode-DFS-2016",
     "Unlicense",
     "Zlib",
@@ -57,6 +82,7 @@ exceptions = []
 [bans]
 multiple-versions = "warn"  # surface duplicate transitives but don't block
 wildcards = "deny"           # no `*` versions in Cargo.toml
+allow-wildcard-paths = true  # path deps within the workspace lack version requirements
 highlight = "all"
 workspace-default-features = "allow"
 external-default-features = "allow"

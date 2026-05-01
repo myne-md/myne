@@ -5,6 +5,7 @@ description = "Myne — end-to-end-encrypted markdown notes desktop client"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/myne-md/myne"
+publish = false
 
 [lib]
 # `_lib` suffix is required so the lib name is unique and does not conflict
