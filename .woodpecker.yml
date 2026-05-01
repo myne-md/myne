@@ -38,19 +38,20 @@ steps:
       - cargo test -p protocol --no-fail-fast
 
   # ─── Rust supply-chain audit ─────────────────────────────────
+  # `git` is required by cargo-deny to fetch the rustsec advisory-db.
   cargo-deny:
     image: rust:1.90.0-slim
     commands:
+      - apt-get update && apt-get install -y --no-install-recommends git
       - cargo install --locked cargo-deny
       - cargo deny check
 
   # ─── TypeScript typecheck + Vite build ───────────────────────
-  # Full `node:25` (not -slim): slim variant ships without corepack.
+  # `node:25` does not ship corepack; install pnpm directly via npm.
   pnpm-build:
     image: node:25
     commands:
-      - corepack enable
-      - corepack prepare pnpm@9 --activate
+      - npm install -g pnpm@9
       - pnpm install --frozen-lockfile
       - pnpm build
 
@@ -63,8 +64,7 @@ steps:
     commands:
       - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
-      - corepack enable
-      - corepack prepare pnpm@9 --activate
+      - npm install -g pnpm@9
       - pnpm install --frozen-lockfile
       - pnpm tauri build --no-bundle
 
