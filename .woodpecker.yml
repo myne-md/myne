@@ -22,17 +22,20 @@ steps:
       - cargo fmt --all -- --check
 
   # ─── Rust lint ───────────────────────────────────────────────
+  # Scoped to `protocol` crate: src-tauri pulls Tauri sysdeps (libwebkit2gtk, etc.)
+  # which the slim image lacks; tauri-compile step covers workspace compile gate.
   cargo-clippy:
     image: rust:1.90.0-slim
     commands:
       - rustup component add clippy
-      - cargo clippy --workspace --all-targets -- -D warnings
+      - cargo clippy -p protocol --all-targets -- -D warnings
 
   # ─── Rust tests ──────────────────────────────────────────────
+  # Scoped to `protocol` crate (see cargo-clippy comment above).
   cargo-test:
     image: rust:1.90.0-slim
     commands:
-      - cargo test --workspace --no-fail-fast
+      - cargo test -p protocol --no-fail-fast
 
   # ─── Rust supply-chain audit ─────────────────────────────────
   cargo-deny:
@@ -42,8 +45,9 @@ steps:
       - cargo deny check
 
   # ─── TypeScript typecheck + Vite build ───────────────────────
+  # Full `node:25` (not -slim): slim variant ships without corepack.
   pnpm-build:
-    image: node:25-slim
+    image: node:25
     commands:
       - corepack enable
       - corepack prepare pnpm@9 --activate
