@@ -110,6 +110,12 @@ A resource that the threat model identifies as worth protecting, classified by s
 
 Used in: `threat-model.md` §2
 
+### **atomic range** &nbsp; 📦 *Product*
+
+A region of CodeMirror 6 editor state registered with `EditorView.atomicRanges` so the cursor and selection treat it as a single indivisible unit. Backspace, forward delete, and arrow-key motion at the boundary remove or skip the entire range in one step. Myne uses atomic ranges to make wikilink chips behave as single characters at the user-input level — pressing Backspace next to `[[Note Title]]` deletes the whole chip (delimiters included) rather than chipping away one character at a time. The underlying source bytes are unchanged by atomicity registration; the property is purely about cursor mechanics.
+
+Used in: `spec/wikilink.md` §5.2
+
 ### **at-rest encryption** &nbsp; 🏗️ *Construction*
 
 The property that data stored persistently is encrypted whenever it is not actively being processed. Myne's at-rest encryption applies to every byte of note content, vault metadata, and key material on the user's disk (`spec/protocol.md` §9). Distinct from in-transit encryption (TLS), which protects only data crossing the network.
@@ -227,9 +233,19 @@ The key-committing AEAD construction defined by Chan & Rogaway (ESORICS 2022) th
 Used in: `spec/protocol.md` §5.1
 Reference: Chan & Rogaway, "On Committing Authenticated Encryption", ESORICS 2022.
 
+### **cursor-aware reveal** &nbsp; 📦 *Product*
+
+The Phase 1 editor pattern where decorations on the line containing the cursor lift to expose the underlying markdown source for editing, then reapply when the cursor leaves the line. There is no separate "rendered view" / "source view" mode-switch — cursor location *is* the reveal. Headings show their leading `#`s on the active line and hide them off-line; bold and italic delimiters reveal on entry; inline link URLs become editable when the cursor enters their parent line. Wikilink chips are an exception per `spec/wikilink.md` §5.4 (chips stay atomic regardless of cursor position).
+
+Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`
+
 ### **Cytoscape.js** &nbsp; 🛠️ *Tooling*
 
 The graph-visualization library used for Myne's minimal graph view in Phase 1. Lazy-loaded into a separate panel rather than rendered in the editor surface.
+
+### **decoration layer** &nbsp; 📦 *Product*
+
+The CodeMirror 6 render overlay that hides or replaces ranges of the markdown buffer visually without mutating the underlying text. Decorations come in four kinds: `mark` (apply a CSS class to a range — used to hide leading `#`s), `widget` (insert a DOM element at a position — used for wikilink chips, task list checkboxes), `replace` (hide a range and substitute a widget — used for table widgets and code-block frames), and `line` (per-line attributes on the wrapping `cm-line` div — used for blockquote left-border styling). The decoration layer reads the `@lezer/markdown` AST and produces decorations per node type. The text buffer is canonical; decorations are ephemeral state derived from the buffer plus cursor position.
 
 Used in: `vision.md` Phase 1 Scope
 
@@ -482,6 +498,12 @@ Used in: `spec/protocol.md` §5.3
 The unique identifier of a note. UUIDv7 in v0.1 (time-ordered, naturally sortable). Used as the filename on disk (with the `.myn` extension) and bound into the AAD of content encryption. UUIDv7's millisecond-resolution time component leaks creation-time bucket; v005 may switch to UUIDv4 if even this is unacceptable.
 
 Used in: `spec/protocol.md` §9.1, §5.2
+
+### **Myne markdown dialect (D1)** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
+
+The markdown dialect Myne v0.1 reads and writes: **GFM (GitHub-Flavored Markdown) plus a footnote extension plus a wikilink extension plus YAML frontmatter recognition**. Internally referenced as **D1**. Codified in `spec/markdown-dialect.md`. The dialect is selected as the smallest pin that covers Myne v0.1's editor decoration commitments (tables, task lists, footnotes, wikilinks, frontmatter) while preserving byte-stable round-trip with Obsidian-imported notes (`vision.md` Phase 1 importer commitment). Two alternatives were considered and declined in `decisions.md` 2026-05-01: D2 (D1 + Pandoc extras — declined because the extras are not load-bearing for v0.1 and Obsidian renders them as raw text) and D3 (Djot — declined because `.dj` is not markdown and would break the "walk away into any markdown editor" wedge). Hard rule **C1**: vault imports never silently rewrite content; non-canonical syntax in imported notes is preserved byte-for-byte. Forward-incompatible with v005 by design — v005 will pin its own dialect.
+
+Used in: `spec/markdown-dialect.md`, `decisions.md` 2026-05-01
 
 ### **`myne.v0.1` prefix** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 
@@ -736,11 +758,11 @@ The build tool and dev server used by the Phase 1 desktop client to bundle the R
 Used in: `decisions.md`; `threat-model.md` §7
 Reference: https://vite.dev
 
-### **wikilinks** &nbsp; 📦 *Product*
+### **wikilink** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 
-The `[[note name]]` syntax for inline links between notes. Myne v0.1 supports wikilink parsing in CodeMirror, displays a backlinks pane, and renders the link graph in the lazy-loaded graph view.
+Myne's first-class internal-link syntax: `[[…]]`-bracketed references that resolve against the current vault and render as atomic chip widgets in the editor. Recognized forms include title-only (`[[Note]]`), aliased (`[[Note|Display]]`), heading-anchored (`[[Note#Heading]]`), block-referenced (`[[Note^block-id]]`), path-encoded (`[[vault/relative/path.md|Display]]`), and embed prefixes (`![[Note]]`, `![[image.png]]`). Full grammar in `spec/wikilink.md`. **Myne-divergent from Obsidian conventions in two load-bearing ways:** (1) new Myne-authored wikilinks emit the **path-with-alias** form `[[vault/relative/path.md|Display Title]]` rather than the title-only form, making every Myne-authored wikilink self-resolvable from the markdown alone — improving the wedge sentence from "plain markdown after decryption" to "*resolvable* plain markdown after decryption"; (2) imported Obsidian wikilinks are preserved byte-for-byte (hard rule C1) and coexist indefinitely with Myne-authored path forms. Decoration treats both forms identically as atomic chips; click-resolution differs (title-only via vault-index lookup; path-form follows directly). Auto-update on rename preserves syntactic shape — never promotes form. The manual conversion command (R2 in `wikilink.md` §7) is the only sanctioned migration path from imported title-only to path-form. Wikilinks are **not** standard markdown; no CommonMark / GFM / Pandoc / Djot dialect natively defines them.
 
-Used in: `vision.md` Phase 1 Scope
+Used in: `spec/wikilink.md`, `spec/markdown-dialect.md` §3.5, `vision.md` Phase 1 Scope
 
 ### **wrap key cache** &nbsp; 🗝️ *Key/identifier*
 
