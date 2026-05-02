@@ -27,9 +27,17 @@ import { StepHeading, StepLayout } from "./step-shell";
 
 interface ReadyStepProps {
   onDone: () => void;
+  /**
+   * True while the auto-unlock IPC is in flight (PRD Q4(a)). Disables
+   * both buttons and switches the "Done" label to "Decrypting…" so
+   * the user sees that the click registered and Argon2id is running
+   * (~1s baseline). False during the brief window between mount and
+   * "Done" click.
+   */
+  pending?: boolean;
 }
 
-export function ReadyStep({ onDone }: ReadyStepProps) {
+export function ReadyStep({ onDone, pending = false }: ReadyStepProps) {
   const handleShowVaultFolder = async () => {
     try {
       const base = await appDataDir();
@@ -63,11 +71,16 @@ export function ReadyStep({ onDone }: ReadyStepProps) {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <Button variant="ghost" icon="folder" onClick={handleShowVaultFolder}>
+        <Button
+          variant="ghost"
+          icon="folder"
+          onClick={handleShowVaultFolder}
+          disabled={pending}
+        >
           Show vault folder
         </Button>
-        <Button variant="primary" onClick={onDone}>
-          Done
+        <Button variant="primary" onClick={onDone} disabled={pending}>
+          {pending ? "Decrypting…" : "Done"}
         </Button>
       </div>
     </StepLayout>

@@ -23,7 +23,12 @@ use tauri::{Manager, Runtime};
 /// map and binds the IPC commands declared in [`commands`].
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("vault-unlock")
-        .invoke_handler(tauri::generate_handler![commands::unlock, commands::lock])
+        .invoke_handler(tauri::generate_handler![
+            commands::unlock,
+            commands::lock,
+            commands::vault_status,
+            commands::vault_is_unlocked,
+        ])
         .setup(|app, _api| {
             app.manage(state::VaultRuntimeState::default());
             Ok(())

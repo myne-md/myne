@@ -29,25 +29,32 @@ Self-hosted fonts: Inter Variable + JetBrains Mono in `public/fonts/` (commit 40
 
 ```
 src/
-├── App.tsx              ← top-level stage union (welcome / create-vault / editor)
+├── App.tsx              ← top-level stage union (welcome / create-vault / unlock / locked / editor)
 ├── main.tsx             ← React 19 root mount
 ├── screens/             ← top-level screens (one per stage)
 │   ├── CreateVault.tsx
 │   ├── Editor.tsx       ← B4.5 placeholder; full CodeMirror = Lane B #10 (B5)
+│   ├── Locked.tsx       ← post-explicit-lock screen ("just-locked" framing)
+│   ├── Unlock.tsx       ← password form + reducer (idle / decrypting / corrupted modes)
 │   ├── Welcome.tsx
 │   └── vault-creation/  ← multi-step flow (PasswordStep, PhraseStep, ConfirmStep, ...)
 ├── components/          ← reusable UI primitives
 │   ├── primitives/      ← Button, Input, etc.
 │   ├── ErrorBanner.tsx
+│   ├── FailClosedError.tsx  ← shared fail-closed UI (reason: invalid-state | corrupted-vault | io-error)
 │   ├── PasswordStrength.tsx
 │   ├── Spinner.tsx
 │   └── ComingSoonPill.tsx
 ├── lib/                 ← non-UI helpers
+│   ├── app-window.ts             ← closeApp() helper for fail-closed CTAs
 │   ├── icons.ts
 │   ├── password-generator.ts
 │   ├── secret-export.ts
+│   ├── stage.ts                   ← Stage / Action discriminated unions + transition() + dev harness
 │   ├── vault-creation-errors.ts
-│   └── vault-creation-logging.ts
+│   ├── vault-creation-logging.ts
+│   ├── vault-status.ts            ← probeVaultStatus() boot probe wrapper
+│   └── vault-unlock.ts            ← isVaultUnlocked() + lockVault() wrappers
 ├── styles/              ← global CSS only
 └── types/               ← shared TS types (mirrors Rust ProtocolError enum)
 ```
@@ -65,9 +72,9 @@ When you add a new Tauri command on the Rust side, manually mirror the signature
 - Per-step components (PasswordStep, PhraseStep, ConfirmStep, AccountStep, ReadyStep, SessionLostStep, EncryptingStep)
 - Window-blur cover on PhraseStep (phrase visible → minimize covers it)
 - BIP-39 wordlist autocomplete with exact-match required on ConfirmStep
-- ReadyStep "Done" advances to editor stage (per `decisions.md` 2026-04-29)
+- ReadyStep "Done" triggers auto-unlock chain (`commit` → `vault_unlock` → editor) per `decisions.md` 2026-05-02 — supersedes 2026-04-29 entry's slot-population implication. `passwordRef` lifetime extended through phrase/confirm/account/ready until auto-unlock resolves; wiped on every exit path (BEGIN_ERR / COMMIT_ERR / SESSION_LOST / RESET_TO_PASSWORD / unmount / auto-unlock resolve).
 
-When building the next multi-step flow (B4a unlock, B4b recovery), reuse this structure.
+When building the next multi-step flow (recovery — separate PR), reuse this structure.
 
 ## Empty editor shell (B4.5 shipped, placeholder)
 
@@ -80,11 +87,13 @@ When building the next multi-step flow (B4a unlock, B4b recovery), reuse this st
 
 Don't ship features against this placeholder — wait for B5.
 
-## App shell (MYND-20 basic stage union)
+## App shell (MYND-80 full state machine + route guards)
 
-`src/App.tsx` uses a basic `stage` union (`"welcome" | "create-vault" | "editor"`) — the v0.1 definition of "routing" (no URL/history-aware router). The full state-machine refactor is bundled with the vault-unlock UI work (MYND-33 / MYND-77); a `"locked"` stage will land then. Lock-on-idle (auto-lock on idle timer) is **explicitly out of scope** for Phase 1 per `src-tauri/src/plugins/vault_unlock/state.rs` Phase 2+ docstring — there is no Phase 1 writer for `last_activity`, so a stub here would be dead code.
+`src/App.tsx` uses the full Stage discriminated union (`{ name: "welcome" } | { name: "create-vault" } | { name: "unlock"; initialStatus } | { name: "locked" } | { name: "editor" }`) — the v0.1 definition of "routing" (no URL/history-aware router). Pure `transition(prev, action): Stage` function in `src/lib/stage.ts` enforces legal source/target combinations; illegal pairs return `prev` unchanged + dev `console.warn`. Boot starts in `null` (loading shim) until `vault_status` IPC probe resolves; `initialStageFromProbe(result)` maps Ok(Missing)→welcome, Ok(Exists)→unlock(Exists), Ok(Corrupted)→unlock(Corrupted), Err(IoError)→unlock(IoError). The `recover` stage is **out of scope** for this PR — to be added back-compat in a separate recovery PR (MYND-23 + Ömer recover UI). Lock-on-idle (auto-lock on idle timer) is **explicitly out of scope** for Phase 1 per `src-tauri/src/plugins/vault_unlock/state.rs` Phase 2+ docstring — there is no Phase 1 writer for `last_activity`, so a stub here would be dead code.
 
-Dev-only shortcut: `?test-stage=create-vault|editor` skips to a stage on `pnpm dev` (`import.meta.env.DEV`-guarded; tree-shaken from prod bundle).
+Belt+suspenders invalid-state guard (Q5β-1 of `app-state-machine` grill): `transition()` is React-side defense; `Editor` mount probes `vault_is_unlocked()` at mount as the Rust-side reality check, rendering `<FailClosedError reason="invalid-state" />` if React Stage and Rust slot disagree. The "Kilitle" CTA on that error UI calls `vault_lock` + reprobe via `App.tsx::reprobe()` (out-of-band reset; bypasses transition fn intentionally).
+
+No dev-only stage shortcut: any `?test-stage=` URL parameter has no effect. Per `app-state-machine` PRD + MYND-80 acceptance, dev cannot bypass production guards.
 
 ## Common commands
 

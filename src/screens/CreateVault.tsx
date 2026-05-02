@@ -21,17 +21,11 @@
 //   - vault-creation:commit  — wired below.
 //   - vault-creation:cancel  — wired here (cleanup + PhraseStep Back).
 
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
-
-// Dev guard: Vite-only browser runs (Playwright, plain `pnpm dev`) have no
-// Tauri IPC bridge; the @tauri-apps APIs throw on first access. This flag
-// short-circuits Tauri-touching effects so the UI still renders for design
-// review. In production / `pnpm tauri dev`, __TAURI_INTERNALS__ is set.
-const HAS_TAURI =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { HAS_TAURI } from "../lib/app-window";
 import {
   vaultCreationReducer,
   initialState,
@@ -51,11 +45,28 @@ import type { BeginResult } from "../types/protocol-error";
 
 interface CreateVaultProps {
   onBack: () => void;
-  onComplete: () => void;
+  /**
+   * Auto-unlock success — `vault_unlock(password)` resolved after
+   * `commit`, slot is populated, route directly to editor. PRD Q4(a).
+   */
+  onAutoUnlockSuccess: () => void;
+  /**
+   * Auto-unlock failure (defansif) — `commit` succeeded but the
+   * chained `vault_unlock` call rejected (rare, almost certainly a
+   * transient backend failure since the same password just succeeded
+   * inside `commit`). Route to `unlock(Exists)` so the user can
+   * retype manually.
+   */
+  onAutoUnlockFailed: () => void;
 }
 
-export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
+export function CreateVault({
+  onBack,
+  onAutoUnlockSuccess,
+  onAutoUnlockFailed,
+}: CreateVaultProps) {
   const [state, dispatch] = useReducer(vaultCreationReducer, initialState);
+  const [autoUnlocking, setAutoUnlocking] = useState(false);
 
   const sessionTokenRef = useRef<string | null>(null);
   const stepRef = useRef<Step>(state.step);
@@ -129,6 +140,11 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
 
   useEffect(() => {
     return () => {
+      // Best-effort password wipe on unmount — covers the auto-unlock
+      // success path where the IPC has already nulled the ref + the
+      // failure paths that wiped + the rare case where the component
+      // unmounts mid-flow before any explicit wipe site fired.
+      passwordRef.current = null;
       if (!HAS_TAURI) return;
       const token = sessionTokenRef.current;
       if (token) {
@@ -176,9 +192,10 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
     };
   }, []);
 
-  // Captured password sits here only between PasswordStep submit and
-  // BEGIN_OK / BEGIN_ERR resolution. Cleared on both paths so a stale
-  // password cannot ride along into a later begin attempt.
+  // Lifetime: PasswordStep submit → auto-unlock resolve. Wiped on every
+  // exit path (BEGIN_ERR / COMMIT_ERR / SESSION_LOST / RESET_TO_PASSWORD /
+  // auto-unlock resolve / unmount). TS-side wipe is best-effort; the
+  // load-bearing zeroize is Rust-side inside `Zeroizing<String>`.
   const passwordRef = useRef<string | null>(null);
 
   const handlePasswordSubmit = (password: string) => {
@@ -195,7 +212,43 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
         );
       }
     }
+    passwordRef.current = null;
     dispatch({ type: "RESET_TO_PASSWORD" });
+  };
+
+  /**
+   * Auto-unlock chain (PRD Q4(a)). Triggered by ReadyStep's "Done"
+   * button. Re-feeds the just-typed password into `vault_unlock` so
+   * the user lands directly in editor without retyping. Plugin
+   * isolation preserved: `vault_creation::commit` did NOT populate
+   * `VaultRuntimeState`; this second IPC does.
+   *
+   * On rejection (rare — same password just succeeded inside `commit`),
+   * fall through to manual unlock. The user retypes; if the failure
+   * was transient (JoinFailure, IO blip) the manual attempt
+   * succeeds; if it was structural, the Unlock screen shows the
+   * variant-mapped banner.
+   */
+  const handleAutoUnlock = async () => {
+    const password = passwordRef.current;
+    if (!password || !HAS_TAURI) {
+      // Defansif (web dev or test-step path with no real password).
+      passwordRef.current = null;
+      onAutoUnlockFailed();
+      return;
+    }
+    setAutoUnlocking(true);
+    try {
+      await invoke("plugin:vault-unlock|unlock", { password });
+      passwordRef.current = null;
+      onAutoUnlockSuccess();
+    } catch (e) {
+      passwordRef.current = null;
+      logErrorKind(e, "auto-unlock-failed");
+      onAutoUnlockFailed();
+    } finally {
+      setAutoUnlocking(false);
+    }
   };
 
   useEffect(() => {
@@ -211,7 +264,8 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
           { password },
         );
         if (cancelled) return;
-        passwordRef.current = null;
+        // Password retained — auto-unlock re-feeds it into vault_unlock
+        // after commit (see passwordRef comment above for wipe sites).
         dispatch({
           type: "BEGIN_OK",
           phrase: result.phrase,
@@ -254,6 +308,10 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
         dispatch({ type: "COMMIT_OK" });
       } catch (e) {
         if (cancelled) return;
+        // Wipe password — commit failure is terminal for this flow;
+        // the password should not survive into a retry without an
+        // explicit re-entry through PasswordStep.
+        passwordRef.current = null;
         if (!isAppError(e)) {
           logErrorKind(e, "commit-unknown-error");
           dispatch({ type: "COMMIT_ERR", error: GENERIC_ERROR });
@@ -315,7 +373,7 @@ export function CreateVault({ onBack, onComplete }: CreateVaultProps) {
         />
       );
     case "ready":
-      return <ReadyStep onDone={onComplete} />;
+      return <ReadyStep onDone={handleAutoUnlock} pending={autoUnlocking} />;
     case "session-lost":
       // SESSION_LOST is the only path into this step and always carries
       // an error; the non-null assertion is type-safe per the reducer.
