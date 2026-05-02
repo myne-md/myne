@@ -1,7 +1,7 @@
 # Woodpecker CI — Myne main repo
 # Self-hosted Woodpecker via Forgejo mirror of GitHub.
 # Decision: design-notes.md "2026-05-01 — CI: self-hosted Woodpecker via Forgejo mirror"
-# Plan: agent-tooling/features/phase-1-plan/shared.md §C2
+# Plan: tracked in Plane (plane.myne.md)
 #
 # Notes:
 # - Each step runs in its own container; installed packages do NOT inherit between steps.
@@ -70,4 +70,4 @@ steps:
 
   # ─── (deferred) Vector verification ──────────────────────────
   # Will pull myne-test-vectors and re-run Lane D vectors against current Rust impl.
-  # Wire when D1 (vector schema) lands — see agent-tooling/features/phase-1-plan/omer.md §D1.
+  # Wire when the vector-schema work lands (tracked in Plane: plane.myne.md).

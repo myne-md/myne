@@ -4,7 +4,7 @@
 
 Report security issues to **`security@myne.app`** privately.
 
-Please do **not** open a public GitHub issue for vulnerabilities. We don't have a public bug-bounty page yet (planned for Phase 1 ship — see `agent-tooling/features/phase-1-plan/shared.md` §C7), but we still want to hear about issues before they go public.
+Please do **not** open a public GitHub issue for vulnerabilities. We don't have a public bug-bounty page yet (planned for Phase 1 ship), but we still want to hear about issues before they go public.
 
 If you don't get an acknowledgment within 5 business days, ping again — the address may have failed silently.
 
@@ -43,7 +43,7 @@ Out of scope:
 
 ## Pre-1.0 caveat
 
-Myne is **pre-alpha**. The protocol is v0.1 (under active hardening), there is no third-party cryptographer audit yet (planned for Phase 1 ship — see `agent-tooling/features/phase-1-plan/shared.md` §C-final-1). The threat model (`docs/threat-model.md`) documents the current guarantee envelope; reports outside that envelope are still welcome but may be classified as "known limitation, will reconsider for v1.0".
+Myne is **pre-alpha**. The protocol is v0.1 (under active hardening), there is no third-party cryptographer audit yet (planned for Phase 1 ship). The threat model (`docs/threat-model.md`) documents the current guarantee envelope; reports outside that envelope are still welcome but may be classified as "known limitation, will reconsider for v1.0".
 
 ## Hall of fame
 
