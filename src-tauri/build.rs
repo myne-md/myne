@@ -13,19 +13,37 @@ fn main() {
             .plugin(
                 "vault-unlock",
                 // Task 2 of `vault-unlock-password` ships `unlock`;
-                // Task 6 adds `lock` (the A8e bundle). Task 1 of
-                // `app-state-machine` adds `vault_status` (boot probe)
-                // and `vault_is_unlocked` (Editor mount guard probe).
-                // Adding a command here without a matching
-                // `commands.allow` entry in
-                // `permissions/vault-unlock/default.toml` is a security
-                // regression.
+                // Task 6 of that feature adds `lock` (the A8e bundle).
+                // Task 1 of `app-state-machine` adds `vault_status`
+                // (read-only `vault.meta` disk probe — Exists / Missing
+                // / Corrupted) and `vault_is_unlocked` (read-only
+                // boolean peek of the unlocked-vault slot for Editor
+                // mount-guard reality-checks). Task 8 of
+                // `vault-recovery-from-phrase` adds `vault_slot_kind`
+                // (read-only three-state SlotKind probe — Empty /
+                // Recovering / Unlocked — used by the recovery flow's
+                // boot-time and post-WebView-reload routing). Adding a
+                // command here without a matching `commands.allow`
+                // entry in `permissions/vault-unlock/default.toml` is a
+                // security regression.
                 tauri_build::InlinedPlugin::new().commands(&[
                     "unlock",
                     "lock",
                     "vault_status",
                     "vault_is_unlocked",
+                    "vault_slot_kind",
                 ]),
+            )
+            .plugin(
+                "vault-recover",
+                // Task 4 of `vault-recovery-from-phrase` ships
+                // `recover_with_phrase`. Task 6 adds
+                // `complete_recovery` (the A8f bundle). Adding a
+                // command here without a matching `commands.allow`
+                // entry in `permissions/vault-recover/default.toml`
+                // is a security regression.
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["recover_with_phrase", "complete_recovery"]),
             ),
     )
     .unwrap();

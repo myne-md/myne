@@ -73,11 +73,22 @@ pub enum VaultUnlockError {
     UnlockInProgress,
 
     /// The vault is already unlocked. Returned by the slot-peek guard
-    /// when an unlock attempt arrives with the slot occupied.
+    /// when an unlock attempt arrives with the slot occupied by
+    /// `Slot::Unlocked(_)`.
     /// **Not user-facing**: frontend routes the user to the editor
     /// when the slot is occupied; if this surfaces, a router bug.
     #[error("vault already unlocked")]
     VaultAlreadyUnlocked,
+
+    /// A recovery flow is in progress (`Slot::Recovering`) — the user
+    /// has successfully recovered with their phrase but has not yet
+    /// committed a new master password via `vault_complete_recovery`.
+    /// `vault_unlock` is structurally rejected during this window per
+    /// `recovery-flow.md` §4.1's non-dismissible mandatory chained
+    /// step. Not user-facing: frontend routes via `vault_status` and
+    /// only invokes unlock when slot is Empty.
+    #[error("vault recovery in progress")]
+    VaultRecoveryInProgress,
 
     /// `tokio::task::spawn_blocking` join handle returned an error
     /// (panic in the blocking task, runtime shutdown). User-facing
@@ -184,6 +195,14 @@ mod tests {
     }
 
     #[test]
+    fn vault_recovery_in_progress_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize(&VaultUnlockError::VaultRecoveryInProgress),
+            r#"{"kind":"VaultRecoveryInProgress"}"#
+        );
+    }
+
+    #[test]
     fn join_failure_serializes_with_kind_tag() {
         assert_eq!(
             serialize(&VaultUnlockError::JoinFailure),
@@ -207,6 +226,7 @@ mod tests {
                 VaultUnlockError::IoError { io_error_kind: _ } => {}
                 VaultUnlockError::UnlockInProgress => {}
                 VaultUnlockError::VaultAlreadyUnlocked => {}
+                VaultUnlockError::VaultRecoveryInProgress => {}
                 VaultUnlockError::JoinFailure => {}
             }
         }

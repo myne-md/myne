@@ -105,6 +105,16 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
       return { kind: "banner", text: "Vault zaten açık." };
     case "UnlockInProgress":
       return { kind: "banner", text: "İşlem devam ediyor." };
+    case "VaultRecoveryInProgress":
+      // Slot is in Slot::Recovering — user must complete the
+      // password-reset chained step (recovery-flow.md §4.1) before any
+      // unlock attempt. Reaching this banner means the route guards
+      // failed; the user-actionable repair is to navigate back into
+      // the recovery flow.
+      return {
+        kind: "banner",
+        text: "Kurtarma akışı yarıda kaldı. Önce yeni parolayı belirle.",
+      };
     case "JoinFailure":
       return {
         kind: "banner",
