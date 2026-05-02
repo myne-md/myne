@@ -29,7 +29,7 @@ Self-hosted fonts: Inter Variable + JetBrains Mono in `public/fonts/` (commit 40
 
 ```
 src/
-├── App.tsx              ← top-level stage union (locked / editor / etc.)
+├── App.tsx              ← top-level stage union (welcome / create-vault / editor)
 ├── main.tsx             ← React 19 root mount
 ├── screens/             ← top-level screens (one per stage)
 │   ├── CreateVault.tsx
@@ -80,9 +80,11 @@ When building the next multi-step flow (B4a unlock, B4b recovery), reuse this st
 
 Don't ship features against this placeholder — wait for B5.
 
-## App shell (B2 partial)
+## App shell (MYND-20 basic stage union)
 
-`src/App.tsx` uses a basic `stage` union (`"locked" | "creating" | "editor"`) instead of the full state machine Plan 2 §B2 called for. Lock-on-idle stub is missing. The full state-machine refactor is bundled with B4a/b (vault unlock UI) — until then keep the union approach.
+`src/App.tsx` uses a basic `stage` union (`"welcome" | "create-vault" | "editor"`) — the v0.1 definition of "routing" (no URL/history-aware router). The full state-machine refactor is bundled with the vault-unlock UI work (MYND-33 / MYND-77); a `"locked"` stage will land then. Lock-on-idle (auto-lock on idle timer) is **explicitly out of scope** for Phase 1 per `src-tauri/src/plugins/vault_unlock/state.rs` Phase 2+ docstring — there is no Phase 1 writer for `last_activity`, so a stub here would be dead code.
+
+Dev-only shortcut: `?test-stage=create-vault|editor` skips to a stage on `pnpm dev` (`import.meta.env.DEV`-guarded; tree-shaken from prod bundle).
 
 ## Common commands
 
