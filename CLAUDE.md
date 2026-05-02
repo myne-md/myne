@@ -75,19 +75,7 @@ See `docs/CLAUDE.md` for spec-authoring discipline in depth.
 
 ## Phase 1 plan & ownership
 
-The active Phase 1 plan lives as **three priority-ordered files** under `myne-agents/features/phase-1-plan/`. Daily-driver — open them when deciding what to work on next; do not duplicate their content elsewhere.
-
-| File | Owner | Scope |
-|---|---|---|
-| `omer.md` | Ömer | Lane A (Rust crypto/storage) + Lane D (test vectors) |
-| `furkan.md` | Furkan | Lane B (React/TS UI) |
-| `shared.md` | both | Lane 0 (spec docs) + Lane C-hygiene + Lane C-launch + cross-person blocker matrix |
-
-Each per-person file is one numbered priority list (`Sıralı todo`); every item shows its blocker, what it unblocks, and a `[ortak]` or `[ben]` tag.
-
-**ID discipline (load-bearing):** Task IDs (`A1`, `A8b`, `B3a`, `S4`, `C1`, `D2`) are referenced from `docs/decisions.md`, the `myne-agents/features/<feat>/` directories, and across all three plan files. Sıra numaraları (e.g. "Furkan #5") mutate as PRs land; **always cross-reference by ID, not by row number**. New work gets a new ID using existing lane prefixes.
-
-When work lands: move the item from `Sıralı todo` to `Yapılanlar` in the relevant per-person file, renumber the rows, update cross-references in the other two files. Manual sync — no generator yet.
+Active Phase 1 work is tracked in Plane: **plane.myne.md** (self-hosted). Lane IDs (`A`, `B`, `C`, `D`, `S`) are retired — Plane native work-item identifiers (e.g., `MYN-…`) are the new anchor for cross-references in `docs/decisions.md`, feature directories, commit subjects, and PR titles. Historical lane-ID references in `docs/decisions.md` and git history are preserved (append-only spec discipline).
 
 ## Cryptographically load-bearing identifiers
 
