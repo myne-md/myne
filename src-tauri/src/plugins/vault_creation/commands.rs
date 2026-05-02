@@ -11,6 +11,7 @@ use protocol::{
     VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 use serde::Serialize;
+use std::path::PathBuf;
 use std::time::Instant;
 use tauri::{Runtime, State};
 use uuid::Uuid;
@@ -148,22 +149,30 @@ pub(crate) fn build_session(
 ///
 /// Workflow:
 /// 1. Parse `session_token` (`SessionNotFound` on parse error).
-/// 2. `state.take(token)` consumes the session (`SessionNotFound` /
-///    `SessionExpired` on absent / TTL-evicted).
-/// 3. Resolve `vault_dir` and ensure it exists. If this fails, the
-///    session is restored under the same token so the frontend can
-///    retry — the failure is recoverable (permissions can be fixed,
-///    disk pressure can subside).
-/// 4. In a `spawn_blocking` worker: AEAD-wrap `root_key` twice, derive
-///    `itemsKey_wrap_key` via `derive_subkey`, generate `itemsKey` +
-///    its UUIDv7, AEAD-wrap `itemsKey`, build [`protocol::VaultMeta`],
-///    serialize 345 bytes, atomic-write. The worker takes the session
-///    by value but returns it back inside the `Err` arm so the outer
-///    code can re-insert on a recoverable failure (filesystem error,
-///    rare CSPRNG failure during itemsKey generation, etc.).
-/// 5. On success: drop the session — every Zeroizing field wipes.
-///    On worker failure: re-insert the session under the same token
-///    so the next `commit` invocation with that token can retry.
+/// 2. Resolve `vault_dir` and ensure it exists. If this fails, the
+///    session is left intact in the live map for a future retry —
+///    the failure is recoverable (permissions can be fixed, disk
+///    pressure can subside) and we have not consumed the session
+///    yet, so no restore is needed.
+/// 3. Delegate to [`commit_with_vault_path`], which:
+///    a. `state.take(token)` consumes the session
+///       (`SessionNotFound` / `SessionExpired` on absent / TTL-evicted).
+///    b. Defensive `VaultAlreadyExists` guard: if `vault.meta` is
+///       already present at the resolved path, restore the session
+///       and return [`AppError::VaultAlreadyExists`]. **Expected to
+///       NEVER trigger in normal flow** — see grilling Q12.
+///    c. In a `spawn_blocking` worker: AEAD-wrap `root_key` twice,
+///       derive `itemsKey_wrap_key` via `derive_subkey`, generate
+///       `itemsKey` + its UUIDv7, AEAD-wrap `itemsKey`, build
+///       [`protocol::VaultMeta`], serialize 345 bytes, atomic-write.
+///       The worker takes the session by value but returns it back
+///       inside the `Err` arm so the outer code can re-insert on a
+///       recoverable failure (filesystem error, rare CSPRNG failure
+///       during itemsKey generation, etc.).
+///    d. On success: drop the session — every Zeroizing field wipes.
+///       On worker failure: re-insert the session under the same
+///       token so the next `commit` invocation with that token can
+///       retry.
 #[tauri::command]
 pub async fn commit<R: Runtime>(
     session_token: String,
@@ -171,24 +180,74 @@ pub async fn commit<R: Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), AppError> {
     let token = Uuid::parse_str(&session_token).map_err(|_| AppError::SessionNotFound)?;
+    // Resolve the path before consuming the session — if app_data_dir
+    // lookup or create_dir_all on the vault subfolder fails, there's
+    // nothing to restore yet (the session is still in the live map for
+    // a future retry once the underlying condition is fixed).
+    let vault_dir = crate::paths::vault_dir(&app)?;
+    let vault_path = vault_dir.join("vault.meta");
+    commit_with_vault_path(token, vault_path, state.inner()).await
+}
+
+/// Testable core of [`commit`]. The Tauri-command wrapper resolves the
+/// platform-specific `vault.meta` path and delegates here so tests do
+/// not need an [`tauri::AppHandle`].
+///
+/// Sequence:
+/// 1. `state.take(token)` consumes the session
+///    (`SessionNotFound` / `SessionExpired` on absent / TTL-evicted).
+/// 2. **Defensive `VaultAlreadyExists` guard** (`app-state-machine`
+///    grill Q12 + PRD): if `vault_path.exists()`, restore the session
+///    (so retry remains possible — non-destructive) and return
+///    [`AppError::VaultAlreadyExists`]. **Expected to NEVER trigger
+///    in normal flow.** Trigger = frontend routing regression
+///    (`vault_status` startup probe + state machine should keep the
+///    user out of the create flow when a vault is present).
+/// 3. `tokio::task::spawn_blocking` runs the heavy `vault.meta`
+///    build + atomic write (`build_and_serialize_vault_meta` +
+///    `atomic_write::atomic_write`). On failure the worker returns
+///    the session by-value so this caller can re-insert it under the
+///    same token (retry-on-failure semantics preserved).
+pub(crate) async fn commit_with_vault_path(
+    token: Uuid,
+    vault_path: PathBuf,
+    state: &VaultCreationState,
+) -> Result<(), AppError> {
     let session: VaultCreationSession = match state.take(token) {
         SessionLookup::Found(boxed) => *boxed,
         SessionLookup::Expired => return Err(AppError::SessionExpired),
         SessionLookup::NotFound => return Err(AppError::SessionNotFound),
     };
 
-    let vault_path = match crate::paths::vault_dir(&app) {
-        Ok(dir) => dir.join("vault.meta"),
-        Err(e) => {
-            // Path resolution failed (app_data_dir lookup or
-            // create_dir_all on the vault subfolder). Restore the
-            // session so the frontend can retry once the underlying
-            // condition is fixed (e.g. write permission granted on
-            // the data dir).
-            let _ = state.try_insert(token, session);
-            return Err(e);
-        }
-    };
+    // Defensive guard: vault.meta already present on disk. The
+    // alternative — letting the spawn_blocking pipeline reach
+    // `atomic_write` — would silently overwrite the prior vault.meta
+    // (`atomic_write` uses `OpenOptions::create(true).truncate(true)`
+    // + `rename_replacing` with `MOVEFILE_REPLACE_EXISTING` semantics
+    // on Windows), destroying the prior vault's `root_key`, recovery
+    // phrase derivation salts, and consequently any sealed `.myn`
+    // blobs. **This guard is expected to NEVER trigger in normal
+    // flow**: `vault_status` startup probe + frontend state machine
+    // should keep the user out of create-vault when a vault is
+    // present. Surfacing this error means a frontend routing
+    // regression has bypassed those guards.
+    //
+    // See: `myne-agents/sessions/grill/2026-05-02-app-state-machine.md`
+    // Q12 + `myne-agents/features/app-state-machine/prd.md` (defansif
+    // backend guard).
+    if vault_path.exists() {
+        tracing::error!(
+            stage = "commit_exists_check",
+            error_kind = "VaultAlreadyExists",
+            "commit attempted on path with existing vault.meta — frontend routing bypass"
+        );
+        // Restore the session so `commit_with_vault_path` is
+        // structurally non-destructive: even when the guard fires, no
+        // work or state is lost. `try_insert` cannot exceed the cap
+        // here: the slot was just freed by `state.take` above.
+        let _ = state.try_insert(token, session);
+        return Err(AppError::VaultAlreadyExists);
+    }
 
     let outcome: Result<(), (AppError, VaultCreationSession)> =
         tokio::task::spawn_blocking(move || match build_and_serialize_vault_meta(&session) {
@@ -393,5 +452,210 @@ mod tests {
         let a: [u8; 16] = random_bytes().unwrap();
         let b: [u8; 16] = random_bytes().unwrap();
         assert_ne!(a, b);
+    }
+
+    // ---- Defensive `VaultAlreadyExists` guard (Task 2 of `app-state-machine`) ----
+    //
+    // Belt+suspenders Rust-side mirror of Q5β-1's transition fn +
+    // component-mount peek check. If frontend routing bypasses
+    // `vault_status` and re-enters create-vault on a path that already
+    // has a vault.meta, this guard rejects the commit before
+    // `atomic_write` would silently overwrite — which would destroy
+    // the prior vault's `root_key`, recovery phrase derivation salts,
+    // and any sealed `.myn` blobs.
+    //
+    // **Bug-canary role:** if these tests stay green but production
+    // sees vault overwrite reports, the bug is NOT in the guard
+    // itself — it's either upstream (frontend routing) or downstream
+    // (path resolution producing a different `vault.meta` location
+    // than the probe checked).
+
+    /// Minimal scratch directory for vault.meta path tests. Mirrors the
+    /// `ScratchVault` pattern in `vault_unlock::commands::tests` but
+    /// scoped to vault_creation's needs.
+    struct ScratchVault {
+        dir: std::path::PathBuf,
+        meta_path: std::path::PathBuf,
+    }
+
+    impl ScratchVault {
+        fn new() -> Self {
+            let dir =
+                std::env::temp_dir().join(format!("myne_create_test_{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&dir).expect("create scratch dir");
+            let meta_path = dir.join("vault.meta");
+            Self { dir, meta_path }
+        }
+
+        fn path(&self) -> &std::path::Path {
+            &self.meta_path
+        }
+
+        fn pre_seed_vault_meta(&self, bytes: &[u8]) {
+            std::fs::write(&self.meta_path, bytes).expect("pre-seed vault.meta");
+        }
+    }
+
+    impl Drop for ScratchVault {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    /// Build a current-thread tokio runtime — same pattern used in
+    /// `vault_unlock::commands::tests::rt`. The `tokio = ["macros"]`
+    /// feature is intentionally NOT enabled (TB9 audit-anchor / locked
+    /// `tokio 1.52.1`); tests build a runtime manually via `block_on`.
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime build")
+    }
+
+    /// Insert a session into the state map under a fresh token. Returns
+    /// the token so tests can assert the session is restored on guard
+    /// firing. Uses `try_insert` — bumps the in-flight counter, mirrors
+    /// the exact path commit's retry-on-failure uses.
+    fn seed_session_into_state(state: &VaultCreationState) -> Uuid {
+        let token = Uuid::new_v4();
+        let session = build_session("commit-test-pw", FAST_TEST_KDF).expect("build_session");
+        state
+            .try_insert(token, session)
+            .expect("scratch state has room");
+        token
+    }
+
+    #[test]
+    fn commit_returns_already_exists_when_vault_meta_present() {
+        // Pre-seed `vault.meta` at the target path with arbitrary
+        // bytes (any non-empty content suffices — the guard is a pure
+        // file-presence check, not a parse). The guard must reject
+        // before `atomic_write` would touch the file.
+        //
+        // **If this test fails (production sees overwrite reports
+        // despite this passing), the bug is NOT in this guard.** Look
+        // upstream at frontend routing (`vault_status` probe) or
+        // downstream at path resolution (`crate::paths::vault_dir`
+        // producing a different file location than the probe sees).
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let pre_existing = b"prior vault contents - DO NOT DESTROY";
+            scratch.pre_seed_vault_meta(pre_existing);
+
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            let result =
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+
+            assert!(
+                matches!(result, Err(AppError::VaultAlreadyExists)),
+                "commit must reject when vault.meta exists, got {result:?}"
+            );
+
+            // Pre-existing bytes are untouched — atomic_write was
+            // never called. The guard fired before any write path.
+            let on_disk = std::fs::read(scratch.path()).expect("vault.meta still readable");
+            assert_eq!(
+                on_disk.as_slice(),
+                pre_existing,
+                "guard must NOT touch the pre-existing vault.meta — overwrite is the exact bug we are guarding against"
+            );
+        });
+    }
+
+    #[test]
+    fn commit_already_exists_guard_restores_session_for_retry() {
+        // Non-destructive contract: when the guard fires, the session
+        // must be re-inserted under the same token. This ensures
+        // commit_with_vault_path is idempotent under guard-firing
+        // retry — the user can free up the path (e.g. archive the
+        // pre-existing vault.meta) and call commit again with the
+        // same token.
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            scratch.pre_seed_vault_meta(b"existing");
+
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            let result =
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+            assert!(matches!(result, Err(AppError::VaultAlreadyExists)));
+
+            // Session must still be takeable under the same token.
+            // If `take` returned `NotFound`/`Expired` here, the guard
+            // dropped the session and broke retry semantics.
+            match state.take(token) {
+                SessionLookup::Found(_) => {} // expected
+                SessionLookup::NotFound => panic!(
+                    "guard dropped the session — non-destructive contract broken; retry with same token would now fail with SessionNotFound"
+                ),
+                SessionLookup::Expired => panic!(
+                    "guard mis-routed the session through TTL eviction — should be a clean re-insert"
+                ),
+            }
+        });
+    }
+
+    #[test]
+    fn commit_already_exists_guard_does_not_fire_when_vault_meta_absent() {
+        // Negative control: with no pre-existing file, the guard must
+        // not short-circuit. We can't easily run the full success
+        // path here (it would do real Argon2id-derived AEAD writes
+        // bound to FAST_TEST_KDF — feasible but heavy). What we
+        // verify instead: the guard returns a *different* error
+        // (the success or downstream-IO path), proving the exists-check
+        // didn't mis-fire on a missing file.
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            assert!(!scratch.path().exists(), "scratch starts empty");
+
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            let result = commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+
+            // Either Ok (full happy path completed) or some non-
+            // VaultAlreadyExists error. The point is: guard did not
+            // mis-fire on a missing file.
+            assert!(
+                !matches!(result, Err(AppError::VaultAlreadyExists)),
+                "guard mis-fired on missing vault.meta; got {result:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn commit_returns_session_not_found_for_unknown_token() {
+        // Defensive: token never inserted → SessionNotFound. The
+        // exists-check happens AFTER state.take, so missing-session
+        // takes precedence over guard firing.
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            scratch.pre_seed_vault_meta(b"existing");
+            // Both vault.meta exists AND token is not in state. The
+            // function must return SessionNotFound (precedence: take
+            // happens first, guard happens second).
+            let state = VaultCreationState::default();
+            let unknown_token = Uuid::new_v4();
+
+            let result =
+                commit_with_vault_path(unknown_token, scratch.path().to_path_buf(), &state).await;
+            assert!(
+                matches!(result, Err(AppError::SessionNotFound)),
+                "expected SessionNotFound, got {result:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_already_exists_serializes_with_kind_tag() {
+        // IPC contract: `{"kind":"VaultAlreadyExists"}` — bare unit
+        // variant, externally tagged. Frontend `vault-creation-errors.ts`
+        // matches on this.
+        let json = serde_json::to_string(&AppError::VaultAlreadyExists).expect("serialize variant");
+        assert_eq!(json, r#"{"kind":"VaultAlreadyExists"}"#);
     }
 }

@@ -29,6 +29,7 @@ use thiserror::Error;
 /// | `TooManyConcurrentSessions`  | `{"kind":"TooManyConcurrentSessions"}`                       |
 /// | `JoinFailure`                | `{"kind":"JoinFailure"}`                                     |
 /// | `Io { kind }`                | `{"kind":"Io","detail":{"kind":"PermissionDenied"}}`         |
+/// | `VaultAlreadyExists`         | `{"kind":"VaultAlreadyExists"}`                              |
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum AppError {
@@ -64,6 +65,18 @@ pub enum AppError {
     /// vault path) off the wire.
     #[error("io error")]
     Io { kind: IoErrorKind },
+
+    /// Defensive belt+suspenders guard: `vault.meta` already exists at
+    /// the target path. **Expected to NEVER trigger in normal flow.**
+    /// The frontend `vault_status` startup probe + state machine
+    /// routing should prevent any path that re-enters create-vault when
+    /// a vault is already present. If this surfaces, a frontend routing
+    /// regression has bypassed those guards — the alternative (silent
+    /// `atomic_write` overwrite) would destroy the prior vault's
+    /// `root_key`, recovery phrase, and sealed `.myn` blobs
+    /// irrecoverably. See `app-state-machine` grilling Q12 + PRD.
+    #[error("vault already exists")]
+    VaultAlreadyExists,
 }
 
 /// Bounded categorization of IO failures surfaced from `std::io::Error`.

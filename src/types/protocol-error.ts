@@ -85,7 +85,19 @@ export type AppError =
    * File-system error during `commit`. `detail.kind` discriminates
    * the bounded `IoErrorKind` enum.
    */
-  | { kind: "Io"; detail: IoErrorKind };
+  | { kind: "Io"; detail: IoErrorKind }
+  /**
+   * Defensive belt+suspenders guard: `vault.meta` already exists at
+   * the target path. **Expected to NEVER trigger in normal flow.**
+   * Surfaces as a defensive UI message; if a real user sees it, the
+   * frontend `vault_status` startup probe + state machine routing
+   * has been bypassed and the bug is upstream of `commit`. The
+   * alternative (silent overwrite) would destroy the prior vault's
+   * `root_key`, recovery phrase derivation salts, and any sealed
+   * `.myn` blobs irrecoverably. See `app-state-machine` PRD + grill
+   * Q12.
+   */
+  | { kind: "VaultAlreadyExists" };
 
 /**
  * Type-narrowing helper. `if (isProtocolError(e)) { e.detail.kind ... }`.

@@ -10,7 +10,12 @@
 
 [default]
 description = "Default permission set for the vault-unlock plugin."
-permissions = ["allow-unlock", "allow-lock"]
+permissions = [
+    "allow-unlock",
+    "allow-lock",
+    "allow-vault-status",
+    "allow-vault-is-unlocked",
+]
 
 [[permission]]
 identifier = "allow-unlock"
@@ -21,3 +26,13 @@ commands.allow = ["unlock"]
 identifier = "allow-lock"
 description = "Allow invoking vault_unlock:lock (close the open vault — drops the in-memory keys)."
 commands.allow = ["lock"]
+
+[[permission]]
+identifier = "allow-vault-status"
+description = "Allow invoking vault_unlock:vault_status (read-only probe of vault.meta — Exists | Missing | Corrupted)."
+commands.allow = ["vault_status"]
+
+[[permission]]
+identifier = "allow-vault-is-unlocked"
+description = "Allow invoking vault_unlock:vault_is_unlocked (read-only peek of the unlocked-vault slot)."
+commands.allow = ["vault_is_unlocked"]

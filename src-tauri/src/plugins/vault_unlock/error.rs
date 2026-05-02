@@ -99,6 +99,31 @@ impl From<std::io::Error> for VaultUnlockError {
     }
 }
 
+/// Error type returned by [`super::commands::vault_status`].
+///
+/// Distinct from [`VaultUnlockError`]: the status probe runs before
+/// any unlock attempt, so credential-related variants
+/// (`InvalidCredentialOrVault`, `UnlockInProgress`, `VaultAlreadyUnlocked`,
+/// `JoinFailure`) have no IPC contract meaning here. A per-command
+/// error type keeps the contract minimal and forces the frontend caller
+/// to handle the right error shape.
+///
+/// **`IoError` is the only failure surface.** `parse_vault_meta`
+/// rejects surface as `Ok(VaultStatus::Corrupted)` (β=i in
+/// `myne-agents/sessions/grill/2026-05-02-app-state-machine.md` Q9):
+/// IO failure ≠ corruption, and the frontend's fail-closed UI
+/// branches the same way for both, but the distinction matters for
+/// log triage.
+#[derive(Debug, Error, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind", content = "detail")]
+pub enum VaultStatusError {
+    /// File-system IO failure while probing `vault.meta`. `NotFound`
+    /// is special-cased upstream as `Ok(VaultStatus::Missing)`; only
+    /// `PermissionDenied` / `NoSpace` / `Other` surface here.
+    #[error("io error")]
+    IoError { io_error_kind: IoFailureKind },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,5 +238,34 @@ mod tests {
             }
             other => panic!("expected IoError variant, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn vault_status_error_io_serializes_with_io_failure_kind_payload() {
+        let e = VaultStatusError::IoError {
+            io_error_kind: IoFailureKind::PermissionDenied,
+        };
+        assert_eq!(
+            serde_json::to_string(&e).expect("VaultStatusError must serialize cleanly"),
+            r#"{"kind":"IoError","detail":{"io_error_kind":"PermissionDenied"}}"#
+        );
+    }
+
+    /// Compile-time enforcement of "no `String` field on any variant"
+    /// for [`VaultStatusError`] — mirror of
+    /// `all_variants_have_closed_payloads_only` for the unlock error.
+    /// If a variant grows a `String` field, the match below stops
+    /// covering, the test fails to compile, and the boundary discipline
+    /// is enforced at compile time.
+    #[test]
+    fn vault_status_error_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &VaultStatusError) {
+            match e {
+                VaultStatusError::IoError { io_error_kind: _ } => {}
+            }
+        }
+        assert_closed(&VaultStatusError::IoError {
+            io_error_kind: IoFailureKind::Other,
+        });
     }
 }

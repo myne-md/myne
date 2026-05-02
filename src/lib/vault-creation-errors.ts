@@ -165,6 +165,24 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
       };
     case "Io":
       return mapIoError(error.detail);
+    case "VaultAlreadyExists":
+      // Defensive: this path should never be reached in normal flow —
+      // the `vault_status` startup probe + frontend state machine
+      // route returning users straight to unlock when a vault is
+      // present, keeping them out of the create flow entirely. If a
+      // real user sees this, the frontend routing has bypassed those
+      // guards (a regression bug, not a user-facing condition). The
+      // alternative — letting the backend silently overwrite the
+      // prior vault.meta — would destroy the prior root_key /
+      // recovery phrase / sealed `.myn` blobs irrecoverably, which is
+      // why the backend rejects rather than swallows. See
+      // `app-state-machine` PRD + grill Q12.
+      return {
+        title: "Vault zaten var",
+        body: "Yeni bir vault oluşturulamaz çünkü cihazda zaten bir vault dosyası mevcut. Uygulamayı kapatıp tekrar başlat — startup ekranı seni unlock akışına yönlendirecek.",
+        primaryAction: "restart",
+        displayMode: "dedicated",
+      };
     default:
       return assertNever(error);
   }

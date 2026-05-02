@@ -13,10 +13,11 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-use super::error::VaultUnlockError;
+use super::error::{VaultStatusError, VaultUnlockError};
 use super::state::{UnlockedVault, VaultRuntimeState};
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use protocol::{VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN};
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::{AppHandle, Manager, Runtime, State};
@@ -418,6 +419,163 @@ pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), Vau
     // Drop runs Zeroize on the slot's keys.
     let _ = state.take().await;
     Ok(())
+}
+
+// ---- Boot-time probe + unlocked-state probe (Task 1 of `app-state-machine`) ---
+//
+// `vault_status` is the read-only `vault.meta` probe used by App.tsx
+// at boot to choose the initial Stage (welcome vs unlock vs corrupted).
+// `vault_is_unlocked` exposes `VaultRuntimeState::peek_is_some()` to
+// the frontend so guarded stages (Editor) can do a Rust-side reality
+// check at mount time. Both are read-only; neither holds the unlock
+// permit, neither performs Argon2id.
+//
+// Design context: `myne-agents/sessions/grill/2026-05-02-app-state-machine.md`
+// Q9 (vault_status imzası) + PRD `myne-agents/features/app-state-machine/prd.md`.
+
+/// Result of [`vault_status`] — boot-time probe of `vault.meta`.
+///
+/// Three-state minimal enum (Q9 α=1 + β=i):
+/// - `Exists`: `vault.meta` parses cleanly via [`protocol::parse_vault_meta`].
+///   Frontend routes to the unlock stage.
+/// - `Missing`: file does not exist (`std::io::ErrorKind::NotFound` on
+///   read). Frontend routes to the welcome stage.
+/// - `Corrupted`: the file exists but `parse_vault_meta` rejected the
+///   bytes (magic / length / kdf_id / reserved-byte mismatch). IO
+///   failures do **NOT** surface as `Corrupted` — they surface via
+///   [`VaultStatusError::IoError`] (β=i: IO failure ≠ corruption; the
+///   distinction matters for log triage, even though the frontend
+///   fail-closed UI branches the same way).
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind")]
+pub enum VaultStatus {
+    Exists,
+    Missing,
+    Corrupted,
+}
+
+/// Probe `<app_data_dir>/vault/vault.meta` and classify it.
+///
+/// Read-only: does not hold the unlock permit, does not call into
+/// Argon2id, does not populate or peek [`VaultRuntimeState`]. Safe to
+/// invoke at boot before any unlock attempt.
+///
+/// Internal sequence (mirrors [`unlock_with_path`]'s read-and-parse
+/// pipeline shape):
+/// 1. Resolve `vault.meta` path. Path-resolution failures map to
+///    `VaultStatusError::IoError { Other }`.
+/// 2. `tokio::task::spawn_blocking` reads + parses (filesystem +
+///    `parse_vault_meta` are both blocking work):
+///    - Read `NotFound` → `Ok(VaultStatus::Missing)` (canonical
+///      no-vault case; not an IO error).
+///    - Read other `io::Error` → `Err(VaultStatusError::IoError)` with
+///      bounded [`IoFailureKind`].
+///    - `parse_vault_meta` Ok → `Ok(VaultStatus::Exists)`.
+///    - `parse_vault_meta` Err → `Ok(VaultStatus::Corrupted)`.
+/// 3. `JoinFailure` from the spawn_blocking handle → fold into
+///    `IoError { Other }` (no separate variant — the boundary contract
+///    only surfaces IO-class failures).
+#[tauri::command]
+pub async fn vault_status<R: Runtime>(app: AppHandle<R>) -> Result<VaultStatus, VaultStatusError> {
+    let vault_path = vault_meta_path(&app).map_err(|_| VaultStatusError::IoError {
+        io_error_kind: IoFailureKind::Other,
+    })?;
+    vault_status_with_path(&vault_path).await
+}
+
+/// Testable core of [`vault_status`]. The Tauri-command wrapper
+/// resolves the platform-specific `vault.meta` path and delegates here
+/// so tests do not need an [`AppHandle`].
+///
+/// All decisions documented on [`vault_status`] apply identically.
+pub(crate) async fn vault_status_with_path(
+    vault_path: &Path,
+) -> Result<VaultStatus, VaultStatusError> {
+    let vault_path = vault_path.to_path_buf();
+
+    let join_outcome =
+        tokio::task::spawn_blocking(move || -> Result<VaultStatus, VaultStatusError> {
+            let bytes = match std::fs::read(&vault_path) {
+                Ok(b) => b,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    // Canonical no-vault case — frontend routes to
+                    // welcome (create flow). Not an IO error; do not
+                    // log (this is the expected first-run path).
+                    return Ok(VaultStatus::Missing);
+                }
+                Err(e) => {
+                    let io_kind = from_io_error_kind(e.kind());
+                    tracing::error!(
+                        stage = "status_check",
+                        error_kind = "IoError",
+                        io_failure_kind = ?io_kind,
+                        "vault.meta probe read failed"
+                    );
+                    return Err(VaultStatusError::IoError {
+                        io_error_kind: io_kind,
+                    });
+                }
+            };
+            match protocol::parse_vault_meta(&bytes) {
+                Ok(_) => Ok(VaultStatus::Exists),
+                Err(e) => {
+                    tracing::error!(
+                        stage = "status_check",
+                        result = "Corrupted",
+                        protocol_error_kind = protocol_error_kind(&e),
+                        "vault.meta probe rejected by parse_vault_meta"
+                    );
+                    Ok(VaultStatus::Corrupted)
+                }
+            }
+        })
+        .await;
+
+    match join_outcome {
+        Ok(inner) => inner,
+        Err(_) => {
+            tracing::error!(
+                stage = "status_check",
+                error_kind = "JoinFailure",
+                "blocking task join failed during vault_status"
+            );
+            Err(VaultStatusError::IoError {
+                io_error_kind: IoFailureKind::Other,
+            })
+        }
+    }
+}
+
+/// Read-only probe of [`VaultRuntimeState`]'s slot.
+///
+/// Returns `true` when the slot is populated (an [`UnlockedVault`] is
+/// present), `false` otherwise. Used by the frontend's Editor mount
+/// guard (Q5β-1 belt+suspenders): when Stage = `editor` mounts but the
+/// slot is empty, the React state ↔ Rust state disagreement is
+/// detected here and the component renders `<FailClosedError reason="invalid-state" />`.
+///
+/// Cheap: a single read-lock peek; no IO, no Argon2id, no permit.
+/// Idempotent: callable from any stage at any time without side effects.
+///
+/// Error type is [`VaultStatusError`] for type-mirror consistency with
+/// [`vault_status`] — in practice this command cannot fail (the
+/// [`tokio::sync::RwLock`] read is infallible). The `Result` shape is
+/// retained so the Tauri IPC contract for the two probe commands is
+/// uniform on the frontend side.
+#[tauri::command]
+pub async fn vault_is_unlocked(
+    state: State<'_, VaultRuntimeState>,
+) -> Result<bool, VaultStatusError> {
+    vault_is_unlocked_with_state(state.inner()).await
+}
+
+/// Testable core of [`vault_is_unlocked`]. The Tauri-command wrapper
+/// resolves the [`State`] borrow and delegates here so tests do not
+/// need a [`AppHandle`].
+pub(crate) async fn vault_is_unlocked_with_state(
+    state: &VaultRuntimeState,
+) -> Result<bool, VaultStatusError> {
+    Ok(state.peek_is_some().await)
 }
 
 #[cfg(test)]
@@ -1067,6 +1225,214 @@ mod tests {
                 *unlocked.root_key, [0x11u8; AEAD_KEY_LEN],
                 "fresh unlock must overwrite the prior session's root_key"
             );
+        });
+    }
+
+    // ---- vault_status command (Task 1 of `app-state-machine`) -------
+    //
+    // Three-state probe: Exists | Missing | Corrupted, plus IO failure
+    // surface as `Err(VaultStatusError::IoError)`. Mirrors the existing
+    // `parse_fail_*` matrix on the unlock command but at the read +
+    // parse layer only — no Argon2id, no slot interaction.
+
+    #[test]
+    fn vault_status_returns_missing_when_vault_meta_absent() {
+        // First-run UX path: file does not exist → Ok(Missing).
+        // NotFound is special-cased; not surfaced as IoError.
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            assert!(!scratch.path().exists());
+
+            let result = vault_status_with_path(scratch.path()).await;
+            assert_eq!(result, Ok(VaultStatus::Missing));
+        });
+    }
+
+    #[test]
+    fn vault_status_returns_exists_for_valid_vault_meta() {
+        // Round-trip: a vault.meta freshly produced by
+        // `build_and_serialize_vault_meta` parses cleanly, so the
+        // probe classifies it as Exists.
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let (bytes, _) = seed_vault_meta("pw");
+            scratch.write_meta(&bytes);
+
+            let result = vault_status_with_path(scratch.path()).await;
+            assert_eq!(result, Ok(VaultStatus::Exists));
+        });
+    }
+
+    /// Run the probe against `tampered_bytes` and assert it surfaces
+    /// as `Ok(VaultStatus::Corrupted)` — the canonical "file present
+    /// but unparsable" classification. IO failure must NOT collapse
+    /// into Corrupted; that path is exercised by
+    /// `vault_status_returns_io_error_on_permission_denied` below.
+    async fn assert_corrupted_on_bytes(tampered_bytes: &[u8]) {
+        let scratch = ScratchVault::new();
+        scratch.write_meta(tampered_bytes);
+
+        let result = vault_status_with_path(scratch.path()).await;
+        assert_eq!(
+            result,
+            Ok(VaultStatus::Corrupted),
+            "tampered vault.meta must surface as Corrupted, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn vault_status_corrupted_on_bad_magic() {
+        // Spec §9.3: bytes[0..4] = b"MYV1". Replace with arbitrary
+        // non-magic bytes; parse_vault_meta rejects.
+        rt().block_on(async {
+            let (mut bytes, _) = seed_vault_meta("pw");
+            bytes[0..4].copy_from_slice(b"XXXX");
+            assert_corrupted_on_bytes(&bytes).await;
+        });
+    }
+
+    #[test]
+    fn vault_status_corrupted_on_truncated_length() {
+        // Spec §9.3: vault.meta is exactly VAULT_META_LEN (345) bytes.
+        // One short triggers the length check before any field is read.
+        rt().block_on(async {
+            let (bytes, _) = seed_vault_meta("pw");
+            assert_eq!(bytes.len(), protocol::VAULT_META_LEN);
+            assert_corrupted_on_bytes(&bytes[..protocol::VAULT_META_LEN - 1]).await;
+        });
+    }
+
+    #[test]
+    fn vault_status_corrupted_on_overlong_length() {
+        // Length-classification mirror of truncation: any size !=
+        // VAULT_META_LEN must reject. One byte too many.
+        rt().block_on(async {
+            let (bytes, _) = seed_vault_meta("pw");
+            let mut overlong = bytes.to_vec();
+            overlong.push(0u8);
+            assert_corrupted_on_bytes(&overlong).await;
+        });
+    }
+
+    #[test]
+    fn vault_status_corrupted_on_bad_protocol_version() {
+        // Spec §9.3 offset 4: protocol_version = 0x01 for v0.1.
+        // Anything else is forward-incompatible-by-design (§10).
+        rt().block_on(async {
+            let (mut bytes, _) = seed_vault_meta("pw");
+            bytes[4] = 0x02;
+            assert_corrupted_on_bytes(&bytes).await;
+        });
+    }
+
+    #[test]
+    fn vault_status_corrupted_on_nonzero_reserved_byte() {
+        // Spec §9.3 offset 5: reserved MUST be 0x00. v0.1 parsers
+        // reject non-zero by construction (forward-compat anchor).
+        rt().block_on(async {
+            let (mut bytes, _) = seed_vault_meta("pw");
+            bytes[5] = 0x01;
+            assert_corrupted_on_bytes(&bytes).await;
+        });
+    }
+
+    #[test]
+    fn vault_status_corrupted_on_invalid_kdf_block() {
+        // Spec §9.3 offset 22: kdf_id MUST be 0x01 (Argon2id, the
+        // only value accepted in v0.1). 0xFF triggers the
+        // parse_kdf_params branch inside parse_vault_meta.
+        rt().block_on(async {
+            let (mut bytes, _) = seed_vault_meta("pw");
+            bytes[22] = 0xFF;
+            assert_corrupted_on_bytes(&bytes).await;
+        });
+    }
+
+    /// Permission-denied IO test (Unix-only).
+    ///
+    /// Mirrors the unlock command's `permission_denied_returns_io_error_with_permission_denied_kind`
+    /// test. Skipped automatically when running as root (mode-000 does
+    /// not block reads for the superuser); CI runs unprivileged.
+    #[cfg(unix)]
+    #[test]
+    fn vault_status_returns_io_error_on_permission_denied() {
+        use std::os::unix::fs::PermissionsExt;
+
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let (bytes, _) = seed_vault_meta("pw");
+            scratch.write_meta(&bytes);
+
+            let mut perms = std::fs::metadata(scratch.path())
+                .expect("stat scratch file")
+                .permissions();
+            perms.set_mode(0o000);
+            std::fs::set_permissions(scratch.path(), perms).expect("chmod 000");
+
+            let result = vault_status_with_path(scratch.path()).await;
+
+            // Restore readability for cleanup BEFORE asserting (so a
+            // panicking assert still leaves the dir cleanable).
+            let mut perms = std::fs::metadata(scratch.path())
+                .expect("stat after probe")
+                .permissions();
+            perms.set_mode(0o644);
+            std::fs::set_permissions(scratch.path(), perms).expect("chmod 644 cleanup");
+
+            match result {
+                Err(VaultStatusError::IoError {
+                    io_error_kind: IoFailureKind::PermissionDenied,
+                }) => {} // expected
+                Ok(VaultStatus::Exists) => eprintln!(
+                    "permission_denied test ran with effective read access; \
+                     skipping assertion (CI must run unprivileged)"
+                ),
+                other => panic!("expected IoError(PermissionDenied), got {other:?}"),
+            }
+        });
+    }
+
+    // ---- vault_is_unlocked command (Task 1 of `app-state-machine`) --
+    //
+    // Read-only peek of VaultRuntimeState's slot. Used by Editor mount
+    // guard (Q5β-1 belt+suspenders).
+
+    use super::super::state::fixture_unlocked_with_keys as status_fixture_unlocked_with_keys;
+
+    #[test]
+    fn vault_is_unlocked_returns_false_on_fresh_state() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let result = vault_is_unlocked_with_state(&state).await;
+            assert_eq!(result, Ok(false));
+        });
+    }
+
+    #[test]
+    fn vault_is_unlocked_returns_true_when_slot_populated() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set(status_fixture_unlocked_with_keys(0x42, 0x13, 0x99))
+                .await;
+            let result = vault_is_unlocked_with_state(&state).await;
+            assert_eq!(result, Ok(true));
+        });
+    }
+
+    #[test]
+    fn vault_is_unlocked_returns_false_after_take() {
+        // Lock cycle parity: after the slot is drained (vault_lock
+        // semantics), the probe must immediately surface false.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set(status_fixture_unlocked_with_keys(0x77, 0x88, 0x99))
+                .await;
+            assert_eq!(vault_is_unlocked_with_state(&state).await, Ok(true));
+
+            let _ = state.take().await; // simulate vault_lock
+            assert_eq!(vault_is_unlocked_with_state(&state).await, Ok(false));
         });
     }
 }

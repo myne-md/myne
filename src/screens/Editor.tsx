@@ -23,7 +23,10 @@
 //   - Mockup (structural reference only, NOT copied):
 //     docs/design/ui_kits/desktop/Editor.jsx
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { FailClosedError } from "../components/FailClosedError";
+import { Icon } from "../components/primitives/Icon";
+import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 
 const SECTION_HEADING_STYLE: CSSProperties = {
   fontSize: 11,
@@ -38,8 +41,94 @@ const STATUS_TEXT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-export function Editor() {
+interface EditorProps {
+  /**
+   * Callback invoked when the Editor mount guard fires (slot empty
+   * despite Stage = `editor`) and the user clicks the "Kilitle" CTA
+   * on the resulting `<FailClosedError reason="invalid-state" />`.
+   * The parent (App.tsx) is responsible for re-probing
+   * `vault_status` and routing to welcome/unlock based on the result.
+   * The component itself only fires `vault_lock` (idempotent on
+   * already-empty slot) before invoking this callback.
+   */
+  onResetRequested?: () => void;
+  /**
+   * Callback invoked when the user clicks the Lock affordance in the
+   * editor's bottom bar. The parent (App.tsx) dispatches the
+   * `editor.lock` Stage transition → `locked`. This component fires
+   * `vault_lock()` IPC (idempotent) before invoking the callback so
+   * the slot is wiped before the locked screen renders.
+   *
+   * **Implicit decrypting-hide invariant:** Lock affordance only
+   * mounts when stage = `editor`; `decrypting` is an `unlock` sub-
+   * state during which `editor` is not mounted, so the affordance is
+   * structurally absent during Argon2id (MYND-35 acceptance "decrypting
+   * hide" satisfied without explicit conditional render).
+   */
+  onLock?: () => void;
+}
+
+/**
+ * Mount-time reality check (Q5β-1 belt+suspenders): the React Stage
+ * machine says we're in `editor`, but the Rust-side slot might
+ * actually be empty (devtools manipulation, routing regression,
+ * post-lock race). Probe `vault_is_unlocked` once on mount; if the
+ * slot is empty, render the fail-closed error UI in place of the
+ * editor body.
+ */
+export function Editor({ onResetRequested, onLock }: EditorProps = {}) {
   const [content, setContent] = useState("");
+  const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
+
+  const probed = useRef(false);
+  useEffect(() => {
+    if (probed.current) return; // StrictMode double-invoke guard
+    probed.current = true;
+    void (async () => {
+      try {
+        const ok = await isVaultUnlocked();
+        setSlotPopulated(ok);
+      } catch (e) {
+        // IPC error itself is treated as invalid state — fail-closed
+        // UI instead of the editor body. Surface to dev console so a
+        // genuinely broken IPC channel doesn't masquerade as a
+        // slot-empty signal silently.
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[Editor] vault_is_unlocked IPC rejected:", e);
+        }
+        setSlotPopulated(false);
+      }
+    })();
+  }, []);
+
+  if (slotPopulated === null) {
+    // Loading shim — the IPC takes microseconds (single RwLock read);
+    // a flash of nothing is invisible at human latency. Returning
+    // null avoids any flash of the editor body before the guard
+    // result arrives.
+    return null;
+  }
+
+  if (slotPopulated === false) {
+    return (
+      <FailClosedError
+        reason={{ kind: "invalid-state" }}
+        onCtaClick={() => {
+          void (async () => {
+            // vault_lock is idempotent (Ok(()) on already-empty slot)
+            // — safe to call regardless of whether the slot is
+            // genuinely empty or the IPC failed.
+            await lockVault().catch(() => {
+              // Even if lock rejects, we still want to re-probe
+              // and route the user out of editor stage.
+            });
+            onResetRequested?.();
+          })();
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -62,7 +151,7 @@ export function Editor() {
         <CenterPane content={content} onChange={setContent} />
         <RightSidebar />
       </div>
-      <BottomBar />
+      <BottomBar onLock={onLock} />
     </div>
   );
 }
@@ -200,7 +289,22 @@ function RightSidebar() {
   );
 }
 
-function BottomBar() {
+interface BottomBarProps {
+  onLock?: () => void;
+}
+
+function BottomBar({ onLock }: BottomBarProps) {
+  const handleLockClick = () => {
+    void (async () => {
+      // vault_lock is idempotent + param-less. Errors are swallowed —
+      // slot wipe is best-effort; the parent's `editor.lock` Stage
+      // transition still fires either way (the Locked screen + later
+      // unlock attempt would catch any structural issue).
+      await lockVault().catch(() => {});
+      onLock?.();
+    })();
+  };
+
   return (
     <div
       style={{
@@ -215,14 +319,38 @@ function BottomBar() {
     >
       <span style={STATUS_TEXT_STYLE}>Local-only · not synced</span>
       <div style={{ flex: 1 }} />
-      <span
-        style={{
-          ...STATUS_TEXT_STYLE,
-          fontFamily: "var(--font-mono)",
-        }}
-      >
-        0 words
-      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          type="button"
+          onClick={handleLockClick}
+          aria-label="Vault'u kilitle"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "4px 8px",
+            background: "transparent",
+            border: 0,
+            borderRadius: "var(--radius-1)",
+            color: "var(--fg-3)",
+            fontFamily: "var(--font-sans)",
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          <Icon name="lock" size={12} />
+          <span>Kilitle</span>
+        </button>
+        <span
+          style={{
+            ...STATUS_TEXT_STYLE,
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          0 words
+        </span>
+      </div>
     </div>
   );
 }

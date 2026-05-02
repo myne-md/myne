@@ -13,11 +13,19 @@ fn main() {
             .plugin(
                 "vault-unlock",
                 // Task 2 of `vault-unlock-password` ships `unlock`;
-                // Task 6 adds `lock` (the A8e bundle). Adding a
-                // command here without a matching `commands.allow`
-                // entry in `permissions/vault-unlock/default.toml`
-                // is a security regression.
-                tauri_build::InlinedPlugin::new().commands(&["unlock", "lock"]),
+                // Task 6 adds `lock` (the A8e bundle). Task 1 of
+                // `app-state-machine` adds `vault_status` (boot probe)
+                // and `vault_is_unlocked` (Editor mount guard probe).
+                // Adding a command here without a matching
+                // `commands.allow` entry in
+                // `permissions/vault-unlock/default.toml` is a security
+                // regression.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "unlock",
+                    "lock",
+                    "vault_status",
+                    "vault_is_unlocked",
+                ]),
             ),
     )
     .unwrap();

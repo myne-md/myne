@@ -37,6 +37,8 @@ Multi-step flows live as Tauri plugins under `src/plugins/<flow-name>/`:
 
 Reference: `src/plugins/vault_creation/` — implements the begin/commit/cancel session pattern (`decisions.md` 2026-04-28 "Vault creation flow: backend session pattern; root_key never crosses IPC"). New flows that need to keep secrets server-side should follow the same shape.
 
+**Defensive guards on user-meaningful destructive operations.** Plugins that write to user-meaningful state (vault.meta, .myn blobs, future settings stores) defensively guard pre-existing destinations: an exists-check at the top of the write command + a closed `<X>AlreadyExists` error variant + restore the session under its token so retry stays non-destructive. Pattern is canonical in `src/plugins/vault_creation/commands.rs::commit_with_vault_path` (`VaultAlreadyExists` guard, `decisions.md` 2026-05-02). The guard is expected to NEVER trigger in normal flow — its role is bug-canary against frontend routing regressions or dev-tools manipulation that would otherwise silently overwrite irrecoverable state.
+
 ## Secret-handling logging discipline
 
 Canonical for all `src-tauri/` plugins that touch secret material (passwords, recovery phrases, wrap keys, root keys, items keys, salts, nonces, account-number-hash bytes, raw vault.meta bytes, OS path strings). Per-plugin module docs **point here** with a single line — `// see: ../../CLAUDE.md "Secret-handling logging discipline"` — rather than duplicating the lists below.
