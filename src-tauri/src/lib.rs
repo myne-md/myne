@@ -1,4 +1,5 @@
 mod atomic_write;
+mod io_failure_kind;
 mod paths;
 mod plugins;
 
@@ -10,6 +11,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(plugins::vault_creation::init())
+        .plugin(plugins::vault_unlock::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
