@@ -37,6 +37,82 @@ Multi-step flows live as Tauri plugins under `src/plugins/<flow-name>/`:
 
 Reference: `src/plugins/vault_creation/` — implements the begin/commit/cancel session pattern (`decisions.md` 2026-04-28 "Vault creation flow: backend session pattern; root_key never crosses IPC"). New flows that need to keep secrets server-side should follow the same shape.
 
+## Secret-handling logging discipline
+
+Canonical for all `src-tauri/` plugins that touch secret material (passwords, recovery phrases, wrap keys, root keys, items keys, salts, nonces, account-number-hash bytes, raw vault.meta bytes, OS path strings). Per-plugin module docs **point here** with a single line — `// see: ../../CLAUDE.md "Secret-handling logging discipline"` — rather than duplicating the lists below.
+
+### Pattern: Zeroizing wrap + spawn_blocking move
+
+A Tauri command that touches a secret takes the secret as a plain `String` parameter (the IPC layer hands us one), then **on the first non-doc statement** wraps it in `Zeroizing<String>` and moves the wrapper into the heavy-compute closure:
+
+```rust
+#[tauri::command]
+pub async fn unlock(
+    password: String,
+    state: State<'_, VaultRuntimeState>,
+    // ...
+) -> Result<(), VaultUnlockError> {
+    // First statement: bound the lifetime of the bytes to a Zeroizing
+    // wrapper. Every early-return path (slot guard, permit guard, IO
+    // failure, parse failure) drops the wrapper and zeroes the bytes.
+    let password = Zeroizing::new(password);
+
+    // ... cheap guards run with the wrapper in scope ...
+
+    let result = tokio::task::spawn_blocking(move || {
+        // The wrapper moves into the closure. derive_* helpers borrow
+        // `&str` via deref coercion: &Zeroizing<String> → &String → &str.
+        // No clone, no format-arg, no log of the password.
+        derive_root_key(&password, &meta)
+    })
+    .await;
+    // Closure exit: wrapper drops, bytes wipe.
+    // ...
+}
+```
+
+**Do NOT** enable the `zeroize/serde` feature for "Zeroizing<String> deserializes directly". V8 immutable strings + serde intermediate buffers do not become Zeroizing-aware just because the command signature looks tighter. Cosmetic gain, deps surface bloat — TB9 audit-anchor disciplined. The first-line wrap is the load-bearing pattern.
+
+### DENY list — never emit via tracing, log, format, or any IPC payload
+
+Never reference any of these in a `tracing::*!`, `println!`, `eprintln!`, `format!`, `?fmt`, `%fmt`, or any IPC-bound `serde::Serialize` field. Reviewer-enforced; no automated lint.
+
+- `password`, recovery phrase
+- `password.len()` / phrase word count (partial-attempt counter telemetry leak)
+- wrap_key, root_key, items_key, item_key, HKDF PRK
+- salts, nonces (vault-stable correlation tags, even though not secret-bearing)
+- `account_number_hash` bytes
+- `vault.meta` raw bytes
+- full filesystem path
+- raw `std::io::Error::Display` (kernel-dependent path leakage on some platforms)
+
+### ALLOW list — safe to emit via tracing
+
+- bounded `ProtocolError` / `VaultUnlockError` / `AppError` variant name (use a `&'static str` helper, NOT `?e` Debug formatting)
+- `stage` tag: `read_meta`, `parse_meta`, `password_kdf`, `root_unwrap`, `items_key_unwrap`, `slot_check`, `permit_acquire`, `spawn_blocking_join`, etc. — static strings naming the failure stage
+- coarse `duration_ms` (Argon2id timing telemetry; sub-ms precision deliberately discarded — no fingerprintable timing channel)
+- success/failure event without account identifier (`event = "vault_unlocked"`)
+- closed `IoFailureKind` enum (from `src-tauri/src/io_failure_kind.rs`) — Debug emits `PermissionDenied`/`NotFound`/`NoSpace`/`Other`, all DENY-list-safe
+
+### Closed-enum mapping rule
+
+`?` and `%` `tracing` formatters are **forbidden** on `std::io::Error`, `String` containing OS path, and any DENY-listed type. Always reduce to a closed enum first. Pattern:
+
+```rust
+// ❌ Wrong — io::Error::Display may include kernel path strings.
+tracing::error!(stage = "read_meta", error = ?e, "...");
+
+// ✅ Right — bounded enum, Debug emits the variant name only.
+let io_kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+tracing::error!(stage = "read_meta", io_failure_kind = ?io_kind, "...");
+```
+
+For `ProtocolError` (all unit variants), `?e` Debug-formatting would also emit just the variant name — but use the `protocol_error_kind(&ProtocolError) -> &'static str` helper anyway. Discipline-explicit, drift-detecting (a new variant compile-fails the helper's match), and survives an accidental future `Debug` impl change on the protocol crate.
+
+### Reference implementation
+
+`src-tauri/src/plugins/vault_unlock/commands.rs` (Task 8 of `vault-unlock-password`) wires this discipline end-to-end — 12 instrumented call sites, one `protocol_error_kind` helper, zero DENY-listed values in any `tracing::*!` argument. `src-tauri/src/plugins/vault_creation/commands.rs` retroactively adopted the Zeroizing-wrap idiom in Task 7 of the same feature.
+
 ## Atomic file writes
 
 `src/atomic_write.rs` — write-to-temp + rename-into-place pattern; on Windows the destination is replaced explicitly (see commit 529e532 "Fix: atomic_write replaces existing destination on Windows"). Use this for any persistent state (vault.meta, .myn blobs, settings).

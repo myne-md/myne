@@ -1,0 +1,23 @@
+# Permissions for the in-app `vault-unlock` Tauri plugin.
+# Picked up under the `vault-unlock:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `vault-unlock:default` (or `vault-unlock:allow-<cmd>`).
+#
+# Task 2 of `vault-unlock-password` introduces `allow-unlock`. Task 6
+# adds `allow-lock` (the A8e bundle).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-unlock plugin."
+permissions = ["allow-unlock", "allow-lock"]
+
+[[permission]]
+identifier = "allow-unlock"
+description = "Allow invoking vault_unlock:unlock (open an existing vault with master password)."
+commands.allow = ["unlock"]
+
+[[permission]]
+identifier = "allow-lock"
+description = "Allow invoking vault_unlock:lock (close the open vault — drops the in-memory keys)."
+commands.allow = ["lock"]

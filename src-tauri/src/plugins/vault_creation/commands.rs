@@ -14,6 +14,7 @@ use serde::Serialize;
 use std::time::Instant;
 use tauri::{Runtime, State};
 use uuid::Uuid;
+use zeroize::Zeroizing;
 
 /// Result returned by [`begin`].
 ///
@@ -57,14 +58,27 @@ pub async fn begin(
     password: String,
     state: State<'_, VaultCreationState>,
 ) -> Result<BeginResult, AppError> {
+    // Wrap immediately so any early-return path (slot-cap rejection,
+    // spawn_blocking join failure, build_session error) drops the
+    // wrapper and zeroes the bytes. Plain `String` would drop without
+    // zeroize. Retroactive memory-hygiene fix bundled with
+    // `vault-unlock-password` Task 7 — same pattern Task 2 established
+    // for the unlock command. `build_session` borrows `&str` (signature
+    // unchanged); the deref chain `&Zeroizing<String>` → `&String` →
+    // `&str` holds via standard deref coercion.
+    let password = Zeroizing::new(password);
+
     // Reserve a slot atomically before kicking off ~2 seconds of
     // Argon2id work. If the cap is already saturated, fail fast
     // without consuming any memory.
     let reservation = state.try_reserve()?;
 
-    // Heavy work off the runtime worker pool. If anything in here
-    // fails, the `?` early-exit drops `reservation`, releasing the
-    // slot via SlotReservation::drop.
+    // Heavy work off the runtime worker pool. The `move` consumes
+    // the Zeroizing wrapper into the closure, so the password's
+    // bytes wipe when the closure ends — success or failure. If
+    // anything in here fails, the `?` early-exit drops `reservation`
+    // (releasing the slot via SlotReservation::drop) and the closure-
+    // captured wrapper drops in spawn_blocking's task pool.
     let session =
         tokio::task::spawn_blocking(move || build_session(&password, DEFAULT_V0_1_KDF_PARAMS))
             .await
