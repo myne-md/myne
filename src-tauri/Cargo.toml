@@ -29,4 +29,8 @@ uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
 getrandom = "0.2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
+# `tracing` for structured ops-side logging (stage tags + bounded
+# variant-name fields only; see src-tauri/CLAUDE.md
+# "Secret-handling logging discipline").
+tracing = "0.1"
