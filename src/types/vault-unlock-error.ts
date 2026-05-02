@@ -109,12 +109,27 @@ export type VaultUnlockError =
   | { kind: "UnlockInProgress" }
   /**
    * The vault is already unlocked. Returned by the slot-peek guard
-   * when an unlock attempt arrives with the slot occupied.
+   * when an unlock attempt arrives with the slot occupied by
+   * `Slot::Unlocked(_)`.
    *
    * **Not user-facing**: frontend routes the user to the editor
    * when the slot is occupied; if this surfaces, a router bug.
    */
   | { kind: "VaultAlreadyUnlocked" }
+  /**
+   * A recovery flow is in progress (`Slot::Recovering`) — the user
+   * has successfully recovered with their phrase but has not yet
+   * committed a new master password via `vault_complete_recovery`.
+   * `vault_unlock` is structurally rejected during this window per
+   * `docs/spec/recovery-flow.md` § 4.1's "non-dismissible mandatory
+   * chained step" rule.
+   *
+   * **Not user-facing**: frontend routes the user to the password-
+   * reset form when `vault_status` returns `Recovering`; if this
+   * surfaces from `vault_unlock`, a router bug. Added by Task 3 of
+   * `vault-recovery-from-phrase`.
+   */
+  | { kind: "VaultRecoveryInProgress" }
   /**
    * `tokio::task::spawn_blocking` join handle returned an error
    * (panic in the blocking task, runtime shutdown). User-facing

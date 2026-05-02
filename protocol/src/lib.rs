@@ -36,10 +36,11 @@ pub use aead::{
 };
 pub use error::ProtocolError;
 pub use kdf::{
-    derive_password_wrap_key, derive_recovery_wrap_key, ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
+    derive_password_wrap_key, derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
+    ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
 };
 pub use phrase::{
-    generate_recovery_phrase, RecoveryPhrase, RECOVERY_PHRASE_ENTROPY_BYTES,
+    generate_recovery_phrase, normalize_user_phrase, RecoveryPhrase, RECOVERY_PHRASE_ENTROPY_BYTES,
     RECOVERY_PHRASE_WORD_COUNT,
 };
 pub use subkey::{derive_subkey, SubkeyRole};
@@ -48,8 +49,8 @@ pub use types::{
     KDF_PARAMS_CANONICAL_LEN,
 };
 pub use vault_meta::{
-    parse_vault_meta, serialize_vault_meta, VaultMeta, VAULT_META_ACCOUNT_HASH_LEN,
-    VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN, VAULT_META_MAGIC, VAULT_META_NONCE_LEN,
-    VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED, VAULT_META_SALT_RANDOM_LEN,
-    VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
+    parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta, VaultMeta,
+    VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN, VAULT_META_MAGIC,
+    VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
+    VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };

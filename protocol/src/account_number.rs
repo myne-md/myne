@@ -35,6 +35,7 @@
 use crate::error::ProtocolError;
 use alloc::string::String;
 use sha2::{Digest, Sha256};
+use unicode_normalization::UnicodeNormalization;
 
 /// Crockford base32 alphabet, in canonical position order
 /// (`account-number.md` § 2). Excludes `I`, `L`, `O`, `U`.
@@ -203,17 +204,27 @@ pub fn generate_account_number() -> Result<AccountNumber, ProtocolError> {
 /// rule failed; this function returns a single error variant so the UI
 /// cannot accidentally distinguish causes.
 ///
-/// **NFKD note.** Spec § 5 step 1 calls for NFKD normalization. This
-/// implementation skips NFKD for v0.1 — the alphabet check at step 7
-/// already rejects any non-ASCII character, and pulling
-/// `unicode-normalization` in directly is not justified for a feature
-/// that adds no behavior beyond rejection. NFKD compliance is a v0.1.x
-/// follow-up if real users hit it.
+/// **NFKD.** Spec § 5 step 1 mandates NFKD normalization on the input
+/// before any other processing. Applied via `unicode-normalization`
+/// (added as a direct dep alongside `protocol::phrase` recovery-flow
+/// normalization — see `decisions.md` 2026-05-02). This canonicalizes
+/// compatibility-decomposable input — full-width digits (`０`–`９`),
+/// full-width Latin letters (`Ａ`–`Ｚ`), no-break space (U+00A0),
+/// ideographic space (U+3000), and ligatures like `ﬁ` — into ASCII
+/// equivalents so the downstream alphabet check accepts them. Non-
+/// decomposable non-ASCII (e.g. Cyrillic Е U+0415) survives NFKD and
+/// is rejected at the ASCII fast-path below.
 pub fn parse_account_number(input: &str) -> Result<AccountNumber, ProtocolError> {
-    // 1+2. Strip whitespace anywhere (trim is implied by removing all
+    // 1. NFKD normalize (spec § 5 step 1). Compatibility decomposition
+    //    folds full-width / ligature / compatibility variants into the
+    //    canonical ASCII forms expected by the downstream alphabet
+    //    check, before any whitespace stripping or case folding runs.
+    let normalized: String = input.nfkd().collect();
+
+    // 2+3. Strip whitespace anywhere (trim is implied by removing all
     // whitespace characters). Avoids relying on `str::trim` semantics.
-    let mut compact = String::with_capacity(input.len());
-    for c in input.chars() {
+    let mut compact = String::with_capacity(normalized.len());
+    for c in normalized.chars() {
         if !c.is_whitespace() {
             compact.push(c);
         }
@@ -553,5 +564,62 @@ mod tests {
         // arithmetic in generate_account_number too.
         assert_eq!(ENTROPY_CHARS, 19);
         assert_eq!(CANONICAL_LEN, 20);
+    }
+
+    // ---- NFKD normalization (spec § 5 step 1) ----------------------
+    //
+    // `unicode-normalization` direct dep adds NFKD canonicalization
+    // before the rest of the parse pipeline runs. Compatibility-
+    // decomposable input (full-width Latin/digit forms, ligatures,
+    // some compatibility characters) folds to ASCII before the
+    // alphabet check, so real-world copy-paste paths (screenshot
+    // OCR producing `０`, ﬁ-typesetting password-manager output)
+    // succeed instead of falsely rejecting on "non-ASCII".
+
+    #[test]
+    fn parse_accepts_fullwidth_digit_normalization() {
+        // U+FF10..U+FF19 (full-width digits ０..９) NFKD-decompose
+        // to ASCII 0..9. Parse must succeed and produce a canonical
+        // identical to the ASCII form.
+        let acct_ascii = parse_account_number("MY-0123-4567-89AB-CDEF-GHJT").unwrap();
+        let acct_full_width =
+            parse_account_number("MY-\u{FF10}\u{FF11}\u{FF12}\u{FF13}-4567-89AB-CDEF-GHJT")
+                .unwrap();
+        assert_eq!(&acct_full_width.canonical, &acct_ascii.canonical);
+        assert_eq!(acct_full_width.hash, acct_ascii.hash);
+    }
+
+    #[test]
+    fn parse_accepts_fullwidth_letter_normalization() {
+        // U+FF21..U+FF3A (full-width Latin uppercase Ａ..Ｚ) NFKD-
+        // decompose to ASCII A..Z. The Crockford alphabet check at
+        // step 7 then accepts them as canonical alphabet bytes.
+        let acct_ascii = parse_account_number("MY-0123-4567-89AB-CDEF-GHJT").unwrap();
+        // Replace "AB" with full-width "ＡＢ" (U+FF21, U+FF22).
+        let acct_full_width =
+            parse_account_number("MY-0123-4567-89\u{FF21}\u{FF22}-CDEF-GHJT").unwrap();
+        assert_eq!(&acct_full_width.canonical, &acct_ascii.canonical);
+    }
+
+    #[test]
+    fn parse_accepts_fullwidth_my_prefix() {
+        // The case-insensitive `MY-` prefix strip happens after NFKD,
+        // so a full-width prefix `ＭＹ-` (U+FF2D, U+FF39, ASCII '-')
+        // round-trips through NFKD to ASCII `MY-` and is accepted.
+        let acct_ascii = parse_account_number("MY-0123-4567-89AB-CDEF-GHJT").unwrap();
+        let acct_full_width =
+            parse_account_number("\u{FF2D}\u{FF39}-0123-4567-89AB-CDEF-GHJT").unwrap();
+        assert_eq!(&acct_full_width.canonical, &acct_ascii.canonical);
+    }
+
+    #[test]
+    fn parse_accepts_no_break_space_separator() {
+        // U+00A0 (NO-BREAK SPACE) decomposes to ASCII U+0020 under NFKD;
+        // the whitespace-strip step then removes it. Word-processor /
+        // password-manager copies frequently substitute regular spaces
+        // with U+00A0 — this test documents the canonical accept.
+        let s = "MY-0123-4567-89AB-CDEF-GHJT".replace('-', "\u{00A0}-\u{00A0}");
+        let acct = parse_account_number(&s).unwrap();
+        assert_eq!(&acct.canonical, b"0123456789ABCDEFGHJT");
     }
 }

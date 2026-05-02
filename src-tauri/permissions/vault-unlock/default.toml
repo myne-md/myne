@@ -4,7 +4,13 @@
 # reference these as `vault-unlock:default` (or `vault-unlock:allow-<cmd>`).
 #
 # Task 2 of `vault-unlock-password` introduces `allow-unlock`. Task 6
-# adds `allow-lock` (the A8e bundle).
+# of that feature adds `allow-lock` (the A8e bundle). Task 1 of
+# `app-state-machine` adds `allow-vault-status` (read-only `vault.meta`
+# disk probe — Exists | Missing | Corrupted) and `allow-vault-is-unlocked`
+# (read-only boolean peek of the unlocked-vault slot). Task 8 of
+# `vault-recovery-from-phrase` adds `allow-vault-slot-kind` (read-only
+# three-state SlotKind probe — Empty | Recovering | Unlocked, used by
+# frontend boot-time + post-WebView-reload routing in the recovery flow).
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -15,6 +21,7 @@ permissions = [
     "allow-lock",
     "allow-vault-status",
     "allow-vault-is-unlocked",
+    "allow-vault-slot-kind",
 ]
 
 [[permission]]
@@ -24,7 +31,7 @@ commands.allow = ["unlock"]
 
 [[permission]]
 identifier = "allow-lock"
-description = "Allow invoking vault_unlock:lock (close the open vault — drops the in-memory keys)."
+description = "Allow invoking vault_unlock:lock (close the open vault — drops whichever Slot variant is held; idempotent on Empty)."
 commands.allow = ["lock"]
 
 [[permission]]
@@ -36,3 +43,8 @@ commands.allow = ["vault_status"]
 identifier = "allow-vault-is-unlocked"
 description = "Allow invoking vault_unlock:vault_is_unlocked (read-only peek of the unlocked-vault slot)."
 commands.allow = ["vault_is_unlocked"]
+
+[[permission]]
+identifier = "allow-vault-slot-kind"
+description = "Allow invoking vault_unlock:vault_slot_kind (read-only: returns the current SlotKind variant — Empty | Recovering | Unlocked. Used by frontend boot-time + post-WebView-reload routing for the recovery flow)."
+commands.allow = ["vault_slot_kind"]

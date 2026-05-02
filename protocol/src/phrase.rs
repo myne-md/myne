@@ -40,6 +40,7 @@
 use crate::error::ProtocolError;
 use alloc::string::{String, ToString};
 use bip39::Mnemonic;
+use unicode_normalization::UnicodeNormalization;
 use zeroize::Zeroizing;
 
 /// Number of BIP-39 words in a Myne recovery phrase (256-bit entropy).
@@ -105,6 +106,57 @@ impl RecoveryPhrase {
         }
         Zeroizing::new(out)
     }
+}
+
+/// Normalize user-typed recovery phrase per `protocol.md` § 7.4.
+///
+/// Pipeline (single pass over the NFKD char stream):
+/// 1. **NFKD** compatibility decomposition — folds full-width digits
+///    (`０`–`９`), full-width Latin letters (`Ａ`–`Ｚ`), no-break space
+///    (U+00A0), ideographic space (U+3000), ligatures like `ﬁ`, etc.
+/// 2. **ASCII lowercase** — BIP-39 English wordlist is lowercase, so
+///    user-typed uppercase or mixed-case input must lowercase to
+///    match. ASCII-only is sufficient (the wordlist contains no
+///    Unicode-uppercase-sensitive characters).
+/// 3. **Trim** leading and trailing Unicode whitespace.
+/// 4. **Whitespace coalesce** — runs of one or more Unicode whitespace
+///    characters between tokens become a single ASCII space U+0020.
+///
+/// Returns the canonical bytes wrapped in [`Zeroizing<String>`] so the
+/// bytes wipe on drop. The output is the `phrase_normalized` form fed
+/// directly into Argon2id during recovery (`protocol.md` § 3.1).
+///
+/// Does **not** validate against the BIP-39 wordlist — invalid input
+/// produces a normalized string that fails AEAD-tag verification at the
+/// `recovery_wrap` unwrap stage; the caller surfaces a single non-
+/// distinguishing error per `recovery-flow.md` § 3.4 ("Phrase or vault
+/// is invalid — please retry."). This is the single-pass cousin of
+/// [`RecoveryPhrase::join_normalized`], which canonicalizes a phrase
+/// Myne *generated* (already ASCII lowercase, no NFKD pass needed).
+pub fn normalize_user_phrase(input: &str) -> Zeroizing<String> {
+    // Pre-allocate against input byte length. NFKD can expand chars
+    // (e.g. ﬁ → "fi" doubles), but the realistic 24-word phrase case
+    // does not stress this; a small reallocation under expansion is
+    // acceptable cost for the common-path zero-realloc path.
+    let mut out = String::with_capacity(input.len());
+    let mut prev_was_whitespace = false;
+    let mut have_emitted_token = false;
+
+    for c in input.nfkd() {
+        let c = c.to_ascii_lowercase();
+        if c.is_whitespace() {
+            prev_was_whitespace = true;
+        } else {
+            if prev_was_whitespace && have_emitted_token {
+                out.push(' ');
+            }
+            out.push(c);
+            have_emitted_token = true;
+            prev_was_whitespace = false;
+        }
+    }
+
+    Zeroizing::new(out)
 }
 
 /// Generate a fresh 24-word recovery phrase from the OS CSPRNG.
@@ -296,5 +348,107 @@ mod tests {
         // recheck BIP-39 word count (24 ↔ 32 bytes).
         assert_eq!(RECOVERY_PHRASE_ENTROPY_BYTES, 32);
         assert_eq!(RECOVERY_PHRASE_WORD_COUNT, 24);
+    }
+
+    // ---- normalize_user_phrase (spec § 7.4) ----------------------------
+    //
+    // NFKD + ASCII lowercase + trim + whitespace-coalesce. Used by the
+    // recovery flow's `vault_recover_with_phrase` Tauri command before
+    // Argon2id consumes the bytes. The function does NOT validate against
+    // the BIP-39 wordlist — that is intentional per `recovery-flow.md`
+    // §3.2 (no per-cell wordlist-membership feedback).
+
+    #[test]
+    fn normalize_identity_on_canonical_phrase() {
+        // A 24-word ASCII single-space-joined phrase from the BIP-39
+        // wordlist must pass through unchanged.
+        let canonical = "abandon abandon abandon abandon abandon abandon \
+                         abandon abandon abandon abandon abandon abandon \
+                         abandon abandon abandon abandon abandon abandon \
+                         abandon abandon abandon abandon abandon art";
+        let normalized = normalize_user_phrase(canonical);
+        assert_eq!(normalized.as_str(), canonical);
+    }
+
+    #[test]
+    fn normalize_folds_fullwidth_digits() {
+        // U+FF10..U+FF19 (full-width digits ０..９) NFKD-decompose to
+        // ASCII 0..9.
+        let normalized = normalize_user_phrase("abc \u{FF10}\u{FF11}\u{FF12} def");
+        assert_eq!(normalized.as_str(), "abc 012 def");
+    }
+
+    #[test]
+    fn normalize_folds_no_break_space_to_ascii_space() {
+        // U+00A0 (NO-BREAK SPACE) NFKD-decomposes to ASCII U+0020.
+        // Common in word-processor / password-manager copies.
+        let normalized = normalize_user_phrase("abc\u{00A0}def");
+        assert_eq!(normalized.as_str(), "abc def");
+    }
+
+    #[test]
+    fn normalize_folds_ligature_fi_to_two_chars() {
+        // U+FB01 (ﬁ ligature) NFKD-decomposes to "fi" (two ASCII chars).
+        // Output length differs from input byte length — implementation
+        // must allocate against the post-NFKD char stream, not bytes.
+        let normalized = normalize_user_phrase("of\u{FB01}cer");
+        assert_eq!(normalized.as_str(), "officer");
+    }
+
+    #[test]
+    fn normalize_lowercases_uppercase_ascii() {
+        // BIP-39 English wordlist is lowercase; uppercase input must
+        // lowercase. ASCII-only lowercase is sufficient (the wordlist
+        // contains no Unicode-uppercase-sensitive characters).
+        let normalized = normalize_user_phrase("ABC DEF");
+        assert_eq!(normalized.as_str(), "abc def");
+    }
+
+    #[test]
+    fn normalize_collapses_multiple_whitespace_runs() {
+        // Runs of one or more whitespace characters between tokens
+        // collapse to a single ASCII space U+0020.
+        let normalized = normalize_user_phrase("abc    def\t\tghi");
+        assert_eq!(normalized.as_str(), "abc def ghi");
+    }
+
+    #[test]
+    fn normalize_trims_leading_and_trailing_whitespace() {
+        let normalized = normalize_user_phrase("   abc def   ");
+        assert_eq!(normalized.as_str(), "abc def");
+    }
+
+    #[test]
+    fn normalize_combines_all_steps_in_realistic_paste() {
+        // Realistic password-manager paste: leading/trailing space,
+        // full-width letter mixed with ASCII, U+00A0 between words,
+        // mixed case, multiple ASCII spaces.
+        // Pipeline: NFKD folds Ａ → A and U+00A0 → space; lowercase
+        // folds A → a; trim removes leading/trailing; coalesce collapses
+        // multi-space.
+        let raw = "  ABC\u{FF21}\u{00A0}\u{00A0}defＢ  ";
+        let normalized = normalize_user_phrase(raw);
+        assert_eq!(normalized.as_str(), "abca defb");
+    }
+
+    #[test]
+    fn normalize_empty_input_yields_empty_output() {
+        let normalized = normalize_user_phrase("");
+        assert_eq!(normalized.as_str(), "");
+    }
+
+    #[test]
+    fn normalize_whitespace_only_input_yields_empty_output() {
+        // Pure whitespace input has no tokens to emit; output is empty.
+        let normalized = normalize_user_phrase("   \t\n\u{00A0}  ");
+        assert_eq!(normalized.as_str(), "");
+    }
+
+    #[test]
+    fn normalize_returns_zeroizing_string() {
+        // Compile-time shape check: the output must be `Zeroizing<String>`
+        // so the bytes wipe on drop. This test would fail to type-check
+        // if the signature drifted to a bare `String`.
+        let _zero: Zeroizing<String> = normalize_user_phrase("test");
     }
 }

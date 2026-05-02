@@ -122,6 +122,12 @@ The property that data stored persistently is encrypted whenever it is not activ
 
 Used in: `spec/protocol.md` §9; `threat-model.md` §1 (A5)
 
+### **auth_permits** &nbsp; 📦 *Product*
+
+A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleton in `src-tauri/src/plugins/vault_unlock/state.rs`) shared across all three Argon2id-bound vault auth commands: `vault_unlock`, `vault_recover_with_phrase`, and `vault_complete_recovery`. Each command acquires via `try_acquire()` (reject, never queue) at the start of its critical section and releases via RAII guard on every return path. The single-permit invariant guarantees at most one ~1-second Argon2id derivation in flight client-wide, defending the no-queue posture (`decisions.md` 2026-05-02 "Phase 1 unlock UI semantics") uniformly across plugins. Renamed from `unlock_permits` (the pre-recovery-flow shape) when the recovery commands started sharing the lock.
+
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
+
 ### **backup-key** &nbsp; 🗝️ *Key/identifier*
 
 A subkey derived from `root_key` via the `derive_key` pattern with context string `"myne.v0.1 backup-key"`. Used to encrypt user-initiated backup files exported from the client. Stored only transiently during the backup operation.
@@ -599,6 +605,12 @@ The UI library used for the Phase 1 desktop client UI inside the Tauri WebView, 
 Used in: `decisions.md`; `threat-model.md` §7
 Reference: https://react.dev
 
+### **Recovering** (slot state) &nbsp; 📦 *Product*
+
+The intermediate variant of the [`Slot`] enum representing a vault that has successfully completed phrase-based recovery (`vault_recover_with_phrase`) but has not yet committed a new master password (`vault_complete_recovery`). Carries `root_key`, `items_key`, `items_key_id`, and `recovered_at: Instant` in `Zeroizing` wrappers — both keys are derived eagerly during the recovery step so the entire credential chain is verified before the slot transitions. Editor commands cannot pattern-match `Slot::Recovering` and are therefore structurally denied access during this window per `recovery-flow.md` §4.1's non-dismissible chained step. The only legal transitions out are `Slot::Recovering → Slot::Unlocked` (via `vault_complete_recovery` success) or `Slot::Recovering → Slot::Empty` (via `vault_lock` — the §4.3 within-session bail case).
+
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
+
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
 The 24-word BIP-39-encoded representation of 256 bits of secret entropy plus an 8-bit checksum, used as Myne's secondary credential for vault unlock. Generated at vault creation from OS CSPRNG output, presented to the user with a forced-confirmation flow before vault creation completes (`spec/protocol.md` §7.2; full UX in `spec/recovery-flow.md` §2). The phrase string, after NFKD normalization, is fed directly to Argon2id with `salt_recovery` to derive `recovery_wrap_key`. **Myne does not use BIP-39's standard PBKDF2-HMAC-SHA512 derivation** — that step is replaced by Argon2id with the same parameters as the password path. The phrase is never sent to any server. If the user loses both the phrase and the master password, the vault is permanently unrecoverable; this is a hard architectural commitment.
@@ -672,6 +684,18 @@ Reference: FIPS 180-4.
 The 512-bit Secure Hash Algorithm 2. **Not used by Myne** — referenced only when explaining the standard BIP-39 derivation (PBKDF2-HMAC-SHA512) that Myne explicitly avoids.
 
 Used in: `spec/protocol.md` §7.1
+
+### **Slot** &nbsp; 📦 *Product*
+
+The three-state enum that holds the current vault auth state inside `VaultRuntimeState`'s `RwLock<Slot>` (Rust-side singleton, one instance per app process). Variants: `Slot::Empty` (no vault open; the default at process start and the post-`vault_lock` state), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access). Editor commands match only `Slot::Unlocked(uv) => ...`; the `Slot::Recovering` and `Slot::Empty` variants are structurally rejected at compile time. The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Phase 2 multi-vault is a mechanical type swap (`HashMap<VaultId, Slot>`); the lifecycle reasoning carries forward unchanged.
+
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
+
+### **SlotKind** &nbsp; 📋 *Protocol*
+
+The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_status` Tauri command. Three variants: `Empty | Recovering | Unlocked`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of three bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_status` round-trip would be paranoia).
+
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
 ### **state-level actor** &nbsp; ⚠️ *Threat*
 
@@ -750,6 +774,12 @@ Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation sessio
 The single binary file holding vault-level cryptographic state. Magic bytes `MYV1` for v0.1. Layout per `spec/protocol.md` §9.3: protocol version, account_number_hash, the 11-byte canonical KDF parameters block, both salt-randomness fields (`random_salt_password_16`, `random_salt_recovery_16`), nonces and ciphertexts for both wrapped root-key copies (`enc_root_key_password`, `enc_root_key_recovery`), and the items_key_id, items_key_nonce, and `enc_items_key`. `vault.meta` plus the `.myn` files are the only artifacts that leave the device in any future sync scenario; both are opaque ciphertext plus a small public header.
 
 Used in: `spec/protocol.md` §9.3
+
+### **vault_status** &nbsp; 🛠️ *Tooling*
+
+The Tauri command `vault_unlock:status` that returns the current [`SlotKind`]. Read-only (`tokio::sync::RwLock::read`); never fails in practice — the `Result<SlotKind, VaultUnlockError>` return is purely IPC-contract uniformity with the rest of the unlock plugin. Lives in `vault_unlock` because the plugin owns the runtime-state singleton; permission `vault-unlock:default allow-status`. Frontend boot-time and post-WebView-reload routing call `vault_status` to recover from the case where Tauri's Rust state outlives the WebView's JS state across Cmd+R / hot-reload — `Empty` routes to unlock (or vault-creation if no `vault.meta` exists), `Recovering` routes to the password-reset form, `Unlocked` routes to the editor. Explicitly NOT part of the post-recovery happy path: a defensive round-trip after `vault_complete_recovery` would be paranoia per `decisions.md` 2026-05-02 (the IPC contract pins `Slot::Unlocked` as the success postcondition).
+
+Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/slot-kind.ts`
 
 ### **Vite** &nbsp; 🛠️ *Tooling*
 

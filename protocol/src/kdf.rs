@@ -89,13 +89,18 @@ pub fn derive_password_wrap_key(
 }
 
 /// Derive the 32-byte AEAD wrap key for the recovery-phrase-protected
-/// copy of `root_key` (spec § 3.1).
+/// copy of `root_key` (spec § 3.1) from a structured [`RecoveryPhrase`].
 ///
 /// Internally calls `phrase.join_normalized()` to obtain the spec § 7.4
 /// `phrase_normalized` form — single-space-joined ASCII-lowercase BIP-39
-/// words. The bytes of that string are passed as the Argon2id password
-/// input. Salt construction uses the recovery prefix
-/// `"myne.v0.1 argon2id-recovery|"` (distinct from the password prefix).
+/// words — then delegates to
+/// [`derive_recovery_wrap_key_from_normalized`]. Used at vault-creation
+/// time when the phrase has been freshly generated (and therefore
+/// already conforms to the canonical normalized form by construction).
+///
+/// Salt construction uses the recovery prefix
+/// `"myne.v0.1 argon2id-recovery|"` (distinct from the password
+/// prefix).
 ///
 /// Returns [`ProtocolError::KdfFailure`] on Argon2id error (same
 /// discipline as [`derive_password_wrap_key`]).
@@ -105,8 +110,43 @@ pub fn derive_recovery_wrap_key(
     account_number_hash: &[u8; 16],
     params: &KdfParams,
 ) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
-    let salt = build_salt(SALT_PREFIX_RECOVERY, account_number_hash, salt_random);
     let phrase_normalized = phrase.join_normalized();
+    derive_recovery_wrap_key_from_normalized(
+        phrase_normalized.as_str(),
+        salt_random,
+        account_number_hash,
+        params,
+    )
+}
+
+/// Derive the 32-byte AEAD wrap key for the recovery-phrase-protected
+/// copy of `root_key` (spec § 3.1) directly from the
+/// `phrase_normalized` byte string.
+///
+/// Used by the **recovery-time** flow (`vault_recover_with_phrase` in
+/// `src-tauri/src/plugins/vault_recover/`) where the phrase comes from
+/// raw user input that has been normalized via
+/// [`crate::phrase::normalize_user_phrase`] (NFKD + ASCII lowercase +
+/// trim + whitespace coalesce per spec § 7.4). The function deliberately
+/// **does not validate** against the BIP-39 wordlist — invalid phrases
+/// produce a wrap key that fails AEAD-tag verification on
+/// `enc_root_key_recovery`, surfacing the single non-distinguishing
+/// error per `recovery-flow.md` § 3.4. Wordlist validation here would
+/// leak BIP-39 membership through error timing or class.
+///
+/// Salt construction is identical to [`derive_recovery_wrap_key`]; the
+/// two functions are byte-equivalent given byte-equivalent normalized
+/// input.
+///
+/// Returns [`ProtocolError::KdfFailure`] on Argon2id error (same
+/// discipline as [`derive_password_wrap_key`]).
+pub fn derive_recovery_wrap_key_from_normalized(
+    phrase_normalized: &str,
+    salt_random: &[u8; 16],
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(SALT_PREFIX_RECOVERY, account_number_hash, salt_random);
     argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
 }
 

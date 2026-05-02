@@ -14,7 +14,7 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::{VaultStatusError, VaultUnlockError};
-use super::state::{UnlockedVault, VaultRuntimeState};
+use super::state::{Slot, SlotKind, UnlockedVault, VaultRuntimeState};
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use protocol::{VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use serde::Serialize;
@@ -139,31 +139,47 @@ pub(crate) async fn unlock_with_path(
 
     let started = Instant::now();
 
-    // (1) Slot peek precedes permit acquire so the cheap "already
-    //     unlocked" guard never blocks on the semaphore (grilling Q5).
-    if state.peek_is_some().await {
-        tracing::error!(
-            stage = "slot_check",
-            error_kind = "VaultAlreadyUnlocked",
-            "unlock attempt rejected: slot already populated"
-        );
-        return Err(VaultUnlockError::VaultAlreadyUnlocked);
+    // (1) Slot peek precedes permit acquire so the cheap occupied-slot
+    //     guard never blocks on the semaphore (grilling Q5). The two
+    //     non-Empty variants surface as distinct guard variants so the
+    //     frontend can route correctly: `Unlocked` → editor, `Recovering`
+    //     → password-reset form (per `recovery-flow.md` §4.1's
+    //     non-dismissible chained step).
+    match state.slot_kind().await {
+        SlotKind::Empty => {}
+        SlotKind::Unlocked => {
+            tracing::error!(
+                stage = "slot_check",
+                error_kind = "VaultAlreadyUnlocked",
+                "unlock attempt rejected: slot already populated with Unlocked"
+            );
+            return Err(VaultUnlockError::VaultAlreadyUnlocked);
+        }
+        SlotKind::Recovering => {
+            tracing::error!(
+                stage = "slot_check",
+                error_kind = "VaultRecoveryInProgress",
+                "unlock attempt rejected: slot is Recovering (password-reset commit pending)"
+            );
+            return Err(VaultUnlockError::VaultRecoveryInProgress);
+        }
     }
 
-    // (2) Acquire the unlock permit (Semaphore capacity 1). Reject,
-    //     don't queue: `decisions.md` 2026-05-02 (Phase 1 unlock UI
-    //     semantics) extends `recovery-flow.md` §3.3's "single
-    //     in-flight" posture to vault_unlock. The RAII guard releases
-    //     the permit on every return path — success, every error
-    //     variant, panic unwind. Held across the spawn_blocking
-    //     await so a concurrent unlock attempt sees the permit busy.
-    let _permit = match state.unlock_permits().try_acquire() {
+    // (2) Acquire the auth permit (Semaphore capacity 1). Reject,
+    //     don't queue: `decisions.md` 2026-05-02 ("Slot state machine +
+    //     auth_permits generalization") shares the permit across
+    //     vault_unlock + vault_recover_with_phrase + vault_complete_recovery
+    //     — at most one Argon2id-bound auth op in flight client-wide. The
+    //     RAII guard releases the permit on every return path — success,
+    //     every error variant, panic unwind. Held across the
+    //     spawn_blocking await so a concurrent attempt sees the permit busy.
+    let _permit = match state.auth_permits().try_acquire() {
         Ok(p) => p,
         Err(_) => {
             tracing::error!(
                 stage = "permit_acquire",
                 error_kind = "UnlockInProgress",
-                "unlock attempt rejected: another unlock in flight"
+                "unlock attempt rejected: another auth op in flight"
             );
             return Err(VaultUnlockError::UnlockInProgress);
         }
@@ -246,7 +262,7 @@ pub(crate) async fn unlock_with_path(
 
     let now = Instant::now();
     state
-        .set(UnlockedVault {
+        .set_unlocked(UnlockedVault {
             root_key,
             items_key,
             items_key_id,
@@ -379,45 +395,108 @@ fn open_32_byte_secret(
     Ok(buf)
 }
 
-/// Close the unlocked vault — drops the [`UnlockedVault`] slot.
+/// Close the vault — drops whichever [`Slot`] variant is held,
+/// transitioning to [`Slot::Empty`].
 ///
-/// Param-less + idempotent: returns `Ok(())` regardless of whether
-/// the slot was occupied. When the slot WAS occupied, dropping the
-/// taken `UnlockedVault` runs `Zeroize` on its `root_key` and
-/// `items_key` (per the [`Zeroizing`] wrappers in
-/// [`super::state::UnlockedVault`]).
+/// Handles all three variants:
+/// - `Slot::Unlocked` → `Zeroize` `root_key` + `items_key` (editor Lock).
+/// - `Slot::Recovering` → `Zeroize` recovery-staged keys
+///   (`recovery-flow.md` §4.3 within-session bail case).
+/// - `Slot::Empty` → no-op `Ok(())` (idempotent).
 ///
-/// **Async despite "sync" wording in the priority plan / PRD task
-/// description.** [`tokio::sync::RwLock`] is async-aware (PRD
-/// section "State Tauri-side" picked it for compatibility with the
-/// async unlock path). The `.await` on `state.take()` resolves in
-/// microseconds — the write lock is held only long enough to
-/// `.take()` the option's value. No spawn_blocking, no heavy
-/// compute; the spirit of the "sync" wording is preserved (no
-/// runtime worker pool dispatch, no IO).
+/// The tracing event `vault_locked` carries a `from_slot_kind` static
+/// tag (`"unlocked" | "recovering" | "empty"`).
 ///
-/// **TOCTOU note (grilling Q5 + decisions.md 2026-05-02):** If
-/// `vault_lock` is called while `vault_unlock` is mid-Argon2id —
-/// unlock has acquired the permit but not yet populated the slot —
-/// the slot is `None` and this lock is a no-op; then unlock
-/// completes and populates the slot, so the user's lock intent is
-/// silently swallowed. **Phase 1 mitigation is UI-side**: B4c
-/// (Furkan, separate task) hides the Lock affordance during the
-/// `decrypting` state, so the user cannot form the wrong intent in
-/// the first place. A Rust-side "lock requested" signal that
-/// step 6 of `unlock_with_path` checks before populating the slot
-/// is a Phase 2+ deeper fix; not required for v0.1.
+/// ## §4.3 bail mechanism — no separate `vault_recover_cancel`
+///
+/// §4.3 requires that mid-recovery `root_key` be zeroized if the user
+/// bails. Process exit handles itself (`Slot::Recovering`'s `Drop`).
+/// Within-session bail (WebView reload, route-guard cleanup) calls
+/// **this same command** — same mechanism, half the surface. The
+/// alternative dedicated `vault_recover_cancel` IPC was rejected
+/// (`decisions.md`): non-dismissible UI is the *primary* guard but
+/// not load-bearing — Tauri 2's WebView reload bypasses Rust state.
+///
+/// Async despite read-only-ish: `tokio::sync::RwLock::write().await`
+/// is microseconds; no spawn_blocking, no IO.
+///
+/// ## TOCTOU
+///
+/// Lock arriving while an unlock/recovery is mid-Argon2id finds the
+/// slot still `Empty`; the in-flight op completes and populates the
+/// slot afterward, so the lock intent is silently swallowed. Phase 1
+/// mitigates this UI-side (Lock affordance hidden during
+/// `decrypting`); a Rust-side "lock requested" signal that the
+/// pipelines check before populating the slot is a Phase 2+ fix.
 #[tauri::command]
 pub async fn lock(state: State<'_, VaultRuntimeState>) -> Result<(), VaultUnlockError> {
     lock_with_state(state.inner()).await
 }
 
+/// Report the current [`Slot`] variant via the [`SlotKind`]
+/// discriminator. Used by frontend boot-time and post-WebView-reload
+/// routing — Tauri's Rust state can outlive the WebView's JS state
+/// across Cmd+R / hot-reload, so the frontend re-queries which screen
+/// to render: `Empty` → unlock (or create), `Recovering` →
+/// password-reset form, `Unlocked` → editor.
+///
+/// **NOT part of the post-recovery happy path.** On success
+/// `vault_complete_recovery` returns `Ok(())` and the frontend
+/// navigates directly to editor — defensive `vault_slot_kind`
+/// round-trip would be paranoia (`decisions.md`: IPC contract pins
+/// `Slot::Unlocked` as the success postcondition).
+///
+/// Wire shape: bare variant-name string (`"Empty" | "Recovering" |
+/// "Unlocked"`) per the TS hand-mirror at `src/types/slot-kind.ts`.
+///
+/// Distinct from [`vault_status`], which probes `vault.meta` on disk
+/// (Exists / Missing / Corrupted) for boot routing. `vault_slot_kind`
+/// probes the in-memory [`VaultRuntimeState`] slot; the two together
+/// cover the full boot decision tree (disk presence → runtime state).
+///
+/// `Err` arm is structurally unreachable; the `Result` return is for
+/// IPC-contract uniformity with the rest of the plugin.
+#[tauri::command]
+pub async fn vault_slot_kind(
+    state: State<'_, VaultRuntimeState>,
+) -> Result<SlotKind, VaultUnlockError> {
+    vault_slot_kind_inner(state.inner()).await
+}
+
+/// Testable core of [`vault_slot_kind`]. The Tauri-command wrapper
+/// resolves the [`State`] borrow and delegates here so tests do not
+/// need a [`AppHandle`].
+pub(crate) async fn vault_slot_kind_inner(
+    state: &VaultRuntimeState,
+) -> Result<SlotKind, VaultUnlockError> {
+    Ok(state.slot_kind().await)
+}
+
 /// Testable core of [`lock`]. The Tauri-command wrapper resolves
 /// the [`State`] borrow and delegates here so tests do not need a
 /// [`AppHandle`].
+///
+/// Emits a single tracing event `vault_locked` with the
+/// `from_slot_kind` tag so ops can group lock events by the prior
+/// slot variant. The taken [`Slot`] drops at the end of this
+/// function; whichever variant it held has its `Zeroizing` fields
+/// wiped in the process.
 pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), VaultUnlockError> {
-    // Drop runs Zeroize on the slot's keys.
-    let _ = state.take().await;
+    let prior = state.take().await;
+    let from_slot_kind: &'static str = match &prior {
+        Slot::Empty => "empty",
+        Slot::Recovering { .. } => "recovering",
+        Slot::Unlocked(_) => "unlocked",
+    };
+    tracing::info!(
+        event = "vault_locked",
+        from_slot_kind,
+        "vault_lock dropped slot; Zeroizing fields wipe on the prior variant's Drop"
+    );
+    // Explicit drop for clarity — the prior `Slot` would drop at
+    // end-of-scope anyway, but naming the moment helps grep/audit
+    // reviewers see "this is where the keys wipe".
+    drop(prior);
     Ok(())
 }
 
@@ -425,10 +504,13 @@ pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), Vau
 //
 // `vault_status` is the read-only `vault.meta` probe used by App.tsx
 // at boot to choose the initial Stage (welcome vs unlock vs corrupted).
-// `vault_is_unlocked` exposes `VaultRuntimeState::peek_is_some()` to
-// the frontend so guarded stages (Editor) can do a Rust-side reality
-// check at mount time. Both are read-only; neither holds the unlock
-// permit, neither performs Argon2id.
+// `vault_is_unlocked` exposes a boolean view of the runtime slot
+// (`true` iff the slot is `Slot::Unlocked`) to the frontend so guarded
+// stages (Editor) can do a Rust-side reality check at mount time. Both
+// are read-only; neither holds the auth permit, neither performs
+// Argon2id. The richer three-state view (`Empty | Recovering |
+// Unlocked`) lives behind [`vault_slot_kind`] for the recovery-flow
+// routing path.
 //
 // Design context: `myne-agents/sessions/grill/2026-05-02-app-state-machine.md`
 // Q9 (vault_status imzası) + PRD `myne-agents/features/app-state-machine/prd.md`.
@@ -572,29 +654,23 @@ pub async fn vault_is_unlocked(
 /// Testable core of [`vault_is_unlocked`]. The Tauri-command wrapper
 /// resolves the [`State`] borrow and delegates here so tests do not
 /// need a [`AppHandle`].
+///
+/// Returns `true` only when the slot is [`Slot::Unlocked`]. A slot in
+/// [`Slot::Recovering`] (post-A8d, pre-A8f) returns `false` — the
+/// Editor mount guard requires the fully-Unlocked variant; the
+/// recovery flow routes through [`vault_slot_kind`] to distinguish
+/// the intermediate state.
 pub(crate) async fn vault_is_unlocked_with_state(
     state: &VaultRuntimeState,
 ) -> Result<bool, VaultStatusError> {
-    Ok(state.peek_is_some().await)
+    Ok(matches!(state.slot_kind().await, SlotKind::Unlocked))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
-    use protocol::KdfParams;
-
-    /// Fast Argon2id parameters for tests (RFC 9106 minimum). Mirrors
-    /// `protocol::kdf::tests::FAST_TEST_KDF_PARAMS`. DEFAULT params
-    /// would add ~1–2 s per test; FAST_TEST_KDF runs in microseconds.
-    /// Production never uses these — `DEFAULT_V0_1_KDF_PARAMS` is the
-    /// only set that reaches `derive_password_wrap_key` at runtime.
-    const FAST_TEST_KDF: KdfParams = KdfParams {
-        m_kib: 8,
-        t: 1,
-        p: 1,
-        argon2_version: 0x13,
-    };
+    use crate::test_support::{ScratchVault, FAST_TEST_KDF};
 
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
@@ -603,42 +679,13 @@ mod tests {
             .expect("current-thread runtime build")
     }
 
-    /// Build a unique scratch directory under the OS temp dir and a
-    /// path to its `vault.meta`. Caller writes the bytes; the
-    /// `RemoveOnDrop` guard cleans up when it falls out of scope.
-    struct ScratchVault {
-        dir: PathBuf,
-        meta_path: PathBuf,
-    }
-
-    impl ScratchVault {
-        fn new() -> Self {
-            let dir =
-                std::env::temp_dir().join(format!("myne_unlock_test_{}", uuid::Uuid::new_v4()));
-            std::fs::create_dir_all(&dir).expect("create scratch dir");
-            let meta_path = dir.join("vault.meta");
-            Self { dir, meta_path }
-        }
-
-        fn path(&self) -> &Path {
-            &self.meta_path
-        }
-
-        fn write_meta(&self, bytes: &[u8]) {
-            std::fs::write(&self.meta_path, bytes).expect("write vault.meta");
-        }
-    }
-
-    impl Drop for ScratchVault {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.dir);
-        }
+    fn scratch_vault() -> ScratchVault {
+        ScratchVault::new("unlock_test")
     }
 
     /// Seed a real `vault.meta` via `vault_creation::build_session`
-    /// + `build_and_serialize_vault_meta`. Returns the bytes plus
-    ///   the original session-side `root_key` so tests can assert
-    ///   post-unlock equality.
+    /// plus `build_and_serialize_vault_meta`. Returns the bytes and
+    /// the original session-side `root_key` for post-unlock assertions.
     fn seed_vault_meta(password: &str) -> ([u8; protocol::VAULT_META_LEN], [u8; AEAD_KEY_LEN]) {
         let session = build_session(password, FAST_TEST_KDF).expect("build_session");
         let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
@@ -649,7 +696,7 @@ mod tests {
     #[test]
     fn round_trip_unlock_recovers_original_root_key() {
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (meta_bytes, original_root_key) = seed_vault_meta("correct horse battery staple");
             scratch.write_meta(&meta_bytes);
 
@@ -663,7 +710,7 @@ mod tests {
             .expect("unlock with correct password");
 
             // Slot is occupied with the original root_key bytes.
-            let unlocked = state.take().await.expect("slot populated post-unlock");
+            let unlocked = state.take().await.unwrap_unlocked();
             assert_eq!(*unlocked.root_key, original_root_key);
         });
     }
@@ -671,7 +718,7 @@ mod tests {
     #[test]
     fn wrong_password_returns_invalid_credential_or_vault() {
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (meta_bytes, _) = seed_vault_meta("the right password");
             scratch.write_meta(&meta_bytes);
 
@@ -684,14 +731,14 @@ mod tests {
                 Err(VaultUnlockError::InvalidCredentialOrVault)
             ));
             // Failed unlock leaves slot empty.
-            assert!(!state.peek_is_some().await);
+            assert!(state.slot_kind().await == SlotKind::Empty);
         });
     }
 
     #[test]
     fn missing_vault_meta_returns_vault_not_found() {
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             // Do NOT call write_meta — vault.meta is absent.
             assert!(!scratch.path().exists());
 
@@ -699,7 +746,7 @@ mod tests {
             let result = unlock_with_path("anything".to_string(), scratch.path(), &state).await;
 
             assert!(matches!(result, Err(VaultUnlockError::VaultNotFound)));
-            assert!(!state.peek_is_some().await);
+            assert!(state.slot_kind().await == SlotKind::Empty);
         });
     }
 
@@ -712,7 +759,7 @@ mod tests {
         // crate's canonical primitives (wrong subkey role, wrong
         // AAD, wrong nonce field, wrong blob slice) this catches it.
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (meta_bytes, original_root_key) = seed_vault_meta("pw");
             scratch.write_meta(&meta_bytes);
 
@@ -738,7 +785,7 @@ mod tests {
                 .await
                 .expect("unlock");
 
-            let unlocked = state.take().await.expect("slot populated");
+            let unlocked = state.take().await.unwrap_unlocked();
             assert_eq!(unlocked.items_key_id, parsed.items_key_id);
             assert_eq!(
                 unlocked.items_key.as_slice(),
@@ -759,7 +806,7 @@ mod tests {
         // credential mismatch (see grilling Q4 + Task 11
         // decisions.md entry).
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (mut meta_bytes, _) = seed_vault_meta("pw");
             // Flip one bit in the first byte of enc_items_key.
             meta_bytes[281] ^= 0x01;
@@ -784,7 +831,7 @@ mod tests {
             // inside spawn_blocking, then dropped on the items_key
             // failure early-return. No half-state.
             assert!(
-                !state.peek_is_some().await,
+                state.slot_kind().await == SlotKind::Empty,
                 "items_key failure must leave slot empty (no half-state)"
             );
         });
@@ -804,7 +851,7 @@ mod tests {
     /// failure mode is exactly `InvalidVaultMeta` with the slot empty.
     /// Used by the parse-error matrix tests below.
     async fn assert_invalid_vault_meta_on_bytes(tampered_bytes: &[u8]) {
-        let scratch = ScratchVault::new();
+        let scratch = scratch_vault();
         scratch.write_meta(tampered_bytes);
 
         let state = VaultRuntimeState::default();
@@ -822,7 +869,7 @@ mod tests {
             other => panic!("expected InvalidVaultMeta, got {other:?}"),
         }
         assert!(
-            !state.peek_is_some().await,
+            state.slot_kind().await == SlotKind::Empty,
             "parse failure must leave slot empty"
         );
     }
@@ -917,7 +964,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
@@ -957,7 +1004,7 @@ mod tests {
                 other => panic!("expected IoError(PermissionDenied), got {other:?}"),
             }
             assert!(
-                !state.peek_is_some().await,
+                state.slot_kind().await == SlotKind::Empty,
                 "IO failure must leave slot empty"
             );
         });
@@ -971,12 +1018,12 @@ mod tests {
     // so the cheap "already unlocked" path is fast-path observable
     // and never consumes a permit.
 
-    use super::super::state::fixture_unlocked_with_keys;
+    use super::super::state::{fixture_recovering_with_keys, fixture_unlocked_with_keys};
 
     #[test]
     fn vault_already_unlocked_returns_guard_when_slot_occupied() {
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
@@ -985,7 +1032,7 @@ mod tests {
             // directly with a fixture distinguishable by byte pattern
             // (so we can assert the existing slot is unchanged).
             state
-                .set(fixture_unlocked_with_keys(0x42, 0x13, 0x99))
+                .set_unlocked(fixture_unlocked_with_keys(0x42, 0x13, 0x99))
                 .await;
 
             let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
@@ -998,7 +1045,7 @@ mod tests {
             // Existing slot is untouched: the same fixture bytes
             // come back from take(). The unlock attempt did NOT
             // overwrite or perturb it.
-            let existing = state.take().await.expect("slot still populated");
+            let existing = state.take().await.unwrap_unlocked();
             assert_eq!(*existing.root_key, [0x42u8; AEAD_KEY_LEN]);
             assert_eq!(*existing.items_key, [0x13u8; AEAD_KEY_LEN]);
             assert_eq!(existing.items_key_id, [0x99u8; 16]);
@@ -1013,23 +1060,23 @@ mod tests {
         // when the permit is exhausted, the guard fires correctly
         // because we never reach try_acquire.
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
             let state = VaultRuntimeState::default();
             state
-                .set(fixture_unlocked_with_keys(0x55, 0x66, 0x77))
+                .set_unlocked(fixture_unlocked_with_keys(0x55, 0x66, 0x77))
                 .await;
 
             // Manually hold the unlock permit. If unlock_with_path
             // tried try_acquire BEFORE peek, this would surface as
             // UnlockInProgress instead of VaultAlreadyUnlocked.
             let _held_permit = state
-                .unlock_permits()
+                .auth_permits()
                 .try_acquire()
                 .expect("first acquire on fresh state");
-            assert_eq!(state.unlock_permits().available_permits(), 0);
+            assert_eq!(state.auth_permits().available_permits(), 0);
 
             let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
 
@@ -1042,7 +1089,77 @@ mod tests {
             // one, and unlock_with_path did NOT consume an additional
             // one (which would've been impossible anyway, but the
             // test asserts the early-return path was taken).
-            assert_eq!(state.unlock_permits().available_permits(), 0);
+            assert_eq!(state.auth_permits().available_permits(), 0);
+        });
+    }
+
+    #[test]
+    fn vault_recovery_in_progress_returns_guard_when_slot_is_recovering() {
+        // Slot is `Slot::Recovering` — A8d succeeded but A8f has not
+        // committed yet. `vault_unlock` MUST reject with the new
+        // `VaultRecoveryInProgress` guard variant rather than
+        // `VaultAlreadyUnlocked` (which would route the user to editor)
+        // — the type-system realization of `recovery-flow.md` §4.1's
+        // "non-dismissible mandatory chained step" rule.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (bytes, _) = seed_vault_meta("pw");
+            scratch.write_meta(&bytes);
+
+            let state = VaultRuntimeState::default();
+            // Populate slot directly with a Recovering fixture using a
+            // distinguishable byte pattern so we can prove the existing
+            // recovering material is NOT perturbed by the rejected
+            // unlock attempt.
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+
+            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+
+            assert!(matches!(
+                result,
+                Err(VaultUnlockError::VaultRecoveryInProgress)
+            ));
+
+            // Existing slot is untouched — slot_kind still Recovering.
+            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+        });
+    }
+
+    #[test]
+    fn vault_recovery_in_progress_does_not_consume_permit() {
+        // Mirrors the load-bearing ordering invariant tested for
+        // `VaultAlreadyUnlocked`: slot peek precedes permit acquire,
+        // so the fast-path `Recovering` rejection does not touch the
+        // semaphore even when the permit is exhausted.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (bytes, _) = seed_vault_meta("pw");
+            scratch.write_meta(&bytes);
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0x55, 0x66, 0x77))
+                .await;
+
+            // Manually hold the auth permit. If unlock_with_path tried
+            // try_acquire BEFORE peek, this would surface as
+            // UnlockInProgress instead of VaultRecoveryInProgress.
+            let _held_permit = state
+                .auth_permits()
+                .try_acquire()
+                .expect("first acquire on fresh state");
+            assert_eq!(state.auth_permits().available_permits(), 0);
+
+            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+
+            // Peek catches it before try_acquire runs.
+            assert!(matches!(
+                result,
+                Err(VaultUnlockError::VaultRecoveryInProgress)
+            ));
+            assert_eq!(state.auth_permits().available_permits(), 0);
         });
     }
 
@@ -1055,38 +1172,38 @@ mod tests {
         // queueing or sleeping. No tokio::time::sleep, no race —
         // pure structural verification of try_acquire's reject path.
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
             let state = VaultRuntimeState::default();
-            assert!(!state.peek_is_some().await);
+            assert!(state.slot_kind().await == SlotKind::Empty);
 
             // Simulate "in-flight unlock" by holding the permit.
             let held_permit = state
-                .unlock_permits()
+                .auth_permits()
                 .try_acquire()
                 .expect("first acquire on fresh state");
-            assert_eq!(state.unlock_permits().available_permits(), 0);
+            assert_eq!(state.auth_permits().available_permits(), 0);
 
             // While held, a fresh unlock attempt rejects cleanly.
             let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
             assert!(matches!(result, Err(VaultUnlockError::UnlockInProgress)));
             // The slot stayed empty — no half-state.
-            assert!(!state.peek_is_some().await);
+            assert!(state.slot_kind().await == SlotKind::Empty);
 
             // Release the held permit; subsequent unlock succeeds
             // (proving the guard is purely structural, not stateful
             // beyond permit availability).
             drop(held_permit);
-            assert_eq!(state.unlock_permits().available_permits(), 1);
+            assert_eq!(state.auth_permits().available_permits(), 1);
 
             unlock_with_path("pw".to_string(), scratch.path(), &state)
                 .await
                 .expect("retry after permit released succeeds");
 
             // Permit released after successful unlock too.
-            assert_eq!(state.unlock_permits().available_permits(), 1);
+            assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }
 
@@ -1097,7 +1214,7 @@ mod tests {
         // release the permit when the function returns, so the next
         // attempt is not stuck on UnlockInProgress.
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (bytes, _) = seed_vault_meta("right pw");
             scratch.write_meta(&bytes);
 
@@ -1113,7 +1230,7 @@ mod tests {
                 Err(VaultUnlockError::InvalidCredentialOrVault)
             ));
             assert_eq!(
-                state.unlock_permits().available_permits(),
+                state.auth_permits().available_permits(),
                 1,
                 "permit must be released after failed unlock — not stuck on UnlockInProgress"
             );
@@ -1125,7 +1242,7 @@ mod tests {
                 .expect("retry after wrong-password failure works");
 
             // Permit released after successful unlock too.
-            assert_eq!(state.unlock_permits().available_permits(), 1);
+            assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }
 
@@ -1146,41 +1263,210 @@ mod tests {
             let state = VaultRuntimeState::default();
             // Populate the slot directly with a fixture.
             state
-                .set(fixture_unlocked_with_keys(0x77, 0x88, 0x99))
+                .set_unlocked(fixture_unlocked_with_keys(0x77, 0x88, 0x99))
                 .await;
-            assert!(state.peek_is_some().await);
+            assert!(state.slot_kind().await == SlotKind::Unlocked);
 
             lock_with_state(&state)
                 .await
                 .expect("lock on populated slot returns Ok");
 
             assert!(
-                !state.peek_is_some().await,
+                state.slot_kind().await == SlotKind::Empty,
                 "lock must drop the slot — Zeroizing fields wipe on the taken UnlockedVault's drop"
             );
         });
     }
 
+    // ---- vault_slot_kind -----------------------------------------------
+    //
+    // Read-only SlotKind probe. Thin wrapper over `state.slot_kind()`;
+    // serde shape is verified by
+    // `state::tests::slot_kind_serializes_as_bare_variant_name`.
+
+    /// Unwrap `Result<SlotKind, VaultUnlockError>` to `SlotKind` for
+    /// test assertions. `VaultUnlockError` does not derive
+    /// `PartialEq` (closed-payload variants carrying `IoFailureKind`
+    /// would force a manual impl that adds churn for no test wins),
+    /// so we cannot use `assert_eq!(result, Ok(...))` directly.
+    fn unwrap_slot_kind(r: Result<SlotKind, VaultUnlockError>) -> SlotKind {
+        r.expect("vault_slot_kind_inner is structurally infallible")
+    }
+
     #[test]
-    fn lock_is_idempotent_across_repeated_calls() {
-        // Idempotency property: calling lock N times produces the
-        // same final state (slot empty) regardless of the starting
-        // state. Acceptance criterion explicitly mentions 10
-        // consecutive calls.
+    fn vault_slot_kind_returns_empty_on_fresh_state() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            // Start with the slot populated.
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                SlotKind::Empty
+            );
+        });
+    }
+
+    #[test]
+    fn vault_slot_kind_returns_recovering_after_set_recovering() {
+        rt().block_on(async {
+            use super::super::state::fixture_recovering_with_keys;
+
+            let state = VaultRuntimeState::default();
             state
-                .set(fixture_unlocked_with_keys(0x01, 0x02, 0x03))
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
                 .await;
 
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                SlotKind::Recovering
+            );
+
+            // Read-only: state was not perturbed by the probe.
+            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+        });
+    }
+
+    #[test]
+    fn vault_slot_kind_returns_unlocked_after_successful_unlock() {
+        // End-to-end: seed vault.meta, unlock via the unlock_with_path
+        // pipeline (full Argon2id at FAST_TEST_KDF), then verify
+        // vault_slot_kind_inner reports Unlocked. Confirms the
+        // `vault_slot_kind` surface integrates cleanly with the unlock
+        // pipeline's slot population.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path("pw".to_string(), scratch.path(), &state)
+                .await
+                .expect("unlock seeded vault");
+
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                SlotKind::Unlocked
+            );
+        });
+    }
+
+    #[test]
+    fn vault_slot_kind_after_lock_returns_empty() {
+        // Cycle: populate Unlocked → probe reports Unlocked → lock
+        // → probe reports Empty. Confirms `vault_slot_kind` reflects
+        // the slot's transitions in real time (no caching, no stale
+        // observation).
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                SlotKind::Unlocked
+            );
+
+            lock_with_state(&state).await.expect("lock");
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                SlotKind::Empty
+            );
+        });
+    }
+
+    #[test]
+    fn lock_when_recovering_drops_slot() {
+        // `lock_with_state` MUST drop a `Slot::Recovering` variant —
+        // structural realization of `recovery-flow.md` § 4.3's
+        // within-session bail mechanism (frontend route-guard cleanup
+        // or boot-time `vault_slot_kind`-Recovering routing both call
+        // this same command).
+        rt().block_on(async {
+            use super::super::state::fixture_recovering_with_keys;
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+
+            lock_with_state(&state)
+                .await
+                .expect("lock on Recovering slot returns Ok");
+
+            assert_eq!(
+                state.slot_kind().await,
+                SlotKind::Empty,
+                "lock must drop the Recovering slot — Zeroizing fields wipe on the taken material's drop"
+            );
+        });
+    }
+
+    #[test]
+    fn lock_when_empty_is_no_op() {
+        // Idempotent on Empty: lock returns Ok(()) without state
+        // change. The `from_slot_kind = "empty"` tracing tag covers
+        // the audit need without surfacing a user-facing error.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+
+            lock_with_state(&state)
+                .await
+                .expect("lock on Empty slot returns Ok (idempotent)");
+
+            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+        });
+    }
+
+    #[test]
+    fn lock_is_idempotent_across_repeated_calls() {
+        // Idempotency property: 10 consecutive lock calls produce the
+        // same final state (slot empty) regardless of the starting
+        // variant — Unlocked, Recovering, or already Empty.
+        rt().block_on(async {
+            use super::super::state::fixture_recovering_with_keys;
+
+            // (a) Starting from Unlocked.
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(0x01, 0x02, 0x03))
+                .await;
             for i in 0..10 {
                 lock_with_state(&state)
                     .await
-                    .unwrap_or_else(|_| panic!("lock call #{i} must succeed"));
-                assert!(
-                    !state.peek_is_some().await,
-                    "slot must remain empty after lock call #{i}"
+                    .unwrap_or_else(|_| panic!("lock #{i} from Unlocked must succeed"));
+                assert_eq!(
+                    state.slot_kind().await,
+                    SlotKind::Empty,
+                    "slot must be Empty after lock #{i} (from Unlocked)"
+                );
+            }
+
+            // (b) Starting from Recovering.
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0x10, 0x20, 0x30))
+                .await;
+            for i in 0..10 {
+                lock_with_state(&state)
+                    .await
+                    .unwrap_or_else(|_| panic!("lock #{i} from Recovering must succeed"));
+                assert_eq!(
+                    state.slot_kind().await,
+                    SlotKind::Empty,
+                    "slot must be Empty after lock #{i} (from Recovering)"
+                );
+            }
+
+            // (c) Starting from Empty.
+            let state = VaultRuntimeState::default();
+            for i in 0..10 {
+                lock_with_state(&state)
+                    .await
+                    .unwrap_or_else(|_| panic!("lock #{i} from Empty must succeed"));
+                assert_eq!(
+                    state.slot_kind().await,
+                    SlotKind::Empty,
+                    "slot must be Empty after lock #{i} (from Empty)"
                 );
             }
         });
@@ -1195,7 +1481,7 @@ mod tests {
         // vault.meta — distinct from any pre-existing fixture
         // bytes.
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = scratch_vault();
             let (bytes, original_root_key) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
@@ -1204,12 +1490,12 @@ mod tests {
             // bytes (0x11) so we can prove the next unlock
             // overwrites them with the real derived root_key.
             state
-                .set(fixture_unlocked_with_keys(0x11, 0x12, 0x13))
+                .set_unlocked(fixture_unlocked_with_keys(0x11, 0x12, 0x13))
                 .await;
 
             // Lock — drops the fixture; slot empties.
             lock_with_state(&state).await.expect("lock");
-            assert!(!state.peek_is_some().await);
+            assert!(state.slot_kind().await == SlotKind::Empty);
 
             // Real unlock from the seeded vault.meta. Pays the
             // full Argon2id (FAST_TEST_KDF) + AEAD-open pipeline.
@@ -1219,7 +1505,7 @@ mod tests {
 
             // The slot now carries the FRESH root_key from
             // vault.meta, NOT the prior fixture's 0x11 bytes.
-            let unlocked = state.take().await.expect("slot populated");
+            let unlocked = state.take().await.unwrap_unlocked();
             assert_eq!(*unlocked.root_key, original_root_key);
             assert_ne!(
                 *unlocked.root_key, [0x11u8; AEAD_KEY_LEN],
@@ -1240,7 +1526,7 @@ mod tests {
         // First-run UX path: file does not exist → Ok(Missing).
         // NotFound is special-cased; not surfaced as IoError.
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = ScratchVault::new("vault_status_missing");
             assert!(!scratch.path().exists());
 
             let result = vault_status_with_path(scratch.path()).await;
@@ -1254,7 +1540,7 @@ mod tests {
         // `build_and_serialize_vault_meta` parses cleanly, so the
         // probe classifies it as Exists.
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = ScratchVault::new("vault_status_exists");
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
@@ -1269,7 +1555,7 @@ mod tests {
     /// into Corrupted; that path is exercised by
     /// `vault_status_returns_io_error_on_permission_denied` below.
     async fn assert_corrupted_on_bytes(tampered_bytes: &[u8]) {
-        let scratch = ScratchVault::new();
+        let scratch = ScratchVault::new("vault_status_corrupted");
         scratch.write_meta(tampered_bytes);
 
         let result = vault_status_with_path(scratch.path()).await;
@@ -1359,7 +1645,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         rt().block_on(async {
-            let scratch = ScratchVault::new();
+            let scratch = ScratchVault::new("vault_status_perm_denied");
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
@@ -1413,7 +1699,7 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set(status_fixture_unlocked_with_keys(0x42, 0x13, 0x99))
+                .set_unlocked(status_fixture_unlocked_with_keys(0x42, 0x13, 0x99))
                 .await;
             let result = vault_is_unlocked_with_state(&state).await;
             assert_eq!(result, Ok(true));
@@ -1427,7 +1713,7 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set(status_fixture_unlocked_with_keys(0x77, 0x88, 0x99))
+                .set_unlocked(status_fixture_unlocked_with_keys(0x77, 0x88, 0x99))
                 .await;
             assert_eq!(vault_is_unlocked_with_state(&state).await, Ok(true));
 
