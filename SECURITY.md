@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Report security issues to **`security@myne.app`** privately.
+Report security issues to **`security@myne.md`** privately.
 
 Please do **not** open a public GitHub issue for vulnerabilities. We don't have a public bug-bounty page yet (planned for Phase 1 ship), but we still want to hear about issues before they go public.
 
@@ -51,7 +51,7 @@ When the public bug-bounty page goes live (Plan 1 §C7), reporters who agreed to
 
 ## PGP / encrypted reports
 
-We don't currently publish a PGP key. If your report contains material you don't want to send via plain email, contact us first via `security@myne.app` to coordinate a transport (Signal handle, Tutanota address, etc.).
+We don't currently publish a PGP key. If your report contains material you don't want to send via plain email, contact us first via `security@myne.md` to coordinate a transport (Signal handle, Tutanota address, etc.).
 
 ## Why no public-issue tracker for vulnerabilities
 

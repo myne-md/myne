@@ -1,7 +1,7 @@
 # Myne security contact (RFC 9116)
 # Full policy: https://github.com/myne-md/myne/blob/main/SECURITY.md
 
-Contact: mailto:security@myne.app
+Contact: mailto:security@myne.md
 Expires: 2027-05-01T00:00:00.000Z
 Preferred-Languages: en, tr
 Canonical: https://raw.githubusercontent.com/myne-md/myne/main/public/.well-known/security.txt
