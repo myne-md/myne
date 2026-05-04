@@ -10,41 +10,19 @@
 //     window-close is the OS-level escape valve. Helper text below the
 //     spinner makes that escape path explicit.
 //
-// Reduced motion: <Spinner> falls back to a static ring under
-// `prefers-reduced-motion: reduce` (tokens.css zeroes animation-duration).
+// Visual + layout delegated to the shared `<BlockingProgressStep>`
+// component (`src/components/BlockingProgressStep.tsx`) so the recover
+// flow's `decrypting` sub-step (per `recovery-flow.md` §3.3) renders
+// the same idiom with a different label.
 
-import { Spinner } from "../../components/Spinner";
-import { StepHeading, StepLayout } from "./step-shell";
+import { BlockingProgressStep } from "../../components/BlockingProgressStep";
 
 export function EncryptingStep() {
   return (
-    <StepLayout align="center">
-      <Spinner size={36} />
-      <div style={{ marginTop: 12 }}>
-        <StepHeading centered>Encrypting your vault</StepHeading>
-      </div>
-      <div
-        style={{
-          fontSize: 14,
-          lineHeight: 1.6,
-          color: "var(--fg-2)",
-          textAlign: "center",
-        }}
-      >
-        This takes a moment.
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          lineHeight: 1.5,
-          color: "var(--fg-3)",
-          textAlign: "center",
-          marginTop: 32,
-          maxWidth: 320,
-        }}
-      >
-        If this takes longer than 30 seconds, close the window and try again.
-      </div>
-    </StepLayout>
+    <BlockingProgressStep
+      heading="Encrypting your vault"
+      caption="This takes a moment."
+      footerHint="If this takes longer than 30 seconds, close the window and try again."
+    />
   );
 }

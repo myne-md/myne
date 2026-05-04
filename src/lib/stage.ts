@@ -1,12 +1,22 @@
 // App-level stage union + transition function.
 //
-// Recover stage is intentionally absent — added back-compat in a
-// separate recovery PR.
-//
 // `transition(prev, action)` is pure. Illegal pairs return `prev`
 // unchanged + dev `console.warn`. The `LEGAL` table is the source of
 // truth for the dev-only verification harness; keep it in sync with
 // the switch arms in `transition`.
+//
+// `recover` carries a `subStep` discriminator (`'phrase-entry' |
+// 'decrypting' | 'password-reset'`) used as the **mount-time hint**
+// for which sub-step component the recover screen renders first.
+// **It is not kept in sync with the recover-screen reducer's live
+// sub-step** — once the recover screen mounts, its internal
+// `useReducer` is the source of truth for sub-step transitions.
+// Therefore Stage-level transitions out of recover (`recover.cancel`,
+// `recover.complete-success`) are NOT sub-step-conditional in
+// `transition()`; the recover-screen component is responsible for
+// gating which sub-step dispatches each action (Cancel button is
+// rendered only on phrase-entry; complete-success is dispatched only
+// from PasswordResetStep on A8f success).
 
 /**
  * Mirrors the Rust-side `IoFailureKind` enum
@@ -30,18 +40,31 @@ export type StageVaultStatus =
   | { kind: "IoError"; ioKind: IoFailureKind };
 
 /**
+ * Sub-step discriminator for the `recover` stage. Carried in the
+ * Stage payload as a **mount-time hint** for which sub-step the
+ * recover screen renders first; NOT kept in sync with the recover
+ * screen's reducer post-mount. The recover screen's internal
+ * `useReducer` is the live source of truth for sub-step transitions
+ * (phrase-entry → decrypting → password-reset, plus Q4 silent-
+ * recovery swaps). Stage-level transitions out of recover trust the
+ * recover-screen component to gate which sub-step dispatches each
+ * action (Cancel button rendered only on phrase-entry; complete-
+ * success dispatched only from PasswordResetStep on A8f success).
+ */
+export type RecoverSubStep = "phrase-entry" | "decrypting" | "password-reset";
+
+/**
  * Top-level app stage. Discriminator is `name`. `unlock` carries an
- * `initialStatus` payload; the other four stages are payload-free.
- *
- * `recover` stage is intentionally absent — the recovery flow lands
- * in a separate PR and will extend this union backwards-compatibly.
+ * `initialStatus` payload; `recover` carries a `subStep` payload;
+ * the other four stages are payload-free.
  */
 export type Stage =
   | { name: "welcome" }
   | { name: "create-vault" }
   | { name: "unlock"; initialStatus: StageVaultStatus }
   | { name: "locked" }
-  | { name: "editor" };
+  | { name: "editor" }
+  | { name: "recover"; subStep: RecoverSubStep };
 
 /**
  * Action type sent to `transition`. Each action corresponds to a
@@ -79,7 +102,34 @@ export type Action =
   /** editor → locked on user clicking the Lock affordance. */
   | { type: "editor.lock" }
   /** locked → unlock(Exists) on user clicking Unlock from the locked screen. */
-  | { type: "locked.unlock" };
+  | { type: "locked.unlock" }
+  /**
+   * unlock → recover(phrase-entry). Cold-start entry: user clicked
+   * the "Recovery phrase ile aç" link below the password CTA.
+   */
+  | { type: "unlock.start-recovery" }
+  /**
+   * unlock → recover(password-reset). Resume entry: user clicked the
+   * "Devam et" CTA on the `VaultRecoveryInProgress` banner — runtime
+   * slot is `Recovering`, A8d already succeeded last (sub)session.
+   */
+  | { type: "unlock.resume-recovery" }
+  /**
+   * recover → unlock(Exists). Dispatched by the Cancel button on the
+   * `phrase-entry` sub-step (the recover screen renders Cancel only
+   * there per `recovery-flow.md` §3.3 + §4.1). Stage transition is
+   * not sub-step-aware — the recover-screen component is the gate.
+   */
+  | { type: "recover.cancel" }
+  /**
+   * recover → editor. Dispatched by PasswordResetStep on A8f
+   * success. Stage transition is not sub-step-aware — Stage's
+   * `subStep` is a mount-time hint and may drift from the recover
+   * screen's live reducer state across silent-recovery swaps; the
+   * recover-screen component is the gate that ensures only
+   * `password-reset` dispatches this action.
+   */
+  | { type: "recover.complete-success" };
 
 /**
  * Pure transition function. Returns the next Stage given the previous
@@ -121,6 +171,18 @@ export function transition(prev: Stage, action: Action): Stage {
       switch (action.type) {
         case "unlock.success":
           return { name: "editor" };
+        case "unlock.start-recovery":
+          // Cold-start entry — user does not have a recovery in
+          // flight yet (slot is Empty); recover screen mounts in
+          // phrase-entry sub-step.
+          return { name: "recover", subStep: "phrase-entry" };
+        case "unlock.resume-recovery":
+          // Resume entry — slot is `Recovering` (A8d previously
+          // succeeded); skip phrase-entry and mount directly in
+          // password-reset to chain A8f. If the React-side claim
+          // disagrees with the actual slot at IPC time, the recover
+          // screen reducer collapses the mismatch silently per Q4.
+          return { name: "recover", subStep: "password-reset" };
         default:
           return rejectIllegal(prev, action);
       }
@@ -141,27 +203,78 @@ export function transition(prev: Stage, action: Action): Stage {
         default:
           return rejectIllegal(prev, action);
       }
+    case "recover":
+      switch (action.type) {
+        case "recover.cancel":
+          // Stage's `subStep` payload is a mount-time hint and may
+          // drift from the recover-screen reducer's live sub-step
+          // (e.g., entered via `unlock.start-recovery` → Stage subStep
+          // = phrase-entry, but reducer transitioned to decrypting and
+          // back). The recover-screen component renders Cancel only
+          // on its live phrase-entry sub-step, so dispatch-site
+          // gating is sufficient; Stage transition trusts the
+          // component.
+          return { name: "unlock", initialStatus: { kind: "Exists" } };
+        case "recover.complete-success":
+          // PasswordResetStep dispatches this on A8f success. Same
+          // reasoning as recover.cancel — Stage trusts the dispatch
+          // site.
+          return { name: "editor" };
+        default:
+          return rejectIllegal(prev, action);
+      }
     default:
       return assertNever(prev);
   }
 }
 
 /**
- * Map a `vault_status` probe result to the initial Stage at app boot.
+ * Map paired probe results (`vault_status` on disk +
+ * `vault_slot_kind` on runtime) to the initial Stage at app boot.
  *
- * Boot-probe transition table (from PRD Implementation Decisions):
- * - `Ok(Missing)`              → `welcome`
- * - `Ok(Exists)`               → `unlock` with `initialStatus = Exists`
- * - `Ok(Corrupted)`            → `unlock` with `initialStatus = Corrupted`
- * - `Err(IoError)`             → `unlock` with `initialStatus = IoError`
+ * **Runtime slot trumps disk for non-Empty variants.** A live
+ * `Recovering` or `Unlocked` slot means the Rust process is mid-flow
+ * (typically post-WebView-reload — Tauri's host outlives the JS
+ * runtime across Cmd+R / HMR). At cold boot the slot is always
+ * `Empty` and disk-based routing applies as before.
+ *
+ * Decision tree:
+ * - Slot `Recovering`            → `recover` with `subStep = password-reset`
+ *   (skip phrase-entry; A8d already produced the in-memory `root_key`
+ *   in a prior session — `recovery-flow.md` §4.1's non-dismissible
+ *   chained step continues from where the user left off).
+ * - Slot `Unlocked`              → `editor` (auto-unlock parity;
+ *   the Editor mount guard's `vault_is_unlocked()` probe is the
+ *   reality check if Rust state somehow disagrees).
+ * - Slot `Empty` + `Ok(Missing)`     → `welcome`
+ * - Slot `Empty` + `Ok(Exists)`      → `unlock` with `initialStatus = Exists`
+ * - Slot `Empty` + `Ok(Corrupted)`   → `unlock` with `initialStatus = Corrupted`
+ * - Slot `Empty` + `Err(IoError)`    → `unlock` with `initialStatus = IoError`
  *
  * The IO-error path lands in `unlock` (not a separate `error` stage)
  * per Q10 α=3 — Unlock component renders `<FailClosedError reason="io-error">`
  * in place of the password form when `initialStatus.kind === "IoError"`.
+ *
+ * **Exotic disagreements** (slot says Recovering/Unlocked but disk
+ * is Missing/Corrupted/IoError) are routed by slot anyway; the
+ * downstream A8f / editor mount surfaces the real failure (parse
+ * fail → fail-closed corrupted-vault; missing file → A8f
+ * VaultNotFound). Keeping the boot decision tree slot-priority
+ * preserves the silent-recovery posture (Q4) at the boundary.
  */
 export function initialStageFromProbe(
   result: { ok: VaultStatus } | { err: VaultStatusError },
+  slotKind: SlotKind,
 ): Stage {
+  // Slot-priority: a non-Empty runtime slot pins the boot stage
+  // regardless of disk state.
+  if (slotKind === "Recovering") {
+    return { name: "recover", subStep: "password-reset" };
+  }
+  if (slotKind === "Unlocked") {
+    return { name: "editor" };
+  }
+  // Slot is Empty — fall through to disk-based routing.
   if ("ok" in result) {
     switch (result.ok.kind) {
       case "Missing":
@@ -196,6 +309,7 @@ function assertNever(x: never): never {
 }
 
 import type { VaultStatus, VaultStatusError } from "../types/vault-status";
+import type { SlotKind } from "../types/slot-kind";
 
 // ---- Dev-only runtime verification harness ----
 //
@@ -209,7 +323,10 @@ import type { VaultStatus, VaultStatusError } from "../types/vault-status";
  * Source-of-truth legal-transition table. Keys are
  * `<stage.name>|<action.type>`; values are the expected resulting
  * `stage.name`. Pairs not present here are illegal (must return
- * `prev` unchanged).
+ * `prev` unchanged). Recover transitions are NOT sub-step-aware —
+ * `recover.cancel` and `recover.complete-success` are legal from
+ * any recover sub-step; the recover-screen component gates which
+ * sub-step dispatches each action.
  */
 const LEGAL: Record<string, Stage["name"]> = {
   "welcome|create-vault.start": "create-vault",
@@ -219,6 +336,10 @@ const LEGAL: Record<string, Stage["name"]> = {
   "unlock|unlock.success": "editor",
   "editor|editor.lock": "locked",
   "locked|locked.unlock": "unlock",
+  "unlock|unlock.start-recovery": "recover",
+  "unlock|unlock.resume-recovery": "recover",
+  "recover|recover.cancel": "unlock",
+  "recover|recover.complete-success": "editor",
 };
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
@@ -227,6 +348,9 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   { name: "unlock", initialStatus: { kind: "Exists" } },
   { name: "locked" },
   { name: "editor" },
+  { name: "recover", subStep: "phrase-entry" },
+  { name: "recover", subStep: "decrypting" },
+  { name: "recover", subStep: "password-reset" },
 ];
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
@@ -237,6 +361,10 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "unlock.success" },
   { type: "editor.lock" },
   { type: "locked.unlock" },
+  { type: "unlock.start-recovery" },
+  { type: "unlock.resume-recovery" },
+  { type: "recover.cancel" },
+  { type: "recover.complete-success" },
 ];
 
 /**
@@ -248,7 +376,7 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
  */
 function verifyTransitionTable(): void {
   // Suppress the rejectIllegal `console.warn` during the verification
-  // walk so the dev console isn't flooded with the 24 illegal-pair
+  // walk so the dev console isn't flooded with the illegal-pair
   // warnings the harness deliberately exercises. The harness's job is
   // to verify the table itself, not to test the warn-emit path (that
   // path is observable in real app usage).
@@ -265,7 +393,7 @@ function verifyTransitionTable(): void {
           // Illegal pair → must return prev unchanged.
           if (actualNext.name !== stage.name) {
             throw new Error(
-              `[stage] regression: illegal pair (${stage.name}, ${action.type}) was accepted; ` +
+              `[stage] regression: illegal pair (${key}) was accepted; ` +
                 `transition returned ${actualNext.name}, expected ${stage.name}`,
             );
           }
@@ -273,7 +401,7 @@ function verifyTransitionTable(): void {
           // Legal pair → must return the expected next stage.
           if (actualNext.name !== expectedNext) {
             throw new Error(
-              `[stage] regression: legal pair (${stage.name}, ${action.type}) returned ` +
+              `[stage] regression: legal pair (${key}) returned ` +
                 `${actualNext.name}; expected ${expectedNext}`,
             );
           }
@@ -287,47 +415,91 @@ function verifyTransitionTable(): void {
 }
 
 /**
- * Walk every `vault_status` probe outcome and assert
- * `initialStageFromProbe` produces the expected Stage. Catches
+ * Walk every (vault_status × slot_kind) probe outcome combination and
+ * assert `initialStageFromProbe` produces the expected Stage. Catches
  * regressions where a refactor on either side (Rust enum drift, TS
  * mapping change) breaks the boot routing.
+ *
+ * Coverage:
+ * - Slot `Empty` × four disk states (Missing / Exists / Corrupted /
+ *   two IoError variants) — five disk-priority cases.
+ * - Slot `Recovering` × Exists (the realistic post-reload case) —
+ *   slot-priority routes to `recover(password-reset)`.
+ * - Slot `Recovering` × Missing (exotic disagreement) — still routes
+ *   to recover; downstream A8f surfaces VaultNotFound.
+ * - Slot `Unlocked` × Exists — slot-priority routes to `editor`.
  */
 function verifyInitialStageFromProbe(): void {
-  const cases: Array<{
+  type Case = {
     label: string;
     input: { ok: VaultStatus } | { err: VaultStatusError };
+    slotKind: SlotKind;
     expectedName: Stage["name"];
     expectedInitialStatus?: { kind: "Exists" | "Corrupted" | "IoError"; ioKind?: IoFailureKind };
-  }> = [
-    { label: "Ok(Missing)", input: { ok: { kind: "Missing" } }, expectedName: "welcome" },
+    expectedSubStep?: RecoverSubStep;
+  };
+  const cases: Array<Case> = [
+    // ---- Slot Empty: disk-based routing (cold boot path) ----
     {
-      label: "Ok(Exists)",
+      label: "Empty + Ok(Missing)",
+      input: { ok: { kind: "Missing" } },
+      slotKind: "Empty",
+      expectedName: "welcome",
+    },
+    {
+      label: "Empty + Ok(Exists)",
       input: { ok: { kind: "Exists" } },
+      slotKind: "Empty",
       expectedName: "unlock",
       expectedInitialStatus: { kind: "Exists" },
     },
     {
-      label: "Ok(Corrupted)",
+      label: "Empty + Ok(Corrupted)",
       input: { ok: { kind: "Corrupted" } },
+      slotKind: "Empty",
       expectedName: "unlock",
       expectedInitialStatus: { kind: "Corrupted" },
     },
     {
-      label: "Err(IoError, PermissionDenied)",
+      label: "Empty + Err(IoError, PermissionDenied)",
       input: { err: { kind: "IoError", detail: { io_error_kind: "PermissionDenied" } } },
+      slotKind: "Empty",
       expectedName: "unlock",
       expectedInitialStatus: { kind: "IoError", ioKind: "PermissionDenied" },
     },
     {
-      label: "Err(IoError, Other)",
+      label: "Empty + Err(IoError, Other)",
       input: { err: { kind: "IoError", detail: { io_error_kind: "Other" } } },
+      slotKind: "Empty",
       expectedName: "unlock",
       expectedInitialStatus: { kind: "IoError", ioKind: "Other" },
+    },
+    // ---- Slot Recovering: slot-priority (post-reload mid-recovery) ----
+    {
+      label: "Recovering + Ok(Exists)",
+      input: { ok: { kind: "Exists" } },
+      slotKind: "Recovering",
+      expectedName: "recover",
+      expectedSubStep: "password-reset",
+    },
+    {
+      label: "Recovering + Ok(Missing) (exotic)",
+      input: { ok: { kind: "Missing" } },
+      slotKind: "Recovering",
+      expectedName: "recover",
+      expectedSubStep: "password-reset",
+    },
+    // ---- Slot Unlocked: slot-priority (post-reload mid-edit) ----
+    {
+      label: "Unlocked + Ok(Exists)",
+      input: { ok: { kind: "Exists" } },
+      slotKind: "Unlocked",
+      expectedName: "editor",
     },
   ];
 
   for (const c of cases) {
-    const actual = initialStageFromProbe(c.input);
+    const actual = initialStageFromProbe(c.input, c.slotKind);
     if (actual.name !== c.expectedName) {
       throw new Error(
         `[stage] regression: initialStageFromProbe(${c.label}) returned name=${actual.name}; expected ${c.expectedName}`,
@@ -346,6 +518,13 @@ function verifyInitialStageFromProbe(): void {
             `[stage] regression: initialStageFromProbe(${c.label}) ioKind=${got.ioKind}; expected ${c.expectedInitialStatus.ioKind}`,
           );
         }
+      }
+    }
+    if (c.expectedSubStep !== undefined && actual.name === "recover") {
+      if (actual.subStep !== c.expectedSubStep) {
+        throw new Error(
+          `[stage] regression: initialStageFromProbe(${c.label}) subStep=${actual.subStep}; expected ${c.expectedSubStep}`,
+        );
       }
     }
   }
