@@ -1,4 +1,5 @@
-// Vault unlock screen — task 7 of `app-state-machine`.
+// Vault unlock screen — task 7 of `app-state-machine`, extended with
+// recovery-flow entry affordances per `recovery-from-phrase-ui` Task 8.
 //
 // Mounts when Stage = `unlock`. Two rendering modes driven by
 // `initialStatus`:
@@ -7,13 +8,25 @@
 //
 // Normal-mode reducer state machine: `idle` (with optional banner from
 // the prior failed attempt — password retained across the
-// decrypting → idle bounce) | `decrypting` (input + submit disabled).
+// decrypting → idle bounce) | `decrypting` (input + submit disabled) |
+// `recovery-in-progress` (Rust slot is `Recovering`; password form is
+// suppressed in favor of an info banner + "Devam et" resume CTA;
+// CTA dispatches `unlock.resume-recovery` to App.tsx, routing the
+// user into recover(password-reset)).
+//
 // `InvalidVaultMeta` mid-attempt switches the component into the same
 // fail-closed surface as a boot-time corrupted vault — one-way, no
 // return to the form within the session.
+//
+// **Cold-start recovery link.** In `idle` mode (Exists), a ghost-style
+// "Parolanı mı unuttun? Recovery phrase ile aç" link below the
+// primary CTA dispatches `unlock.start-recovery` → App routes Stage
+// to `recover(phrase-entry)`. The link is suppressed during
+// `decrypting`, `recovery-in-progress`, and fail-closed states.
 
 import { invoke } from "@tauri-apps/api/core";
 import { useReducer, type CSSProperties, type FormEvent } from "react";
+import { DestructiveBanner } from "../components/DestructiveBanner";
 import { FailClosedError } from "../components/FailClosedError";
 import {
   CARD_BODY_STYLE,
@@ -22,24 +35,36 @@ import {
 } from "../components/primitives/CenteredCard";
 import { Spinner } from "../components/Spinner";
 import { closeApp } from "../lib/app-window";
-import type { IoFailureKind, StageVaultStatus } from "../lib/stage";
+import { ioBanner } from "../lib/io-banner";
+import type { StageVaultStatus } from "../lib/stage";
 import type { VaultUnlockError } from "../types/vault-unlock-error";
 
 interface UnlockProps {
   initialStatus: StageVaultStatus;
   onUnlocked: () => void;
+  /** Cold-start recovery entry. Dispatched by the "Recovery phrase ile
+   *  aç" link in idle mode. App.tsx sends `unlock.start-recovery` →
+   *  Stage transitions to `recover(phrase-entry)`. */
+  onStartRecovery: () => void;
+  /** Resume recovery entry. Dispatched by the "Devam et" CTA on the
+   *  `VaultRecoveryInProgress` info banner. App.tsx sends
+   *  `unlock.resume-recovery` → Stage transitions to
+   *  `recover(password-reset)`. */
+  onResumeRecovery: () => void;
 }
 
 type UnlockState =
   | { kind: "idle"; password: string; error: string | null }
   | { kind: "decrypting"; password: string }
-  | { kind: "corrupted-after-unlock" };
+  | { kind: "corrupted-after-unlock" }
+  | { kind: "recovery-in-progress" };
 
 type UnlockAction =
   | { type: "set-password"; value: string }
   | { type: "submit" }
   | { type: "fail"; error: string }
   | { type: "fail-corrupted" }
+  | { type: "fail-recovery-in-progress" }
   | { type: "success" };
 
 function reducer(state: UnlockState, action: UnlockAction): UnlockState {
@@ -55,6 +80,12 @@ function reducer(state: UnlockState, action: UnlockAction): UnlockState {
       return { kind: "idle", password: state.password, error: action.error };
     case "fail-corrupted":
       return { kind: "corrupted-after-unlock" };
+    case "fail-recovery-in-progress":
+      // Slot was `Recovering` at unlock-attempt time. Switch the
+      // component to a banner + "Devam et" surface; the password form
+      // is suppressed (typing a password while the slot is recovering
+      // is meaningless — the user must complete A8f first).
+      return { kind: "recovery-in-progress" };
     case "success":
       // Stay in `decrypting` until parent transitions Stage → editor
       // and this component unmounts. Switching to a `success` variant
@@ -67,21 +98,10 @@ function reducer(state: UnlockState, action: UnlockAction): UnlockState {
 
 const INITIAL_STATE: UnlockState = { kind: "idle", password: "", error: null };
 
-type BannerOutcome = { kind: "banner"; text: string } | { kind: "corrupted" };
-
-function ioBanner(kind: IoFailureKind): string {
-  switch (kind) {
-    case "PermissionDenied":
-      return "Vault dosyasına erişim izni yok. Dosya izinlerini kontrol et.";
-    case "NotFound":
-      // Defensive — `vault_unlock` special-cases NotFound to
-      // `VaultNotFound`; this branch is unreachable in practice.
-      return "Vault dosyası bulunamadı. Uygulamayı yeniden başlat.";
-    case "NoSpace":
-    case "Other":
-      return "Vault dosyası okunamıyor.";
-  }
-}
+type BannerOutcome =
+  | { kind: "banner"; text: string }
+  | { kind: "corrupted" }
+  | { kind: "recovery-in-progress" };
 
 function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
   switch (e.kind) {
@@ -108,13 +128,10 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "VaultRecoveryInProgress":
       // Slot is in Slot::Recovering — user must complete the
       // password-reset chained step (recovery-flow.md §4.1) before any
-      // unlock attempt. Reaching this banner means the route guards
-      // failed; the user-actionable repair is to navigate back into
-      // the recovery flow.
-      return {
-        kind: "banner",
-        text: "Kurtarma akışı yarıda kaldı. Önce yeni parolayı belirle.",
-      };
+      // unlock attempt. Switch into the `recovery-in-progress` mode so
+      // the user can dispatch `unlock.resume-recovery` via the Devam
+      // et CTA.
+      return { kind: "recovery-in-progress" };
     case "JoinFailure":
       return {
         kind: "banner",
@@ -141,14 +158,30 @@ const INPUT_STYLE: CSSProperties = {
   outline: "none",
 };
 
-const BANNER_STYLE: CSSProperties = {
-  background: "var(--bg-3)",
-  border: "1px solid var(--line-1)",
+// Info-style banner used for `recovery-in-progress` mode — distinct
+// from the destructive `<DestructiveBanner>` used for idle-error.
+// The user has not made a mistake; the flow was simply paused.
+const INFO_BANNER_STYLE: CSSProperties = {
+  background: "var(--info-soft)",
+  border: "1px solid var(--info)",
   borderRadius: "var(--radius-2)",
   padding: "var(--space-3) var(--space-4)",
   fontSize: "var(--text-base)",
   lineHeight: "var(--leading-normal)",
-  color: "var(--fg-2)",
+  color: "var(--info)",
+};
+
+const RECOVER_LINK_STYLE: CSSProperties = {
+  background: "transparent",
+  border: 0,
+  padding: 0,
+  marginTop: "var(--space-2)",
+  alignSelf: "center",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--accent)",
+  cursor: "pointer",
 };
 
 function ctaStyle(disabled: boolean): CSSProperties {
@@ -169,7 +202,12 @@ function ctaStyle(disabled: boolean): CSSProperties {
   };
 }
 
-export function Unlock({ initialStatus, onUnlocked }: UnlockProps) {
+export function Unlock({
+  initialStatus,
+  onUnlocked,
+  onStartRecovery,
+  onResumeRecovery,
+}: UnlockProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
   // Boot-time corrupted/IoError mode: render <FailClosedError /> from
@@ -196,6 +234,26 @@ export function Unlock({ initialStatus, onUnlocked }: UnlockProps) {
     );
   }
 
+  // Recovery-in-progress mode: an unlock attempt returned
+  // `VaultRecoveryInProgress`. Render an info banner + Devam et CTA;
+  // password form is suppressed.
+  if (state.kind === "recovery-in-progress") {
+    return (
+      <CenteredCard>
+        <h1 style={CARD_TITLE_STYLE}>Kurtarma akışı yarıda kaldı.</h1>
+        <p style={CARD_BODY_STYLE}>
+          Önce yeni parolanı belirle, vault'unu yeniden mühürle.
+        </p>
+        <div role="alert" style={INFO_BANNER_STYLE}>
+          Kurtarma akışı yarıda kaldı. Önce yeni parolayı belirle.
+        </div>
+        <button type="button" onClick={onResumeRecovery} style={ctaStyle(false)}>
+          <span>Devam et</span>
+        </button>
+      </CenteredCard>
+    );
+  }
+
   const decrypting = state.kind === "decrypting";
   const password = state.password;
   const error = state.kind === "idle" ? state.error : null;
@@ -214,6 +272,8 @@ export function Unlock({ initialStatus, onUnlocked }: UnlockProps) {
         const outcome = unlockErrorOutcome(raw as VaultUnlockError);
         if (outcome.kind === "corrupted") {
           dispatch({ type: "fail-corrupted" });
+        } else if (outcome.kind === "recovery-in-progress") {
+          dispatch({ type: "fail-recovery-in-progress" });
         } else {
           dispatch({ type: "fail", error: outcome.text });
         }
@@ -238,15 +298,16 @@ export function Unlock({ initialStatus, onUnlocked }: UnlockProps) {
           aria-label="Parolan"
           aria-invalid={error != null ? true : undefined}
         />
-        {error != null && (
-          <div role="alert" style={BANNER_STYLE}>
-            {error}
-          </div>
-        )}
+        {error != null && <DestructiveBanner>{error}</DestructiveBanner>}
         <button type="submit" disabled={submitDisabled} style={ctaStyle(submitDisabled)}>
           {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
           <span>{decrypting ? "Decrypting…" : "Aç"}</span>
         </button>
+        {!decrypting && (
+          <button type="button" onClick={onStartRecovery} style={RECOVER_LINK_STYLE}>
+            Parolanı mı unuttun? Recovery phrase ile aç
+          </button>
+        )}
       </form>
     </CenteredCard>
   );

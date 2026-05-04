@@ -4,8 +4,10 @@ import { CreateVault } from "./screens/CreateVault";
 import { Unlock } from "./screens/Unlock";
 import { Locked } from "./screens/Locked";
 import { Editor } from "./screens/Editor";
+import { VaultRecover } from "./screens/VaultRecover";
 import { initialStageFromProbe, transition, type Action, type Stage } from "./lib/stage";
 import { probeVaultStatus } from "./lib/vault-status";
+import { probeSlotKind } from "./lib/vault-slot-kind";
 
 function App() {
   // Initial stage is `null` until the boot probe resolves (loading
@@ -16,20 +18,27 @@ function App() {
   // VaultRuntimeState slot, defeating the editor mount guard).
   const [stage, setStage] = useState<Stage | null>(null);
 
-  // Boot-time `vault_status` probe. Fires once per process — the
-  // `probed` ref guards against React 18 StrictMode double-effect in
-  // dev (both invocations would otherwise hit the IPC). Production
-  // doesn't double-invoke; the guard is defensive belt+suspenders.
-  // Also re-fires when `reprobe()` resets `stage` to null (Editor
-  // mount guard's "Kilitle" CTA → fail-closed → re-route).
+  // Boot-time probe pair: `vault_status` (disk) + `vault_slot_kind`
+  // (runtime slot). Issued in parallel via `Promise.all` — both are
+  // cheap (vault.meta is 345 bytes; slot peek is microseconds) and
+  // independent, so the boot blocking-time is bounded by the slower
+  // of the two. The `probed` ref guards against React 18 StrictMode
+  // double-effect in dev. Also re-fires when `reprobe()` resets
+  // `stage` to null (Editor mount guard's "Kilitle" CTA →
+  // fail-closed → re-route). Slot-priority routing applies: a
+  // `Recovering` or `Unlocked` runtime slot pins the boot stage to
+  // `recover(password-reset)` or `editor` regardless of disk state.
   const probed = useRef(false);
   useEffect(() => {
     if (stage !== null) return; // already-resolved probe
     if (probed.current) return; // StrictMode second invocation
     probed.current = true;
     void (async () => {
-      const result = await probeVaultStatus();
-      setStage(initialStageFromProbe(result));
+      const [vaultResult, slotKind] = await Promise.all([
+        probeVaultStatus(),
+        probeSlotKind(),
+      ]);
+      setStage(initialStageFromProbe(vaultResult, slotKind));
     })();
   }, [stage]);
 
@@ -73,6 +82,8 @@ function App() {
         <Unlock
           initialStatus={stage.initialStatus}
           onUnlocked={() => dispatch({ type: "unlock.success" })}
+          onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
+          onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
         />
       );
     case "locked":
@@ -82,6 +93,16 @@ function App() {
         <Editor
           onResetRequested={reprobe}
           onLock={() => dispatch({ type: "editor.lock" })}
+        />
+      );
+    case "recover":
+      return (
+        <VaultRecover
+          initialSubStep={stage.subStep}
+          onCancel={() => dispatch({ type: "recover.cancel" })}
+          onCompleteSuccess={() =>
+            dispatch({ type: "recover.complete-success" })
+          }
         />
       );
   }
