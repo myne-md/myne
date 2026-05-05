@@ -71,5 +71,4 @@ Specs in `protocol.md` are the human-readable contract; vectors in the `myne-tes
 ## Gotchas
 
 - `glossary.md` references are case-sensitive matches in some downstream tools — keep entry titles stable.
-- `protocol.md` §6 currently has a `<!-- TODO -->` for Per-Note Encryption prose (Plan 1 §S2). When filling it, don't change byte layout in §9.2 — only narrate it.
 - `decisions.md` has ~50 entries; adding more never breaks anything but **never reorder existing ones**, even to fix a date typo (write a new entry that says "2026-04-26 entry has wrong date, actual was 2026-04-27").
