@@ -17,27 +17,12 @@ use super::super::vault_unlock::state::{
 };
 use super::error::VaultRecoveryError;
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
+use crate::protocol_error_kind::protocol_error_kind;
 use protocol::{VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::{AppHandle, Manager, Runtime, State};
 use zeroize::Zeroizing;
-
-/// Map a `protocol::ProtocolError` variant to a `'static` string for
-/// structured logging. A new variant compile-fails this match —
-/// drift-detecting per `src-tauri/CLAUDE.md` "Closed-enum mapping rule".
-fn protocol_error_kind(e: &protocol::ProtocolError) -> &'static str {
-    match e {
-        protocol::ProtocolError::InvalidPassword => "InvalidPassword",
-        protocol::ProtocolError::PasswordTooShort => "PasswordTooShort",
-        protocol::ProtocolError::KdfFailure => "KdfFailure",
-        protocol::ProtocolError::AeadFailure => "AeadFailure",
-        protocol::ProtocolError::InvalidVaultMeta => "InvalidVaultMeta",
-        protocol::ProtocolError::AccountNumberInvalid => "AccountNumberInvalid",
-        protocol::ProtocolError::Csprng => "Csprng",
-        protocol::ProtocolError::PlaintextTooLarge => "PlaintextTooLarge",
-    }
-}
 
 /// Bundle returned by the spawn_blocking pipeline closure: both
 /// derived keys (Zeroizing-wrapped; bytes wipe on drop, including
@@ -241,9 +226,11 @@ pub(crate) async fn recover_with_phrase_with_path(
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
     // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `duration_ms` rounded down to 10ms granularity per
+    // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry.
     tracing::info!(
         event = "vault_recovered_with_phrase",
-        duration_ms = now.duration_since(started).as_millis() as u64,
+        duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
         "vault recovered successfully (Slot::Recovering populated, awaiting password commit)"
     );
 
@@ -303,6 +290,23 @@ pub(crate) async fn complete_recovery_with_path(
     let new_password = Zeroizing::new(new_password);
     let started = Instant::now();
 
+    // (0) Backend min-length floor — structural belt+suspenders against
+    //     frontend bypass per `decisions.md` 2026-05-06 "Auth-pipeline
+    //     backend MIN_PASSWORD_LEN floor; project-wide retroactive".
+    //     Fires BEFORE slot peek + permit acquire so a weak-password
+    //     submit does not consume the shared `auth_permits` slot.
+    //     Cross-plugin shared variant name with
+    //     `AppError::WeakNewPassword` (vault_creation) per Q6 of the
+    //     MYND-22 grilling.
+    if protocol::password_policy::validate_min_length(&new_password).is_err() {
+        tracing::error!(
+            stage = "weak_new_password",
+            error_kind = "WeakNewPassword",
+            "complete_recovery rejected: new password below MIN_PASSWORD_LEN"
+        );
+        return Err(VaultRecoveryError::WeakNewPassword);
+    }
+
     // (1) Slot peek — must be Recovering.
     match state.slot_kind().await {
         SlotKind::Recovering => {}
@@ -329,28 +333,51 @@ pub(crate) async fn complete_recovery_with_path(
         }
     };
 
-    // (3) Take the recovering material — slot becomes Empty here.
-    //     If a race occurred (e.g. concurrent vault_lock between peek
-    //     and take), surface as VaultRecoveryRequiresActiveSession.
-    let recovering = match state.take_recovering().await {
-        Some(m) => m,
-        None => {
-            tracing::error!(
-                stage = "take_recovering",
-                error_kind = "VaultRecoveryRequiresActiveSession",
-                "complete_recovery race: slot was Recovering at peek but Empty at take"
-            );
-            return Err(VaultRecoveryError::VaultRecoveryRequiresActiveSession);
-        }
-    };
+    // (3) Snapshot `root_key` from the still-Recovering slot via a
+    //     read-lock CLONE. Slot stays Recovering across the Argon2id
+    //     work — this is the (p) post-Argon2id slot peek pattern
+    //     (MYND-22 grilling Q4): if `vault_lock` fires mid-Argon2id
+    //     and drops Slot::Recovering → Slot::Empty, the post-await
+    //     `take_recovering()` (step 5) returns None and we bail with
+    //     `RecoveryAbortedByLock` without touching vault.meta.
+    //
+    //     Vacuous-by-affordance-absence today (recovery UI shows no
+    //     Cancel during decrypting per recovery-flow.md §3.3) but
+    //     contract-correct if a Cancel affordance ever ships;
+    //     symmetric with `vault_change_password::commit`'s
+    //     `VaultLockedDuringChange`. See `decisions.md` 2026-05-06
+    //     entry "vault_complete_recovery post-Argon2id slot peek
+    //     symmetric retrofit".
+    //
+    //     The clone is a stack-bound 32-byte copy (Phase 1 A7 side-
+    //     channel out of scope); the original Zeroizing<[u8; 32]>
+    //     stays in the slot, the clone moves into the spawn_blocking
+    //     closure and zeroizes on closure exit.
+    let root_key_snapshot: Zeroizing<[u8; AEAD_KEY_LEN]> =
+        match state.peek_recovering_root_key_clone().await {
+            Some(rk) => rk,
+            None => {
+                // Race between step (1) `slot_kind` peek and now —
+                // possible because `slot_kind` releases the read lock
+                // before returning. Surface as the existing variant.
+                tracing::error!(
+                    stage = "snapshot_recovering",
+                    error_kind = "VaultRecoveryRequiresActiveSession",
+                    "complete_recovery race: slot was Recovering at peek but not now"
+                );
+                return Err(VaultRecoveryError::VaultRecoveryRequiresActiveSession);
+            }
+        };
 
-    let vault_path = vault_path.to_path_buf();
+    let vault_path_for_derive = vault_path.to_path_buf();
+    let vault_path_for_write = vault_path_for_derive.clone();
 
-    // (4) Run the password-commit pipeline in spawn_blocking. Returns
-    //     the recovering material (passed through) on success so the
-    //     post-join code can promote it into Slot::Unlocked.
-    let join_outcome =
-        tokio::task::spawn_blocking(move || -> Result<RecoveringMaterial, VaultRecoveryError> {
+    // (4) Run the Argon2id-bound derivation pipeline in spawn_blocking.
+    //     Returns the freshly-built vault.meta bytes WITHOUT writing
+    //     them to disk — disk write is conditional on the post-Argon2id
+    //     slot peek (step 5).
+    let derive_outcome = tokio::task::spawn_blocking(
+        move || -> Result<[u8; protocol::VAULT_META_LEN], VaultRecoveryError> {
             // (a) Fresh CSPRNG salt + nonce.
             let mut fresh_salt = [0u8; ARGON2_SALT_LEN];
             getrandom::getrandom(&mut fresh_salt).map_err(|_| {
@@ -376,7 +403,7 @@ pub(crate) async fn complete_recovery_with_path(
             })?;
 
             // (b) Read existing vault.meta.
-            let bytes = std::fs::read(&vault_path).map_err(|e| {
+            let bytes = std::fs::read(&vault_path_for_derive).map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     tracing::error!(
                         stage = "read_meta",
@@ -416,7 +443,7 @@ pub(crate) async fn complete_recovery_with_path(
             //     2+ feature decision).
             let new_bytes = protocol::rewrite_vault_meta_password_side(
                 &parsed,
-                &recovering.root_key,
+                &root_key_snapshot,
                 new_password.as_str(),
                 &fresh_salt,
                 &fresh_nonce,
@@ -438,11 +465,55 @@ pub(crate) async fn complete_recovery_with_path(
                 VaultRecoveryError::InvalidVaultMeta
             })?;
 
+            Ok(new_bytes)
+        },
+    )
+    .await;
+
+    let new_bytes = match derive_outcome {
+        Ok(Ok(b)) => b,
+        Ok(Err(inner)) => return Err(inner),
+        Err(_) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "blocking derivation task join failed during complete_recovery"
+            );
+            return Err(VaultRecoveryError::JoinFailure);
+        }
+    };
+
+    // (5) Post-Argon2id slot peek (option p). Take the recovering
+    //     material now — if it is gone, `vault_lock` (or another
+    //     slot-dropping action) fired during the derivation window;
+    //     bail without disk write.
+    let recovering = match state.take_recovering().await {
+        Some(m) => m,
+        None => {
+            tracing::warn!(
+                stage = "post_argon2id_slot_peek",
+                error_kind = "RecoveryAbortedByLock",
+                "vault_lock fired mid-Argon2id during complete_recovery; bailing without disk write"
+            );
+            return Err(VaultRecoveryError::RecoveryAbortedByLock);
+        }
+    };
+
+    // (6) Atomic write + SHA-256 of the freshly-written bytes in a
+    //     second spawn_blocking. The hash becomes the
+    //     `Slot::Unlocked.vault_meta_bytes_hash` CAS anchor for
+    //     `vault_change_password` per `decisions.md` 2026-05-06 entry;
+    //     captured AFTER atomic_write succeeds so it pins what is
+    //     actually on disk, not the in-memory blob.
+    //
+    //     If atomic_write fails here, `recovering` (held in this
+    //     async scope) drops on early-return — Zeroizing wipes the
+    //     keys. The slot is currently Empty (we just took); the user
+    //     must restart from A8d.
+    let write_outcome =
+        tokio::task::spawn_blocking(move || -> Result<[u8; 32], VaultRecoveryError> {
             // (e) Atomic write — tempfile + fsync + rename per §4.2.
-            //     A failure here leaves vault.meta on disk with the
-            //     original password still in effect; the user can
-            //     re-attempt recovery.
-            crate::atomic_write::atomic_write(&vault_path, &new_bytes).map_err(|e| {
+            crate::atomic_write::atomic_write(&vault_path_for_write, &new_bytes).map_err(|e| {
                 let io_kind = from_io_error_kind(e.kind());
                 tracing::error!(
                     stage = "tempfile_rename",
@@ -455,24 +526,27 @@ pub(crate) async fn complete_recovery_with_path(
                 }
             })?;
 
-            Ok(recovering)
+            // (f) SHA-256 of the freshly-written bytes.
+            let new_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&new_bytes);
+
+            Ok(new_bytes_hash)
         })
         .await;
 
-    let recovering = match join_outcome {
-        Ok(Ok(m)) => m,
+    let vault_meta_bytes_hash = match write_outcome {
+        Ok(Ok(h)) => h,
         Ok(Err(inner)) => return Err(inner),
         Err(_) => {
             tracing::error!(
                 stage = "spawn_blocking_join",
                 error_kind = "JoinFailure",
-                "blocking task join failed during complete_recovery"
+                "blocking write task join failed during complete_recovery"
             );
             return Err(VaultRecoveryError::JoinFailure);
         }
     };
 
-    // (5) Promote Slot::Recovering material → Slot::Unlocked.
+    // (7) Promote Slot::Recovering material → Slot::Unlocked.
     let now = Instant::now();
     state
         .set_unlocked(UnlockedVault {
@@ -480,15 +554,21 @@ pub(crate) async fn complete_recovery_with_path(
             items_key: recovering.items_key,
             items_key_id: recovering.items_key_id,
             unlocked_at: now,
+            vault_meta_bytes_hash,
         })
         .await;
 
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
     // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `duration_ms` rounded down to 10ms granularity per
+    // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry.
+    // Event name `vault_recovery_completed` follows the project-wide
+    // `vault_<verb_past>` discipline that pins by example for the
+    // future `vault_password_changed` (MYND-22 plugin tasks).
     tracing::info!(
         event = "vault_recovery_completed",
-        duration_ms = now.duration_since(started).as_millis() as u64,
+        duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
         "post-recovery password commit succeeded; slot is Unlocked"
     );
 
@@ -1030,19 +1110,103 @@ mod tests {
         (state, scratch, password.to_string(), phrase, meta_bytes)
     }
 
+    /// `complete_recovery` must reject a sub-floor new password with
+    /// `WeakNewPassword` BEFORE consuming the `auth_permits` slot or
+    /// running Argon2id. See `decisions.md` 2026-05-06 entry
+    /// "Auth-pipeline backend MIN_PASSWORD_LEN floor; project-wide
+    /// retroactive".
+    #[test]
+    fn complete_recovery_rejects_weak_new_password_pre_argon2id() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, orig_bytes) =
+                seed_recovering_state_via_full_a8d("orig-pw").await;
+
+            // 11 chars — below MIN_PASSWORD_LEN of 12.
+            let weak_pw = "a".repeat(11);
+            let started = std::time::Instant::now();
+            let result = complete_recovery_with_path(weak_pw, scratch.path(), &state).await;
+            let elapsed = started.elapsed();
+
+            assert!(
+                matches!(result, Err(VaultRecoveryError::WeakNewPassword)),
+                "expected WeakNewPassword, got {result:?}"
+            );
+
+            // Disk untouched — vault.meta byte-equal to the original.
+            let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(
+                &after_bytes[..],
+                &orig_bytes[..],
+                "vault.meta must be unchanged on weak-password reject (no atomic_write fired)"
+            );
+
+            // Slot stays Recovering — gate fired before slot peek's
+            // potential mutations and before take_recovering. User can
+            // retry with a stronger password.
+            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+
+            // Permit released — gate fires before permit acquire.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+
+            // Sanity: rejection is fast (< 100ms even on cold hardware) —
+            // proves Argon2id was NOT invoked.
+            assert!(
+                elapsed.as_millis() < 200,
+                "weak-password reject must be sub-Argon2id fast; got {}ms",
+                elapsed.as_millis()
+            );
+        });
+    }
+
     #[test]
     fn complete_recovery_round_trip_promotes_recovering_to_unlocked() {
         rt().block_on(async {
             let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state)
+            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
                 .await
                 .expect("A8f must succeed when slot is Recovering");
 
             assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
             // Permit released after success.
             assert_eq!(state.auth_permits().available_permits(), 1);
+        });
+    }
+
+    /// `Slot::Unlocked.vault_meta_bytes_hash` must equal SHA-256 of
+    /// the freshly-rewritten vault.meta bytes after `complete_recovery`
+    /// promotes Slot::Recovering → Slot::Unlocked. The hash pins the
+    /// NEW disk state (not the original) so a subsequent
+    /// `vault_change_password` CAS check sees a coherent anchor. See
+    /// `decisions.md` 2026-05-06 entry "Slot::Unlocked anchor field
+    /// for vault.meta CAS".
+    #[test]
+    fn complete_recovery_populates_slot_meta_bytes_hash_with_new_disk_bytes() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, orig_bytes) =
+                seed_recovering_state_via_full_a8d("orig-pw").await;
+
+            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
+                .await
+                .expect("A8f");
+
+            let new_disk_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            let expected_hash = crate::vault_meta_hash::vault_meta_sha256(&new_disk_bytes);
+
+            let unlocked = state.take().await.unwrap_unlocked();
+            assert_eq!(
+                unlocked.vault_meta_bytes_hash, expected_hash,
+                "slot.vault_meta_bytes_hash must equal SHA-256 of the rewritten vault.meta bytes"
+            );
+
+            // The hash must NOT match the original (pre-rewrite) bytes —
+            // verifying we captured the post-rewrite state, not stale.
+            let original_hash = crate::vault_meta_hash::vault_meta_sha256(orig_bytes.as_slice());
+            assert_ne!(
+                unlocked.vault_meta_bytes_hash, original_hash,
+                "slot hash must reflect post-rewrite bytes, not the pre-rewrite original"
+            );
         });
     }
 
@@ -1055,7 +1219,7 @@ mod tests {
             let (state, scratch, _orig_pw, _phrase, orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state)
+            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
                 .await
                 .expect("A8f");
 
@@ -1092,7 +1256,7 @@ mod tests {
 
     #[test]
     fn complete_recovery_old_password_no_longer_unlocks() {
-        // After A8f commits "new-pw", `vault_unlock("orig-pw")` MUST
+        // After A8f commits "new-password-12", `vault_unlock("orig-pw")` MUST
         // return `InvalidCredentialOrVault` — the new password fully
         // replaces the old. This is the central security property of
         // the recovery flow ("forgot password" → "vault recovered" →
@@ -1103,7 +1267,7 @@ mod tests {
             let (state, scratch, orig_pw, _phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state)
+            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
                 .await
                 .expect("A8f");
 
@@ -1132,12 +1296,12 @@ mod tests {
             let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state)
+            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
                 .await
                 .expect("A8f");
 
             let _ = state.take().await;
-            unlock_with_path("new-pw".to_string(), scratch.path(), &state)
+            unlock_with_path("new-password-12".to_string(), scratch.path(), &state)
                 .await
                 .expect("new password must unlock the rewritten vault.meta");
             assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
@@ -1154,7 +1318,7 @@ mod tests {
             let (state, scratch, _orig_pw, phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state)
+            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
                 .await
                 .expect("A8f");
 
@@ -1179,7 +1343,8 @@ mod tests {
             assert_eq!(state.slot_kind().await, SlotKind::Empty);
 
             let result =
-                complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state).await;
+                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
+                    .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::VaultRecoveryRequiresActiveSession)
@@ -1208,7 +1373,8 @@ mod tests {
                 .await;
 
             let result =
-                complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state).await;
+                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
+                    .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::VaultRecoveryRequiresActiveSession)
@@ -1237,7 +1403,8 @@ mod tests {
             assert_eq!(state.auth_permits().available_permits(), 0);
 
             let result =
-                complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state).await;
+                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
+                    .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::RecoveryInProgress)
@@ -1250,14 +1417,26 @@ mod tests {
 
     #[test]
     fn complete_recovery_filesystem_failure_leaves_vault_meta_unchanged() {
-        // Simulate a filesystem write failure by removing the parent
+        // Simulate a filesystem failure by removing the parent
         // directory between `seed_recovering_state_via_full_a8d` (which
         // populates vault.meta on disk) and `complete_recovery`. The
-        // atomic_write step will fail; A8f must surface IoError and
-        // leave the slot Empty (recovering material drops + zeroizes).
-        // The original vault.meta is also gone in this exotic scenario,
-        // but the test's load-bearing assertion is "no half-state
-        // survives the failure".
+        // load-bearing assertion is "no half-state survives the
+        // failure" — vault.meta is not partially written.
+        //
+        // After the post-Argon2id slot peek (option p) retrofit
+        // (`decisions.md` 2026-05-06), the slot semantics on failure
+        // depend on WHICH stage failed:
+        //   - Failures BEFORE the post-Argon2id slot peek (read_meta,
+        //     parse_meta, vault_meta_rewrite) leave the slot in
+        //     `Recovering` because we have not taken yet — the user
+        //     can retry without re-running A8d.
+        //   - Failures AFTER the slot peek (atomic_write,
+        //     spawn_blocking_join on the write task) leave the slot
+        //     `Empty` because we took post-Argon2id.
+        //
+        // In this test the parent directory removal kills both reads
+        // and writes; either failure path is acceptable, both
+        // coherent with the new flow.
         rt().block_on(async {
             let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
@@ -1266,7 +1445,7 @@ mod tests {
             std::fs::remove_dir_all(&scratch.dir).expect("remove parent dir");
 
             let result =
-                complete_recovery_with_path("new-pw".to_string(), scratch.path(), &state).await;
+                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state).await;
             // Either IoError (read_meta / atomic_write failed) or
             // VaultNotFound (vault.meta was removed alongside the dir).
             assert!(
@@ -1277,11 +1456,15 @@ mod tests {
                 "expected IoError or VaultNotFound, got {result:?}"
             );
 
-            // Slot is Empty regardless — the recovering material was
-            // taken before spawn_blocking and dropped on the failure
-            // path. No half-state survived.
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
-            // Permit released by RAII drop.
+            // Slot must be coherent with the failure-stage rule above:
+            // pre-Argon2id failure → Recovering (retryable);
+            // post-Argon2id failure → Empty (must restart from A8d).
+            let slot_kind_after = state.slot_kind().await;
+            assert!(
+                matches!(slot_kind_after, SlotKind::Recovering | SlotKind::Empty),
+                "slot must be Recovering (pre-Argon2id failure) or Empty (post-Argon2id failure), got {slot_kind_after:?}"
+            );
+            // Permit released by RAII drop regardless of failure stage.
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }

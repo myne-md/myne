@@ -44,6 +44,22 @@ fn main() {
                 // is a security regression.
                 tauri_build::InlinedPlugin::new()
                     .commands(&["recover_with_phrase", "complete_recovery"]),
+            )
+            .plugin(
+                "vault-change-password",
+                // Task 7 of `vault-change-password` (MYND-22) ships
+                // the `change_password` command (scaffolding stub;
+                // pipeline body lands in Tasks 8–13). Standalone
+                // change-password flow: user knows current password,
+                // sets new password. Function name is
+                // `change_password` (not `commit`) to avoid a
+                // `#[tauri::command]` macro symbol collision with
+                // `vault_creation::commands::commit`. Adding a
+                // command here without a matching `commands.allow`
+                // entry in
+                // `permissions/vault-change-password/default.toml` is
+                // a security regression.
+                tauri_build::InlinedPlugin::new().commands(&["change_password"]),
             ),
     )
     .unwrap();

@@ -69,6 +69,24 @@ pub async fn begin(
     // `&str` holds via standard deref coercion.
     let password = Zeroizing::new(password);
 
+    // Backend min-length floor — structural belt+suspenders against
+    // frontend bypass per `decisions.md` 2026-05-06 "Auth-pipeline
+    // backend MIN_PASSWORD_LEN floor; project-wide retroactive". Fires
+    // BEFORE slot reservation so a weak-password attempt does not
+    // consume a concurrent-session slot. Mapped explicitly to
+    // `AppError::WeakNewPassword` rather than `?`-propagated through
+    // `From<ProtocolError> for AppError` (which would surface as
+    // `AppError::Protocol(PasswordTooShort)`) — cross-plugin shared
+    // variant name discipline (Q6 of MYND-22 grilling).
+    if protocol::password_policy::validate_min_length(&password).is_err() {
+        tracing::error!(
+            stage = "weak_new_password",
+            error_kind = "WeakNewPassword",
+            "vault_creation::begin rejected: new password below MIN_PASSWORD_LEN"
+        );
+        return Err(AppError::WeakNewPassword);
+    }
+
     // Reserve a slot atomically before kicking off ~2 seconds of
     // Argon2id work. If the cap is already saturated, fail fast
     // without consuming any memory.
@@ -657,5 +675,16 @@ mod tests {
         // matches on this.
         let json = serde_json::to_string(&AppError::VaultAlreadyExists).expect("serialize variant");
         assert_eq!(json, r#"{"kind":"VaultAlreadyExists"}"#);
+    }
+
+    #[test]
+    fn weak_new_password_serializes_with_kind_tag() {
+        // Cross-plugin shared variant name with
+        // `VaultRecoveryError::WeakNewPassword` and the future
+        // `VaultPasswordChangeError::WeakNewPassword` (Q6 of the
+        // MYND-22 grilling). Wire shape MUST be identical:
+        // `{"kind":"WeakNewPassword"}`.
+        let json = serde_json::to_string(&AppError::WeakNewPassword).expect("serialize variant");
+        assert_eq!(json, r#"{"kind":"WeakNewPassword"}"#);
     }
 }

@@ -16,6 +16,7 @@
 use super::error::{VaultStatusError, VaultUnlockError};
 use super::state::{Slot, SlotKind, UnlockedVault, VaultRuntimeState};
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
+use crate::protocol_error_kind::protocol_error_kind;
 use protocol::{VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -23,35 +24,19 @@ use std::time::Instant;
 use tauri::{AppHandle, Manager, Runtime, State};
 use zeroize::Zeroizing;
 
-/// Map a `protocol::ProtocolError` variant to a `'static` string for
-/// structured logging. **Static-only by design**: passing the
-/// `ProtocolError` itself to `tracing::error!(...)` via `?e` would
-/// also yield the variant name (all variants are unit), but using a
-/// helper keeps the discipline explicit — emit only bounded enum
-/// names, never values. See `src-tauri/CLAUDE.md` "Secret-handling
-/// logging discipline".
-fn protocol_error_kind(e: &protocol::ProtocolError) -> &'static str {
-    match e {
-        protocol::ProtocolError::InvalidPassword => "InvalidPassword",
-        protocol::ProtocolError::PasswordTooShort => "PasswordTooShort",
-        protocol::ProtocolError::KdfFailure => "KdfFailure",
-        protocol::ProtocolError::AeadFailure => "AeadFailure",
-        protocol::ProtocolError::InvalidVaultMeta => "InvalidVaultMeta",
-        protocol::ProtocolError::AccountNumberInvalid => "AccountNumberInvalid",
-        protocol::ProtocolError::Csprng => "Csprng",
-        protocol::ProtocolError::PlaintextTooLarge => "PlaintextTooLarge",
-    }
-}
-
 /// Bundle returned by the spawn_blocking pipeline closure: both
 /// derived keys (Zeroizing-wrapped; bytes wipe on drop, including
 /// the early-return paths inside the closure when items_key
 /// derivation fails) plus the `items_key_id` UUID parsed out of
-/// `vault.meta` (not secret-bearing; copy is cheap).
+/// `vault.meta` (not secret-bearing; copy is cheap) plus the
+/// `vault_meta_bytes_hash` (`SHA-256(read bytes)`) which becomes the
+/// `Slot::Unlocked` CAS anchor for `vault_change_password`'s in-place
+/// rewrite per `decisions.md` 2026-05-06 entry.
 struct DerivedKeys {
     root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     items_key_id: [u8; 16],
+    vault_meta_bytes_hash: [u8; 32],
 }
 
 /// Resolve `<app_data_dir>/vault/vault.meta` for the running app.
@@ -229,6 +214,11 @@ pub(crate) async fn unlock_with_path(
             })?;
 
             let items_key_id = meta.items_key_id;
+            // SHA-256 of unlock-time vault.meta bytes — the CAS anchor
+            // that `vault_change_password` will compare against before
+            // rewriting in-place. Computed inside spawn_blocking so
+            // sha2 runs on the blocking pool, not the runtime worker.
+            let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&bytes);
             let root_key = derive_root_key(&password, &meta)?;
             // items_key derivation drops `root_key` on early-return;
             // the slot stays empty (no half-state).
@@ -237,6 +227,7 @@ pub(crate) async fn unlock_with_path(
                 root_key,
                 items_key,
                 items_key_id,
+                vault_meta_bytes_hash,
             })
         })
         .await;
@@ -245,6 +236,7 @@ pub(crate) async fn unlock_with_path(
         root_key,
         items_key,
         items_key_id,
+        vault_meta_bytes_hash,
     } = match join_outcome {
         Ok(Ok(keys)) => keys,
         // Inner `Err` was already traced at its origin (read_meta /
@@ -268,15 +260,20 @@ pub(crate) async fn unlock_with_path(
             items_key,
             items_key_id,
             unlocked_at: now,
+            vault_meta_bytes_hash,
         })
         .await;
 
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
     // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `duration_ms` rounded down to 10ms granularity per
+    // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry —
+    // future-ready timing-channel resistance (Phase 1 A7 side-channel
+    // out of scope, but the discipline costs ~zero today).
     tracing::info!(
         event = "vault_unlocked",
-        duration_ms = now.duration_since(started).as_millis() as u64,
+        duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
         "vault unlocked successfully"
     );
 
@@ -692,6 +689,42 @@ mod tests {
         let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
         let bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
         (bytes, original_root_key)
+    }
+
+    /// `Slot::Unlocked.vault_meta_bytes_hash` must equal SHA-256 of
+    /// the on-disk vault.meta bytes after a successful unlock — the
+    /// CAS anchor for `vault_change_password`'s in-place rewrite. See
+    /// `decisions.md` 2026-05-06 entry "Slot::Unlocked anchor field
+    /// for vault.meta CAS".
+    #[test]
+    fn unlock_populates_slot_meta_bytes_hash() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _) = seed_vault_meta("correct horse battery staple");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "correct horse battery staple".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("unlock with correct password");
+
+            let unlocked = state.take().await.unwrap_unlocked();
+            let expected_hash = crate::vault_meta_hash::vault_meta_sha256(meta_bytes.as_slice());
+            assert_eq!(
+                unlocked.vault_meta_bytes_hash, expected_hash,
+                "slot.vault_meta_bytes_hash must equal SHA-256 of the on-disk vault.meta bytes"
+            );
+            // Sentinel sanity: the populator-written hash is NOT the
+            // fixture sentinel `[0xFF; 32]`.
+            assert_ne!(
+                unlocked.vault_meta_bytes_hash, [0xFF; 32],
+                "populator hash should not collide with fixture sentinel",
+            );
+        });
     }
 
     #[test]
