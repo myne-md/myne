@@ -130,14 +130,6 @@ pub fn aad_password_wrap(kdf_params: &KdfParams) -> Vec<u8> {
 /// Build the AAD bound into the AEAD wrap of the singleton v0.1
 /// `itemsKey` (spec § 3.3 key hierarchy, § 9.3 offset 281).
 ///
-/// **Spec gap noted.** Spec § 5.2 defines `AAD_wrap_item_key` for the
-/// per-note `item_key` (which carries `note_uuid`); the singleton
-/// `itemsKey` wrap has no per-note UUID. This builder uses the
-/// natural reduction: AAD prefix || protocol_version || items_key_id.
-/// A spec follow-on landing in `protocol.md` § 5.2 should pin this
-/// shape explicitly before v1.0 ship; until then this function is the
-/// de-facto definition.
-///
 /// Layout (27 bytes):
 ///
 /// ```text
@@ -145,7 +137,7 @@ pub fn aad_password_wrap(kdf_params: &KdfParams) -> Vec<u8> {
 /// 0x01              1 byte   (protocol_version, § 9.3)
 /// items_key_id     16 bytes  (UUIDv7 of the singleton v0.1 itemsKey)
 /// ```
-pub fn aad_items_key_wrap(items_key_id: &[u8; 16]) -> Vec<u8> {
+pub fn aad_vault_items_key_wrap(items_key_id: &[u8; 16]) -> Vec<u8> {
     let mut aad = Vec::with_capacity(AAD_PREFIX_V0_1.len() + 1 + items_key_id.len());
     aad.extend_from_slice(AAD_PREFIX_V0_1);
     aad.push(PROTOCOL_VERSION_V0_1);
@@ -166,31 +158,95 @@ pub fn aad_recovery_wrap(kdf_params: &KdfParams) -> Vec<u8> {
     build_wrap_aad(ROLE_STR_RECOVERY_WRAP, kdf_params)
 }
 
-/// Common AAD assembly. Length prefixes are encoded as **u16
-/// big-endian**.
+/// Build the AAD bound into the AEAD wrap of a per-note `item_key`
+/// under the singleton v0.1 `itemsKey` (spec § 5.2 + § 6.2).
 ///
-/// **Spec gap flagged.** Spec § 5.2 prose says
-/// "length-prefixed UTF-8" without pinning the prefix width. This
-/// implementation chooses u16 big-endian to match the binary-format
-/// convention elsewhere in the spec (§ 9.2 reads `enc_item_key_len`
-/// as a 2-byte big-endian field). A spec follow-on landing in
-/// `protocol.md` § 5.2 should pin the width explicitly before v1.0
-/// ship; until then this module is the de-facto definition.
-fn build_wrap_aad(role: &[u8], kdf_params: &KdfParams) -> Vec<u8> {
-    debug_assert!(
-        role.len() <= u16::MAX as usize,
-        "role string longer than u16 length-prefix can encode",
-    );
-    let role_len_be = (role.len() as u16).to_be_bytes();
-    let kdf_canonical = serialize_kdf_params(kdf_params);
+/// Layout (43 bytes):
+///
+/// ```text
+/// "myne.v0.1|"     10 bytes  (AAD prefix, § 5.2)
+/// 0x01              1 byte   (protocol_version, § 9.3)
+/// items_key_id     16 bytes  (UUIDv7 of the singleton v0.1 itemsKey)
+/// note_uuid        16 bytes  (UUIDv7 of the note; from the .myn filename, § 9.1)
+/// ```
+///
+/// Distinct from [`aad_vault_items_key_wrap`] (no note_uuid). The
+/// `vault_`/`note_` prefix retires the one-letter
+/// `items_key`/`item_key` near-collision footgun — see
+/// `protocol/CLAUDE.md` for the naming-discipline rationale.
+pub fn aad_note_item_key_wrap(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> Vec<u8> {
+    let mut aad =
+        Vec::with_capacity(AAD_PREFIX_V0_1.len() + 1 + items_key_id.len() + note_uuid.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    aad.extend_from_slice(items_key_id);
+    aad.extend_from_slice(note_uuid);
+    aad
+}
 
+/// Build the AAD bound into the AEAD encryption of a note's
+/// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
+///
+/// Layout (58 bytes for v0.1's hardcoded `content_type`):
+///
+/// ```text
+/// "myne.v0.1|"             10 bytes  (AAD prefix, § 5.2)
+/// 0x01                      1 byte   (protocol_version, § 9.3)
+/// items_key_id             16 bytes
+/// note_uuid                16 bytes
+/// u16_be(13) || "text/markdown"  15 bytes  (length-prefixed UTF-8, § 5.2)
+/// ```
+///
+/// `content_type` is **hardcoded** to `"text/markdown"` in v0.1 per
+/// spec § 5.2 — encoder and decoder both bind the same constant, so
+/// any future v005 attachment type would diverge at the AAD prefix
+/// level rather than via a parameter on this v0.1 helper. v0.1 and
+/// v005 are forward-incompatible by design (§ 10).
+pub fn aad_note_content_encrypt(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> Vec<u8> {
+    const CONTENT_TYPE: &[u8] = b"text/markdown";
     let mut aad = Vec::with_capacity(
-        AAD_PREFIX_V0_1.len() + 1 + role_len_be.len() + role.len() + kdf_canonical.len(),
+        AAD_PREFIX_V0_1.len() + 1 + items_key_id.len() + note_uuid.len() + 2 + CONTENT_TYPE.len(),
     );
     aad.extend_from_slice(AAD_PREFIX_V0_1);
     aad.push(PROTOCOL_VERSION_V0_1);
-    aad.extend_from_slice(&role_len_be);
-    aad.extend_from_slice(role);
+    aad.extend_from_slice(items_key_id);
+    aad.extend_from_slice(note_uuid);
+    push_length_prefixed_u16_be(&mut aad, CONTENT_TYPE);
+    aad
+}
+
+/// Append `bytes` to `buf` prefixed by its length as a 2-byte
+/// big-endian unsigned integer per `protocol.md` § 5.2's
+/// length-prefix convention.
+///
+/// Writer-style on purpose: the length-and-bytes pair is emitted as a
+/// single call so a buggy caller cannot write a length without the
+/// payload (or vice versa). Single source of truth for every
+/// length-prefixed AAD field in this crate.
+///
+/// Panics in debug builds if `bytes.len() > u16::MAX`. v0.1 inputs
+/// (role strings of 13 bytes; `content_type` of 13 bytes) are bounded
+/// well below this limit; the assert exists to catch a future caller
+/// that would silently truncate via `as u16`.
+pub(crate) fn push_length_prefixed_u16_be(buf: &mut Vec<u8>, bytes: &[u8]) {
+    debug_assert!(
+        bytes.len() <= u16::MAX as usize,
+        "length-prefixed bytes longer than u16 length-prefix can encode",
+    );
+    buf.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
+    buf.extend_from_slice(bytes);
+}
+
+/// Common AAD assembly. Length prefixes are encoded as **u16
+/// big-endian** per `protocol.md` § 5.2.
+fn build_wrap_aad(role: &[u8], kdf_params: &KdfParams) -> Vec<u8> {
+    let kdf_canonical = serialize_kdf_params(kdf_params);
+
+    let mut aad =
+        Vec::with_capacity(AAD_PREFIX_V0_1.len() + 1 + 2 + role.len() + kdf_canonical.len());
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, role);
     aad.extend_from_slice(&kdf_canonical);
     aad
 }
@@ -431,6 +487,44 @@ mod tests {
     }
 
     #[test]
+    fn push_length_prefixed_u16_be_writes_zero_length_for_empty() {
+        let mut buf = Vec::new();
+        push_length_prefixed_u16_be(&mut buf, b"");
+        assert_eq!(buf, [0x00, 0x00]);
+    }
+
+    #[test]
+    fn push_length_prefixed_u16_be_writes_short_string() {
+        let mut buf = Vec::new();
+        push_length_prefixed_u16_be(&mut buf, b"text/markdown");
+        assert_eq!(buf.len(), 2 + 13);
+        assert_eq!(buf[0..2], [0x00, 0x0D]);
+        assert_eq!(&buf[2..], b"text/markdown");
+    }
+
+    #[test]
+    fn push_length_prefixed_u16_be_appends_does_not_replace() {
+        // Prove the writer-style helper appends to an existing buffer
+        // rather than overwriting — load-bearing for callers that
+        // assemble AADs in-place.
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&[0xAA, 0xBB]);
+        push_length_prefixed_u16_be(&mut buf, b"hi");
+        assert_eq!(buf.as_slice(), &[0xAA, 0xBB, 0x00, 0x02, b'h', b'i']);
+    }
+
+    #[test]
+    fn push_length_prefixed_u16_be_writes_two_byte_length_at_or_above_256() {
+        // 256 bytes triggers the high byte of the u16 length: 0x01 0x00.
+        let payload = [0x42u8; 256];
+        let mut buf = Vec::new();
+        push_length_prefixed_u16_be(&mut buf, &payload);
+        assert_eq!(buf.len(), 2 + 256);
+        assert_eq!(buf[0..2], [0x01, 0x00]);
+        assert!(buf[2..].iter().all(|b| *b == 0x42));
+    }
+
+    #[test]
     fn aad_password_wrap_default_is_thirty_seven_bytes() {
         // 10 (prefix) + 1 (version) + 2 (length prefix) + 13 (role) +
         // 11 (KDF canonical) = 37.
@@ -496,13 +590,13 @@ mod tests {
     }
 
     #[test]
-    fn aad_items_key_wrap_default_matches_pinned_hex() {
+    fn aad_vault_items_key_wrap_default_matches_pinned_hex() {
         // Hand-derived: prefix (10) + version (1) + items_key_id (16) = 27 bytes.
         let items_key_id: [u8; 16] = [
             0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
             0xEE, 0xFF,
         ];
-        let aad = aad_items_key_wrap(&items_key_id);
+        let aad = aad_vault_items_key_wrap(&items_key_id);
         let expected: [u8; 27] = [
             // "myne.v0.1|"
             0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C, // protocol_version
@@ -514,12 +608,116 @@ mod tests {
     }
 
     #[test]
-    fn aad_items_key_wrap_changes_with_id() {
+    fn aad_vault_items_key_wrap_changes_with_id() {
         // Different items_key_id ⇒ different AAD (the only variable
         // in the v0.1 layout).
         let id1 = [0x00; 16];
         let id2 = [0xFF; 16];
-        assert_ne!(aad_items_key_wrap(&id1), aad_items_key_wrap(&id2));
+        assert_ne!(
+            aad_vault_items_key_wrap(&id1),
+            aad_vault_items_key_wrap(&id2)
+        );
+    }
+
+    /// Shared per-note AAD test fixtures. `items_key_id` matches the
+    /// pattern used by `aad_vault_items_key_wrap_default_matches_pinned_hex`;
+    /// `note_uuid` is the byte-reverse of that pattern so a copy-paste
+    /// confusion between the two parameters is visible at a glance in
+    /// the golden bytes.
+    const NOTE_AAD_FIXTURE_ITEMS_KEY_ID: [u8; 16] = [
+        0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
+        0xFF,
+    ];
+    const NOTE_AAD_FIXTURE_NOTE_UUID: [u8; 16] = [
+        0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11,
+        0x00,
+    ];
+
+    #[test]
+    fn aad_note_item_key_wrap_default_matches_pinned_hex() {
+        // Hand-derived per spec § 5.2:
+        // prefix (10) + version (1) + items_key_id (16) + note_uuid (16) = 43 bytes.
+        let aad =
+            aad_note_item_key_wrap(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID, &NOTE_AAD_FIXTURE_NOTE_UUID);
+        let expected: [u8; 43] = [
+            // "myne.v0.1|"
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C, // protocol_version
+            0x01, // items_key_id
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF, // note_uuid
+            0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22,
+            0x11, 0x00,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+    }
+
+    #[test]
+    fn aad_note_item_key_wrap_changes_with_note_uuid() {
+        // §6.5 cross-note rename protection: changing note_uuid alone
+        // must change the AAD (else a renamed .myn would decrypt under
+        // the old AAD).
+        let uuid_a = [0x00; 16];
+        let uuid_b = [0xFF; 16];
+        assert_ne!(
+            aad_note_item_key_wrap(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID, &uuid_a),
+            aad_note_item_key_wrap(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID, &uuid_b),
+        );
+    }
+
+    #[test]
+    fn aad_note_item_key_wrap_extends_vault_items_key_wrap_with_note_uuid() {
+        // Structural property: the per-note AAD is the singleton AAD
+        // followed by note_uuid. A drift here would break parity with
+        // §5.2's prose definition.
+        let vault_aad = aad_vault_items_key_wrap(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID);
+        let note_aad =
+            aad_note_item_key_wrap(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID, &NOTE_AAD_FIXTURE_NOTE_UUID);
+        assert_eq!(&note_aad[..vault_aad.len()], vault_aad.as_slice());
+        assert_eq!(
+            &note_aad[vault_aad.len()..],
+            &NOTE_AAD_FIXTURE_NOTE_UUID[..]
+        );
+    }
+
+    #[test]
+    fn aad_note_content_encrypt_default_matches_pinned_hex() {
+        // Hand-derived per spec § 5.2:
+        // prefix (10) + version (1) + items_key_id (16) + note_uuid (16)
+        // + u16-BE-len (2) + "text/markdown" (13) = 58 bytes.
+        let aad =
+            aad_note_content_encrypt(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID, &NOTE_AAD_FIXTURE_NOTE_UUID);
+        let expected: [u8; 58] = [
+            // "myne.v0.1|"
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C, // protocol_version
+            0x01, // items_key_id
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF, // note_uuid
+            0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22,
+            0x11, 0x00, // u16-BE length = 13
+            0x00, 0x0D, // "text/markdown"
+            0x74, 0x65, 0x78, 0x74, 0x2F, 0x6D, 0x61, 0x72, 0x6B, 0x64, 0x6F, 0x77, 0x6E,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+    }
+
+    #[test]
+    fn aad_note_content_encrypt_extends_note_item_key_wrap_with_length_prefixed_content_type() {
+        // Structural property: the content-encrypt AAD is the per-note
+        // wrap AAD followed by length-prefixed "text/markdown". v0.1
+        // hardcodes the content_type literal; a buggy decoder using a
+        // different literal would diverge here, not in some downstream
+        // parser.
+        let wrap_aad =
+            aad_note_item_key_wrap(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID, &NOTE_AAD_FIXTURE_NOTE_UUID);
+        let content_aad =
+            aad_note_content_encrypt(&NOTE_AAD_FIXTURE_ITEMS_KEY_ID, &NOTE_AAD_FIXTURE_NOTE_UUID);
+        assert_eq!(&content_aad[..wrap_aad.len()], wrap_aad.as_slice());
+        // After the wrap-AAD prefix: u16-BE 13 || "text/markdown"
+        assert_eq!(
+            &content_aad[wrap_aad.len()..wrap_aad.len() + 2],
+            &[0x00, 0x0D]
+        );
+        assert_eq!(&content_aad[wrap_aad.len() + 2..], b"text/markdown");
     }
 
     #[test]

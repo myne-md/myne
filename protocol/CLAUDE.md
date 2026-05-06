@@ -20,6 +20,7 @@
 | OS CSPRNG | `getrandom` (0.2) | salts, nonces, root_key generation |
 | Recovery phrase | `bip39` (2, alloc-only) | 24-word encoding/decoding only — **NOT** PBKDF2 step |
 | Constant-time | `subtle` (2, no_std) | tag verification |
+| Tracing facade | `tracing` (0.1, no default features) | non-distinguishing decode failures emit cause via `tracing::debug!(stage = ?cause)` so ops/forensics can disambiguate without crossing the IPC boundary (§6.4 boundary-policy discipline; cf. `decisions.md` 2026-05-02 vault-unlock-error-discipline). Zero default features — pure macro-call surface; no subscriber wired into the crate. |
 
 **Audit anchors:** `chacha20poly1305` reviewed by NCC Group (Feb 2020, no significant findings); `vodozemac` (uses RustCrypto stack heavily) reviewed by Least Authority (Mar 2022, no significant findings); `age`/`rage` production use validates the same primitives at the byte level. See `decisions.md` 2026-04-28 "Rust-side primitives: RustCrypto stack as primary".
 
@@ -37,6 +38,29 @@ The helper constructs `info = "myne.v0.1 " || role` from the registered `SubkeyR
 
 **Why it matters:** an ad-hoc `info` string that drifts from the registered role table silently produces a different subkey, but the AEAD tag check might still pass with another caller's wrong-key blob. The only defense is making it impossible to construct an `info` outside the registry.
 
+## `_raw` suffix convention (caller-supplied randomness)
+
+Public functions in this crate that accept caller-supplied nonces, item keys, or other randomness — rather than pulling from `getrandom` internally — carry a `_raw` suffix. Three properties travel with that suffix at every call site:
+
+1. **Caller sources all randomness from a CSPRNG-grade source.** Passing low-entropy or attacker-influenced bytes to a `_raw` function is a security-fatal contract violation owned by the caller, not by the crate.
+2. **Nonce reuse is catastrophic and is the caller's contract.** The crate cannot detect cross-call nonce collisions; the suffix is the visible reminder that the caller is on the hook.
+3. **Legitimate consumers are well-defined.** `_raw` functions exist for the `myne-test-vectors/` companion (byte-level cross-implementation vector generation) and for crate-internal deterministic tampering / golden tests. Production callers SHOULD use the non-`_raw` convenience wrapper that pulls randomness internally.
+
+A code reviewer seeing a production import of a `_raw` function from outside this crate has a clear reason to question the change. The convention is greenfield-applied — first instance is `blob.rs` (MYND-25). Backporting to existing functions that match the property (e.g., `aead.rs::aead_seal_ctx`) is a separate decision, not implicit. See `decisions.md` 2026-05-06 entry for the full rationale.
+
+## AAD helper naming discipline (`vault_` / `note_` prefix)
+
+AAD-builder functions in `aead.rs` are prefixed with `vault_` (vault-singleton context) or `note_` (per-note context) to retire a one-letter near-collision footgun: spec §5.2 distinguishes `AAD_wrap_items_key` (singleton itemsKey wrap, no per-note UUID) from `AAD_wrap_item_key` (per-note item_key wrap, with note_uuid). The `items_key` / `item_key` token pair differs by a single trailing `s` — visually indistinguishable at a glance, type-confusable in import statements, and historically a documented hazard class for crypto code (the kind of footgun the subkey discipline rule above exists to prevent at the subkey level).
+
+The discipline:
+
+- `aad_vault_*_wrap` → AAD for an AEAD operation in the vault-singleton scope (e.g., `aad_vault_items_key_wrap` wraps the singleton `itemsKey` under `itemsKey_wrap_key`).
+- `aad_note_*_*` → AAD for an AEAD operation in the per-note scope (e.g., `aad_note_item_key_wrap` wraps a per-note `item_key` under `itemsKey`; `aad_note_content_encrypt` encrypts note content under `item_key`).
+
+The three-letter `vault_` / `note_` prefix is visible at a glance in any import or call-site — same defense shape as the subkey-derivation single-helper rule, applied at the AAD-builder layer. This discipline replaces the earlier `aad_items_key_wrap` (singleton-only) name at MYND-25; the rename is recorded in `decisions.md` 2026-05-06 entries that pin the per-note codec design.
+
+**Code review must reject** any new AAD-builder function whose name relies on a one-character distinction (e.g., `aad_item_key_wrap` next to `aad_items_key_wrap`); collapse to the prefix-disambiguated form.
+
 ## Module map
 
 | Module | Purpose |
@@ -49,7 +73,7 @@ The helper constructs `info = "myne.v0.1 " || role` from the registered `SubkeyR
 | `phrase.rs` | BIP-39 24-word generation + NFKD-normalized validation |
 | `error.rs` | `ProtocolError` enum (serde-serialize for TS interop) |
 | `types.rs` | `KdfParams`, `VaultMeta`, `AccountNumber`, `RecoveryPhrase` newtypes |
-| `blob.rs` | **planned (Lane A #8)** — `MY01` blob encoder per `protocol.md` §9.2 |
+| `blob.rs` | `MY01` per-note encoder/decoder per `protocol.md` §9.2; per-note `item_key` wrap + content encrypt; deterministic `_raw` surface (D6 verification) + `getrandom` convenience surface; `DecryptedNote` handle (Zeroizing on `item_key` + plaintext); single-variant `DecryptError` + `pub(crate) DecryptCause` for tampering-test verification (MYND-25) |
 
 ## Vector verification (Lane D, retroactive borç)
 
@@ -60,7 +84,7 @@ A2/A3/A4/A5/A6 merged without test vectors. The `myne-test-vectors/` companion r
 - `vectors/account-number/` (D7 → A5)
 - `vectors/aad-construction/` (per-AEAD AAD assembly)
 - `vault.meta` byte-string vectors (D5 → A6)
-- `.myn` blob vectors (D6 → A7, after blob.rs lands)
+- `.myn` blob vectors (D6 → MYND-25, blob.rs landed; D6 ready)
 
 When you change a primitive: regenerate the relevant vector file in the companion repo and bump it in the same PR. CI (Plan 1 §C2) will pull `myne-test-vectors` and re-run vectors against the current Rust impl.
 

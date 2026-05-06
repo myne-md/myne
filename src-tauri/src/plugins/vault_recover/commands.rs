@@ -35,6 +35,7 @@ fn protocol_error_kind(e: &protocol::ProtocolError) -> &'static str {
         protocol::ProtocolError::InvalidVaultMeta => "InvalidVaultMeta",
         protocol::ProtocolError::AccountNumberInvalid => "AccountNumberInvalid",
         protocol::ProtocolError::Csprng => "Csprng",
+        protocol::ProtocolError::PlaintextTooLarge => "PlaintextTooLarge",
     }
 }
 
@@ -576,7 +577,7 @@ fn derive_items_key(
     meta: &VaultMeta,
 ) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, VaultRecoveryError> {
     let items_wrap_key = protocol::derive_subkey(root_key, protocol::SubkeyRole::ItemsKeyWrap);
-    let aad = protocol::aad_items_key_wrap(&meta.items_key_id);
+    let aad = protocol::aad_vault_items_key_wrap(&meta.items_key_id);
     open_32_byte_secret(
         &items_wrap_key,
         &meta.items_key_nonce,

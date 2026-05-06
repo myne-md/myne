@@ -625,6 +625,8 @@ Offset  Size       Field                Description
 
 The two AEAD operations (wrapping `item_key`, encrypting note content) use independent random nonces drawn from the OS CSPRNG. XChaCha20-Poly1305's 192-bit nonce makes random-nonce collisions negligible across any realistic usage.
 
+Implementations SHOULD reject `ciphertext_len > 16 MiB + 32`. Larger payloads belong to the Phase 1.5+ attachment subsystem (§11). The cap exists to bound the parser's pre-AEAD allocation footprint — `ciphertext_len` is read and acted upon before any tag verification can run, so a hostile blob with a 4 GiB advertised length would otherwise force an unrecoverable allocation attempt before authenticity is established. See `docs/decisions.md` 2026-05-06 entry for the full rationale.
+
 ### 9.3 Vault metadata (`vault.meta`)
 
 ```

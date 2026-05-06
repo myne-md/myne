@@ -20,6 +20,7 @@ bip39 = { version = "2", default-features = false, features = ["alloc"] }
 unicode-normalization = { version = "0.1.25", default-features = false }
 thiserror = { version = "2", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
