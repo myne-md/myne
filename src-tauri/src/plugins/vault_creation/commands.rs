@@ -318,7 +318,7 @@ pub(crate) fn build_and_serialize_vault_meta(
     let items_key = protocol::generate_root_key()?;
     let items_uuid = Uuid::now_v7();
     let items_key_id: [u8; VAULT_META_ITEMS_KEY_ID_LEN] = *items_uuid.as_bytes();
-    let aad_items = protocol::aad_items_key_wrap(&items_key_id);
+    let aad_items = protocol::aad_vault_items_key_wrap(&items_key_id);
     let (items_key_nonce, enc_items_key) =
         seal_32_byte_secret(&items_wrap_key, &items_key, &aad_items)?;
 
