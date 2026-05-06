@@ -66,6 +66,16 @@ pub enum ProtocolError {
     /// user-correctable, surfaces as an unrecoverable error.
     #[error("csprng failure")]
     Csprng,
+
+    /// Note plaintext exceeds the per-note ciphertext_len cap pinned at
+    /// `MAX_PLAINTEXT_LEN = 16 MiB` (see `crate::MAX_PLAINTEXT_LEN` and
+    /// `design-notes.md` 2026-05-06 entry). Returned by the encoder
+    /// boundary check before any allocation; symmetric with the
+    /// decoder's parse-level reject of `ciphertext_len > MAX + 32`.
+    /// Larger payloads belong to the §11 attachment subsystem
+    /// (Phase 1.5+).
+    #[error("plaintext too large")]
+    PlaintextTooLarge,
 }
 
 #[cfg(test)]
@@ -90,6 +100,7 @@ mod tests {
                 ProtocolError::InvalidVaultMeta => {}
                 ProtocolError::AccountNumberInvalid => {}
                 ProtocolError::Csprng => {}
+                ProtocolError::PlaintextTooLarge => {}
             }
         }
         assert_unit(&ProtocolError::AeadFailure);
@@ -150,6 +161,14 @@ mod tests {
     #[test]
     fn csprng_serializes_with_kind_tag() {
         assert_eq!(serialize(ProtocolError::Csprng), r#"{"kind":"Csprng"}"#);
+    }
+
+    #[test]
+    fn plaintext_too_large_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize(ProtocolError::PlaintextTooLarge),
+            r#"{"kind":"PlaintextTooLarge"}"#
+        );
     }
 
     #[test]

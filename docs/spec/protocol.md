@@ -358,7 +358,116 @@ Nonces are 192-bit random values drawn from the OS CSPRNG immediately before eac
 
 ## 6. Per-Note Encryption
 
-<!-- TODO: pending §3.3 confirmation — item-key wrap structure. -->
+This section narrates the per-note encryption and decryption flow that produces and consumes the `.myn` blob format of §9.2. The key hierarchy that supplies `itemsKey` is established in §3.3; the AEAD primitive is XChaCha20-Poly1305 + CTX commitment per §5.1; the AAD bindings are defined in §5.2. The byte layout in §9.2 is normative — this section adds no new fields and changes no offsets.
+
+### 6.1 Inputs available to the client
+
+A note encryption or decryption operation runs only when the vault is unlocked. The client therefore holds in memory:
+
+- `root_key` — 32 bytes, recovered by the §3.1 unlock procedure.
+- `itemsKey` — 32 bytes, recovered by AEAD-decrypting `enc_items_key` (`vault.meta` offset 281; §9.3) under `itemsKey_wrap_key = DeriveSubkey(root_key, "itemsKey-wrap")` per §3.2 and §3.4.
+- `items_key_id` — 16-byte UUIDv7 of the singleton v0.1 `itemsKey`, read from `vault.meta` offset 241.
+
+Per-note state:
+
+- `note_uuid` — 16-byte UUIDv7 generated when the note is created. Doubles as the `.myn` filename per §9.1 and as an AAD field per §5.2.
+- `content_type` — fixed string `"text/markdown"` in v0.1.
+- `plaintext` — UTF-8 bytes of the note's Markdown body.
+
+### 6.2 Creating a new note
+
+Each AEAD call below is the CTX-committed XChaCha20-Poly1305 of §5.1: the on-disk tag is the 32-byte commitment `T'`, never the 16-byte Poly1305 tag (§5.1.2).
+
+```
+1. item_key       ← OS_CSPRNG(32 bytes)
+2. item_key_nonce ← OS_CSPRNG(24 bytes)
+   AAD_wrap_item_key constructed per §5.2 with
+       items_key_id and note_uuid.
+   enc_item_key  ← AEAD-encrypt(K = itemsKey,
+                                N = item_key_nonce,
+                                P = item_key,
+                                AD = AAD_wrap_item_key)
+                  yields 32 B ciphertext || 32 B CTX tag = 64 B on disk
+3. content_nonce  ← OS_CSPRNG(24 bytes)
+   AAD_encrypt_content constructed per §5.2 with
+       items_key_id, note_uuid, content_type.
+   ciphertext    ← AEAD-encrypt(K = item_key,
+                                N = content_nonce,
+                                P = plaintext,
+                                AD = AAD_encrypt_content)
+                  yields len(plaintext) B ciphertext || 32 B CTX tag
+4. Write the .myn blob per §9.2:
+       "MY01" || 0x01 || 0x00 || items_key_id || item_key_nonce
+       || enc_item_key_len = 64 (2 B BE) || enc_item_key
+       || content_nonce
+       || ciphertext_len = len(plaintext) + 32 (4 B BE)
+       || ciphertext
+5. Zeroize item_key in client memory.
+```
+
+`item_key` is never persisted in plaintext and never leaves the encryption call.
+
+### 6.3 Updating an existing note
+
+`item_key`, `item_key_nonce`, and `enc_item_key` are persistent for the note's lifetime per §3.3. Updates reuse the existing `item_key` under a fresh `content_nonce`:
+
+```
+1. Decrypt the existing note per §6.4 to recover item_key.
+2. content_nonce ← OS_CSPRNG(24 bytes)
+   ciphertext   ← AEAD-encrypt(K = item_key,
+                               N = content_nonce,
+                               P = updated_plaintext,
+                               AD = AAD_encrypt_content)
+3. Rewrite the .myn blob. Bytes 0 through 47+N inclusive — the header
+   through enc_item_key — are byte-identical to the previous blob;
+   only content_nonce, ciphertext_len, and ciphertext change.
+4. Zeroize item_key.
+```
+
+The note's `note_uuid` and therefore its filename are unchanged by an update, so `AAD_wrap_item_key` and `AAD_encrypt_content` continue to commit to the same identity bytes across the note's lifetime. The persistence of `enc_item_key` is intentional: it allows password rotation (which changes `itemsKey_wrap_key` but not `itemsKey`) to leave every `.myn` file untouched, per §3.3.
+
+### 6.4 Decrypting a note
+
+```
+1. Parse the .myn blob per §9.2. Reject if
+       magic != "MY01" || protocol_version != 0x01
+       || reserved != 0x00 || enc_item_key_len != 64.
+2. Reject if items_key_id does not match the singleton itemsKey id
+   in vault.meta (offset 241). v0.1 has exactly one itemsKey; a
+   mismatch is either a foreign blob or vault-meta corruption.
+3. AAD_wrap_item_key constructed per §5.2 with
+       items_key_id and note_uuid (= the .myn filename UUID per §9.1).
+   item_key  ← AEAD-decrypt(K = itemsKey,
+                            N = item_key_nonce,
+                            C = enc_item_key,
+                            AD = AAD_wrap_item_key)
+4. AAD_encrypt_content constructed per §5.2 with
+       items_key_id, note_uuid, content_type.
+   plaintext ← AEAD-decrypt(K = item_key,
+                            N = content_nonce,
+                            C = ciphertext,
+                            AD = AAD_encrypt_content)
+5. Zeroize item_key once plaintext is delivered.
+```
+
+Failure at step 3 means either the blob was tampered (any byte feeding the CTX canonical encoding: `enc_item_key`, `item_key_nonce`, the AAD-bound fields `items_key_id` or `note_uuid`, or the version/prefix bytes) or `itemsKey` is wrong. Failure at step 4 — given step 3 succeeded — narrows to corruption of `content_nonce`, `ciphertext`, or `content_type`. The CTX commitment construction (§5.1.3) folds authenticity and key-commitment into a single constant-time tag comparison; the client MUST NOT distinguish failure causes to the user beyond "this note cannot be decrypted under the current vault".
+
+### 6.5 What the AAD bindings prevent
+
+Because both AEAD operations bind their AAD per §5.2, a successful decrypt commits the encryptor to:
+
+- **Protocol version and AAD prefix.** A v005 client's `"myne.v005|"` AAD will not verify a v0.1 blob's `"myne.v0.1|"` AAD; cross-major substitution fails by construction (§10.5).
+- **itemsKey identity.** A `.myn` file from a different vault cannot be silently accepted: both AEAD AADs bind `items_key_id` and the §6.4 step-2 check additionally requires the id match the singleton recorded in `vault.meta`.
+- **Note identity.** Renaming a `.myn` file (changing the UUID in its filename) without re-encrypting fails verification — `note_uuid` is bound into both `AAD_wrap_item_key` and `AAD_encrypt_content`.
+- **Content type.** Future v005 attachment types cannot be substituted into a v0.1 blob: `content_type` is bound into `AAD_encrypt_content` and any mismatch fails the CTX commitment check.
+
+### 6.6 Why two AEAD calls
+
+Encrypting plaintext directly under `itemsKey` would save one AEAD call per note but defeat the password-rotation property of §3.3: re-wrapping under a new key would force every note's ciphertext to be re-encrypted. The two-call structure isolates per-note cost from `itemsKey` rotation — a future rewrap touches one 64-byte field per note, never the bulk plaintext.
+
+### 6.7 Nonce hygiene
+
+Both `item_key_nonce` and `content_nonce` are 192-bit values from the OS CSPRNG (§5.3). At this width, random collisions are negligible across any realistic note count or revision count under a single `itemsKey` or `item_key`. v0.1 does not use deterministic, counter, or input-derived nonces; deviation is a major-version event.
 
 ## 7. Recovery Phrase Derivation
 
@@ -515,6 +624,8 @@ Offset  Size       Field                Description
 ```
 
 The two AEAD operations (wrapping `item_key`, encrypting note content) use independent random nonces drawn from the OS CSPRNG. XChaCha20-Poly1305's 192-bit nonce makes random-nonce collisions negligible across any realistic usage.
+
+Implementations SHOULD reject `ciphertext_len > 16 MiB + 32`. Larger payloads belong to the Phase 1.5+ attachment subsystem (§11). The cap exists to bound the parser's pre-AEAD allocation footprint — `ciphertext_len` is read and acted upon before any tag verification can run, so a hostile blob with a 4 GiB advertised length would otherwise force an unrecoverable allocation attempt before authenticity is established. See `design-notes.md` 2026-05-06 entry for the full rationale.
 
 ### 9.3 Vault metadata (`vault.meta`)
 

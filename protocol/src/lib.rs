@@ -18,8 +18,30 @@
 
 extern crate alloc;
 
+/// Per-note plaintext upper bound, inclusive (`16 MiB`). The per-note
+/// `.myn` blob's `ciphertext_len` field (`docs/spec/protocol.md` § 9.2,
+/// 4-byte big-endian at offset 72+N) is capped at
+/// `MAX_PLAINTEXT_LEN + 32` — the trailing `+ 32` is the CTX commitment
+/// tag that follows the ciphertext.
+///
+/// **Encoder symmetry.** The encoder rejects `plaintext.len() >
+/// MAX_PLAINTEXT_LEN` at the boundary with
+/// [`ProtocolError::PlaintextTooLarge`]; the decoder rejects
+/// `ciphertext_len > MAX_PLAINTEXT_LEN + 32` as a parse-level failure
+/// **before** any allocation that would scale with the advertised
+/// length. Without the cap, a hostile blob declaring
+/// `ciphertext_len = 0xFFFFFFFF` would attempt a ~4 GiB allocation
+/// before any AEAD verification could fire (the CTX commitment check
+/// is post-allocation by construction).
+///
+/// Pinned by `design-notes.md` 2026-05-06 entry; spec amendment in
+/// `docs/spec/protocol.md` § 9.2 (SHOULD-tone). Larger payloads belong
+/// to the Phase 1.5+ attachment subsystem (spec § 11).
+pub const MAX_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
+
 pub mod account_number;
 pub mod aead;
+pub mod blob;
 pub mod error;
 pub mod kdf;
 pub mod phrase;
@@ -31,8 +53,13 @@ pub use account_number::{
     generate_account_number, parse_account_number, AccountNumber, ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_items_key_wrap, aad_password_wrap, aad_recovery_wrap, aead_open_ctx, aead_seal_ctx,
-    AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_recovery_wrap,
+    aad_vault_items_key_wrap, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
+    CTX_COMMITMENT_TAG_LEN,
+};
+pub use blob::{
+    decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,
+    DecryptError, DecryptedNote,
 };
 pub use error::ProtocolError;
 pub use kdf::{
