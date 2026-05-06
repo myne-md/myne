@@ -34,3 +34,20 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
 # variant-name fields only; see src-tauri/CLAUDE.md
 # "Secret-handling logging discipline").
 tracing = "0.1"
+
+# Direct-dep widening of the existing workspace-transitive `sha2`
+# (already pulled in via `protocol`'s KDF salt construction). Used
+# desktop-side to compute SHA-256 of `vault.meta` bytes for the
+# slot-held CAS anchor (`Slot::Unlocked.vault_meta_bytes_hash`)
+# introduced in MYND-22's foundation hardening. Sister-crate audit
+# anchor per `decisions.md` 2026-05-06 entry.
+sha2 = { version = "0.10", default-features = false }
+
+# Desktop-only: collapse the parallel-instance race source at process
+# boundary (a second app launch redirects to the existing window
+# instead of opening a new one). Defends against the catastrophic-
+# overwrite class on `vault.meta` together with the slot-held meta-hash
+# CAS introduced in MYND-22 — single-instance + CAS = belt+suspenders.
+# TB9 audit anchor: see `decisions.md` 2026-05-06 entry.
+[target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+tauri-plugin-single-instance = "2"

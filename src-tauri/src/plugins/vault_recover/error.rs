@@ -102,6 +102,45 @@ pub enum VaultRecoveryError {
     /// error.
     #[error("blocking task join failure")]
     JoinFailure,
+
+    /// `vault_lock` (or another slot-dropping action) fired while
+    /// `complete_recovery`'s Argon2id-bound derivation was running in
+    /// `spawn_blocking`. The post-Argon2id slot peek (option p)
+    /// detected `Slot::Recovering` had been dropped to `Slot::Empty`;
+    /// the rewrite was bailed without touching `vault.meta` and the
+    /// recovery material was zeroized when the slot dropped. The user
+    /// must restart from A8d.
+    ///
+    /// Symmetric with `vault_change_password::commit`'s
+    /// `VaultLockedDuringChange` (MYND-22 plugin tasks). The contract
+    /// is **vacuous-by-affordance-absence today** — the recovery UI
+    /// shows no Cancel during decrypting per `recovery-flow.md` §3.3,
+    /// so the race cannot fire in normal flow — but the contract is
+    /// in place if a Cancel affordance is ever added. See
+    /// `decisions.md` 2026-05-06 entry "vault_complete_recovery
+    /// post-Argon2id slot peek symmetric retrofit".
+    ///
+    /// Frontend UX: informational banner, "Kurtarma iptal edildi:
+    /// kilit atıldı." — not a suspicion signal. User can restart
+    /// recovery from the unlock screen.
+    #[error("recovery aborted by lock")]
+    RecoveryAbortedByLock,
+
+    /// Backend min-length floor (`protocol::password_policy::MIN_PASSWORD_LEN`,
+    /// currently 12 Unicode chars) rejected the new password chosen
+    /// during the post-recovery password reset flow (A8f). The
+    /// frontend `PasswordForm` already gates this; the backend is a
+    /// structural belt+suspenders defense against a frontend bypass
+    /// per `decisions.md` 2026-05-06 "Auth-pipeline backend
+    /// MIN_PASSWORD_LEN floor; project-wide retroactive". Not an
+    /// entropy guarantee.
+    ///
+    /// Cross-plugin shared variant name with
+    /// `AppError::WeakNewPassword` (vault_creation) and the future
+    /// `VaultPasswordChangeError::WeakNewPassword`. Distinct Rust
+    /// types, identical JSON wire encoding `{"kind":"WeakNewPassword"}`.
+    #[error("weak new password")]
+    WeakNewPassword,
 }
 
 impl From<std::io::Error> for VaultRecoveryError {
@@ -204,6 +243,26 @@ mod tests {
         );
     }
 
+    #[test]
+    fn recovery_aborted_by_lock_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize(&VaultRecoveryError::RecoveryAbortedByLock),
+            r#"{"kind":"RecoveryAbortedByLock"}"#
+        );
+    }
+
+    #[test]
+    fn weak_new_password_serializes_with_kind_tag() {
+        // Cross-plugin shared variant name with
+        // `AppError::WeakNewPassword` (vault_creation) — both must
+        // serialize to the same `{"kind":"WeakNewPassword"}` JSON for
+        // the frontend to discriminate uniformly.
+        assert_eq!(
+            serialize(&VaultRecoveryError::WeakNewPassword),
+            r#"{"kind":"WeakNewPassword"}"#
+        );
+    }
+
     /// Compile-time enforcement of "no `String` field on any variant".
     ///
     /// If a variant ever grows a `String` (or any non-closed) field,
@@ -223,6 +282,8 @@ mod tests {
                 VaultRecoveryError::RecoveryAlreadyInProgress => {}
                 VaultRecoveryError::VaultRecoveryRequiresActiveSession => {}
                 VaultRecoveryError::JoinFailure => {}
+                VaultRecoveryError::RecoveryAbortedByLock => {}
+                VaultRecoveryError::WeakNewPassword => {}
             }
         }
         assert_closed(&VaultRecoveryError::VaultNotFound);

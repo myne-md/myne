@@ -14,6 +14,7 @@
     "vault-creation:default",
     "vault-unlock:default",
     "vault-recover:default",
+    "vault-change-password:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-clear",

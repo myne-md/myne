@@ -486,6 +486,12 @@ The user-initiated upgrade procedure between major protocol versions (e.g., v0.1
 
 Used in: `spec/protocol.md` §10.4
 
+### **MIN_PASSWORD_LEN** &nbsp; 🛠️ *Tooling*
+
+Project-wide minimum number of Unicode characters a master password must contain before any Argon2id-bound auth-pipeline plugin (`vault_creation`, `vault_recover`, `vault_change_password`) accepts it. Phase 1 value: `12`. Defined in `protocol::password_policy`; mirrored by the frontend `PasswordForm` component (TS hand-mirror; Phase-1-end CI drift check planned). A **structural floor against trivial bypass** (e.g., DevTools-IPC manipulation), not an entropy guarantee — entropy gating (zxcvbn) is deliberately frontend-only per `decisions.md` 2026-05-06 "Auth-pipeline backend MIN_PASSWORD_LEN floor; project-wide retroactive". Counts via `str::chars().count()`, not UTF-8 byte length.
+
+Used in: `protocol/src/password_policy.rs`, `decisions.md` 2026-05-06.
+
 ### **MLS (Messaging Layer Security)** &nbsp; 🏗️ *Construction*
 
 The IETF group-key-agreement protocol standardized as RFC 9420. Myne plans to use MLS in `appname-v005` for multi-device and multi-user group key management. Not used in v0.1.
@@ -780,6 +786,18 @@ Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation sessio
 The single binary file holding vault-level cryptographic state. Magic bytes `MYV1` for v0.1. Layout per `spec/protocol.md` §9.3: protocol version, account_number_hash, the 11-byte canonical KDF parameters block, both salt-randomness fields (`random_salt_password_16`, `random_salt_recovery_16`), nonces and ciphertexts for both wrapped root-key copies (`enc_root_key_password`, `enc_root_key_recovery`), and the items_key_id, items_key_nonce, and `enc_items_key`. `vault.meta` plus the `.myn` files are the only artifacts that leave the device in any future sync scenario; both are opaque ciphertext plus a small public header.
 
 Used in: `spec/protocol.md` §9.3
+
+### **vault_<verb_past> tracing event-name pattern** &nbsp; 🛠️ *Tooling*
+
+Project-wide naming discipline for `tracing::info!(event = "...")` success-event emissions across the auth-pipeline plugins. Format: `vault_<verb in past tense>`. Concrete instances in v0.1: `vault_unlocked` (vault_unlock command success), `vault_locked` (vault_lock command success), `vault_recovered_with_phrase` (A8d phrase-recovery success), `vault_recovery_completed` (A8f post-recovery password commit success), and the forthcoming `vault_password_changed` (MYND-22's vault_change_password commit success). Future Phase 2 plugins (OPAQUE, hardware-unlock, etc.) extend the pattern without per-plugin `decisions.md` entries — the convention is self-evident from the existing instances. Phase 2 ops-tooling primitive: log aggregation queries can pattern-match `event = "vault_*"` once a `tracing-subscriber` is wired (deferred today). Pinned by `decisions.md` 2026-05-06 "Tracing event-name pattern: vault_<verb_past> across auth-pipeline plugins".
+
+Used in: `src-tauri/src/plugins/{vault_unlock,vault_recover}/commands.rs`; `decisions.md` 2026-05-06.
+
+### **vault_meta_bytes_hash** &nbsp; 🛠️ *Tooling*
+
+Public-material `[u8; 32]` field on the desktop client's `Slot::Unlocked` carrying `SHA-256(vault.meta bytes)` captured at slot-populate time. Populated by `vault_unlock` (digest of unlock-time read bytes) and by `vault_complete_recovery` (digest of the freshly-rewritten bytes; AFTER `atomic_write` succeeds). Serves as the **in-memory CAS anchor** for `vault_change_password`'s in-place rewrite — the command compares the slot-held hash against a fresh digest of the on-disk bytes before committing the rewrite, returning `VaultMetaChangedExternally` and force-relocking on mismatch. SHA-256 of public bytes is itself public material; held bare without `Zeroize`. Pinned by `decisions.md` 2026-05-06 entry "Slot::Unlocked anchor field for vault.meta CAS" (MYND-22 foundation hardening).
+
+Used in: `src-tauri/src/plugins/vault_unlock/state.rs::UnlockedVault.vault_meta_bytes_hash`; `decisions.md` 2026-05-06.
 
 ### **vault_status** &nbsp; 🛠️ *Tooling*
 

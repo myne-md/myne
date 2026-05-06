@@ -44,6 +44,7 @@ pub mod aead;
 pub mod blob;
 pub mod error;
 pub mod kdf;
+pub mod password_policy;
 pub mod phrase;
 pub mod subkey;
 pub mod types;
@@ -66,6 +67,7 @@ pub use kdf::{
     derive_password_wrap_key, derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
     ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
 };
+pub use password_policy::{validate_min_length, MIN_PASSWORD_LEN};
 pub use phrase::{
     generate_recovery_phrase, normalize_user_phrase, RecoveryPhrase, RECOVERY_PHRASE_ENTROPY_BYTES,
     RECOVERY_PHRASE_WORD_COUNT,

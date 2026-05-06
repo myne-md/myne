@@ -178,6 +178,137 @@ impl VaultRuntimeState {
     pub async fn set_unlocked(&self, vault: UnlockedVault) -> Slot {
         core::mem::replace(&mut *self.slot.write().await, Slot::Unlocked(vault))
     }
+
+    /// Read-lock peek that returns a CLONE of the `root_key` from
+    /// [`Slot::Recovering`], or `None` if the slot is `Empty` or
+    /// `Unlocked`. The returned `Zeroizing<[u8; 32]>` is a fresh
+    /// allocation that wipes on drop; the slot's original copy stays
+    /// in place.
+    ///
+    /// Used by `vault_complete_recovery` to snapshot the recovery-
+    /// derived root_key for the Argon2id-bound rewrite pipeline
+    /// without taking the slot — keeping the slot in
+    /// [`Slot::Recovering`] across spawn_blocking enables the
+    /// post-Argon2id slot peek (option p, MYND-22 grilling Q4) to
+    /// detect mid-flight `vault_lock` and bail without disk write.
+    /// See `decisions.md` 2026-05-06 entry "vault_complete_recovery
+    /// post-Argon2id slot peek symmetric retrofit".
+    pub async fn peek_recovering_root_key_clone(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
+        match &*self.slot.read().await {
+            Slot::Recovering { root_key, .. } => Some(Zeroizing::new(**root_key)),
+            Slot::Empty | Slot::Unlocked(_) => None,
+        }
+    }
+
+    /// Read-lock peek that returns a CLONE of `(root_key, vault_meta_bytes_hash)`
+    /// from [`Slot::Unlocked`], or `None` if the slot is `Empty` or
+    /// `Recovering`. The cloned `Zeroizing<[u8; 32]>` wipes on drop;
+    /// the slot's original copy stays in place.
+    ///
+    /// Used by `vault_change_password::change_password` to snapshot
+    /// the unlocked-vault material for the Argon2id-bound rewrite
+    /// pipeline without taking the slot — keeping the slot in
+    /// [`Slot::Unlocked`] across spawn_blocking enables the post-
+    /// Argon2id slot peek (option p, MYND-22 grilling Q4 — Task 12)
+    /// to detect mid-flight `vault_lock` and bail without disk write.
+    /// The `vault_meta_bytes_hash` returned alongside is the CAS
+    /// anchor consumed by Task 11.
+    pub async fn peek_unlocked_root_key_and_hash_clone(
+        &self,
+    ) -> Option<(Zeroizing<[u8; AEAD_KEY_LEN]>, [u8; 32])> {
+        match &*self.slot.read().await {
+            Slot::Unlocked(uv) => Some((Zeroizing::new(*uv.root_key), uv.vault_meta_bytes_hash)),
+            Slot::Empty | Slot::Recovering { .. } => None,
+        }
+    }
+
+    /// Atomically commit a `vault.meta` rewrite while holding the
+    /// slot's write lock end-to-end: verify the slot is still
+    /// [`Slot::Unlocked`] with `expected_hash`, run the `rewrite`
+    /// closure (in `spawn_blocking` so sync IO doesn't stall the
+    /// runtime), and update the slot's `vault_meta_bytes_hash` to
+    /// the closure's returned new hash — all without releasing the
+    /// write lock between the verify and the update.
+    ///
+    /// **Closes the post-Argon2id race** that an earlier
+    /// `peek_unlocked_root_key_and_hash_clone` + separate
+    /// `spawn_blocking(atomic_write)` opened: a `vault_lock` could
+    /// fire in the µs gap between the peek's read-lock release and
+    /// the spawn_blocking dispatch, drop the slot to `Empty`, and
+    /// `atomic_write` would still proceed because its closure had
+    /// already captured `new_bytes`. With the lock held throughout,
+    /// `vault_lock`'s own write-lock acquire blocks for the duration
+    /// of the rewrite (~ms scale), which is allowed by
+    /// `CLAUDE.md` "RwLock held only at start/end" — that rule
+    /// targets long holds across Argon2id, not the rewrite-commit
+    /// critical section.
+    ///
+    /// On `Slot::Unlocked` with mismatched hash: drops the slot to
+    /// `Empty` (force-relock per the CAS-mismatch posture) and
+    /// returns [`CommitRewriteError::HashMismatch`] without running
+    /// the closure. On `Slot::Empty` or `Slot::Recovering`: returns
+    /// [`CommitRewriteError::SlotDropped`] without running the
+    /// closure (the slot is already in a non-Unlocked state).
+    pub async fn commit_unlocked_rewrite<E, F>(
+        &self,
+        expected_hash: [u8; 32],
+        rewrite: F,
+    ) -> Result<(), CommitRewriteError<E>>
+    where
+        F: FnOnce() -> Result<[u8; 32], E> + Send + 'static,
+        E: Send + 'static,
+    {
+        let mut slot_guard = self.slot.write().await;
+        match &*slot_guard {
+            Slot::Unlocked(uv) if uv.vault_meta_bytes_hash == expected_hash => {
+                // Verified. Hold the lock through the rewrite below.
+            }
+            Slot::Unlocked(_) => {
+                // Hash drift — defensive (auth_permits hold makes
+                // this unreachable today). Force-relock.
+                *slot_guard = Slot::Empty;
+                return Err(CommitRewriteError::HashMismatch);
+            }
+            Slot::Empty | Slot::Recovering { .. } => {
+                return Err(CommitRewriteError::SlotDropped);
+            }
+        }
+
+        // Run the rewrite in spawn_blocking; the write lock is held
+        // across the .await, blocking any concurrent `vault_lock`
+        // until atomic_write completes.
+        let new_hash = match tokio::task::spawn_blocking(rewrite).await {
+            Ok(Ok(h)) => h,
+            Ok(Err(e)) => return Err(CommitRewriteError::Rewrite(e)),
+            Err(_) => return Err(CommitRewriteError::Join),
+        };
+
+        // Slot is still Unlocked under the held write lock; update
+        // the hash anchor in place. root_key + items_key untouched.
+        if let Slot::Unlocked(uv) = &mut *slot_guard {
+            uv.vault_meta_bytes_hash = new_hash;
+        }
+        Ok(())
+    }
+}
+
+/// Outcome of [`VaultRuntimeState::commit_unlocked_rewrite`].
+///
+/// Generic over the rewrite closure's error type so each plugin can
+/// route its own `IoError` / `InvalidVaultMeta` back through its own
+/// command-level error enum.
+pub enum CommitRewriteError<E> {
+    /// Slot's `vault_meta_bytes_hash` no longer matches the snapshot.
+    /// The slot has been dropped to `Empty` (force-relock); caller
+    /// surfaces a CAS-mismatch error to the user.
+    HashMismatch,
+    /// Slot was `Empty` or `Recovering` at the post-Argon2id check.
+    /// The rewrite did NOT run; disk is untouched.
+    SlotDropped,
+    /// The rewrite closure returned an error.
+    Rewrite(E),
+    /// `tokio::task::spawn_blocking` join handle returned an error.
+    Join,
 }
 
 /// Three-state slot per `recovery-flow.md` §4.1 + §4.3.
@@ -245,15 +376,26 @@ pub enum SlotKind {
 /// updated by activity-tracking commands; not added here because there
 /// is no Phase 1 writer for it.
 ///
+/// `vault_meta_bytes_hash` is `SHA-256(vault.meta bytes)` captured at
+/// populate time (unlock-time read for the password path; post-rewrite
+/// in `vault_complete_recovery`). **Public material** — SHA of public
+/// bytes — held bare without `Zeroize`. Serves as the in-memory CAS
+/// anchor for `vault_change_password`'s in-place rewrite, detecting
+/// external mutation of `vault.meta` between unlock and the rewrite
+/// commit. Pinned by `decisions.md` 2026-05-06 "Slot::Unlocked anchor
+/// field for vault.meta CAS" (MYND-22 foundation hardening).
+///
 /// Production reads materialize when note CRUD ships (Lane A `A9`):
 /// note encrypt/decrypt borrows `root_key` + `items_key`; lock-on-idle
-/// (Phase 2+) borrows `unlocked_at`.
+/// (Phase 2+) borrows `unlocked_at`; `vault_change_password` borrows
+/// `vault_meta_bytes_hash` for the CAS check.
 #[allow(dead_code)]
 pub struct UnlockedVault {
     pub root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key_id: [u8; 16],
     pub unlocked_at: Instant,
+    pub vault_meta_bytes_hash: [u8; 32],
 }
 
 /// Test-only helper: extract the [`UnlockedVault`] from a `Slot::Unlocked`
@@ -274,6 +416,11 @@ impl Slot {
 /// Build a fixture `UnlockedVault` with byte-pattern arguments so tests
 /// can assert against distinguishable bytes. Shared across `state.rs`
 /// tests and `commands.rs` tests.
+///
+/// `vault_meta_bytes_hash` is filled with the sentinel `[0xFF; 32]`
+/// (production code never produces all-`0xFF` from SHA-256 with
+/// vanishing probability), letting tests distinguish "fixture-built
+/// slot" from "real-unlock-built slot" when needed.
 #[cfg(test)]
 pub(crate) fn fixture_unlocked_with_keys(
     root_byte: u8,
@@ -285,6 +432,7 @@ pub(crate) fn fixture_unlocked_with_keys(
         items_key: Zeroizing::new([items_byte; AEAD_KEY_LEN]),
         items_key_id: [items_id_byte; 16],
         unlocked_at: Instant::now(),
+        vault_meta_bytes_hash: [0xFF; 32],
     }
 }
 
@@ -496,6 +644,46 @@ mod tests {
     }
 
     #[test]
+    fn peek_recovering_root_key_clone_returns_some_when_recovering() {
+        // The (p) post-Argon2id slot peek pattern (MYND-22 Q4) needs a
+        // way to snapshot root_key without taking from slot. Verify
+        // the clone matches the slot's bytes; slot stays in Recovering.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_recovering(fixture_recovering()).await;
+
+            let cloned = state
+                .peek_recovering_root_key_clone()
+                .await
+                .expect("slot is Recovering");
+            // Clone must equal the fixture's root_key byte pattern
+            // (0xAA, 32 bytes).
+            assert_eq!(*cloned, [0xAA; AEAD_KEY_LEN]);
+            // Slot must STILL be Recovering (clone doesn't take).
+            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+        });
+    }
+
+    #[test]
+    fn peek_recovering_root_key_clone_returns_none_when_empty() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            assert!(state.peek_recovering_root_key_clone().await.is_none());
+        });
+    }
+
+    #[test]
+    fn peek_recovering_root_key_clone_returns_none_when_unlocked() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_unlocked(fixture_unlocked()).await;
+            assert!(state.peek_recovering_root_key_clone().await.is_none());
+            // Slot still Unlocked (peek does not mutate).
+            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+        });
+    }
+
+    #[test]
     fn set_recovering_then_set_unlocked_promotes() {
         // The A8f happy-path shape: take_recovering then set_unlocked
         // promotes Recovering → Unlocked. Verify the transition.
@@ -512,6 +700,7 @@ mod tests {
                 items_key: recovering.items_key,
                 items_key_id: recovering.items_key_id,
                 unlocked_at: Instant::now(),
+                vault_meta_bytes_hash: [0xAA; 32],
             };
             state.set_unlocked(promoted).await;
 

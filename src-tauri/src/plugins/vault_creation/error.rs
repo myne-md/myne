@@ -77,6 +77,25 @@ pub enum AppError {
     /// irrecoverably. See `app-state-machine` grilling Q12 + PRD.
     #[error("vault already exists")]
     VaultAlreadyExists,
+
+    /// Backend min-length floor (`protocol::password_policy::MIN_PASSWORD_LEN`,
+    /// currently 12 Unicode chars) rejected the new password. The
+    /// frontend `PasswordForm` already gates this at submit time; the
+    /// backend is a structural belt+suspenders defense against a
+    /// frontend bypass (DevTools, hand-crafted IPC payload, future UI
+    /// regression) per `decisions.md` 2026-05-06 "Auth-pipeline backend
+    /// MIN_PASSWORD_LEN floor; project-wide retroactive". **Not** an
+    /// entropy guarantee — zxcvbn-style entropy gating remains
+    /// frontend-only.
+    ///
+    /// Cross-plugin shared variant name with
+    /// `VaultRecoveryError::WeakNewPassword` (and the future
+    /// `VaultPasswordChangeError::WeakNewPassword`) per the
+    /// "naming-discipline > scenario-optimization" rule (Q6 of MYND-22
+    /// grilling). Distinct Rust types, identical JSON wire encoding
+    /// `{"kind":"WeakNewPassword"}`.
+    #[error("weak new password")]
+    WeakNewPassword,
 }
 
 /// Bounded categorization of IO failures surfaced from `std::io::Error`.
