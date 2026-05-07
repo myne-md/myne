@@ -3,15 +3,10 @@
 # declares this as an `InlinedPlugin`. Capability files reference these
 # as `notes:default` (or `notes:allow-<cmd>`).
 #
-# MYND-26 Task 7 lays the scaffold + the two permissions ahead of the
-# command handlers. The actual `note_create` / `note_read` commands
-# wire into the plugin's `invoke_handler!` at MYND-26 Tasks 8 / 9.
-# Tauri validates these permissions only at invocation time, so
-# declaring them ahead of the handlers is intentional — keeps the
-# capability ACL surface stable across the MYND-26 PR's task chain.
-#
-# MYND-27 will add `allow-note-update` + `allow-note-delete`; MYND-28
-# will add `allow-note-list`. Each follows the same structural pattern.
+# Tauri validates these permissions only at invocation time, so the
+# declarations may land ahead of the matching handlers without
+# breaking the build — this keeps the capability ACL surface stable
+# across staged PR landings.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -20,6 +15,8 @@ description = "Default permission set for the notes plugin."
 permissions = [
     "allow-note-create",
     "allow-note-read",
+    "allow-note-update",
+    "allow-note-delete",
 ]
 
 [[permission]]
@@ -31,3 +28,13 @@ commands.allow = ["note_create"]
 identifier = "allow-note-read"
 description = "Allow invoking notes:note_read (read + AEAD-decrypt a .myn note by NoteId; returns the UTF-8 plaintext)."
 commands.allow = ["note_read"]
+
+[[permission]]
+identifier = "allow-note-update"
+description = "Allow invoking notes:note_update (re-encrypt an existing .myn note in place under the persistent item_key with a fresh content_nonce per protocol.md §6.3; bytes 0..47+N byte-identical across update revisions; atomic_write replace=true)."
+commands.allow = ["note_update"]
+
+[[permission]]
+identifier = "allow-note-delete"
+description = "Allow invoking notes:note_delete (hard-delete a .myn note via remove_file + Unix parent-dir sync_all; cryptographic erase yapısal property of the v0.1 key hierarchy — enc_item_key removed with the file)."
+commands.allow = ["note_delete"]

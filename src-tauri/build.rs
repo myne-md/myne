@@ -63,18 +63,21 @@ fn main() {
             )
             .plugin(
                 "notes",
-                // MYND-26 Task 7 lays the plugin scaffold ahead of the
-                // command handlers; `note_create` lands at MYND-26
-                // Task 8 and `note_read` at MYND-26 Task 9. The
-                // `commands.allow` entries in
-                // `permissions/notes/default.toml` already declare
-                // both — this `InlinedPlugin` mirror is load-bearing
-                // per the same security regression note pinned for
-                // `vault-creation` above. MYND-27 will add
-                // `note_update` + `note_delete`; MYND-28 will add
-                // `note_list`. Each addition follows the same
-                // structural pattern.
-                tauri_build::InlinedPlugin::new().commands(&["note_create", "note_read"]),
+                // The `commands.allow` entries in
+                // `permissions/notes/default.toml` declare all four —
+                // this `InlinedPlugin` mirror is load-bearing per the
+                // same security regression note pinned for
+                // `vault-creation` above (without it, permissions
+                // silently flatten into `__app-acl__` and the ACL
+                // resolver registers them as bare names that never
+                // match the `plugin:notes|<cmd>` form Tauri uses to
+                // authorize plugin invokes).
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "note_create",
+                    "note_read",
+                    "note_update",
+                    "note_delete",
+                ]),
             ),
     )
     .unwrap();
