@@ -60,6 +60,21 @@ fn main() {
                 // `permissions/vault-change-password/default.toml` is
                 // a security regression.
                 tauri_build::InlinedPlugin::new().commands(&["change_password"]),
+            )
+            .plugin(
+                "notes",
+                // MYND-26 Task 7 lays the plugin scaffold ahead of the
+                // command handlers; `note_create` lands at MYND-26
+                // Task 8 and `note_read` at MYND-26 Task 9. The
+                // `commands.allow` entries in
+                // `permissions/notes/default.toml` already declare
+                // both — this `InlinedPlugin` mirror is load-bearing
+                // per the same security regression note pinned for
+                // `vault-creation` above. MYND-27 will add
+                // `note_update` + `note_delete`; MYND-28 will add
+                // `note_list`. Each addition follows the same
+                // structural pattern.
+                tauri_build::InlinedPlugin::new().commands(&["note_create", "note_read"]),
             ),
     )
     .unwrap();

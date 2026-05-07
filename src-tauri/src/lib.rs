@@ -35,6 +35,7 @@ pub fn run() {
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
         .plugin(plugins::vault_change_password::init())
+        .plugin(plugins::notes::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
