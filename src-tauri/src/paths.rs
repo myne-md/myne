@@ -46,7 +46,6 @@ pub fn vault_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppError> {
 /// Tested via the lower-level [`notes_dir_under`] helper (which takes
 /// a base path directly, allowing `ScopedTempDir` exercise without
 /// `tauri::test::mock_app_builder`).
-#[allow(dead_code)] // production callers land with Tasks 8/9 (notes plugin commands)
 pub fn notes_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
     let base = app
         .path()
@@ -70,33 +69,7 @@ pub(crate) fn notes_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Mirror of `atomic_write::tests::ScopedTempDir`. Creates a
-    /// unique-named directory under `std::env::temp_dir()` and removes
-    /// it on drop. Avoids pulling `tempfile` as a dev-dep.
-    struct ScopedTempDir {
-        path: PathBuf,
-    }
-    impl ScopedTempDir {
-        fn new(label: &str) -> std::io::Result<Self> {
-            let mut p = std::env::temp_dir();
-            let nanos = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0);
-            p.push(format!("myne-test-{label}-{nanos}"));
-            std::fs::create_dir_all(&p)?;
-            Ok(Self { path: p })
-        }
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-    impl Drop for ScopedTempDir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.path);
-        }
-    }
+    use crate::test_support::ScopedTempDir;
 
     // ---- happy paths ---------------------------------------------------
 

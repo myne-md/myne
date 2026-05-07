@@ -53,3 +53,35 @@ impl Drop for ScratchVault {
         let _ = std::fs::remove_dir_all(&self.dir);
     }
 }
+
+/// Generic self-cleaning scratch directory for tests that don't need
+/// `ScratchVault`'s vault-meta convenience. Creates a unique-named dir
+/// under `std::env::temp_dir()` and removes it on drop. Avoids pulling
+/// `tempfile` as a dev-dep just to provide the same shape (TB9
+/// minimal-dep posture).
+pub(crate) struct ScopedTempDir {
+    path: PathBuf,
+}
+
+impl ScopedTempDir {
+    pub(crate) fn new(label: &str) -> std::io::Result<Self> {
+        let mut p = std::env::temp_dir();
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        p.push(format!("myne-test-{label}-{nanos}"));
+        std::fs::create_dir_all(&p)?;
+        Ok(Self { path: p })
+    }
+
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ScopedTempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}

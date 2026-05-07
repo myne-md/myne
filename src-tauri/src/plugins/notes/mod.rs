@@ -44,6 +44,9 @@ use tauri::Runtime;
 /// from day one.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("notes")
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            commands::note_create,
+            commands::note_read,
+        ])
         .build()
 }

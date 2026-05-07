@@ -151,34 +151,8 @@ fn tmp_path(path: &Path) -> std::path::PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::ScopedTempDir;
     use std::io::Read;
-
-    /// A minimal scoped temp directory: creates a unique-named dir
-    /// under `std::env::temp_dir()` and removes it on drop. Avoids
-    /// pulling `tempfile` as a dev-dep just for these tests.
-    struct ScopedTempDir {
-        path: std::path::PathBuf,
-    }
-    impl ScopedTempDir {
-        fn new(label: &str) -> std::io::Result<Self> {
-            let mut p = std::env::temp_dir();
-            let nanos = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0);
-            p.push(format!("myne-test-{label}-{nanos}"));
-            std::fs::create_dir_all(&p)?;
-            Ok(Self { path: p })
-        }
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-    impl Drop for ScopedTempDir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.path);
-        }
-    }
 
     fn read_file(path: &Path) -> Vec<u8> {
         let mut buf = Vec::new();

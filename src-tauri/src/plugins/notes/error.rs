@@ -45,7 +45,6 @@ use thiserror::Error;
 /// that requires updating both sides.
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
-#[allow(dead_code)] // production constructors land with Task 8 (note_create command)
 pub enum NoteCreateError {
     /// Slot is `Empty` or `Recovering`. Frontend routes the user to
     /// the lock screen via `vault_status` / `vault_slot_kind`; if this
@@ -109,7 +108,6 @@ impl From<std::io::Error> for NoteCreateError {
 /// Hand-mirrored on the TS side at `src/types/note-read-error.ts`.
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
-#[allow(dead_code)] // production constructors land with Task 9 (note_read command)
 pub enum NoteReadError {
     /// `<vault>/notes/<note_id>.myn` does not exist. UI: "Bu not
     /// silinmiş olabilir." Distinct from `InvalidNoteId` because that

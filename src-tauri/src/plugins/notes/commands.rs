@@ -1,22 +1,1037 @@
 //! Tauri commands for the `notes` plugin.
 //!
-//! Wired in across MYND-26 Tasks 8 / 9:
+//! `note_create` mints a backend-side [`NoteId::new_v7`], AEAD-encrypts
+//! the plaintext via `protocol::encode_new_note` on a
+//! `tokio::task::spawn_blocking` thread, and atomically writes the
+//! `.myn` blob via `atomic_write::atomic_write(.., replace=false)` so
+//! the destination is created-only (the canary defense against
+//! backend-gen UUIDv7 collision).
 //!
-//! - `note_create` (Task 8): mints a backend-side `NoteId::new_v7()`,
-//!   AEAD-encrypts the plaintext via `protocol::encode_new_note` on a
-//!   `tokio::task::spawn_blocking` thread, and atomically writes the
-//!   `.myn` blob via `atomic_write::atomic_write(.., replace=false)`.
-//! - `note_read` (Task 9): strict-parses the UI-supplied `note_id` via
-//!   `NoteId::parse`, reads the blob, and AEAD-decrypts via
-//!   `protocol::decode_note` on a `spawn_blocking` thread; UTF-8
-//!   boundary at the command layer surfaces `InvalidPlaintextEncoding`
-//!   as a structural-corruption distinct from `CannotDecrypt`.
+//! `note_read` mirrors the flow: strict-parse the UI-supplied `NoteId`
+//! string, read + AEAD-decrypt via `protocol::decode_note` on a
+//! `spawn_blocking` thread, and apply the UTF-8 boundary check at the
+//! command layer (codec stays content_type-agnostic).
 //!
 //! Both commands pattern-match `Slot::Unlocked(uv) => ...` only;
 //! `Slot::Recovering` is structurally rejected at compile time per
-//! `recovery-flow.md` §4.1. `items_key` is cloned out into a
-//! `Zeroizing<[u8; 32]>` and moved into the blocking closure;
-//! `vault_lock` waits for in-flight ops via `tokio::sync::RwLock` fair
-//! queueing (no extra synchronization primitive needed).
+//! `recovery-flow.md` §4.1. `items_key` is cloned out of the slot
+//! into a `Zeroizing<[u8; 32]>` and moved into the blocking closure;
+//! `vault_lock` waits for in-flight ops via `tokio::sync::RwLock`
+//! fair queueing — no extra synchronization primitive needed.
+//!
+//! Spec touchpoints:
+//! - `protocol.md` §6.2 (per-note encryption flow)
+//! - `protocol.md` §3.3 (three-level wrapping)
+//! - `protocol.md` §9.1 (vault layout — `.myn` filename is the
+//!   canonical UUIDv7)
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
+
+use crate::atomic_write;
+use crate::io_failure_kind::from_io_error_kind;
+use crate::paths;
+use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
+use protocol::{decode_note, encode_new_note, DecryptError, ProtocolError};
+use std::path::PathBuf;
+use std::time::Instant;
+use tauri::{AppHandle, Runtime, State};
+use zeroize::Zeroizing;
+
+use super::error::{NoteCreateError, NoteReadError};
+use super::note_id::NoteId;
+
+/// Create a new encrypted `.myn` note. See module-level docs for the
+/// full pipeline narration.
+///
+/// Returns the canonical lowercase-hyphenated 36-char `NoteId` string
+/// on success — the UI never produces a `NoteId`, only consumes one
+/// returned by this command (see `decisions.md` 2026-05-07
+/// "Note UUIDv7 backend-gen; UI never names the destination").
+#[tauri::command]
+pub async fn note_create<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    plaintext: String,
+) -> Result<String, NoteCreateError> {
+    // Resolve `<vault>/notes/` (lazy `create_dir_all`); map both
+    // `NotADirectory` and `AlreadyExists` to the structural defensive
+    // variant per the accept-list pinned in `paths::notes_dir_under`'s
+    // tests.
+    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+        let kind = e.kind();
+        match kind {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_create notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteCreateError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_create notes_dir resolution failed"
+                );
+                NoteCreateError::Io {
+                    io_error_kind: io_kind,
+                }
+            }
+        }
+    })?;
+    note_create_with_dir(notes_dir, state.inner(), plaintext).await
+}
+
+/// Inner — pure-and-testable helper. Tauri-aware path resolution is
+/// the [`note_create`] caller's responsibility; this fn takes
+/// `notes_dir` directly so tests exercise the full pipeline (slot
+/// guard → AEAD → atomic_write) under a `ScopedTempDir` without
+/// spinning up a Tauri runtime.
+///
+/// Mirrors the `vault_unlock::commands::unlock_with_path` shape.
+pub(crate) async fn note_create_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    plaintext: String,
+) -> Result<String, NoteCreateError> {
+    // First non-doc statement: bound the lifetime of plaintext bytes
+    // to a `Zeroizing<String>` wrapper. Every early-return path drops
+    // the wrapper and zeroes the bytes (see
+    // `src-tauri/CLAUDE.md` "Secret-handling logging discipline").
+    let plaintext = Zeroizing::new(plaintext);
+
+    // Acquire the slot read guard and HOLD it across spawn_blocking +
+    // atomic_write. `tokio::sync::RwLock`'s fair queueing makes
+    // `vault_lock`'s subsequent write-lock request wait for this guard
+    // to drop, so an in-flight `note_create` cannot race with
+    // `vault_lock` taking the slot mid-write (`decisions.md` 2026-05-07
+    // "Note AEAD ops"). The guard drops at the function-exit `drop(slot)`
+    // below — or any early-return on its way out.
+    let slot = state.slot_read().await;
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_create rejected: slot is not Unlocked"
+            );
+            return Err(NoteCreateError::VaultNotUnlocked);
+        }
+    };
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    // Mint NoteId server-side — UI never produces this.
+    let note_id = NoteId::new_v7();
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+
+    // AEAD on a background thread. `Zeroizing<String>` and
+    // `Zeroizing<[u8; 32]>` move into the closure; both drop and zero
+    // their bytes on closure exit. The slot read guard remains in the
+    // outer task across this `.await` — its lifetime is bounded by
+    // `state`, not the closure.
+    let started = Instant::now();
+    let blob_result = tokio::task::spawn_blocking(move || {
+        encode_new_note(
+            &items_key,
+            &items_key_id,
+            &note_uuid_bytes,
+            plaintext.as_bytes(),
+        )
+    })
+    .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    let blob = match blob_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_create encode panicked or runtime shutdown"
+            );
+            return Err(NoteCreateError::JoinFailure);
+        }
+        Ok(Err(ProtocolError::PlaintextTooLarge)) => {
+            tracing::debug!(
+                stage = "encode",
+                error_kind = "PlaintextTooLarge",
+                "note_create rejected: plaintext exceeds MAX_PLAINTEXT_LEN"
+            );
+            return Err(NoteCreateError::PlaintextTooLarge);
+        }
+        Ok(Err(_other_protocol_err)) => {
+            // v0.1 fixed parameters make AEAD seal failure
+            // unreachable: `items_key` is 32 bytes by type, nonces are
+            // 24 bytes from `getrandom`, AAD widths are compile-time
+            // const, plaintext boundary already passed. If this fires,
+            // it's a v0.1 invariant violation; surface as JoinFailure
+            // (panic-equivalent semantic) and let the user retry.
+            tracing::error!(
+                stage = "encode",
+                error_kind = "JoinFailure",
+                "note_create encode_new_note returned an unreachable ProtocolError under v0.1 fixed params"
+            );
+            return Err(NoteCreateError::JoinFailure);
+        }
+        Ok(Ok(blob)) => blob,
+    };
+    tracing::debug!(
+        stage = "encode",
+        duration_ms = duration_ms,
+        "note_create AEAD seal succeeded"
+    );
+
+    // Atomic write with create-only semantic. The defensive
+    // `replace=false` guarantees `<dest>` did not exist; backend-gen
+    // UUIDv7 collision is astronomically improbable so the canary
+    // never fires in normal flow.
+    let dest = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    if let Err(e) = atomic_write::atomic_write(&dest, &blob, /* replace = */ false) {
+        let kind = e.kind();
+        let mapped = match kind {
+            std::io::ErrorKind::AlreadyExists => NoteCreateError::NoteAlreadyExists,
+            std::io::ErrorKind::NotADirectory => NoteCreateError::NotesDirNotADirectory,
+            other => NoteCreateError::Io {
+                io_error_kind: from_io_error_kind(other),
+            },
+        };
+        tracing::error!(
+            stage = "atomic_write",
+            error_kind = note_create_error_kind(&mapped),
+            "note_create atomic_write failed"
+        );
+        return Err(mapped);
+    }
+
+    // Explicit drop — make the lock-release point visible to readers
+    // (the implicit end-of-fn drop would do the same). After this
+    // line, `vault_lock`'s queued write-lock request can proceed.
+    drop(slot);
+
+    tracing::debug!(stage = "success", event = "note_created");
+    Ok(note_id.as_uuid().to_string())
+}
+
+/// Static-string label for [`NoteCreateError`] variants — emitted via
+/// `tracing` without crossing the IPC boundary. Mirrors the
+/// `vault_unlock`'s `protocol_error_kind` discipline (see
+/// `src-tauri/CLAUDE.md` "Secret-handling logging discipline" closed-
+/// enum mapping rule). A new variant compile-fails this match, so
+/// drift between the public enum and the tracing label is structurally
+/// caught.
+fn note_create_error_kind(e: &NoteCreateError) -> &'static str {
+    match e {
+        NoteCreateError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteCreateError::NoteAlreadyExists => "NoteAlreadyExists",
+        NoteCreateError::PlaintextTooLarge => "PlaintextTooLarge",
+        NoteCreateError::NotesDirNotADirectory => "NotesDirNotADirectory",
+        NoteCreateError::Io { .. } => "Io",
+        NoteCreateError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// Read + AEAD-decrypt an existing `.myn` note by [`NoteId`] string.
+///
+/// Returns the canonical UTF-8 markdown plaintext on success. UI never
+/// produces `NoteId` values — only consumes ones returned by
+/// [`note_create`]; this command's strict-parse step
+/// ([`NoteId::parse`]) doubly enforces that contract for any UI that
+/// hands back an unexpected string (`InvalidNoteId` is a bug-canary
+/// per `decisions.md` 2026-05-07).
+///
+/// Failure modes (closed-enum surface, `decisions.md` 2026-04-26
+/// unlock-error-discipline pattern):
+/// - `InvalidNoteId` — strict parse rejected (sub-cause via tracing).
+/// - `VaultNotUnlocked` — slot is `Empty` or `Recovering`.
+/// - `NoteNotFound` — file at `<vault>/notes/<note_id>.myn` missing.
+/// - `Io` — other filesystem failure.
+/// - `CannotDecrypt` — AEAD-tag failure on `decode_note` (non-
+///   distinguishing per `protocol.md` §6.4; codec emits its own
+///   sub-cause via `tracing`).
+/// - `InvalidPlaintextEncoding` — AEAD passed but plaintext is not
+///   valid UTF-8 (structural-corruption / foreign-writer suspicion;
+///   distinct from `CannotDecrypt`).
+/// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown.
+#[tauri::command]
+pub async fn note_read<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+) -> Result<String, NoteReadError> {
+    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+        let io_kind = from_io_error_kind(e.kind());
+        tracing::error!(
+            stage = "notes_dir",
+            error_kind = "Io",
+            io_failure_kind = ?io_kind,
+            "note_read notes_dir resolution failed"
+        );
+        NoteReadError::Io {
+            io_error_kind: io_kind,
+        }
+    })?;
+    note_read_with_dir(notes_dir, state.inner(), note_id).await
+}
+
+/// Inner — pure-and-testable helper. Mirror of [`note_create_with_dir`].
+pub(crate) async fn note_read_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    note_id: String,
+) -> Result<String, NoteReadError> {
+    // Strict-parse FIRST — before any path concatenation. Sub-cause
+    // emits to `tracing::debug!(stage = ?cause)` for ops debugging;
+    // IPC sees only the single `InvalidNoteId` variant per
+    // `decisions.md` 2026-05-07.
+    let note_id = NoteId::parse(&note_id).map_err(|cause| {
+        tracing::debug!(stage = ?cause, "note_read note_id strict-parse failed");
+        NoteReadError::InvalidNoteId
+    })?;
+    tracing::debug!(stage = "note_id_parse", outcome = "ok");
+
+    // Slot guard. Held across spawn_blocking + file read so vault_lock
+    // waits for in-flight decrypts via `tokio::sync::RwLock` fair
+    // queueing — same load-bearing pattern as `note_create_with_dir`.
+    let slot = state.slot_read().await;
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_read rejected: slot is not Unlocked"
+            );
+            return Err(NoteReadError::VaultNotUnlocked);
+        }
+    };
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+
+    // File read AND AEAD decrypt run together inside spawn_blocking —
+    // `std::fs::read` is synchronous and reads up to ~16 MiB on a
+    // 16 MiB-cap blob; running it on the async runtime thread would
+    // block all other tokio tasks for the read window. Bundling read +
+    // decode keeps both blocking ops on the worker thread; the slot
+    // read guard remains in the outer task and the fair-queue
+    // semantics for `vault_lock` are preserved.
+    let started = Instant::now();
+    let join_result =
+        tokio::task::spawn_blocking(move || -> Result<protocol::DecryptedNote, NoteReadError> {
+            let blob = match std::fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    let io_kind_raw = e.kind();
+                    let mapped = match io_kind_raw {
+                        std::io::ErrorKind::NotFound => NoteReadError::NoteNotFound,
+                        _ => NoteReadError::Io {
+                            io_error_kind: from_io_error_kind(io_kind_raw),
+                        },
+                    };
+                    tracing::error!(
+                        stage = "read_blob",
+                        error_kind = note_read_error_kind(&mapped),
+                        "note_read blob read failed"
+                    );
+                    return Err(mapped);
+                }
+            };
+            // `decode_note` parameter order is
+            // (blob, note_uuid, items_key, items_key_id) — note_uuid is
+            // the SECOND argument (different from `encode_new_note`'s).
+            decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id).map_err(
+                |_: DecryptError| {
+                    // The codec emitted its sub-cause via
+                    // `tracing::debug!(stage = ?cause, ...)` from inside
+                    // `decode_note`; the host adds a parallel non-
+                    // distinguishing event without re-introducing the
+                    // distinguisher at the IPC boundary
+                    // (`protocol.md` §6.4 preserved).
+                    tracing::debug!(
+                        stage = "decode",
+                        outcome = "cannot_decrypt",
+                        "note_read decode_note returned CannotDecrypt"
+                    );
+                    NoteReadError::CannotDecrypt
+                },
+            )
+        })
+        .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    let decrypted = match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_read read+decode panicked or runtime shutdown"
+            );
+            return Err(NoteReadError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(decrypted)) => decrypted,
+    };
+    tracing::debug!(
+        stage = "decode",
+        duration_ms = duration_ms,
+        "note_read read + AEAD verification + decrypt succeeded"
+    );
+
+    // UTF-8 boundary at the command layer (codec stays content_type-
+    // agnostic per the Q4 grilling decision). The intermediate
+    // `to_vec()` allocation is non-Zeroizing — accepted under the V8-
+    // leak-dominance argument in `decisions.md` 2026-05-07: V8-side
+    // retention strictly dominates this Rust-side window. The original
+    // plaintext bytes inside `decrypted` (Zeroizing<Vec<u8>>) wipe on
+    // `decrypted`'s drop at end-of-scope.
+    let utf8_check = String::from_utf8(decrypted.plaintext().to_vec());
+    drop(decrypted);
+    let plaintext = match utf8_check {
+        Ok(s) => s,
+        Err(_) => {
+            tracing::error!(
+                stage = "utf8_check",
+                error_kind = "InvalidPlaintextEncoding",
+                "note_read post-AEAD plaintext is not valid UTF-8 — structural corruption suspected"
+            );
+            return Err(NoteReadError::InvalidPlaintextEncoding);
+        }
+    };
+
+    drop(slot);
+
+    tracing::debug!(stage = "success", event = "note_read");
+    Ok(plaintext)
+}
+
+/// Static-string label for [`NoteReadError`] variants — same
+/// discipline as [`note_create_error_kind`].
+fn note_read_error_kind(e: &NoteReadError) -> &'static str {
+    match e {
+        NoteReadError::NoteNotFound => "NoteNotFound",
+        NoteReadError::InvalidNoteId => "InvalidNoteId",
+        NoteReadError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteReadError::CannotDecrypt => "CannotDecrypt",
+        NoteReadError::InvalidPlaintextEncoding => "InvalidPlaintextEncoding",
+        NoteReadError::Io { .. } => "Io",
+        NoteReadError::JoinFailure => "JoinFailure",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::paths::notes_dir_under;
+    use crate::plugins::vault_unlock::state::{
+        fixture_recovering_with_keys, fixture_unlocked_with_keys, VaultRuntimeState,
+    };
+    use crate::test_support::ScopedTempDir;
+    use std::path::Path;
+
+    /// Byte-pattern items_byte from `fixture_unlocked_with_keys` so
+    /// production decode under the same fixture works.
+    const FIXTURE_ROOT_BYTE: u8 = 0x07;
+    const FIXTURE_ITEMS_BYTE: u8 = 0x09;
+    const FIXTURE_ITEMS_ID_BYTE: u8 = 0x01;
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("multi-thread runtime")
+    }
+
+    // ---- happy path: round-trip create + on-disk decode -----------------
+
+    #[test]
+    fn round_trip_create_then_protocol_decode_returns_same_plaintext() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-roundtrip").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let plaintext = "# happy path\nnote body";
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, plaintext.to_string())
+                    .await
+                    .expect("happy path must succeed");
+
+            let note_id = NoteId::parse(&note_id_str).expect("returned id must be canonical");
+            let on_disk = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+            assert!(on_disk.is_file(), ".myn file must exist on disk");
+
+            let blob = std::fs::read(&on_disk).unwrap();
+            let items_key = [FIXTURE_ITEMS_BYTE; 32];
+            let items_key_id = [FIXTURE_ITEMS_ID_BYTE; 16];
+            let decrypted = protocol::decode_note(
+                &blob,
+                note_id.as_uuid().as_bytes(),
+                &items_key,
+                &items_key_id,
+            )
+            .expect("on-disk blob must decrypt under fixture keys");
+
+            assert_eq!(decrypted.plaintext(), plaintext.as_bytes());
+        });
+    }
+
+    // ---- slot guards ----------------------------------------------------
+
+    #[test]
+    fn slot_empty_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-slot-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default(); // Slot::Empty by default
+
+            let result = note_create_with_dir(notes_dir, &state, "x".to_string()).await;
+            assert!(matches!(result, Err(NoteCreateError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn slot_recovering_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-slot-recovering").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+
+            let result = note_create_with_dir(notes_dir, &state, "x".to_string()).await;
+            assert!(matches!(result, Err(NoteCreateError::VaultNotUnlocked)));
+        });
+    }
+
+    // ---- 16 MiB boundary -----------------------------------------------
+
+    #[test]
+    fn plaintext_at_max_succeeds() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-max").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let plaintext = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN]).unwrap();
+            let result = note_create_with_dir(notes_dir, &state, plaintext).await;
+            assert!(
+                result.is_ok(),
+                "MAX_PLAINTEXT_LEN must succeed; got {result:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn plaintext_above_max_returns_plaintext_too_large() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-above-max").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let plaintext = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN + 1]).unwrap();
+            let result = note_create_with_dir(notes_dir, &state, plaintext).await;
+            assert!(matches!(result, Err(NoteCreateError::PlaintextTooLarge)));
+        });
+    }
+
+    // ---- defensive guards ------------------------------------------------
+
+    #[test]
+    fn atomic_write_replace_false_canary_under_notes_dir() {
+        // The `NoteAlreadyExists` defensive guard rides on
+        // `atomic_write::atomic_write(.., replace=false)` rejecting a
+        // pre-existing destination. UUIDv7 isn't predictable mid-test,
+        // so we cannot forge a real collision through `note_create`;
+        // this test pins the helper-layer guard the canary depends on.
+        // That `note_create_with_dir` invokes the helper with
+        // `replace=false` is verified by reading the call site directly.
+        let scratch = ScopedTempDir::new("note-create-already-exists").unwrap();
+        let notes_dir = notes_dir_under(scratch.path()).unwrap();
+        let sentinel = notes_dir.join("sentinel.myn");
+        std::fs::write(&sentinel, b"pre-existing").unwrap();
+
+        let err = atomic_write::atomic_write(&sentinel, b"replacement", false).expect_err(
+            "atomic_write replace=false must reject a pre-existing dest — the canary \
+                that note_create maps to NoteAlreadyExists",
+        );
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+    }
+
+    #[test]
+    fn notes_dir_resolution_failing_with_not_a_directory_returns_structural_variant() {
+        // `note_create_with_dir` takes `notes_dir` already resolved,
+        // so the `NotesDirNotADirectory` mapping lives in the outer
+        // `note_create` (which calls `paths::notes_dir`). We exercise
+        // the helper-layer surface that the outer matches: confirm
+        // `paths::notes_dir_under` returns an IO error of the expected
+        // kind when `<parent>/notes` is a regular file. The outer's
+        // accept-list mapping (`NotADirectory | AlreadyExists`) is
+        // verified at the `paths::tests::notes_dir_under_errors_when_path_is_a_file`
+        // boundary, which is where the kind preservation is pinned.
+        let scratch = ScopedTempDir::new("note-create-notes-is-file").unwrap();
+        let conflict = scratch.path().join("notes");
+        std::fs::write(&conflict, b"hostile").unwrap();
+        let err = notes_dir_under(scratch.path()).expect_err("conflict must error");
+        assert!(matches!(
+            err.kind(),
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists
+        ));
+    }
+
+    // ---- concurrent vault_lock fair-queue --------------------------------
+
+    #[test]
+    fn note_create_concurrent_with_vault_lock_completes_cleanly() {
+        // The deterministic properties: under multi-thread scheduling,
+        // `note_create` and a concurrent `state.take()` (which is what
+        // `vault_lock` does internally) both complete without deadlock,
+        // and the terminal state is `Slot::Empty`. The fair-queue
+        // ordering between read and write requests is a
+        // `tokio::sync::RwLock` implementation guarantee — exercised
+        // structurally by holding the read guard across spawn_blocking
+        // + atomic_write in `note_create_with_dir`. The race outcome
+        // (which task acquired its lock first) is non-deterministic
+        // under multi-thread runtime; both orderings produce a valid
+        // terminal state that this test pins.
+        rt().block_on(async {
+            use std::sync::Arc;
+
+            let scratch = ScopedTempDir::new("note-create-concurrent-lock").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = Arc::new(VaultRuntimeState::default());
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let create_state = Arc::clone(&state);
+            let create_dir = notes_dir.clone();
+            let create = tokio::spawn(async move {
+                note_create_with_dir(create_dir, &create_state, "concurrent".to_string()).await
+            });
+
+            tokio::task::yield_now().await;
+
+            let lock_state = Arc::clone(&state);
+            let lock = tokio::spawn(async move { lock_state.take().await });
+
+            let create_result = create.await.expect("create task joins");
+            let lock_taken = lock.await.expect("lock task joins");
+
+            // Lock observed `Slot::Unlocked(_)` regardless of which
+            // task's lock-request reached the queue first — the
+            // variant set at test start. Under fair queueing, the
+            // write-lock (lock's `state.take()`) waits for any
+            // outstanding read guard before it runs.
+            assert!(
+                matches!(
+                    lock_taken,
+                    crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+                ),
+                "lock must take the Unlocked variant"
+            );
+
+            // After both tasks join, the slot is Empty (lock consumed
+            // it; create never mutated the variant).
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+            );
+
+            // create's outcome depends on which task acquired its
+            // lock first. Both orderings are valid; either proves no
+            // deadlock + no state corruption:
+            //   - `Ok(_)`                        → create ran first;
+            //                                       lock waited for the
+            //                                       read guard to drop.
+            //   - `Err(VaultNotUnlocked)`        → lock ran first;
+            //                                       create observed
+            //                                       `Slot::Empty`.
+            match create_result {
+                Ok(_) => {}
+                Err(NoteCreateError::VaultNotUnlocked) => {}
+                Err(other) => panic!("unexpected create outcome: {other:?}"),
+            }
+        });
+    }
+
+    // ---- error_kind label ------------------------------------------------
+
+    #[test]
+    fn error_kind_label_covers_every_variant() {
+        // Compile-time exhaustiveness via the helper's match. Each
+        // label is a static `&'static str`; the test just exercises
+        // every variant through the helper to pin the wire shape.
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_create_error_kind(&NoteCreateError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            note_create_error_kind(&NoteCreateError::NoteAlreadyExists),
+            "NoteAlreadyExists"
+        );
+        assert_eq!(
+            note_create_error_kind(&NoteCreateError::PlaintextTooLarge),
+            "PlaintextTooLarge"
+        );
+        assert_eq!(
+            note_create_error_kind(&NoteCreateError::NotesDirNotADirectory),
+            "NotesDirNotADirectory"
+        );
+        assert_eq!(
+            note_create_error_kind(&NoteCreateError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_create_error_kind(&NoteCreateError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+
+    // =====================================================================
+    // note_read
+    // =====================================================================
+
+    /// Helper: write a v0.1 .myn blob with caller-supplied randomness
+    /// (tests need predictable bytes; `encode_new_note_blob_raw` is the
+    /// `_raw` surface in the protocol crate that takes nonces + item_key
+    /// as parameters). Used by the non-UTF-8 plaintext test below.
+    fn forge_note_blob_with_plaintext(
+        notes_dir: &Path,
+        items_key: &[u8; 32],
+        items_key_id: &[u8; 16],
+        plaintext: &[u8],
+    ) -> (NoteId, PathBuf) {
+        let note_id = NoteId::new_v7();
+        let item_key = [0xAAu8; 32];
+        let item_key_nonce = [0xBBu8; 24];
+        let content_nonce = [0xCCu8; 24];
+        let blob = protocol::encode_new_note_blob_raw(
+            items_key,
+            items_key_id,
+            note_id.as_uuid().as_bytes(),
+            &item_key,
+            &item_key_nonce,
+            &content_nonce,
+            plaintext,
+        )
+        .expect("forge encode must succeed for raw input");
+        let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+        std::fs::write(&path, &blob).unwrap();
+        (note_id, path)
+    }
+
+    // ---- happy round-trip with note_create -----------------------------
+
+    #[test]
+    fn round_trip_create_then_read_returns_same_plaintext() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-roundtrip").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let plaintext = "# round trip\nbody bytes";
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, plaintext.to_string())
+                    .await
+                    .unwrap();
+
+            let recovered = note_read_with_dir(notes_dir, &state, note_id_str)
+                .await
+                .expect("read of freshly created note must succeed");
+            assert_eq!(recovered, plaintext);
+        });
+    }
+
+    // ---- slot guards ---------------------------------------------------
+
+    #[test]
+    fn read_slot_empty_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-slot-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteReadError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn read_slot_recovering_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-slot-recovering").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteReadError::VaultNotUnlocked)));
+        });
+    }
+
+    // ---- strict NoteId parse rejects -----------------------------------
+
+    #[test]
+    fn read_invalid_note_id_wrong_length() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-id-len").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let result = note_read_with_dir(notes_dir, &state, "too-short".to_string()).await;
+            assert!(matches!(result, Err(NoteReadError::InvalidNoteId)));
+        });
+    }
+
+    #[test]
+    fn read_invalid_note_id_uppercase() {
+        // Filesystem case-sensitivity defense — APFS/ext4 inconsistency
+        // structurally prevented at the parser before any path
+        // concatenation (path-traversal-impossible by construction).
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-id-upper").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                "01970E83-4F2F-7000-8000-000000000000".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteReadError::InvalidNoteId)));
+        });
+    }
+
+    #[test]
+    fn read_invalid_note_id_v4_uuid() {
+        // Backend-gen v7-only contract is double-pinned: UI cannot
+        // inject a v4 UUID and have it routed to a real file.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-id-v4").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                "550e8400-e29b-41d4-a716-446655440000".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteReadError::InvalidNoteId)));
+        });
+    }
+
+    // ---- NoteNotFound: valid v7 UUID, no file --------------------------
+
+    #[test]
+    fn read_note_not_found_for_valid_id_with_no_file() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-not-found").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            // Mint a fresh v7 UUID; no corresponding file on disk.
+            let phantom = NoteId::new_v7();
+            let result = note_read_with_dir(notes_dir, &state, phantom.to_string()).await;
+            assert!(matches!(result, Err(NoteReadError::NoteNotFound)));
+        });
+    }
+
+    // ---- AEAD failure: tampered byte returns CannotDecrypt --------------
+
+    #[test]
+    fn read_tampered_blob_returns_cannot_decrypt() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-tamper").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            // Create a real note, then tamper one byte of the on-disk
+            // blob's content_nonce region (offset > 47, post-prefix) so
+            // §6.4 inner-AEAD verification fails.
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, "untampered original".to_string())
+                    .await
+                    .unwrap();
+            let path = notes_dir.join(format!(
+                "{}.myn",
+                NoteId::parse(&note_id_str).unwrap().as_uuid()
+            ));
+            let mut blob = std::fs::read(&path).unwrap();
+            // Last byte sits in the inner ciphertext + CTX tag region;
+            // flipping it invalidates the inner-AEAD CTX commitment.
+            let last = blob.len() - 1;
+            blob[last] ^= 0xFF;
+            std::fs::write(&path, &blob).unwrap();
+
+            let result = note_read_with_dir(notes_dir, &state, note_id_str).await;
+            assert!(matches!(result, Err(NoteReadError::CannotDecrypt)));
+        });
+    }
+
+    // ---- Post-AEAD UTF-8 boundary: InvalidPlaintextEncoding ------------
+
+    #[test]
+    fn read_non_utf8_plaintext_returns_invalid_plaintext_encoding() {
+        // Use the protocol crate's `_raw` surface to forge a blob with
+        // intentionally non-UTF-8 plaintext bytes ([0xFF, 0xFE]) under
+        // the same items_key + items_key_id the fixture uses. The blob
+        // is a valid v0.1 `.myn` (AEAD verifies); only the post-AEAD
+        // UTF-8 conversion fails. This is the structural-corruption
+        // distinguisher distinct from `CannotDecrypt`.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-read-non-utf8").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let items_key = [FIXTURE_ITEMS_BYTE; 32];
+            let items_key_id = [FIXTURE_ITEMS_ID_BYTE; 16];
+            let bad_plaintext: &[u8] = &[0xFF, 0xFE]; // valid bytes, invalid UTF-8 prefix
+            let (note_id, _path) = forge_note_blob_with_plaintext(
+                &notes_dir,
+                &items_key,
+                &items_key_id,
+                bad_plaintext,
+            );
+
+            let result = note_read_with_dir(notes_dir, &state, note_id.to_string()).await;
+            assert!(matches!(
+                result,
+                Err(NoteReadError::InvalidPlaintextEncoding)
+            ));
+        });
+    }
+
+    // ---- error_kind label ----------------------------------------------
+
+    #[test]
+    fn read_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_read_error_kind(&NoteReadError::NoteNotFound),
+            "NoteNotFound"
+        );
+        assert_eq!(
+            note_read_error_kind(&NoteReadError::InvalidNoteId),
+            "InvalidNoteId"
+        );
+        assert_eq!(
+            note_read_error_kind(&NoteReadError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            note_read_error_kind(&NoteReadError::CannotDecrypt),
+            "CannotDecrypt"
+        );
+        assert_eq!(
+            note_read_error_kind(&NoteReadError::InvalidPlaintextEncoding),
+            "InvalidPlaintextEncoding"
+        );
+        assert_eq!(
+            note_read_error_kind(&NoteReadError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_read_error_kind(&NoteReadError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+}

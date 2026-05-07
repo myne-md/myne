@@ -87,6 +87,23 @@ impl VaultRuntimeState {
         &self.auth_permits
     }
 
+    /// Acquire a read borrow of the [`Slot`].
+    ///
+    /// Editor commands (Lane A `A9`+ — MYND-26 `note_create` /
+    /// `note_read`) pattern-match the returned guard's `Slot::Unlocked
+    /// (uv) => ...` variant, clone keys out of `uv`, and HOLD the
+    /// guard across `tokio::task::spawn_blocking` + `atomic_write` so
+    /// `vault_lock` waits for in-flight ops via `tokio::sync::RwLock`
+    /// fair queueing — no extra Semaphore/Notify/CancellationToken
+    /// machinery (see `decisions.md` 2026-05-07 "Note AEAD ops").
+    ///
+    /// The guard is `Send + Sync` because `Slot: Send + Sync` (every
+    /// variant's fields are; `Zeroizing<[u8; 32]>` is `Send + Sync`).
+    /// Holding it across `.await` keeps the outer future `Send`-clean.
+    pub async fn slot_read(&self) -> tokio::sync::RwLockReadGuard<'_, Slot> {
+        self.slot.read().await
+    }
+
     /// Cheap read-lock peek: which [`Slot`] variant is currently held?
     ///
     /// Used at the start of every auth command to surface the
