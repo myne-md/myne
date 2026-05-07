@@ -62,11 +62,9 @@ use uuid::Uuid;
 /// `Display` emits the canonical lowercase-hyphenated 36-char form (the
 /// shape `parse` accepts) so `format!("{note_id}.myn")` produces a
 /// filename ready for the `notes/` directory.
-#[allow(dead_code)] // production constructors land with Tasks 8/9 (notes plugin commands)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NoteId(Uuid);
 
-#[allow(dead_code)] // inherent methods consumed by Tasks 8/9 (notes plugin commands)
 impl NoteId {
     /// Generate a fresh UUIDv7 NoteId. The only production constructor —
     /// called by `note_create` (Task 8) to mint the destination
@@ -147,7 +145,6 @@ impl<'de> Deserialize<'de> for NoteId {
 /// Consuming Tauri commands (Tasks 8 / 9) collapse all five to a single
 /// public `InvalidNoteId` variant per the boundary policy in
 /// `decisions.md` 2026-05-07.
-#[allow(dead_code)] // variants emitted via `tracing::debug!(stage = ?cause)` from Tasks 8/9
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum InvalidNoteIdCause {
     WrongLength,
