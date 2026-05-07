@@ -67,9 +67,18 @@ export type NoteReadError =
    */
   | { kind: "InvalidPlaintextEncoding" }
   /**
+   * `<vault>/notes` exists as a regular file rather than a directory —
+   * defensive bug-canary parallel to `NoteCreateError`,
+   * `NoteUpdateError`, `NoteDeleteError`. UI: render
+   * `<FailClosedError reason="invalid-state" />`.
+   */
+  | { kind: "NotesDirNotADirectory" }
+  /**
    * File-system IO failure during `notes_dir` resolution or the blob
-   * read. `NotFound` is special-cased upstream as `NoteNotFound`; only
-   * `PermissionDenied` / `NoSpace` / `Other` surface here.
+   * read. `NotFound` is special-cased upstream as `NoteNotFound`;
+   * `NotADirectory` / `AlreadyExists` are special-cased as
+   * `NotesDirNotADirectory`; only `PermissionDenied` / `NoSpace` /
+   * `Other` surface here.
    */
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   /**

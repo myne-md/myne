@@ -155,10 +155,20 @@ pub enum NoteReadError {
     #[error("plaintext is not valid utf-8")]
     InvalidPlaintextEncoding,
 
+    /// `<vault>/notes` exists as a regular file rather than a
+    /// directory — defensive bug-canary parallel to
+    /// [`NoteCreateError::NotesDirNotADirectory`] /
+    /// [`NoteUpdateError::NotesDirNotADirectory`] /
+    /// [`NoteDeleteError::NotesDirNotADirectory`]. Fires for dev-tools
+    /// manipulation, disk corruption, or cross-process race edge cases.
+    #[error("vault notes path is not a directory")]
+    NotesDirNotADirectory,
+
     /// File-system IO failure during `notes_dir` resolution or the
     /// blob read. `NotFound` is special-cased upstream as
-    /// [`Self::NoteNotFound`]; only `PermissionDenied` / `NoSpace` /
-    /// `Other` surface here.
+    /// [`Self::NoteNotFound`]; `NotADirectory` / `AlreadyExists` are
+    /// special-cased as [`Self::NotesDirNotADirectory`]; only
+    /// `PermissionDenied` / `NoSpace` / `Other` surface here.
     #[error("io error")]
     Io { io_error_kind: IoFailureKind },
 
@@ -174,6 +184,190 @@ impl From<std::io::Error> for NoteReadError {
         // to `NoteNotFound` for the distinct user message). This
         // `From` handles the residual cases.
         NoteReadError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
+/// Single error type returned across the IPC boundary by
+/// [`super::commands::note_update`].
+///
+/// Hand-mirrored on the TS side at `src/types/note-update-error.ts`.
+/// Variant set is closed; adding a variant is an IPC contract change
+/// that requires updating both sides.
+///
+/// Asymmetry vs [`NoteCreateError`] is intentional and pinned by
+/// `decisions.md` 2026-05-07 "`note_update` error surface: 8 variant,
+/// p1 + q1, drift-free MYND-26 mirror":
+///
+/// - ⊕ `NoteNotFound` — file missing. Distinct from `CannotDecrypt`
+///   (q1 decision): the §6.4 non-distinguishing rule covers credential-
+///   validity leak (wrong-password vs wrong-vault Argon2id partition
+///   oracle); update path runs after vault unlocked + items_key in hand
+///   + password verified, so "file missing" leaks no credential-validity
+///     information. Surfaces the autosave-after-delete race signal which
+///     the UI session-aware-folds to "kullanıcı sildi, autosave yetişemedi" —
+///     clean affordance that `CannotDecrypt` would muddle with sahte data-loss
+///     alarm.
+/// - ⊕ `CannotDecrypt` — existing blob fails AEAD. §6.4 non-
+///   distinguishing applies; the codec emits its sub-cause via
+///   `tracing::debug!`, host adds `outcome = "cannot_decrypt"` without
+///   re-introducing the distinguisher.
+/// - ⊖ `NoteAlreadyExists` removed — `atomic_write(replace=true)`
+///   semantic; create-only canary not applicable to update.
+/// - ⊖ `InvalidPlaintextEncoding` removed — update flow never converts
+///   old plaintext bytes to UTF-8 (codec content_type-agnostic per
+///   `decisions.md` 2026-05-07 "Plaintext IPC: String both directions";
+///   bytes discarded inside spawn_blocking; new plaintext arrives as
+///   `String` at IPC boundary → UTF-8 guaranteed by Tauri serde).
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteUpdateError {
+    /// Slot is `Empty` or `Recovering`. Frontend routes the user to the
+    /// lock screen via `vault_status` / `vault_slot_kind`; if this
+    /// surfaces from `note_update`, a router bug.
+    #[error("vault not unlocked")]
+    VaultNotUnlocked,
+
+    /// `note_id` failed strict parse via `super::note_id::NoteId::parse`.
+    /// The internal sub-cause is emitted via `tracing::debug!(stage = ?cause)`
+    /// for ops debugging and **does not** cross the IPC boundary as a
+    /// distinguisher. Bug-canary: backend always returns canonical
+    /// `note_id` strings, so anything else is a UI regression.
+    #[error("invalid note id")]
+    InvalidNoteId,
+
+    /// `<vault>/notes/<note_id>.myn` does not exist. UI: "Bu not silinmiş
+    /// olabilir." Distinct from `CannotDecrypt` per the q1 decision (see
+    /// type-level rationale).
+    #[error("note not found")]
+    NoteNotFound,
+
+    /// Plaintext exceeds `protocol::MAX_PLAINTEXT_LEN` (16 MiB cap).
+    /// Mapped from `protocol::ProtocolError::PlaintextTooLarge` returned
+    /// by `encode_update`; **no host-side pre-check** — protocol crate
+    /// is the sole canonical enforcement point per `decisions.md`
+    /// 2026-05-06 "Per-note ciphertext_len cap at 16 MiB" + 2026-05-07
+    /// "`note_update` error surface" rationale.
+    #[error("plaintext too large")]
+    PlaintextTooLarge,
+
+    /// AEAD-tag failure on `decode_note` of the existing `.myn` blob.
+    /// **By design this single tag does NOT distinguish** parse-level
+    /// failure (magic / version / reserved / `enc_item_key_len` / cap),
+    /// `items_key_id` mismatch, outer-AEAD failure (`enc_item_key`
+    /// wrap), or inner-AEAD failure (content) — see `protocol.md` §6.4.
+    /// The codec's internal `pub(crate) DecryptCause` flows through its
+    /// own `tracing::debug!(stage = ?cause)` inside `decode_note`; the
+    /// host plugin emits a parallel `outcome = "cannot_decrypt"` event
+    /// without re-introducing the distinguisher at the IPC boundary.
+    #[error("note cannot be decrypted")]
+    CannotDecrypt,
+
+    /// `<vault>/notes` exists as a regular file rather than a directory.
+    /// Defensive bug-canary parallel to
+    /// [`NoteCreateError::NotesDirNotADirectory`] — fires for dev-tools
+    /// manipulation, disk corruption, or cross-process race edge cases.
+    /// UI surfaces a `<FailClosedError reason="invalid-state" />` for
+    /// "vault yapısı bozuk, uygulamayı yeniden başlat".
+    #[error("vault notes path is not a directory")]
+    NotesDirNotADirectory,
+
+    /// File-system IO failure during `notes_dir` resolution, blob read,
+    /// or `atomic_write`. The bounded [`IoFailureKind`] keeps OS error
+    /// messages off the wire.
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error
+    /// (panic in the blocking task, runtime shutdown). User-facing CTA
+    /// is "try again".
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteUpdateError {
+    fn from(e: std::io::Error) -> Self {
+        // `NotFound` is special-cased by the calling command (mapped to
+        // `NoteNotFound` for the autosave-after-delete race fold).
+        // `NotADirectory` / `AlreadyExists` are mapped to
+        // `NotesDirNotADirectory` upstream. This `From` handles the
+        // residual cases where an `io::Error` bubbles up unclassified.
+        NoteUpdateError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
+/// Single error type returned across the IPC boundary by
+/// [`super::commands::note_delete`].
+///
+/// Hand-mirrored on the TS side at `src/types/note-delete-error.ts`.
+///
+/// Asymmetry vs [`NoteUpdateError`] is intentional and pinned by
+/// `decisions.md` 2026-05-07 "`note_delete` durability: Unix parent-dir
+/// `sync_all` only; Windows s1 best-effort":
+///
+/// - ⊖ `PlaintextTooLarge` removed — delete carries no plaintext.
+/// - ⊖ `CannotDecrypt` removed — delete does no AEAD; cryptographic
+///   erase is structural via the v0.1 key hierarchy per `decisions.md`
+///   2026-05-07 "Note delete cryptographic erase: structural property"
+///   (`unlink` removes both ciphertext and the only on-disk copy of the
+///   wrapped item_key in one operation; without `itemsKey` in RAM the
+///   bytes remain indistinguishable from random).
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteDeleteError {
+    /// Slot is `Empty` or `Recovering`.
+    #[error("vault not unlocked")]
+    VaultNotUnlocked,
+
+    /// `note_id` failed strict parse via `NoteId::parse`. UI-bug-canary;
+    /// internal cause emitted via `tracing::debug!(stage = ?cause)`.
+    #[error("invalid note id")]
+    InvalidNoteId,
+
+    /// `<vault>/notes/<note_id>.myn` does not exist. **Strict at IPC,
+    /// idempotent at UI** per `decisions.md` 2026-05-07 "Note delete UX:
+    /// hard-delete in v0.1, vault-internal soft-trash deferred to v0.2"
+    /// — the second `note_delete` invoke for the same `note_id` returns
+    /// this variant, but the UI folds it to a "note already gone" toast
+    /// (autosave-after-delete race + double-click idempotency).
+    #[error("note not found")]
+    NoteNotFound,
+
+    /// `<vault>/notes` exists as a regular file rather than a directory.
+    /// Defensive bug-canary parallel to
+    /// [`NoteCreateError::NotesDirNotADirectory`] and
+    /// [`NoteUpdateError::NotesDirNotADirectory`].
+    #[error("vault notes path is not a directory")]
+    NotesDirNotADirectory,
+
+    /// File-system IO failure during `notes_dir` resolution or
+    /// `remove_file` / parent-dir `sync_all`. `NotFound` is special-
+    /// cased upstream as [`Self::NoteNotFound`].
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error.
+    /// User-facing CTA is "try again". Uniform with the other three
+    /// notes-plugin commands per `decisions.md` 2026-05-07 "Note AEAD
+    /// ops: clone-out items_key + always spawn_blocking" — `note_delete`
+    /// touches no AEAD but follows the same `spawn_blocking` shape so
+    /// `parent_dir.sync_all()` (Unix) cannot block the tokio runtime
+    /// under ext4 journal commit / NFS / FUSE / AV-overlay scanner
+    /// worst cases.
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteDeleteError {
+    fn from(e: std::io::Error) -> Self {
+        // `NotFound` is special-cased by the calling command (mapped to
+        // `NoteNotFound`). `NotADirectory` / `AlreadyExists` are mapped
+        // to `NotesDirNotADirectory` upstream. This `From` handles the
+        // residual cases.
+        NoteDeleteError::Io {
             io_error_kind: from_io_error_kind(e.kind()),
         }
     }
@@ -286,6 +480,14 @@ mod tests {
     }
 
     #[test]
+    fn read_notes_dir_not_a_directory_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_read(&NoteReadError::NotesDirNotADirectory),
+            r#"{"kind":"NotesDirNotADirectory"}"#
+        );
+    }
+
+    #[test]
     fn read_io_serializes_with_io_failure_kind_payload() {
         let e = NoteReadError::Io {
             io_error_kind: IoFailureKind::Other,
@@ -336,6 +538,7 @@ mod tests {
                 NoteReadError::VaultNotUnlocked => {}
                 NoteReadError::CannotDecrypt => {}
                 NoteReadError::InvalidPlaintextEncoding => {}
+                NoteReadError::NotesDirNotADirectory => {}
                 NoteReadError::Io { io_error_kind: _ } => {}
                 NoteReadError::JoinFailure => {}
             }
@@ -387,6 +590,243 @@ mod tests {
         let mapped: NoteReadError = raw.into();
         match mapped {
             NoteReadError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteUpdateError
+    // =====================================================================
+
+    fn serialize_update(e: &NoteUpdateError) -> String {
+        serde_json::to_string(e).expect("NoteUpdateError must serialize cleanly")
+    }
+
+    // ---- NoteUpdateError serde shape -----------------------------------
+
+    #[test]
+    fn update_vault_not_unlocked_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_update(&NoteUpdateError::VaultNotUnlocked),
+            r#"{"kind":"VaultNotUnlocked"}"#
+        );
+    }
+
+    #[test]
+    fn update_invalid_note_id_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_update(&NoteUpdateError::InvalidNoteId),
+            r#"{"kind":"InvalidNoteId"}"#
+        );
+    }
+
+    #[test]
+    fn update_note_not_found_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_update(&NoteUpdateError::NoteNotFound),
+            r#"{"kind":"NoteNotFound"}"#
+        );
+    }
+
+    #[test]
+    fn update_plaintext_too_large_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_update(&NoteUpdateError::PlaintextTooLarge),
+            r#"{"kind":"PlaintextTooLarge"}"#
+        );
+    }
+
+    #[test]
+    fn update_cannot_decrypt_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_update(&NoteUpdateError::CannotDecrypt),
+            r#"{"kind":"CannotDecrypt"}"#
+        );
+    }
+
+    #[test]
+    fn update_notes_dir_not_a_directory_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_update(&NoteUpdateError::NotesDirNotADirectory),
+            r#"{"kind":"NotesDirNotADirectory"}"#
+        );
+    }
+
+    #[test]
+    fn update_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteUpdateError::Io {
+            io_error_kind: IoFailureKind::PermissionDenied,
+        };
+        assert_eq!(
+            serialize_update(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
+        );
+    }
+
+    #[test]
+    fn update_join_failure_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_update(&NoteUpdateError::JoinFailure),
+            r#"{"kind":"JoinFailure"}"#
+        );
+    }
+
+    // ---- Closed-payload exhaustiveness pin -----------------------------
+    //
+    // Mirror of `create_all_variants_have_closed_payloads_only` /
+    // `read_all_variants_have_closed_payloads_only`. If a future variant
+    // is added to `NoteUpdateError`, the exhaustive match below stops
+    // compiling; the reviewer must add the new arm AND verify the new
+    // variant's payload is closed (no `String`, no unbounded-shape data
+    // crossing the IPC boundary).
+
+    #[test]
+    fn update_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteUpdateError) {
+            match e {
+                NoteUpdateError::VaultNotUnlocked => {}
+                NoteUpdateError::InvalidNoteId => {}
+                NoteUpdateError::NoteNotFound => {}
+                NoteUpdateError::PlaintextTooLarge => {}
+                NoteUpdateError::CannotDecrypt => {}
+                NoteUpdateError::NotesDirNotADirectory => {}
+                NoteUpdateError::Io { io_error_kind: _ } => {}
+                NoteUpdateError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteUpdateError::VaultNotUnlocked);
+    }
+
+    // ---- From<std::io::Error> mapping ----------------------------------
+
+    #[test]
+    fn update_from_io_error_routes_via_closed_enum_for_permission_denied() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteUpdateError = raw.into();
+        match mapped {
+            NoteUpdateError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn update_from_io_error_unknown_kind_collapses_to_other() {
+        // `AlreadyExists` is special-cased by the calling command upstream
+        // (routed to `NotesDirNotADirectory` per the `paths::notes_dir`
+        // accept-list). The bare `From<io::Error>` impl falls through to
+        // `Other`; this pins the residual-case behavior.
+        let raw = std::io::Error::from(std::io::ErrorKind::AlreadyExists);
+        let mapped: NoteUpdateError = raw.into();
+        match mapped {
+            NoteUpdateError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::Other);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteDeleteError
+    // =====================================================================
+
+    fn serialize_delete(e: &NoteDeleteError) -> String {
+        serde_json::to_string(e).expect("NoteDeleteError must serialize cleanly")
+    }
+
+    // ---- NoteDeleteError serde shape -----------------------------------
+
+    #[test]
+    fn delete_vault_not_unlocked_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_delete(&NoteDeleteError::VaultNotUnlocked),
+            r#"{"kind":"VaultNotUnlocked"}"#
+        );
+    }
+
+    #[test]
+    fn delete_invalid_note_id_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_delete(&NoteDeleteError::InvalidNoteId),
+            r#"{"kind":"InvalidNoteId"}"#
+        );
+    }
+
+    #[test]
+    fn delete_note_not_found_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_delete(&NoteDeleteError::NoteNotFound),
+            r#"{"kind":"NoteNotFound"}"#
+        );
+    }
+
+    #[test]
+    fn delete_notes_dir_not_a_directory_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_delete(&NoteDeleteError::NotesDirNotADirectory),
+            r#"{"kind":"NotesDirNotADirectory"}"#
+        );
+    }
+
+    #[test]
+    fn delete_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteDeleteError::Io {
+            io_error_kind: IoFailureKind::Other,
+        };
+        assert_eq!(
+            serialize_delete(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#
+        );
+    }
+
+    #[test]
+    fn delete_join_failure_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_delete(&NoteDeleteError::JoinFailure),
+            r#"{"kind":"JoinFailure"}"#
+        );
+    }
+
+    // ---- Closed-payload exhaustiveness pin -----------------------------
+
+    #[test]
+    fn delete_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteDeleteError) {
+            match e {
+                NoteDeleteError::VaultNotUnlocked => {}
+                NoteDeleteError::InvalidNoteId => {}
+                NoteDeleteError::NoteNotFound => {}
+                NoteDeleteError::NotesDirNotADirectory => {}
+                NoteDeleteError::Io { io_error_kind: _ } => {}
+                NoteDeleteError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteDeleteError::VaultNotUnlocked);
+    }
+
+    // ---- From<std::io::Error> mapping ----------------------------------
+
+    #[test]
+    fn delete_from_io_error_routes_via_closed_enum_for_permission_denied() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteDeleteError = raw.into();
+        match mapped {
+            NoteDeleteError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn delete_from_io_error_no_space_collapses_to_no_space() {
+        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
+        let mapped: NoteDeleteError = raw.into();
+        match mapped {
+            NoteDeleteError::Io { io_error_kind } => {
                 assert_eq!(io_error_kind, IoFailureKind::NoSpace);
             }
             other => panic!("expected Io variant, got {other:?}"),

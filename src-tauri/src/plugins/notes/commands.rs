@@ -31,13 +31,13 @@ use crate::atomic_write;
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
 use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
-use protocol::{decode_note, encode_new_note, DecryptError, ProtocolError};
+use protocol::{decode_note, encode_new_note, encode_update, DecryptError, ProtocolError};
 use std::path::PathBuf;
 use std::time::Instant;
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
-use super::error::{NoteCreateError, NoteReadError};
+use super::error::{NoteCreateError, NoteDeleteError, NoteReadError, NoteUpdateError};
 use super::note_id::NoteId;
 
 /// Create a new encrypted `.myn` note. See module-level docs for the
@@ -262,15 +262,28 @@ pub async fn note_read<R: Runtime>(
     note_id: String,
 ) -> Result<String, NoteReadError> {
     let notes_dir = paths::notes_dir(&app).map_err(|e| {
-        let io_kind = from_io_error_kind(e.kind());
-        tracing::error!(
-            stage = "notes_dir",
-            error_kind = "Io",
-            io_failure_kind = ?io_kind,
-            "note_read notes_dir resolution failed"
-        );
-        NoteReadError::Io {
-            io_error_kind: io_kind,
+        let kind = e.kind();
+        match kind {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_read notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteReadError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_read notes_dir resolution failed"
+                );
+                NoteReadError::Io {
+                    io_error_kind: io_kind,
+                }
+            }
         }
     })?;
     note_read_with_dir(notes_dir, state.inner(), note_id).await
@@ -417,8 +430,487 @@ fn note_read_error_kind(e: &NoteReadError) -> &'static str {
         NoteReadError::VaultNotUnlocked => "VaultNotUnlocked",
         NoteReadError::CannotDecrypt => "CannotDecrypt",
         NoteReadError::InvalidPlaintextEncoding => "InvalidPlaintextEncoding",
+        NoteReadError::NotesDirNotADirectory => "NotesDirNotADirectory",
         NoteReadError::Io { .. } => "Io",
         NoteReadError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// Update an existing encrypted `.myn` note in place. See module-level
+/// docs for the broader pipeline narration.
+///
+/// **Pipeline:**
+/// 1. First-line `Zeroizing::new(plaintext)` Plaintext-IPC discipline.
+/// 2. Strict [`NoteId::parse`] — UI bug-canary; sub-cause via tracing.
+/// 3. Slot read guard + `Slot::Unlocked(uv)` match (clone `items_key`
+///    + `items_key_id` into Zeroizing wrappers; reject `Empty` /
+///    `Recovering` as `VaultNotUnlocked`). Guard held across
+///    `spawn_blocking + atomic_write` so `vault_lock` fair-queues per
+///    `decisions.md` 2026-05-07 "Note AEAD ops".
+/// 4. `spawn_blocking { std::fs::read → decode_note → encode_update }`
+///    — `encode_update` consumes the [`protocol::DecryptedNote`] handle
+///    (typestate "one decode, one update"); fresh `content_nonce` is
+///    generated internally by the convenience wrapper; bytes 0..47+N
+///    of the new blob are byte-identical to the previous blob per
+///    `protocol.md` §6.3.
+/// 5. `atomic_write(replace=true)` — `decisions.md` 2026-05-07
+///    `atomic_write` durability + `replace:bool` parameter pin.
+/// 6. Drop guard, emit `event = "note_updated"`.
+///
+/// **Failure mapping** (closed-enum, drift-free MYND-26 mirror per
+/// `decisions.md` 2026-05-07 "`note_update` error surface"):
+/// - `InvalidNoteId` — strict parse rejected (sub-cause via tracing).
+/// - `VaultNotUnlocked` — slot is `Empty` or `Recovering`.
+/// - `NoteNotFound` — `<vault>/notes/<id>.myn` missing during read
+///   (autosave-after-delete race signal; q1 decision keeps this
+///   distinct from `CannotDecrypt`).
+/// - `CannotDecrypt` — AEAD-tag failure on `decode_note`; non-
+///   distinguishing per `protocol.md` §6.4.
+/// - `PlaintextTooLarge` — `protocol::ProtocolError::PlaintextTooLarge`
+///   from `encode_update`; cap is sole canonical enforcement in the
+///   protocol crate (no host-side pre-check).
+/// - `NotesDirNotADirectory` — `<vault>/notes` is a regular file
+///   (defensive bug-canary parallel to MYND-26).
+/// - `Io` — residual filesystem failure.
+/// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown,
+///   absorbing v0.1-unreachable `ProtocolError::Csprng` /
+///   `ProtocolError::AeadFailure` paths defensively.
+#[tauri::command]
+pub async fn note_update<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+    plaintext: String,
+) -> Result<(), NoteUpdateError> {
+    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+        let kind = e.kind();
+        match kind {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_update notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteUpdateError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_update notes_dir resolution failed"
+                );
+                NoteUpdateError::Io {
+                    io_error_kind: io_kind,
+                }
+            }
+        }
+    })?;
+    note_update_with_dir(notes_dir, state.inner(), note_id, plaintext).await
+}
+
+/// Inner — pure-and-testable helper. Mirror of
+/// [`note_create_with_dir`] / [`note_read_with_dir`].
+pub(crate) async fn note_update_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    note_id: String,
+    plaintext: String,
+) -> Result<(), NoteUpdateError> {
+    // First non-doc statement: bound the lifetime of plaintext bytes
+    // to a `Zeroizing<String>` wrapper. Same Plaintext-IPC discipline
+    // as `note_create_with_dir` (see `src-tauri/CLAUDE.md`).
+    let plaintext = Zeroizing::new(plaintext);
+
+    // Strict NoteId parse FIRST — before any path concatenation.
+    let note_id = NoteId::parse(&note_id).map_err(|cause| {
+        tracing::debug!(stage = ?cause, "note_update note_id strict-parse failed");
+        NoteUpdateError::InvalidNoteId
+    })?;
+    tracing::debug!(stage = "note_id_parse", outcome = "ok");
+
+    // Slot read guard. Held across `spawn_blocking + atomic_write` so
+    // `tokio::sync::RwLock`'s fair queueing gives `vault_lock`
+    // wait-and-complete semantics — same uniform pattern as
+    // `note_create_with_dir` / `note_read_with_dir` per
+    // `decisions.md` 2026-05-07 "Note AEAD ops".
+    let slot = state.slot_read().await;
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_update rejected: slot is not Unlocked"
+            );
+            return Err(NoteUpdateError::VaultNotUnlocked);
+        }
+    };
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+    let path_for_read = path.clone();
+
+    // spawn_blocking pipeline: read .myn → decode_note → encode_update.
+    // `encode_update` consumes the `DecryptedNote` handle (typestate
+    // "one decode, one update"); fresh `content_nonce` generated
+    // internally; bytes 0..47+N byte-identical per §6.3.
+    let started = Instant::now();
+    let join_result =
+        tokio::task::spawn_blocking(move || -> Result<Vec<u8>, NoteUpdateError> {
+            let blob = match std::fs::read(&path_for_read) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    let io_kind_raw = e.kind();
+                    let mapped = match io_kind_raw {
+                        std::io::ErrorKind::NotFound => NoteUpdateError::NoteNotFound,
+                        _ => NoteUpdateError::Io {
+                            io_error_kind: from_io_error_kind(io_kind_raw),
+                        },
+                    };
+                    tracing::error!(
+                        stage = "fs_read",
+                        error_kind = note_update_error_kind(&mapped),
+                        "note_update blob read failed"
+                    );
+                    return Err(mapped);
+                }
+            };
+            // `decode_note` parameter order matches `note_read_with_dir`:
+            // (blob, note_uuid, items_key, items_key_id). The codec
+            // emits its sub-cause via `tracing::debug!(stage = ?cause)`
+            // from inside `decode_note`; host adds parallel non-
+            // distinguishing event without re-introducing the
+            // distinguisher at the IPC boundary (`protocol.md` §6.4).
+            let decrypted = decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id)
+                .map_err(|_: DecryptError| {
+                    tracing::debug!(
+                        stage = "decode_note",
+                        outcome = "cannot_decrypt",
+                        "note_update decode_note returned CannotDecrypt"
+                    );
+                    NoteUpdateError::CannotDecrypt
+                })?;
+            // `encode_update` consumes `decrypted` and pulls a fresh
+            // 24-byte `content_nonce` from `getrandom` internally.
+            match encode_update(decrypted, plaintext.as_bytes()) {
+                Ok(new_blob) => Ok(new_blob),
+                Err(ProtocolError::PlaintextTooLarge) => {
+                    tracing::debug!(
+                        stage = "encode_update",
+                        error_kind = "PlaintextTooLarge",
+                        "note_update rejected: plaintext exceeds MAX_PLAINTEXT_LEN"
+                    );
+                    Err(NoteUpdateError::PlaintextTooLarge)
+                }
+                Err(_other_protocol_err) => {
+                    // v0.1 fixed parameters make AEAD seal failure
+                    // unreachable: `item_key` is 32 bytes by type,
+                    // nonces are 24 bytes from `getrandom`, AAD widths
+                    // are compile-time const, plaintext boundary
+                    // already checked by encode_update. If this fires,
+                    // it's a v0.1 invariant violation; surface as
+                    // JoinFailure (panic-equivalent semantic).
+                    tracing::error!(
+                        stage = "encode_update",
+                        error_kind = "JoinFailure",
+                        "note_update encode_update returned an unreachable ProtocolError under v0.1 fixed params"
+                    );
+                    Err(NoteUpdateError::JoinFailure)
+                }
+            }
+        })
+        .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    let new_blob = match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_update read+decode+encode panicked or runtime shutdown"
+            );
+            return Err(NoteUpdateError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(blob)) => blob,
+    };
+    tracing::debug!(
+        stage = "encode_update",
+        duration_ms = duration_ms,
+        "note_update read + AEAD verify + re-encrypt succeeded"
+    );
+
+    // Atomic write with replace=true semantic — bytes 0..47+N are
+    // byte-identical to the previous blob; `atomic_write` durably
+    // commits the rename per `decisions.md` 2026-05-07 atomic_write
+    // entry.
+    if let Err(e) = atomic_write::atomic_write(&path, &new_blob, /* replace = */ true) {
+        let kind = e.kind();
+        let mapped = match kind {
+            std::io::ErrorKind::NotADirectory => NoteUpdateError::NotesDirNotADirectory,
+            other => NoteUpdateError::Io {
+                io_error_kind: from_io_error_kind(other),
+            },
+        };
+        tracing::error!(
+            stage = "atomic_write",
+            error_kind = note_update_error_kind(&mapped),
+            "note_update atomic_write failed"
+        );
+        return Err(mapped);
+    }
+
+    // Explicit drop — make the lock-release point visible.
+    drop(slot);
+
+    tracing::debug!(stage = "success", event = "note_updated");
+    Ok(())
+}
+
+/// Static-string label for [`NoteUpdateError`] variants — same
+/// drift-detector discipline as [`note_create_error_kind`] /
+/// [`note_read_error_kind`]. A new variant compile-fails this match.
+fn note_update_error_kind(e: &NoteUpdateError) -> &'static str {
+    match e {
+        NoteUpdateError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteUpdateError::InvalidNoteId => "InvalidNoteId",
+        NoteUpdateError::NoteNotFound => "NoteNotFound",
+        NoteUpdateError::PlaintextTooLarge => "PlaintextTooLarge",
+        NoteUpdateError::CannotDecrypt => "CannotDecrypt",
+        NoteUpdateError::NotesDirNotADirectory => "NotesDirNotADirectory",
+        NoteUpdateError::Io { .. } => "Io",
+        NoteUpdateError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// Hard-delete an existing `.myn` note. See module-level docs for the
+/// broader pipeline narration.
+///
+/// **Cryptographic erase is structural in v0.1** per `decisions.md`
+/// 2026-05-07 "Note delete cryptographic erase: structural property of
+/// v0.1 key hierarchy". The per-note `item_key` lives wrapped *inside*
+/// the `.myn` blob as `enc_item_key` (offset 48..48+N per
+/// `protocol.md` §9.2); `std::fs::remove_file` removes both the
+/// ciphertext and the only on-disk copy of the wrapped key in one
+/// syscall. No platform-specific secure-delete is added; the guarantee
+/// derives from the v0.1 key hierarchy.
+///
+/// **Pipeline:**
+/// 1. Strict [`NoteId::parse`] — UI bug-canary; sub-cause via tracing.
+/// 2. Slot read guard + `Slot::Unlocked(_)` peek (no `items_key` clone
+///    — delete does no AEAD). Reject `Empty` / `Recovering` as
+///    `VaultNotUnlocked`. Guard held across `spawn_blocking` for
+///    fair-queue uyumu with `vault_lock` per `decisions.md` 2026-05-07
+///    "Note AEAD ops".
+/// 3. `spawn_blocking { is_dir(notes_dir) → remove_file → #[cfg(unix)]
+///    parent_dir.sync_all() }`. Uniform `spawn_blocking` shape with
+///    the other three notes-plugin commands per the same decisions
+///    entry, even though delete touches no AEAD — `parent_dir.sync_all`
+///    can block on ext4 journal commit / NFS / FUSE / AV-overlay
+///    scanner worst cases.
+/// 4. Drop guard, emit `event = "note_deleted"`.
+///
+/// **Durability is asymmetric vs `atomic_write`** per `decisions.md`
+/// 2026-05-07 "`note_delete` durability: Unix parent-dir `sync_all`
+/// only; Windows s1 best-effort": Windows arm is `#[cfg(unix)]`-explicit
+/// no-op (no `FlushFileBuffers` parent-handle, no `windows-sys` direct
+/// dep extension). Power-loss may leave the deleted file reappearing
+/// after reboot; user re-deletes; security-neutral (AEAD-encrypted
+/// bytes leak nothing in the meantime per the cryptographic-erase
+/// yapısal property).
+///
+/// **Failure mapping** (closed-enum, drift-free MYND-26 mirror):
+/// - `InvalidNoteId` — strict parse rejected.
+/// - `VaultNotUnlocked` — slot is `Empty` or `Recovering`.
+/// - `NoteNotFound` — `<vault>/notes/<id>.myn` already gone (strict
+///   at IPC, idempotent at UI per `decisions.md` 2026-05-07 "Note
+///   delete UX"; the second invoke for the same id returns this
+///   variant, but the UI folds it to a "note already gone" toast).
+/// - `NotesDirNotADirectory` — `<vault>/notes` is a regular file
+///   (defensive bug-canary parallel to MYND-26).
+/// - `Io` — residual filesystem failure on `remove_file` or parent-
+///   dir `sync_all`.
+/// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown.
+#[tauri::command]
+pub async fn note_delete<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+) -> Result<(), NoteDeleteError> {
+    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+        let kind = e.kind();
+        match kind {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_delete notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteDeleteError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_delete notes_dir resolution failed"
+                );
+                NoteDeleteError::Io {
+                    io_error_kind: io_kind,
+                }
+            }
+        }
+    })?;
+    note_delete_with_dir(notes_dir, state.inner(), note_id).await
+}
+
+/// Inner — pure-and-testable helper. Mirror of
+/// [`note_create_with_dir`] / [`note_read_with_dir`] /
+/// [`note_update_with_dir`].
+pub(crate) async fn note_delete_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    note_id: String,
+) -> Result<(), NoteDeleteError> {
+    // Strict NoteId parse FIRST — before any path concatenation.
+    let note_id = NoteId::parse(&note_id).map_err(|cause| {
+        tracing::debug!(stage = ?cause, "note_delete note_id strict-parse failed");
+        NoteDeleteError::InvalidNoteId
+    })?;
+    tracing::debug!(stage = "note_id_parse", outcome = "ok");
+
+    // Slot read guard. Held across `spawn_blocking` so `vault_lock`
+    // fair-queues per `decisions.md` 2026-05-07 "Note AEAD ops" — same
+    // uniform pattern even though delete touches no AEAD. **No
+    // `items_key` clone** — delete needs only the `Slot::Unlocked`
+    // invariant, not the keys themselves.
+    let slot = state.slot_read().await;
+    match &*slot {
+        Slot::Unlocked(_) => {}
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_delete rejected: slot is not Unlocked"
+            );
+            return Err(NoteDeleteError::VaultNotUnlocked);
+        }
+    }
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+
+    let started = Instant::now();
+    let join_result = tokio::task::spawn_blocking(move || -> Result<(), NoteDeleteError> {
+        // Defensive bug-canary: `<vault>/notes` may have been replaced
+        // by a regular file via dev-tools manipulation, disk corruption,
+        // or cross-process race. Parallel to
+        // `NoteCreateError::NotesDirNotADirectory`.
+        if !notes_dir.is_dir() {
+            tracing::error!(
+                stage = "exists_check",
+                error_kind = "NotesDirNotADirectory",
+                "note_delete notes_dir is not a directory"
+            );
+            return Err(NoteDeleteError::NotesDirNotADirectory);
+        }
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                tracing::debug!(
+                    stage = "remove_file",
+                    error_kind = "NoteNotFound",
+                    "note_delete file already gone"
+                );
+                return Err(NoteDeleteError::NoteNotFound);
+            }
+            Err(e) => {
+                let mapped = NoteDeleteError::Io {
+                    io_error_kind: from_io_error_kind(e.kind()),
+                };
+                tracing::error!(
+                    stage = "remove_file",
+                    error_kind = note_delete_error_kind(&mapped),
+                    "note_delete remove_file failed"
+                );
+                return Err(mapped);
+            }
+        }
+        // Unix-only durability: flush the directory entry's removal to
+        // the journal. Windows arm is intentionally absent —
+        // `decisions.md` 2026-05-07 "`note_delete` durability" pins the
+        // asymmetry (write durability is data-integrity, delete
+        // durability is redundancy-elimination; failure mode'lar farklı).
+        #[cfg(unix)]
+        {
+            let dir = std::fs::File::open(&notes_dir).map_err(|e| {
+                let mapped = NoteDeleteError::Io {
+                    io_error_kind: from_io_error_kind(e.kind()),
+                };
+                tracing::error!(
+                    stage = "parent_dir_sync",
+                    error_kind = note_delete_error_kind(&mapped),
+                    "note_delete parent dir open failed"
+                );
+                mapped
+            })?;
+            dir.sync_all().map_err(|e| {
+                let mapped = NoteDeleteError::Io {
+                    io_error_kind: from_io_error_kind(e.kind()),
+                };
+                tracing::error!(
+                    stage = "parent_dir_sync",
+                    error_kind = note_delete_error_kind(&mapped),
+                    "note_delete parent dir sync_all failed"
+                );
+                mapped
+            })?;
+        }
+        Ok(())
+    })
+    .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_delete remove+sync panicked or runtime shutdown"
+            );
+            return Err(NoteDeleteError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(())) => {}
+    }
+    tracing::debug!(
+        stage = "remove_file",
+        duration_ms = duration_ms,
+        "note_delete remove_file + parent_dir_sync (Unix) succeeded"
+    );
+
+    // Explicit drop — make the lock-release point visible.
+    drop(slot);
+
+    tracing::debug!(stage = "success", event = "note_deleted");
+    Ok(())
+}
+
+/// Static-string label for [`NoteDeleteError`] variants — same
+/// drift-detector discipline as the other three helpers. A new variant
+/// compile-fails this match.
+fn note_delete_error_kind(e: &NoteDeleteError) -> &'static str {
+    match e {
+        NoteDeleteError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteDeleteError::InvalidNoteId => "InvalidNoteId",
+        NoteDeleteError::NoteNotFound => "NoteNotFound",
+        NoteDeleteError::NotesDirNotADirectory => "NotesDirNotADirectory",
+        NoteDeleteError::Io { .. } => "Io",
+        NoteDeleteError::JoinFailure => "JoinFailure",
     }
 }
 
@@ -1024,6 +1516,10 @@ mod tests {
             "InvalidPlaintextEncoding"
         );
         assert_eq!(
+            note_read_error_kind(&NoteReadError::NotesDirNotADirectory),
+            "NotesDirNotADirectory"
+        );
+        assert_eq!(
             note_read_error_kind(&NoteReadError::Io {
                 io_error_kind: IoFailureKind::Other,
             }),
@@ -1031,6 +1527,694 @@ mod tests {
         );
         assert_eq!(
             note_read_error_kind(&NoteReadError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+
+    // ---- MYND-26 retroactive: notes_dir-as-regular-file behavioral pin --
+
+    #[test]
+    fn read_notes_dir_resolution_failing_with_not_a_directory_returns_structural_variant() {
+        // `note_read_with_dir` takes `notes_dir` already resolved; the
+        // `NotesDirNotADirectory` mapping lives in the outer `note_read`
+        // (which calls `paths::notes_dir`). Exercise the helper-layer
+        // surface that the outer matches: `paths::notes_dir_under`
+        // returns an IO error of the expected kind when `<parent>/notes`
+        // is a regular file. The outer's accept-list mapping
+        // (`NotADirectory | AlreadyExists`) is verified by code
+        // inspection on `note_read`'s map_err arm.
+        let scratch = ScopedTempDir::new("note-read-notes-is-file").unwrap();
+        let conflict = scratch.path().join("notes");
+        std::fs::write(&conflict, b"hostile").unwrap();
+        let err = notes_dir_under(scratch.path()).expect_err("conflict must error");
+        assert!(matches!(
+            err.kind(),
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists
+        ));
+    }
+
+    // =====================================================================
+    // note_update
+    // =====================================================================
+
+    // ---- happy path: round-trip create + update + read ------------------
+
+    #[test]
+    fn round_trip_create_then_update_then_read_returns_updated_plaintext() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-roundtrip").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let original = "# original\nfirst body";
+            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, original.to_string())
+                .await
+                .unwrap();
+
+            // Capture the original blob's prefix for the byte-identical pin
+            // below. `protocol.md` §6.3: bytes 0..=47+N (where N = 64 in
+            // v0.1: enc_item_key_len = 32 ct + 32 CTX tag) are byte-identical
+            // across update revisions. Total prefix = 48 + 64 = 112 bytes.
+            let note_id = NoteId::parse(&note_id_str).unwrap();
+            let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+            let original_blob = std::fs::read(&path).unwrap();
+            const PREFIX_LEN: usize = 48 + 64;
+            let original_prefix = original_blob[..PREFIX_LEN].to_vec();
+
+            let updated = "# updated\nrewritten body bytes";
+            note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                note_id_str.clone(),
+                updated.to_string(),
+            )
+            .await
+            .expect("update must succeed on a fresh note");
+
+            // Pin §6.3: bytes 0..=47+N must be byte-identical post-update.
+            let updated_blob = std::fs::read(&path).unwrap();
+            let updated_prefix = updated_blob[..PREFIX_LEN].to_vec();
+            assert_eq!(
+                original_prefix, updated_prefix,
+                "bytes 0..=47+N must be byte-identical across update per protocol.md §6.3"
+            );
+
+            // The content tail (content_nonce + ciphertext_len + ciphertext)
+            // MUST differ — fresh content_nonce + new plaintext.
+            assert_ne!(
+                original_blob[PREFIX_LEN..],
+                updated_blob[PREFIX_LEN..],
+                "content tail must change across update (fresh content_nonce + new plaintext)"
+            );
+
+            // Round-trip: post-update read returns the new plaintext.
+            let recovered = note_read_with_dir(notes_dir, &state, note_id_str)
+                .await
+                .expect("read after update must succeed");
+            assert_eq!(recovered, updated);
+        });
+    }
+
+    // ---- slot guards ----------------------------------------------------
+
+    #[test]
+    fn update_slot_empty_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-slot-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+
+            // Valid v7 UUID so InvalidNoteId doesn't intercept the slot
+            // guard (NoteId::parse runs before the slot check).
+            let result = note_update_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                "x".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteUpdateError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn update_slot_recovering_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-slot-recovering").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+
+            let result = note_update_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                "x".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteUpdateError::VaultNotUnlocked)));
+        });
+    }
+
+    // ---- strict NoteId parse rejects -----------------------------------
+
+    #[test]
+    fn update_invalid_note_id_returns_invalid_note_id() {
+        // Parser is exhaustively covered by `note_id::tests`; the host-
+        // layer test pins that update routes the rejection to the public
+        // `InvalidNoteId` variant before any path concatenation or slot
+        // guard.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-invalid-id").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let result =
+                note_update_with_dir(notes_dir, &state, "too-short".to_string(), "x".to_string())
+                    .await;
+            assert!(matches!(result, Err(NoteUpdateError::InvalidNoteId)));
+        });
+    }
+
+    // ---- NoteNotFound: valid v7 UUID, no file --------------------------
+
+    #[test]
+    fn update_note_not_found_for_valid_id_with_no_file() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-not-found").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            // Mint a fresh v7 UUID; no corresponding file on disk.
+            // This is the autosave-after-delete race signal per the q1
+            // decision in `decisions.md` 2026-05-07 "`note_update` error
+            // surface".
+            let phantom = NoteId::new_v7();
+            let result =
+                note_update_with_dir(notes_dir, &state, phantom.to_string(), "x".to_string()).await;
+            assert!(matches!(result, Err(NoteUpdateError::NoteNotFound)));
+        });
+    }
+
+    // ---- AEAD failure: tampered byte returns CannotDecrypt --------------
+
+    #[test]
+    fn update_tampered_blob_returns_cannot_decrypt() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-tamper").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            // Create a real note, then tamper one byte of the on-disk
+            // blob's inner ciphertext + CTX tag region so §6.4 inner-AEAD
+            // verification fails on decode_note.
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, "untampered original".to_string())
+                    .await
+                    .unwrap();
+            let path = notes_dir.join(format!(
+                "{}.myn",
+                NoteId::parse(&note_id_str).unwrap().as_uuid()
+            ));
+            let mut blob = std::fs::read(&path).unwrap();
+            let last = blob.len() - 1;
+            blob[last] ^= 0xFF;
+            std::fs::write(&path, &blob).unwrap();
+
+            let result =
+                note_update_with_dir(notes_dir, &state, note_id_str, "rewrite".to_string()).await;
+            assert!(matches!(result, Err(NoteUpdateError::CannotDecrypt)));
+        });
+    }
+
+    // ---- 16 MiB boundary -----------------------------------------------
+
+    #[test]
+    fn update_plaintext_at_max_succeeds() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-max").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, "small".to_string())
+                .await
+                .unwrap();
+
+            let big = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN]).unwrap();
+            let result = note_update_with_dir(notes_dir, &state, note_id_str, big).await;
+            assert!(
+                result.is_ok(),
+                "MAX_PLAINTEXT_LEN must succeed; got {result:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn update_plaintext_above_max_returns_plaintext_too_large() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-above-max").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, "small".to_string())
+                .await
+                .unwrap();
+
+            let too_big = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN + 1]).unwrap();
+            let result = note_update_with_dir(notes_dir, &state, note_id_str, too_big).await;
+            assert!(matches!(result, Err(NoteUpdateError::PlaintextTooLarge)));
+        });
+    }
+
+    // ---- concurrent vault_lock fair-queue --------------------------------
+
+    #[test]
+    fn update_concurrent_with_vault_lock_completes_cleanly() {
+        // Mirror of `note_create_concurrent_with_vault_lock_completes_cleanly`.
+        // The deterministic properties: under multi-thread scheduling,
+        // `note_update` and a concurrent `state.take()` (which is what
+        // `vault_lock` does internally) both complete without deadlock,
+        // and the terminal state is `Slot::Empty`. Update's outcome
+        // depends on which task acquired its lock first; both orderings
+        // are valid and tested.
+        rt().block_on(async {
+            use std::sync::Arc;
+
+            let scratch = ScopedTempDir::new("note-update-concurrent-lock").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = Arc::new(VaultRuntimeState::default());
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, "initial body".to_string())
+                    .await
+                    .unwrap();
+
+            let update_state = Arc::clone(&state);
+            let update_dir = notes_dir.clone();
+            let update_id = note_id_str.clone();
+            let update_task = tokio::spawn(async move {
+                note_update_with_dir(update_dir, &update_state, update_id, "rewrite".to_string())
+                    .await
+            });
+
+            tokio::task::yield_now().await;
+
+            let lock_state = Arc::clone(&state);
+            let lock_task = tokio::spawn(async move { lock_state.take().await });
+
+            let update_result = update_task.await.expect("update task joins");
+            let lock_taken = lock_task.await.expect("lock task joins");
+
+            assert!(
+                matches!(
+                    lock_taken,
+                    crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+                ),
+                "lock must take the Unlocked variant"
+            );
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+            );
+
+            // Update outcome depends on which task acquired its lock first:
+            //   - `Ok(())`                        → update ran first; lock
+            //                                       waited for the read guard.
+            //   - `Err(VaultNotUnlocked)`         → lock ran first; update
+            //                                       observed `Slot::Empty`.
+            match update_result {
+                Ok(()) => {}
+                Err(NoteUpdateError::VaultNotUnlocked) => {}
+                Err(other) => panic!("unexpected update outcome: {other:?}"),
+            }
+        });
+    }
+
+    // ---- error_kind label ------------------------------------------------
+
+    #[test]
+    fn update_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::InvalidNoteId),
+            "InvalidNoteId"
+        );
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::NoteNotFound),
+            "NoteNotFound"
+        );
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::PlaintextTooLarge),
+            "PlaintextTooLarge"
+        );
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::CannotDecrypt),
+            "CannotDecrypt"
+        );
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::NotesDirNotADirectory),
+            "NotesDirNotADirectory"
+        );
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_update_error_kind(&NoteUpdateError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+
+    // =====================================================================
+    // note_delete
+    // =====================================================================
+
+    // ---- happy path: round-trip create + delete + read NoteNotFound ----
+
+    #[test]
+    fn round_trip_create_then_delete_then_read_returns_note_not_found() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-roundtrip").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, "to be deleted".to_string())
+                    .await
+                    .unwrap();
+
+            // Confirm file exists pre-delete.
+            let path = notes_dir.join(format!(
+                "{}.myn",
+                NoteId::parse(&note_id_str).unwrap().as_uuid()
+            ));
+            assert!(path.is_file(), "file must exist pre-delete");
+
+            note_delete_with_dir(notes_dir.clone(), &state, note_id_str.clone())
+                .await
+                .expect("delete must succeed on a fresh note");
+
+            // File is gone (cryptographic erase yapısal: enc_item_key
+            // lived inside the .myn; unlink removes both ciphertext and
+            // wrapped key in one operation).
+            assert!(!path.exists(), "file must be removed post-delete");
+
+            // Subsequent read returns NoteNotFound — the ledger / editor
+            // route's natural affordance for a deleted note.
+            let read_result = note_read_with_dir(notes_dir, &state, note_id_str).await;
+            assert!(matches!(read_result, Err(NoteReadError::NoteNotFound)));
+        });
+    }
+
+    // ---- idempotent contract: second delete returns NoteNotFound -------
+
+    #[test]
+    fn double_delete_returns_note_not_found_on_second_call() {
+        // Strict at IPC, idempotent at UI — `decisions.md` 2026-05-07
+        // "Note delete UX". Pin the IPC-side strictness here; the UI
+        // fold to "note already gone" is editor-side and not in scope.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-idempotent").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, "transient".to_string())
+                    .await
+                    .unwrap();
+
+            note_delete_with_dir(notes_dir.clone(), &state, note_id_str.clone())
+                .await
+                .expect("first delete must succeed");
+
+            let second = note_delete_with_dir(notes_dir, &state, note_id_str).await;
+            assert!(matches!(second, Err(NoteDeleteError::NoteNotFound)));
+        });
+    }
+
+    // ---- NoteNotFound: valid v7 UUID, no file --------------------------
+
+    #[test]
+    fn delete_note_not_found_for_valid_id_with_no_file() {
+        // Autosave-after-delete race + cross-tab race: ledger view
+        // deletes a note while the editor is still open; the editor's
+        // subsequent close-prompt-driven delete call hits this path.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-not-found").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let phantom = NoteId::new_v7();
+            let result = note_delete_with_dir(notes_dir, &state, phantom.to_string()).await;
+            assert!(matches!(result, Err(NoteDeleteError::NoteNotFound)));
+        });
+    }
+
+    // ---- slot guards ----------------------------------------------------
+
+    #[test]
+    fn delete_slot_empty_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-slot-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+
+            let result = note_delete_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteDeleteError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn delete_slot_recovering_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-slot-recovering").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+
+            let result = note_delete_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+            )
+            .await;
+            assert!(matches!(result, Err(NoteDeleteError::VaultNotUnlocked)));
+        });
+    }
+
+    // ---- strict NoteId parse rejects -----------------------------------
+
+    #[test]
+    fn delete_invalid_note_id_returns_invalid_note_id() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-invalid-id").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let result = note_delete_with_dir(notes_dir, &state, "too-short".to_string()).await;
+            assert!(matches!(result, Err(NoteDeleteError::InvalidNoteId)));
+        });
+    }
+
+    // ---- defensive: notes_dir is a regular file ------------------------
+
+    #[test]
+    fn delete_notes_dir_not_a_directory_defensive_canary() {
+        // Inner `note_delete_with_dir` takes `notes_dir` already
+        // resolved; the outer `note_delete` maps `paths::notes_dir`
+        // failures upstream. Here we exercise the spawn_blocking-side
+        // defensive check directly: pass a path that resolves to a
+        // regular file rather than a directory.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-notes-is-file").unwrap();
+            let bogus_notes_dir = scratch.path().join("notes");
+            std::fs::write(&bogus_notes_dir, b"hostile content").unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let phantom = NoteId::new_v7();
+            let result = note_delete_with_dir(bogus_notes_dir, &state, phantom.to_string()).await;
+            assert!(matches!(
+                result,
+                Err(NoteDeleteError::NotesDirNotADirectory)
+            ));
+        });
+    }
+
+    // ---- concurrent vault_lock fair-queue --------------------------------
+
+    #[test]
+    fn delete_concurrent_with_vault_lock_completes_cleanly() {
+        // Mirror of `note_create_concurrent_with_vault_lock_completes_cleanly`
+        // and the update equivalent. Both task orderings produce a
+        // valid `Slot::Empty` terminal state; delete's outcome depends
+        // on which task acquired its lock first.
+        rt().block_on(async {
+            use std::sync::Arc;
+
+            let scratch = ScopedTempDir::new("note-delete-concurrent-lock").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = Arc::new(VaultRuntimeState::default());
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, "to be deleted".to_string())
+                    .await
+                    .unwrap();
+
+            let delete_state = Arc::clone(&state);
+            let delete_dir = notes_dir.clone();
+            let delete_id = note_id_str.clone();
+            let delete_task = tokio::spawn(async move {
+                note_delete_with_dir(delete_dir, &delete_state, delete_id).await
+            });
+
+            tokio::task::yield_now().await;
+
+            let lock_state = Arc::clone(&state);
+            let lock_task = tokio::spawn(async move { lock_state.take().await });
+
+            let delete_result = delete_task.await.expect("delete task joins");
+            let lock_taken = lock_task.await.expect("lock task joins");
+
+            assert!(
+                matches!(
+                    lock_taken,
+                    crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+                ),
+                "lock must take the Unlocked variant"
+            );
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+            );
+
+            //   - `Ok(())`                      → delete ran first; lock
+            //                                     waited for the read guard.
+            //   - `Err(VaultNotUnlocked)`       → lock ran first; delete
+            //                                     observed `Slot::Empty`.
+            match delete_result {
+                Ok(()) => {}
+                Err(NoteDeleteError::VaultNotUnlocked) => {}
+                Err(other) => panic!("unexpected delete outcome: {other:?}"),
+            }
+        });
+    }
+
+    // ---- error_kind label ------------------------------------------------
+
+    #[test]
+    fn delete_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_delete_error_kind(&NoteDeleteError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            note_delete_error_kind(&NoteDeleteError::InvalidNoteId),
+            "InvalidNoteId"
+        );
+        assert_eq!(
+            note_delete_error_kind(&NoteDeleteError::NoteNotFound),
+            "NoteNotFound"
+        );
+        assert_eq!(
+            note_delete_error_kind(&NoteDeleteError::NotesDirNotADirectory),
+            "NotesDirNotADirectory"
+        );
+        assert_eq!(
+            note_delete_error_kind(&NoteDeleteError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_delete_error_kind(&NoteDeleteError::JoinFailure),
             "JoinFailure"
         );
     }
