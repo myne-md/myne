@@ -75,6 +75,14 @@ pub async fn unlock(
 
 **Do NOT** enable the `zeroize/serde` feature for "Zeroizing<String> deserializes directly". V8 immutable strings + serde intermediate buffers do not become Zeroizing-aware just because the command signature looks tighter. Cosmetic gain, deps surface bloat — TB9 audit-anchor disciplined. The first-line wrap is the load-bearing pattern.
 
+### Pattern: Plaintext IPC across the WebView boundary
+
+Note plaintext (the user's Markdown body) crosses IPC as `String` in both directions — `note_create(plaintext: String)` and `note_read(...) -> Result<String, _>`. Mechanically, the discipline is identical to the password pattern above (first-line `Zeroizing::new(plaintext)` wrap, move into spawn_blocking, drop on closure exit). Threat-shape-wise, plaintext is a longer-lived secret than a password: a password is consumed by Argon2id within milliseconds; plaintext lives in the WebView's V8 immutable string heap for the **hours** the user has the editor open. The Rust-side discipline still applies (and is verified by `src-tauri/src/plugins/notes/commands.rs::note_create_with_dir` + `note_read_with_dir`), but the Rust-side window is **strictly dominated** by the V8-side window — the dominant leak is on the WebView side, not the IPC transit. v0.1 accepts the V8-side leak under `threat-model.md` §5 "NOT Protected Against — A7 active local malware" (an A7-class attacker has process-memory inspection capabilities that cover both V8 and Rust heaps regardless).
+
+The intermediate Tauri serde V8-string-deserialization buffer (the bytes that materialize between V8's immutable-string release and the first Rust binding) is **accepted as outside Rust-side wipe scope** — its lifetime is microseconds and the V8-side retention window strictly dominates it. The `zeroize/serde` feature is **explicitly rejected** for plaintext-bearing types: it wraps `serde::Deserialize` impls with Zeroize-on-drop semantics but does not touch the parsing intermediate buffers; it provides "we tried" cosmetic gain without closing the dominant V8 channel. **v005 forward-look:** a native render path (Tauri 2 native widget OR custom IPC channel that bypasses WebView serialization entirely) keeps plaintext outside the WebView and collapses the dominant channel — see `decisions.md` 2026-05-07 "v005 native render path forward-look" for the design constraint.
+
+On the read side, `note_read_with_dir` pairs `String::from_utf8(decrypted.plaintext().to_vec())` with an explicit `drop(decrypted)` immediately after. The `to_vec()` allocation is the non-Zeroized intermediate that crosses from `decrypted`'s `Zeroizing<Vec<u8>>` into the eventual `String` (which will leave through IPC); the explicit drop minimizes the window where both wrappers coexist. Same shape applies to any future plugin command that returns plaintext to the WebView.
+
 ### DENY list — never emit via tracing, log, format, or any IPC payload
 
 Never reference any of these in a `tracing::*!`, `println!`, `eprintln!`, `format!`, `?fmt`, `%fmt`, or any IPC-bound `serde::Serialize` field. Reviewer-enforced; no automated lint.
@@ -85,6 +93,8 @@ Never reference any of these in a `tracing::*!`, `println!`, `eprintln!`, `forma
 - salts, nonces (vault-stable correlation tags, even though not secret-bearing)
 - `account_number_hash` bytes
 - `vault.meta` raw bytes
+- `plaintext`, `body`, `content` — note plaintext bytes/strings (IPC-arrived UTF-8 markdown; same secret class as `password`, longer-lived V8-side window per the Plaintext-IPC pattern above)
+- `note_id` — per-note vault-stable correlation tag (same category as the `salts, nonces` line above; `items_key_id` is implicitly covered by that line)
 - full filesystem path
 - raw `std::io::Error::Display` (kernel-dependent path leakage on some platforms)
 
@@ -113,7 +123,7 @@ For `ProtocolError` (all unit variants), `?e` Debug-formatting would also emit j
 
 ### Reference implementation
 
-`src-tauri/src/plugins/vault_unlock/commands.rs` (Task 8 of `vault-unlock-password`) wires this discipline end-to-end — 12 instrumented call sites, one `protocol_error_kind` helper, zero DENY-listed values in any `tracing::*!` argument. `src-tauri/src/plugins/vault_creation/commands.rs` retroactively adopted the Zeroizing-wrap idiom in Task 7 of the same feature.
+`src-tauri/src/plugins/vault_unlock/commands.rs` (Task 8 of `vault-unlock-password`) wires this discipline end-to-end — 12 instrumented call sites, one `protocol_error_kind` helper, zero DENY-listed values in any `tracing::*!` argument. `src-tauri/src/plugins/vault_creation/commands.rs` retroactively adopted the Zeroizing-wrap idiom in Task 7 of the same feature. `src-tauri/src/plugins/notes/commands.rs` (MYND-26) is the canonical reference for the **Plaintext-IPC pattern** — `note_create_with_dir` shows the input direction (first-line `Zeroizing::new(plaintext)` + move into `spawn_blocking`); `note_read_with_dir` shows the output direction (`String::from_utf8(decrypted.plaintext().to_vec())` + explicit `drop(decrypted)` to minimize the non-Zeroized intermediate's lifetime); both ship `note_create_error_kind` / `note_read_error_kind` static-string label helpers that mirror `protocol_error_kind` and structurally catch enum-variant drift.
 
 ## Atomic file writes
 
