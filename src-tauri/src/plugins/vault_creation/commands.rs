@@ -270,7 +270,7 @@ pub(crate) async fn commit_with_vault_path(
     let outcome: Result<(), (AppError, VaultCreationSession)> =
         tokio::task::spawn_blocking(move || match build_and_serialize_vault_meta(&session) {
             Err(e) => Err((e, session)),
-            Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes) {
+            Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
                 Err(e) => Err((AppError::from(e), session)),
                 Ok(()) => Ok(()),
             },
