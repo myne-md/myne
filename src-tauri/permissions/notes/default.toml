@@ -1,0 +1,33 @@
+# Permissions for the in-app `notes` Tauri plugin.
+# Picked up under the `notes:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these
+# as `notes:default` (or `notes:allow-<cmd>`).
+#
+# MYND-26 Task 7 lays the scaffold + the two permissions ahead of the
+# command handlers. The actual `note_create` / `note_read` commands
+# wire into the plugin's `invoke_handler!` at MYND-26 Tasks 8 / 9.
+# Tauri validates these permissions only at invocation time, so
+# declaring them ahead of the handlers is intentional — keeps the
+# capability ACL surface stable across the MYND-26 PR's task chain.
+#
+# MYND-27 will add `allow-note-update` + `allow-note-delete`; MYND-28
+# will add `allow-note-list`. Each follows the same structural pattern.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the notes plugin."
+permissions = [
+    "allow-note-create",
+    "allow-note-read",
+]
+
+[[permission]]
+identifier = "allow-note-create"
+description = "Allow invoking notes:note_create (encrypt + atomically write a new .myn note under <vault>/notes/<UUIDv7>.myn — backend-generated NoteId returned to the UI)."
+commands.allow = ["note_create"]
+
+[[permission]]
+identifier = "allow-note-read"
+description = "Allow invoking notes:note_read (read + AEAD-decrypt a .myn note by NoteId; returns the UTF-8 plaintext)."
+commands.allow = ["note_read"]
