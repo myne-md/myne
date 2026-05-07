@@ -396,18 +396,20 @@ pub(crate) async fn change_password_with_path(
     use super::super::vault_unlock::state::CommitRewriteError;
     match state
         .commit_unlocked_rewrite(snapshot_meta_hash, move || {
-            crate::atomic_write::atomic_write(&vault_path_for_write, &new_bytes).map_err(|e| {
-                let io_kind = from_io_error_kind(e.kind());
-                tracing::error!(
-                    stage = "atomic_write",
-                    error_kind = "IoError",
-                    io_failure_kind = ?io_kind,
-                    "atomic write of new vault.meta failed during change_password"
-                );
-                VaultChangePasswordError::IoError {
-                    io_error_kind: io_kind,
-                }
-            })?;
+            crate::atomic_write::atomic_write(&vault_path_for_write, &new_bytes, true).map_err(
+                |e| {
+                    let io_kind = from_io_error_kind(e.kind());
+                    tracing::error!(
+                        stage = "atomic_write",
+                        error_kind = "IoError",
+                        io_failure_kind = ?io_kind,
+                        "atomic write of new vault.meta failed during change_password"
+                    );
+                    VaultChangePasswordError::IoError {
+                        io_error_kind: io_kind,
+                    }
+                },
+            )?;
             Ok(crate::vault_meta_hash::vault_meta_sha256(&new_bytes))
         })
         .await

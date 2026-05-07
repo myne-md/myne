@@ -51,3 +51,14 @@ sha2 = { version = "0.10", default-features = false }
 # TB9 audit anchor: see `decisions.md` 2026-05-06 entry.
 [target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
 tauri-plugin-single-instance = "2"
+
+# Windows durability primitive: MoveFileExW(MOVEFILE_WRITE_THROUGH) for
+# `atomic_write`'s Windows arm (`src/atomic_write.rs`). Microsoft-
+# maintained, audit-strong (transitively used by zip/rusqlite/tempfile
+# in the broader Rust ecosystem; version 0.60 is already locked via
+# `tauri 2.10.3` / `arboard` / `muda` — no `Cargo.lock` tree expansion).
+# Target-conditional so non-Windows builds neither resolve nor compile
+# the crate. See `decisions.md` 2026-05-07 for the dependency-policy
+# checklist.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }

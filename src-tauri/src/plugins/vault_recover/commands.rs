@@ -513,18 +513,23 @@ pub(crate) async fn complete_recovery_with_path(
     let write_outcome =
         tokio::task::spawn_blocking(move || -> Result<[u8; 32], VaultRecoveryError> {
             // (e) Atomic write — tempfile + fsync + rename per §4.2.
-            crate::atomic_write::atomic_write(&vault_path_for_write, &new_bytes).map_err(|e| {
-                let io_kind = from_io_error_kind(e.kind());
-                tracing::error!(
-                    stage = "tempfile_rename",
-                    error_kind = "IoError",
-                    io_failure_kind = ?io_kind,
-                    "atomic write of new vault.meta failed during complete_recovery"
-                );
-                VaultRecoveryError::IoError {
-                    io_error_kind: io_kind,
-                }
-            })?;
+            //     A failure here leaves vault.meta on disk with the
+            //     original password still in effect; the user can
+            //     re-attempt recovery.
+            crate::atomic_write::atomic_write(&vault_path_for_write, &new_bytes, true).map_err(
+                |e| {
+                    let io_kind = from_io_error_kind(e.kind());
+                    tracing::error!(
+                        stage = "tempfile_rename",
+                        error_kind = "IoError",
+                        io_failure_kind = ?io_kind,
+                        "atomic write of new vault.meta failed during complete_recovery"
+                    );
+                    VaultRecoveryError::IoError {
+                        io_error_kind: io_kind,
+                    }
+                },
+            )?;
 
             // (f) SHA-256 of the freshly-written bytes.
             let new_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&new_bytes);
