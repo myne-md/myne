@@ -31,8 +31,9 @@ export type IoFailureKind = "PermissionDenied" | "NoSpace" | "NotFound" | "Other
  * whether the Unlock component renders the password form (`Exists`)
  * or `<FailClosedError reason="corrupted-vault" />` (`Corrupted` /
  * `IoError`). For transitions other than the boot probe (auto-unlock
- * after create-vault, locked → unlock), the entry is always
- * `{ kind: "Exists" }` — the vault was just confirmed openable.
+ * after create-vault, editor → unlock on user-initiated lock), the
+ * entry is always `{ kind: "Exists" }` — the vault was just confirmed
+ * openable.
  */
 export type StageVaultStatus =
   | { kind: "Exists" }
@@ -56,13 +57,12 @@ export type RecoverSubStep = "phrase-entry" | "decrypting" | "password-reset";
 /**
  * Top-level app stage. Discriminator is `name`. `unlock` carries an
  * `initialStatus` payload; `recover` carries a `subStep` payload;
- * the other four stages are payload-free.
+ * the other three stages are payload-free.
  */
 export type Stage =
   | { name: "welcome" }
   | { name: "create-vault" }
   | { name: "unlock"; initialStatus: StageVaultStatus }
-  | { name: "locked" }
   | { name: "editor" }
   | { name: "recover"; subStep: RecoverSubStep };
 
@@ -99,10 +99,14 @@ export type Action =
   | { type: "create-vault.auto-unlock-success" }
   /** unlock(decrypting) → editor on `vault_unlock` IPC resolve. */
   | { type: "unlock.success" }
-  /** editor → locked on user clicking the Lock affordance. */
+  /**
+   * editor → unlock(Exists) on user clicking the Lock affordance.
+   * vault.meta is known good (the user just locked from a successful
+   * editor session), so initialStatus is `Exists` — the user lands
+   * directly on the password form with no intermediate "vault locked"
+   * screen.
+   */
   | { type: "editor.lock" }
-  /** locked → unlock(Exists) on user clicking Unlock from the locked screen. */
-  | { type: "locked.unlock" }
   /**
    * unlock → recover(phrase-entry). Cold-start entry: user clicked
    * the "Recovery phrase ile aç" link below the password CTA.
@@ -189,16 +193,10 @@ export function transition(prev: Stage, action: Action): Stage {
     case "editor":
       switch (action.type) {
         case "editor.lock":
-          return { name: "locked" };
-        default:
-          return rejectIllegal(prev, action);
-      }
-    case "locked":
-      switch (action.type) {
-        case "locked.unlock":
           // Post-explicit-lock entry: vault.meta is known good
           // (the user just locked from a successful editor session),
-          // so initialStatus is `Exists`.
+          // so initialStatus is `Exists`. No intermediate "locked"
+          // screen — the user lands directly on the password form.
           return { name: "unlock", initialStatus: { kind: "Exists" } };
         default:
           return rejectIllegal(prev, action);
@@ -334,8 +332,7 @@ const LEGAL: Record<string, Stage["name"]> = {
   "create-vault|create-vault.commit-success": "unlock",
   "create-vault|create-vault.auto-unlock-success": "editor",
   "unlock|unlock.success": "editor",
-  "editor|editor.lock": "locked",
-  "locked|locked.unlock": "unlock",
+  "editor|editor.lock": "unlock",
   "unlock|unlock.start-recovery": "recover",
   "unlock|unlock.resume-recovery": "recover",
   "recover|recover.cancel": "unlock",
@@ -346,7 +343,6 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   { name: "welcome" },
   { name: "create-vault" },
   { name: "unlock", initialStatus: { kind: "Exists" } },
-  { name: "locked" },
   { name: "editor" },
   { name: "recover", subStep: "phrase-entry" },
   { name: "recover", subStep: "decrypting" },
@@ -360,7 +356,6 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "create-vault.auto-unlock-success" },
   { type: "unlock.success" },
   { type: "editor.lock" },
-  { type: "locked.unlock" },
   { type: "unlock.start-recovery" },
   { type: "unlock.resume-recovery" },
   { type: "recover.cancel" },
