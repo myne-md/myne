@@ -126,8 +126,10 @@ export type VaultChangePasswordError =
   | { kind: "SamePasswordRejected" }
   /**
    * Backend min-length floor (`MIN_PASSWORD_LEN = 12` Unicode chars)
-   * rejected the new password. The frontend `PasswordForm` already
-   * gates this; the backend is a structural belt+suspenders defense
+   * rejected the new password. The frontend `PasswordChangeForm`
+   * (and its sibling `PasswordCreateForm`) already gate this via
+   * the shared `PasswordInput` primitive; the backend is a structural
+   * belt+suspenders defense
    * against frontend bypass per `decisions.md` 2026-05-06
    * "Auth-pipeline backend MIN_PASSWORD_LEN floor; project-wide
    * retroactive". Cross-plugin shared variant name with

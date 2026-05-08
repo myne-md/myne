@@ -7,13 +7,14 @@
 //     RAII handles by zeroizing `Slot::Recovering` on drop. Frontend
 //     installs no `beforeunload` listener and dispatches no defensive
 //     `vault_lock` (Q8 policy).
-//   - **B3a-style form.** Mounts the shared `<PasswordForm>`
-//     extracted in Task 3 — same zxcvbn strength meter, suggest-
-//     password helper, min-length + match + min-strength gating as
-//     vault-creation's PasswordStep. The min-strength constants
-//     (`MIN_PASSWORD_LEN = 12`, `MIN_ZXCVBN_SCORE = 3`) are
-//     co-located with `PasswordForm` so create-time and recover-time
-//     gating can't drift.
+//   - **B3a-style form.** Mounts the shared `<PasswordCreateForm>`
+//     (sibling of `PasswordChangeForm`; both compose the underlying
+//     `PasswordInput` primitive) — same zxcvbn strength meter,
+//     suggest-password helper, min-length + match + min-strength
+//     gating as vault-creation's PasswordStep. The min-strength
+//     constants (`MIN_PASSWORD_LEN = 12`, `MIN_ZXCVBN_SCORE = 3`)
+//     live in `PasswordInput.tsx` so all three forms see the same
+//     numbers and drift is structurally impossible.
 //   - On submit, invoke A8f (`completeRecovery`); on Ok, call
 //     `onCompleteSuccess` so App.tsx transitions Stage to `editor`.
 //     On Err, map `VaultRecoveryError` → `PasswordOutcome` per Q7
@@ -26,7 +27,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { DestructiveBanner } from "../../components/DestructiveBanner";
-import { PasswordForm } from "../../components/PasswordForm";
+import { PasswordCreateForm } from "../../components/PasswordCreateForm";
 import { completeRecovery } from "../../lib/vault-recover";
 import { ioBanner } from "../../lib/io-banner";
 import type { VaultRecoveryError } from "../../types/vault-recovery-error";
@@ -176,7 +177,7 @@ export function PasswordResetStep({
         <div style={EYEBROW_STYLE}>Recovery · New password</div>
         <h1 style={TITLE_STYLE}>Set a new master password</h1>
 
-        <PasswordForm
+        <PasswordCreateForm
           submitLabel="Set new password"
           onSubmit={handleSubmit}
           disabled={inFlight}
