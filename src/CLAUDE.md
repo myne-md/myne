@@ -29,12 +29,11 @@ Self-hosted fonts: Inter Variable + JetBrains Mono in `public/fonts/` (commit 40
 
 ```
 src/
-├── App.tsx              ← top-level stage union (welcome / create-vault / unlock / locked / editor)
+├── App.tsx              ← top-level stage union (welcome / create-vault / unlock / editor / recover)
 ├── main.tsx             ← React 19 root mount
 ├── screens/             ← top-level screens (one per stage)
 │   ├── CreateVault.tsx
 │   ├── Editor.tsx       ← B4.5 placeholder; full CodeMirror = Lane B #10 (B5)
-│   ├── Locked.tsx       ← post-explicit-lock screen ("just-locked" framing)
 │   ├── Unlock.tsx       ← password form + reducer (idle / decrypting / corrupted modes)
 │   ├── Welcome.tsx
 │   └── vault-creation/  ← multi-step flow (PasswordStep, PhraseStep, ConfirmStep, ...)
@@ -43,8 +42,7 @@ src/
 │   ├── ErrorBanner.tsx
 │   ├── FailClosedError.tsx  ← shared fail-closed UI (reason: invalid-state | corrupted-vault | io-error)
 │   ├── PasswordStrength.tsx
-│   ├── Spinner.tsx
-│   └── ComingSoonPill.tsx
+│   └── Spinner.tsx
 ├── lib/                 ← non-UI helpers
 │   ├── app-window.ts             ← closeApp() helper for fail-closed CTAs
 │   ├── icons.ts
@@ -89,7 +87,7 @@ Don't ship features against this placeholder — wait for B5.
 
 ## App shell (MYND-80 full state machine + route guards)
 
-`src/App.tsx` uses the full Stage discriminated union (`{ name: "welcome" } | { name: "create-vault" } | { name: "unlock"; initialStatus } | { name: "locked" } | { name: "editor" }`) — the v0.1 definition of "routing" (no URL/history-aware router). Pure `transition(prev, action): Stage` function in `src/lib/stage.ts` enforces legal source/target combinations; illegal pairs return `prev` unchanged + dev `console.warn`. Boot starts in `null` (loading shim) until `vault_status` IPC probe resolves; `initialStageFromProbe(result)` maps Ok(Missing)→welcome, Ok(Exists)→unlock(Exists), Ok(Corrupted)→unlock(Corrupted), Err(IoError)→unlock(IoError). The `recover` stage is **out of scope** for this PR — to be added back-compat in a separate recovery PR (MYND-23 + Ömer recover UI). Lock-on-idle (auto-lock on idle timer) is **explicitly out of scope** for Phase 1 per `src-tauri/src/plugins/vault_unlock/state.rs` Phase 2+ docstring — there is no Phase 1 writer for `last_activity`, so a stub here would be dead code.
+`src/App.tsx` uses the full Stage discriminated union (`{ name: "welcome" } | { name: "create-vault" } | { name: "unlock"; initialStatus } | { name: "editor" } | { name: "recover"; subStep }`) — the v0.1 definition of "routing" (no URL/history-aware router). Pure `transition(prev, action): Stage` function in `src/lib/stage.ts` enforces legal source/target combinations; illegal pairs return `prev` unchanged + dev `console.warn`. Boot starts in `null` (loading shim) until `vault_status` IPC probe resolves; `initialStageFromProbe(result)` maps Ok(Missing)→welcome, Ok(Exists)→unlock(Exists), Ok(Corrupted)→unlock(Corrupted), Err(IoError)→unlock(IoError). User-initiated `editor.lock` lands directly on `unlock(Exists)` — no intermediate "vault locked" screen (MYND-131). Lock-on-idle (auto-lock on idle timer) is **explicitly out of scope** for Phase 1 per `src-tauri/src/plugins/vault_unlock/state.rs` Phase 2+ docstring — there is no Phase 1 writer for `last_activity`, so a stub here would be dead code.
 
 Belt+suspenders invalid-state guard (Q5β-1 of `app-state-machine` grill): `transition()` is React-side defense; `Editor` mount probes `vault_is_unlocked()` at mount as the Rust-side reality check, rendering `<FailClosedError reason="invalid-state" />` if React Stage and Rust slot disagree. The "Kilitle" CTA on that error UI calls `vault_lock` + reprobe via `App.tsx::reprobe()` (out-of-band reset; bypasses transition fn intentionally).
 

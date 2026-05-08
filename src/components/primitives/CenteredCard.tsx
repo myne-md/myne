@@ -1,5 +1,5 @@
-// Centered single-column card shell — shared by FailClosedError,
-// Locked, and Unlock screens. Penpot canon: `screen------*` frames in
+// Centered single-column card shell — shared by FailClosedError and
+// Unlock screens. Penpot canon: `screen------*` frames in
 // page "4 — Desktop UI Kit"; all use the same envelope (centered card
 // on `--bg-1` canvas, max-width 480, `--bg-2` fill + `--line-1`
 // hairline + `--radius-2` + `--space-6` padding + `--space-4` row gap).

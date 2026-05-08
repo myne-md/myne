@@ -1,6 +1,5 @@
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { ComingSoonPill } from "../components/ComingSoonPill";
 
 interface WelcomeProps {
   onCreateVault: () => void;
@@ -76,12 +75,6 @@ export function Welcome({ onCreateVault }: WelcomeProps) {
         >
           <Button variant="primary" onClick={onCreateVault}>
             Create new vault
-          </Button>
-          <Button variant="secondary" disabled>
-            <span style={{ flex: 1, textAlign: "left" }}>
-              Sign in to existing vault
-            </span>
-            <ComingSoonPill />
           </Button>
         </div>
 

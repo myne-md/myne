@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Welcome } from "./screens/Welcome";
 import { CreateVault } from "./screens/CreateVault";
 import { Unlock } from "./screens/Unlock";
-import { Locked } from "./screens/Locked";
 import { Editor } from "./screens/Editor";
 import { VaultRecover } from "./screens/VaultRecover";
 import { initialStageFromProbe, transition, type Action, type Stage } from "./lib/stage";
@@ -86,8 +85,6 @@ function App() {
           onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
         />
       );
-    case "locked":
-      return <Locked onUnlock={() => dispatch({ type: "locked.unlock" })} />;
     case "editor":
       return (
         <Editor

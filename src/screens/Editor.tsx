@@ -55,9 +55,11 @@ interface EditorProps {
   /**
    * Callback invoked when the user clicks the Lock affordance in the
    * editor's bottom bar. The parent (App.tsx) dispatches the
-   * `editor.lock` Stage transition → `locked`. This component fires
-   * `vault_lock()` IPC (idempotent) before invoking the callback so
-   * the slot is wiped before the locked screen renders.
+   * `editor.lock` Stage transition → `unlock(Exists)` (no intermediate
+   * "locked" screen — the user lands directly on the password form).
+   * This component fires `vault_lock()` IPC (idempotent) before
+   * invoking the callback so the slot is wiped before the unlock form
+   * renders.
    *
    * **Implicit decrypting-hide invariant:** Lock affordance only
    * mounts when stage = `editor`; `decrypting` is an `unlock` sub-
@@ -298,8 +300,8 @@ function BottomBar({ onLock }: BottomBarProps) {
     void (async () => {
       // vault_lock is idempotent + param-less. Errors are swallowed —
       // slot wipe is best-effort; the parent's `editor.lock` Stage
-      // transition still fires either way (the Locked screen + later
-      // unlock attempt would catch any structural issue).
+      // transition still fires either way (a later unlock attempt
+      // would catch any structural issue).
       await lockVault().catch(() => {});
       onLock?.();
     })();
