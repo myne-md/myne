@@ -17,6 +17,7 @@ permissions = [
     "allow-note-read",
     "allow-note-update",
     "allow-note-delete",
+    "allow-note-list",
 ]
 
 [[permission]]
@@ -38,3 +39,8 @@ commands.allow = ["note_update"]
 identifier = "allow-note-delete"
 description = "Allow invoking notes:note_delete (hard-delete a .myn note via remove_file + Unix parent-dir sync_all; cryptographic erase yapısal property of the v0.1 key hierarchy — enc_item_key removed with the file)."
 commands.allow = ["note_delete"]
+
+[[permission]]
+identifier = "allow-note-list"
+description = "Allow invoking notes:note_list (metadata-only enumeration of <vault>/notes/ — returns Vec<NoteId> sorted ascending UUIDv7; no decryption, no AEAD; the cheap half of two-tier sidebar virtualization paired with note_titles_batch per MYND-28 grill Q1)."
+commands.allow = ["note_list"]

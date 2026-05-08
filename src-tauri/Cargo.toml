@@ -62,3 +62,14 @@ tauri-plugin-single-instance = "2"
 # checklist.
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
+
+# Dev-dependencies — evaluated under the same `docs/dependency-policy.md`
+# bar as runtime dependencies. `tracing-test` (tokio-rs org, MIT) is the
+# project's first dev-dep; it captures `tracing` events per-test so the
+# notes plugin's tracing-level discipline (debug for orphan files, warn
+# for corruption canaries) is asserted in unit tests rather than
+# reviewer-inspected. See `decisions.md` 2026-05-08 "Dev-dependencies
+# under the same policy bar as runtime dependencies; `tracing-test` as
+# the precedent".
+[dev-dependencies]
+tracing-test = "0.2"

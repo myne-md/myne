@@ -373,6 +373,78 @@ impl From<std::io::Error> for NoteDeleteError {
     }
 }
 
+/// Single error type returned across the IPC boundary by
+/// [`super::commands::note_list`].
+///
+/// Hand-mirrored on the TS side at `src/types/note-list-error.ts` (Task
+/// 5 of `myne-agents/features/mynd-28-note-list/tasks.md` — lock-step
+/// with the structural plumbing changes; intentionally NOT in this task).
+///
+/// Asymmetry vs the other four notes-error enums: list operates on **no
+/// specific note** and performs **no decryption**. The variants
+/// `NoteNotFound`, `CannotDecrypt`, `InvalidNoteId`, `PlaintextTooLarge`,
+/// `NoteAlreadyExists`, `InvalidPlaintextEncoding` are therefore not
+/// applicable. The remaining 4 variants mirror the matching variants in
+/// the other four enums byte-for-byte (review-fatigue unification per
+/// `decisions.md` 2026-05-06 "Naming-discipline > scenario-optimization").
+///
+/// Spec touchpoints:
+///
+/// - `decisions.md` 2026-05-02 — slot state machine (the
+///   `Slot::Unlocked` guard `VaultNotUnlocked` rejects).
+/// - `decisions.md` 2026-05-07 "Note AEAD ops: clone-out items_key +
+///   always spawn_blocking" — uniform `spawn_blocking` pattern that
+///   feeds `JoinFailure`. `note_list` joins the pattern even though it
+///   does no AEAD (Q4e of the MYND-28 grilling: NFS / FUSE / AV-overlay
+///   topology violates the laboratuvar "`read_dir` ucuz" assumption).
+/// - `myne-agents/sessions/grill/2026-05-07-mynd-28-note-list.md` Q4d —
+///   variant set rationale + naming mirror.
+///
+/// See: ../../CLAUDE.md "Secret-handling logging discipline".
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteListError {
+    /// Slot is `Empty` or `Recovering`. Frontend routes the user to the
+    /// lock screen via `vault_status` / `vault_slot_kind`; if this
+    /// surfaces from `note_list`, a router bug.
+    #[error("vault not unlocked")]
+    VaultNotUnlocked,
+
+    /// `<vault>/notes` exists as a regular file rather than a directory.
+    /// Defensive bug-canary parallel to the matching variant in the
+    /// other four notes-error enums — fires for dev-tools manipulation,
+    /// disk corruption, or cross-process race edge cases.
+    #[error("vault notes path is not a directory")]
+    NotesDirNotADirectory,
+
+    /// File-system IO failure during `notes_dir` resolution or per-entry
+    /// `read_dir` enumeration. The bounded [`IoFailureKind`] keeps OS
+    /// error messages off the wire. `NotADirectory` / `AlreadyExists`
+    /// are special-cased upstream as [`Self::NotesDirNotADirectory`];
+    /// only `PermissionDenied` / `NoSpace` / `Other` surface here.
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error
+    /// (panic in the blocking task, runtime shutdown). User-facing CTA
+    /// is "try again". Uniform with the other four notes-plugin
+    /// commands.
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteListError {
+    fn from(e: std::io::Error) -> Self {
+        // `NotADirectory` / `AlreadyExists` are special-cased by the
+        // calling command (mapped to `NotesDirNotADirectory` upstream).
+        // This `From` handles the residual cases where an `io::Error`
+        // bubbles up unclassified.
+        NoteListError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -827,6 +899,92 @@ mod tests {
         let mapped: NoteDeleteError = raw.into();
         match mapped {
             NoteDeleteError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteListError
+    // =====================================================================
+
+    fn serialize_list(e: &NoteListError) -> String {
+        serde_json::to_string(e).expect("NoteListError must serialize cleanly")
+    }
+
+    // ---- NoteListError serde shape -------------------------------------
+
+    #[test]
+    fn list_vault_not_unlocked_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_list(&NoteListError::VaultNotUnlocked),
+            r#"{"kind":"VaultNotUnlocked"}"#
+        );
+    }
+
+    #[test]
+    fn list_notes_dir_not_a_directory_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_list(&NoteListError::NotesDirNotADirectory),
+            r#"{"kind":"NotesDirNotADirectory"}"#
+        );
+    }
+
+    #[test]
+    fn list_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteListError::Io {
+            io_error_kind: IoFailureKind::PermissionDenied,
+        };
+        assert_eq!(
+            serialize_list(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
+        );
+    }
+
+    #[test]
+    fn list_join_failure_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_list(&NoteListError::JoinFailure),
+            r#"{"kind":"JoinFailure"}"#
+        );
+    }
+
+    // ---- Closed-payload exhaustiveness pin -----------------------------
+
+    #[test]
+    fn list_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteListError) {
+            match e {
+                NoteListError::VaultNotUnlocked => {}
+                NoteListError::NotesDirNotADirectory => {}
+                NoteListError::Io { io_error_kind: _ } => {}
+                NoteListError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteListError::VaultNotUnlocked);
+    }
+
+    // ---- From<std::io::Error> mapping ----------------------------------
+
+    #[test]
+    fn list_from_io_error_routes_via_closed_enum_for_permission_denied() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteListError = raw.into();
+        match mapped {
+            NoteListError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn list_from_io_error_no_space_collapses_to_no_space() {
+        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
+        let mapped: NoteListError = raw.into();
+        match mapped {
+            NoteListError::Io { io_error_kind } => {
                 assert_eq!(io_error_kind, IoFailureKind::NoSpace);
             }
             other => panic!("expected Io variant, got {other:?}"),
