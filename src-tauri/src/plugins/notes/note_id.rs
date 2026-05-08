@@ -62,7 +62,7 @@ use uuid::Uuid;
 /// `Display` emits the canonical lowercase-hyphenated 36-char form (the
 /// shape `parse` accepts) so `format!("{note_id}.myn")` produces a
 /// filename ready for the `notes/` directory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NoteId(Uuid);
 
 impl NoteId {

@@ -37,7 +37,9 @@ use std::time::Instant;
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
-use super::error::{NoteCreateError, NoteDeleteError, NoteReadError, NoteUpdateError};
+use super::error::{
+    NoteCreateError, NoteDeleteError, NoteListError, NoteReadError, NoteUpdateError,
+};
 use super::note_id::NoteId;
 
 /// Create a new encrypted `.myn` note. See module-level docs for the
@@ -900,6 +902,63 @@ pub(crate) async fn note_delete_with_dir(
     Ok(())
 }
 
+/// Inner sync enumerator — reads `notes_dir`, filters by `.myn`
+/// extension + strict [`NoteId::parse`], sorts ascending UUIDv7,
+/// returns the result. Called from inside the async wrapper's
+/// `spawn_blocking` closure (see [`note_list_with_dir`]). Tests
+/// exercise this layer directly via `ScopedTempDir` to verify the
+/// filter + sort + tracing-level behavior without taking the slot
+/// guard.
+///
+/// Lexicographic UUIDv7 order approximates creation-time-asc per
+/// `protocol.md` §9.1; the backend-side sort is the cross-platform
+/// determinism guarantee (POSIX `readdir` order is unspecified —
+/// ext4 / APFS / tmpfs / FAT all differ).
+///
+/// **Tracing level split** (per `agent-tooling/sessions/grill/2026-05-07-mynd-28-note-list.md` Q4b):
+/// - non-`.myn` files (`.DS_Store`, `.tmp`, accidental drops) +
+///   non-UTF-8 filenames → `tracing::debug!(stage = "skip_orphan")`,
+///   benign noise.
+/// - `.myn` files whose stem fails [`NoteId::parse`] →
+///   `tracing::warn!(stage = "skip_malformed_uuid", cause = ?cause)`,
+///   corruption canary. The offending stem string itself is **never**
+///   logged (DENY-list compliance per `src-tauri/CLAUDE.md`
+///   "Secret-handling logging discipline").
+pub(crate) fn enumerate_notes_dir(notes_dir: &std::path::Path) -> std::io::Result<Vec<NoteId>> {
+    let mut ids: Vec<NoteId> = Vec::new();
+    for entry in std::fs::read_dir(notes_dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            // Non-UTF-8 filename (Linux can hold arbitrary bytes; APFS /
+            // NTFS normalize but accept many invalid sequences). Benign
+            // OS-level housekeeping noise — the offending bytes never
+            // appear in tracing per `src-tauri/CLAUDE.md` DENY list.
+            tracing::debug!(stage = "skip_orphan");
+            continue;
+        };
+        let Some(stem) = name_str.strip_suffix(".myn") else {
+            // Non-`.myn` orphan: `.DS_Store`, `.tmp`, accidental drops.
+            // Filename string is **not** logged — DENY-list compliance.
+            tracing::debug!(stage = "skip_orphan");
+            continue;
+        };
+        match NoteId::parse(stem) {
+            Ok(id) => ids.push(id),
+            Err(cause) => {
+                // `.myn` extension but malformed UUIDv7 stem — corruption
+                // canary. The closed `InvalidNoteIdCause` enum's Debug
+                // impl emits a bare variant name (DENY-list-safe per the
+                // pattern in `src-tauri/src/plugins/notes/note_id.rs`).
+                // The offending stem string itself is **not** logged.
+                tracing::warn!(stage = "skip_malformed_uuid", cause = ?cause);
+            }
+        }
+    }
+    ids.sort();
+    Ok(ids)
+}
+
 /// Static-string label for [`NoteDeleteError`] variants — same
 /// drift-detector discipline as the other three helpers. A new variant
 /// compile-fails this match.
@@ -911,6 +970,146 @@ fn note_delete_error_kind(e: &NoteDeleteError) -> &'static str {
         NoteDeleteError::NotesDirNotADirectory => "NotesDirNotADirectory",
         NoteDeleteError::Io { .. } => "Io",
         NoteDeleteError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// `note_list` Tauri command — returns the set of [`NoteId`]s for all
+/// `.myn` files in the unlocked vault, sorted ascending UUIDv7.
+///
+/// Single-responsibility: "which notes exist in the unlocked vault?"
+/// → identifier set. No metadata (no `items_key_id`, no `blob_size`,
+/// no `file_mtime`). Field-set rationale: MYND-28 grill Q1–Q3 +
+/// `decisions.md` 2026-05-07 "User-meaningful timestamp storage path".
+///
+/// Pipeline: resolve `<vault>/notes/` via [`paths::notes_dir`] →
+/// delegate to [`note_list_with_dir`] (which holds the slot guard +
+/// `spawn_blocking`s the inner [`enumerate_notes_dir`] call).
+///
+/// Failure modes (closed-enum surface):
+/// - `VaultNotUnlocked` — slot is `Empty` or `Recovering`.
+/// - `NotesDirNotADirectory` — `<vault>/notes` is a regular file
+///   (defensive bug-canary).
+/// - `Io` — read_dir / per-entry IO failure (`PermissionDenied` /
+///   `NoSpace` / other).
+/// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown.
+#[tauri::command]
+pub async fn note_list<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<NoteId>, NoteListError> {
+    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+        let kind = e.kind();
+        match kind {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_list notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteListError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_list notes_dir resolution failed"
+                );
+                NoteListError::Io {
+                    io_error_kind: io_kind,
+                }
+            }
+        }
+    })?;
+    note_list_with_dir(notes_dir, state.inner()).await
+}
+
+/// Inner — pure-and-testable helper. Mirror of [`note_create_with_dir`]
+/// / [`note_read_with_dir`] / [`note_update_with_dir`] /
+/// [`note_delete_with_dir`]. Takes `notes_dir` directly so tests
+/// exercise the slot guard + `spawn_blocking` + io-error mapping
+/// pipeline under a `ScopedTempDir` without spinning up a Tauri runtime.
+///
+/// Diverges from the precedent in one way: it does **not** clone an
+/// `items_key` from the slot — `note_list` is metadata-only and does
+/// no AEAD. The slot guard is just a `match &*slot { Slot::Unlocked(_)
+/// => {}, … }` pattern; the read guard is held across the `.await` for
+/// `vault_lock` fair-queue uyumu (`decisions.md` 2026-05-07 "Note AEAD
+/// ops" — the uniform pattern that Q4e of the MYND-28 grilling extends
+/// to the non-AEAD `note_list` to absorb NFS / FUSE / AV-overlay
+/// topology violating the laboratuvar "`read_dir` ucuz" assumption).
+pub(crate) async fn note_list_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+) -> Result<Vec<NoteId>, NoteListError> {
+    let slot = state.slot_read().await;
+    match &*slot {
+        Slot::Unlocked(_) => {}
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_list rejected: slot is not Unlocked"
+            );
+            return Err(NoteListError::VaultNotUnlocked);
+        }
+    }
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let started = Instant::now();
+    let result = tokio::task::spawn_blocking(move || enumerate_notes_dir(&notes_dir)).await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    let ids = match result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_list enumerate panicked or runtime shutdown"
+            );
+            return Err(NoteListError::JoinFailure);
+        }
+        Ok(Err(e)) => {
+            let kind = e.kind();
+            let mapped = match kind {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    NoteListError::NotesDirNotADirectory
+                }
+                other => NoteListError::Io {
+                    io_error_kind: from_io_error_kind(other),
+                },
+            };
+            tracing::error!(
+                stage = "enumerate",
+                error_kind = note_list_error_kind(&mapped),
+                "note_list enumerate failed"
+            );
+            return Err(mapped);
+        }
+        Ok(Ok(ids)) => ids,
+    };
+
+    drop(slot);
+
+    tracing::info!(
+        stage = "success",
+        event = "note_listed",
+        count = ids.len(),
+        duration_ms = duration_ms,
+    );
+    Ok(ids)
+}
+
+/// Static-string label for [`NoteListError`] variants — same
+/// drift-detector discipline as the other four helpers. A new variant
+/// compile-fails this match.
+fn note_list_error_kind(e: &NoteListError) -> &'static str {
+    match e {
+        NoteListError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteListError::NotesDirNotADirectory => "NotesDirNotADirectory",
+        NoteListError::Io { .. } => "Io",
+        NoteListError::JoinFailure => "JoinFailure",
     }
 }
 
@@ -2215,6 +2414,468 @@ mod tests {
         );
         assert_eq!(
             note_delete_error_kind(&NoteDeleteError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+
+    // ---- enumerate_notes_dir tests ---------------------------------------
+
+    #[test]
+    fn list_with_dir_empty_directory_returns_empty_vec() {
+        let tmp = ScopedTempDir::new("list-empty").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert!(result.is_empty(), "empty notes/ must return empty Vec");
+    }
+
+    #[test]
+    fn list_with_dir_three_valid_files_returns_all_sorted() {
+        let tmp = ScopedTempDir::new("list-three").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        let stems = [
+            "01970e83-4f2f-7000-8000-000000000001",
+            "01970e84-4f2f-7000-8000-000000000002",
+            "01970e85-4f2f-7000-8000-000000000003",
+        ];
+        for stem in stems {
+            std::fs::write(notes_dir.join(format!("{stem}.myn")), b"\0").unwrap();
+        }
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert_eq!(result.len(), 3);
+        let result_strs: Vec<String> = result.iter().map(|id| format!("{id}")).collect();
+        assert_eq!(result_strs, stems.to_vec());
+    }
+
+    #[test]
+    fn list_with_dir_reversed_insertion_order_still_returns_sorted() {
+        // Cross-platform determinism pin: writing files in descending UUID
+        // order must NOT yield a descending Vec. The backend sort is what
+        // makes `Vec<NoteId>` honest as a sorted contract — POSIX `readdir`
+        // order is unspecified per platform.
+        let tmp = ScopedTempDir::new("list-reversed").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        let stems_descending = [
+            "01970e85-4f2f-7000-8000-000000000003",
+            "01970e84-4f2f-7000-8000-000000000002",
+            "01970e83-4f2f-7000-8000-000000000001",
+        ];
+        for stem in stems_descending {
+            std::fs::write(notes_dir.join(format!("{stem}.myn")), b"\0").unwrap();
+        }
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+        let result_strs: Vec<String> = result.iter().map(|id| format!("{id}")).collect();
+
+        assert_eq!(
+            result_strs,
+            vec![
+                "01970e83-4f2f-7000-8000-000000000001",
+                "01970e84-4f2f-7000-8000-000000000002",
+                "01970e85-4f2f-7000-8000-000000000003",
+            ]
+        );
+    }
+
+    #[test]
+    fn list_with_dir_silently_skips_non_myn_orphan_files() {
+        let tmp = ScopedTempDir::new("list-orphan").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        let valid_stem = "01970e83-4f2f-7000-8000-000000000001";
+        std::fs::write(notes_dir.join(format!("{valid_stem}.myn")), b"\0").unwrap();
+        std::fs::write(notes_dir.join(".DS_Store"), b"\0").unwrap();
+        std::fs::write(notes_dir.join("random.txt"), b"hello").unwrap();
+        std::fs::write(notes_dir.join("temp.tmp"), b"\0").unwrap();
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(format!("{}", result[0]), valid_stem);
+        // Tracing-level assertion (skip_orphan debug events fired exactly
+        // 3 times) is Task 3's responsibility.
+    }
+
+    #[test]
+    fn list_with_dir_silently_skips_myn_files_with_malformed_uuid_stem() {
+        let tmp = ScopedTempDir::new("list-malformed").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        let valid_stem = "01970e83-4f2f-7000-8000-000000000001";
+        std::fs::write(notes_dir.join(format!("{valid_stem}.myn")), b"\0").unwrap();
+        // v4 UUID — passes char/length/hyphen filters but `NoteId::parse`
+        // rejects with `WrongVersion`.
+        std::fs::write(
+            notes_dir.join("550e8400-e29b-41d4-a716-446655440000.myn"),
+            b"\0",
+        )
+        .unwrap();
+        // Outright not a UUID — fails on hyphen positions.
+        std::fs::write(notes_dir.join("not-a-uuid-at-all-stem-here.myn"), b"\0").unwrap();
+        // Uppercase canonical form — rejected by `InvalidChar`.
+        std::fs::write(
+            notes_dir.join("01970E83-4F2F-7000-8000-000000000002.myn"),
+            b"\0",
+        )
+        .unwrap();
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(format!("{}", result[0]), valid_stem);
+        // Tracing-level assertion (skip_malformed_uuid warn events fired
+        // exactly 3 times) is Task 3's responsibility.
+    }
+
+    // ---- enumerate_notes_dir tracing tests --------------------------------
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn list_with_dir_emits_skip_orphan_debug_for_non_myn_files() {
+        let tmp = ScopedTempDir::new("list-trace-orphan").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        let valid_stem = "01970e83-4f2f-7000-8000-000000000001";
+        std::fs::write(notes_dir.join(format!("{valid_stem}.myn")), b"\0").unwrap();
+        std::fs::write(notes_dir.join(".DS_Store"), b"\0").unwrap();
+        std::fs::write(notes_dir.join("random.txt"), b"hello").unwrap();
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert!(
+            logs_contain("skip_orphan"),
+            "non-.myn entries must trigger skip_orphan tracing event"
+        );
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn list_with_dir_emits_skip_malformed_uuid_warn_for_bad_stems() {
+        let tmp = ScopedTempDir::new("list-trace-malformed").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        // Uppercase canonical form → `InvalidNoteIdCause::InvalidChar`.
+        std::fs::write(
+            notes_dir.join("01970E83-4F2F-7000-8000-000000000002.myn"),
+            b"\0",
+        )
+        .unwrap();
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert!(result.is_empty());
+        assert!(
+            logs_contain("skip_malformed_uuid"),
+            "malformed-UUID `.myn` must trigger skip_malformed_uuid tracing event"
+        );
+        assert!(
+            logs_contain("InvalidChar"),
+            "the closed `InvalidNoteIdCause` Debug variant name must appear in the captured cause field"
+        );
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn list_with_dir_mixed_directory_emits_correct_event_counts() {
+        let tmp = ScopedTempDir::new("list-trace-counts").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        let valid_stem = "01970e83-4f2f-7000-8000-000000000001";
+        std::fs::write(notes_dir.join(format!("{valid_stem}.myn")), b"\0").unwrap();
+        std::fs::write(notes_dir.join(".DS_Store"), b"\0").unwrap();
+        std::fs::write(notes_dir.join("random.txt"), b"hello").unwrap();
+        std::fs::write(notes_dir.join("not-a-uuid-at-all-stem-here.myn"), b"\0").unwrap();
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(format!("{}", result[0]), valid_stem);
+
+        logs_assert(|lines: &[&str]| {
+            let orphan_count = lines.iter().filter(|l| l.contains("skip_orphan")).count();
+            let malformed_count = lines
+                .iter()
+                .filter(|l| l.contains("skip_malformed_uuid"))
+                .count();
+            if orphan_count != 2 {
+                return Err(format!("expected 2 skip_orphan events, got {orphan_count}"));
+            }
+            if malformed_count != 1 {
+                return Err(format!(
+                    "expected 1 skip_malformed_uuid event, got {malformed_count}"
+                ));
+            }
+            Ok(())
+        });
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn list_with_dir_skip_events_do_not_leak_offending_stem_string() {
+        // DENY-list compliance: `note_id` strings (and the offending
+        // pre-parse stem variants) must never appear in any captured
+        // tracing field. Per `src-tauri/CLAUDE.md` "Secret-handling
+        // logging discipline".
+        let tmp = ScopedTempDir::new("list-trace-deny").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        // Distinctive, hard-to-mistake stem strings.
+        let orphan_name = "alphareconnaissancehallmark.txt";
+        let malformed_stem = "betacontradictionperformative";
+        std::fs::write(notes_dir.join(orphan_name), b"\0").unwrap();
+        std::fs::write(notes_dir.join(format!("{malformed_stem}.myn")), b"\0").unwrap();
+
+        let _ = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert!(
+            !logs_contain(orphan_name),
+            "offending non-.myn filename must not appear in tracing fields"
+        );
+        assert!(
+            !logs_contain(malformed_stem),
+            "offending malformed-UUID stem must not appear in tracing fields"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tracing_test::traced_test]
+    #[test]
+    fn list_with_dir_emits_skip_orphan_for_non_utf8_filename() {
+        // `name.to_str()` None branch is exercised here. Linux ext4
+        // accepts arbitrary bytes; APFS / NTFS normalize, so this test
+        // is `#[cfg(target_os = "linux")]`-gated. Production code path
+        // is platform-agnostic — when an invalid-UTF-8 entry appears
+        // (corrupt FS, foreign tooling), it is treated as an orphan.
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
+        let tmp = ScopedTempDir::new("list-trace-non-utf8").unwrap();
+        let notes_dir = notes_dir_under(tmp.path()).unwrap();
+
+        // Invalid UTF-8 prefix (lone continuation bytes) + `.myn` suffix
+        // bytes; the entry will hit the `to_str()` None branch before
+        // any extension check runs.
+        let bad_bytes: &[u8] = b"\xff\xfename.myn";
+        let bad_name = OsStr::from_bytes(bad_bytes);
+        std::fs::write(notes_dir.join(bad_name), b"\0").unwrap();
+
+        let result = enumerate_notes_dir(&notes_dir).unwrap();
+
+        assert!(result.is_empty(), "non-UTF-8 entry must be skipped");
+        assert!(
+            logs_contain("skip_orphan"),
+            "non-UTF-8 filename must hit the skip_orphan branch"
+        );
+    }
+
+    // ---- note_list_with_dir integration tests --------------------------
+    //
+    // These tests exercise the async slot-guarded wrapper (Task 4) — the
+    // outer `note_list` Tauri command's path-resolution layer is covered
+    // via `paths::tests::notes_dir_under_*` (the `<parent>/notes is a
+    // file` boundary). The wrapper layer is the meaningful coverage
+    // target: slot guard + `spawn_blocking` + io-error mapping +
+    // success-path tracing event.
+
+    #[test]
+    fn note_list_with_dir_empty_unlocked_returns_empty_vec() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-list-empty-unlocked").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let result = note_list_with_dir(notes_dir, &state).await;
+            assert!(matches!(result, Ok(ref v) if v.is_empty()));
+        });
+    }
+
+    #[test]
+    fn note_list_with_dir_three_valid_files_unlocked_returns_sorted() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-list-three-unlocked").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let stems_descending = [
+                "01970e85-4f2f-7000-8000-000000000003",
+                "01970e84-4f2f-7000-8000-000000000002",
+                "01970e83-4f2f-7000-8000-000000000001",
+            ];
+            for stem in stems_descending {
+                std::fs::write(notes_dir.join(format!("{stem}.myn")), b"\0").unwrap();
+            }
+
+            let ids = note_list_with_dir(notes_dir, &state).await.unwrap();
+            let id_strs: Vec<String> = ids.iter().map(|id| format!("{id}")).collect();
+            assert_eq!(
+                id_strs,
+                vec![
+                    "01970e83-4f2f-7000-8000-000000000001",
+                    "01970e84-4f2f-7000-8000-000000000002",
+                    "01970e85-4f2f-7000-8000-000000000003",
+                ]
+            );
+        });
+    }
+
+    #[test]
+    fn note_list_with_dir_slot_empty_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-list-slot-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default(); // Slot::Empty by default
+
+            let result = note_list_with_dir(notes_dir, &state).await;
+            assert!(matches!(result, Err(NoteListError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn note_list_with_dir_slot_recovering_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-list-slot-recovering").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+
+            let result = note_list_with_dir(notes_dir, &state).await;
+            assert!(matches!(result, Err(NoteListError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn note_list_with_dir_path_is_file_returns_notes_dir_not_a_directory() {
+        // Pass a regular-file path as `notes_dir` — `read_dir` errors
+        // with `NotADirectory` and the wrapper's map_err routes it to
+        // the structural variant. This is the test-seam-layer pin for
+        // the `notes_dir_under` boundary; the outer `note_list` Tauri
+        // command's path-resolution map_err lands the same variant
+        // before reaching the wrapper.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-list-notes-as-file").unwrap();
+            let conflict = scratch.path().join("notes-as-file");
+            std::fs::write(&conflict, b"hostile").unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let result = note_list_with_dir(conflict, &state).await;
+            assert!(matches!(result, Err(NoteListError::NotesDirNotADirectory)));
+        });
+    }
+
+    #[test]
+    fn note_list_concurrent_with_vault_lock_completes_cleanly() {
+        // Mirrors `note_create_concurrent_with_vault_lock_completes_cleanly` /
+        // `update_concurrent_with_vault_lock_completes_cleanly` /
+        // `delete_concurrent_with_vault_lock_completes_cleanly`. Under
+        // multi-thread scheduling, an in-flight `note_list_with_dir`
+        // and a concurrent `state.take()` (the inner of `vault_lock`)
+        // both complete without deadlock. Two terminal outcomes are
+        // valid:
+        //   - `Ok(_)`                       → list ran first; lock
+        //                                     waited for the read guard.
+        //   - `Err(VaultNotUnlocked)`       → lock ran first; list
+        //                                     observed `Slot::Empty`.
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-list-concurrent-lock").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = std::sync::Arc::new(VaultRuntimeState::default());
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            // Pre-populate so the list does real work.
+            for stem in [
+                "01970e83-4f2f-7000-8000-000000000001",
+                "01970e84-4f2f-7000-8000-000000000002",
+            ] {
+                std::fs::write(notes_dir.join(format!("{stem}.myn")), b"\0").unwrap();
+            }
+
+            let list_state = std::sync::Arc::clone(&state);
+            let list_dir = notes_dir.clone();
+            let list_task =
+                tokio::spawn(async move { note_list_with_dir(list_dir, &list_state).await });
+
+            tokio::task::yield_now().await;
+
+            let lock_state = std::sync::Arc::clone(&state);
+            let lock_task = tokio::spawn(async move { lock_state.take().await });
+
+            let list_result = list_task.await.expect("list task joins");
+            let lock_taken = lock_task.await.expect("lock task joins");
+
+            assert!(
+                matches!(
+                    lock_taken,
+                    crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+                ),
+                "lock must take the Unlocked variant"
+            );
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+            );
+
+            match list_result {
+                Ok(_) => {}
+                Err(NoteListError::VaultNotUnlocked) => {}
+                Err(other) => panic!("unexpected list outcome: {other:?}"),
+            }
+        });
+    }
+
+    #[test]
+    fn list_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_list_error_kind(&NoteListError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            note_list_error_kind(&NoteListError::NotesDirNotADirectory),
+            "NotesDirNotADirectory"
+        );
+        assert_eq!(
+            note_list_error_kind(&NoteListError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_list_error_kind(&NoteListError::JoinFailure),
             "JoinFailure"
         );
     }

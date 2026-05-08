@@ -96,6 +96,22 @@ The frontmatter block must:
 
 Frontmatter is recognized as a structured block and rendered as a code block in the v0.1 baseline editor. The Properties UI (editable key-value grid) is deferred to a post-v0.1 release. Unknown frontmatter fields are preserved on write — Myne never strips fields it does not recognize.
 
+#### 3.6.1 Myne-managed canonical frontmatter fields
+
+Myne writes one canonical field to YAML frontmatter from the host on `note_update`, per [`decisions.md`](../decisions.md) 2026-05-07 "User-meaningful timestamp storage path: YAML frontmatter convention":
+
+| Field | Type | Semantics | Writer |
+|---|---|---|---|
+| `updated` | RFC 3339 string (UTC) | User-meaningful last-edit timestamp | Backend (`note_update`) — overwrite on every call |
+
+Mechanics:
+
+- The field is **unprefixed** (no `myne_` namespace). Obsidian Templater/Linter and the wider markdown ecosystem use unprefixed `updated:` for this purpose; Myne aligns with that convention so a user who walks away from Myne sees a field every other editor recognizes (`PRODUCT.md` design principle 5 — plain-markdown portability).
+- The first `note_update` after `note_create` prepends the canonical frontmatter block with the `updated:` line; subsequent calls preserve the block and overwrite only the `updated:` value. Other frontmatter fields (`title:`, `tags:`, user-authored fields) are preserved per the §3.6 "Unknown frontmatter fields are preserved on write" rule.
+- A user who manually sets `updated:` to a custom value sees it overwritten on the next save — autosave is Myne's responsibility. Users who want a manually-managed timestamp use a different field name (e.g., `last_reviewed:`).
+- `created_at` is **not** stored in frontmatter — it is derived from the UUIDv7 filename's millisecond time component per [`protocol.md`](protocol.md) §9.1 (already public-accepted leak; no new commitment violation, no frontmatter write needed).
+- The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with v005: v005 may rename, drop, or supersede `updated:` per its own dialect specification.
+
 ## 4. File extension and on-disk identity
 
 - The post-decryption plaintext content of a note is stored as **UTF-8 markdown text**.

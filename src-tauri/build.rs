@@ -77,6 +77,7 @@ fn main() {
                     "note_read",
                     "note_update",
                     "note_delete",
+                    "note_list",
                 ]),
             ),
     )
