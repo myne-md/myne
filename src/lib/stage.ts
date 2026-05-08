@@ -31,9 +31,12 @@ export type IoFailureKind = "PermissionDenied" | "NoSpace" | "NotFound" | "Other
  * whether the Unlock component renders the password form (`Exists`)
  * or `<FailClosedError reason="corrupted-vault" />` (`Corrupted` /
  * `IoError`). For transitions other than the boot probe (auto-unlock
- * after create-vault, editor → unlock on user-initiated lock), the
- * entry is always `{ kind: "Exists" }` — the vault was just confirmed
- * openable.
+ * after create-vault, editor → unlock on user-initiated lock,
+ * change-password force-relock with `suspicionReason` set), the entry
+ * is `{ kind: "Exists" }` — the vault was just confirmed openable.
+ * `InvalidVaultMeta` from change-password routes through
+ * `{ kind: "Corrupted" }` instead, so the Unlock screen lands on the
+ * existing `corrupted-vault` fail-closed UI shared with the boot probe.
  */
 export type StageVaultStatus =
   | { kind: "Exists" }
@@ -55,14 +58,47 @@ export type StageVaultStatus =
 export type RecoverSubStep = "phrase-entry" | "decrypting" | "password-reset";
 
 /**
+ * Optional one-shot signal carried on the `unlock` stage when the
+ * change-password modal force-relocks. Set ONLY by the change-password
+ * modal's force-relock callback (via App.tsx's `setStageWithSuspicion`
+ * out-of-band Stage set, sibling of `reprobe()`); the boot probe NEVER
+ * emits this field. Read by `<Unlock>` to render a one-shot banner above
+ * the password form (`<SuspicionBanner>`); cleared on first unlock
+ * attempt or stage exit.
+ *
+ * Two values mirror the user-recoverable change-password backend errors:
+ * - `"vault-meta-changed-externally"` — backend returned `VaultMetaChangedExternally`
+ *   (CAS mismatch — another instance committed a competing rewrite).
+ *   Banner copy LITERAL (`decisions.md` 2026-05-06):
+ *   `"Vault başka bir oturumda değişti — yeniden açın."` Red severity.
+ * - `"vault-locked-during-change"` — backend returned `VaultLockedDuringChange`
+ *   (user fired vault_lock during the Argon2id window; informational).
+ *   Banner copy LITERAL: `"Şifre değişikliği iptal edildi: kilit atıldı."`
+ *   Informational gray severity.
+ *
+ * `InvalidVaultMeta` (the third change-password force-relock variant)
+ * deliberately does NOT use this field — it routes through
+ * `initialStatus: { kind: "Corrupted" }` to the existing
+ * `<FailClosedError reason="corrupted-vault" />` shared with the
+ * boot-probe corrupted-vault path; "vault file is unreadable" is a
+ * different UX category from "vault was changed during change-password"
+ * (fail-closed vs suspicion). See `decisions.md` 2026-05-08
+ * "`Stage.unlock.suspicionReason?` field" entry §Rationale (2).
+ */
+export type SuspicionReason =
+  | "vault-meta-changed-externally"
+  | "vault-locked-during-change";
+
+/**
  * Top-level app stage. Discriminator is `name`. `unlock` carries an
- * `initialStatus` payload; `recover` carries a `subStep` payload;
- * the other three stages are payload-free.
+ * `initialStatus` payload + optional `suspicionReason` for change-password
+ * force-relock signals; `recover` carries a `subStep` payload; the other
+ * three stages are payload-free.
  */
 export type Stage =
   | { name: "welcome" }
   | { name: "create-vault" }
-  | { name: "unlock"; initialStatus: StageVaultStatus }
+  | { name: "unlock"; initialStatus: StageVaultStatus; suspicionReason?: SuspicionReason }
   | { name: "editor" }
   | { name: "recover"; subStep: RecoverSubStep };
 
@@ -343,6 +379,11 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   { name: "welcome" },
   { name: "create-vault" },
   { name: "unlock", initialStatus: { kind: "Exists" } },
+  // Coverage entry for the optional `suspicionReason` payload field
+  // (`decisions.md` 2026-05-08). The `transition` fn ignores the field;
+  // this entry exercises every (Stage × Action) pair to confirm the
+  // field's presence does not change transition outcomes.
+  { name: "unlock", initialStatus: { kind: "Exists" }, suspicionReason: "vault-meta-changed-externally" },
   { name: "editor" },
   { name: "recover", subStep: "phrase-entry" },
   { name: "recover", subStep: "decrypting" },

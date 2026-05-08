@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Welcome } from "./screens/Welcome";
 import { CreateVault } from "./screens/CreateVault";
 import { Unlock } from "./screens/Unlock";
 import { Editor } from "./screens/Editor";
 import { VaultRecover } from "./screens/VaultRecover";
-import { initialStageFromProbe, transition, type Action, type Stage } from "./lib/stage";
+import {
+  initialStageFromProbe,
+  transition,
+  type Action,
+  type Stage,
+  type StageVaultStatus,
+  type SuspicionReason,
+} from "./lib/stage";
 import { probeVaultStatus } from "./lib/vault-status";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 
@@ -52,6 +59,26 @@ function App() {
     setStage(null);
   };
 
+  // Out-of-band stage set with a fully-known target — sibling to
+  // `reprobe()`. Used by post-event handlers (today: change-password
+  // modal's force-relock callback) where the post-event Stage is
+  // already known from the error variant; re-probing would re-issue
+  // `vault_status` + `vault_slot_kind` IPCs and could subtly race
+  // (low probability, but the goal of the suspicion path is to surface
+  // unusual state — a probe race could hide it). Direct atomic Stage
+  // set: one transition, one render, no IPC roundtrip.
+  //
+  // `suspicionReason` is the optional one-shot signal carried on the
+  // resulting `unlock` stage's payload (`<Unlock>` reads it and
+  // renders `<SuspicionBanner>` above the password form). See
+  // `decisions.md` 2026-05-08 "`Stage.unlock.suspicionReason?` field".
+  const setStageWithSuspicion = useCallback(
+    (status: StageVaultStatus, suspicionReason?: SuspicionReason) => {
+      setStage({ name: "unlock", initialStatus: status, suspicionReason });
+    },
+    [],
+  );
+
   if (stage === null) {
     // Loading shim — vault_status probe in flight (~ms on warm disk).
     // Returning null avoids a flash-of-welcome before existing-vault
@@ -83,6 +110,7 @@ function App() {
           onUnlocked={() => dispatch({ type: "unlock.success" })}
           onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
           onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
+          suspicionReason={stage.suspicionReason}
         />
       );
     case "editor":
@@ -90,6 +118,7 @@ function App() {
         <Editor
           onResetRequested={reprobe}
           onLock={() => dispatch({ type: "editor.lock" })}
+          onForceRelock={setStageWithSuspicion}
         />
       );
     case "recover":

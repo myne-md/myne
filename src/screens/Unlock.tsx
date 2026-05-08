@@ -34,9 +34,10 @@ import {
   CenteredCard,
 } from "../components/primitives/CenteredCard";
 import { Spinner } from "../components/Spinner";
+import { SuspicionBanner } from "../components/SuspicionBanner";
 import { closeApp } from "../lib/app-window";
 import { ioBanner } from "../lib/io-banner";
-import type { StageVaultStatus } from "../lib/stage";
+import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 import type { VaultUnlockError } from "../types/vault-unlock-error";
 
 interface UnlockProps {
@@ -51,6 +52,20 @@ interface UnlockProps {
    *  `unlock.resume-recovery` → Stage transitions to
    *  `recover(password-reset)`. */
   onResumeRecovery: () => void;
+  /**
+   * Optional one-shot signal carried via `Stage.unlock.suspicionReason`
+   * — set only by the change-password modal's force-relock callback
+   * (Task 13's plumbing). Renders `<SuspicionBanner>` above the
+   * password form. Two values: `"vault-meta-changed-externally"` (red
+   * severity, CAS mismatch) and `"vault-locked-during-change"`
+   * (informational gray, user-initiated lock during Argon2id). The
+   * banner has no dismiss affordance — it informs, doesn't gate.
+   * App.tsx implicitly clears the field on stage exit (next mount of
+   * Unlock from boot probe or from a different transition won't carry
+   * it). See `decisions.md` 2026-05-08 "`Stage.unlock.suspicionReason?`"
+   * entry.
+   */
+  suspicionReason?: SuspicionReason;
 }
 
 type UnlockState =
@@ -207,6 +222,7 @@ export function Unlock({
   onUnlocked,
   onStartRecovery,
   onResumeRecovery,
+  suspicionReason,
 }: UnlockProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
@@ -283,6 +299,7 @@ export function Unlock({
 
   return (
     <CenteredCard>
+      {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
       <h1 style={CARD_TITLE_STYLE}>Vault'unu aç.</h1>
       <p style={CARD_BODY_STYLE}>Parolanı gir, devam et.</p>
       <form style={FORM_STYLE} onSubmit={onSubmit} noValidate>

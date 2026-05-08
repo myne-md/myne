@@ -33,28 +33,51 @@ src/
 ├── main.tsx             ← React 19 root mount
 ├── screens/             ← top-level screens (one per stage)
 │   ├── CreateVault.tsx
-│   ├── Editor.tsx       ← B4.5 placeholder; full CodeMirror = Lane B #10 (B5)
-│   ├── Unlock.tsx       ← password form + reducer (idle / decrypting / corrupted modes)
+│   ├── Editor.tsx       ← B4.5 placeholder; full CodeMirror = Lane B #10 (B5). Hosts SettingsModal mount.
+│   ├── Unlock.tsx       ← password form + reducer (idle / decrypting / corrupted modes); renders SuspicionBanner when stage carries one
+│   ├── VaultRecover.tsx
 │   ├── Welcome.tsx
-│   └── vault-creation/  ← multi-step flow (PasswordStep, PhraseStep, ConfirmStep, ...)
+│   ├── vault-creation/  ← multi-step flow (PasswordStep, PhraseStep, ConfirmStep, ...)
+│   └── vault-recover/   ← recover-from-phrase flow
 ├── components/          ← reusable UI primitives
-│   ├── primitives/      ← Button, Input, etc.
+│   ├── primitives/      ← Button, Input, Icon, CenteredCard, MyneMark
+│   ├── BlockingProgressStep.tsx
+│   ├── DestructiveBanner.tsx
 │   ├── ErrorBanner.tsx
 │   ├── FailClosedError.tsx  ← shared fail-closed UI (reason: invalid-state | corrupted-vault | io-error)
+│   ├── PasswordChangeForm.tsx  ← 3-input form (current + new + confirm) used by Settings → Account
+│   ├── PasswordCreateForm.tsx  ← 2-input form (new + confirm) used by vault-creation + vault-recover (renamed from PasswordForm.tsx)
+│   ├── PasswordInput.tsx       ← single-field primitive: Input + eye toggle + optional zxcvbn meter slot; exports MIN_PASSWORD_LEN/MIN_ZXCVBN_SCORE + usePasswordStrength hook
 │   ├── PasswordStrength.tsx
-│   └── Spinner.tsx
+│   ├── SettingsModal.tsx       ← Settings shell modal (5-panel rail; carve-out per decisions.md 2026-05-08)
+│   ├── settings/               ← per-panel content components rendered by SettingsModal
+│   │   ├── AboutPanel.tsx
+│   │   ├── AccountPanel.tsx
+│   │   ├── AppearancePanel.tsx
+│   │   ├── PrivacyPanel.tsx
+│   │   └── StoragePanel.tsx
+│   ├── Spinner.tsx
+│   ├── SuspicionBanner.tsx     ← red/informational banner driven by Stage.unlock.suspicionReason
+│   └── Toast.tsx               ← post-event notification (auto-dismiss 2.5s); used by Editor for "Parola güncellendi"
 ├── lib/                 ← non-UI helpers
 │   ├── app-window.ts             ← closeApp() helper for fail-closed CTAs
+│   ├── bip39-normalize.ts
 │   ├── icons.ts
+│   ├── io-banner.ts
+│   ├── notes.ts
 │   ├── password-generator.ts
 │   ├── secret-export.ts
-│   ├── stage.ts                   ← Stage / Action discriminated unions + transition() + dev harness
+│   ├── stage.ts                   ← Stage / Action discriminated unions + transition() + dev harness; carries optional suspicionReason on the unlock variant
+│   ├── vault-change-password.ts   ← changePassword() IPC wrapper (MYND-22 backend)
 │   ├── vault-creation-errors.ts
 │   ├── vault-creation-logging.ts
+│   ├── vault-recover.ts
+│   ├── vault-slot-kind.ts
 │   ├── vault-status.ts            ← probeVaultStatus() boot probe wrapper
 │   └── vault-unlock.ts            ← isVaultUnlocked() + lockVault() wrappers
 ├── styles/              ← global CSS only
-└── types/               ← shared TS types (mirrors Rust ProtocolError enum)
+├── types/               ← shared TS types (mirrors Rust error enums)
+└── vite-env.d.ts        ← Vite client types + __APP_VERSION__ compile-time global (sourced from package.json::version, displayed by Settings → About)
 ```
 
 ## Tauri command bindings
@@ -92,6 +115,22 @@ Don't ship features against this placeholder — wait for B5.
 Belt+suspenders invalid-state guard (Q5β-1 of `app-state-machine` grill): `transition()` is React-side defense; `Editor` mount probes `vault_is_unlocked()` at mount as the Rust-side reality check, rendering `<FailClosedError reason="invalid-state" />` if React Stage and Rust slot disagree. The "Kilitle" CTA on that error UI calls `vault_lock` + reprobe via `App.tsx::reprobe()` (out-of-band reset; bypasses transition fn intentionally).
 
 No dev-only stage shortcut: any `?test-stage=` URL parameter has no effect. Per `app-state-machine` PRD + MYND-80 acceptance, dev cannot bypass production guards.
+
+### `Stage.unlock.suspicionReason?` field (MYND-87 + MYND-107)
+
+The `unlock` variant carries an optional `suspicionReason` payload — `"vault-meta-changed-externally" | "vault-locked-during-change"`. It is a one-shot signal carried from change-password force-relock paths to the resulting Unlock screen banner; never produced by `initialStageFromProbe()` (boot probe), only by explicit `setStageWithSuspicion()` calls from `App.tsx`. The `LEGAL` transition table tracks `name` only (not payload), so the field doesn't affect legality. **Dev-harness lockstep:** `ALL_STAGES_FOR_VERIFICATION` includes at least one `unlock` entry with `suspicionReason` populated so `verifyTransitionTable()` covers the variant. Adding a third reason value requires a matching `ALL_STAGES_FOR_VERIFICATION` entry. Rationale + provenance: `design-notes.md` 2026-05-08 "`Stage.unlock.suspicionReason?` field for change-password force-relock signals".
+
+## Settings shell (MYND-87 + MYND-107)
+
+The Settings UI is **not** a Stage variant. It mounts as a modal overlay inside `Editor.tsx` driven by Editor-local React state (`settingsOpen` boolean), per the desktop modal carve-out in `design-notes.md` 2026-05-08. Entry points: gear button in BottomBar's right cluster + `Cmd+,` / `Ctrl+,` keyboard shortcut. Both toggle `settingsOpen`; `<SettingsModal open onClose>` only renders when true.
+
+`SettingsModal.tsx` owns the 5-panel rail (Account → Privacy → Appearance → Storage → About — fixed taxonomy locked by `decisions.md` 2026-05-08). Panel content components live in `src/components/settings/`. Rail navigation: ↑/↓ arrows cycle (with focus management via per-panel refs); click sets selection. Default panel: Account.
+
+**In-flight gating (Q9 of the grill):** Settings's only Argon2id-bound IPC today is `vault_change_password`. During the ~1-3s window, AccountPanel calls `onInFlightChange(true)` which gates the parent's Esc / backdrop / × dismissal handlers (the user must wait for the backend response). The Editor's BottomBar Lock button stays enabled — firing `vault_lock` during in-flight is the canonical graceful-cancel path; backend returns `VaultLockedDuringChange` which routes through `setStageWithSuspicion()` → Unlock screen with informational `SuspicionBanner`.
+
+**Force-relock plumbing:** AccountPanel's change-password error handler pattern-matches on `VaultChangePasswordError` variants: `InvalidVaultMeta` → `setStageWithSuspicion({kind:"Corrupted"})`; `VaultMetaChangedExternally` → `setStageWithSuspicion({kind:"Exists"}, "vault-meta-changed-externally")`; `VaultLockedDuringChange` → `setStageWithSuspicion({kind:"Exists"}, "vault-locked-during-change")`. Modal closes via Editor unmount cascade after Stage transitions away from `editor`.
+
+**Disabled-control discipline:** disabled toggles / buttons in Privacy / Appearance / Storage / About panels carry **real labels**, not "Coming soon" copy. Each disabled control corresponds to a tracked Plane work item and enables on the same PR that lands the backing feature. This is **distinct** from MYND-130's `ComingSoonPill` removal — that was a marketing-style hope label on a Phase-2+ scope; these are tracked-feature stubs. Don't reflexively delete them. Rationale: `design-notes.md` 2026-05-08 "Desktop modal carve-out + Settings 5-panel taxonomy + disabled-control discipline".
 
 ## Common commands
 

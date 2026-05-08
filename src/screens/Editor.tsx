@@ -26,7 +26,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
+import { SettingsModal } from "../components/SettingsModal";
+import { Toast } from "../components/Toast";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
+import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 
 const SECTION_HEADING_STYLE: CSSProperties = {
   fontSize: 11,
@@ -68,6 +71,16 @@ interface EditorProps {
    * hide" satisfied without explicit conditional render).
    */
   onLock?: () => void;
+  /**
+   * Out-of-band Stage set wired from App.tsx's `setStageWithSuspicion`
+   * callback. Threaded through to SettingsModal → AccountPanel for the
+   * change-password force-relock paths: `InvalidVaultMeta` routes
+   * through `{kind:"Corrupted"}` (no suspicionReason);
+   * `VaultMetaChangedExternally` and `VaultLockedDuringChange` route
+   * through `{kind:"Exists"}` with a `SuspicionReason` set. See
+   * `decisions.md` 2026-05-08 "`Stage.unlock.suspicionReason?` field".
+   */
+  onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
 }
 
 /**
@@ -78,9 +91,15 @@ interface EditorProps {
  * slot is empty, render the fail-closed error UI in place of the
  * editor body.
  */
-export function Editor({ onResetRequested, onLock }: EditorProps = {}) {
+export function Editor({
+  onResetRequested,
+  onLock,
+  onForceRelock,
+}: EditorProps = {}) {
   const [content, setContent] = useState("");
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const probed = useRef(false);
   useEffect(() => {
@@ -103,6 +122,22 @@ export function Editor({ onResetRequested, onLock }: EditorProps = {}) {
       }
     })();
   }, []);
+
+  // Cmd+, (macOS) / Ctrl+, (Win/Linux) toggles the Settings modal —
+  // toggle so the same shortcut closes the modal when it's open.
+  // Listener mounts only when the editor body renders (after the
+  // mount-time slot guard passes); pre-mount keystrokes are ignored.
+  useEffect(() => {
+    if (slotPopulated !== true) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen((s) => !s);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [slotPopulated]);
 
   if (slotPopulated === null) {
     // Loading shim — the IPC takes microseconds (single RwLock read);
@@ -153,7 +188,14 @@ export function Editor({ onResetRequested, onLock }: EditorProps = {}) {
         <CenterPane content={content} onChange={setContent} />
         <RightSidebar />
       </div>
-      <BottomBar onLock={onLock} />
+      <BottomBar onLock={onLock} onOpenSettings={() => setSettingsOpen(true)} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onShowToast={setToastMessage}
+        onForceRelock={onForceRelock}
+      />
+      <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
     </div>
   );
 }
@@ -169,23 +211,6 @@ function LeftSidebar() {
         flexDirection: "column",
       }}
     >
-      <div
-        style={{
-          padding: "14px 14px 12px",
-          borderBottom: "1px solid var(--line-1)",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            color: "var(--fg-2)",
-          }}
-        >
-          MY-XXXX-XXXX-XXXX-XXXX-X
-        </span>
-      </div>
-
       <div
         style={{
           padding: "14px 14px 6px",
@@ -293,9 +318,10 @@ function RightSidebar() {
 
 interface BottomBarProps {
   onLock?: () => void;
+  onOpenSettings?: () => void;
 }
 
-function BottomBar({ onLock }: BottomBarProps) {
+function BottomBar({ onLock, onOpenSettings }: BottomBarProps) {
   const handleLockClick = () => {
     void (async () => {
       // vault_lock is idempotent + param-less. Errors are swallowed —
@@ -322,6 +348,25 @@ function BottomBar({ onLock }: BottomBarProps) {
       <span style={STATUS_TEXT_STYLE}>Local-only · not synced</span>
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="Open settings"
+          title="Settings (⌘,)"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "4px 8px",
+            background: "transparent",
+            border: 0,
+            borderRadius: "var(--radius-1)",
+            color: "var(--fg-3)",
+            cursor: "pointer",
+          }}
+        >
+          <Icon name="settings" size={12} />
+        </button>
         <button
           type="button"
           onClick={handleLockClick}

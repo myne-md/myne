@@ -227,7 +227,7 @@ export function vaultRecoverReducer(
         case "needs-active-session":
           // Q4 silent recovery: slot is now Empty. Restart from
           // phrase-entry. Wipe password (the field's React state
-          // also drops on PasswordForm unmount, but the reducer's
+          // also drops on PasswordCreateForm unmount, but the reducer's
           // password mirror is wiped here for hygiene).
           return {
             ...state,
