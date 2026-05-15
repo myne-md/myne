@@ -75,7 +75,7 @@ The three-letter `vault_` / `note_` prefix is visible at a glance in any import 
 | `types.rs` | `KdfParams`, `VaultMeta`, `AccountNumber`, `RecoveryPhrase` newtypes |
 | `blob.rs` | `MY01` per-note encoder/decoder per `protocol.md` §9.2; per-note `item_key` wrap + content encrypt; deterministic `_raw` surface (D6 verification) + `getrandom` convenience surface; `DecryptedNote` handle (Zeroizing on `item_key` + plaintext); single-variant `DecryptError` + `pub(crate) DecryptCause` for tampering-test verification (MYND-25) |
 
-## Vector verification (Lane D, retroactive borç)
+## Vector verification (Lane D, retroactive debt)
 
 A2/A3/A4/A5/A6 merged without test vectors. The `myne-test-vectors/` companion repo will hold:
 - `vectors/argon2id/` (D4 → A4)
