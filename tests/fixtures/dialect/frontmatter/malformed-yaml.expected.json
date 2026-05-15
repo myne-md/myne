@@ -1,0 +1,9 @@
+{
+  "raw": "title: \"unclosed quote\ntags: [foo, bar]\n",
+  "parsed": null,
+  "byteRange": { "start": 0, "end": 48 },
+  "error": {
+    "kind": "yaml",
+    "severity": "error"
+  }
+}

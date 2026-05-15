@@ -1,0 +1,8 @@
+[
+  {"level": 1, "text": "bold", "raw": "# **bold**", "byteRange": {"start": 0, "end": 10}},
+  {"level": 2, "text": "italic", "raw": "## *italic*", "byteRange": {"start": 11, "end": 22}},
+  {"level": 3, "text": "code", "raw": "### `code`", "byteRange": {"start": 23, "end": 33}},
+  {"level": 4, "text": "link", "raw": "#### [link](url)", "byteRange": {"start": 34, "end": 50}},
+  {"level": 5, "text": "strike", "raw": "##### ~~strike~~", "byteRange": {"start": 51, "end": 67}},
+  {"level": 6, "text": "plain text", "raw": "###### plain text", "byteRange": {"start": 68, "end": 85}}
+]

@@ -1,0 +1,5 @@
+[
+  {"raw":"[[Note A]]","byteRange":{"start":8,"end":18},"embed":false,"target":"Note A","targetKind":"title","alias":null,"heading":null,"blockId":null},
+  {"raw":"[[Note B|alias]]","byteRange":{"start":28,"end":44},"embed":false,"target":"Note B","targetKind":"title","alias":"alias","heading":null,"blockId":null},
+  {"raw":"[[Note C#Heading]]","byteRange":{"start":58,"end":76},"embed":false,"target":"Note C","targetKind":"title","alias":null,"heading":"Heading","blockId":null}
+]

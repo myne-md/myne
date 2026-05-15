@@ -1,0 +1,10 @@
+{
+  "raw": "başlık: Türkçe note\netiketler:\n  - kitap\n  - günlük\n日記: 日本語\n",
+  "parsed": {
+    "başlık": "Türkçe note",
+    "etiketler": ["kitap", "günlük"],
+    "日記": "日本語"
+  },
+  "byteRange": { "start": 0, "end": 68 },
+  "error": null
+}

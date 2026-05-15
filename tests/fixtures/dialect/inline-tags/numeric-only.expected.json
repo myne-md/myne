@@ -1,0 +1,6 @@
+[
+  {"raw":"#1tag","tag":"1tag","byteRange":{"start":6,"end":11}},
+  {"raw":"#tag1","tag":"tag1","byteRange":{"start":12,"end":17}},
+  {"raw":"#100-grit","tag":"100-grit","byteRange":{"start":18,"end":27}},
+  {"raw":"#00FFFF","tag":"00FFFF","byteRange":{"start":28,"end":35}}
+]

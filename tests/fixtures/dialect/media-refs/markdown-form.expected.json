@@ -1,0 +1,5 @@
+[
+  {"raw":"![simple alt](simple-path.png)","byteRange":{"start":0,"end":30},"alt":"simple alt","src":"simple-path.png"},
+  {"raw":"![](no-alt.png)","byteRange":{"start":31,"end":46},"alt":"","src":"no-alt.png"},
+  {"raw":"![multi word alt](path/with/slashes.jpg)","byteRange":{"start":47,"end":87},"alt":"multi word alt","src":"path/with/slashes.jpg"}
+]

@@ -1,0 +1,3 @@
+```
+#tag-in-fenced-code
+```

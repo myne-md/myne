@@ -1,0 +1,9 @@
+{
+  "raw": "title: Test\ntags:\n  - foo\n  - bar\n",
+  "parsed": {
+    "title": "Test",
+    "tags": ["foo", "bar"]
+  },
+  "byteRange": { "start": 0, "end": 42 },
+  "error": null
+}
