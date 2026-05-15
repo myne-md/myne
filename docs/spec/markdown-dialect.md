@@ -102,15 +102,81 @@ Myne writes one canonical field to YAML frontmatter from the host on `note_updat
 
 | Field | Type | Semantics | Writer |
 |---|---|---|---|
-| `updated` | RFC 3339 string (UTC) | User-meaningful last-edit timestamp | Backend (`note_update`) — overwrite on every call |
+| `updated` | RFC 3339 string (UTC) | User-meaningful last-edit timestamp | Dialect surgery module — invoked by the host on every save (`src/dialect/surgery.ts::patchUpdatedField` in the v0.1 reference implementation; see [`decisions.md`](../decisions.md) 2026-05-09 "Frontmatter byte-level surgery owned by TS dialect module" — supersedes the 2026-05-07 writer mechanic) |
 
 Mechanics:
 
 - The field is **unprefixed** (no `myne_` namespace). Obsidian Templater/Linter and the wider markdown ecosystem use unprefixed `updated:` for this purpose; Myne aligns with that convention so a user who walks away from Myne sees a field every other editor recognizes (`PRODUCT.md` design principle 5 — plain-markdown portability).
-- The first `note_update` after `note_create` prepends the canonical frontmatter block with the `updated:` line; subsequent calls preserve the block and overwrite only the `updated:` value. Other frontmatter fields (`title:`, `tags:`, user-authored fields) are preserved per the §3.6 "Unknown frontmatter fields are preserved on write" rule.
+- Each save calls the canonical surgery function: the first save after `note_create` prepends the canonical frontmatter block with the `updated:` line; subsequent saves preserve the block and overwrite only the `updated:` value byte-by-byte (preserving trailing comments and quote style, collapsing YAML block-scalar form to single-line canonical). Other frontmatter fields (`title:`, `tags:`, user-authored fields) are preserved per the §3.6 "Unknown frontmatter fields are preserved on write" rule.
 - A user who manually sets `updated:` to a custom value sees it overwritten on the next save — autosave is Myne's responsibility. Users who want a manually-managed timestamp use a different field name (e.g., `last_reviewed:`).
 - `created_at` is **not** stored in frontmatter — it is derived from the UUIDv7 filename's millisecond time component per [`protocol.md`](protocol.md) §9.1 (already public-accepted leak; no new commitment violation, no frontmatter write needed).
 - The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with v005: v005 may rename, drop, or supersede `updated:` per its own dialect specification.
+
+### 3.7 Inline-tag extension
+
+Notes may contain inline tags — `#`-prefixed identifiers in body text that consumers (search, backlink, sidebar UI) treat as structured metadata distinct from the YAML frontmatter `tags:` list. The grammar below mirrors Obsidian's runtime behavior so an Obsidian-imported vault produces the same tag set in Myne as it does in Obsidian. Each rule is verified against observed Obsidian behavior in `agent-tooling/researches/2026-05-09-obsidian-inline-tag-behavior.md` (the Q-numbered findings cited per rule).
+
+#### 3.7.1 Boundary
+
+An inline tag begins at a `#` character preceded by either the start of a line OR a Unicode whitespace character. A `#` immediately following a non-whitespace character (e.g. `abc#tag`) is **not** an inline tag. (Research Q1.)
+
+#### 3.7.2 Allowed character set
+
+An inline-tag body consists of one or more Unicode code points, each of which is **not** in any of the following:
+
+- U+2000 through U+206F (Unicode General Punctuation block)
+- U+2E00 through U+2E7F (Unicode Supplemental Punctuation block)
+- The ASCII characters: `'`, `!`, `"`, `#`, `$`, `%`, `&`, `(`, `)`, `*`, `+`, `,`, `.`, `:`, `;`, `<`, `=`, `>`, `?`, `@`, `^`, `` ` ``, `{`, `|`, `}`, `~`, `[`, `]`, `\`
+- Any Unicode whitespace character
+
+All other code points are permitted, including Unicode letters (Latin, Cyrillic, CJK, Arabic, etc.), digits, `_`, `-`, `/`, and emoji presentation. (Research Q2, Q4, Q14.)
+
+This is a **deny-list** rather than the simpler positive allow-list given in the Obsidian Help documentation, because the runtime Obsidian regex (extracted from `app.js` and acknowledged by the Obsidian Help maintainer in `obsidianmd/obsidian-help` issue #816 as the actual behavior) is more permissive than the docs and is the authoritative source for compatibility with imported Obsidian vaults.
+
+#### 3.7.3 Numeric-only reject (inline only)
+
+An inline-tag body must contain at least one character that is not an ASCII digit. A body composed entirely of ASCII digits (e.g. `#1984`) is not a valid inline tag. The form `#y1984` is valid (`y` is non-digit). The form `#100-grit` is valid (`-grit` contains non-digit characters). The hex-string form `#00FFFF` is valid (hex letters are not ASCII digits).
+
+This rule applies **only to inline tags**. YAML frontmatter `tags:` list entries are not subject to it; `tags: [1984]` produces a valid frontmatter tag value. The asymmetry is intentional and matches Obsidian's behavior — the inline `#1984` form is rejected because it is overwhelmingly a numbering convention (e.g. "Suite #200"), but a frontmatter list entry is an explicit user assertion that the value is a tag. (Research Q3, Q9; Obsidian core verbatim in `obsidianmd/obsidian-importer` issue #10.)
+
+#### 3.7.4 Nested form
+
+An inline-tag body may contain `/` characters, separating the tag into hierarchical segments. The number of segments is unbounded by this specification. (Research Q5.)
+
+Index-layer derivation of parent-chain semantics (e.g., `#a/b/c` populating `#a` and `#a/b` as well as `#a/b/c` in a tag index) is not the parser's responsibility — the parser exposes the full tag string verbatim; the consuming index layer decides whether to expand the parent chain.
+
+#### 3.7.5 Exclusion zones
+
+The inline-tag tokenizer **does not** match within the following nested syntactic zones:
+
+1. Fenced code blocks (`` ``` `` and `~~~`)
+2. Indented code blocks (4-space indent)
+3. Inline code (`` ` ``)
+4. The interior of a wikilink, including target, alias, heading anchor, and block-id components (`[[…]]`, `[[…|…]]`, `[[…#…]]`, `[[…^…]]`, `![[…]]`)
+5. Raw HTML embeds (block and inline)
+6. The YAML frontmatter block (per §3.6's line-1-anchored detection)
+
+When the parser is built on a nested-node syntax tree (e.g., the `@lezer/markdown` reference implementation per §8), zones (1)–(6) are excluded structurally because the inline-tag tokenizer runs only at the outer-inline-text level and does not descend into nested nodes. (Research Q7, Q9.)
+
+**Future hook (v0.1.x).** When math (`$…$`, `$$…$$`) lands per §7's deferred items, the inline-tag tokenizer must additionally exclude math zones. v0.1 implementations may safely skip this case because math is not yet parsed.
+
+#### 3.7.6 Frontmatter scope
+
+The inline-tag tokenizer does **not** match within the YAML frontmatter block. Tags inside frontmatter are parsed as YAML 1.2 list values from the `tags:` key (per §3.6).
+
+The numeric-only-reject rule (§3.7.3) applies only to inline tags. Frontmatter `tags:` entries may be entirely numeric. (Research Q3, Q9.)
+
+#### 3.7.7 Recognize-only
+
+The inline-tag tokenizer **only recognizes** tag occurrences. It MUST NOT rewrite, normalize, or canonicalize the bytes of any matched tag. The byte-stability guarantee in §6 (C1) extends to inline-tag bytes alongside the existing list (non-canonical emphasis, alternate list markers, etc.).
+
+A user who wants to programmatically rewrite tags (e.g., a "rename tag across vault" affordance) must invoke an explicit, transparent conversion command — the parser does not perform implicit rewrites on save or on load. (Spec discipline derived from §6 C1.)
+
+#### 3.7.8 Case identity
+
+The inline-tag tokenizer surfaces tag bytes verbatim — un-normalized, un-folded. Tag identity (whether `#Tag` and `#TAG` collide for index purposes) is determined by the consuming layer. In Myne v0.1, the tag index applies Unicode case-fold and NFC normalization at index-write time, matching Obsidian's globally case-insensitive behavior.
+
+The parser exposes raw bytes to keep its output deterministic and to push encoding policy to one place; downstream consumers (search index, sidebar UI, backlink graph) all share the same fold/normalize rule by virtue of going through the index layer. (Research Q10.)
 
 ## 4. File extension and on-disk identity
 
@@ -151,6 +217,7 @@ When Myne authors new content (slash command, selection toolbar, keyboard shortc
 - callout / admonition syntax not yet rendered by Myne (`> [!NOTE]`)
 - block ID markers (`^block-id`)
 - HTML embeds
+- inline `#tag` bytes (per §3.7 — recognizer-only; never rewritten)
 
 **Implication for Myne authoring.** When a user imports a vault and then edits a note, only the lines they directly change adopt canonical emit forms. Untouched lines stay as written by the original author.
 

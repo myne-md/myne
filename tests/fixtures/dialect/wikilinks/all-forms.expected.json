@@ -1,0 +1,11 @@
+[
+  {"raw":"[[Note]]","byteRange":{"start":0,"end":8},"embed":false,"target":"Note","targetKind":"title","alias":null,"heading":null,"blockId":null},
+  {"raw":"[[Note|Display]]","byteRange":{"start":9,"end":25},"embed":false,"target":"Note","targetKind":"title","alias":"Display","heading":null,"blockId":null},
+  {"raw":"[[Note#Heading]]","byteRange":{"start":26,"end":42},"embed":false,"target":"Note","targetKind":"title","alias":null,"heading":"Heading","blockId":null},
+  {"raw":"[[Note^block-id]]","byteRange":{"start":43,"end":60},"embed":false,"target":"Note","targetKind":"title","alias":null,"heading":null,"blockId":"block-id"},
+  {"raw":"[[vault/path.md]]","byteRange":{"start":61,"end":78},"embed":false,"target":"vault/path.md","targetKind":"vault-path","alias":null,"heading":null,"blockId":null},
+  {"raw":"[[vault/path.md|Display]]","byteRange":{"start":79,"end":104},"embed":false,"target":"vault/path.md","targetKind":"vault-path","alias":"Display","heading":null,"blockId":null},
+  {"raw":"[[vault/path.md#Heading]]","byteRange":{"start":105,"end":130},"embed":false,"target":"vault/path.md","targetKind":"vault-path","alias":null,"heading":"Heading","blockId":null},
+  {"raw":"![[Embed Note]]","byteRange":{"start":131,"end":146},"embed":true,"target":"Embed Note","targetKind":"title","alias":null,"heading":null,"blockId":null},
+  {"raw":"![[image.png]]","byteRange":{"start":147,"end":161},"embed":true,"target":"image.png","targetKind":"title","alias":null,"heading":null,"blockId":null}
+]

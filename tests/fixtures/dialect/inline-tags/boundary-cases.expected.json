@@ -1,0 +1,6 @@
+[
+  {"raw":"#line-start","tag":"line-start","byteRange":{"start":0,"end":11}},
+  {"raw":"#after-space","tag":"after-space","byteRange":{"start":17,"end":29}},
+  {"raw":"#tag1","tag":"tag1","byteRange":{"start":55,"end":60}},
+  {"raw":"#tag2","tag":"tag2","byteRange":{"start":61,"end":66}}
+]

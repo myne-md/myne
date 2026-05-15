@@ -377,6 +377,12 @@ TLS 1.3 with strict cipher configuration plus client-side certificate pinning. T
 
 Used in: `threat-model.md` §3 TB4
 
+### **inline tag** &nbsp; 📦 *Product*
+
+A `#`-prefixed identifier appearing inside note body text (as opposed to the YAML `tags:` frontmatter list). Recognized by the Myne dialect per `spec/markdown-dialect.md` §3.7. Boundary: line-start or whitespace must precede the `#`; `abc#tag` does not match. Character set: Unicode (excluding the General/Supplemental Punctuation blocks and an explicit ASCII-punctuation set). Numeric-only forms (`#1984`) reject; `#y1984` accepts. Nested forms via `/` (`#parent/child`) supported with unbounded depth. The parser only recognizes; never rewrites — byte-stability per §6 C1 extends to inline-tag bytes. Tag identity (case-fold, NFC normalization) is the consuming index layer's responsibility, not the parser's.
+
+Used in: `spec/markdown-dialect.md` §3.7, §6 C1
+
 ### **insider threat** &nbsp; ⚠️ *Threat*
 
 Adversary class A11: a Myne team member acting maliciously. The architecture grants the team no privileged read access — keys never leave the client. The single privileged asset is the code-signing key (TB8); compromise reduces to A9 (compromised distribution).

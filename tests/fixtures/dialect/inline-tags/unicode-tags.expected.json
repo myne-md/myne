@@ -1,0 +1,6 @@
+[
+  {"raw":"#kitap","tag":"kitap","byteRange":{"start":0,"end":6}},
+  {"raw":"#günlük","tag":"günlük","byteRange":{"start":7,"end":14}},
+  {"raw":"#日記","tag":"日記","byteRange":{"start":15,"end":18}},
+  {"raw":"#😀tag","tag":"😀tag","byteRange":{"start":19,"end":25}}
+]

@@ -1,0 +1,8 @@
+[
+  {"level": 1, "text": "H1", "raw": "# H1", "byteRange": {"start": 0, "end": 4}},
+  {"level": 2, "text": "H2", "raw": "## H2", "byteRange": {"start": 5, "end": 10}},
+  {"level": 3, "text": "H3", "raw": "### H3", "byteRange": {"start": 11, "end": 17}},
+  {"level": 4, "text": "H4", "raw": "#### H4", "byteRange": {"start": 18, "end": 25}},
+  {"level": 5, "text": "H5", "raw": "##### H5", "byteRange": {"start": 26, "end": 34}},
+  {"level": 6, "text": "H6", "raw": "###### H6", "byteRange": {"start": 35, "end": 44}}
+]

@@ -1,0 +1,5 @@
+[
+  {"raw":"#parent/child","tag":"parent/child","byteRange":{"start":0,"end":13}},
+  {"raw":"#a/b/c","tag":"a/b/c","byteRange":{"start":14,"end":20}},
+  {"raw":"#deep/nested/forth/level","tag":"deep/nested/forth/level","byteRange":{"start":21,"end":45}}
+]
