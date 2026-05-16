@@ -38,9 +38,11 @@ use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
 use super::error::{
-    NoteCreateError, NoteDeleteError, NoteListError, NoteReadError, NoteUpdateError,
+    NoteCreateError, NoteDeleteError, NoteListError, NoteReadError, NoteTitleBatchError,
+    NoteTitleError, NoteUpdateError,
 };
 use super::note_id::NoteId;
+use super::title_extract::extract_title_slices;
 
 /// Create a new encrypted `.myn` note. See module-level docs for the
 /// full pipeline narration.
@@ -1111,6 +1113,288 @@ fn note_list_error_kind(e: &NoteListError) -> &'static str {
         NoteListError::Io { .. } => "Io",
         NoteListError::JoinFailure => "JoinFailure",
     }
+}
+
+/// Static-string label for [`NoteTitleError`] variants — drift-detector
+/// pattern parallel to the other five helpers. A new variant
+/// compile-fails this match.
+fn note_title_error_kind(e: &NoteTitleError) -> &'static str {
+    match e {
+        NoteTitleError::CannotDecrypt => "CannotDecrypt",
+        NoteTitleError::NoteNotFound => "NoteNotFound",
+        NoteTitleError::Io { .. } => "Io",
+        NoteTitleError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// Static-string label for [`NoteTitleBatchError`] variants — drift-
+/// detector pattern. A new variant compile-fails this match.
+fn note_title_batch_error_kind(e: &NoteTitleBatchError) -> &'static str {
+    match e {
+        NoteTitleBatchError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteTitleBatchError::NotesDirNotADirectory => "NotesDirNotADirectory",
+        NoteTitleBatchError::BatchTooLarge { .. } => "BatchTooLarge",
+        NoteTitleBatchError::Io { .. } => "Io",
+        NoteTitleBatchError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// Per-call cap for [`note_titles_batch`] input length, pinned by the
+/// 2026-05-15 MYND-82 grill Q5 decision. Larger batches are rejected
+/// with [`NoteTitleBatchError::BatchTooLarge`] without touching disk.
+pub const NOTE_TITLES_BATCH_CAP: usize = 100;
+
+/// Per-item slice payload returned by [`note_titles_batch`]. Both byte-
+/// range fields are UTF-8-lossy stringifications of the post-AEAD
+/// plaintext slices — TS dialect side parses these as raw markdown.
+///
+/// Hand-mirrored on the TS side at `src/types/title-slice.ts` (Task 11
+/// of the `notes-sidebar-autosave` PRD).
+#[derive(Debug, serde::Serialize)]
+pub struct TitleSlice {
+    pub note_uuid: String,
+    pub frontmatter_bytes: Option<String>,
+    pub first_h1_line: Option<String>,
+}
+
+/// Hybrid byte-range batch read: per-item decrypt + slice extract, all
+/// inside a single slot-read window. Per-item failures surface in the
+/// inner `Result` without aborting peers; batch-level preconditions
+/// (slot locked, oversize batch, structural notes_dir failure) abort
+/// the whole call via the outer `Result`.
+///
+/// Spec touchpoints:
+///
+/// - `decisions.md` 2026-05-15 "Note title write target" (companion
+///   entry; the precedence chain this batch read serves).
+/// - `agent-tooling/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
+///   Q3 (hybrid byte-range), Q4 (per-item Result), Q5 (cap 100),
+///   Q6 (parallel decrypt — implemented here as concurrent spawn-then-
+///   sequential-await; ordering preserved by await order).
+/// - `decisions.md` 2026-05-07 "Note AEAD ops: clone-out items_key +
+///   always spawn_blocking" — same pattern reused per-item.
+#[tauri::command]
+pub async fn note_titles_batch<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    ids: Vec<String>,
+) -> Result<Vec<Result<TitleSlice, NoteTitleError>>, NoteTitleBatchError> {
+    // Cap check BEFORE notes_dir resolution — defensive cheap precondition
+    // (no I/O if caller bypasses the chunking convention).
+    if ids.len() > NOTE_TITLES_BATCH_CAP {
+        let err = NoteTitleBatchError::BatchTooLarge {
+            cap: NOTE_TITLES_BATCH_CAP,
+        };
+        tracing::warn!(
+            stage = "cap_check",
+            error_kind = note_title_batch_error_kind(&err),
+            requested = ids.len(),
+            cap = NOTE_TITLES_BATCH_CAP,
+            "note_titles_batch rejected: input exceeds per-call cap"
+        );
+        return Err(err);
+    }
+
+    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+        let kind = e.kind();
+        match kind {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_titles_batch notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteTitleBatchError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_titles_batch notes_dir resolution failed"
+                );
+                NoteTitleBatchError::Io {
+                    io_error_kind: io_kind,
+                }
+            }
+        }
+    })?;
+    note_titles_batch_with_dir(notes_dir, state.inner(), ids).await
+}
+
+/// Inner — pure-and-testable helper. Mirror of the other notes-command
+/// `_with_dir` helpers.
+pub(crate) async fn note_titles_batch_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    ids: Vec<String>,
+) -> Result<Vec<Result<TitleSlice, NoteTitleError>>, NoteTitleBatchError> {
+    // Cap re-check at the inner layer — direct test callers must
+    // honor the same invariant as the IPC boundary.
+    if ids.len() > NOTE_TITLES_BATCH_CAP {
+        return Err(NoteTitleBatchError::BatchTooLarge {
+            cap: NOTE_TITLES_BATCH_CAP,
+        });
+    }
+
+    let slot = state.slot_read().await;
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_titles_batch rejected: slot is not Unlocked"
+            );
+            return Err(NoteTitleBatchError::VaultNotUnlocked);
+        }
+    };
+    tracing::debug!(
+        stage = "slot_check",
+        outcome = "vault_unlocked",
+        count = ids.len()
+    );
+
+    let started = Instant::now();
+
+    // Spawn all per-item tasks up front; each lands on the blocking pool
+    // immediately. Awaiting sequentially below preserves input order
+    // without sacrificing wall-clock parallelism — tokio executes the
+    // spawned tasks concurrently regardless of await order.
+    let mut handles = Vec::with_capacity(ids.len());
+    for id_str in ids {
+        let items_key_clone = items_key.clone();
+        let items_key_id_local = items_key_id;
+        let notes_dir_clone = notes_dir.clone();
+        handles.push(tokio::task::spawn_blocking(move || {
+            extract_one_title_slice(
+                &notes_dir_clone,
+                id_str,
+                &items_key_clone,
+                &items_key_id_local,
+            )
+        }));
+    }
+
+    let mut results: Vec<Result<TitleSlice, NoteTitleError>> = Vec::with_capacity(handles.len());
+    for handle in handles {
+        let per_item = match handle.await {
+            Ok(per_item) => per_item,
+            Err(_join_err) => {
+                tracing::error!(
+                    stage = "spawn_blocking_join",
+                    error_kind = "JoinFailure",
+                    "note_titles_batch per-item task panicked or runtime shutdown"
+                );
+                Err(NoteTitleError::JoinFailure)
+            }
+        };
+        if let Err(ref e) = per_item {
+            tracing::warn!(
+                stage = "title_extract",
+                error_kind = note_title_error_kind(e),
+                "note_titles_batch per-item failed"
+            );
+        }
+        results.push(per_item);
+    }
+
+    drop(slot);
+
+    let duration_ms = started.elapsed().as_millis() as u64;
+    let ok_count = results.iter().filter(|r| r.is_ok()).count();
+    let err_count = results.len() - ok_count;
+    tracing::info!(
+        stage = "success",
+        event = "note_titles_batched",
+        count = results.len(),
+        ok_count = ok_count,
+        err_count = err_count,
+        duration_ms = duration_ms,
+    );
+    Ok(results)
+}
+
+/// Per-item worker: parse `note_id`, read `.myn`, AEAD-decrypt, extract
+/// title slices. Runs inside [`tokio::task::spawn_blocking`].
+fn extract_one_title_slice(
+    notes_dir: &std::path::Path,
+    id_str: String,
+    items_key: &Zeroizing<[u8; 32]>,
+    items_key_id: &[u8; 16],
+) -> Result<TitleSlice, NoteTitleError> {
+    // Strict-parse `note_id`. A malformed ID is treated as `NoteNotFound`
+    // since the canonical ID set comes from `note_list` — anything else
+    // is a UI bug or a manual invocation; the file doesn't exist on
+    // disk either way, and surfacing `NoteNotFound` keeps the user
+    // experience honest (the row drops out of the sidebar).
+    let note_id = match NoteId::parse(&id_str) {
+        Ok(id) => id,
+        Err(cause) => {
+            tracing::debug!(
+                stage = "note_id_parse",
+                outcome = "invalid",
+                cause = ?cause,
+                "note_titles_batch per-item note_id strict-parse failed; mapping to NoteNotFound"
+            );
+            return Err(NoteTitleError::NoteNotFound);
+        }
+    };
+
+    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+
+    let blob = match std::fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            let io_kind_raw = e.kind();
+            return Err(match io_kind_raw {
+                std::io::ErrorKind::NotFound => NoteTitleError::NoteNotFound,
+                _ => NoteTitleError::Io {
+                    io_error_kind: from_io_error_kind(io_kind_raw),
+                },
+            });
+        }
+    };
+
+    let decrypted = match decode_note(&blob, &note_uuid_bytes, items_key, items_key_id) {
+        Ok(d) => d,
+        Err(_dec_err) => {
+            // `DecryptError` sub-cause was already emitted via
+            // `tracing::debug!(stage = ?cause)` from inside `decode_note`;
+            // host adds a parallel non-distinguishing event without
+            // re-introducing the distinguisher at the IPC boundary
+            // (`protocol.md` §6.4 preserved).
+            return Err(NoteTitleError::CannotDecrypt);
+        }
+    };
+
+    let slices = extract_title_slices(decrypted.plaintext());
+    // `from_utf8_lossy` allocates a new `String` even for valid UTF-8 —
+    // accepted overhead because the slice sizes are small (FM block
+    // ~100-500B, H1 line ~10-80B) and the alternative (strict UTF-8
+    // boundary at command layer like `note_read`) would conflate a
+    // genuine encoding error with the per-item error surface. The lossy
+    // path renders replacement characters in the rare edge case; the
+    // sidebar row shows "Untitled" if both slices end up empty.
+    let frontmatter_bytes = slices
+        .frontmatter_bytes
+        .map(|s| String::from_utf8_lossy(s).into_owned());
+    let first_h1_line = slices
+        .first_h1_line
+        .map(|s| String::from_utf8_lossy(s).into_owned());
+
+    // Drop the decrypted plaintext early — `Zeroizing<Vec<u8>>` wipes
+    // its bytes on drop. The extracted slice strings are no-longer-
+    // sensitive byproducts at this point (they will cross IPC anyway).
+    drop(decrypted);
+
+    Ok(TitleSlice {
+        note_uuid: id_str,
+        frontmatter_bytes,
+        first_h1_line,
+    })
 }
 
 #[cfg(test)]
@@ -2876,6 +3160,267 @@ mod tests {
         );
         assert_eq!(
             note_list_error_kind(&NoteListError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+
+    // =====================================================================
+    // note_titles_batch
+    // =====================================================================
+
+    async fn make_unlocked_state_and_dir(
+        slug: &str,
+    ) -> (ScopedTempDir, PathBuf, VaultRuntimeState) {
+        let scratch = ScopedTempDir::new(slug).unwrap();
+        let notes_dir = notes_dir_under(scratch.path()).unwrap();
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(fixture_unlocked_with_keys(
+                FIXTURE_ROOT_BYTE,
+                FIXTURE_ITEMS_BYTE,
+                FIXTURE_ITEMS_ID_BYTE,
+            ))
+            .await;
+        (scratch, notes_dir, state)
+    }
+
+    async fn create_note_with(
+        notes_dir: &Path,
+        state: &VaultRuntimeState,
+        plaintext: &str,
+    ) -> String {
+        note_create_with_dir(notes_dir.to_path_buf(), state, plaintext.to_string())
+            .await
+            .expect("note_create must succeed in test setup")
+    }
+
+    // ---- happy path: mixed FM / H1 / both / neither --------------------
+
+    #[test]
+    fn batch_returns_per_item_slices_in_input_order() {
+        rt().block_on(async {
+            let (_scratch, notes_dir, state) = make_unlocked_state_and_dir("nt-batch-happy").await;
+
+            // Four notes with distinct shapes.
+            let id_a = create_note_with(&notes_dir, &state, "# Heading A\nbody a").await;
+            let id_b = create_note_with(
+                &notes_dir,
+                &state,
+                "---\ntitle: B Title\nupdated: 2026-01-01T00:00:00Z\n---\n\nbody b\n",
+            )
+            .await;
+            let id_c = create_note_with(
+                &notes_dir,
+                &state,
+                "---\ntags: [x]\n---\n\n# Heading C\nbody c\n",
+            )
+            .await;
+            let id_d = create_note_with(&notes_dir, &state, "no heading, no fm\njust body\n").await;
+
+            // Input order: B, D, A, C — verifies output ordering matches.
+            let ids = vec![id_b.clone(), id_d.clone(), id_a.clone(), id_c.clone()];
+            let results = note_titles_batch_with_dir(notes_dir, &state, ids.clone())
+                .await
+                .expect("batch must succeed at outer level");
+
+            assert_eq!(results.len(), 4);
+            // Position 0 — id_b (FM with title).
+            let r0 = results[0].as_ref().expect("position 0 must be Ok");
+            assert_eq!(r0.note_uuid, id_b);
+            assert_eq!(
+                r0.frontmatter_bytes.as_deref(),
+                Some("title: B Title\nupdated: 2026-01-01T00:00:00Z\n")
+            );
+            assert!(r0.first_h1_line.is_none());
+            // Position 1 — id_d (no fm, no h1).
+            let r1 = results[1].as_ref().expect("position 1 must be Ok");
+            assert_eq!(r1.note_uuid, id_d);
+            assert!(r1.frontmatter_bytes.is_none());
+            assert!(r1.first_h1_line.is_none());
+            // Position 2 — id_a (H1 only).
+            let r2 = results[2].as_ref().expect("position 2 must be Ok");
+            assert_eq!(r2.note_uuid, id_a);
+            assert!(r2.frontmatter_bytes.is_none());
+            assert_eq!(r2.first_h1_line.as_deref(), Some("# Heading A"));
+            // Position 3 — id_c (FM + H1).
+            let r3 = results[3].as_ref().expect("position 3 must be Ok");
+            assert_eq!(r3.note_uuid, id_c);
+            assert_eq!(r3.frontmatter_bytes.as_deref(), Some("tags: [x]\n"));
+            assert_eq!(r3.first_h1_line.as_deref(), Some("# Heading C"));
+        });
+    }
+
+    // ---- cap exceeded --------------------------------------------------
+
+    #[test]
+    fn batch_cap_exceeded_returns_batch_too_large_with_cap_payload() {
+        rt().block_on(async {
+            let (_scratch, notes_dir, state) = make_unlocked_state_and_dir("nt-batch-cap").await;
+
+            // 101 fake IDs — cap is 100 per NOTE_TITLES_BATCH_CAP.
+            let ids: Vec<String> = (0..101)
+                .map(|_| "00000000-0000-7000-8000-000000000000".to_string())
+                .collect();
+            let result = note_titles_batch_with_dir(notes_dir, &state, ids).await;
+            match result {
+                Err(NoteTitleBatchError::BatchTooLarge { cap }) => {
+                    assert_eq!(cap, NOTE_TITLES_BATCH_CAP);
+                }
+                other => panic!("expected BatchTooLarge, got {other:?}"),
+            }
+        });
+    }
+
+    #[test]
+    fn batch_at_cap_succeeds() {
+        rt().block_on(async {
+            let (_scratch, notes_dir, state) = make_unlocked_state_and_dir("nt-batch-at-cap").await;
+
+            // Create one real note + pad with malformed IDs to reach the cap.
+            // Per-item NoteNotFound for the malformed slots, Ok for the real.
+            let real_id = create_note_with(&notes_dir, &state, "# At cap\n").await;
+            let mut ids: Vec<String> = vec![real_id.clone()];
+            for _ in 0..(NOTE_TITLES_BATCH_CAP - 1) {
+                ids.push("not-a-uuid".to_string());
+            }
+            assert_eq!(ids.len(), NOTE_TITLES_BATCH_CAP);
+
+            let results = note_titles_batch_with_dir(notes_dir, &state, ids)
+                .await
+                .expect("at-cap batch must succeed at outer level");
+            assert_eq!(results.len(), NOTE_TITLES_BATCH_CAP);
+            assert!(results[0].is_ok(), "real ID at position 0 must succeed");
+            for (i, r) in results.iter().enumerate().skip(1) {
+                assert!(
+                    matches!(r, Err(NoteTitleError::NoteNotFound)),
+                    "position {i} expected NoteNotFound, got {r:?}"
+                );
+            }
+        });
+    }
+
+    // ---- slot guards ---------------------------------------------------
+
+    #[test]
+    fn batch_slot_empty_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("nt-batch-slot-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default(); // Slot::Empty by default
+            let result = note_titles_batch_with_dir(notes_dir, &state, vec![]).await;
+            assert!(matches!(result, Err(NoteTitleBatchError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn batch_slot_recovering_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("nt-batch-slot-recovering").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+            let result = note_titles_batch_with_dir(notes_dir, &state, vec![]).await;
+            assert!(matches!(result, Err(NoteTitleBatchError::VaultNotUnlocked)));
+        });
+    }
+
+    // ---- per-item failure modes ---------------------------------------
+
+    #[test]
+    fn batch_per_item_missing_file_surfaces_note_not_found() {
+        rt().block_on(async {
+            let (_scratch, notes_dir, state) =
+                make_unlocked_state_and_dir("nt-batch-missing").await;
+
+            // Create one note, then delete it BEFORE the batch — simulates the
+            // note_list / note_titles_batch race.
+            let id = create_note_with(&notes_dir, &state, "# Will vanish\n").await;
+            let note_id = NoteId::parse(&id).unwrap();
+            std::fs::remove_file(notes_dir.join(format!("{}.myn", note_id.as_uuid()))).unwrap();
+
+            let results = note_titles_batch_with_dir(notes_dir, &state, vec![id.clone()])
+                .await
+                .expect("outer must succeed");
+            assert_eq!(results.len(), 1);
+            assert!(matches!(results[0], Err(NoteTitleError::NoteNotFound)));
+        });
+    }
+
+    #[test]
+    fn batch_per_item_malformed_id_surfaces_note_not_found() {
+        rt().block_on(async {
+            let (_scratch, notes_dir, state) =
+                make_unlocked_state_and_dir("nt-batch-malformed-id").await;
+            let results =
+                note_titles_batch_with_dir(notes_dir, &state, vec!["not-a-valid-uuid".to_string()])
+                    .await
+                    .expect("outer must succeed");
+            assert_eq!(results.len(), 1);
+            assert!(matches!(results[0], Err(NoteTitleError::NoteNotFound)));
+        });
+    }
+
+    #[test]
+    fn batch_empty_input_returns_empty_results() {
+        rt().block_on(async {
+            let (_scratch, notes_dir, state) = make_unlocked_state_and_dir("nt-batch-empty").await;
+            let results = note_titles_batch_with_dir(notes_dir, &state, vec![])
+                .await
+                .expect("empty batch must succeed");
+            assert!(results.is_empty());
+        });
+    }
+
+    // ---- error_kind labels --------------------------------------------
+
+    #[test]
+    fn title_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_title_error_kind(&NoteTitleError::CannotDecrypt),
+            "CannotDecrypt"
+        );
+        assert_eq!(
+            note_title_error_kind(&NoteTitleError::NoteNotFound),
+            "NoteNotFound"
+        );
+        assert_eq!(
+            note_title_error_kind(&NoteTitleError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_title_error_kind(&NoteTitleError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+
+    #[test]
+    fn title_batch_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_title_batch_error_kind(&NoteTitleBatchError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            note_title_batch_error_kind(&NoteTitleBatchError::NotesDirNotADirectory),
+            "NotesDirNotADirectory"
+        );
+        assert_eq!(
+            note_title_batch_error_kind(&NoteTitleBatchError::BatchTooLarge { cap: 100 }),
+            "BatchTooLarge"
+        );
+        assert_eq!(
+            note_title_batch_error_kind(&NoteTitleBatchError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_title_batch_error_kind(&NoteTitleBatchError::JoinFailure),
             "JoinFailure"
         );
     }

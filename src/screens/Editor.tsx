@@ -23,21 +23,30 @@
 //   - Mockup (structural reference only, NOT copied):
 //     docs/design/ui_kits/desktop/Editor.jsx
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
 import { Toast } from "../components/Toast";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
+import { noteList } from "../notes";
+import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
+import { SECTION_HEADING_STYLE } from "../notes/components/sharedStyles";
+import { noteRead } from "../notes/readNote";
+import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
+import { SidebarStateProvider, useSelectedNote } from "../notes/sidebarState";
+import { useAutosave, type SaveStatus as SaveStatusValue } from "../notes/useAutosave";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
-const SECTION_HEADING_STYLE: CSSProperties = {
-  fontSize: 11,
-  color: "var(--fg-3)",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  fontWeight: 600,
-};
 
 const STATUS_TEXT_STYLE: CSSProperties = {
   fontSize: 12,
@@ -96,7 +105,6 @@ export function Editor({
   onLock,
   onForceRelock,
 }: EditorProps = {}) {
-  const [content, setContent] = useState("");
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -168,6 +176,173 @@ export function Editor({
   }
 
   return (
+    <SidebarStateProvider>
+      <EditorChrome
+        onLock={onLock}
+        onForceRelock={onForceRelock}
+        settingsOpen={settingsOpen}
+        setSettingsOpen={setSettingsOpen}
+        toastMessage={toastMessage}
+        setToastMessage={setToastMessage}
+      />
+    </SidebarStateProvider>
+  );
+}
+
+/**
+ * Inner editor body — mounts inside `<SidebarStateProvider>` so it can
+ * use `useSelectedNote()`. Owns the loaded-body state, the autosave
+ * hook, Tauri close-intercept (T28), editor-blur listener (T29), and
+ * the BottomBar's save-status / Lock-flush wiring.
+ */
+type EditorChromeProps = {
+  onLock?: () => void;
+  onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: Dispatch<SetStateAction<boolean>>;
+  toastMessage: string | null;
+  setToastMessage: Dispatch<SetStateAction<string | null>>;
+};
+
+function EditorChrome({
+  onLock,
+  onForceRelock,
+  settingsOpen,
+  setSettingsOpen,
+  toastMessage,
+  setToastMessage,
+}: EditorChromeProps) {
+  const ctx = useSelectedNote();
+  const [content, setContent] = useState<string>("");
+  const [bodyLoading, setBodyLoading] = useState<boolean>(false);
+
+  // Selection-change → load body via `noteRead`. The ID is the
+  // canonical reload trigger; if it stays stable across renders we
+  // never re-fetch. Race protection: a pending fetch that resolves
+  // AFTER a newer selection is dropped via the `cancelled` flag.
+  useEffect(() => {
+    let cancelled = false;
+    const id = ctx.selectedId;
+    if (id === null) {
+      setContent("");
+      setBodyLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setBodyLoading(true);
+    void (async () => {
+      try {
+        const body = await noteRead(id);
+        if (!cancelled) {
+          setContent(body);
+          setBodyLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setContent("");
+          setBodyLoading(false);
+        }
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[Editor] noteRead failed:", err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx.selectedId]);
+
+  const autosave = useAutosave(ctx.selectedId, content);
+
+  // After every successful save, refresh the sidebar entry for that
+  // note so a title/H1 edit in the editor body propagates to the row
+  // label (Q13 "action-driven surgical refresh after saveNote"). We
+  // track the `saved.at` timestamp identity so re-renders don't
+  // re-fire — `useAutosave` produces a new `saved` object only when
+  // an IPC actually completes successfully.
+  const lastRefreshedAtRef = useRef<number>(0);
+  useEffect(() => {
+    if (autosave.status.status !== "saved") return;
+    const at = autosave.status.at.getTime();
+    if (at === lastRefreshedAtRef.current) return;
+    lastRefreshedAtRef.current = at;
+    const id = ctx.selectedId;
+    if (id === null) return;
+    void ctx.refreshOne(id).catch(() => {
+      /* refresh failure is non-fatal — sidebar shows stale title until next refresh */
+    });
+  }, [autosave.status, ctx]);
+
+  // T28 — Tauri close-intercept. Block window close until any pending
+  // save flushes. Uses the `tauri::api::webviewWindow` listener; safe
+  // to no-op when running outside Tauri (browser dev fallback).
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const w = getCurrentWebviewWindow();
+        unlisten = await w.onCloseRequested(async (event) => {
+          if (cancelled) return;
+          // Stop the default close; we'll close manually after flush.
+          event.preventDefault();
+          try {
+            await autosave.flushIfDirty();
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.warn("[Editor] flushIfDirty on close failed:", err);
+            }
+            // Surface the failure to the user — but for v0.1 we close
+            // anyway since blocking forever is worse UX. T31 manual
+            // smoke can revisit the close-fail alert dialog.
+          }
+          await w.close();
+        });
+      } catch {
+        // Not running inside Tauri (e.g., `pnpm dev` browser shim) →
+        // close-intercept is a no-op. Tests + vite dev mode hit this
+        // path; no error surfaced.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, [autosave]);
+
+  // T29 — fire-on-blur. When the editor body loses focus (Tab away to
+  // sidebar / another app / Settings modal), trigger an immediate flush.
+  // Fire-and-forget; the autosave latest-wins gate handles in-flight
+  // overlap.
+  const handleEditorBlur = useCallback(() => {
+    void autosave.flushIfDirty().catch(() => {
+      /* per-flush error already routed through saveStatus */
+    });
+  }, [autosave]);
+
+  // Lock button flush-then-lock — `decisions.md` 2026-05-07 canonical
+  // flush-on-lock. The BottomBar's existing onLock handler fires
+  // `lockVault()` then the parent's callback; we wrap with a flush
+  // pre-step.
+  const handleLockFlushed = useCallback(async () => {
+    try {
+      await autosave.flushIfDirty();
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[Editor] flushIfDirty on lock failed:", err);
+      }
+    }
+    await lockVault().catch(() => {
+      /* lock is best-effort, parent callback still fires */
+    });
+    onLock?.();
+  }, [autosave, onLock]);
+
+  return (
     <div
       style={{
         display: "flex",
@@ -184,11 +359,27 @@ export function Editor({
           minHeight: 0,
         }}
       >
-        <LeftSidebar />
-        <CenterPane content={content} onChange={setContent} />
+        <SidebarBootstrap />
+        <NotesSidebarList />
+        <CenterPane
+          content={content}
+          onChange={setContent}
+          onBlur={handleEditorBlur}
+          loading={bodyLoading}
+          hasSelection={ctx.selectedId !== null}
+          onCreateNote={() => {
+            void ctx.createAndStartRename().catch(() => {});
+          }}
+        />
         <RightSidebar />
       </div>
-      <BottomBar onLock={onLock} onOpenSettings={() => setSettingsOpen(true)} />
+      <BottomBar
+        onOpenSettings={() => setSettingsOpen(true)}
+        onLockFlushed={handleLockFlushed}
+        saveStatus={autosave.status}
+        onRetry={autosave.retry}
+        hideSaveStatus={ctx.selectedId === null}
+      />
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -200,44 +391,72 @@ export function Editor({
   );
 }
 
-function LeftSidebar() {
-  return (
-    <aside
-      style={{
-        width: 260,
-        background: "var(--paper-2)",
-        borderRight: "1px solid var(--line-1)",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div
-        style={{
-          padding: "14px 14px 6px",
-          ...SECTION_HEADING_STYLE,
-        }}
-      >
-        Notes
-      </div>
-      <div
-        style={{
-          padding: "4px 14px 14px",
-          fontSize: 13,
-          color: "var(--fg-3)",
-        }}
-      >
-        No notes yet.
-      </div>
-    </aside>
-  );
+/**
+ * Initial-boot sidebar refresh: `note_list` → chunked `loadNoteBatch`
+ * → cache populate. Runs once on mount inside the provider tree.
+ *
+ * Also owns the global Cmd+N keymap (T25) — wired here so the
+ * shortcut fires regardless of which pane is focused.
+ *
+ * Returns `null` — purely a side-effect mount. The actual sidebar
+ * surface is `<NotesSidebarList>` rendered as a sibling.
+ */
+function SidebarBootstrap() {
+  const ctx = useSelectedNote();
+  const booted = useRef(false);
+  useEffect(() => {
+    if (booted.current) return; // StrictMode double-invoke guard
+    booted.current = true;
+    void (async () => {
+      try {
+        const ids = await noteList();
+        await ctx.refreshAll(ids);
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[Editor] sidebar boot refresh failed:", e);
+        }
+      }
+    })();
+  }, [ctx]);
+
+  // Global Cmd+N / Ctrl+N → create new note (T25).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key !== "n" && e.key !== "N") return;
+      e.preventDefault();
+      void ctx.createAndStartRename().catch((err) => {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[Editor] Cmd+N createNote failed:", err);
+        }
+      });
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [ctx]);
+
+  return null;
 }
 
 interface CenterPaneProps {
   content: string;
   onChange: (next: string) => void;
+  onBlur: () => void;
+  loading: boolean;
+  hasSelection: boolean;
+  onCreateNote: () => void;
 }
 
-function CenterPane({ content, onChange }: CenterPaneProps) {
+function CenterPane({
+  content,
+  onChange,
+  onBlur,
+  loading,
+  hasSelection,
+  onCreateNote,
+}: CenterPaneProps) {
   return (
     <main
       style={{
@@ -269,28 +488,87 @@ function CenterPane({ content, onChange }: CenterPaneProps) {
           padding: "32px 64px",
         }}
       >
-        <div style={{ maxWidth: 680, margin: "0 auto" }}>
-          <textarea
-            value={content}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="Start typing…"
-            spellCheck={false}
-            style={{
-              width: "100%",
-              minHeight: 360,
-              border: 0,
-              outline: 0,
-              resize: "none",
-              background: "transparent",
-              color: "var(--fg-1)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 14,
-              lineHeight: 1.7,
-            }}
-          />
-        </div>
+        {!hasSelection ? (
+          <CenterPaneEmpty onCreateNote={onCreateNote} />
+        ) : loading ? (
+          <CenterPaneLoading />
+        ) : (
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>
+            <textarea
+              value={content}
+              onChange={(e) => onChange(e.target.value)}
+              onBlur={onBlur}
+              placeholder="Start typing…"
+              spellCheck={false}
+              style={{
+                width: "100%",
+                minHeight: 360,
+                border: 0,
+                outline: 0,
+                resize: "none",
+                background: "transparent",
+                color: "var(--fg-1)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 14,
+                lineHeight: 1.7,
+              }}
+            />
+          </div>
+        )}
       </div>
     </main>
+  );
+}
+
+function CenterPaneEmpty({ onCreateNote }: { onCreateNote: () => void }) {
+  return (
+    <div
+      style={{
+        maxWidth: 680,
+        margin: "10vh auto 0",
+        textAlign: "center",
+        color: "var(--fg-3)",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <div style={{ fontSize: 14, marginBottom: 14 }}>
+        Select a note from the sidebar, or
+      </div>
+      <button
+        type="button"
+        onClick={onCreateNote}
+        style={{
+          fontFamily: "var(--font-sans)",
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--accent-on)",
+          background: "var(--accent)",
+          border: 0,
+          padding: "10px 14px",
+          borderRadius: 6,
+          cursor: "pointer",
+        }}
+      >
+        + Create a new note
+      </button>
+    </div>
+  );
+}
+
+function CenterPaneLoading() {
+  return (
+    <div
+      style={{
+        maxWidth: 680,
+        margin: "10vh auto 0",
+        textAlign: "center",
+        color: "var(--fg-3)",
+        fontSize: 13,
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      Loading…
+    </div>
   );
 }
 
@@ -317,20 +595,29 @@ function RightSidebar() {
 }
 
 interface BottomBarProps {
-  onLock?: () => void;
+  /** Lock callback that awaits the autosave flush before firing
+   *  `lockVault()` and the parent's onLock — wired by `EditorChrome`. */
+  onLockFlushed: () => Promise<void>;
   onOpenSettings?: () => void;
+  saveStatus: SaveStatusValue;
+  onRetry: () => void;
+  /** Hide the save-status badge entirely when no note is selected
+   *  (the indicator would otherwise read "Saved" / a stale relative-
+   *  time from the previous note and confuse the user). */
+  hideSaveStatus?: boolean;
 }
 
-function BottomBar({ onLock, onOpenSettings }: BottomBarProps) {
+function BottomBar({
+  onLockFlushed,
+  onOpenSettings,
+  saveStatus,
+  onRetry,
+  hideSaveStatus = false,
+}: BottomBarProps) {
   const handleLockClick = () => {
-    void (async () => {
-      // vault_lock is idempotent + param-less. Errors are swallowed —
-      // slot wipe is best-effort; the parent's `editor.lock` Stage
-      // transition still fires either way (a later unlock attempt
-      // would catch any structural issue).
-      await lockVault().catch(() => {});
-      onLock?.();
-    })();
+    void onLockFlushed().catch(() => {
+      /* lock flush failures already routed through saveStatus */
+    });
   };
 
   return (
@@ -348,6 +635,7 @@ function BottomBar({ onLock, onOpenSettings }: BottomBarProps) {
       <span style={STATUS_TEXT_STYLE}>Local-only · not synced</span>
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {!hideSaveStatus && <SaveStatusBadge status={saveStatus} onRetry={onRetry} />}
         <button
           type="button"
           onClick={onOpenSettings}

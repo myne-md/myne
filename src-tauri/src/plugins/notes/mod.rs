@@ -26,6 +26,7 @@
 pub mod commands;
 pub mod error;
 pub mod note_id;
+mod title_extract;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
@@ -39,6 +40,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::note_update,
             commands::note_delete,
             commands::note_list,
+            commands::note_titles_batch,
         ])
         .build()
 }
