@@ -445,6 +445,135 @@ impl From<std::io::Error> for NoteListError {
     }
 }
 
+/// Per-item error returned by [`super::commands::note_titles_batch`] for
+/// a single ID inside the batch. The batch outer Result carries
+/// [`NoteTitleBatchError`] for preconditions that abort the whole call;
+/// individual notes that fail decrypt or are race-deleted surface here
+/// without aborting peers (per the 2026-05-15 MYND-82 grill Q4 per-item
+/// Result decision).
+///
+/// Hand-mirrored on the TS side at `src/types/note-title-error.ts`.
+/// Variant set is closed — adding a variant requires updating both
+/// sides of the IPC.
+///
+/// Note: `InvalidNoteId` is **not** a per-item variant. The implementation
+/// maps a malformed `note_id` string to `NoteNotFound` — the canonical ID
+/// set is produced by `note_list`, so anything else is a UI bug AND the
+/// file doesn't exist on disk under the parsed path; surfacing
+/// `NoteNotFound` keeps the user experience honest (the row drops out of
+/// the sidebar).
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteTitleError {
+    /// AEAD-tag failure on `decode_note` for this note. The same
+    /// `protocol.md` §6.4 non-distinguishing rule applies as in
+    /// [`NoteReadError::CannotDecrypt`] — the codec's internal sub-cause
+    /// flows through `tracing::debug!` without reaching the IPC layer.
+    /// In `note_titles_batch`, this surfaces as a per-item canary that
+    /// the UI renders inline (italic error icon next to the row's
+    /// "Untitled" placeholder, tooltip "Couldn't load this note").
+    #[error("note cannot be decrypted")]
+    CannotDecrypt,
+
+    /// `<vault>/notes/<note_id>.myn` does not exist. Surfaces the race
+    /// between `note_list` (returning a UUID set) and `note_titles_batch`
+    /// (decrypting them) — a `note_delete` landing in between drops the
+    /// file. UI optimistic-removes the row when this surfaces.
+    #[error("note not found")]
+    NoteNotFound,
+
+    /// Per-file IO failure during the blob read or directory traversal
+    /// for this single note. `NotFound` is special-cased upstream as
+    /// [`Self::NoteNotFound`].
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error for
+    /// this single item's decrypt task. Other items in the batch
+    /// proceed independently (per-item Result semantic).
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteTitleError {
+    fn from(e: std::io::Error) -> Self {
+        // `NotFound` is special-cased by the calling command (mapped to
+        // `NoteNotFound`). This `From` handles the residual cases.
+        NoteTitleError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
+/// Single error type returned across the IPC boundary by
+/// [`super::commands::note_titles_batch`] when a precondition fails and
+/// the whole call aborts before per-item decryption begins. Per-item
+/// failures use [`NoteTitleError`] (inner Result).
+///
+/// Hand-mirrored on the TS side at `src/types/note-title-batch-error.ts`.
+///
+/// Spec touchpoints:
+///
+/// - `decisions.md` 2026-05-15 "Note title write target" (companion
+///   entry; this batch command serves the read side of the same FM
+///   `title:` ↳ first `# H1` ↳ None precedence chain).
+/// - `myne-agents/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
+///   Q4 (per-item Result vs fail-whole-batch decision) + Q5 (hard cap
+///   100 to prevent Tokio blocking-pool saturation).
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteTitleBatchError {
+    /// Slot is `Empty` or `Recovering`. Frontend routes the user to
+    /// the lock screen via `vault_status`; if this surfaces from
+    /// `note_titles_batch`, a router bug.
+    #[error("vault not unlocked")]
+    VaultNotUnlocked,
+
+    /// `<vault>/notes` exists as a regular file rather than a
+    /// directory — defensive bug-canary parallel to the matching
+    /// variant on the other notes-error enums.
+    #[error("vault notes path is not a directory")]
+    NotesDirNotADirectory,
+
+    /// Input `ids.len()` exceeded the per-call cap (100 per the 2026-
+    /// 05-15 MYND-82 grill Q5 decision). UI is expected to chunk inputs
+    /// at `cap` and fire chunks via `Promise.all`; this variant fires
+    /// only when a caller bypasses the chunking convention or a UI bug
+    /// passes the full `note_list` output unchunked. The cap value is
+    /// carried in the payload so callers can introspect it without
+    /// hard-coding.
+    #[error("batch too large")]
+    BatchTooLarge { cap: usize },
+
+    /// File-system IO failure during `notes_dir` resolution. Per-item
+    /// reads route their IO failures through [`NoteTitleError::Io`]
+    /// instead.
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error at
+    /// the batch-coordination level (e.g., panic in the outer
+    /// dispatcher). Per-item join failures route through
+    /// [`NoteTitleError::JoinFailure`] instead.
+    ///
+    /// `#[allow(dead_code)]`: reserved for forward-compat — the current
+    /// implementation collapses outer-dispatcher panics into the per-item
+    /// `NoteTitleError::JoinFailure` path. If a future refactor introduces
+    /// a non-per-item batch coordinator (e.g., bounded-parallel semaphore
+    /// wrapping the dispatch), this variant becomes its surface.
+    #[allow(dead_code)]
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteTitleBatchError {
+    fn from(e: std::io::Error) -> Self {
+        NoteTitleBatchError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -986,6 +1115,151 @@ mod tests {
         match mapped {
             NoteListError::Io { io_error_kind } => {
                 assert_eq!(io_error_kind, IoFailureKind::NoSpace);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteTitleError (per-item)
+    // =====================================================================
+
+    fn serialize_title(e: &NoteTitleError) -> String {
+        serde_json::to_string(e).expect("NoteTitleError must serialize cleanly")
+    }
+
+    #[test]
+    fn title_cannot_decrypt_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_title(&NoteTitleError::CannotDecrypt),
+            r#"{"kind":"CannotDecrypt"}"#
+        );
+    }
+
+    #[test]
+    fn title_note_not_found_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_title(&NoteTitleError::NoteNotFound),
+            r#"{"kind":"NoteNotFound"}"#
+        );
+    }
+
+    #[test]
+    fn title_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteTitleError::Io {
+            io_error_kind: IoFailureKind::PermissionDenied,
+        };
+        assert_eq!(
+            serialize_title(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
+        );
+    }
+
+    #[test]
+    fn title_join_failure_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_title(&NoteTitleError::JoinFailure),
+            r#"{"kind":"JoinFailure"}"#
+        );
+    }
+
+    #[test]
+    fn title_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteTitleError) {
+            match e {
+                NoteTitleError::CannotDecrypt => {}
+                NoteTitleError::NoteNotFound => {}
+                NoteTitleError::Io { io_error_kind: _ } => {}
+                NoteTitleError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteTitleError::CannotDecrypt);
+    }
+
+    #[test]
+    fn title_from_io_error_routes_via_closed_enum_for_permission_denied() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteTitleError = raw.into();
+        match mapped {
+            NoteTitleError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteTitleBatchError (batch-level)
+    // =====================================================================
+
+    fn serialize_title_batch(e: &NoteTitleBatchError) -> String {
+        serde_json::to_string(e).expect("NoteTitleBatchError must serialize cleanly")
+    }
+
+    #[test]
+    fn title_batch_vault_not_unlocked_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_title_batch(&NoteTitleBatchError::VaultNotUnlocked),
+            r#"{"kind":"VaultNotUnlocked"}"#
+        );
+    }
+
+    #[test]
+    fn title_batch_notes_dir_not_a_directory_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_title_batch(&NoteTitleBatchError::NotesDirNotADirectory),
+            r#"{"kind":"NotesDirNotADirectory"}"#
+        );
+    }
+
+    #[test]
+    fn title_batch_too_large_serializes_with_cap_payload() {
+        assert_eq!(
+            serialize_title_batch(&NoteTitleBatchError::BatchTooLarge { cap: 100 }),
+            r#"{"kind":"BatchTooLarge","detail":{"cap":100}}"#
+        );
+    }
+
+    #[test]
+    fn title_batch_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteTitleBatchError::Io {
+            io_error_kind: IoFailureKind::Other,
+        };
+        assert_eq!(
+            serialize_title_batch(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"Other"}}"#
+        );
+    }
+
+    #[test]
+    fn title_batch_join_failure_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_title_batch(&NoteTitleBatchError::JoinFailure),
+            r#"{"kind":"JoinFailure"}"#
+        );
+    }
+
+    #[test]
+    fn title_batch_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteTitleBatchError) {
+            match e {
+                NoteTitleBatchError::VaultNotUnlocked => {}
+                NoteTitleBatchError::NotesDirNotADirectory => {}
+                NoteTitleBatchError::BatchTooLarge { cap: _ } => {}
+                NoteTitleBatchError::Io { io_error_kind: _ } => {}
+                NoteTitleBatchError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteTitleBatchError::VaultNotUnlocked);
+    }
+
+    #[test]
+    fn title_batch_from_io_error_routes_via_closed_enum_for_permission_denied() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteTitleBatchError = raw.into();
+        match mapped {
+            NoteTitleBatchError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
             }
             other => panic!("expected Io variant, got {other:?}"),
         }

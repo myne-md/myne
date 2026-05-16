@@ -98,19 +98,25 @@ Frontmatter is recognized as a structured block and rendered as a code block in 
 
 #### 3.6.1 Myne-managed canonical frontmatter fields
 
-Myne writes one canonical field to YAML frontmatter from the host on `note_update`, per [`decisions.md`](../decisions.md) 2026-05-07 "User-meaningful timestamp storage path: YAML frontmatter convention":
+Myne writes two canonical fields to YAML frontmatter from the host, both via the dialect surgery module per [`decisions.md`](../decisions.md) 2026-05-09 "Frontmatter byte-level surgery owned by TS dialect module" (which supersedes the 2026-05-07 writer mechanic):
 
-| Field | Type | Semantics | Writer |
-|---|---|---|---|
-| `updated` | RFC 3339 string (UTC) | User-meaningful last-edit timestamp | Dialect surgery module — invoked by the host on every save (`src/dialect/surgery.ts::patchUpdatedField` in the v0.1 reference implementation; see [`decisions.md`](../decisions.md) 2026-05-09 "Frontmatter byte-level surgery owned by TS dialect module" — supersedes the 2026-05-07 writer mechanic) |
+| Field | Type | Semantics | Writer | Trigger |
+|---|---|---|---|---|
+| `updated` | RFC 3339 string (UTC) | User-meaningful last-edit timestamp | `src/dialect/surgery.ts::patchUpdatedField` | Every save (per [`decisions.md`](../decisions.md) 2026-05-07 "User-meaningful timestamp storage path") |
+| `title` | YAML string (plain scalar) | User-visible note title surfaced by sidebar / note-titles batch | `src/dialect/surgery.ts::patchTitleField` | Rename action only — invoked by the caller's title-write decision tree per [`decisions.md`](../decisions.md) 2026-05-15 "Note title write target: mirror-existing source-of-truth (β)" |
 
-Mechanics:
+Mechanics — shared across both fields:
 
-- The field is **unprefixed** (no `myne_` namespace). Obsidian Templater/Linter and the wider markdown ecosystem use unprefixed `updated:` for this purpose; Myne aligns with that convention so a user who walks away from Myne sees a field every other editor recognizes (`PRODUCT.md` design principle 5 — plain-markdown portability).
-- Each save calls the canonical surgery function: the first save after `note_create` prepends the canonical frontmatter block with the `updated:` line; subsequent saves preserve the block and overwrite only the `updated:` value byte-by-byte (preserving trailing comments and quote style, collapsing YAML block-scalar form to single-line canonical). Other frontmatter fields (`title:`, `tags:`, user-authored fields) are preserved per the §3.6 "Unknown frontmatter fields are preserved on write" rule.
-- A user who manually sets `updated:` to a custom value sees it overwritten on the next save — autosave is Myne's responsibility. Users who want a manually-managed timestamp use a different field name (e.g., `last_reviewed:`).
+- Fields are **unprefixed** (no `myne_` namespace). Obsidian Templater/Linter and the wider markdown ecosystem use unprefixed `updated:` and `title:` for these purposes; Myne aligns with the convention so a user who walks away from Myne sees fields every other editor recognizes (`PRODUCT.md` design principle 5 — plain-markdown portability).
+- Each writer follows the same 3-state surgery matrix: state A (no FM block) → prepend `---\n<key>: <value>\n---\n\n` (canonical Obsidian-Templater shape with one trailing blank line); state B (FM exists, key absent) → insert `<key>: <value>\n` at the end of the FM block (just before the closing `---`); state C (FM exists, key present) → replace the value byte-by-byte, preserving trailing comments, preserving quote style (`unquoted`, `'single'`, `"double"`), and collapsing YAML block-scalar form (`<key>: |\n  …\n`) to single-line canonical form. The state-C collapse is justified by both fields being Myne-managed — a user who wants multi-line content in these fields uses a different field name.
+- Other frontmatter fields (`tags:`, user-authored fields) are preserved per the §3.6 "Unknown frontmatter fields are preserved on write" rule.
 - `created_at` is **not** stored in frontmatter — it is derived from the UUIDv7 filename's millisecond time component per [`protocol.md`](protocol.md) §9.1 (already public-accepted leak; no new commitment violation, no frontmatter write needed).
-- The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with v005: v005 may rename, drop, or supersede `updated:` per its own dialect specification.
+- The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with v005: v005 may rename, drop, or supersede `updated:` / `title:` per its own dialect specification.
+
+Mechanics — per-field:
+
+- **`updated`** is owned by autosave: a user who manually sets `updated:` to a custom value sees it overwritten on the next save — autosave is Myne's responsibility. Users who want a manually-managed timestamp use a different field name (e.g., `last_reviewed:`).
+- **`title`** is owned by the rename action only — body autosave does NOT write `title:`. The caller's rename decision tree (`src/notes/renameNote.ts` in the v0.1 reference implementation) chooses between writing `title:` and writing the body's first `# H1` line via `patchFirstH1Line` based on which slot the title was already read from. `patchFirstH1Line` is a structural-transform primitive operating on user-authored body content; it is NOT a Myne-managed field. See [`decisions.md`](../decisions.md) 2026-05-15 "Note title write target" for the full mirror-existing source-of-truth (β) decision tree.
 
 ### 3.7 Inline-tag extension
 

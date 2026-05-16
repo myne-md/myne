@@ -20,6 +20,11 @@ export type {
 } from "./types";
 
 export { parse } from "./parse";
-export { patchSourceRanges, patchUpdatedField } from "./surgery";
+export {
+  patchFirstH1Line,
+  patchSourceRanges,
+  patchTitleField,
+  patchUpdatedField,
+} from "./surgery";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";

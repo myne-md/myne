@@ -8,16 +8,33 @@ import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+  patchFirstH1Line,
   patchSourceRanges,
+  patchTitleField,
   patchUpdatedField,
 } from "../../src/dialect/surgery";
 import { bytesEqual, dec, enc, fixtureDir } from "./_helpers";
 
 const FIXTURE_DIR = fixtureDir("surgery");
+const TITLE_FIXTURE_DIR = fixtureDir("surgery/title");
+const H1_FIXTURE_DIR = fixtureDir("surgery/h1");
 const TEST_ISO = "2026-05-10T12:00:00Z";
+const TEST_TITLE = "Test Note Title";
 
 const fixtures = fs
   .readdirSync(FIXTURE_DIR)
+  .filter((f) => f.endsWith(".input.md"))
+  .map((f) => f.replace(/\.input\.md$/, ""))
+  .sort();
+
+const titleFixtures = fs
+  .readdirSync(TITLE_FIXTURE_DIR)
+  .filter((f) => f.endsWith(".input.md"))
+  .map((f) => f.replace(/\.input\.md$/, ""))
+  .sort();
+
+const h1Fixtures = fs
+  .readdirSync(H1_FIXTURE_DIR)
   .filter((f) => f.endsWith(".input.md"))
   .map((f) => f.replace(/\.input\.md$/, ""))
   .sort();
@@ -90,6 +107,157 @@ describe("patchUpdatedField — invariants", () => {
     );
     const result = dec.decode(patchUpdatedField(input, TEST_ISO));
     expect(result).toContain("# Heading\n**bold** body.\n");
+  });
+});
+
+describe("patchTitleField — fixtures", () => {
+  for (const name of titleFixtures) {
+    it(`fixture: ${name}`, () => {
+      const inputBytes = enc.encode(
+        fs.readFileSync(
+          path.join(TITLE_FIXTURE_DIR, `${name}.input.md`),
+          "utf-8",
+        ),
+      );
+      const expectedBytes = enc.encode(
+        fs.readFileSync(
+          path.join(TITLE_FIXTURE_DIR, `${name}.expected.md`),
+          "utf-8",
+        ),
+      );
+      const actualBytes = patchTitleField(inputBytes, TEST_TITLE);
+      expect(dec.decode(actualBytes)).toBe(dec.decode(expectedBytes));
+      expect(bytesEqual(actualBytes, expectedBytes)).toBe(true);
+    });
+  }
+});
+
+describe("patchTitleField — invariants", () => {
+  it("idempotent: applying the same title twice yields byte-identical output", () => {
+    for (const name of titleFixtures) {
+      const inputBytes = enc.encode(
+        fs.readFileSync(
+          path.join(TITLE_FIXTURE_DIR, `${name}.input.md`),
+          "utf-8",
+        ),
+      );
+      const once = patchTitleField(inputBytes, TEST_TITLE);
+      const twice = patchTitleField(once, TEST_TITLE);
+      expect(bytesEqual(once, twice)).toBe(true);
+    }
+  });
+
+  it("escalates to double-quoted when value contains YAML-unsafe characters", () => {
+    const input = enc.encode("---\ntitle: Plain\n---\n\nBody\n");
+    const result = dec.decode(patchTitleField(input, "Has: colon and space"));
+    // `: ` opens a YAML mapping when unquoted → must be double-quoted.
+    expect(result).toContain('title: "Has: colon and space"');
+  });
+
+  it("escapes embedded double-quotes and backslashes when quoting is forced", () => {
+    const input = enc.encode("---\ntitle: Plain\n---\n");
+    // Leading `-` is a YAML-reserved start char → forces double-quoting,
+    // and the embedded `"` + `\` then need escaping inside the quoted form.
+    const result = dec.decode(
+      patchTitleField(input, '- value "quoted" and \\ slash'),
+    );
+    expect(result).toContain(
+      'title: "- value \\"quoted\\" and \\\\ slash"',
+    );
+  });
+
+  it("preserves bytes outside the FM block", () => {
+    const input = enc.encode(
+      "---\ntitle: Old\n---\n\n# Heading\n**bold** body.\n",
+    );
+    const result = dec.decode(patchTitleField(input, TEST_TITLE));
+    expect(result).toContain("# Heading\n**bold** body.\n");
+  });
+
+  it("never throws on adversarial input", () => {
+    const inputs: Uint8Array[] = [
+      enc.encode(""),
+      enc.encode("---"),
+      enc.encode("---\n"),
+      enc.encode("---\n---"),
+      enc.encode("---\n\0\n---\n"),
+      new Uint8Array([0xff, 0xfe, 0xfd]),
+    ];
+    for (const input of inputs) {
+      expect(() => patchTitleField(input, TEST_TITLE)).not.toThrow();
+    }
+  });
+});
+
+describe("patchFirstH1Line — fixtures", () => {
+  for (const name of h1Fixtures) {
+    it(`fixture: ${name}`, () => {
+      const inputBytes = enc.encode(
+        fs.readFileSync(
+          path.join(H1_FIXTURE_DIR, `${name}.input.md`),
+          "utf-8",
+        ),
+      );
+      const expectedBytes = enc.encode(
+        fs.readFileSync(
+          path.join(H1_FIXTURE_DIR, `${name}.expected.md`),
+          "utf-8",
+        ),
+      );
+      const actualBytes = patchFirstH1Line(inputBytes, TEST_TITLE);
+      expect(dec.decode(actualBytes)).toBe(dec.decode(expectedBytes));
+      expect(bytesEqual(actualBytes, expectedBytes)).toBe(true);
+    });
+  }
+});
+
+describe("patchFirstH1Line — invariants", () => {
+  it("idempotent: applying the same H1 twice yields byte-identical output", () => {
+    for (const name of h1Fixtures) {
+      const inputBytes = enc.encode(
+        fs.readFileSync(
+          path.join(H1_FIXTURE_DIR, `${name}.input.md`),
+          "utf-8",
+        ),
+      );
+      const once = patchFirstH1Line(inputBytes, TEST_TITLE);
+      const twice = patchFirstH1Line(once, TEST_TITLE);
+      expect(bytesEqual(once, twice)).toBe(true);
+    }
+  });
+
+  it("strips embedded newlines from the value (defensive)", () => {
+    const input = enc.encode("# Old\nBody.\n");
+    const result = dec.decode(patchFirstH1Line(input, "Multi\nLine\rTitle"));
+    expect(result).toBe("# Multi Line Title\nBody.\n");
+  });
+
+  it("does NOT treat `#hashtag` as an H1 (CommonMark strict: space required)", () => {
+    const input = enc.encode("#hashtag-like\nbody\n");
+    const result = dec.decode(patchFirstH1Line(input, TEST_TITLE));
+    // No H1 → prepend path with separator.
+    expect(result.startsWith("# " + TEST_TITLE + "\n\n")).toBe(true);
+    expect(result).toContain("#hashtag-like");
+  });
+
+  it("skips H2/H3/etc. when looking for the first H1", () => {
+    const input = enc.encode("## H2 first\n### H3 next\n# Real H1\nbody\n");
+    const result = dec.decode(patchFirstH1Line(input, TEST_TITLE));
+    expect(result).toBe("## H2 first\n### H3 next\n# Test Note Title\nbody\n");
+  });
+
+  it("never throws on adversarial input", () => {
+    const inputs: Uint8Array[] = [
+      enc.encode(""),
+      enc.encode("---"),
+      enc.encode("---\n"),
+      enc.encode("---\n---"),
+      enc.encode("# "),
+      new Uint8Array([0xff, 0xfe, 0xfd]),
+    ];
+    for (const input of inputs) {
+      expect(() => patchFirstH1Line(input, TEST_TITLE)).not.toThrow();
+    }
   });
 });
 
