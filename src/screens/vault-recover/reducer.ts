@@ -123,7 +123,7 @@ export function initialState(initialSubStep: RecoverSubStep): VaultRecoverState 
 /** Spec §3.4 non-distinguishing banner. Co-located with the reducer
  *  so the create-vs-recover boundary can't drift the wording. */
 const NON_DISTINGUISHING_BANNER =
-  "Phrase veya vault dosyası geçersiz. Lütfen tekrar dene.";
+  "Phrase or vault file is invalid. Please try again.";
 
 function sanitizeCellValue(value: string): string {
   // Q5 P5 — typed whitespace is filtered out at the reducer level

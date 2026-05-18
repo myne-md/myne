@@ -178,8 +178,8 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
       // why the backend rejects rather than swallows. See
       // `app-state-machine` PRD + grill Q12.
       return {
-        title: "Vault zaten var",
-        body: "Yeni bir vault oluşturulamaz çünkü cihazda zaten bir vault dosyası mevcut. Uygulamayı kapatıp tekrar başlat — startup ekranı seni unlock akışına yönlendirecek.",
+        title: "Vault already exists",
+        body: "A new vault cannot be created because a vault file already exists on this device. Close the app and restart — the startup screen will route you to the unlock flow.",
         primaryAction: "restart",
         displayMode: "dedicated",
       };

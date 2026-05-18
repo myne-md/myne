@@ -11,7 +11,7 @@
 //   NoSpace, Other). Same fail-closed UI, message varies by io_kind.
 // - `invalid-state`: React state ↔ Rust slot disagreement detected at
 //   component-mount reality check (Q5β-1 belt+suspenders). CTA
-//   "Kilitle" — calls `vault_lock` (idempotent, even on empty slot)
+//   "Lock" — calls `vault_lock` (idempotent, even on empty slot)
 //   then re-probes via `vault_status` and routes accordingly.
 //
 // NO diagnostic detail in prod (TB6: keep internal state model off
@@ -45,27 +45,27 @@ function copyForReason(reason: FailClosedReason): ReasonCopy {
   switch (reason.kind) {
     case "corrupted-vault":
       return {
-        title: "Vault dosyası bozulmuş.",
-        body: "Kurtarma akışı yakında. Şimdilik backup dosyandan vault'u manuel yerine koy.",
-        cta: "Uygulamayı kapat",
+        title: "Vault file is corrupted.",
+        body: "Recovery flow coming soon. For now, manually restore your vault from a backup file.",
+        cta: "Close app",
       };
     case "io-error":
       return reason.ioKind === "PermissionDenied"
         ? {
-            title: "Vault dosyasına erişim izni yok.",
-            body: "Dosya izinlerini kontrol et.",
-            cta: "Uygulamayı kapat",
+            title: "No permission to access the vault file.",
+            body: "Check file permissions.",
+            cta: "Close app",
           }
         : {
-            title: "Vault dosyası okunamıyor.",
-            body: "Disk veya dosya sistemi hatası olabilir.",
-            cta: "Uygulamayı kapat",
+            title: "Cannot read the vault file.",
+            body: "This might be a disk or filesystem error.",
+            cta: "Close app",
           };
     case "invalid-state":
       return {
-        title: "Beklenmeyen durum.",
-        body: "Yeniden başlat.",
-        cta: "Kilitle",
+        title: "Unexpected state.",
+        body: "Please restart.",
+        cta: "Lock",
       };
   }
 }

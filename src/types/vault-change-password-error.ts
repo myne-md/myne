@@ -48,8 +48,8 @@ export type VaultChangePasswordError =
    * The variant name is shared with `VaultUnlockError::InvalidCredentialOrVault`
    * and `VaultRecoveryError::InvalidCredentialOrVault` (distinct TS
    * types, identical name + shape) per the cross-plugin shared-name
-   * discipline. Settings-form copy: LITERAL compound `"Yanlış mevcut
-   * parola veya vault dosyası bozuk."`
+   * discipline. Settings-form copy: LITERAL compound `"Wrong current
+   * password or vault file is corrupted."`
    */
   | { kind: "InvalidCredentialOrVault" }
   /**
@@ -75,8 +75,8 @@ export type VaultChangePasswordError =
    * a competing rewrite; could also indicate disk-level tampering.
    *
    * Force-relock: slot drops to `Empty`. Frontend UX: SUSPICION
-   * signal banner, `"Vault başka bir oturumda değişti — yeniden
-   * açın."` Distinct from `VaultLockedDuringChange` (informational)
+   * signal banner, `"Vault was modified in another session — please
+   * unlock again."` Distinct from `VaultLockedDuringChange` (informational)
    * — both drop the slot but carry different UX bandwidth.
    */
   | { kind: "VaultMetaChangedExternally" }
@@ -87,8 +87,8 @@ export type VaultChangePasswordError =
    * been dropped to `Slot::Empty`; the rewrite was bailed without
    * touching `vault.meta`.
    *
-   * Frontend UX: INFORMATIONAL banner, `"Şifre değişikliği iptal
-   * edildi: kilit atıldı."` — not a suspicion signal; user can
+   * Frontend UX: INFORMATIONAL banner, `"Password change cancelled:
+   * vault was locked."` — not a suspicion signal; user can
    * just re-unlock with their CURRENT (unchanged) password.
    */
   | { kind: "VaultLockedDuringChange" }

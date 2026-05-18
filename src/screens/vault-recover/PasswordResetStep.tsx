@@ -52,7 +52,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // Semaphore busy — stay put, retry shortly.
       return {
         kind: "banner-retry",
-        banner: "İşlem devam ediyor. Lütfen biraz bekle.",
+        banner: "Operation in progress. Please wait.",
       };
     case "IoError":
       // Atomic write failed; slot is now Empty (recovering material
@@ -74,29 +74,29 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // phrase-entry.
       return {
         kind: "io-failure",
-        banner: "Beklenmeyen hata. Lütfen tekrar dene.",
+        banner: "Unexpected error. Please try again.",
       };
     case "VaultAlreadyUnlocked":
-      // Defansif — A8f shouldn't see Unlocked slot, but the
+      // Defensive — A8f shouldn't see Unlocked slot, but the
       // exhaustiveness check forces a mapping. Stage-transition
       // bug-canary.
       return { kind: "fail-closed", reason: "invalid-state" };
     case "RecoveryAlreadyInProgress":
-      // Defansif — A8f's slot peek expects `Recovering`, so this
+      // Defensive — A8f's slot peek expects `Recovering`, so this
       // would only fire on a race where slot transitioned between
       // peek and take. Generic banner.
       return {
         kind: "banner-retry",
-        banner: "Beklenmeyen hata. Lütfen tekrar dene.",
+        banner: "Unexpected error. Please try again.",
       };
     case "InvalidCredentialOrVault":
-      // Defansif — A8f doesn't return this variant in practice
+      // Defensive — A8f doesn't return this variant in practice
       // (recovery wrap-key already verified during A8d; A8f rewrites
       // the password side, no AEAD-tag credential check). Generic
       // banner if surfaces.
       return {
         kind: "banner-retry",
-        banner: "Beklenmeyen hata. Lütfen tekrar dene.",
+        banner: "Unexpected error. Please try again.",
       };
   }
 }

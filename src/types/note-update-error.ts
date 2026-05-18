@@ -24,7 +24,7 @@ export type NoteUpdateError =
   | { kind: "InvalidNoteId" }
   /**
    * `<vault>/notes/<note_id>.myn` does not exist. Autosave-after-delete
-   * race signal — UI folds to "kullanıcı sildi, autosave yetişemedi".
+   * race signal — UI folds to "user deleted before autosave landed".
    * Distinct from `CannotDecrypt` (no credential leak; vault was
    * already unlocked).
    */

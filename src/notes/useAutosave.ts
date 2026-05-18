@@ -44,9 +44,12 @@ export type UseAutosaveReturn = {
 
 /**
  * Test-injectable seam — swap `saveNote` for a mock in fake-timer tests.
- * The default points at the production helper.
+ * The default points at the production helper. Return value is the
+ * patched body (with the fresh `updated:` frontmatter timestamp); the
+ * hook mirrors this back via the optional `onSaved` callback so the
+ * editor's local state reflects the patch without close-reopen.
  */
-export type SaveFn = (noteId: string, body: string) => Promise<void>;
+export type SaveFn = (noteId: string, body: string) => Promise<string>;
 
 const DEFAULT_SAVE_FN: SaveFn = saveNote;
 
@@ -54,6 +57,7 @@ export function useAutosave(
   noteId: string | null,
   body: string,
   saveImpl: SaveFn = DEFAULT_SAVE_FN,
+  onSaved?: (patchedBody: string) => void,
 ): UseAutosaveReturn {
   const [status, setStatus] = useState<SaveStatus>({ status: "clean" });
 
@@ -127,8 +131,7 @@ export function useAutosave(
     setStatus({ status: "saving" });
     const promise = (async () => {
       try {
-        await saveImpl(id, bodyAtFire);
-        savedBodyRef.current = bodyAtFire;
+        const patchedBody = await saveImpl(id, bodyAtFire);
         // Latest-wins gate: if the body changed during the IPC, the
         // current body differs from `bodyAtFire`. Re-arm the idle timer
         // (the body change handler would have armed it if it fired
@@ -139,6 +142,7 @@ export function useAutosave(
           // Schedule the follow-up immediately (no idle wait — we
           // already paid the latency once; the user expects continued
           // saving).
+          savedBodyRef.current = bodyAtFire;
           setStatus({ status: "saving" });
           inFlightRef.current = null;
           dirtyRef.current = true;
@@ -146,8 +150,20 @@ export function useAutosave(
           void fireSave();
           return;
         }
+        // User hasn't typed since save fired → mirror the patched body
+        // back so the editor's local content reflects the fresh
+        // `updated:` timestamp without a close-reopen reload.
+        // `savedBodyRef.current` is set to the PATCHED body so the
+        // subsequent body-change effect (when the parent calls
+        // `setContent(patchedBody)`) sees `body === savedBodyRef.current`
+        // → routes to the "revert to last-saved" clean branch (no
+        // re-fire loop).
+        savedBodyRef.current = patchedBody;
         dirtyRef.current = false;
         setStatus({ status: "saved", at: new Date() });
+        if (onSaved !== undefined && patchedBody !== bodyAtFire) {
+          onSaved(patchedBody);
+        }
       } catch (err) {
         dirtyRef.current = true;
         setStatus({ status: "error", error: err });

@@ -14,7 +14,10 @@
       {
         "title": "Myne",
         "width": 1100,
-        "height": 720
+        "height": 720,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 20 }
       }
     ],
     "security": {

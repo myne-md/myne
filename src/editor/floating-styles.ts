@@ -1,0 +1,259 @@
+// Global CSS injection for the editor's floating UI surfaces (slash menu,
+// selection toolbar, inline URL overlay).
+//
+// These elements are mounted to `document.body` so `position: fixed`
+// escapes any ancestor containing-block context (transform/filter/contain
+// quirks). CodeMirror 6's `EditorView.theme(...)` rules are scoped to the
+// editor's theme class, so descendant selectors don't match when the
+// element is outside `.cm-editor`. Hence: global CSS via a `<style>` tag
+// appended to `document.head` once on first import.
+//
+// All values use `var(--*)` tokens from `docs/design/colors_and_type.css`
+// with hex fallbacks. Live tokens always win — fallbacks only kick in if
+// the CSS variable layer fails to load.
+
+const STYLE_ID = "myne-editor-floating-styles";
+
+const CSS = `
+.cm-slash-menu {
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-3, 8px);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12));
+  padding: 6px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--fg-1);
+  overflow: hidden;
+}
+.cm-slash-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-1, 3px);
+  cursor: pointer;
+}
+.cm-slash-menu-row-selected {
+  background-color: var(--paper-2, #f3f1eb);
+}
+.cm-slash-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+  flex-shrink: 0;
+}
+.cm-slash-menu-label {
+  flex: 1;
+}
+.cm-slash-menu-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.cm-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
+  padding: 4px;
+  font-family: var(--font-sans);
+}
+.cm-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background-color: transparent;
+  color: var(--fg-1);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: var(--radius-1, 3px);
+  font-family: var(--font-sans);
+}
+.cm-toolbar-button:hover {
+  background-color: var(--paper-2, #f3f1eb);
+}
+.cm-toolbar-heading-wrap {
+  position: relative;
+}
+.cm-toolbar-heading-dropdown {
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
+  padding: 4px;
+  min-width: 120px;
+}
+.cm-toolbar-heading-item {
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: var(--radius-1, 3px);
+  color: var(--fg-1);
+}
+.cm-toolbar-heading-item:hover {
+  background-color: var(--paper-2, #f3f1eb);
+}
+
+.cm-url-overlay {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
+  padding: 6px 8px;
+  font-family: var(--font-sans);
+}
+.cm-url-overlay-input {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--fg-1);
+  min-width: 200px;
+}
+.cm-url-overlay-apply {
+  border: 0;
+  background-color: var(--accent, #2c4a7a);
+  color: var(--accent-on, #fff);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-1, 3px);
+  cursor: pointer;
+}
+
+.cm-fm-properties {
+  padding: 12px 0 16px;
+  font-family: var(--font-sans);
+}
+.cm-fm-properties-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-1);
+  margin-bottom: 10px;
+}
+.cm-fm-properties-list {
+  display: grid;
+  grid-template-columns: 24px 160px 1fr;
+  row-gap: 2px;
+  column-gap: 8px;
+  align-items: center;
+}
+.cm-fm-properties-row {
+  display: contents;
+}
+.cm-fm-properties-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-3);
+  font-size: 13px;
+}
+.cm-fm-properties-key {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  outline-style: none;
+  box-shadow: none;
+  font-size: 13px;
+  color: var(--fg-2);
+  font-family: var(--font-sans);
+  padding: 4px 6px;
+  border-radius: var(--radius-1, 3px);
+}
+.cm-fm-properties-key:hover {
+  background: var(--paper-2, #f3f1eb);
+}
+.cm-fm-properties-key:focus,
+.cm-fm-properties-key:focus-visible {
+  outline: 0 !important;
+  outline-style: none !important;
+  box-shadow: none !important;
+  background: var(--paper-2, #f3f1eb);
+  color: var(--fg-1);
+}
+.cm-fm-properties-value {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  outline-style: none;
+  box-shadow: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--fg-1);
+  padding: 4px 6px;
+  border-radius: var(--radius-1, 3px);
+}
+.cm-fm-properties-value:hover {
+  background: var(--paper-2, #f3f1eb);
+}
+.cm-fm-properties-value:focus,
+.cm-fm-properties-value:focus-visible {
+  /* WebKit applies a default focus ring on inputs that outline:none
+   * alone does not always clear (especially under Tauris WKWebView).
+   * Belt-and-suspenders reset, plus a subtle background-only focus
+   * indicator matching Obsidians restrained styling. */
+  outline: 0 !important;
+  outline-style: none !important;
+  box-shadow: none !important;
+  background: var(--paper-2, #f3f1eb);
+}
+.cm-fm-properties-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  margin-left: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-3);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-1, 3px);
+}
+.cm-fm-properties-add:hover {
+  background: var(--paper-2, #f3f1eb);
+  color: var(--fg-1);
+}
+`;
+
+export function ensureFloatingStyles(): void {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(STYLE_ID) !== null) return;
+  const styleEl = document.createElement("style");
+  styleEl.id = STYLE_ID;
+  styleEl.textContent = CSS;
+  document.head.appendChild(styleEl);
+}

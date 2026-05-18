@@ -30,7 +30,7 @@ function App() {
   // independent, so the boot blocking-time is bounded by the slower
   // of the two. The `probed` ref guards against React 18 StrictMode
   // double-effect in dev. Also re-fires when `reprobe()` resets
-  // `stage` to null (Editor mount guard's "Kilitle" CTA →
+  // `stage` to null (Editor mount guard's "Lock" CTA →
   // fail-closed → re-route). Slot-priority routing applies: a
   // `Recovering` or `Unlocked` runtime slot pins the boot stage to
   // `recover(password-reset)` or `editor` regardless of disk state.
@@ -88,50 +88,80 @@ function App() {
 
   const dispatch = (action: Action) => setStage((prev) => (prev ? transition(prev, action) : prev));
 
-  switch (stage.name) {
-    case "welcome":
-      return <Welcome onCreateVault={() => dispatch({ type: "create-vault.start" })} />;
-    case "create-vault":
-      return (
-        <CreateVault
-          onBack={() => dispatch({ type: "create-vault.back" })}
-          onAutoUnlockSuccess={() =>
-            dispatch({ type: "create-vault.auto-unlock-success" })
-          }
-          onAutoUnlockFailed={() =>
-            dispatch({ type: "create-vault.commit-success" })
-          }
-        />
-      );
-    case "unlock":
-      return (
-        <Unlock
-          initialStatus={stage.initialStatus}
-          onUnlocked={() => dispatch({ type: "unlock.success" })}
-          onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
-          onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
-          suspicionReason={stage.suspicionReason}
-        />
-      );
-    case "editor":
-      return (
-        <Editor
-          onResetRequested={reprobe}
-          onLock={() => dispatch({ type: "editor.lock" })}
-          onForceRelock={setStageWithSuspicion}
-        />
-      );
-    case "recover":
-      return (
-        <VaultRecover
-          initialSubStep={stage.subStep}
-          onCancel={() => dispatch({ type: "recover.cancel" })}
-          onCompleteSuccess={() =>
-            dispatch({ type: "recover.complete-success" })
-          }
-        />
-      );
-  }
+  const screen = (() => {
+    switch (stage.name) {
+      case "welcome":
+        return <Welcome onCreateVault={() => dispatch({ type: "create-vault.start" })} />;
+      case "create-vault":
+        return (
+          <CreateVault
+            onBack={() => dispatch({ type: "create-vault.back" })}
+            onAutoUnlockSuccess={() =>
+              dispatch({ type: "create-vault.auto-unlock-success" })
+            }
+            onAutoUnlockFailed={() =>
+              dispatch({ type: "create-vault.commit-success" })
+            }
+          />
+        );
+      case "unlock":
+        return (
+          <Unlock
+            initialStatus={stage.initialStatus}
+            onUnlocked={() => dispatch({ type: "unlock.success" })}
+            onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
+            onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
+            suspicionReason={stage.suspicionReason}
+          />
+        );
+      case "editor":
+        return (
+          <Editor
+            onResetRequested={reprobe}
+            onLock={() => dispatch({ type: "editor.lock" })}
+            onForceRelock={setStageWithSuspicion}
+          />
+        );
+      case "recover":
+        return (
+          <VaultRecover
+            initialSubStep={stage.subStep}
+            onCancel={() => dispatch({ type: "recover.cancel" })}
+            onCompleteSuccess={() =>
+              dispatch({ type: "recover.complete-success" })
+            }
+          />
+        );
+    }
+  })();
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      <div
+        // macOS overlay-mode title bar — `tauri.conf.json` sets
+        // `titleBarStyle: "Overlay"` so the webview extends under the
+        // traffic-light area. This 38px strip keeps the top region
+        // uniform with the sidebar color (var(--bg-2)) and provides a
+        // drag handle for the window. Traffic lights are positioned
+        // inside this strip via `trafficLightPosition` (x:16, y:20).
+        style={{
+          height: 38,
+          flexShrink: 0,
+          background: "var(--bg-2)",
+          borderBottom: "1px solid var(--line-1)",
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          // CSS-side drag region; macOS recognizes this property name
+          // via the `appWindow` plugin. -webkit- prefix for WKWebView.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ WebkitAppRegion: "drag" } as Record<string, string>),
+        }}
+      />
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {screen}
+      </div>
+    </div>
+  );
 }
 
 export default App;

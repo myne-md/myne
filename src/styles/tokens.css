@@ -193,6 +193,13 @@ html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
+  /* Lock outer scroll so the sidebar / editor / right rail never scroll
+   * as a whole — each pane manages its own inner overflow. Without this
+   * the desktop window's webview body could elastic-scroll past the
+   * fixed layout, jumping the sidebar out of view on macOS. */
+  overflow: hidden;
+  /* Disable elastic rubber-band scroll on macOS WebKit. */
+  overscroll-behavior: none;
 }
 
 body {
@@ -200,7 +207,7 @@ body {
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   color: var(--fg-1);
-  background: var(--bg-1);
+  background: var(--bg-2);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;

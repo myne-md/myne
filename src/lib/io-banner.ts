@@ -11,15 +11,15 @@ import type { IoFailureKind } from "./stage";
 export function ioBanner(kind: IoFailureKind): string {
   switch (kind) {
     case "PermissionDenied":
-      return "Vault dosyasına erişim izni yok. Dosya izinlerini kontrol et.";
+      return "No permission to access the vault file. Check file permissions.";
     case "NotFound":
       // Defensive — `vault_unlock` / `vault_recover_with_phrase`
       // special-case NotFound to a dedicated `VaultNotFound` variant;
       // this branch is unreachable in practice when the caller
       // discriminates.
-      return "Vault dosyası bulunamadı. Uygulamayı yeniden başlat.";
+      return "Vault file not found. Please restart the app.";
     case "NoSpace":
     case "Other":
-      return "Vault dosyası okunamıyor.";
+      return "Cannot read the vault file.";
   }
 }

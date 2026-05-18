@@ -145,15 +145,15 @@ function mapChangePasswordError(
 ): string | null {
   switch (e.kind) {
     case "InvalidCredentialOrVault":
-      return "Yanlış mevcut parola veya vault dosyası bozuk.";
+      return "Wrong current password or vault file is corrupted.";
     case "SamePasswordRejected":
-      return "Yeni parola mevcut parolayla aynı.";
+      return "New password matches the current one.";
     case "WeakNewPassword":
-      return "Yeni parola en az 12 karakter olmalı.";
+      return "New password must be at least 12 characters.";
     case "IoError":
-      return "Disk hatası, tekrar dene.";
+      return "Disk error, please try again.";
     case "JoinFailure":
-      return "Bir şeyler ters gitti, tekrar dene.";
+      return "Something went wrong, please try again.";
     case "InvalidVaultMeta":
     case "VaultMetaChangedExternally":
     case "VaultLockedDuringChange":

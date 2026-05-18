@@ -10,7 +10,7 @@
 // the prior failed attempt — password retained across the
 // decrypting → idle bounce) | `decrypting` (input + submit disabled) |
 // `recovery-in-progress` (Rust slot is `Recovering`; password form is
-// suppressed in favor of an info banner + "Devam et" resume CTA;
+// suppressed in favor of an info banner + "Continue" resume CTA;
 // CTA dispatches `unlock.resume-recovery` to App.tsx, routing the
 // user into recover(password-reset)).
 //
@@ -19,7 +19,7 @@
 // return to the form within the session.
 //
 // **Cold-start recovery link.** In `idle` mode (Exists), a ghost-style
-// "Parolanı mı unuttun? Recovery phrase ile aç" link below the
+// "Forgot your password? Unlock with recovery phrase" link below the
 // primary CTA dispatches `unlock.start-recovery` → App routes Stage
 // to `recover(phrase-entry)`. The link is suppressed during
 // `decrypting`, `recovery-in-progress`, and fail-closed states.
@@ -47,7 +47,7 @@ interface UnlockProps {
    *  aç" link in idle mode. App.tsx sends `unlock.start-recovery` →
    *  Stage transitions to `recover(phrase-entry)`. */
   onStartRecovery: () => void;
-  /** Resume recovery entry. Dispatched by the "Devam et" CTA on the
+  /** Resume recovery entry. Dispatched by the "Continue" CTA on the
    *  `VaultRecoveryInProgress` info banner. App.tsx sends
    *  `unlock.resume-recovery` → Stage transitions to
    *  `recover(password-reset)`. */
@@ -97,7 +97,7 @@ function reducer(state: UnlockState, action: UnlockAction): UnlockState {
       return { kind: "corrupted-after-unlock" };
     case "fail-recovery-in-progress":
       // Slot was `Recovering` at unlock-attempt time. Switch the
-      // component to a banner + "Devam et" surface; the password form
+      // component to a banner + "Continue" surface; the password form
       // is suppressed (typing a password while the slot is recovering
       // is meaningless — the user must complete A8f first).
       return { kind: "recovery-in-progress" };
@@ -121,11 +121,11 @@ type BannerOutcome =
 function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
   switch (e.kind) {
     case "InvalidCredentialOrVault":
-      // §7.3 LITERAL compound — UI does NOT collapse to "Yanlış parola"
+      // §7.3 LITERAL compound — UI does NOT collapse to "Wrong password"
       // alone (would silently weaken the non-distinguishing posture).
       return {
         kind: "banner",
-        text: "Yanlış parola veya vault dosyası bozuk.",
+        text: "Wrong password or vault file is corrupted.",
       };
     case "InvalidVaultMeta":
       return { kind: "corrupted" };
@@ -134,23 +134,23 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "VaultNotFound":
       return {
         kind: "banner",
-        text: "Vault dosyası bulunamadı. Uygulamayı yeniden başlat.",
+        text: "Vault file not found. Please restart the app.",
       };
     case "VaultAlreadyUnlocked":
-      return { kind: "banner", text: "Vault zaten açık." };
+      return { kind: "banner", text: "Vault is already unlocked." };
     case "UnlockInProgress":
-      return { kind: "banner", text: "İşlem devam ediyor." };
+      return { kind: "banner", text: "Operation in progress." };
     case "VaultRecoveryInProgress":
       // Slot is in Slot::Recovering — user must complete the
       // password-reset chained step (recovery-flow.md §4.1) before any
       // unlock attempt. Switch into the `recovery-in-progress` mode so
-      // the user can dispatch `unlock.resume-recovery` via the Devam
-      // et CTA.
+      // the user can dispatch `unlock.resume-recovery` via the
+      // "Continue" CTA.
       return { kind: "recovery-in-progress" };
     case "JoinFailure":
       return {
         kind: "banner",
-        text: "Beklenmeyen hata. Lütfen tekrar dene.",
+        text: "Unexpected error. Please try again.",
       };
   }
 }
@@ -251,20 +251,20 @@ export function Unlock({
   }
 
   // Recovery-in-progress mode: an unlock attempt returned
-  // `VaultRecoveryInProgress`. Render an info banner + Devam et CTA;
+  // `VaultRecoveryInProgress`. Render an info banner + "Continue" CTA;
   // password form is suppressed.
   if (state.kind === "recovery-in-progress") {
     return (
       <CenteredCard>
-        <h1 style={CARD_TITLE_STYLE}>Kurtarma akışı yarıda kaldı.</h1>
+        <h1 style={CARD_TITLE_STYLE}>Recovery flow was interrupted.</h1>
         <p style={CARD_BODY_STYLE}>
-          Önce yeni parolanı belirle, vault'unu yeniden mühürle.
+          Set a new password first, then re-seal your vault.
         </p>
         <div role="alert" style={INFO_BANNER_STYLE}>
-          Kurtarma akışı yarıda kaldı. Önce yeni parolayı belirle.
+          Recovery flow was interrupted. Set a new password first.
         </div>
         <button type="button" onClick={onResumeRecovery} style={ctaStyle(false)}>
-          <span>Devam et</span>
+          <span>Continue</span>
         </button>
       </CenteredCard>
     );
@@ -300,29 +300,29 @@ export function Unlock({
   return (
     <CenteredCard>
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
-      <h1 style={CARD_TITLE_STYLE}>Vault'unu aç.</h1>
-      <p style={CARD_BODY_STYLE}>Parolanı gir, devam et.</p>
+      <h1 style={CARD_TITLE_STYLE}>Unlock your vault.</h1>
+      <p style={CARD_BODY_STYLE}>Enter your password to continue.</p>
       <form style={FORM_STYLE} onSubmit={onSubmit} noValidate>
         <input
           type="password"
-          placeholder="Parolan"
+          placeholder="Password"
           value={password}
           onChange={(e) => dispatch({ type: "set-password", value: e.currentTarget.value })}
           disabled={decrypting}
           autoFocus
           autoComplete="current-password"
           style={INPUT_STYLE}
-          aria-label="Parolan"
+          aria-label="Password"
           aria-invalid={error != null ? true : undefined}
         />
         {error != null && <DestructiveBanner>{error}</DestructiveBanner>}
         <button type="submit" disabled={submitDisabled} style={ctaStyle(submitDisabled)}>
           {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
-          <span>{decrypting ? "Decrypting…" : "Aç"}</span>
+          <span>{decrypting ? "Decrypting…" : "Unlock"}</span>
         </button>
         {!decrypting && (
           <button type="button" onClick={onStartRecovery} style={RECOVER_LINK_STYLE}>
-            Parolanı mı unuttun? Recovery phrase ile aç
+            Forgot your password? Unlock with recovery phrase
           </button>
         )}
       </form>
