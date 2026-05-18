@@ -12,6 +12,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { appDataDir, join } from "@tauri-apps/api/path";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "../primitives/Button";
 import { ControlBlock } from "./ControlBlock";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
@@ -29,7 +30,15 @@ function resolveVaultPath(): Promise<string> {
   return vaultPathPromise;
 }
 
+const PATH_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "stretch",
+  gap: "var(--space-2)",
+};
+
 const PATH_DISPLAY_STYLE: CSSProperties = {
+  flex: 1,
   display: "block",
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
@@ -71,7 +80,24 @@ export function StoragePanel() {
       <ControlBlock
         label="Vault location"
         helper="Copy this path to back up your vault manually. The folder contains an encrypted vault.meta file plus per-note .myn blobs."
-        control={<code style={PATH_DISPLAY_STYLE}>{vaultPath}</code>}
+        control={
+          <div style={PATH_ROW_STYLE}>
+            <code style={PATH_DISPLAY_STYLE}>{vaultPath}</code>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (vaultPath === "…" || vaultPath === "Path unavailable") return;
+                void openPath(vaultPath).catch(() => {
+                  /* opener-plugin failure is non-fatal — the path is
+                   * already shown for manual copy/paste. */
+                });
+              }}
+              disabled={vaultPath === "…" || vaultPath === "Path unavailable"}
+            >
+              Open in Files
+            </Button>
+          </div>
+        }
       />
 
       <ControlBlock

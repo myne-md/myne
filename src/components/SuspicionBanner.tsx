@@ -39,9 +39,9 @@ const GRAY_STYLE: CSSProperties = {
 
 const COPY_FOR_REASON: Record<SuspicionReason, string> = {
   "vault-meta-changed-externally":
-    "Vault başka bir oturumda değişti — yeniden açın.",
+    "Vault was modified in another session — please unlock again.",
   "vault-locked-during-change":
-    "Şifre değişikliği iptal edildi: kilit atıldı.",
+    "Password change cancelled: vault was locked.",
 };
 
 export function SuspicionBanner({ reason }: SuspicionBannerProps) {

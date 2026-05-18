@@ -82,7 +82,7 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
     case "VaultNotFound":
       return {
         kind: "banner-retry",
-        banner: "Vault dosyası bulunamadı. Uygulamayı yeniden başlat.",
+        banner: "Vault file not found. Please restart the app.",
       };
     case "VaultAlreadyUnlocked":
       // Stage-transition bug-canary: user shouldn't reach phrase-entry
@@ -96,19 +96,19 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
     case "RecoveryInProgress":
       return {
         kind: "banner-retry",
-        banner: "İşlem devam ediyor. Lütfen biraz bekle.",
+        banner: "Operation in progress. Please wait.",
       };
     case "VaultRecoveryRequiresActiveSession":
-      // Defansif — A8d cannot produce this variant in practice
+      // Defensive — A8d cannot produce this variant in practice
       // (it's an A8f precondition). Treat as generic banner.
       return {
         kind: "banner-retry",
-        banner: "Beklenmeyen hata. Lütfen tekrar dene.",
+        banner: "Unexpected error. Please try again.",
       };
     case "JoinFailure":
       return {
         kind: "banner-retry",
-        banner: "Beklenmeyen hata. Lütfen tekrar dene.",
+        banner: "Unexpected error. Please try again.",
       };
   }
 }

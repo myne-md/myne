@@ -214,7 +214,7 @@ export function PasswordChangeForm({
           onClick={handleSubmit}
           disabled={!submitReady || inFlight}
         >
-          {inFlight ? "Parola değiştiriliyor…" : "Change password"}
+          {inFlight ? "Changing password…" : "Change password"}
         </Button>
       </div>
     </div>

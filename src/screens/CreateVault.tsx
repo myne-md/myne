@@ -232,7 +232,7 @@ export function CreateVault({
   const handleAutoUnlock = async () => {
     const password = passwordRef.current;
     if (!password || !HAS_TAURI) {
-      // Defansif (web dev or test-step path with no real password).
+      // Defensive (web dev or test-step path with no real password).
       passwordRef.current = null;
       onAutoUnlockFailed();
       return;

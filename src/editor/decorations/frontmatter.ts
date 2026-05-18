@@ -1,0 +1,242 @@
+// Frontmatter Properties widget — Obsidian-style key/value rendering.
+//
+// Per the v1 dogfood addendum (post-grill α+R1 revisit): the raw YAML
+// styled-block was replaced with a Properties widget that renders each
+// `^([key]):[ \t]*(value)$` line as an editable row (icon + key label +
+// text input). The Properties widget is ALWAYS shown when frontmatter
+// exists — there is no cursor-aware reveal escape hatch in v1; users
+// edit via the inputs + the "+ Add property" button. Multi-line /
+// nested YAML survives in the source byte-stably but is not surfaced
+// in the widget — those values land in a follow-up typed-values PRD.
+//
+// Block-level decoration: CodeMirror 6 requires `Decoration.replace`
+// with `block: true` to be provided through a `StateField`, not a
+// `ViewPlugin`. The state field re-derives its decoration set on every
+// transaction; cheap because `cachedLocateFrontmatter` is `WeakMap`-keyed
+// on the `Text` ref and skips on non-doc transactions.
+
+import {
+  type Extension,
+  type Range,
+  RangeSetBuilder,
+  StateField,
+} from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  WidgetType,
+} from "@codemirror/view";
+import { cachedLocateFrontmatter } from "../frontmatter-cache";
+import {
+  parseSimpleProperties,
+  type SimpleProperty,
+} from "../frontmatter-properties";
+
+class PropertiesWidget extends WidgetType {
+  constructor(private readonly properties: readonly SimpleProperty[]) {
+    super();
+  }
+
+  eq(other: PropertiesWidget): boolean {
+    if (other.properties.length !== this.properties.length) return false;
+    for (let i = 0; i < this.properties.length; i++) {
+      const a = this.properties[i]!;
+      const b = other.properties[i]!;
+      if (a.key !== b.key || a.value !== b.value) return false;
+    }
+    return true;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const container = document.createElement("div");
+    container.className = "cm-fm-properties";
+
+    const title = document.createElement("div");
+    title.className = "cm-fm-properties-title";
+    title.textContent = "Properties";
+    container.appendChild(title);
+
+    const list = document.createElement("div");
+    list.className = "cm-fm-properties-list";
+    container.appendChild(list);
+
+    for (const prop of this.properties) {
+      list.appendChild(this.renderRow(view, prop));
+    }
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "cm-fm-properties-add";
+    addBtn.textContent = "+ Add property";
+    addBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      this.addProperty(view);
+    });
+    container.appendChild(addBtn);
+
+    return container;
+  }
+
+  /** CM6 contract: returning `true` tells the view "this event belongs to
+   * the widget — leave it alone." Returning `false` would route the event
+   * back into the editor (cursor moves to the widget's source range, no
+   * input focus, no typing). For an editable Properties UI we want the
+   * widget's own DOM (inputs, button) to receive clicks + keystrokes,
+   * not CM6's content layer. */
+  ignoreEvent(): boolean {
+    return true;
+  }
+
+  private renderRow(view: EditorView, prop: SimpleProperty): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "cm-fm-properties-row";
+
+    const icon = document.createElement("span");
+    icon.className = "cm-fm-properties-icon";
+    icon.textContent = "≡";
+    row.appendChild(icon);
+
+    const keyInput = document.createElement("input");
+    keyInput.type = "text";
+    keyInput.className = "cm-fm-properties-key";
+    keyInput.value = prop.key;
+    keyInput.spellcheck = false;
+    keyInput.autocomplete = "off";
+    keyInput.addEventListener("change", () => {
+      this.commitKey(view, prop.key, keyInput.value);
+    });
+    keyInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        keyInput.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        keyInput.value = prop.key;
+        keyInput.blur();
+      }
+    });
+    row.appendChild(keyInput);
+
+    const valueInput = document.createElement("input");
+    valueInput.type = "text";
+    valueInput.className = "cm-fm-properties-value";
+    valueInput.value = prop.value;
+    valueInput.spellcheck = false;
+    valueInput.autocomplete = "off";
+    valueInput.addEventListener("change", () => {
+      this.commitValue(view, prop.key, valueInput.value);
+    });
+    valueInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        valueInput.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        valueInput.value = prop.value;
+        valueInput.blur();
+      }
+    });
+    row.appendChild(valueInput);
+
+    return row;
+  }
+
+  private commitKey(view: EditorView, oldKey: string, nextKeyRaw: string): void {
+    const nextKey = nextKeyRaw.trim();
+    if (nextKey === oldKey) return;
+    // Reject empty / whitespace / non-simple keys — the
+    // `parseSimpleProperties` regex (`^[a-zA-Z0-9_-]+$`) anchors what's
+    // considered a valid simple-property key. Anything else stays on
+    // disk byte-for-byte in the YAML body, but can't be re-typed in
+    // the widget (would shadow the key parse + break the next render).
+    if (nextKey === "" || !/^[a-zA-Z0-9_-]+$/.test(nextKey)) return;
+    const range = cachedLocateFrontmatter(view.state.doc);
+    if (range === null) return;
+    const doc = view.state.doc.toString();
+    const props = parseSimpleProperties(doc, range);
+    const live = props.find((p) => p.key === oldKey);
+    if (live === undefined) return;
+    // Reject collision with another existing key — would produce
+    // duplicate YAML keys, undefined parse behavior.
+    if (props.some((p) => p !== live && p.key === nextKey)) return;
+    view.dispatch({
+      changes: {
+        from: live.lineFrom,
+        to: live.lineFrom + oldKey.length,
+        insert: nextKey,
+      },
+      userEvent: "frontmatter.rename-key",
+    });
+  }
+
+  private commitValue(view: EditorView, key: string, next: string): void {
+    // Resolve the live value range against the current doc — the
+    // captured property snapshot may be stale if other edits ran since
+    // the widget was rendered. Re-parse from the cached frontmatter
+    // range, find the matching key, replace just the value bytes.
+    const range = cachedLocateFrontmatter(view.state.doc);
+    if (range === null) return;
+    const doc = view.state.doc.toString();
+    const live = parseSimpleProperties(doc, range).find((p) => p.key === key);
+    if (live === undefined) return;
+    if (live.value === next) return;
+    view.dispatch({
+      changes: { from: live.valueFrom, to: live.valueTo, insert: next },
+      userEvent: "frontmatter.set-value",
+    });
+  }
+
+  private addProperty(view: EditorView): void {
+    const range = cachedLocateFrontmatter(view.state.doc);
+    if (range === null) return;
+    const doc = view.state.doc.toString();
+    const existing = new Set(
+      parseSimpleProperties(doc, range).map((p) => p.key),
+    );
+    let key = "property";
+    let n = 1;
+    while (existing.has(key)) {
+      key = `property${n++}`;
+    }
+    const insertion = `${key}: \n`;
+    view.dispatch({
+      changes: { from: range.bodyEnd, insert: insertion },
+      userEvent: "frontmatter.add-property",
+    });
+  }
+}
+
+function buildFrontmatterDecorations(
+  state: { doc: Parameters<typeof cachedLocateFrontmatter>[0] },
+): DecorationSet {
+  const range = cachedLocateFrontmatter(state.doc);
+  if (range === null) return Decoration.none;
+  const props = parseSimpleProperties(state.doc.toString(), range);
+  const decorations: Array<Range<Decoration>> = [
+    Decoration.replace({
+      widget: new PropertiesWidget(props),
+      block: true,
+    }).range(range.blockStart, range.blockEnd),
+  ];
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const d of decorations) builder.add(d.from, d.to, d.value);
+  return builder.finish();
+}
+
+const frontmatterField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildFrontmatterDecorations(state);
+  },
+  update(decorations, tr) {
+    if (!tr.docChanged) return decorations;
+    return buildFrontmatterDecorations(tr.state);
+  },
+  provide(field) {
+    return EditorView.decorations.from(field);
+  },
+});
+
+export function frontmatterDecorations(): Extension {
+  return frontmatterField;
+}

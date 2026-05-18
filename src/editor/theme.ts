@@ -1,0 +1,164 @@
+// Myne editor theme — maps all CodeMirror 6 CSS classes used by decorations
+// + floating surfaces to design tokens via `var(--*)` CSS variable
+// references.
+//
+// PRD `editor-mvp-baseline` stories 47-49, 67. No hardcoded color values;
+// OS `prefers-color-scheme` switching happens at the CSS variable layer
+// (`docs/design/colors_and_type.css`) — the editor extension inherits
+// automatically. No JS-side light/dark mode tracking.
+
+import { EditorView } from "@codemirror/view";
+
+export const myneTheme = EditorView.theme({
+  "&": {
+    backgroundColor: "transparent",
+    color: "var(--fg-1)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "14px",
+    lineHeight: "1.7",
+  },
+  ".cm-scroller": {
+    fontFamily: "inherit",
+    lineHeight: "inherit",
+  },
+  ".cm-content": {
+    caretColor: "var(--accent, #2c4a7a)",
+  },
+  "&.cm-focused": {
+    outline: "none",
+  },
+  "&.cm-focused .cm-cursor": {
+    borderLeftColor: "var(--accent, #2c4a7a)",
+  },
+  "&.cm-focused .cm-selectionBackground, ::selection": {
+    backgroundColor: "var(--paper-3, #ece9e2)",
+  },
+
+  // Headings — apply via `Decoration.line` from heading.ts.
+  ".cm-h1": {
+    fontFamily: "var(--font-display, var(--font-sans))",
+    fontSize: "28px",
+    fontWeight: "700",
+    lineHeight: "1.25",
+    letterSpacing: "-0.015em",
+    // No margin/padding on .cm-line — CM6's vertical cursor movement
+    // relies on `coordsAtPos`/`posAtCoords` round-tripping cleanly. Block
+    // spacing on the line wrapper breaks the math; use line-height for
+    // breathing room instead.
+  },
+  ".cm-h2": {
+    fontFamily: "var(--font-display, var(--font-sans))",
+    fontSize: "22px",
+    fontWeight: "700",
+    lineHeight: "1.3",
+  },
+  ".cm-h3": {
+    fontFamily: "var(--font-display, var(--font-sans))",
+    fontSize: "18px",
+    fontWeight: "600",
+    lineHeight: "1.35",
+  },
+  ".cm-h4": {
+    fontFamily: "var(--font-display, var(--font-sans))",
+    fontSize: "16px",
+    fontWeight: "600",
+    lineHeight: "1.4",
+  },
+  ".cm-h5": {
+    fontFamily: "var(--font-display, var(--font-sans))",
+    fontSize: "14px",
+    fontWeight: "600",
+    lineHeight: "1.4",
+  },
+  ".cm-h6": {
+    fontFamily: "var(--font-display, var(--font-sans))",
+    fontSize: "13px",
+    fontWeight: "600",
+    lineHeight: "1.4",
+    color: "var(--fg-2)",
+  },
+
+  // Inline marks — text style classes from emphasis.ts / link.ts / inline-code.ts.
+  ".cm-bold": { fontWeight: "700" },
+  ".cm-italic": { fontStyle: "italic" },
+  ".cm-strike": { textDecoration: "line-through" },
+  ".cm-link": { textDecoration: "underline", color: "var(--accent, #2c4a7a)" },
+  ".cm-inline-code": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.95em",
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    padding: "1px 4px",
+    borderRadius: "var(--radius-1, 3px)",
+  },
+
+  // Block decorations — line classes from blockquote.ts / frontmatter.ts.
+  ".cm-blockquote": {
+    borderLeft: "3px solid var(--line-2, #c8c7c1)",
+    paddingLeft: "14px",
+    color: "var(--fg-2)",
+    fontStyle: "italic",
+  },
+  ".cm-frontmatter": {
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "12px",
+    color: "var(--fg-2)",
+    paddingLeft: "12px",
+  },
+
+  // Horizontal-rule replacement widget from horizontal-rule.ts.
+  ".cm-hr": {
+    display: "inline-block",
+    width: "100%",
+    height: "1px",
+    backgroundColor: "var(--line-1, #d8d5cc)",
+    verticalAlign: "middle",
+  },
+
+  // Task checkbox widget from task-list.ts.
+  ".cm-task-checkbox": {
+    display: "inline-block",
+    width: "14px",
+    height: "14px",
+    border: "1.5px solid var(--line-2, #c8c7c1)",
+    borderRadius: "var(--radius-1, 3px)",
+    backgroundColor: "var(--paper, #faf8f3)",
+    verticalAlign: "middle",
+    cursor: "pointer",
+  },
+  ".cm-task-checkbox-checked": {
+    backgroundColor: "var(--accent, #2c4a7a)",
+    borderColor: "var(--accent, #2c4a7a)",
+    backgroundImage:
+      "linear-gradient(45deg, transparent 40%, var(--accent-on, #fff) 40%, var(--accent-on, #fff) 60%, transparent 60%)",
+  },
+
+  // Wikilink chip widget from wikilink/chip-widget.ts.
+  ".cm-wikilink-chip": {
+    display: "inline-block",
+    padding: "2px 8px",
+    margin: "0 1px",
+    borderRadius: "var(--radius-2, 6px)",
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    border: "1px solid var(--line-1, #d8d5cc)",
+    color: "var(--fg-1)",
+    fontWeight: "500",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    cursor: "pointer",
+    verticalAlign: "baseline",
+  },
+  ".cm-wikilink-chip:hover": {
+    backgroundColor: "var(--paper-3, #ece9e2)",
+  },
+  ".cm-wikilink-chip-embed": {
+    backgroundColor: "var(--paper-3, #ece9e2)",
+    fontStyle: "italic",
+  },
+
+  // Floating UI (slash menu / selection toolbar / URL overlay) styles
+  // live in `floating-styles.ts` as global CSS — they mount to
+  // document.body to escape ancestor containing-block context, so CM6's
+  // theme scoping (which prefixes all selectors with the editor's theme
+  // class) doesn't reach them.
+});

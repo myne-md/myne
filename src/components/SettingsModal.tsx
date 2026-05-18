@@ -245,7 +245,7 @@ export function SettingsModal({
     account: (
       <AccountPanel
         onChangePasswordSuccess={() => {
-          onShowToast?.("Parola güncellendi");
+          onShowToast?.("Password updated");
           onClose();
         }}
         onInFlightChange={setChildInFlight}

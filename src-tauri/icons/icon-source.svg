@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- 1024x1024 source icon for `pnpm tauri icon`. Wider transparent
+       padding (~15% on each side; artwork ~720x720 of the 1024 canvas)
+       so the rendered icon visually matches surrounding modern macOS
+       apps (Obsidian, Linear, etc.) instead of looking outsized in the
+       dock. macOS Sonoma+ Liquid Glass overlays + dock shadow get a
+       proper bleed zone outside the rounded-square clip. The same SVG
+       drives Windows .ico and Linux icons via Tauri's converter; the
+       .icns file embeds all required Apple sizes (16/32/64/128/256/512/
+       1024 + @2x). -->
+  <rect x="152" y="152" width="720" height="720" rx="168" fill="#1a1a17"/>
+  <path d="M300 700 V324 L512 510 L724 324 V700"
+        stroke="#fbfbfa"
+        stroke-width="56"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>

@@ -70,10 +70,10 @@ export type RecoverSubStep = "phrase-entry" | "decrypting" | "password-reset";
  * - `"vault-meta-changed-externally"` — backend returned `VaultMetaChangedExternally`
  *   (CAS mismatch — another instance committed a competing rewrite).
  *   Banner copy LITERAL (`decisions.md` 2026-05-06):
- *   `"Vault başka bir oturumda değişti — yeniden açın."` Red severity.
+ *   `"Vault was modified in another session — please unlock again."` Red severity.
  * - `"vault-locked-during-change"` — backend returned `VaultLockedDuringChange`
  *   (user fired vault_lock during the Argon2id window; informational).
- *   Banner copy LITERAL: `"Şifre değişikliği iptal edildi: kilit atıldı."`
+ *   Banner copy LITERAL: `"Password change cancelled: vault was locked."`
  *   Informational gray severity.
  *
  * `InvalidVaultMeta` (the third change-password force-relock variant)
@@ -119,7 +119,7 @@ export type Action =
    * create-vault → unlock(Exists). **Auto-unlock failure path.** The
    * vault was created (commit ok) but the chained `vault_unlock`
    * call rejected — the user lands on the unlock screen and retypes
-   * the password manually. Defansif: should not trigger in normal
+   * the password manually. Defensive: should not trigger in normal
    * flow because the same password just succeeded inside `commit`.
    */
   | { type: "create-vault.commit-success" }
@@ -150,7 +150,7 @@ export type Action =
   | { type: "unlock.start-recovery" }
   /**
    * unlock → recover(password-reset). Resume entry: user clicked the
-   * "Devam et" CTA on the `VaultRecoveryInProgress` banner — runtime
+   * "Continue" CTA on the `VaultRecoveryInProgress` banner — runtime
    * slot is `Recovering`, A8d already succeeded last (sub)session.
    */
   | { type: "unlock.resume-recovery" }

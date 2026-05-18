@@ -26,12 +26,16 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { CMEditor } from "../editor/CMEditor";
+import { CommandPalette } from "../components/CommandPalette";
+import type { CommandContext } from "../commands";
 import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
@@ -56,7 +60,7 @@ const STATUS_TEXT_STYLE: CSSProperties = {
 interface EditorProps {
   /**
    * Callback invoked when the Editor mount guard fires (slot empty
-   * despite Stage = `editor`) and the user clicks the "Kilitle" CTA
+   * despite Stage = `editor`) and the user clicks the "Lock" CTA
    * on the resulting `<FailClosedError reason="invalid-state" />`.
    * The parent (App.tsx) is responsible for re-probing
    * `vault_status` and routing to welcome/unlock based on the result.
@@ -215,6 +219,7 @@ function EditorChrome({
   const ctx = useSelectedNote();
   const [content, setContent] = useState<string>("");
   const [bodyLoading, setBodyLoading] = useState<boolean>(false);
+  const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
 
   // Selection-change → load body via `noteRead`. The ID is the
   // canonical reload trigger; if it stays stable across renders we
@@ -254,7 +259,7 @@ function EditorChrome({
     };
   }, [ctx.selectedId]);
 
-  const autosave = useAutosave(ctx.selectedId, content);
+  const autosave = useAutosave(ctx.selectedId, content, undefined, setContent);
 
   // After every successful save, refresh the sidebar entry for that
   // note so a title/H1 edit in the editor body propagates to the row
@@ -347,8 +352,10 @@ function EditorChrome({
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100vh",
+        height: "100%",
         background: "var(--bg-1)",
+        flex: 1,
+        minHeight: 0,
       }}
     >
       <div
@@ -367,6 +374,11 @@ function EditorChrome({
           onBlur={handleEditorBlur}
           loading={bodyLoading}
           hasSelection={ctx.selectedId !== null}
+          noteTitle={
+            ctx.selectedId === null
+              ? null
+              : ctx.cache.get(ctx.selectedId)?.title ?? null
+          }
           onCreateNote={() => {
             void ctx.createAndStartRename().catch(() => {});
           }}
@@ -386,9 +398,99 @@ function EditorChrome({
         onShowToast={setToastMessage}
         onForceRelock={onForceRelock}
       />
+      <CommandPaletteHost
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onOpenSettings={() => {
+          setPaletteOpen(false);
+          setSettingsOpen(true);
+        }}
+        onLockFlushed={async () => {
+          setPaletteOpen(false);
+          await handleLockFlushed();
+        }}
+      />
+      <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
       <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
     </div>
   );
+}
+
+/**
+ * Builds the `CommandContext` from `useSelectedNote` + parent callbacks
+ * and renders the `<CommandPalette>`. Lives inside `<SidebarStateProvider>`
+ * so the note title cache is reachable for the "Switch to note…"
+ * sub-palette.
+ */
+type CommandPaletteHostProps = {
+  open: boolean;
+  onClose: () => void;
+  onOpenSettings: () => void;
+  onLockFlushed: () => Promise<void>;
+};
+
+function CommandPaletteHost({
+  open,
+  onClose,
+  onOpenSettings,
+  onLockFlushed,
+}: CommandPaletteHostProps) {
+  const ctx = useSelectedNote();
+  const titles = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const [id, rec] of ctx.cache.entries()) m.set(id, rec.title);
+    return m;
+  }, [ctx.cache]);
+  const commandCtx: CommandContext = useMemo(
+    () => ({
+      stageName: "editor",
+      noteTitles: titles,
+      selectedNoteId: ctx.selectedId,
+      onLock: onLockFlushed,
+      onOpenSettings,
+      onSelectNote: async (id) => {
+        await ctx.open(id).catch(() => {
+          /* selection failure surfaces via sidebar UX */
+        });
+      },
+    }),
+    [titles, ctx.selectedId, ctx.open, onLockFlushed, onOpenSettings],
+  );
+  return <CommandPalette open={open} onClose={onClose} ctx={commandCtx} />;
+}
+
+/**
+ * Global `Cmd+K` / `Ctrl+K` window-level keydown listener for opening
+ * the command palette. Sits outside the editor's CM6 keymap so it works
+ * regardless of which pane has focus (sidebar, settings rail, etc.).
+ */
+function CommandPaletteHotkey({ onToggle }: { onToggle: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key !== "k" && e.key !== "K") return;
+      // Skip when typing inside an input or contenteditable field whose
+      // intent is to capture all keystrokes (e.g., rename input, URL
+      // overlay input). Editor's contentDOM IS contenteditable but the
+      // palette should still open from there — special-case by checking
+      // for the `.cm-content` class.
+      const target = e.target as HTMLElement | null;
+      if (target !== null) {
+        const tag = target.tagName.toLowerCase();
+        if (
+          (tag === "input" || tag === "textarea") &&
+          !target.classList.contains("cm-content")
+        ) {
+          return;
+        }
+      }
+      e.preventDefault();
+      onToggle();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onToggle]);
+  return null;
 }
 
 /**
@@ -446,6 +548,7 @@ interface CenterPaneProps {
   onBlur: () => void;
   loading: boolean;
   hasSelection: boolean;
+  noteTitle: string | null;
   onCreateNote: () => void;
 }
 
@@ -455,8 +558,12 @@ function CenterPane({
   onBlur,
   loading,
   hasSelection,
+  noteTitle,
   onCreateNote,
 }: CenterPaneProps) {
+  const isTitleEmpty = noteTitle === null || noteTitle.trim() === "";
+  const headerLabel = !hasSelection ? "" : isTitleEmpty ? "Untitled" : noteTitle;
+  const headerIsItalic = hasSelection && isTitleEmpty;
   return (
     <main
       style={{
@@ -475,9 +582,10 @@ function CenterPane({
           borderBottom: "1px solid var(--line-1)",
           fontSize: 12,
           color: "var(--fg-2)",
+          fontStyle: headerIsItalic ? "italic" : "normal",
         }}
       >
-        Untitled
+        {headerLabel}
       </div>
 
       <div
@@ -485,7 +593,7 @@ function CenterPane({
           flex: 1,
           minHeight: 0,
           overflow: "auto",
-          padding: "32px 64px",
+          padding: "32px 24px",
         }}
       >
         {!hasSelection ? (
@@ -494,19 +602,13 @@ function CenterPane({
           <CenterPaneLoading />
         ) : (
           <div style={{ maxWidth: 680, margin: "0 auto" }}>
-            <textarea
+            <CMEditor
               value={content}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={onChange}
               onBlur={onBlur}
-              placeholder="Start typing…"
-              spellCheck={false}
               style={{
                 width: "100%",
                 minHeight: 360,
-                border: 0,
-                outline: 0,
-                resize: "none",
-                background: "transparent",
                 color: "var(--fg-1)",
                 fontFamily: "var(--font-mono)",
                 fontSize: 14,
@@ -675,7 +777,7 @@ function BottomBar({
           }}
         >
           <Icon name="lock" size={12} />
-          <span>Kilitle</span>
+          <span>Lock</span>
         </button>
         <span
           style={{

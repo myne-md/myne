@@ -189,6 +189,12 @@ The code-editor framework used as the markdown editor in Myne's Phase 1 desktop 
 
 Used in: `vision.md` Phase 1 Scope
 
+### **command palette** &nbsp; 📦 *Product*
+
+Global keyboard-first action launcher in the Phase 1 desktop client, opened via `Cmd+K` / `Ctrl+K`. Renders a centered modal with a fuzzy-match input + scrollable action list; ArrowUp/Down navigates, Enter runs the highlighted action, Esc dismisses. v1 ships five actions across Vault / App / Navigation / Editor categories: Lock vault, Open settings, Switch to note (transitions into a note-picker sub-palette), Import Obsidian vault (disabled stub for Phase 1.x), Convert wikilinks in this note (disabled stub for `editor-mvp-wikilinks`). Action visibility respects the current `Stage` — non-editor stages hide editor-only actions; the palette never exposes actions unavailable in the current state. The action registry is a frozen `readonly CommandAction[]`; no plugin / scripting API is introduced (acceptance criterion enforced structurally). Distinct from the editor's **slash command** menu, which is editor-internal (cursor-anchored) and bound to insertable markdown elements.
+
+Used in: `myne-agents/features/editor-mvp-baseline/prd.md` (T7), `src/commands/`
+
 ### **compelled lawful access** &nbsp; ⚠️ *Threat*
 
 Adversary class A2: subpoena, court order, national security letter, or other legal compulsion forcing the operator to disclose user data. Myne's strong guarantee against A2 is architectural — the server cannot disclose what it does not possess. The disclosure-forced set is limited to ciphertext blobs, hashed account numbers, transient connection IPs, version counters, and aggregate storage size.
@@ -688,6 +694,12 @@ A non-secret, per-vault random value mixed into KDF input to prevent precomputat
 
 Used in: `spec/protocol.md` §3.1
 
+### **selection toolbar** &nbsp; 📦 *Product*
+
+The floating UI surface that appears above an active text selection in the Phase 1 editor, exposing format actions (bold / italic / strikethrough / inline-code / link / heading dropdown). Positioning uses the shared `src/editor/positioning.ts` helper — `getBoundingClientRect` + viewport-edge clamp + flip-below-when-no-room-above. The 🔗 (link) button opens an **inline URL overlay** adjacent to the selection rather than a `window.prompt()` or modal, matching `PRODUCT.md`'s "modals not as first reach for interaction" anti-pattern. Implemented as a CodeMirror 6 `ViewPlugin` that mounts/unmounts the toolbar React subtree based on selection state; absent when the selection is empty.
+
+Used in: `myne-agents/features/editor-mvp-baseline/prd.md`, `myne-agents/sessions/grill/2026-05-16-mynd-36-editor-inner-scope.md` Q4 + Q8
+
 ### **self-host** &nbsp; 📦 *Product*
 
 User-operated deployment of the Myne sync server. First-class in the product plan: same protocol, same security properties as hosted sync. The protocol treats hosted and self-hosted servers as identical trust boundaries (TB5) — the operator does not see plaintext in either case.
@@ -724,6 +736,12 @@ Reference: FIPS 180-4.
 The 512-bit Secure Hash Algorithm 2. **Not used by Myne** — referenced only when explaining the standard BIP-39 derivation (PBKDF2-HMAC-SHA512) that Myne explicitly avoids.
 
 Used in: `spec/protocol.md` §7.1
+
+### **slash command** &nbsp; 📦 *Product*
+
+The keystroke-driven menu of insertable elements in the Phase 1 editor, triggered by typing `/` (suppressed inside fenced code block ranges, inline link URL portions, and wikilink ranges so `/` remains content in those contexts). The menu is a fuzzy-match floating list — type `/h1`, `/h`, or `/heading 1` to surface H1; Enter applies, Esc dismisses. `editor-mvp-baseline` ships 11 commands: `/h1`-`/h6`, `/quote`, `/divider`, `/link`, `/bullet`, `/numbered`, `/todo`. **`/wiki` is explicitly excluded** from the baseline set — it ships in `editor-mvp-wikilinks` alongside the autocomplete picker, because the menu should only surface element kinds the editor authoring layer can actually deliver. `/table`, `/code`, `/footnote`, `/callout` ship in their owning sub-feature PRDs.
+
+Used in: `myne-agents/features/editor-mvp-baseline/prd.md`, `myne-agents/sessions/grill/2026-05-16-mynd-36-editor-inner-scope.md` Q2
 
 ### **sidebar batch refresh** &nbsp; 📦 *Product*
 
@@ -851,6 +869,12 @@ Reference: https://vite.dev
 Myne's first-class internal-link syntax: `[[…]]`-bracketed references that resolve against the current vault and render as atomic chip widgets in the editor. Recognized forms include title-only (`[[Note]]`), aliased (`[[Note|Display]]`), heading-anchored (`[[Note#Heading]]`), block-referenced (`[[Note^block-id]]`), path-encoded (`[[vault/relative/path.md|Display]]`), and embed prefixes (`![[Note]]`, `![[image.png]]`). Full grammar in `spec/wikilink.md`. **Myne-divergent from Obsidian conventions in two load-bearing ways:** (1) new Myne-authored wikilinks emit the **path-with-alias** form `[[vault/relative/path.md|Display Title]]` rather than the title-only form, making every Myne-authored wikilink self-resolvable from the markdown alone — improving the wedge sentence from "plain markdown after decryption" to "*resolvable* plain markdown after decryption"; (2) imported Obsidian wikilinks are preserved byte-for-byte (hard rule C1) and coexist indefinitely with Myne-authored path forms. Decoration treats both forms identically as atomic chips; click-resolution differs (title-only via vault-index lookup; path-form follows directly). Auto-update on rename preserves syntactic shape — never promotes form. The manual conversion command (R2 in `wikilink.md` §7) is the only sanctioned migration path from imported title-only to path-form. Wikilinks are **not** standard markdown; no CommonMark / GFM / Pandoc / Djot dialect natively defines them.
 
 Used in: `spec/wikilink.md`, `spec/markdown-dialect.md` §3.5, `vision.md` Phase 1 Scope
+
+### **wikilink chip** &nbsp; 📦 *Product*
+
+The atomic-range rendered widget representing a **wikilink** (`[[Note]]`, `[[Note|Display]]`, `[[Note#Heading]]`, `[[Note^block-id]]`, `[[path.md|Alias]]`, `![[Embed]]`) inside the Phase 1 editor surface. Implemented as a CodeMirror 6 `Decoration.replace` paired with `EditorView.atomicRanges` registration so cursor navigation, selection extension, and Backspace / Delete treat each chip as a single indivisible unit. Unlike other inline-mark decorations, chips do **not** lift on cursor entry — they stay rendered regardless of cursor position; the underlying `[[...]]` source remains in the buffer byte-for-byte. `editor-mvp-baseline` ships chip **rendering** (visual + atomic-range behavior); the authoring layer (autocomplete picker, hover-tooltip path resolution, manual conversion, auto-update on rename) lands in `editor-mvp-wikilinks`.
+
+Used in: `myne-agents/features/editor-mvp-baseline/prd.md`, `spec/wikilink.md` §5.4, `myne-agents/sessions/grill/2026-05-16-mynd-36-editor-inner-scope.md` Q6
 
 ### **wrap key cache** &nbsp; 🗝️ *Key/identifier*
 

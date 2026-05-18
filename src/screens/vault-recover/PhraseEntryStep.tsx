@@ -237,8 +237,8 @@ export function PhraseEntryStep({
     <div style={ROOT_STYLE}>
       <div style={CARD_STYLE}>
         <div style={EYEBROW_STYLE}>Recovery</div>
-        <h1 style={TITLE_STYLE}>Vault'unu kurtar.</h1>
-        <p style={BODY_STYLE}>Recovery phrase'ini gir. 24 BIP-39 kelimesi.</p>
+        <h1 style={TITLE_STYLE}>Recover your vault.</h1>
+        <p style={BODY_STYLE}>Enter your recovery phrase. 24 BIP-39 words.</p>
 
         {state.banner != null && <DestructiveBanner>{state.banner}</DestructiveBanner>}
 
@@ -272,7 +272,7 @@ export function PhraseEntryStep({
 
         <div style={FOOTER_STYLE}>
           <button type="button" onClick={onCancel} style={CANCEL_STYLE}>
-            ← Geri
+            ← Back
           </button>
           <div style={{ flex: 1 }} />
           <button
@@ -281,7 +281,7 @@ export function PhraseEntryStep({
             disabled={!allFilled}
             style={submitStyle(!allFilled)}
           >
-            Aç
+            Unlock
           </button>
         </div>
       </div>

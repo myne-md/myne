@@ -54,8 +54,8 @@ export type NoteCreateError =
   /**
    * `<vault>/notes` exists as a regular file rather than a directory
    * — defensive edge case for OS-level user manipulation of the vault
-   * directory. UI: "Vault directory'nizde 'notes' adlı bir dosya var.
-   * Lütfen kaldırın veya vault'u taşıyın."
+   * directory. UI: "A file named 'notes' exists in your vault directory.
+   * Please remove it or move your vault."
    */
   | { kind: "NotesDirNotADirectory" }
   /**
