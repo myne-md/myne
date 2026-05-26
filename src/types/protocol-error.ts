@@ -87,17 +87,27 @@ export type AppError =
    */
   | { kind: "Io"; detail: IoErrorKind }
   /**
-   * Defensive belt+suspenders guard: `vault.meta` already exists at
-   * the target path. **Expected to NEVER trigger in normal flow.**
-   * Surfaces as a defensive UI message; if a real user sees it, the
-   * frontend `vault_status` startup probe + state machine routing
-   * has been bypassed and the bug is upstream of `commit`. The
-   * alternative (silent overwrite) would destroy the prior vault's
-   * `root_key`, recovery phrase derivation salts, and any sealed
-   * `.myn` blobs irrecoverably. See `app-state-machine` PRD + grill
-   * Q12.
+   * Defensive belt+suspenders guard: a recognized vault artefact is
+   * already present at the target path. Recognized artefacts are
+   * `vault.meta`, `vault.meta.tmp` (mid-write crash leftover), or a
+   * `notes/` directory containing one or more `*.myn` files (orphan
+   * blobs from a partial-fail `vault_delete`). **Expected to NEVER
+   * trigger in normal flow.** Surfaces as a defensive UI message; if
+   * a real user sees it, either (a) the frontend `vault_status`
+   * startup probe + state machine routing has been bypassed (a bug
+   * upstream of `commit`) — the alternative (silent overwrite) would
+   * destroy the prior vault's `root_key`, recovery phrase derivation
+   * salts, and any sealed `.myn` blobs irrecoverably; or (b) a prior
+   * `vault_delete` partial-fail left orphan artefacts the user must
+   * manually clean (v0.2 `vault_repair`, Plane MYND-159, handles
+   * this in-app).
+   *
+   * Renamed from `VaultAlreadyExists` on 2026-05-26 per `decisions.md`
+   * "vault_create defensive guard extension". See `app-state-machine`
+   * PRD + grill Q12 (original variant) + MYND-105 PRD + grill Q7
+   * (semantic broadening).
    */
-  | { kind: "VaultAlreadyExists" };
+  | { kind: "VaultArtifactsPresent" };
 
 /**
  * Type-narrowing helper. `if (isProtocolError(e)) { e.detail.kind ... }`.

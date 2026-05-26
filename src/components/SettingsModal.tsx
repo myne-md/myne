@@ -67,6 +67,15 @@ interface SettingsModalProps {
    * `VaultMetaChangedExternally` / `VaultLockedDuringChange`.
    */
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
+  /**
+   * Fired by AccountPanel after a successful `vault_delete` IPC OR
+   * after the user clicks Continue on the post-fail banner. Threaded
+   * from Editor → App.tsx, where it dispatches
+   * `editor.delete-vault-success` to transition Stage to welcome.
+   * Editor unmounts; this modal unmounts in cascade. No
+   * `onClose()` call needed here — the unmount cascade closes us.
+   */
+  onDeleteVaultSuccess: () => void;
 }
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -181,6 +190,7 @@ export function SettingsModal({
   onClose,
   onShowToast,
   onForceRelock,
+  onDeleteVaultSuccess,
 }: SettingsModalProps) {
   const [selected, setSelected] = useState<PanelId>("account");
   const [childInFlight, setChildInFlight] = useState(false);
@@ -248,6 +258,7 @@ export function SettingsModal({
           onShowToast?.("Password updated");
           onClose();
         }}
+        onDeleteVaultSuccess={onDeleteVaultSuccess}
         onInFlightChange={setChildInFlight}
         onForceRelock={onForceRelock}
       />

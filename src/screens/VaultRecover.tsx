@@ -36,11 +36,18 @@
 // A8f success. No defensive cleanup, no `beforeunload` listener.
 
 import { useEffect, useReducer, useRef } from "react";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
 import { closeApp } from "../lib/app-window";
 import { ioBanner } from "../lib/io-banner";
 import type { RecoverSubStep } from "../lib/stage";
 import { recoverWithPhrase } from "../lib/vault-recover";
+import {
+  deleteVault,
+  mapDeleteVaultError,
+  type VaultDeleteError,
+} from "../lib/vault-delete";
 import type { VaultRecoveryError } from "../types/vault-recovery-error";
 import {
   vaultRecoverReducer,
@@ -62,6 +69,20 @@ interface VaultRecoverProps {
    *  `recover(password-reset) → editor` via
    *  `recover.complete-success`. */
   onCompleteSuccess: () => void;
+  /**
+   * MYND-108-bis: terminal-destructive transition from the lost-
+   * credentials cul-de-sac. Dispatched when the user submits the
+   * delete-confirm sub-step's typed-DELETE form (vault_delete IPC Ok)
+   * OR clicks Continue after a PartialDelete/Io banner. Routes Stage
+   * `recover → welcome` via `recover.delete-vault-success`. Backend
+   * accepts via `Slot::Empty + vault.meta-exists` no-keys arm
+   * (`decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
+   * extended to accept Slot::Empty + vault.meta-exists"). The
+   * `recovery-flow.md` §4.1 / §4.3 invariants are preserved — the
+   * delete affordance lives ONLY in the phrase-entry footer; the
+   * `PasswordResetStep` chained password reset stays non-dismissible.
+   */
+  onDeleteVaultSuccess: () => void;
 }
 
 /** Map a `VaultRecoveryError` from A8d to a `PhraseOutcome` per the
@@ -117,6 +138,7 @@ export function VaultRecover({
   initialSubStep,
   onCancel,
   onCompleteSuccess,
+  onDeleteVaultSuccess,
 }: VaultRecoverProps) {
   const [state, dispatch] = useReducer(
     vaultRecoverReducer,
@@ -195,5 +217,52 @@ export function VaultRecover({
           onCompleteSuccess={onCompleteSuccess}
         />
       );
+    case "delete-confirm": {
+      // MYND-108-bis: typed-DELETE confirmation form. IPC accepts
+      // via `Slot::Empty + vault.meta-exists` no-keys arm. On Ok or
+      // PartialDelete-Continue, dispatches `recover.delete-vault-success`
+      // through the parent.
+      const handleDeleteSubmit = () => {
+        dispatch({ type: "delete-in-flight" });
+        void (async () => {
+          try {
+            await deleteVault();
+            onDeleteVaultSuccess();
+          } catch (raw) {
+            const e = raw as VaultDeleteError;
+            const base = await appDataDir();
+            const vaultDirPath = await join(base, "vault");
+            const mapping = mapDeleteVaultError(e, vaultDirPath);
+            if (mapping.kind === "partial-fail") {
+              dispatch({
+                type: "delete-partial-fail",
+                context: mapping.context,
+              });
+              return;
+            }
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.warn(
+                "[VaultRecover] vault_delete rejected (UI/router bug indicator):",
+                e,
+              );
+            }
+            dispatch({ type: "delete-bug-canary" });
+          }
+        })();
+      };
+      return (
+        <DeleteVaultConfirmForm
+          onSubmit={handleDeleteSubmit}
+          onCancel={() => dispatch({ type: "cancel-delete" })}
+          onContinueAfterPartial={() => {
+            // Same terminal effect as happy-path Submit.
+            onDeleteVaultSuccess();
+          }}
+          inFlight={state.deleteInFlight}
+          partialFailContext={state.deletePartialFail}
+        />
+      );
+    }
   }
 }

@@ -184,6 +184,25 @@ const CANCEL_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
+// MYND-108-bis: danger-tinted link-style affordance for the lost-
+// credentials cul-de-sac escape. Always visible in phrase-entry
+// (covers both immediate "I lost everything" intent and the
+// try-recovery-then-fail journey). Subdued visual weight relative to
+// CANCEL_STYLE — link-style, not button-style — so it doesn't
+// compete with the primary Unlock CTA.
+const DELETE_LINK_STYLE: CSSProperties = {
+  background: "transparent",
+  border: 0,
+  padding: 0,
+  marginLeft: "var(--space-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "var(--danger)",
+  cursor: "pointer",
+  textDecoration: "underline",
+};
+
 function submitStyle(disabled: boolean): CSSProperties {
   return {
     background: disabled ? "var(--bg-3)" : "var(--accent)",
@@ -273,6 +292,13 @@ export function PhraseEntryStep({
         <div style={FOOTER_STYLE}>
           <button type="button" onClick={onCancel} style={CANCEL_STYLE}>
             ← Back
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "request-delete" })}
+            style={DELETE_LINK_STYLE}
+          >
+            Delete vault and start over
           </button>
           <div style={{ flex: 1 }} />
           <button

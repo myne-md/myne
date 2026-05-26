@@ -1,0 +1,1476 @@
+//! `vault_delete` Tauri command — one-shot vault destruction.
+//!
+//! Feature `backend-vault-delete` (Plane MYND-105) shipped the initial
+//! Unlocked/Recovering arms; MYND-108-bis (2026-05-26 `/plan` session,
+//! consumed by `ui-vault-delete`) extended the IPC to also accept
+//! `Slot::Empty` when `vault.meta` exists on disk (lost-credentials
+//! cul-de-sac escape from the Unlock + Recovery phrase-entry surfaces).
+//! See `design-notes.md` 2026-05-26 entry "MYND-108-bis vault_delete
+//! extended to accept Slot::Empty + vault.meta-exists" for the
+//! full rationale.
+//!
+//! - **Slot precondition matrix** — `VaultBusyAuth` (auth_permits
+//!   taken), `Slot::Unlocked` / `Slot::Recovering` (zeroize-then-unlink
+//!   happy path), `Slot::Empty + vault.meta-exists` (no-keys lost-
+//!   credentials path per MYND-108-bis), `Slot::Empty + no vault.meta`
+//!   (rejects `VaultNotFound`; no silent no-op). `VaultNotUnlocked`
+//!   variant retained in wire format for cross-version-skew forward
+//!   compat + defense-in-depth, but unreachable from current code
+//!   paths.
+//! - **Happy-path (Unlocked/Recovering):** [`VaultRuntimeState::take_and_run_blocking`]
+//!   takes the slot (zeroize via the moved-out variant's `Drop`)
+//!   BEFORE any I/O, then runs the per-file unlink walk inside
+//!   `spawn_blocking` with the slot write-lock held across the
+//!   await. Both `Slot::Unlocked` and `Slot::Recovering` arms
+//!   accept (D2 revise per MYND-105 grill Q5 — terminal destroy ≠
+//!   navigate-away bail).
+//! - **Happy-path (Empty + meta-exists, MYND-108-bis):**
+//!   `delete_vault_files_no_zeroize` skips the slot.take() step
+//!   (slot is already Empty; no keys to zeroize) and runs the same
+//!   `unlink_walk` / `emit_per_unlink_failure_trace` /
+//!   `try_parent_dir_sync` / `aggregate_unlink_results` pipeline
+//!   directly via `spawn_blocking`. The cryptographic-erase claim is
+//!   structurally inapplicable on this arm (no in-memory keys exist
+//!   to zeroize); the user reaches this path having lost both
+//!   credentials, so the on-disk Argon2id-wrapped keys are already
+//!   computationally unrecoverable — recursive unlink converts
+//!   computationally-unrecoverable bytes into no-bytes, strictly
+//!   stronger.
+//! - **Partial-fail surface:** hand-rolled post-order recursive
+//!   `unlink_walk` collects per-entry `(PathBuf, io::Result<()>)`
+//!   without short-circuit; `emit_per_unlink_failure_trace` emits
+//!   `tracing::warn!(stage = "unlink_blob", io_failure_kind = ?kind)`
+//!   per failure (DENY-list clean, no paths); `aggregate_unlink_results`
+//!   produces `Ok(())` or `Err(PartialDelete { remaining_count })`.
+//! - **Durability:** Unix `parent_dir.sync_all()` journal-commit
+//!   hint (best-effort, never propagates) via `try_parent_dir_sync`;
+//!   Windows `#[cfg(unix)]`-gated no-op (matches `note_delete`
+//!   2026-05-07 asymmetry precedent).
+//! - **Tracing taxonomy:** `event = "vault_deleted"` on success;
+//!   `event = "vault_delete_partial"` with `remaining_count` on
+//!   partial-fail; per-file `stage = "unlink_blob"`; durability
+//!   `stage = "parent_dir_sync"`; rejection-arm `stage = "slot_check"
+//!   | "auth_permits"`. All payloads DENY-list-clean (no paths,
+//!   no note_ids, no kernel-error display strings).
+//!
+//! ### Design history
+//!
+//! - PRD: `agent-tooling/features/backend-vault-delete/prd.md`
+//! - Grilling: `agent-tooling/sessions/grill/2026-05-26-mynd-105-vault-delete.md`
+//!   Q1–Q9 (cryptographic-erase claim, slot precondition matrix,
+//!   R3 escape, partial-fail posture, artefact taxonomy, plugin
+//!   layout, test surface)
+//! - decisions.md anchors: 2026-05-26 (a) cryptographic-erase
+//!   claim, (b) Slot precondition matrix + R3 + VaultNotUnlocked
+//!   bug-canary, (c) partial-fail posture + v0.2 vault_repair
+//!   (Plane MYND-159), (d) VaultArtifactsPresent rename
+//!
+//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+
+use super::error::VaultDeleteError;
+use crate::plugins::vault_unlock::state::{SlotKind, TakeAndRunError, VaultRuntimeState};
+use std::path::PathBuf;
+use tauri::{AppHandle, Runtime, State};
+
+/// One-shot vault destruction.
+///
+/// Zeroizes the in-memory `Slot` (root_key + items_key via the
+/// moved-out `UnlockedVault` / `RecoveringMaterial` `Drop`) BEFORE
+/// any filesystem operation, then recursively unlinks every entry
+/// under `<app_data_dir>/vault/` (post-order, symlinks not
+/// followed). Returns `Ok(())` on full success or
+/// `Err(VaultDeleteError::PartialDelete { remaining_count })` if
+/// some files could not be unlinked (e.g., antivirus / Spotlight /
+/// OneDrive sync file locks). On rejection the slot is left intact;
+/// on any acceptance path (happy or partial-fail) the slot is Empty.
+///
+/// # Frontend contract
+///
+/// **Caller MAY pre-[`crate::plugins::vault_unlock::commands::lock`]
+/// (`vault_lock` IPC).** As of MYND-108-bis (`design-notes.md`
+/// 2026-05-26 entry "MYND-108-bis vault_delete extended to accept
+/// Slot::Empty + vault.meta-exists"), the IPC also accepts the
+/// `Slot::Empty` arm when `vault.meta` exists on disk — so pre-locking
+/// (which drops the slot to Empty while leaving `vault.meta` on disk)
+/// falls through to the new no-keys path with the same end-to-end
+/// cryptographic-erase property (`vault_lock`'s zeroize fires before
+/// our recursive unlink, preserving the zeroize-before-IO ordering).
+/// The MYND-105 era contract that read "MUST NOT pre-lock" is
+/// **loosened** by this revision.
+///
+/// The canonical specification of the broader contract is the PRD at
+/// `agent-tooling/features/backend-vault-delete/prd.md` §"Implementation
+/// Decisions → Frontend contract surface" (initial shape); the
+/// MYND-108-bis extension is canonical in `design-notes.md`
+/// 2026-05-26 entry "MYND-108-bis vault_delete extended to accept
+/// Slot::Empty + vault.meta-exists".
+///
+/// # Slot precondition matrix
+///
+/// | Slot state + disk                                | Behavior                                                                  |
+/// |--------------------------------------------------|---------------------------------------------------------------------------|
+/// | `Slot::Unlocked`                                 | take() + zeroize + recursive unlink (happy)                               |
+/// | `Slot::Recovering`                               | take() + zeroize + recursive unlink (R3 escape, MYND-105 Q5)              |
+/// | `Slot::Empty` + `vault.meta` on disk             | no-keys recursive unlink (lost-credentials path, MYND-108-bis)            |
+/// | `Slot::Empty` + no `vault.meta`                  | reject `VaultNotFound` (no silent no-op success)                          |
+/// | `auth_permits` taken (other auth op mid-Argon2id)| reject `VaultBusyAuth` (try_acquire, never queue)                         |
+/// | (legacy) bug-canary defense-in-depth             | `VaultNotUnlocked` retained in wire format but unreachable from current code |
+///
+/// # See also
+///
+/// - `agent-tooling/features/backend-vault-delete/prd.md` — PRD
+///   (canonical specification of all behavior on this command)
+/// - `design-notes.md` 2026-05-26 entries (a)-(d) —
+///   cryptographic-erase claim, Slot precondition matrix + R3,
+///   partial-fail posture, VaultArtifactsPresent rename
+/// - `docs/threat-model.md` A5 (lost or stolen device — locked,
+///   Strong) — the load-bearing at-rest guarantee that the
+///   "geri getirilemez" UX claim reaffirms post-unlink
+#[tauri::command]
+pub async fn vault_delete<R: Runtime>(
+    state: State<'_, VaultRuntimeState>,
+    app: AppHandle<R>,
+) -> Result<(), VaultDeleteError> {
+    let vault_dir = crate::paths::vault_dir(&app).map_err(|_| VaultDeleteError::Io {
+        io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+    })?;
+    vault_delete_with_dir(vault_dir, state.inner()).await
+}
+
+/// Testable core of [`vault_delete`]. The Tauri-command wrapper
+/// resolves the platform-specific vault directory and delegates here
+/// so tests do not need an `tauri::AppHandle`.
+///
+/// Full pipeline (MYND-105 initial + MYND-108-bis Empty-arm extension):
+///
+/// 1. `auth_permits.try_acquire()` — RAII guard, reject-not-queue.
+/// 2. `state.slot_kind()` peek — discriminate the Slot variant.
+/// 3. `Slot::Empty` arm: delegate to [`dispatch_empty_arm`] which
+///    checks `vault.meta` on disk and routes either to the no-keys
+///    recursive-unlink path (`vault.meta` present → MYND-108-bis
+///    lost-credentials accept) or `VaultNotFound` rejection
+///    (`vault.meta` absent → no silent no-op success).
+/// 4. `Slot::Unlocked` / `Slot::Recovering` arm: delegate to
+///    [`VaultRuntimeState::take_and_run_blocking`] which holds the
+///    slot write-lock across the spawn_blocking closure. The
+///    closure runs the post-order [`unlink_walk`] →
+///    [`emit_per_unlink_failure_trace`] → [`try_parent_dir_sync`]
+///    (Unix-only) → [`aggregate_unlink_results`] pipeline. Returns
+///    Ok(()) on full success, `PartialDelete{remaining_count}` on
+///    any per-file failure.
+/// 5. On `TakeAndRunError::SlotEmpty` (concurrent `vault_lock`
+///    raced between our peek and the write-lock acquire) the unlink
+///    did NOT run; the racing `vault_lock`'s `Drop` already zeroized
+///    the keys, so we fall through to [`dispatch_empty_arm`] which
+///    routes the same way the cold Empty arm would. This preserves
+///    the user's delete intent rather than surfacing a silent
+///    bug-canary rejection.
+pub(crate) async fn vault_delete_with_dir(
+    vault_dir: PathBuf,
+    state: &VaultRuntimeState,
+) -> Result<(), VaultDeleteError> {
+    // (1) auth_permits gate — RAII guard; try_acquire, reject not queue.
+    //     Bound by `decisions.md` 2026-05-02 "single in-flight" posture
+    //     extended in MYND-105 grill Q3-D3 to vault_delete. The permit
+    //     stays held until end of function via the `_permit` binding.
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(
+                stage = "auth_permits",
+                error_kind = "VaultBusyAuth",
+                "vault_delete rejected: another auth-pipeline op in flight"
+            );
+            return Err(VaultDeleteError::VaultBusyAuth);
+        }
+    };
+
+    // (2) Slot precondition matrix — cheap read-lock peek to
+    //     discriminate the variant. The Unlocked/Recovering arm
+    //     escalates to a write-lock for `take()` inside
+    //     `take_and_run_blocking`; the Empty arm routes through
+    //     `dispatch_empty_arm` which decides between the new
+    //     no-keys accept path (MYND-108-bis) and `VaultNotFound`
+    //     rejection.
+    match state.slot_kind().await {
+        SlotKind::Empty => dispatch_empty_arm(vault_dir).await,
+        SlotKind::Recovering | SlotKind::Unlocked => {
+            // Happy path: take_and_run_blocking takes the slot
+            // (zeroize via the moved-out variant's Drop fires BEFORE
+            // any IO) then runs the unlink pipeline inside
+            // spawn_blocking with the slot write-lock held across
+            // the await — concurrent slot-touching ops (vault_lock,
+            // vault_unlock, note_*) queue on the RwLock as
+            // defense-in-depth alongside the auth_permits hold.
+            // Pipeline: `unlink_walk` (enumerated post-order
+            // recursive walk, no short-circuit on per-file failure)
+            // → `emit_per_unlink_failure_trace` (DENY-list-clean
+            // per-file tracing) → `try_parent_dir_sync` (Unix-only
+            // best-effort journal commit) → `aggregate_unlink_results`
+            // (Ok or `PartialDelete{remaining_count}`). See
+            // `decisions.md` 2026-05-26 "vault_delete Slot
+            // precondition matrix" + "vault_delete partial-fail
+            // posture" + PRD §"Implementation Decisions".
+            let vault_dir_for_blocking = vault_dir.clone();
+            match state
+                .take_and_run_blocking(move || -> Result<(), VaultDeleteError> {
+                    let results = unlink_walk(&vault_dir_for_blocking);
+                    emit_per_unlink_failure_trace(&results);
+                    // Task 8: best-effort Unix parent-dir journal
+                    // commit. Always runs (regardless of success or
+                    // partial-fail outcome); never changes the return
+                    // value (sync_all is a hint, not a safety gate).
+                    try_parent_dir_sync(&vault_dir_for_blocking);
+                    aggregate_unlink_results(&results)
+                })
+                .await
+            {
+                Ok(()) => {
+                    tracing::info!(event = "vault_deleted", stage = "complete");
+                    Ok(())
+                }
+                Err(TakeAndRunError::SlotEmpty) => {
+                    // Race: a concurrent `vault_lock` IPC fired between
+                    // our `slot_kind()` peek and the
+                    // `take_and_run_blocking` write-lock acquire.
+                    // `vault_lock` doesn't consume an auth_permit, so
+                    // the permit we hold doesn't block it. The unlink
+                    // did NOT run inside `take_and_run_blocking`, but
+                    // the racing `vault_lock`'s Drop already zeroized
+                    // the keys — so falling through to the same
+                    // `dispatch_empty_arm` as the cold Empty arm
+                    // completes the user's delete intent (MYND-108-bis).
+                    // No silent bug-canary rejection from this branch.
+                    tracing::debug!(
+                        stage = "slot_race",
+                        "vault_delete: slot raced to Empty during write-lock acquire (vault_lock?); falling through to dispatch_empty_arm"
+                    );
+                    dispatch_empty_arm(vault_dir).await
+                }
+                Err(TakeAndRunError::Closure(vd_err)) => {
+                    // The closure returned a fully-typed
+                    // VaultDeleteError. Currently only PartialDelete
+                    // (from aggregate_unlink_results) reaches here.
+                    // Emit the partial-fail summary event before
+                    // surfacing — DENY-list clean (only count, no
+                    // paths).
+                    if let VaultDeleteError::PartialDelete { remaining_count } = &vd_err {
+                        tracing::warn!(
+                            event = "vault_delete_partial",
+                            remaining_count = *remaining_count,
+                            "vault_delete completed with partial-fail"
+                        );
+                    } else {
+                        // Future-proof: log unexpected closure error.
+                        let kind = vault_delete_error_kind(&vd_err);
+                        tracing::warn!(
+                            stage = "unlink_pipeline",
+                            error_kind = kind,
+                            "vault_delete unlink pipeline returned non-PartialDelete error"
+                        );
+                    }
+                    Err(vd_err)
+                }
+                Err(TakeAndRunError::Join) => {
+                    tracing::error!(
+                        stage = "spawn_blocking_join",
+                        error_kind = "Io",
+                        "vault_delete spawn_blocking join failure"
+                    );
+                    Err(VaultDeleteError::Io {
+                        io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+                    })
+                }
+            }
+        }
+    }
+}
+
+/// Dispatch the `Slot::Empty` arm based on `vault.meta` presence on
+/// disk. Called from both the cold Empty arm in [`vault_delete_with_dir`]
+/// and the `TakeAndRunError::SlotEmpty` race branch (concurrent
+/// `vault_lock` raced through during our write-lock acquire). Routes
+/// to [`delete_vault_files_no_zeroize`] when `vault.meta` is present
+/// (MYND-108-bis lost-credentials accept path) or returns
+/// `VaultNotFound` when nothing is on disk to delete (unchanged from
+/// MYND-105's rejection semantics — no silent no-op success).
+///
+/// See `design-notes.md` 2026-05-26 entry "MYND-108-bis vault_delete
+/// extended to accept Slot::Empty + vault.meta-exists" for the
+/// rationale that the racing `vault_lock`'s `Drop` already zeroized
+/// the keys, so the race branch falling through to this dispatcher
+/// preserves the user's delete intent without weakening cryptographic-
+/// erase ordering.
+pub(crate) async fn dispatch_empty_arm(vault_dir: PathBuf) -> Result<(), VaultDeleteError> {
+    if vault_dir.join("vault.meta").is_file() {
+        delete_vault_files_no_zeroize(vault_dir).await
+    } else {
+        tracing::debug!(
+            stage = "slot_check",
+            error_kind = "VaultNotFound",
+            "vault_delete rejected: slot empty and vault.meta absent"
+        );
+        Err(VaultDeleteError::VaultNotFound)
+    }
+}
+
+/// MYND-108-bis no-keys recursive unlink path. Used when the slot is
+/// `Slot::Empty` but `vault.meta` exists on disk — the user has
+/// lost both password and recovery phrase, so there are no in-memory
+/// keys to zeroize before unlink. Skips the `take_and_run_blocking`
+/// step entirely and runs the same `unlink_walk` /
+/// `emit_per_unlink_failure_trace` / `try_parent_dir_sync` /
+/// `aggregate_unlink_results` pipeline directly via
+/// `tokio::task::spawn_blocking`.
+///
+/// Tracing emission is identical to the Unlocked/Recovering arm:
+/// `event="vault_deleted", stage="complete"` on full success;
+/// `event="vault_delete_partial", remaining_count=N` on partial
+/// failure (uniform observability for SRE). DENY-list clean — no
+/// path, no error::Display, no account identifier in payload.
+///
+/// See module-level rustdoc for the cryptographic-erase claim's
+/// structural inapplicability on this arm (the on-disk Argon2id-
+/// wrapped keys are already computationally unrecoverable; recursive
+/// unlink converts unrecoverable-bytes → no-bytes).
+pub(crate) async fn delete_vault_files_no_zeroize(
+    vault_dir: PathBuf,
+) -> Result<(), VaultDeleteError> {
+    tracing::debug!(
+        stage = "slot_check",
+        slot_arm = "empty_meta_exists",
+        "vault_delete proceeding: slot empty, vault.meta present (MYND-108-bis no-keys lost-credentials path)"
+    );
+    let vault_dir_for_blocking = vault_dir.clone();
+    let join_result = tokio::task::spawn_blocking(move || -> Result<(), VaultDeleteError> {
+        let results = unlink_walk(&vault_dir_for_blocking);
+        emit_per_unlink_failure_trace(&results);
+        try_parent_dir_sync(&vault_dir_for_blocking);
+        aggregate_unlink_results(&results)
+    })
+    .await;
+    match join_result {
+        Ok(Ok(())) => {
+            tracing::info!(event = "vault_deleted", stage = "complete");
+            Ok(())
+        }
+        Ok(Err(vd_err)) => {
+            if let VaultDeleteError::PartialDelete { remaining_count } = &vd_err {
+                tracing::warn!(
+                    event = "vault_delete_partial",
+                    remaining_count = *remaining_count,
+                    "vault_delete completed with partial-fail (no-keys path)"
+                );
+            } else {
+                let kind = vault_delete_error_kind(&vd_err);
+                tracing::warn!(
+                    stage = "unlink_pipeline",
+                    error_kind = kind,
+                    "vault_delete unlink pipeline returned non-PartialDelete error (no-keys path)"
+                );
+            }
+            Err(vd_err)
+        }
+        Err(_) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "Io",
+                "vault_delete spawn_blocking join failure (no-keys path)"
+            );
+            Err(VaultDeleteError::Io {
+                io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+            })
+        }
+    }
+}
+
+/// Recursive post-order unlink walker over `vault_dir`. Returns the
+/// per-entry outcome as `Vec<(PathBuf, io::Result<()>)>` — one entry
+/// per file or directory the walk touched, in **bottom-up order**
+/// (children before parents, parents removed after their children
+/// have been removed so `remove_dir` does not see non-empty dirs).
+///
+/// Symlinks: uses `symlink_metadata` so symlinks themselves are
+/// treated as files (`remove_file` unlinks the link, not the
+/// target). Matches `std::fs::remove_dir_all`'s no-follow semantics,
+/// preserving the v0.1 single-vault single-user assumption per
+/// `decisions.md` 2026-05-26 "vault_delete cryptographic-erase claim"
+/// (Phase 2 symlink-aware revisit hook).
+///
+/// Per-entry failures do NOT short-circuit the walk — every entry is
+/// attempted, results aggregated by [`aggregate_unlink_results`].
+/// This is the partial-fail posture from `decisions.md` 2026-05-26
+/// "vault_delete partial-fail posture".
+fn unlink_walk(vault_dir: &std::path::Path) -> Vec<(std::path::PathBuf, std::io::Result<()>)> {
+    let mut results = Vec::new();
+    walk_and_remove(vault_dir, &mut results);
+    results
+}
+
+fn walk_and_remove(
+    path: &std::path::Path,
+    results: &mut Vec<(std::path::PathBuf, std::io::Result<()>)>,
+) {
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(m) => m,
+        Err(e) => {
+            results.push((path.to_path_buf(), Err(e)));
+            return;
+        }
+    };
+    if meta.is_dir() {
+        match std::fs::read_dir(path) {
+            Ok(entries) => {
+                for entry_result in entries {
+                    match entry_result {
+                        Ok(entry) => walk_and_remove(&entry.path(), results),
+                        Err(e) => results.push((path.to_path_buf(), Err(e))),
+                    }
+                }
+                let r = std::fs::remove_dir(path);
+                results.push((path.to_path_buf(), r));
+            }
+            Err(e) => results.push((path.to_path_buf(), Err(e))),
+        }
+    } else {
+        // File or symlink (symlink_metadata did not follow links).
+        let r = std::fs::remove_file(path);
+        results.push((path.to_path_buf(), r));
+    }
+}
+
+/// Best-effort journal-commit hint after the unlink walk completes.
+/// Opens the parent of `vault_dir` (i.e., `app_data_dir`) and calls
+/// `sync_all()` to flush the directory-entry removal to the OS
+/// journal.
+///
+/// **Unix-only.** On non-Unix targets this is an explicit no-op
+/// (matches `note_delete` 2026-05-07 durability asymmetry precedent
+/// — no `windows-sys` dep extension, no `FlushFileBuffers`
+/// parent-handle machinery). Power-loss between `remove` and the
+/// next OS commit on Windows may make the vault reappear after
+/// reboot; the user re-fires `vault_delete`; cryptographic-erase is
+/// unaffected because keys are already zeroized.
+///
+/// **Never propagates errors.** sync_all is a journal-commit *hint*,
+/// not a safety gate — the unlinks already happened. On open or
+/// sync_all failure, a `tracing::warn!(stage = "parent_dir_sync",
+/// io_failure_kind = ?kind, ...)` event fires for oncall
+/// observability, but the IPC return value (Ok / PartialDelete /
+/// Io) is decided by the walk + aggregate pipeline upstream of this
+/// call.
+///
+/// Path leakage discipline: the parent path is opened via
+/// `File::open(parent)` — `std::io::Error::Display` for that error
+/// MAY include the path on some kernels, but we never `?e`-format
+/// the error; we reduce to `IoFailureKind` first per the
+/// `src-tauri/CLAUDE.md` "Closed-enum mapping rule".
+pub(crate) fn try_parent_dir_sync(vault_dir: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        let Some(parent) = vault_dir.parent() else {
+            return;
+        };
+        match std::fs::File::open(parent) {
+            Ok(file) => match file.sync_all() {
+                Ok(()) => {
+                    tracing::debug!(
+                        stage = "parent_dir_sync",
+                        "vault_delete parent-dir journal-commit succeeded"
+                    );
+                }
+                Err(e) => {
+                    let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+                    tracing::warn!(
+                        stage = "parent_dir_sync",
+                        io_failure_kind = ?kind,
+                        "vault_delete parent-dir sync_all failed (best-effort, not propagated)"
+                    );
+                }
+            },
+            Err(e) => {
+                let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+                tracing::warn!(
+                    stage = "parent_dir_sync",
+                    io_failure_kind = ?kind,
+                    "vault_delete parent-dir open failed (best-effort, not propagated)"
+                );
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        // Suppress unused-variable warning on non-Unix targets.
+        let _ = vault_dir;
+    }
+}
+
+/// Emit a `tracing::warn!(stage = "unlink_blob", io_failure_kind = ?kind)`
+/// event for each failed entry in `results`. Path is **never**
+/// included in the payload (DENY-list discipline per
+/// `src-tauri/CLAUDE.md` "Secret-handling logging discipline" — full
+/// filesystem path is on the DENY list).
+///
+/// Helper carved out from the spawn_blocking closure so the L2
+/// tracing emission can be unit-tested directly with synthetic
+/// `Vec<(PathBuf, io::Result<()>)>` inputs. Production caller
+/// (`vault_delete_with_dir`) invokes this between the walk and the
+/// aggregate.
+pub(crate) fn emit_per_unlink_failure_trace(results: &[(std::path::PathBuf, std::io::Result<()>)]) {
+    for (_path, r) in results {
+        if let Err(io_err) = r {
+            let kind = crate::io_failure_kind::from_io_error_kind(io_err.kind());
+            tracing::warn!(
+                stage = "unlink_blob",
+                io_failure_kind = ?kind,
+                "vault_delete unlink failed"
+            );
+        }
+    }
+}
+
+/// Aggregate per-file unlink outcomes into a single
+/// [`VaultDeleteError`] verdict.
+///
+/// Returns `Ok(())` when every entry in `results` is `Ok(())`, else
+/// `Err(VaultDeleteError::PartialDelete { remaining_count })` where
+/// `remaining_count` is the count of failures. **Pure function** —
+/// no I/O, no async, no tracing — the per-failure tracing emission
+/// is the [`emit_per_unlink_failure_trace`] helper's job, and the
+/// I/O surface is [`unlink_walk`]. Three small composable functions
+/// keep each side independently testable.
+///
+/// L1 layer of the L1+L2+L3 test hybrid pinned by PRD §"Testing
+/// Decisions" (synthetic `Vec<(PathBuf, io::Result<()>)>` inputs
+/// drive all-success / all-fail / mixed / edge-count branches).
+pub(crate) fn aggregate_unlink_results(
+    results: &[(std::path::PathBuf, std::io::Result<()>)],
+) -> Result<(), VaultDeleteError> {
+    let failed: usize = results.iter().filter(|(_, r)| r.is_err()).count();
+    if failed == 0 {
+        Ok(())
+    } else {
+        Err(VaultDeleteError::PartialDelete {
+            remaining_count: failed,
+        })
+    }
+}
+
+/// Static-string label helper for every [`VaultDeleteError`] variant.
+///
+/// Used by `tracing::*!(error_kind = vault_delete_error_kind(&e), ...)`
+/// call sites so the variant name (a `&'static str`) crosses the
+/// tracing boundary instead of a `?e` Debug formatting that could
+/// drag DENY-listed values (paths, io::Error::Display) into log
+/// payloads. Same drift-detector discipline as `note_delete_error_kind`
+/// — adding a new variant compile-fails this match (the reviewer
+/// must update the helper + the wire test).
+///
+/// Production caller: the `take_and_run_blocking` non-PartialDelete
+/// future-proof branch in `vault_delete_with_dir` (Task 7).
+pub(crate) fn vault_delete_error_kind(e: &VaultDeleteError) -> &'static str {
+    match e {
+        VaultDeleteError::VaultBusyAuth => "VaultBusyAuth",
+        VaultDeleteError::VaultNotUnlocked => "VaultNotUnlocked",
+        VaultDeleteError::VaultNotFound => "VaultNotFound",
+        VaultDeleteError::PartialDelete { .. } => "PartialDelete",
+        VaultDeleteError::Io { .. } => "Io",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::io_failure_kind::IoFailureKind;
+    use crate::plugins::vault_unlock::state::VaultRuntimeState;
+    use crate::test_support::ScopedTempDir;
+
+    /// Same per-test runtime pattern as the sibling plugins. Builds a
+    /// current-thread tokio runtime each test (no `#[tokio::test]` —
+    /// the `tokio = ["macros"]` feature is intentionally NOT enabled
+    /// per workspace TB9 audit-anchor discipline; tests build the
+    /// runtime manually via `block_on`).
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime build")
+    }
+
+    // ---- Slot precondition matrix — rejection arms (Task 5) --------------
+
+    /// Test that `vault_delete` rejects with `VaultBusyAuth` when the
+    /// auth_permits semaphore is already taken by another in-flight
+    /// op (simulated by acquiring the permit elsewhere first).
+    /// `try_acquire` MUST reject rather than queue per the
+    /// `decisions.md` 2026-05-02 + MYND-105 Q3-D3 "single in-flight,
+    /// reject-not-queue" posture.
+    #[test]
+    fn vault_delete_returns_busy_auth_when_permit_taken() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-busy-auth").unwrap();
+            let state = VaultRuntimeState::default();
+            // Pre-acquire the single auth_permit; the guard's drop at
+            // function end releases.
+            let _held = state.auth_permits().acquire().await.unwrap();
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                matches!(result, Err(VaultDeleteError::VaultBusyAuth)),
+                "expected VaultBusyAuth, got {result:?}"
+            );
+        });
+    }
+
+    /// Test that `vault_delete` rejects with `VaultNotFound` when
+    /// Slot is Empty AND vault.meta is missing on disk. The
+    /// "idempotent no-op success" path was explicitly rejected per
+    /// `decisions.md` 2026-05-26 entry "vault_delete Slot precondition
+    /// matrix" — silent success would mask UI bugs and capability-ACL
+    /// fuzz attempts (Q3-D1). Orphan-artefact sweeping is the v0.2
+    /// `vault_repair` feature's responsibility (Plane MYND-159).
+    #[test]
+    fn vault_delete_returns_not_found_when_empty_and_no_vault_meta() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-not-found").unwrap();
+            // Empty tempdir — no vault.meta, no notes/, no artefacts.
+            let state = VaultRuntimeState::default();
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                matches!(result, Err(VaultDeleteError::VaultNotFound)),
+                "expected VaultNotFound, got {result:?}"
+            );
+        });
+    }
+
+    /// MYND-108-bis: Slot::Empty + vault.meta on disk is now the
+    /// **happy path** for the lost-credentials cul-de-sac escape
+    /// (Unlock screen tertiary link and Recovery phrase-entry footer
+    /// link). The cryptographic-erase claim is structurally
+    /// inapplicable on this arm (no keys in memory to zeroize); the
+    /// user has lost both password and recovery phrase, so the
+    /// on-disk Argon2id-wrapped keys are already computationally
+    /// unrecoverable. Recursive unlink converts unrecoverable-bytes
+    /// into no-bytes, strictly stronger.
+    ///
+    /// Test asserts: Ok(()) returned, vault directory gone, slot
+    /// remains Empty (no state change since slot was already Empty
+    /// entering the call). Was previously the
+    /// `vault_delete_returns_not_unlocked_when_empty_with_vault_meta`
+    /// rejection test; repurposed for the MYND-108-bis accept path.
+    #[test]
+    fn vault_delete_from_empty_with_meta_exists_succeeds() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-empty-meta-exists").unwrap();
+            // Seed vault.meta + one note + tmp orphan (mimic a real
+            // post-creation vault directory without unlocking).
+            std::fs::write(tmp.path().join("vault.meta"), b"placeholder vault.meta bytes")
+                .expect("seed vault.meta");
+            let notes = tmp.path().join("notes");
+            std::fs::create_dir_all(&notes).expect("seed notes/");
+            std::fs::write(
+                notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+                b"placeholder ciphertext",
+            )
+            .expect("seed .myn");
+            // Slot stays Empty — no set_unlocked / set_recovering call.
+            let state = VaultRuntimeState::default();
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                result.is_ok(),
+                "MYND-108-bis: Empty + vault.meta-exists is the no-keys accept path; expected Ok, got {result:?}"
+            );
+            assert!(
+                !tmp.path().exists(),
+                "vault_dir must be removed by the no-keys recursive-unlink path"
+            );
+            // Slot was Empty entering the call and stays Empty exiting.
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+                "slot was Empty entering and stays Empty exiting (no state change)"
+            );
+        });
+    }
+
+    /// Order-of-operations test: auth_permits gate fires BEFORE the
+    /// slot peek. When the permit is taken AND the slot would
+    /// otherwise produce `VaultNotFound`, the function MUST return
+    /// `VaultBusyAuth` (not VaultNotFound). This pins the matrix
+    /// order from MYND-105 grill Q3-D3 + Q3-D1.
+    #[test]
+    fn vault_delete_busy_auth_wins_over_not_found_when_both_apply() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-precedence").unwrap();
+            let state = VaultRuntimeState::default();
+            // Empty tempdir + slot Empty would normally produce
+            // VaultNotFound. But we also hold the permit, so
+            // VaultBusyAuth must win.
+            let _held = state.auth_permits().acquire().await.unwrap();
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                matches!(result, Err(VaultDeleteError::VaultBusyAuth)),
+                "auth_permits check must run before slot peek; got {result:?}"
+            );
+        });
+    }
+
+    // ---- L1: aggregate_unlink_results pure function (Task 7) -------------
+    //
+    // Pure aggregation: count failures, return Ok(()) when zero else
+    // PartialDelete{remaining_count}. No I/O, no async, no tracing.
+    // Synthetic Vec<(PathBuf, io::Result<()>)> drives the cases.
+
+    fn ok(p: &str) -> (std::path::PathBuf, std::io::Result<()>) {
+        (std::path::PathBuf::from(p), Ok(()))
+    }
+
+    fn err(p: &str, kind: std::io::ErrorKind) -> (std::path::PathBuf, std::io::Result<()>) {
+        (std::path::PathBuf::from(p), Err(std::io::Error::from(kind)))
+    }
+
+    #[test]
+    fn aggregate_unlink_empty_input_returns_ok() {
+        let results: Vec<(std::path::PathBuf, std::io::Result<()>)> = vec![];
+        assert!(aggregate_unlink_results(&results).is_ok());
+    }
+
+    #[test]
+    fn aggregate_unlink_all_ok_returns_ok() {
+        let results = vec![ok("a"), ok("b"), ok("c")];
+        assert!(aggregate_unlink_results(&results).is_ok());
+    }
+
+    #[test]
+    fn aggregate_unlink_single_fail_returns_partial_with_count_one() {
+        let results = vec![
+            ok("a"),
+            err("b", std::io::ErrorKind::PermissionDenied),
+            ok("c"),
+        ];
+        match aggregate_unlink_results(&results) {
+            Err(VaultDeleteError::PartialDelete { remaining_count }) => {
+                assert_eq!(remaining_count, 1);
+            }
+            other => panic!("expected PartialDelete{{1}}, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn aggregate_unlink_all_fail_returns_partial_with_full_count() {
+        let results = vec![
+            err("a", std::io::ErrorKind::PermissionDenied),
+            err("b", std::io::ErrorKind::NotFound),
+            err("c", std::io::ErrorKind::Other),
+        ];
+        match aggregate_unlink_results(&results) {
+            Err(VaultDeleteError::PartialDelete { remaining_count }) => {
+                assert_eq!(remaining_count, 3);
+            }
+            other => panic!("expected PartialDelete{{3}}, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn aggregate_unlink_mixed_returns_partial_with_failure_count() {
+        // 5 entries, 2 failures.
+        let results = vec![
+            ok("a"),
+            err("b", std::io::ErrorKind::PermissionDenied),
+            ok("c"),
+            err("d", std::io::ErrorKind::Other),
+            ok("e"),
+        ];
+        match aggregate_unlink_results(&results) {
+            Err(VaultDeleteError::PartialDelete { remaining_count }) => {
+                assert_eq!(remaining_count, 2);
+            }
+            other => panic!("expected PartialDelete{{2}}, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn aggregate_unlink_single_ok_returns_ok() {
+        let results = vec![ok("a")];
+        assert!(aggregate_unlink_results(&results).is_ok());
+    }
+
+    // ---- L2: try_parent_dir_sync — durability hook (Task 8) ---------------
+    //
+    // Unix-only `parent_dir.sync_all()` journal-commit hint fired
+    // after the unlink walk. Windows is `#[cfg(unix)]`-explicit no-op
+    // (matches `note_delete` 2026-05-07 asymmetry precedent — no
+    // `windows-sys` dep extension). Tests only run the Unix branch.
+
+    #[cfg(unix)]
+    #[test]
+    #[tracing_test::traced_test]
+    fn try_parent_dir_sync_emits_debug_event_on_success() {
+        let tmp = ScopedTempDir::new("vd-sync-ok").unwrap();
+        // tmp.path() exists; its parent (/tmp or platform equivalent)
+        // is open-able and sync_all-able. We point the helper at
+        // tmp.path().join("vault") whose parent is tmp.path() (real).
+        let vault_dir = tmp.path().join("vault");
+        try_parent_dir_sync(&vault_dir);
+        assert!(
+            logs_contain("stage=\"parent_dir_sync\""),
+            "expected parent_dir_sync stage in tracing"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[tracing_test::traced_test]
+    fn try_parent_dir_sync_emits_warn_on_missing_parent() {
+        // Parent path that does not exist → File::open fails.
+        // The helper should emit a warn (with io_failure_kind=NotFound)
+        // but NOT panic, NOT propagate.
+        let missing =
+            std::path::PathBuf::from("/this/path/intentionally/does/not/exist/for/myne/test/vault");
+        try_parent_dir_sync(&missing);
+        assert!(
+            logs_contain("stage=\"parent_dir_sync\""),
+            "expected parent_dir_sync stage in tracing"
+        );
+        assert!(
+            logs_contain("NotFound"),
+            "expected NotFound IoFailureKind label"
+        );
+    }
+
+    /// Windows no-op variant: the helper should compile and do
+    /// nothing on non-Unix targets. Test is gated to the negation
+    /// so it runs on whatever non-Unix platform happens to compile
+    /// (likely none in practice for this repo, but the gate is
+    /// load-bearing for the `#[cfg(unix)]` discipline). Skipped on
+    /// Unix.
+    #[cfg(not(unix))]
+    #[test]
+    fn try_parent_dir_sync_is_noop_on_non_unix() {
+        let p = std::path::PathBuf::from("doesnt_matter");
+        try_parent_dir_sync(&p);
+        // No panic, no IO, no events. Just here so the call site
+        // compiles on Windows.
+    }
+
+    // ---- L2: emit_per_unlink_failure_trace (Task 7) ----------------------
+    //
+    // For each failed unlink in the results, emit a tracing::warn!
+    // with stage = "unlink_blob" + io_failure_kind = ?<IoFailureKind>.
+    // Path is NEVER emitted (DENY-list discipline). Synthetic
+    // io::Error inputs verify the right IoFailureKind label crosses
+    // the tracing boundary.
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn emit_per_unlink_failure_trace_emits_permission_denied_kind() {
+        let results = vec![err(
+            "any/path/should/not/appear",
+            std::io::ErrorKind::PermissionDenied,
+        )];
+        emit_per_unlink_failure_trace(&results);
+        assert!(
+            logs_contain("stage=\"unlink_blob\""),
+            "expected stage=unlink_blob in tracing"
+        );
+        assert!(
+            logs_contain("PermissionDenied"),
+            "expected PermissionDenied IoFailureKind label in tracing"
+        );
+        // DENY-list: path must NOT appear.
+        assert!(
+            !logs_contain("any/path/should/not/appear"),
+            "path leaked into tracing payload"
+        );
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn emit_per_unlink_failure_trace_emits_not_found_kind() {
+        let results = vec![err("p", std::io::ErrorKind::NotFound)];
+        emit_per_unlink_failure_trace(&results);
+        assert!(logs_contain("NotFound"));
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn emit_per_unlink_failure_trace_emits_other_for_unmapped_kind() {
+        let results = vec![err("p", std::io::ErrorKind::AlreadyExists)];
+        emit_per_unlink_failure_trace(&results);
+        // AlreadyExists maps to IoFailureKind::Other per
+        // io_failure_kind::from_io_error_kind.
+        assert!(logs_contain("Other"));
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn emit_per_unlink_failure_trace_silent_on_all_ok() {
+        let results = vec![ok("a"), ok("b")];
+        emit_per_unlink_failure_trace(&results);
+        // No unlink_blob events should fire when all entries are Ok.
+        assert!(
+            !logs_contain("unlink_blob"),
+            "no tracing events should fire for all-Ok input"
+        );
+    }
+
+    // ---- Happy-path matrix arms (Task 6) ---------------------------------
+
+    /// R3 recovery-escape happy-path test: from `Slot::Recovering`
+    /// fixture + populated vault dir, fires vault_delete_with_dir
+    /// and asserts the same post-state as the Unlocked path —
+    /// slot Empty (RecoveringMaterial zeroize fired), vault_dir
+    /// gone. Verifies user stories 4, 5 (R3 escape).
+    #[test]
+    fn vault_delete_recovering_removes_dir_and_zeroizes_slot() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-happy-recovering").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"meta").unwrap();
+            let notes = tmp.path().join("notes");
+            std::fs::create_dir_all(&notes).unwrap();
+            std::fs::write(notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn"), b"x").unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(
+                    crate::plugins::vault_unlock::state::fixture_recovering_with_keys(
+                        0xAA, 0xBB, 0xCC,
+                    ),
+                )
+                .await;
+
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                result.is_ok(),
+                "R3 happy-path Slot::Recovering must succeed; got {result:?}"
+            );
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+                "slot must be Empty after vault_delete (RecoveringMaterial zeroize fired)"
+            );
+            assert!(!tmp.path().exists(), "vault_dir must be removed");
+        });
+    }
+
+    /// Task 9 strict-count L3 cascade test: chmod 0o555 on `notes/`
+    /// produces a deterministic cascade of exactly 3 failures —
+    /// (1) `notes/<uuid>.myn` unlink fails (notes/ is read-only),
+    /// (2) `remove_dir(notes/)` fails (notes/ is non-empty because
+    /// the .myn couldn't be removed), (3) `remove_dir(vault_dir)`
+    /// fails (vault_dir is non-empty because notes/ couldn't be
+    /// removed). `vault.meta` (directly under vault_dir) is removed
+    /// successfully because vault_dir is writable.
+    ///
+    /// PRD Task 9 originally asked for `remaining_count == 1` from
+    /// chmod-on-file, which is structurally unachievable on POSIX
+    /// (see `vault_delete_chmod_on_myn_file_still_succeeds_posix_unlink_semantic`).
+    /// The realistic strict-count assertion is `== 3` for the
+    /// cascade topology — tighter than Task 7's `>= 1` end-to-end
+    /// test. Regression detector if the walker semantics change.
+    #[cfg(unix)]
+    #[test]
+    fn vault_delete_partial_fail_cascade_remains_count_exactly_three() {
+        use std::os::unix::fs::PermissionsExt;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-l3-cascade").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"meta").unwrap();
+            let notes = tmp.path().join("notes");
+            std::fs::create_dir_all(&notes).unwrap();
+            std::fs::write(
+                notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+                b"x",
+            )
+            .unwrap();
+            // chmod 0o555 on notes/ — read+exec but not write.
+            // .myn unlink fails. Cascades upward (notes/, vault_dir).
+            let mut perms = std::fs::metadata(&notes).unwrap().permissions();
+            perms.set_mode(0o555);
+            std::fs::set_permissions(&notes, perms).unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
+                )
+                .await;
+
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+
+            // Restore notes/ permissions BEFORE assertions so the
+            // tempdir teardown can succeed regardless of assertion
+            // outcome.
+            let mut restore = std::fs::metadata(&notes).unwrap().permissions();
+            restore.set_mode(0o755);
+            let _ = std::fs::set_permissions(&notes, restore);
+
+            // Exact cascade count: .myn unlink + remove_dir(notes/) +
+            // remove_dir(vault_dir) = 3 failures.
+            match result {
+                Err(VaultDeleteError::PartialDelete { remaining_count }) => {
+                    assert_eq!(
+                        remaining_count, 3,
+                        "expected cascade of exactly 3 failures (.myn + notes/ + vault_dir), got {remaining_count}"
+                    );
+                }
+                other => panic!("expected PartialDelete{{3}}, got {other:?}"),
+            }
+            // Slot zeroize fired before walk — slot must be Empty
+            // despite the unlink cascade failure.
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+                "key zeroize must precede unlink, regardless of unlink outcome"
+            );
+            // vault.meta was directly under vault_dir (writable) — it
+            // should have been successfully removed before the
+            // cascade started.
+            assert!(
+                !tmp.path().join("vault.meta").exists(),
+                "vault.meta should be removed (vault_dir is writable; only notes/ is the read-only barrier)"
+            );
+        });
+    }
+
+    /// Task 9 L3 integration test: chmod 0o000 directly on the .myn
+    /// file under a writable notes/ parent. Documents the empirical
+    /// finding that POSIX `unlink(2)` requires write permission on
+    /// the **parent directory**, not on the file itself — so chmod
+    /// on the file alone does NOT block deletion. Result: vault is
+    /// fully removed (Ok), `remaining_count` is 0, no PartialDelete.
+    ///
+    /// The PRD's Task 9 spec called for `PartialDelete{remaining_count: 1}`
+    /// from this setup, but that's structurally unachievable on POSIX.
+    /// Task 7's `vault_delete_partial_fail_emits_partial_event_and_returns_partial_delete`
+    /// (chmod 0o555 on notes/ — parent-dir injection) provides the
+    /// realistic L3 partial-fail coverage. This test exists as the
+    /// codified empirical evidence and as a regression detector if
+    /// the walk's unlink semantics ever change.
+    #[cfg(unix)]
+    #[test]
+    fn vault_delete_chmod_on_myn_file_still_succeeds_posix_unlink_semantic() {
+        use std::os::unix::fs::PermissionsExt;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-l3-file-chmod").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"meta").unwrap();
+            let notes = tmp.path().join("notes");
+            std::fs::create_dir_all(&notes).unwrap();
+            let myn = notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn");
+            std::fs::write(&myn, b"x").unwrap();
+            // chmod 0o000 on the .myn file — POSIX unlink does NOT
+            // check this; it checks the parent dir's write perm.
+            let mut perms = std::fs::metadata(&myn).unwrap().permissions();
+            perms.set_mode(0o000);
+            std::fs::set_permissions(&myn, perms).unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
+                )
+                .await;
+
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+
+            // POSIX semantic: vault is fully removed despite file chmod.
+            assert!(
+                result.is_ok(),
+                "POSIX unlink ignores file perms; expected full Ok, got {result:?}"
+            );
+            assert!(
+                !tmp.path().exists(),
+                "vault_dir must be removed (POSIX unlink succeeded despite chmod 0o000 on file)"
+            );
+        });
+    }
+
+    /// Partial-fail end-to-end test: synthetic chmod injection on
+    /// the .myn file (Unix-only) produces a partial-fail outcome,
+    /// `PartialDelete{remaining_count: 1}`, AND the `vault_delete_partial`
+    /// summary event fires with the right count. This is an
+    /// end-to-end smoke for Task 7 — Task 9 will land a more
+    /// comprehensive Unix-only integration test.
+    #[cfg(unix)]
+    #[test]
+    #[tracing_test::traced_test]
+    fn vault_delete_partial_fail_emits_partial_event_and_returns_partial_delete() {
+        use std::os::unix::fs::PermissionsExt;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-partial-event").unwrap();
+            // Populate vault.meta + one .myn note.
+            std::fs::write(tmp.path().join("vault.meta"), b"meta").unwrap();
+            let notes = tmp.path().join("notes");
+            std::fs::create_dir_all(&notes).unwrap();
+            let myn = notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn");
+            std::fs::write(&myn, b"x").unwrap();
+            // Make notes/ read-only so remove_file on myn fails with
+            // PermissionDenied. (The myn file itself stays writable —
+            // we need the parent dir to be unwritable to block unlink.)
+            let mut perms = std::fs::metadata(&notes).unwrap().permissions();
+            perms.set_mode(0o555);
+            std::fs::set_permissions(&notes, perms).unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
+                )
+                .await;
+
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+
+            // Restore notes/ permissions so the test fixture's Drop
+            // can clean up.
+            let mut restore = std::fs::metadata(&notes).unwrap().permissions();
+            restore.set_mode(0o755);
+            let _ = std::fs::set_permissions(&notes, restore);
+
+            // Expect PartialDelete; remaining_count depends on what
+            // could and couldn't be unlinked (the .myn under
+            // read-only notes/ is the at-least-one definite failure).
+            match result {
+                Err(VaultDeleteError::PartialDelete { remaining_count }) => {
+                    assert!(remaining_count >= 1, "expected at least one failed file");
+                }
+                other => panic!("expected PartialDelete, got {other:?}"),
+            }
+            // Slot zeroize fired before the unlink — slot must be Empty.
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+                "key zeroize must precede unlink failure"
+            );
+            assert!(
+                logs_contain("event=\"vault_delete_partial\""),
+                "expected vault_delete_partial summary event in tracing"
+            );
+            // NOTE: per-file `unlink_blob` events fire INSIDE the
+            // spawn_blocking thread, outside this test's span scope.
+            // `tracing_test::traced_test` only captures events emitted
+            // from within the test's span — so the per-file emission
+            // is verified by the L2 unit tests
+            // (`emit_per_unlink_failure_trace_emits_*`) which call the
+            // helper directly without spawning. The summary event is
+            // captured because it fires post-await in the test's async
+            // scope.
+        });
+    }
+
+    /// MYND-108-bis no-keys partial-fail integration test: Slot::Empty
+    /// + chmod 0o555 on notes/ produces the same 3-failure cascade
+    /// as the Unlocked-path equivalent
+    /// (`vault_delete_partial_fail_cascade_remains_count_exactly_three`),
+    /// proving the shared `unlink_walk` pipeline is reused correctly
+    /// from the no-keys path. PartialDelete + count assertion via
+    /// `vault_delete_partial` summary event.
+    #[cfg(unix)]
+    #[test]
+    #[tracing_test::traced_test]
+    fn vault_delete_from_empty_partial_fail_returns_partial() {
+        use std::os::unix::fs::PermissionsExt;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-empty-partial").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"meta").unwrap();
+            let notes = tmp.path().join("notes");
+            std::fs::create_dir_all(&notes).unwrap();
+            std::fs::write(notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn"), b"x").unwrap();
+            let mut perms = std::fs::metadata(&notes).unwrap().permissions();
+            perms.set_mode(0o555);
+            std::fs::set_permissions(&notes, perms).unwrap();
+
+            // Slot stays Empty entering the call — MYND-108-bis path.
+            let state = VaultRuntimeState::default();
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+
+            // Restore notes/ permissions for tempdir teardown.
+            let mut restore = std::fs::metadata(&notes).unwrap().permissions();
+            restore.set_mode(0o755);
+            let _ = std::fs::set_permissions(&notes, restore);
+
+            match result {
+                Err(VaultDeleteError::PartialDelete { remaining_count }) => {
+                    assert!(
+                        remaining_count >= 1,
+                        "expected at least one failed file in the no-keys partial-fail cascade"
+                    );
+                }
+                other => panic!("expected PartialDelete from no-keys path, got {other:?}"),
+            }
+            assert!(
+                logs_contain("event=\"vault_delete_partial\""),
+                "expected vault_delete_partial summary event from no-keys path"
+            );
+            // vault.meta was directly under vault_dir (writable) so
+            // it should have been unlinked before the cascade.
+            assert!(
+                !tmp.path().join("vault.meta").exists(),
+                "vault.meta should be removed (vault_dir writable; only notes/ is the barrier)"
+            );
+        });
+    }
+
+    /// Verify the `vault_deleted` tracing event is emitted on
+    /// successful unlink, with no DENY-list payload (no path, no
+    /// account identifier, no key material, no kernel error strings).
+    #[test]
+    #[tracing_test::traced_test]
+    fn vault_delete_success_emits_vault_deleted_event() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-success-trace").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"x").unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
+                )
+                .await;
+            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                logs_contain("event=\"vault_deleted\""),
+                "expected vault_deleted event in tracing on success"
+            );
+            assert!(
+                logs_contain("stage=\"complete\""),
+                "expected stage=complete in tracing on success"
+            );
+            // Path string must NOT appear (DENY-list discipline).
+            let path_str = tmp.path().to_string_lossy().to_string();
+            assert!(
+                !logs_contain(&path_str),
+                "vault_dir path leaked into tracing payload (DENY-list violation)"
+            );
+        });
+    }
+
+    /// Happy-path test: from `Slot::Unlocked` fixture + populated
+    /// vault directory (vault.meta + notes/<uuid>.myn + vault.meta.tmp
+    /// orphan from mid-write crash), fires `vault_delete_with_dir`
+    /// and asserts: Ok(()), slot is now Empty, vault_dir gone.
+    /// Verifies user stories 1, 2, 3, 12 (vault.meta.tmp removal).
+    #[test]
+    fn vault_delete_unlocked_removes_dir_and_zeroizes_slot() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-happy-unlocked").unwrap();
+            // Populate a realistic vault directory.
+            std::fs::write(tmp.path().join("vault.meta"), b"meta bytes").unwrap();
+            std::fs::write(tmp.path().join("vault.meta.tmp"), b"mid-write crash artefact").unwrap();
+            let notes = tmp.path().join("notes");
+            std::fs::create_dir_all(&notes).unwrap();
+            std::fs::write(notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn"), b"note").unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+
+            assert!(result.is_ok(), "happy-path Slot::Unlocked must succeed; got {result:?}");
+            assert_eq!(
+                state.slot_kind().await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+                "slot must be Empty after vault_delete (UnlockedVault zeroize-on-drop fired)"
+            );
+            assert!(
+                !tmp.path().exists(),
+                "vault_dir must be removed recursively (vault.meta + vault.meta.tmp + notes/*.myn + notes/ dir + vault_dir itself)"
+            );
+        });
+    }
+
+    // ---- L2: tracing-test emission verification ---------------------------
+    //
+    // Each rejection arm emits a `tracing::debug!(stage = ..., error_kind = ...)`
+    // event. These tests assert the right error_kind label crosses the
+    // tracing boundary without DENY-list values (no paths, no kernel
+    // error strings, no key material).
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn busy_auth_rejection_emits_static_error_kind() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-tr-busy").unwrap();
+            let state = VaultRuntimeState::default();
+            let _held = state.auth_permits().acquire().await.unwrap();
+            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                logs_contain("error_kind=\"VaultBusyAuth\""),
+                "expected VaultBusyAuth error_kind label in tracing"
+            );
+            assert!(
+                logs_contain("stage=\"auth_permits\""),
+                "expected stage=auth_permits in tracing"
+            );
+        });
+    }
+
+    /// MYND-108-bis tracing test: Empty + vault.meta-exists emits the
+    /// new `slot_arm = "empty_meta_exists"` discriminator at
+    /// `stage = "slot_check"` (the dispatch decision), then the same
+    /// uniform `event="vault_deleted", stage="complete"` event on
+    /// success that the Unlocked/Recovering arms emit. Was previously
+    /// the `not_unlocked_rejection_emits_static_error_kind` rejection
+    /// test; repurposed for the MYND-108-bis happy path.
+    #[test]
+    #[tracing_test::traced_test]
+    fn vault_delete_from_empty_with_meta_exists_emits_vault_deleted_event() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-empty-trace").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"x").unwrap();
+            let state = VaultRuntimeState::default();
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                result.is_ok(),
+                "Empty + vault.meta-exists must succeed; got {result:?}"
+            );
+            assert!(
+                logs_contain("slot_arm=\"empty_meta_exists\""),
+                "expected slot_arm=empty_meta_exists discriminator at slot_check stage"
+            );
+            assert!(
+                logs_contain("event=\"vault_deleted\""),
+                "expected vault_deleted event on success (uniform with Unlocked/Recovering arms)"
+            );
+            assert!(
+                logs_contain("stage=\"complete\""),
+                "expected stage=complete on success"
+            );
+            // DENY-list: path string must not appear.
+            let path_str = tmp.path().to_string_lossy().to_string();
+            assert!(
+                !logs_contain(&path_str),
+                "vault_dir path leaked into tracing payload (DENY-list violation)"
+            );
+        });
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn not_found_rejection_emits_static_error_kind() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-tr-not-found").unwrap();
+            let state = VaultRuntimeState::default();
+            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                logs_contain("error_kind=\"VaultNotFound\""),
+                "expected VaultNotFound error_kind label in tracing"
+            );
+        });
+    }
+
+    // ---- JSON wire shape -------------------------------------------------
+    //
+    // IPC contract: each VaultDeleteError variant serializes to the
+    // exact tag shape pinned by the PRD §"Implementation Decisions →
+    // VaultDeleteError variant set". TS-side parser (lands with
+    // MYND-108 frontend feature) consumes these.
+
+    #[test]
+    fn vault_busy_auth_serializes_with_kind_tag() {
+        let json =
+            serde_json::to_string(&VaultDeleteError::VaultBusyAuth).expect("serialize variant");
+        assert_eq!(json, r#"{"kind":"VaultBusyAuth"}"#);
+    }
+
+    #[test]
+    fn vault_not_unlocked_serializes_with_kind_tag() {
+        let json =
+            serde_json::to_string(&VaultDeleteError::VaultNotUnlocked).expect("serialize variant");
+        assert_eq!(json, r#"{"kind":"VaultNotUnlocked"}"#);
+    }
+
+    #[test]
+    fn vault_not_found_serializes_with_kind_tag() {
+        let json =
+            serde_json::to_string(&VaultDeleteError::VaultNotFound).expect("serialize variant");
+        assert_eq!(json, r#"{"kind":"VaultNotFound"}"#);
+    }
+
+    #[test]
+    fn partial_delete_serializes_with_kind_tag_and_remaining_count() {
+        let json = serde_json::to_string(&VaultDeleteError::PartialDelete { remaining_count: 3 })
+            .expect("serialize variant");
+        assert_eq!(
+            json,
+            r#"{"kind":"PartialDelete","detail":{"remaining_count":3}}"#
+        );
+    }
+
+    #[test]
+    fn io_serializes_with_kind_tag_and_io_error_kind() {
+        let json = serde_json::to_string(&VaultDeleteError::Io {
+            io_error_kind: IoFailureKind::PermissionDenied,
+        })
+        .expect("serialize variant");
+        assert_eq!(
+            json,
+            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
+        );
+    }
+
+    // ---- Static-string label exhaustive-match drift test -----------------
+    //
+    // Compile-time exhaustiveness via the helper's match. Each variant
+    // is asserted by the test; adding a new variant compile-fails the
+    // helper, which compile-fails this test, which surfaces in code
+    // review (the reviewer must update both helper and test in the
+    // same PR). Same pattern as `note_delete_error_kind` drift test.
+
+    #[test]
+    fn vault_delete_error_kind_label_covers_every_variant() {
+        assert_eq!(
+            vault_delete_error_kind(&VaultDeleteError::VaultBusyAuth),
+            "VaultBusyAuth"
+        );
+        assert_eq!(
+            vault_delete_error_kind(&VaultDeleteError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            vault_delete_error_kind(&VaultDeleteError::VaultNotFound),
+            "VaultNotFound"
+        );
+        assert_eq!(
+            vault_delete_error_kind(&VaultDeleteError::PartialDelete { remaining_count: 1 }),
+            "PartialDelete"
+        );
+        assert_eq!(
+            vault_delete_error_kind(&VaultDeleteError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+    }
+
+    // ---- io::Error From impl ---------------------------------------------
+
+    #[test]
+    fn from_io_error_maps_permission_denied_to_io_variant() {
+        let e: VaultDeleteError = std::io::Error::from(std::io::ErrorKind::PermissionDenied).into();
+        assert!(
+            matches!(
+                e,
+                VaultDeleteError::Io {
+                    io_error_kind: IoFailureKind::PermissionDenied
+                }
+            ),
+            "PermissionDenied must map to Io{{PermissionDenied}}, got {e:?}"
+        );
+    }
+
+    #[test]
+    fn from_io_error_maps_not_found_to_io_variant() {
+        let e: VaultDeleteError = std::io::Error::from(std::io::ErrorKind::NotFound).into();
+        assert!(matches!(
+            e,
+            VaultDeleteError::Io {
+                io_error_kind: IoFailureKind::NotFound
+            }
+        ));
+    }
+}

@@ -29,7 +29,7 @@ use thiserror::Error;
 /// | `TooManyConcurrentSessions`  | `{"kind":"TooManyConcurrentSessions"}`                       |
 /// | `JoinFailure`                | `{"kind":"JoinFailure"}`                                     |
 /// | `Io { kind }`                | `{"kind":"Io","detail":{"kind":"PermissionDenied"}}`         |
-/// | `VaultAlreadyExists`         | `{"kind":"VaultAlreadyExists"}`                              |
+/// | `VaultArtifactsPresent`      | `{"kind":"VaultArtifactsPresent"}`                           |
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum AppError {
@@ -66,17 +66,29 @@ pub enum AppError {
     #[error("io error")]
     Io { kind: IoErrorKind },
 
-    /// Defensive belt+suspenders guard: `vault.meta` already exists at
-    /// the target path. **Expected to NEVER trigger in normal flow.**
+    /// Defensive belt+suspenders guard: a recognized vault artefact is
+    /// already present at the target path. Recognized artefacts are
+    /// `vault.meta`, `vault.meta.tmp` (mid-write crash leftover from
+    /// `atomic_write`), or a `notes/` directory containing one or more
+    /// `*.myn` files (orphan blobs from a partial-fail `vault_delete`).
+    /// **Expected to NEVER trigger in normal flow.**
+    ///
     /// The frontend `vault_status` startup probe + state machine
     /// routing should prevent any path that re-enters create-vault when
-    /// a vault is already present. If this surfaces, a frontend routing
-    /// regression has bypassed those guards — the alternative (silent
-    /// `atomic_write` overwrite) would destroy the prior vault's
-    /// `root_key`, recovery phrase, and sealed `.myn` blobs
-    /// irrecoverably. See `app-state-machine` grilling Q12 + PRD.
-    #[error("vault already exists")]
-    VaultAlreadyExists,
+    /// a vault is already present. If this surfaces, either (a) a
+    /// frontend routing regression has bypassed those guards — the
+    /// alternative (silent `atomic_write` overwrite) would destroy the
+    /// prior vault's `root_key`, recovery phrase, and sealed `.myn`
+    /// blobs irrecoverably; or (b) a prior `vault_delete` partial-fail
+    /// left orphan artefacts that the user must manually clean (or, in
+    /// v0.2, in-app via `vault_repair`, Plane MYND-159).
+    ///
+    /// Renamed from `VaultAlreadyExists` on 2026-05-26 per
+    /// `decisions.md` "vault_create defensive guard extension". See
+    /// `app-state-machine` grilling Q12 (original variant) +
+    /// MYND-105 grill Q7 T2 (semantic broadening).
+    #[error("vault artefacts present")]
+    VaultArtifactsPresent,
 
     /// Backend min-length floor (`protocol::password_policy::MIN_PASSWORD_LEN`,
     /// currently 12 Unicode chars) rejected the new password. The

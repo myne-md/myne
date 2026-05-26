@@ -46,6 +46,19 @@ fn main() {
                     .commands(&["recover_with_phrase", "complete_recovery"]),
             )
             .plugin(
+                "vault-delete",
+                // Task 4 of `backend-vault-delete` (MYND-105) ships
+                // the `vault_delete` command (scaffolding stub; the
+                // Slot precondition matrix + recursive unlink +
+                // partial-fail aggregation + Unix-only durability
+                // body lands in Tasks 5-8). One-shot destruction of
+                // the local vault. Adding a command here without a
+                // matching `commands.allow` entry in
+                // `permissions/vault-delete/default.toml` is a
+                // security regression.
+                tauri_build::InlinedPlugin::new().commands(&["vault_delete"]),
+            )
+            .plugin(
                 "vault-change-password",
                 // Task 7 of `vault-change-password` (MYND-22) ships
                 // the `change_password` command (scaffolding stub;
