@@ -94,6 +94,14 @@ interface EditorProps {
    * `decisions.md` 2026-05-08 "`Stage.unlock.suspicionReason?` field".
    */
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
+  /**
+   * Pass-through to SettingsModal → AccountPanel. Fired on successful
+   * `vault_delete` IPC OR Continue-after-partial-fail click. App.tsx
+   * wires this to `dispatch({ type: "editor.delete-vault-success" })`;
+   * Stage transitions to welcome, this Editor unmounts, the
+   * SettingsModal unmounts in cascade.
+   */
+  onDeleteVaultSuccess: () => void;
 }
 
 /**
@@ -108,7 +116,8 @@ export function Editor({
   onResetRequested,
   onLock,
   onForceRelock,
-}: EditorProps = {}) {
+  onDeleteVaultSuccess,
+}: EditorProps) {
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -184,6 +193,7 @@ export function Editor({
       <EditorChrome
         onLock={onLock}
         onForceRelock={onForceRelock}
+        onDeleteVaultSuccess={onDeleteVaultSuccess}
         settingsOpen={settingsOpen}
         setSettingsOpen={setSettingsOpen}
         toastMessage={toastMessage}
@@ -202,6 +212,7 @@ export function Editor({
 type EditorChromeProps = {
   onLock?: () => void;
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
+  onDeleteVaultSuccess: () => void;
   settingsOpen: boolean;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
   toastMessage: string | null;
@@ -211,6 +222,7 @@ type EditorChromeProps = {
 function EditorChrome({
   onLock,
   onForceRelock,
+  onDeleteVaultSuccess,
   settingsOpen,
   setSettingsOpen,
   toastMessage,
@@ -397,6 +409,7 @@ function EditorChrome({
         onClose={() => setSettingsOpen(false)}
         onShowToast={setToastMessage}
         onForceRelock={onForceRelock}
+        onDeleteVaultSuccess={onDeleteVaultSuccess}
       />
       <CommandPaletteHost
         open={paletteOpen}

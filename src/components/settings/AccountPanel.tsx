@@ -1,30 +1,49 @@
-// Settings → Account panel. Two sub-views driven by local `view` state:
+// Settings → Account panel. Three sub-views driven by local `view` state:
 //
 //   - "idle" — Argon2id parameters readout, Change password CTA, Danger
-//     zone with disabled Delete vault (enables with MYND-105 + MYND-108).
+//     zone with active Delete vault button (MYND-105 backend + MYND-108
+//     frontend both shipped).
 //   - "change-password" — `<PasswordChangeForm>` replaces the panel;
 //     Cancel returns to idle; Submit calls `vault_change_password` IPC.
+//   - "delete-vault" — `<DeleteVaultConfirmForm>` replaces the panel;
+//     Cancel returns to idle (idle-mode only); Submit calls
+//     `vault_delete` IPC. On Ok → fires `onDeleteVaultSuccess()` →
+//     Stage transitions to welcome (App-level dispatch). On
+//     `PartialDelete`/`Io` → form switches to post-fail mode + Continue
+//     button (same terminal effect as Ok).
 //
 // Penpot canon:
 //   - idle: `🔴 screen------settings--account`
 //   - change-password: `🔴 screen------settings--account--change-password`
+//   - delete-vault idle: `screen------settings--account--delete-vault`
+//   - delete-vault post-fail: `screen------settings--account--delete-vault--partial-fail` / `--io-error`
 //
 // In-flight gating: during the Argon2id window the form disables itself
 // AND raises `onInFlightChange(true)` so SettingsModal can gate Esc /
 // backdrop / ×. The BottomBar Lock button stays enabled — firing
 // vault_lock during in-flight is the canonical graceful-cancel path
 // (backend returns `VaultLockedDuringChange` → suspicion banner via
-// `onForceRelock`).
+// `onForceRelock`). The same `onInFlightChange` chain covers
+// vault_delete (sub-second IPC window — Esc / backdrop / × gated).
 //
-// Memory hygiene: on success / cancel, PasswordChangeForm unmounts, which
-// clears its three fields by component-lifecycle teardown. The
-// load-bearing wipe is Rust-side `Zeroizing<String>`; V8 cleanup here is
-// best-effort.
+// Memory hygiene: on success / cancel, the relevant form unmounts,
+// which clears its fields by component-lifecycle teardown. The
+// load-bearing wipe is Rust-side `Zeroizing<String>` (change-password)
+// or `take_and_run_blocking` slot zeroize-before-unlink (vault_delete);
+// V8 cleanup here is best-effort.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { appDataDir, join } from "@tauri-apps/api/path";
 import { Button } from "../primitives/Button";
 import { PasswordChangeForm } from "../PasswordChangeForm";
+import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
 import { changePassword } from "../../lib/vault-change-password";
+import {
+  deleteVault,
+  mapDeleteVaultError,
+  type DeleteVaultPartialFailContext,
+  type VaultDeleteError,
+} from "../../lib/vault-delete";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { StageVaultStatus, SuspicionReason } from "../../lib/stage";
 
@@ -37,11 +56,23 @@ interface AccountPanelProps {
    */
   onChangePasswordSuccess: () => void;
   /**
+   * Fired after a successful `vault_delete` IPC OR after the user
+   * clicks Continue on the post-fail banner (PartialDelete / Io).
+   * Parent chain (SettingsModal → Editor → App) dispatches
+   * `editor.delete-vault-success`, which transitions Stage to
+   * `welcome`. Editor unmounts; SettingsModal unmounts in cascade.
+   * The slot is already Empty in both paths (zeroize-before-unlink
+   * fires on resolve AND reject), so the transition is consistent
+   * with the Rust slot state.
+   */
+  onDeleteVaultSuccess: () => void;
+  /**
    * Notify parent when an in-flight Argon2id-bound IPC starts/ends.
    * Parent (SettingsModal) uses this to gate Esc / backdrop / ×
    * dismissal during the ~1-3s window. Optional — when omitted, the
    * parent's gating is unaffected (but the form's own internal
-   * disabling still applies).
+   * disabling still applies). Same chain covers vault_delete's
+   * sub-second IPC window.
    */
   onInFlightChange?: (busy: boolean) => void;
   /**
@@ -126,7 +157,7 @@ const DIVIDER_STYLE: CSSProperties = {
   alignSelf: "stretch",
 };
 
-type View = "idle" | "change-password";
+type View = "idle" | "change-password" | "delete-vault";
 
 /**
  * Map a `VaultChangePasswordError` to the form-level banner copy.
@@ -170,17 +201,20 @@ function mapChangePasswordError(
 }
 
 function assertNever(x: never): never {
-  throw new Error(`[AccountPanel] unhandled VaultChangePasswordError variant: ${JSON.stringify(x)}`);
+  throw new Error(`[AccountPanel] unhandled error variant: ${JSON.stringify(x)}`);
 }
 
 export function AccountPanel({
   onChangePasswordSuccess,
+  onDeleteVaultSuccess,
   onInFlightChange,
   onForceRelock,
 }: AccountPanelProps) {
   const [view, setView] = useState<View>("idle");
   const [inFlight, setInFlight] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [deletePartialFail, setDeletePartialFail] =
+    useState<DeleteVaultPartialFailContext | null>(null);
   const mountedRef = useRef(true);
 
   // Defensive guard against state updates after unmount (e.g., the
@@ -277,6 +311,68 @@ export function AccountPanel({
     );
   }
 
+  if (view === "delete-vault") {
+    const handleDeleteSubmit = () => {
+      setInFlight(true);
+      void (async () => {
+        try {
+          await deleteVault();
+          if (!mountedRef.current) return;
+          // Resolve = full success. Slot is Empty + vault dir gone.
+          // Notify parent to dispatch `editor.delete-vault-success`;
+          // Stage transitions to welcome, Editor unmounts, SettingsModal
+          // unmounts in cascade. inFlight clear is harmless because the
+          // component is about to unmount.
+          setInFlight(false);
+          onDeleteVaultSuccess();
+        } catch (raw) {
+          if (!mountedRef.current) return;
+          setInFlight(false);
+          const e = raw as VaultDeleteError;
+          // Resolve the vault path lazily on reject — the success
+          // path doesn't need it. UI-side resolution mirrors the
+          // backend's `paths::vault_dir` derivation.
+          const base = await appDataDir();
+          const vaultDirPath = await join(base, "vault");
+          if (!mountedRef.current) return;
+          const mapping = mapDeleteVaultError(e, vaultDirPath);
+          if (mapping.kind === "partial-fail") {
+            setDeletePartialFail(mapping.context);
+            return;
+          }
+          // Bug-canary: VaultBusyAuth / VaultNotUnlocked /
+          // VaultNotFound. No banner. Dev-only warn so the underlying
+          // routing bug surfaces in development.
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              "[AccountPanel] vault_delete rejected (UI/router bug indicator):",
+              e,
+            );
+          }
+        }
+      })();
+    };
+
+    return (
+      <DeleteVaultConfirmForm
+        onSubmit={handleDeleteSubmit}
+        onCancel={() => {
+          setView("idle");
+        }}
+        onContinueAfterPartial={() => {
+          // Same terminal effect as the happy-path Submit — slot is
+          // already Empty (zeroize-before-unlink fired on the IPC
+          // reject path too). Stage transition to welcome.
+          setDeletePartialFail(null);
+          onDeleteVaultSuccess();
+        }}
+        inFlight={inFlight}
+        partialFailContext={deletePartialFail}
+      />
+    );
+  }
+
   return (
     <div style={ROOT_STYLE}>
       <section style={SECTION_STYLE}>
@@ -319,13 +415,13 @@ export function AccountPanel({
           Recovery phrase will not restore the vault.
         </p>
         <div>
-          {/*
-            Disabled today; enables when MYND-105 (vault_delete IPC) +
-            MYND-108 (frontend wiring) both land. Real label preserved
-            per `decisions.md` 2026-05-08 disabled-control discipline.
-            Will switch to `variant="danger"` (active red) when enabled.
-          */}
-          <Button variant="secondary" disabled>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setDeletePartialFail(null);
+              setView("delete-vault");
+            }}
+          >
             Delete vault…
           </Button>
         </div>

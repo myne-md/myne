@@ -309,6 +309,78 @@ impl VaultRuntimeState {
     }
 }
 
+impl VaultRuntimeState {
+    /// Take the current Slot (zeroizing the moved-out variant's
+    /// Drop-able fields), then run a `spawn_blocking` closure with
+    /// the slot write-lock **held across the await**. Used by
+    /// `vault_delete` to ensure concurrent slot-touching ops queue
+    /// on the lock during the recursive unlink walk.
+    ///
+    /// Mirrors [`Self::commit_unlocked_rewrite`]'s lock-held-across-
+    /// spawn_blocking posture (`decisions.md` 2026-05-06 "Slot::Unlocked
+    /// anchor field + post-Argon2id slot peek"); difference is that
+    /// vault_delete drops the slot to Empty before the spawn_blocking
+    /// rather than keeping it Unlocked.
+    ///
+    /// Lock-acquire-time invariant: if the slot is `Empty`, returns
+    /// [`TakeAndRunError::SlotEmpty`] without invoking the closure.
+    /// This catches a race where the caller peeked `slot_kind()`
+    /// observing Unlocked/Recovering, then a concurrent `vault_lock`
+    /// fired between peek and write-lock acquire. The auth_permits
+    /// semaphore the caller holds normally prevents this for the
+    /// auth-pipeline ops, but `vault_lock` does NOT consume an
+    /// auth_permit so the race exists in principle.
+    ///
+    /// **Cryptographic-erase ordering:** `core::mem::replace` consumes
+    /// the prior Slot and the explicit `drop(_dropped)` fires the
+    /// `UnlockedVault` / `RecoveringMaterial` `Drop` impl BEFORE the
+    /// `spawn_blocking` await begins — keys zeroize before any
+    /// filesystem operation runs. Pinned by `decisions.md` 2026-05-26
+    /// "vault_delete partial-fail posture" (the rationale that
+    /// partial-fail leaves only cryptographically-junk ciphertext
+    /// because key zeroize happens BEFORE the unlink loop).
+    pub async fn take_and_run_blocking<F, E>(&self, unlink: F) -> Result<(), TakeAndRunError<E>>
+    where
+        F: FnOnce() -> Result<(), E> + Send + 'static,
+        E: Send + 'static,
+    {
+        let mut slot_guard = self.slot.write().await;
+        if matches!(&*slot_guard, Slot::Empty) {
+            return Err(TakeAndRunError::SlotEmpty);
+        }
+        let dropped = core::mem::replace(&mut *slot_guard, Slot::Empty);
+        // Explicit drop fires zeroize NOW — before any IO.
+        drop(dropped);
+        // Lock still held across the spawn_blocking await; any
+        // concurrent slot-touching op (vault_lock, vault_unlock,
+        // note_*) queues on the RwLock.
+        match tokio::task::spawn_blocking(unlink).await {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(e)) => Err(TakeAndRunError::Closure(e)),
+            Err(_) => Err(TakeAndRunError::Join),
+        }
+    }
+}
+
+/// Outcome of [`VaultRuntimeState::take_and_run_blocking`].
+///
+/// Generic over the closure's error type so the caller (`vault_delete`)
+/// can route its own io-error variant back through its own
+/// command-level error enum.
+pub enum TakeAndRunError<E> {
+    /// Slot was `Empty` at write-lock acquire time. The closure did
+    /// NOT run; disk is untouched. Race between caller's
+    /// `slot_kind()` peek and this call (typically a concurrent
+    /// `vault_lock` IPC, since `vault_lock` does not consume an
+    /// `auth_permits` permit and so the auth-permits hold by
+    /// vault_delete does not block it).
+    SlotEmpty,
+    /// The closure returned an error.
+    Closure(E),
+    /// `tokio::task::spawn_blocking` join handle returned an error.
+    Join,
+}
+
 /// Outcome of [`VaultRuntimeState::commit_unlocked_rewrite`].
 ///
 /// Generic over the rewrite closure's error type so each plugin can

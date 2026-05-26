@@ -1,5 +1,6 @@
 // Vault unlock screen — task 7 of `app-state-machine`, extended with
-// recovery-flow entry affordances per `recovery-from-phrase-ui` Task 8.
+// recovery-flow entry affordances per `recovery-from-phrase-ui` Task 8
+// and the MYND-108-bis lost-credentials cul-de-sac escape.
 //
 // Mounts when Stage = `unlock`. Two rendering modes driven by
 // `initialStatus`:
@@ -12,7 +13,10 @@
 // `recovery-in-progress` (Rust slot is `Recovering`; password form is
 // suppressed in favor of an info banner + "Continue" resume CTA;
 // CTA dispatches `unlock.resume-recovery` to App.tsx, routing the
-// user into recover(password-reset)).
+// user into recover(password-reset)) | `delete-vault` (MYND-108-bis:
+// user clicked the tertiary "Lost both password and recovery phrase?
+// Delete vault and start over" link; the password form is replaced
+// by `<DeleteVaultConfirmForm>` for the typed-DELETE gate).
 //
 // `InvalidVaultMeta` mid-attempt switches the component into the same
 // fail-closed surface as a boot-time corrupted vault — one-way, no
@@ -22,11 +26,24 @@
 // "Forgot your password? Unlock with recovery phrase" link below the
 // primary CTA dispatches `unlock.start-recovery` → App routes Stage
 // to `recover(phrase-entry)`. The link is suppressed during
-// `decrypting`, `recovery-in-progress`, and fail-closed states.
+// `decrypting`, `recovery-in-progress`, fail-closed, and delete-vault
+// states.
+//
+// **Lost-credentials delete link (MYND-108-bis).** Below the recovery
+// link, a danger-tinted "Lost both password and recovery phrase?
+// Delete vault and start over" link switches the component to the
+// `delete-vault` sub-view. On Submit the IPC accepts via
+// `Slot::Empty + vault.meta-exists` (backend `delete_vault_files_no_zeroize`
+// no-keys arm); on Ok or PartialDelete-Continue the parent dispatches
+// `unlock.delete-vault-success` → Stage transitions to `welcome`.
+// See `decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
+// extended to accept Slot::Empty + vault.meta-exists".
 
 import { invoke } from "@tauri-apps/api/core";
-import { useReducer, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useReducer, useRef, type CSSProperties, type FormEvent } from "react";
+import { appDataDir, join } from "@tauri-apps/api/path";
 import { DestructiveBanner } from "../components/DestructiveBanner";
+import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
 import {
   CARD_BODY_STYLE,
@@ -38,6 +55,12 @@ import { SuspicionBanner } from "../components/SuspicionBanner";
 import { closeApp } from "../lib/app-window";
 import { ioBanner } from "../lib/io-banner";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
+import {
+  deleteVault,
+  mapDeleteVaultError,
+  type DeleteVaultPartialFailContext,
+  type VaultDeleteError,
+} from "../lib/vault-delete";
 import type { VaultUnlockError } from "../types/vault-unlock-error";
 
 interface UnlockProps {
@@ -52,6 +75,17 @@ interface UnlockProps {
    *  `unlock.resume-recovery` → Stage transitions to
    *  `recover(password-reset)`. */
   onResumeRecovery: () => void;
+  /**
+   * Terminal-destructive transition (MYND-108-bis lost-credentials
+   * cul-de-sac escape). Fired on `vault_delete` IPC Ok from the
+   * `delete-vault` sub-view OR on the user's Continue click after a
+   * PartialDelete/Io banner. App.tsx sends
+   * `unlock.delete-vault-success` → Stage transitions to `welcome`.
+   * Backend accepts via `Slot::Empty + vault.meta-exists` no-keys
+   * arm per `decisions.md` 2026-05-26 entry "MYND-108-bis
+   * vault_delete extended to accept Slot::Empty + vault.meta-exists".
+   */
+  onDeleteVaultSuccess: () => void;
   /**
    * Optional one-shot signal carried via `Stage.unlock.suspicionReason`
    * — set only by the change-password modal's force-relock callback
@@ -72,7 +106,12 @@ type UnlockState =
   | { kind: "idle"; password: string; error: string | null }
   | { kind: "decrypting"; password: string }
   | { kind: "corrupted-after-unlock" }
-  | { kind: "recovery-in-progress" };
+  | { kind: "recovery-in-progress" }
+  | {
+      kind: "delete-vault";
+      inFlight: boolean;
+      partialFail: DeleteVaultPartialFailContext | null;
+    };
 
 type UnlockAction =
   | { type: "set-password"; value: string }
@@ -80,7 +119,12 @@ type UnlockAction =
   | { type: "fail"; error: string }
   | { type: "fail-corrupted" }
   | { type: "fail-recovery-in-progress" }
-  | { type: "success" };
+  | { type: "success" }
+  | { type: "request-delete-vault" }
+  | { type: "cancel-delete-vault" }
+  | { type: "delete-vault-in-flight" }
+  | { type: "delete-vault-partial-fail"; context: DeleteVaultPartialFailContext }
+  | { type: "delete-vault-bug-canary" };
 
 function reducer(state: UnlockState, action: UnlockAction): UnlockState {
   switch (action.type) {
@@ -106,6 +150,29 @@ function reducer(state: UnlockState, action: UnlockAction): UnlockState {
       // and this component unmounts. Switching to a `success` variant
       // would briefly render an idle-empty state before unmount.
       return state;
+    case "request-delete-vault":
+      // Permitted only from idle mode (no in-flight password attempt,
+      // no recovery-in-progress). Resets any pending partial-fail
+      // context from a stale prior attempt.
+      if (state.kind !== "idle") return state;
+      return { kind: "delete-vault", inFlight: false, partialFail: null };
+    case "cancel-delete-vault":
+      // Cancel back to idle. Permitted only when NOT inFlight
+      // (the form's Cancel button is hidden during the IPC window).
+      if (state.kind !== "delete-vault" || state.inFlight) return state;
+      return { kind: "idle", password: "", error: null };
+    case "delete-vault-in-flight":
+      if (state.kind !== "delete-vault") return state;
+      return { ...state, inFlight: true };
+    case "delete-vault-partial-fail":
+      if (state.kind !== "delete-vault") return state;
+      return { ...state, inFlight: false, partialFail: action.context };
+    case "delete-vault-bug-canary":
+      // Bug-canary error (VaultBusyAuth / VaultNotUnlocked /
+      // VaultNotFound). Clear inFlight, stay in the form so the
+      // user can retry or cancel. No user-visible banner.
+      if (state.kind !== "delete-vault") return state;
+      return { ...state, inFlight: false };
     default:
       return state;
   }
@@ -186,6 +253,25 @@ const INFO_BANNER_STYLE: CSSProperties = {
   color: "var(--info)",
 };
 
+// Danger-tinted clone of RECOVER_LINK_STYLE — same shape (link-style
+// transparent button) but rendered in `--danger` to telegraph the
+// terminal-destructive nature of the affordance without escalating to
+// the full Button danger variant (which would compete visually with
+// the primary Unlock CTA).
+const DELETE_VAULT_LINK_STYLE: CSSProperties = {
+  background: "transparent",
+  border: 0,
+  padding: 0,
+  marginTop: "var(--space-1)",
+  alignSelf: "center",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--danger)",
+  cursor: "pointer",
+  textAlign: "center",
+};
+
 const RECOVER_LINK_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
@@ -222,9 +308,80 @@ export function Unlock({
   onUnlocked,
   onStartRecovery,
   onResumeRecovery,
+  onDeleteVaultSuccess,
   suspicionReason,
 }: UnlockProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // MYND-108-bis delete-vault sub-view. Mounts when the user clicks
+  // the tertiary "Lost both password and recovery phrase? Delete vault
+  // and start over" link below the recovery link. The IPC accepts via
+  // `Slot::Empty + vault.meta-exists` (backend's no-keys arm).
+  if (state.kind === "delete-vault") {
+    const handleDeleteSubmit = () => {
+      dispatch({ type: "delete-vault-in-flight" });
+      void (async () => {
+        try {
+          await deleteVault();
+          if (!mountedRef.current) return;
+          // Resolve = full success. Slot stayed Empty (no state change);
+          // vault directory recursively removed. Parent dispatches
+          // `unlock.delete-vault-success` → Stage transitions to
+          // welcome, this component unmounts.
+          onDeleteVaultSuccess();
+        } catch (raw) {
+          if (!mountedRef.current) return;
+          const e = raw as VaultDeleteError;
+          const base = await appDataDir();
+          const vaultDirPath = await join(base, "vault");
+          if (!mountedRef.current) return;
+          const mapping = mapDeleteVaultError(e, vaultDirPath);
+          if (mapping.kind === "partial-fail") {
+            dispatch({
+              type: "delete-vault-partial-fail",
+              context: mapping.context,
+            });
+            return;
+          }
+          // Bug-canary: VaultBusyAuth / VaultNotUnlocked / VaultNotFound.
+          // VaultNotUnlocked is unreachable from current backend paths
+          // (MYND-108-bis lifted that arm) but we treat it as bug-canary
+          // for defense-in-depth.
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              "[Unlock] vault_delete rejected (UI/router bug indicator):",
+              e,
+            );
+          }
+          dispatch({ type: "delete-vault-bug-canary" });
+        }
+      })();
+    };
+
+    return (
+      <CenteredCard>
+        {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
+        <DeleteVaultConfirmForm
+          onSubmit={handleDeleteSubmit}
+          onCancel={() => dispatch({ type: "cancel-delete-vault" })}
+          onContinueAfterPartial={() => {
+            // Same terminal effect as the happy-path Submit.
+            onDeleteVaultSuccess();
+          }}
+          inFlight={state.inFlight}
+          partialFailContext={state.partialFail}
+        />
+      </CenteredCard>
+    );
+  }
 
   // Boot-time corrupted/IoError mode: render <FailClosedError /> from
   // the first frame; password form never mounts.
@@ -323,6 +480,15 @@ export function Unlock({
         {!decrypting && (
           <button type="button" onClick={onStartRecovery} style={RECOVER_LINK_STYLE}>
             Forgot your password? Unlock with recovery phrase
+          </button>
+        )}
+        {!decrypting && (
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "request-delete-vault" })}
+            style={DELETE_VAULT_LINK_STYLE}
+          >
+            Lost both password and recovery phrase? Delete vault and start over
           </button>
         )}
       </form>

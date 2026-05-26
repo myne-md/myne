@@ -11,7 +11,7 @@ use protocol::{
     VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::{Runtime, State};
 use uuid::Uuid;
@@ -175,10 +175,12 @@ pub(crate) fn build_session(
 /// 3. Delegate to [`commit_with_vault_path`], which:
 ///    a. `state.take(token)` consumes the session
 ///       (`SessionNotFound` / `SessionExpired` on absent / TTL-evicted).
-///    b. Defensive `VaultAlreadyExists` guard: if `vault.meta` is
+///    b. Defensive `VaultArtifactsPresent` guard: if any recognized
+///       vault artefact (vault.meta, vault.meta.tmp, notes/*.myn) is
 ///       already present at the resolved path, restore the session
-///       and return [`AppError::VaultAlreadyExists`]. **Expected to
-///       NEVER trigger in normal flow** — see grilling Q12.
+///       and return [`AppError::VaultArtifactsPresent`]. **Expected
+///       to NEVER trigger in normal flow** — see grilling Q12 +
+///       MYND-105 grill Q7 (taxonomy broadening).
 ///    c. In a `spawn_blocking` worker: AEAD-wrap `root_key` twice,
 ///       derive `itemsKey_wrap_key` via `derive_subkey`, generate
 ///       `itemsKey` + its UUIDv7, AEAD-wrap `itemsKey`, build
@@ -207,6 +209,61 @@ pub async fn commit<R: Runtime>(
     commit_with_vault_path(token, vault_path, state.inner()).await
 }
 
+/// Recognized-artefact predicate consumed by the
+/// [`commit_with_vault_path`] defensive guard.
+///
+/// Returns `Ok(true)` if any of the following exists under `vault_dir`:
+/// - `vault.meta` (the canonical case — fully-formed vault present)
+/// - `vault.meta.tmp` (mid-write crash leftover from
+///   [`crate::atomic_write::atomic_write`]'s tempfile-rename path; same
+///   class as `vault.meta` because either rename half-completed or the
+///   process died between tempfile write and rename)
+/// - `notes/` directory contains at least one `*.myn` file (orphan
+///   per-note blobs from a partial-fail `vault_delete` — Plane
+///   MYND-105, `decisions.md` 2026-05-26 entry "vault_delete
+///   partial-fail posture")
+///
+/// Returns `Ok(false)` when `vault_dir` itself does not exist (no
+/// artefacts to find — caller should proceed with fresh creation).
+/// Returns `Err(io::Error)` only on `read_dir` failure while scanning
+/// `notes/` (e.g., permission denied); the `From<io::Error> for
+/// AppError` impl maps this to [`AppError::Io`] at the call site.
+///
+/// Future per-vault artefact families (A14 encrypted per-note
+/// snapshots, Phase 1.5 FTS index, attachments) extend this helper by
+/// adding a check in the same PR that introduces the artefact —
+/// concrete maintenance discipline preserved by the dual taxonomy
+/// with `vault_delete`'s recursive unlink (decisions.md 2026-05-26
+/// entry "vault_create defensive guard extension", T1a + T2b sub-
+/// decisions). The check intentionally does NOT recognize arbitrary
+/// files under `vault_dir` (e.g., `.DS_Store`, `Thumbs.db`,
+/// OS-injected artefacts) — those are not vault state and must not
+/// gate `vault_create`.
+///
+/// `pub(crate)` so the future `vault_repair` (v0.2, Plane MYND-159)
+/// can re-use the same predicate without duplication.
+pub(crate) fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool> {
+    if !vault_dir.exists() {
+        return Ok(false);
+    }
+    if vault_dir.join("vault.meta").is_file() {
+        return Ok(true);
+    }
+    if vault_dir.join("vault.meta.tmp").is_file() {
+        return Ok(true);
+    }
+    let notes = vault_dir.join("notes");
+    if notes.is_dir() {
+        for entry in std::fs::read_dir(&notes)? {
+            let entry = entry?;
+            if entry.path().extension().is_some_and(|e| e == "myn") {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
 /// Testable core of [`commit`]. The Tauri-command wrapper resolves the
 /// platform-specific `vault.meta` path and delegates here so tests do
 /// not need an [`tauri::AppHandle`].
@@ -214,13 +271,17 @@ pub async fn commit<R: Runtime>(
 /// Sequence:
 /// 1. `state.take(token)` consumes the session
 ///    (`SessionNotFound` / `SessionExpired` on absent / TTL-evicted).
-/// 2. **Defensive `VaultAlreadyExists` guard** (`app-state-machine`
-///    grill Q12 + PRD): if `vault_path.exists()`, restore the session
-///    (so retry remains possible — non-destructive) and return
-///    [`AppError::VaultAlreadyExists`]. **Expected to NEVER trigger
-///    in normal flow.** Trigger = frontend routing regression
-///    (`vault_status` startup probe + state machine should keep the
-///    user out of the create flow when a vault is present).
+/// 2. **Defensive `VaultArtifactsPresent` guard** (`app-state-machine`
+///    grill Q12 + MYND-105 grill Q7): if [`vault_artifacts_present`]
+///    returns `true` for the parent directory of `vault_path`, restore
+///    the session (so retry remains possible — non-destructive) and
+///    return [`AppError::VaultArtifactsPresent`]. **Expected to NEVER
+///    trigger in normal flow.** Trigger = (a) frontend routing
+///    regression (`vault_status` probe + state machine should keep
+///    the user out of create-vault when a vault is present), or (b)
+///    a prior `vault_delete` partial-fail left orphan artefacts that
+///    the user has not manually cleaned (v0.2 `vault_repair`
+///    feature, Plane MYND-159, will handle this in-app).
 /// 3. `tokio::task::spawn_blocking` runs the heavy `vault.meta`
 ///    build + atomic write (`build_and_serialize_vault_meta` +
 ///    `atomic_write::atomic_write`). On failure the worker returns
@@ -237,34 +298,42 @@ pub(crate) async fn commit_with_vault_path(
         SessionLookup::NotFound => return Err(AppError::SessionNotFound),
     };
 
-    // Defensive guard: vault.meta already present on disk. The
-    // alternative — letting the spawn_blocking pipeline reach
-    // `atomic_write` — would silently overwrite the prior vault.meta
-    // (`atomic_write` uses `OpenOptions::create(true).truncate(true)`
-    // + `rename_replacing` with `MOVEFILE_REPLACE_EXISTING` semantics
-    // on Windows), destroying the prior vault's `root_key`, recovery
-    // phrase derivation salts, and consequently any sealed `.myn`
-    // blobs. **This guard is expected to NEVER trigger in normal
-    // flow**: `vault_status` startup probe + frontend state machine
-    // should keep the user out of create-vault when a vault is
-    // present. Surfacing this error means a frontend routing
-    // regression has bypassed those guards.
+    // Defensive guard: any recognized vault artefact already present
+    // under the vault directory. Recognized artefacts (per the
+    // [`vault_artifacts_present`] taxonomy): `vault.meta`,
+    // `vault.meta.tmp` (mid-write crash leftover from
+    // [`crate::atomic_write::atomic_write`]'s tempfile-rename path),
+    // or `notes/` containing one or more `*.myn` files (orphan blobs
+    // from a partial-fail `vault_delete`). The alternative — letting
+    // the spawn_blocking pipeline reach `atomic_write` — would
+    // silently overwrite a prior vault.meta (destroying its
+    // `root_key`, recovery phrase derivation salts, and consequently
+    // any sealed `.myn` blobs), or co-mingle a fresh vault with
+    // orphan blobs that surface as ghost notes after unlock.
+    // **Expected to NEVER trigger in normal flow**: `vault_status`
+    // startup probe + frontend state machine should keep the user out
+    // of create-vault when artefacts are present.
     //
     // See: `myne-agents/sessions/grill/2026-05-02-app-state-machine.md`
-    // Q12 + `myne-agents/features/app-state-machine/prd.md` (defansif
-    // backend guard).
-    if vault_path.exists() {
+    // Q12 (original variant) + `myne-agents/features/app-state-machine/prd.md`
+    // + `myne-agents/sessions/grill/2026-05-26-mynd-105-vault-delete.md` Q7
+    // (taxonomy broadening + rename) + `decisions.md` 2026-05-26
+    // "vault_create defensive guard extension".
+    let vault_dir = vault_path
+        .parent()
+        .expect("vault.meta path resolution always yields a parent directory");
+    if vault_artifacts_present(vault_dir)? {
         tracing::error!(
-            stage = "commit_exists_check",
-            error_kind = "VaultAlreadyExists",
-            "commit attempted on path with existing vault.meta — frontend routing bypass"
+            stage = "commit_artifacts_check",
+            error_kind = "VaultArtifactsPresent",
+            "commit attempted on path with existing vault artefacts — frontend routing bypass or unclean partial-delete"
         );
         // Restore the session so `commit_with_vault_path` is
         // structurally non-destructive: even when the guard fires, no
         // work or state is lost. `try_insert` cannot exceed the cap
         // here: the slot was just freed by `state.take` above.
         let _ = state.try_insert(token, session);
-        return Err(AppError::VaultAlreadyExists);
+        return Err(AppError::VaultArtifactsPresent);
     }
 
     let outcome: Result<(), (AppError, VaultCreationSession)> =
@@ -472,15 +541,18 @@ mod tests {
         assert_ne!(a, b);
     }
 
-    // ---- Defensive `VaultAlreadyExists` guard (Task 2 of `app-state-machine`) ----
+    // ---- Defensive `VaultArtifactsPresent` guard (Task 2 of `app-state-machine`,
+    //      broadened in MYND-105 to recognized-artefact taxonomy) ----
     //
     // Belt+suspenders Rust-side mirror of Q5β-1's transition fn +
     // component-mount peek check. If frontend routing bypasses
-    // `vault_status` and re-enters create-vault on a path that already
-    // has a vault.meta, this guard rejects the commit before
-    // `atomic_write` would silently overwrite — which would destroy
-    // the prior vault's `root_key`, recovery phrase derivation salts,
-    // and any sealed `.myn` blobs.
+    // `vault_status` and re-enters create-vault on a path that has any
+    // recognized vault artefact (vault.meta, vault.meta.tmp, or
+    // notes/*.myn), this guard rejects the commit before
+    // `atomic_write` would either silently overwrite (destroying the
+    // prior vault's `root_key`, recovery phrase derivation salts, and
+    // any sealed `.myn` blobs) or co-mingle a fresh vault with
+    // partial-delete orphan blobs.
     //
     // **Bug-canary role:** if these tests stay green but production
     // sees vault overwrite reports, the bug is NOT in the guard
@@ -545,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_returns_already_exists_when_vault_meta_present() {
+    fn commit_returns_artifacts_present_when_vault_meta_present() {
         // Pre-seed `vault.meta` at the target path with arbitrary
         // bytes (any non-empty content suffices — the guard is a pure
         // file-presence check, not a parse). The guard must reject
@@ -568,7 +640,7 @@ mod tests {
                 commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
 
             assert!(
-                matches!(result, Err(AppError::VaultAlreadyExists)),
+                matches!(result, Err(AppError::VaultArtifactsPresent)),
                 "commit must reject when vault.meta exists, got {result:?}"
             );
 
@@ -584,7 +656,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_already_exists_guard_restores_session_for_retry() {
+    fn commit_artifacts_present_guard_restores_session_for_retry() {
         // Non-destructive contract: when the guard fires, the session
         // must be re-inserted under the same token. This ensures
         // commit_with_vault_path is idempotent under guard-firing
@@ -600,7 +672,7 @@ mod tests {
 
             let result =
                 commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
-            assert!(matches!(result, Err(AppError::VaultAlreadyExists)));
+            assert!(matches!(result, Err(AppError::VaultArtifactsPresent)));
 
             // Session must still be takeable under the same token.
             // If `take` returned `NotFound`/`Expired` here, the guard
@@ -618,7 +690,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_already_exists_guard_does_not_fire_when_vault_meta_absent() {
+    fn commit_artifacts_present_guard_does_not_fire_when_dir_empty() {
         // Negative control: with no pre-existing file, the guard must
         // not short-circuit. We can't easily run the full success
         // path here (it would do real Argon2id-derived AEAD writes
@@ -636,11 +708,11 @@ mod tests {
             let result = commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
 
             // Either Ok (full happy path completed) or some non-
-            // VaultAlreadyExists error. The point is: guard did not
-            // mis-fire on a missing file.
+            // VaultArtifactsPresent error. The point is: guard did not
+            // mis-fire on a clean directory.
             assert!(
-                !matches!(result, Err(AppError::VaultAlreadyExists)),
-                "guard mis-fired on missing vault.meta; got {result:?}"
+                !matches!(result, Err(AppError::VaultArtifactsPresent)),
+                "guard mis-fired on clean directory; got {result:?}"
             );
         });
     }
@@ -669,12 +741,155 @@ mod tests {
     }
 
     #[test]
-    fn vault_already_exists_serializes_with_kind_tag() {
-        // IPC contract: `{"kind":"VaultAlreadyExists"}` — bare unit
+    fn vault_artifacts_present_serializes_with_kind_tag() {
+        // IPC contract: `{"kind":"VaultArtifactsPresent"}` — bare unit
         // variant, externally tagged. Frontend `vault-creation-errors.ts`
-        // matches on this.
-        let json = serde_json::to_string(&AppError::VaultAlreadyExists).expect("serialize variant");
-        assert_eq!(json, r#"{"kind":"VaultAlreadyExists"}"#);
+        // matches on this. Renamed from `VaultAlreadyExists` on
+        // 2026-05-26 per `decisions.md` "vault_create defensive guard
+        // extension"; the wire shape changes with the variant name.
+        let json =
+            serde_json::to_string(&AppError::VaultArtifactsPresent).expect("serialize variant");
+        assert_eq!(json, r#"{"kind":"VaultArtifactsPresent"}"#);
+    }
+
+    // ---- `vault_artifacts_present` helper unit tests (MYND-105) ----
+    //
+    // Covers the taxonomy from `decisions.md` 2026-05-26 entry
+    // "vault_create defensive guard extension": vault.meta exists OR
+    // vault.meta.tmp exists OR notes/ contains a *.myn file. Negative
+    // cases also exercised (empty dir, notes/ with non-myn files,
+    // nonexistent vault_dir).
+
+    #[test]
+    fn vault_artifacts_present_returns_false_for_nonexistent_dir() {
+        let tmp = crate::test_support::ScopedTempDir::new("vap-none").expect("scoped tempdir");
+        let ghost = tmp.path().join("does-not-exist");
+        assert!(
+            !vault_artifacts_present(&ghost).expect("nonexistent dir is not an error"),
+            "nonexistent vault_dir must report no artefacts"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_false_for_empty_dir() {
+        let tmp = crate::test_support::ScopedTempDir::new("vap-empty").expect("scoped tempdir");
+        assert!(
+            !vault_artifacts_present(tmp.path()).expect("empty dir scan ok"),
+            "empty vault_dir must report no artefacts"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_vault_meta_present() {
+        let tmp = crate::test_support::ScopedTempDir::new("vap-meta").expect("scoped tempdir");
+        std::fs::write(tmp.path().join("vault.meta"), b"any bytes").expect("seed vault.meta");
+        assert!(vault_artifacts_present(tmp.path()).expect("scan ok"));
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_vault_meta_tmp_present() {
+        let tmp = crate::test_support::ScopedTempDir::new("vap-tmp").expect("scoped tempdir");
+        std::fs::write(tmp.path().join("vault.meta.tmp"), b"interrupted write")
+            .expect("seed vault.meta.tmp");
+        assert!(
+            vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "vault.meta.tmp is a recognized mid-write crash artefact"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_notes_contains_myn_blob() {
+        let tmp = crate::test_support::ScopedTempDir::new("vap-myn").expect("scoped tempdir");
+        let notes = tmp.path().join("notes");
+        std::fs::create_dir_all(&notes).expect("mkdir notes/");
+        std::fs::write(
+            notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+            b"orphan blob bytes",
+        )
+        .expect("seed orphan .myn");
+        assert!(
+            vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "orphan .myn from partial-fail vault_delete is a recognized artefact"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_false_when_notes_empty() {
+        let tmp =
+            crate::test_support::ScopedTempDir::new("vap-notes-empty").expect("scoped tempdir");
+        std::fs::create_dir_all(tmp.path().join("notes")).expect("mkdir notes/");
+        assert!(
+            !vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "empty notes/ is not a recognized artefact"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_false_when_notes_contains_only_non_myn() {
+        let tmp =
+            crate::test_support::ScopedTempDir::new("vap-notes-other").expect("scoped tempdir");
+        let notes = tmp.path().join("notes");
+        std::fs::create_dir_all(&notes).expect("mkdir notes/");
+        std::fs::write(notes.join(".DS_Store"), b"x").expect("seed .DS_Store");
+        std::fs::write(notes.join("readme.txt"), b"x").expect("seed readme.txt");
+        assert!(
+            !vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "non-myn files (OS artefacts, user notes) must not gate vault_create"
+        );
+    }
+
+    // ---- Cross-plugin orphan-state guard test (MYND-105 Task 3) ----
+    //
+    // Asserts that `commit_with_vault_path` rejects with
+    // `VaultArtifactsPresent` when the target path has orphan `.myn`
+    // files (e.g., from a partial-fail `vault_delete`) even though
+    // `vault.meta` itself is absent. This is the rationale for the
+    // T2b semantic broadening: without the recognized-artefact check,
+    // create-vault would proceed and the unlock side would surface
+    // ghost notes from the previous partial-deletion state.
+
+    #[test]
+    fn commit_rejects_when_orphan_myn_present_without_vault_meta() {
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            // Construct orphan disk state: notes/<uuid>.myn but NO
+            // vault.meta. Simulates a partial-fail vault_delete that
+            // removed vault.meta first but failed on the .myn file.
+            let notes = scratch.dir.join("notes");
+            std::fs::create_dir_all(&notes).expect("mkdir notes/");
+            std::fs::write(
+                notes.join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+                b"orphan blob - cryptographically junk after root_key zeroize",
+            )
+            .expect("seed orphan .myn");
+            assert!(
+                !scratch.meta_path.exists(),
+                "test premise: vault.meta absent (partial-fail simulation)"
+            );
+
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            let result =
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+
+            assert!(
+                matches!(result, Err(AppError::VaultArtifactsPresent)),
+                "commit must reject orphan-myn-without-vault-meta state, got {result:?}"
+            );
+
+            // Non-destructive: session restored for retry after user
+            // manually cleans (or in v0.2, via vault_repair MYND-159).
+            match state.take(token) {
+                SessionLookup::Found(_) => {}
+                SessionLookup::NotFound => panic!(
+                    "guard dropped the session - non-destructive contract broken; retry with same token would now fail with SessionNotFound"
+                ),
+                SessionLookup::Expired => panic!(
+                    "guard mis-routed the session through TTL eviction - should be a clean re-insert"
+                ),
+            }
+        });
     }
 
     #[test]

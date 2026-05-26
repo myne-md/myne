@@ -111,6 +111,9 @@ function App() {
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
+            onDeleteVaultSuccess={() =>
+              dispatch({ type: "unlock.delete-vault-success" })
+            }
             suspicionReason={stage.suspicionReason}
           />
         );
@@ -120,6 +123,9 @@ function App() {
             onResetRequested={reprobe}
             onLock={() => dispatch({ type: "editor.lock" })}
             onForceRelock={setStageWithSuspicion}
+            onDeleteVaultSuccess={() =>
+              dispatch({ type: "editor.delete-vault-success" })
+            }
           />
         );
       case "recover":
@@ -129,6 +135,9 @@ function App() {
             onCancel={() => dispatch({ type: "recover.cancel" })}
             onCompleteSuccess={() =>
               dispatch({ type: "recover.complete-success" })
+            }
+            onDeleteVaultSuccess={() =>
+              dispatch({ type: "recover.delete-vault-success" })
             }
           />
         );

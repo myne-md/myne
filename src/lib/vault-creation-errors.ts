@@ -165,21 +165,28 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
       };
     case "Io":
       return mapIoError(error.detail);
-    case "VaultAlreadyExists":
+    case "VaultArtifactsPresent":
       // Defensive: this path should never be reached in normal flow —
       // the `vault_status` startup probe + frontend state machine
       // route returning users straight to unlock when a vault is
       // present, keeping them out of the create flow entirely. If a
-      // real user sees this, the frontend routing has bypassed those
-      // guards (a regression bug, not a user-facing condition). The
-      // alternative — letting the backend silently overwrite the
-      // prior vault.meta — would destroy the prior root_key /
-      // recovery phrase / sealed `.myn` blobs irrecoverably, which is
-      // why the backend rejects rather than swallows. See
-      // `app-state-machine` PRD + grill Q12.
+      // real user sees this, either (a) the frontend routing has
+      // bypassed those guards (regression bug, not a user-facing
+      // condition; the alternative — letting the backend silently
+      // overwrite the prior vault.meta — would destroy the prior
+      // root_key / recovery phrase / sealed `.myn` blobs
+      // irrecoverably, which is why the backend rejects rather than
+      // swallows), or (b) a prior `vault_delete` partial-fail left
+      // orphan artefacts. UI copy intentionally does NOT reference
+      // v0.2 `vault_repair` (no vaporware per PRODUCT.md design
+      // principle 3); the "restart and unlock" path covers case (a)
+      // which is by far the most likely if this ever surfaces in
+      // production. See `app-state-machine` PRD + grill Q12
+      // (original) + MYND-105 PRD + grill Q7 (semantic broadening).
+      // Renamed from VaultAlreadyExists on 2026-05-26.
       return {
         title: "Vault already exists",
-        body: "A new vault cannot be created because a vault file already exists on this device. Close the app and restart — the startup screen will route you to the unlock flow.",
+        body: "A new vault cannot be created because vault data already exists on this device. Close the app and restart — the startup screen will route you to the unlock flow.",
         primaryAction: "restart",
         displayMode: "dedicated",
       };

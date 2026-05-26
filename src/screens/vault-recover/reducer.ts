@@ -33,6 +33,7 @@
 // user retries the same submit).
 
 import type { RecoverSubStep } from "../../lib/stage";
+import type { DeleteVaultPartialFailContext } from "../../lib/vault-delete";
 
 /** Reason used to render `<FailClosedError>`. Recover never produces
  *  `io-error` here — IO failures stay banner-retry per Q7 (E1/E2). */
@@ -52,6 +53,16 @@ export interface VaultRecoverState {
   /** When non-null, the recover screen unmounts the sub-step
    *  components and renders `<FailClosedError>` with this reason. */
   failClosed: FailClosedReason | null;
+  /** MYND-108-bis: in-flight flag for the `delete-confirm` sub-step
+   *  during the `vault_delete` IPC window. Mirrors the AccountPanel +
+   *  Unlock screen pattern. `false` outside the `delete-confirm`
+   *  sub-step. */
+  deleteInFlight: boolean;
+  /** MYND-108-bis: post-fail context for the `delete-confirm` sub-step.
+   *  Non-null when the IPC returned `PartialDelete` or `Io` and the
+   *  user is reading the banner before clicking Continue. `null`
+   *  outside the `delete-confirm` sub-step or before the first reject. */
+  deletePartialFail: DeleteVaultPartialFailContext | null;
 }
 
 /** Outcome variants produced by the consumer of `recover_with_phrase`
@@ -97,7 +108,29 @@ export type Action =
   /** A8f IPC failure — consumer dispatches the mapped
    *  `PasswordOutcome`. (Success is handled outside the reducer
    *  via `onCompleteSuccess`.) */
-  | { type: "password-result"; outcome: PasswordOutcome };
+  | { type: "password-result"; outcome: PasswordOutcome }
+  /** MYND-108-bis: user clicked the "Delete vault and start over"
+   *  footer link in phrase-entry. Transitions to the `delete-confirm`
+   *  sub-step. No-op from any other sub-step (PasswordResetStep is
+   *  non-dismissible per recovery-flow.md §4.1 / §4.3). */
+  | { type: "request-delete" }
+  /** MYND-108-bis: user clicked Cancel inside the delete-confirm
+   *  form (idle mode only). Returns to phrase-entry sub-step. Cells
+   *  preserved (user might want to retry recovery after canceling
+   *  the delete intent). */
+  | { type: "cancel-delete" }
+  /** MYND-108-bis: consumer fired the `vault_delete` IPC and is
+   *  waiting for the response. Sets `deleteInFlight = true`. */
+  | { type: "delete-in-flight" }
+  /** MYND-108-bis: IPC rejected with PartialDelete or Io. Stores
+   *  the form's post-fail context (count + resolved vault path).
+   *  Clears `deleteInFlight`. */
+  | { type: "delete-partial-fail"; context: DeleteVaultPartialFailContext }
+  /** MYND-108-bis: IPC rejected with a bug-canary variant
+   *  (VaultBusyAuth / VaultNotUnlocked / VaultNotFound). Clears
+   *  `deleteInFlight`; stays in delete-confirm sub-step. The
+   *  consumer emits a dev-only `console.warn`. */
+  | { type: "delete-bug-canary" };
 
 export const PHRASE_CELL_COUNT = 24;
 
@@ -117,6 +150,8 @@ export function initialState(initialSubStep: RecoverSubStep): VaultRecoverState 
     password: "",
     banner: null,
     failClosed: null,
+    deleteInFlight: false,
+    deletePartialFail: null,
   };
 }
 
@@ -254,6 +289,47 @@ export function vaultRecoverReducer(
       }
       // Exhaustiveness — unreachable.
       return state;
+    }
+    case "request-delete": {
+      // MYND-108-bis: only reachable from phrase-entry. PasswordResetStep
+      // stays non-dismissible per `recovery-flow.md` §4.1 / §4.3.
+      if (state.subStep !== "phrase-entry") return state;
+      return {
+        ...state,
+        subStep: "delete-confirm",
+        banner: null,
+        deleteInFlight: false,
+        deletePartialFail: null,
+      };
+    }
+    case "cancel-delete": {
+      // Permitted only when NOT inFlight (the form hides Cancel
+      // during the IPC window).
+      if (state.subStep !== "delete-confirm" || state.deleteInFlight) {
+        return state;
+      }
+      return {
+        ...state,
+        subStep: "phrase-entry",
+        deleteInFlight: false,
+        deletePartialFail: null,
+      };
+    }
+    case "delete-in-flight": {
+      if (state.subStep !== "delete-confirm") return state;
+      return { ...state, deleteInFlight: true };
+    }
+    case "delete-partial-fail": {
+      if (state.subStep !== "delete-confirm") return state;
+      return {
+        ...state,
+        deleteInFlight: false,
+        deletePartialFail: action.context,
+      };
+    }
+    case "delete-bug-canary": {
+      if (state.subStep !== "delete-confirm") return state;
+      return { ...state, deleteInFlight: false };
     }
   }
 }
