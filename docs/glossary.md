@@ -694,6 +694,12 @@ A non-secret, per-vault random value mixed into KDF input to prevent precomputat
 
 Used in: `spec/protocol.md` §3.1
 
+### **screen-capture protection** &nbsp; 📦 *Product*
+
+Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (macOS `NSWindowSharingNone`, Windows `WDA_EXCLUDEFROMCAPTURE`). Platform support: macOS (all Tauri-supported versions), Windows 10 build 19041+. Unavailable on Linux v0.1.
+
+Used in: `threat-model.md` §6, §7
+
 ### **selection toolbar** &nbsp; 📦 *Product*
 
 The floating UI surface that appears above an active text selection in the Phase 1 editor, exposing format actions (bold / italic / strikethrough / inline-code / link / heading dropdown). Positioning uses the shared `src/editor/positioning.ts` helper — `getBoundingClientRect` + viewport-edge clamp + flip-below-when-no-room-above. The 🔗 (link) button opens an **inline URL overlay** adjacent to the selection rather than a `window.prompt()` or modal, matching `PRODUCT.md`'s "modals not as first reach for interaction" anti-pattern. Implemented as a CodeMirror 6 `ViewPlugin` that mounts/unmounts the toolbar React subtree based on selection state; absent when the selection is empty.

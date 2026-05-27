@@ -3,6 +3,7 @@ mod io_failure_kind;
 mod paths;
 mod plugins;
 mod protocol_error_kind;
+mod screen_capture;
 #[cfg(test)]
 mod test_support;
 mod vault_meta_hash;
@@ -37,6 +38,14 @@ pub fn run() {
         .plugin(plugins::vault_change_password::init())
         .plugin(plugins::vault_delete::init())
         .plugin(plugins::notes::init())
+        .setup(|app| {
+            // Apply screen-capture protection before `window.show()` so
+            // the first frame is protected on macOS + Windows 10 build
+            // 19041+. The main window is declared `"visible": false` in
+            // `tauri.conf.json` so this is the only `show()` call.
+            screen_capture::init(app)?;
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
