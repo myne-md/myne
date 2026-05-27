@@ -19,6 +19,14 @@ This is the **main repository** for the Myne project. It holds the desktop clien
 - **Forward-incompatible major versions.** v005 will be a separate closed spec; cross-major migration is explicit and one-way.
 - **Same protocol for hosted sync and self-host.** No closed-source server. Self-hosting changes the operator, not the security model.
 
+## Supported platforms
+
+- **macOS** — all Tauri 2-supported versions; full screen-capture protection (window invisible to OS screen-recording and screenshot APIs).
+- **Windows** — Windows 10 build 19041+ (May 2020 Update) recommended for full screen-capture protection. Older Windows 10 builds install and run, but the screen-capture exclusion API silently no-ops.
+- **Linux** (X11 + Wayland) — installs and runs; screen-capture protection unavailable in v0.1 (no portable API). Tracked for additive support in a future release.
+
+See [`docs/threat-model.md`](docs/threat-model.md) §7 for the canonical limitations record.
+
 ## Documentation
 
 All specifications live under [`docs/`](docs/):
