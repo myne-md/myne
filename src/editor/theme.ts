@@ -83,6 +83,10 @@ export const myneTheme = EditorView.theme({
   ".cm-italic": { fontStyle: "italic" },
   ".cm-strike": { textDecoration: "line-through" },
   ".cm-link": { textDecoration: "underline", color: "var(--accent, #2c4a7a)" },
+  // Clickable autolinks / bare URLs (MYND-150 + MYND-151) carry `data-cm-url`;
+  // give them a pointer cursor so the open-on-click affordance reads. Regular
+  // `[text](url)` links don't carry the attribute (click reveals source).
+  ".cm-link[data-cm-url]": { cursor: "pointer" },
   ".cm-inline-code": {
     fontFamily: "var(--font-mono)",
     fontSize: "0.95em",

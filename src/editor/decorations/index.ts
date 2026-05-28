@@ -10,6 +10,7 @@ import type { Extension } from "@codemirror/state";
 import { headingDecorations } from "./heading";
 import { emphasisDecorations } from "./emphasis";
 import { linkDecorations } from "./link";
+import { autolinkDecorations } from "./autolink";
 import { inlineCodeDecorations } from "./inline-code";
 import { taskListDecorations } from "./task-list";
 import { blockquoteDecorations } from "./blockquote";
@@ -21,6 +22,7 @@ export function myneDecorations(): readonly Extension[] {
     headingDecorations(),
     emphasisDecorations(),
     linkDecorations(),
+    ...autolinkDecorations(),
     inlineCodeDecorations(),
     taskListDecorations(),
     blockquoteDecorations(),
