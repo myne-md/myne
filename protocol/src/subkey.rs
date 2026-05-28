@@ -233,6 +233,12 @@ mod tests {
         // regenerate, run this test, copy the actual bytes from the
         // panic message, paste back, and update the corresponding
         // entry in `myne-test-vectors/` if it exists.
+        //
+        // This in-crate golden mirrors the first vector in
+        // `myne-test-vectors/vectors/hkdf-sha256/v0.1/cases.json`
+        // (`hkdf-sha256/v0.1/zero-root-items-key-wrap`); both must
+        // pass against identical bytes — drift in either indicates
+        // HKDF prefix / role-string corruption.
         let derived = derive_subkey(&[0u8; 32], SubkeyRole::ItemsKeyWrap);
         let expected: [u8; 32] = [
             0xA6, 0x6C, 0xA9, 0x2D, 0x9D, 0x6B, 0xA7, 0xF8, 0x91, 0x63, 0x5B, 0xCF, 0x9D, 0xFD,
@@ -240,5 +246,212 @@ mod tests {
             0xB7, 0x7A, 0x4F, 0xB6,
         ];
         assert_eq!(*derived, expected, "HKDF golden mismatch — regenerate");
+    }
+
+    // ---- KAT vector regenerator (companion repo) ----------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/hkdf-sha256/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_hkdf_sha256_vectors.json`,
+    /// ready to copy verbatim into the companion repo.
+    ///
+    /// `#[ignore]` because regenerating vectors should be a deliberate
+    /// act, not a side effect of `cargo test`. Run with:
+    /// `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored`
+    ///
+    /// The 10 cases cover the v0.1 input space:
+    /// - 4 baseline: each registered role × {all-zero, all-0xFF} root
+    /// - 6 pseudorandom-root: each role × 3 distinct SHA-256-derived
+    ///   roots (alpha / beta / gamma seeds). The alpha pair carries
+    ///   `informational_info_utf8_hex` for cross-implementation
+    ///   reviewers — the other 8 omit it to keep the file compact.
+    ///
+    /// Cross-role independence is implicit: every root appears with
+    /// both roles; the integration runner asserts byte-equality for
+    /// each independent vector. Determinism is implicit: cargo test
+    /// runs deterministically, so re-running the integration test
+    /// re-exercises every (root, role) → expected_subkey_hex assertion.
+    /// Info-string tampering tests stay in-crate (`subkey.rs:174,188`)
+    /// because the type-safe `SubkeyRole` enum makes tampered info
+    /// inexpressible at the JSON layer.
+    #[test]
+    #[ignore]
+    fn emit_subkey_vectors_for_paste() {
+        extern crate std;
+        use sha2::Digest;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        fn pseudorandom_root(label: &[u8]) -> [u8; 32] {
+            let digest = Sha256::digest(label);
+            let mut out = [0u8; 32];
+            out.copy_from_slice(&digest);
+            out
+        }
+
+        fn role_str_json(role: SubkeyRole) -> &'static str {
+            match role {
+                SubkeyRole::ItemsKeyWrap => "itemsKey-wrap",
+                SubkeyRole::PrefsKey => "prefs-key",
+            }
+        }
+
+        let zero_root: [u8; 32] = [0u8; 32];
+        let ff_root: [u8; 32] = [0xFFu8; 32];
+        let alpha = pseudorandom_root(b"myne-test-vectors-seed-v0.1.alpha");
+        let beta = pseudorandom_root(b"myne-test-vectors-seed-v0.1.beta");
+        let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
+
+        type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
+        let cases: [Case<'_>; 10] = [
+            (
+                "zero-root-items-key-wrap",
+                "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
+                &zero_root,
+                SubkeyRole::ItemsKeyWrap,
+                false,
+            ),
+            (
+                "zero-root-prefs-key",
+                "All-zero root_key with the PrefsKey role. Pair to the previous vector under the same trivial root; catches role-confusion bugs that collapse the two registered roles to the same info string.",
+                &zero_root,
+                SubkeyRole::PrefsKey,
+                false,
+            ),
+            (
+                "all-ff-root-items-key-wrap",
+                "All-0xFF root_key with the ItemsKeyWrap role. Detects byte-swap or partial-zero bugs that pass against all-zero inputs (since the all-zero baseline cannot distinguish certain XOR / index-by-zero defects).",
+                &ff_root,
+                SubkeyRole::ItemsKeyWrap,
+                false,
+            ),
+            (
+                "all-ff-root-prefs-key",
+                "All-0xFF root_key with the PrefsKey role. Role-differentiation pair to the previous vector under a non-trivial root.",
+                &ff_root,
+                SubkeyRole::PrefsKey,
+                false,
+            ),
+            (
+                "prn-alpha-items-key-wrap",
+                "Pseudorandom root_key (SHA-256 of the ASCII string 'myne-test-vectors-seed-v0.1.alpha') with the ItemsKeyWrap role. The informational_info_utf8_hex field carries the canonical 23-byte HKDF info bytes ('myne.v0.1 itemsKey-wrap') so independent implementers verifying their port assemble the same info parameter can do so without re-parsing the spec.",
+                &alpha,
+                SubkeyRole::ItemsKeyWrap,
+                true,
+            ),
+            (
+                "prn-alpha-prefs-key",
+                "Same pseudorandom alpha root as the previous vector, with the PrefsKey role. Pair documents both registered roles' canonical 19-byte info-string assembly ('myne.v0.1 prefs-key'). Cross-role independence under a pseudorandom root is implicit: the two vectors share an identical input_root_key_hex but produce byte-different expected_subkey_hex.",
+                &alpha,
+                SubkeyRole::PrefsKey,
+                true,
+            ),
+            (
+                "prn-beta-items-key-wrap",
+                "Pseudorandom root_key (SHA-256 of the ASCII string 'myne-test-vectors-seed-v0.1.beta') with the ItemsKeyWrap role. Additional coverage of the (root, role) input space with a second distinct pseudorandom root.",
+                &beta,
+                SubkeyRole::ItemsKeyWrap,
+                false,
+            ),
+            (
+                "prn-beta-prefs-key",
+                "Same beta root, PrefsKey role.",
+                &beta,
+                SubkeyRole::PrefsKey,
+                false,
+            ),
+            (
+                "prn-gamma-items-key-wrap",
+                "Pseudorandom root_key (SHA-256 of the ASCII string 'myne-test-vectors-seed-v0.1.gamma') with the ItemsKeyWrap role. Third pseudorandom root expands coverage beyond the all-zero / all-0xFF / alpha / beta points.",
+                &gamma,
+                SubkeyRole::ItemsKeyWrap,
+                false,
+            ),
+            (
+                "prn-gamma-prefs-key",
+                "Same gamma root, PrefsKey role.",
+                &gamma,
+                SubkeyRole::PrefsKey,
+                false,
+            ),
+        ];
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {
+            let subkey = derive_subkey(root, *role);
+
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"hkdf-sha256/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(desc)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                hex_lower(root.as_slice())
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_role\": \"{}\",\n",
+                role_str_json(*role)
+            ));
+            if *include_info {
+                let mut info = alloc::vec::Vec::new();
+                info.extend_from_slice(HKDF_PREFIX_V0_1);
+                info.extend_from_slice(role.role_str());
+                dump.push_str(&alloc::format!(
+                    "      \"informational_info_utf8_hex\": \"{}\",\n",
+                    hex_lower(&info)
+                ));
+            }
+            dump.push_str(&alloc::format!(
+                "      \"expected_subkey_hex\": \"{}\"\n",
+                hex_lower(&*subkey)
+            ));
+            if i + 1 < cases.len() {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_hkdf_sha256_vectors.json", dump.as_bytes())
+            .expect("write hkdf vectors dump");
     }
 }

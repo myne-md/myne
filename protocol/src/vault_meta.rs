@@ -747,7 +747,7 @@ mod tests {
             FAST_TEST_KDF.argon2_version,
         ));
         dump.push_str(&alloc::format!(
-            "expected_output_hex: {}\n",
+            "expected_vault_meta_hex: {}\n",
             hex_lower(&bytes)
         ));
         dump.push_str("---end vector---\n");

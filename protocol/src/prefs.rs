@@ -966,7 +966,7 @@ mod tests {
             hex_lower(&nonce_default)
         ));
         dump.push_str(&alloc::format!(
-            "expected_blob_hex: {}\n\n",
+            "expected_prefs_blob_hex: {}\n\n",
             hex_lower(&blob_default)
         ));
 
@@ -985,7 +985,7 @@ mod tests {
             hex_lower(&nonce_toggled)
         ));
         dump.push_str(&alloc::format!(
-            "expected_blob_hex: {}\n\n",
+            "expected_prefs_blob_hex: {}\n\n",
             hex_lower(&blob_toggled)
         ));
 
