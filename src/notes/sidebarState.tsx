@@ -37,12 +37,23 @@ export type SidebarState = {
   selectedId: NoteId | null;
   renamingId: NoteId | null;
   cache: Map<NoteId, TitleRecord>;
+  /**
+   * Bumped whenever the currently-open note is mutated on disk by a
+   * sidebar action (today: rename). The Editor watches this to silently
+   * re-read the open note's body so the editor's local content — and
+   * therefore the autosave writer — picks up the change instead of
+   * clobbering it on the next save (MYND-140). Selection-driven loads
+   * use `selectedId`; this is strictly for "the open note changed under
+   * us" re-syncs.
+   */
+  contentReloadNonce: number;
 };
 
 export const EMPTY_SIDEBAR_STATE: SidebarState = {
   selectedId: null,
   renamingId: null,
   cache: new Map(),
+  contentReloadNonce: 0,
 };
 
 // ============================================================
@@ -231,6 +242,8 @@ export type UseSelectedNoteReturn = {
   selectedId: NoteId | null;
   renamingId: NoteId | null;
   cache: ReadonlyMap<NoteId, TitleRecord>;
+  /** Re-sync signal for the open note's body — see [`SidebarState.contentReloadNonce`]. */
+  contentReloadNonce: number;
   /** Update selection. Does NOT load editor content; caller orchestrates. */
   select: (id: NoteId | null) => void;
   /** Select + emit a load-body intent (caller wires the editor). */
@@ -321,6 +334,15 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
         // matches what we just wrote, but updatedAt only refreshes
         // after the round-trip).
         await refreshOne(id);
+        // If we just renamed the OPEN note, its on-disk body now carries
+        // the new title but the editor's local content (and the autosave
+        // writer's view of it) is stale — a subsequent autosave would
+        // overwrite the title back out. Signal the Editor to re-read.
+        setState((prev) =>
+          prev.selectedId === id
+            ? { ...prev, contentReloadNonce: prev.contentReloadNonce + 1 }
+            : prev,
+        );
       } catch (err) {
         setState((prev) => rollbackOptimisticRename(prev, id, snapshot));
         throw err;
@@ -358,6 +380,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       selectedId: state.selectedId,
       renamingId: state.renamingId,
       cache: state.cache,
+      contentReloadNonce: state.contentReloadNonce,
       select,
       open,
       startRename,

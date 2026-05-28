@@ -153,6 +153,14 @@ function App() {
         // uniform with the sidebar color (var(--bg-2)) and provides a
         // drag handle for the window. Traffic lights are positioned
         // inside this strip via `trafficLightPosition` (x:16, y:20).
+        //
+        // Drag uses Tauri's `data-tauri-drag-region` attribute, NOT CSS
+        // `-webkit-app-region: drag`. The CSS property is a Chromium-only
+        // feature; Tauri's macOS (WKWebView) and Linux (WebKitGTK) webviews
+        // don't implement it, so the strip was a dead zone there. The data
+        // attribute is intercepted by the webview on all platforms and
+        // calls `startDragging()` (permitted via `core:default`).
+        data-tauri-drag-region
         style={{
           height: 38,
           flexShrink: 0,
@@ -160,10 +168,6 @@ function App() {
           borderBottom: "1px solid var(--line-1)",
           WebkitUserSelect: "none",
           userSelect: "none",
-          // CSS-side drag region; macOS recognizes this property name
-          // via the `appWindow` plugin. -webkit- prefix for WKWebView.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...({ WebkitAppRegion: "drag" } as Record<string, string>),
         }}
       />
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>

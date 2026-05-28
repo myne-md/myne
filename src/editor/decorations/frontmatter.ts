@@ -27,11 +27,30 @@ import {
   EditorView,
   WidgetType,
 } from "@codemirror/view";
+import { formatYamlScalar } from "../../dialect";
 import { cachedLocateFrontmatter } from "../frontmatter-cache";
 import {
   parseSimpleProperties,
   type SimpleProperty,
 } from "../frontmatter-properties";
+
+/**
+ * Render a raw YAML scalar (as captured by `parseSimpleProperties`, i.e.
+ * the literal bytes after `key:`) as a plain display string. Inverts
+ * `formatYamlScalar`'s double-quote escaping and handles single-quoted
+ * scalars; plain scalars pass through. Keeps the title field showing the
+ * human title rather than its quoted on-disk form.
+ */
+function displayYamlScalar(raw: string): string {
+  const v = raw.trim();
+  if (v.length >= 2 && v.startsWith('"') && v.endsWith('"')) {
+    return v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  }
+  if (v.length >= 2 && v.startsWith("'") && v.endsWith("'")) {
+    return v.slice(1, -1).replace(/''/g, "'");
+  }
+  return v;
+}
 
 class PropertiesWidget extends WidgetType {
   constructor(private readonly properties: readonly SimpleProperty[]) {
@@ -52,6 +71,13 @@ class PropertiesWidget extends WidgetType {
     const container = document.createElement("div");
     container.className = "cm-fm-properties";
 
+    // Note title — promoted above the "Properties" label as a prominent,
+    // inline-editable field (MYND-141). The value mirrors the FM `title:`
+    // key; edits dispatch a CM change to that line, so persistence rides
+    // the editor's single autosave writer (no separate write path that
+    // could race — see decisions.md 2026-05-15 save-handler discipline).
+    container.appendChild(this.renderTitleField(view));
+
     const title = document.createElement("div");
     title.className = "cm-fm-properties-title";
     title.textContent = "Properties";
@@ -62,6 +88,9 @@ class PropertiesWidget extends WidgetType {
     container.appendChild(list);
 
     for (const prop of this.properties) {
+      // `title` is surfaced by the promoted field above — don't repeat it
+      // as a generic key/value row.
+      if (prop.key === "title") continue;
       list.appendChild(this.renderRow(view, prop));
     }
 
@@ -86,6 +115,36 @@ class PropertiesWidget extends WidgetType {
    * not CM6's content layer. */
   ignoreEvent(): boolean {
     return true;
+  }
+
+  private renderTitleField(view: EditorView): HTMLElement {
+    const titleProp = this.properties.find((p) => p.key === "title");
+    const displayValue =
+      titleProp === undefined ? "" : displayYamlScalar(titleProp.value);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "cm-fm-properties-name";
+    input.value = displayValue;
+    input.placeholder = "Untitled";
+    input.spellcheck = false;
+    input.autocomplete = "off";
+    input.setAttribute("aria-label", "Note title");
+
+    input.addEventListener("change", () => {
+      this.commitTitle(view, input, displayValue);
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        input.value = displayValue;
+        input.blur();
+      }
+    });
+    return input;
   }
 
   private renderRow(view: EditorView, prop: SimpleProperty): HTMLElement {
@@ -185,6 +244,50 @@ class PropertiesWidget extends WidgetType {
       changes: { from: live.valueFrom, to: live.valueTo, insert: next },
       userEvent: "frontmatter.set-value",
     });
+  }
+
+  /**
+   * Commit the promoted title field. Writes to the FM `title:` value
+   * range when the key exists, else inserts a `title:` line at the top of
+   * the frontmatter body. The value is YAML-escaped via `formatYamlScalar`
+   * (titles routinely contain `:`/`#`/leading `-`, which would otherwise
+   * break the next parse — and the sidebar's js-yaml title read).
+   *
+   * Empty commit reverts (no write) — same convention as the sidebar
+   * rename (MYND-140); a note keeps its previous title rather than gaining
+   * an empty one.
+   */
+  private commitTitle(
+    view: EditorView,
+    input: HTMLInputElement,
+    prevDisplay: string,
+  ): void {
+    const next = input.value.replace(/[\r\n]+/g, " ").trim();
+    if (next === "") {
+      input.value = prevDisplay; // revert visual state; no spurious save
+      return;
+    }
+    if (next === prevDisplay) return;
+
+    const range = cachedLocateFrontmatter(view.state.doc);
+    if (range === null) return;
+    const doc = view.state.doc.toString();
+    const formatted = formatYamlScalar(next);
+    const live = parseSimpleProperties(doc, range).find(
+      (p) => p.key === "title",
+    );
+    if (live !== undefined) {
+      if (doc.slice(live.valueFrom, live.valueTo) === formatted) return;
+      view.dispatch({
+        changes: { from: live.valueFrom, to: live.valueTo, insert: formatted },
+        userEvent: "frontmatter.set-title",
+      });
+    } else {
+      view.dispatch({
+        changes: { from: range.bodyStart, insert: `title: ${formatted}\n` },
+        userEvent: "frontmatter.add-title",
+      });
+    }
   }
 
   private addProperty(view: EditorView): void {

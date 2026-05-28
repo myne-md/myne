@@ -14,8 +14,9 @@
 // the account-number chip is a static MY-XXXX-… placeholder
 // (the real account number is owned by <CreateVault>'s reducer and
 // not threaded through to App-level — it becomes a vault-unlock
-// concern when that feature lands). The "0 words" indicator is
-// static; live counters are explicitly out of scope per the PRD.
+// concern when that feature lands). The status-bar word counter is
+// live (MYND-143): it counts the active note's body words, frontmatter
+// excluded, on a short debounce.
 //
 // References:
 //   - PRD: agent-tooling/features/empty-editor-shell/prd.md
@@ -34,6 +35,7 @@ import {
   type SetStateAction,
 } from "react";
 import { CMEditor } from "../editor/CMEditor";
+import { extractFullText } from "../dialect";
 import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
 import { FailClosedError } from "../components/FailClosedError";
@@ -56,6 +58,18 @@ const STATUS_TEXT_STYLE: CSSProperties = {
   fontSize: 12,
   color: "var(--fg-3)",
 };
+
+/**
+ * Word count of a note body, frontmatter excluded. `extractFullText`
+ * strips the YAML frontmatter block + decoration syntax (code URLs,
+ * wikilink targets behind aliases) and collapses whitespace to single
+ * spaces, so a plain space-split yields the body word count. Empty body
+ * → 0 (a bare split would otherwise return `[""]`, miscounting as 1).
+ */
+function countBodyWords(content: string): number {
+  const text = extractFullText(content);
+  return text.length === 0 ? 0 : text.split(" ").length;
+}
 
 interface EditorProps {
   /**
@@ -232,6 +246,18 @@ function EditorChrome({
   const [content, setContent] = useState<string>("");
   const [bodyLoading, setBodyLoading] = useState<boolean>(false);
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
+  const [wordCount, setWordCount] = useState<number>(0);
+
+  // Status-bar word counter — recompute on a short debounce so the parse
+  // doesn't run on every keystroke. Frontmatter is excluded by
+  // `countBodyWords`. Note-switch flows through `content` too (the
+  // selection effect resets it), so the counter follows the active note.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setWordCount(countBodyWords(content));
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [content]);
 
   // Selection-change → load body via `noteRead`. The ID is the
   // canonical reload trigger; if it stays stable across renders we
@@ -270,6 +296,40 @@ function EditorChrome({
       cancelled = true;
     };
   }, [ctx.selectedId]);
+
+  // Re-sync the open note's body when a sidebar action mutates it on
+  // disk (today: rename of the currently-open note — MYND-140). Without
+  // this, the editor's local `content` stays stale after a rename and the
+  // next autosave writes the old title back, silently reverting the
+  // rename. Keyed on the nonce only (not `selectedId` — plain selection
+  // changes flow through the load effect above); skips the initial mount.
+  const reloadNonce = ctx.contentReloadNonce;
+  const reloadInitRef = useRef(true);
+  useEffect(() => {
+    if (reloadInitRef.current) {
+      reloadInitRef.current = false;
+      return;
+    }
+    const id = ctx.selectedId;
+    if (id === null) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const body = await noteRead(id);
+        if (!cancelled) setContent((prev) => (prev === body ? prev : body));
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[Editor] content re-sync after rename failed:", err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // selectedId is read at fire time intentionally; nonce is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadNonce]);
 
   const autosave = useAutosave(ctx.selectedId, content, undefined, setContent);
 
@@ -403,6 +463,7 @@ function EditorChrome({
         saveStatus={autosave.status}
         onRetry={autosave.retry}
         hideSaveStatus={ctx.selectedId === null}
+        wordCount={ctx.selectedId === null ? null : wordCount}
       />
       <SettingsModal
         open={settingsOpen}
@@ -606,7 +667,7 @@ function CenterPane({
           flex: 1,
           minHeight: 0,
           overflow: "auto",
-          padding: "32px 24px",
+          padding: "12px 24px 32px",
         }}
       >
         {!hasSelection ? (
@@ -720,6 +781,10 @@ interface BottomBarProps {
    *  (the indicator would otherwise read "Saved" / a stale relative-
    *  time from the previous note and confuse the user). */
   hideSaveStatus?: boolean;
+  /** Body word count of the active note (frontmatter excluded). `null`
+   *  hides the counter entirely — same rationale as `hideSaveStatus`:
+   *  with no note selected the value would be a meaningless 0. */
+  wordCount?: number | null;
 }
 
 function BottomBar({
@@ -728,6 +793,7 @@ function BottomBar({
   saveStatus,
   onRetry,
   hideSaveStatus = false,
+  wordCount = null,
 }: BottomBarProps) {
   const handleLockClick = () => {
     void onLockFlushed().catch(() => {
@@ -792,14 +858,16 @@ function BottomBar({
           <Icon name="lock" size={12} />
           <span>Lock</span>
         </button>
-        <span
-          style={{
-            ...STATUS_TEXT_STYLE,
-            fontFamily: "var(--font-mono)",
-          }}
-        >
-          0 words
-        </span>
+        {wordCount !== null && (
+          <span
+            style={{
+              ...STATUS_TEXT_STYLE,
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            {wordCount} {wordCount === 1 ? "word" : "words"}
+          </span>
+        )}
       </div>
     </div>
   );

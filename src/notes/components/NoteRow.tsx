@@ -305,11 +305,25 @@ function NoteRowRenameInput(props: NoteRowRenameInputProps) {
   // Guard against an outer unmount-before-blur race (e.g., user
   // navigates away with renaming still active). The commit/cancel
   // path is idempotent via `committedRef`.
+  //
+  // `settledRef` exists because React 19 StrictMode double-invokes
+  // effects in dev (mount → cleanup → mount). Without the guard, the
+  // cleanup fired `onCancel()` synchronously on that fake unmount,
+  // cancelling the rename the instant the input opened — the user could
+  // never type (MYND-140). The timer flips `settledRef` on a macrotask
+  // that runs strictly AFTER the synchronous StrictMode remount, so only
+  // a genuine later unmount (row deleted / scrolled away without a blur
+  // commit) reaches `onCancel`.
+  const settledRef = useRef(false);
   useEffect(() => {
+    const settleTimer = setTimeout(() => {
+      settledRef.current = true;
+    }, 0);
     return () => {
-      if (!committedRef.current) {
-        // Component unmounted without explicit commit/cancel — treat
-        // as cancel so optimistic state doesn't leak.
+      clearTimeout(settleTimer);
+      if (settledRef.current && !committedRef.current) {
+        // Genuine unmount without explicit commit/cancel — treat as
+        // cancel so optimistic state doesn't leak.
         committedRef.current = true;
         onCancel();
       }

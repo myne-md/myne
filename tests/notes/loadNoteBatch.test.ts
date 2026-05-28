@@ -78,22 +78,22 @@ describe("loadNoteBatch — chunking + parallel dispatch", () => {
   });
 });
 
-describe("loadNoteBatch — title derivation precedence", () => {
-  it("frontmatter title wins over body H1", async () => {
+describe("loadNoteBatch — title derivation (frontmatter `title:` only)", () => {
+  it("derives the title from the frontmatter `title:` field", async () => {
     invokeMock.mockResolvedValueOnce([
       {
         Ok: {
           note_uuid: "id-1",
-          frontmatter_bytes: "title: FM Wins\n",
-          first_h1_line: "# H1 Loses",
+          frontmatter_bytes: "title: FM Title\n",
+          first_h1_line: "# H1 Ignored",
         },
       },
     ]);
     const [rec] = await loadNoteBatch(["id-1"]);
-    expect(rec.title).toBe("FM Wins");
+    expect(rec.title).toBe("FM Title");
   });
 
-  it("falls back to H1 when frontmatter has no title field", async () => {
+  it("yields null when frontmatter has no title field (no H1 fallback)", async () => {
     invokeMock.mockResolvedValueOnce([
       {
         Ok: {
@@ -104,16 +104,16 @@ describe("loadNoteBatch — title derivation precedence", () => {
       },
     ]);
     const [rec] = await loadNoteBatch(["id-2"]);
-    expect(rec.title).toBe("H1 Title");
+    expect(rec.title).toBeNull();
   });
 
-  it("falls back to null when neither frontmatter title nor H1 present", async () => {
+  it("yields null when no frontmatter present (no H1 fallback)", async () => {
     invokeMock.mockResolvedValueOnce([
       {
         Ok: {
           note_uuid: "id-3",
           frontmatter_bytes: null,
-          first_h1_line: null,
+          first_h1_line: "# H1 Title",
         },
       },
     ]);
@@ -121,47 +121,19 @@ describe("loadNoteBatch — title derivation precedence", () => {
     expect(rec.title).toBeNull();
   });
 
-  it("treats malformed YAML frontmatter as no title (falls through to H1)", async () => {
+  it("treats malformed YAML frontmatter as no title", async () => {
     invokeMock.mockResolvedValueOnce([
       {
         Ok: {
           note_uuid: "id-4",
           frontmatter_bytes: "title: : invalid yaml::\n",
-          first_h1_line: "# H1 Fallback",
+          first_h1_line: "# H1 Ignored",
         },
       },
     ]);
     const [rec] = await loadNoteBatch(["id-4"]);
     // Malformed YAML → js-yaml throws → parseFrontmatterSlice returns {} →
-    // fall through to H1.
-    expect(rec.title).toBe("H1 Fallback");
-  });
-
-  it("strips the `# ` prefix and trims whitespace from H1 fallback", async () => {
-    invokeMock.mockResolvedValueOnce([
-      {
-        Ok: {
-          note_uuid: "id-5",
-          frontmatter_bytes: null,
-          first_h1_line: "#   Padded H1   ",
-        },
-      },
-    ]);
-    const [rec] = await loadNoteBatch(["id-5"]);
-    expect(rec.title).toBe("Padded H1");
-  });
-
-  it("empty H1 content (`# ` only) yields null title", async () => {
-    invokeMock.mockResolvedValueOnce([
-      {
-        Ok: {
-          note_uuid: "id-6",
-          frontmatter_bytes: null,
-          first_h1_line: "# ",
-        },
-      },
-    ]);
-    const [rec] = await loadNoteBatch(["id-6"]);
+    // no title (and no H1 fallback).
     expect(rec.title).toBeNull();
   });
 });

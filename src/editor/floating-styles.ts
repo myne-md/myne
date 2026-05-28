@@ -145,8 +145,42 @@ const CSS = `
 }
 
 .cm-fm-properties {
-  padding: 12px 0 16px;
+  padding: 2px 0 16px;
   font-family: var(--font-sans);
+}
+.cm-fm-properties-name {
+  display: block;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  outline-style: none;
+  box-shadow: none;
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--fg-1);
+  padding: 2px 6px;
+  margin: 0 -6px 10px;
+  border-radius: var(--radius-1, 3px);
+}
+.cm-fm-properties-name::placeholder {
+  color: var(--fg-3);
+  font-style: italic;
+  font-weight: 400;
+}
+.cm-fm-properties-name:hover {
+  background: var(--paper-2, #f3f1eb);
+}
+.cm-fm-properties-name:focus,
+.cm-fm-properties-name:focus-visible {
+  outline: 0 !important;
+  outline-style: none !important;
+  box-shadow: none !important;
+  background: var(--paper-2, #f3f1eb);
 }
 .cm-fm-properties-title {
   font-size: 14px;

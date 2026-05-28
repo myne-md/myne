@@ -97,14 +97,6 @@ function parseFrontmatterSlice(
   return loaded as Record<string, unknown>;
 }
 
-function deriveTitleFromH1(h1Line: string | null): string | null {
-  if (h1Line === null) return null;
-  // `extract_title_slices` returns the line including the `# ` prefix.
-  // Strip the prefix; trim whitespace. Empty H1 (`"# "`) → null after trim.
-  const text = h1Line.replace(/^# /, "").trim();
-  return text.length === 0 ? null : text;
-}
-
 function deriveUpdatedAt(parsed: Record<string, unknown>): Date | null {
   const raw = parsed["updated"];
   // js-yaml's default schema parses RFC 3339 / YAML 1.1 timestamps to
@@ -122,12 +114,14 @@ function deriveUpdatedAt(parsed: Record<string, unknown>): Date | null {
 
 function recordFromSlice(slice: TitleSlice): TitleRecord {
   const parsed = parseFrontmatterSlice(slice.frontmatter_bytes);
+  // Title comes from the frontmatter `title:` key only — no first-H1
+  // fallback. A note without an explicit `title:` renders as "Untitled"
+  // until the user names it (sidebar rename / Properties title field).
   const titleFromFm =
     typeof parsed["title"] === "string" ? (parsed["title"] as string) : null;
-  const titleFromH1 = deriveTitleFromH1(slice.first_h1_line);
   return {
     noteUuid: slice.note_uuid,
-    title: titleFromFm ?? titleFromH1 ?? null,
+    title: titleFromFm,
     updatedAt: deriveUpdatedAt(parsed),
   };
 }
