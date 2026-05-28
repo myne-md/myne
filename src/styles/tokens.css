@@ -213,6 +213,24 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Desktop-app text-selection discipline. Native apps don't let you select
+ * arbitrary chrome (labels, buttons); a stray Cmd/Ctrl+A while focus sits
+ * outside an editable region must not sweep the entire UI into a selection.
+ * UI chrome is non-selectable by default; editable + intentionally-selectable
+ * regions opt back in. Inputs/textareas are always selectable regardless.
+ * `.t-account-number` keeps its `user-select: all` (more specific). */
+#root {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.cm-editor .cm-content,
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0ms !important;

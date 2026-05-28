@@ -115,22 +115,48 @@ export const myneTheme = EditorView.theme({
     verticalAlign: "middle",
   },
 
-  // Task checkbox widget from task-list.ts.
+  // Task checkbox widget from task-list.ts. Checked state: subtle accent-soft
+  // fill + accent checkmark glyph (MYND-142) — reads as "done" without the
+  // heavy solid fill the old diagonal-slash icon used.
   ".cm-task-checkbox": {
+    position: "relative",
     display: "inline-block",
-    width: "14px",
-    height: "14px",
+    width: "16px",
+    height: "16px",
     border: "1.5px solid var(--line-2, #c8c7c1)",
     borderRadius: "var(--radius-1, 3px)",
     backgroundColor: "var(--paper, #faf8f3)",
     verticalAlign: "middle",
     cursor: "pointer",
+    transition:
+      "background-color var(--duration-fast, 120ms) var(--ease-standard, ease), border-color var(--duration-fast, 120ms) var(--ease-standard, ease)",
   },
   ".cm-task-checkbox-checked": {
-    backgroundColor: "var(--accent, #2c4a7a)",
+    backgroundColor: "var(--accent-soft, #e8edf5)",
     borderColor: "var(--accent, #2c4a7a)",
-    backgroundImage:
-      "linear-gradient(45deg, transparent 40%, var(--accent-on, #fff) 40%, var(--accent-on, #fff) 60%, transparent 60%)",
+  },
+  // Checkmark drawn with borders (not a glyph, to avoid font-metric drift) and
+  // centered with absolute positioning + transform — deterministic regardless
+  // of the box's content-box quirks. translateY is biased up slightly so the
+  // tick reads optically centered (its visual mass hangs low-left).
+  ".cm-task-checkbox-checked::after": {
+    content: '""',
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: "4px",
+    height: "8px",
+    boxSizing: "border-box",
+    borderStyle: "solid",
+    borderColor: "var(--accent, #2c4a7a)",
+    borderWidth: "0 2px 2px 0",
+    transform: "translate(-50%, -60%) rotate(45deg)",
+  },
+  // Completed-todo label: struck through + muted so it recedes from active items.
+  ".cm-task-done-label": {
+    textDecoration: "line-through",
+    textDecorationColor: "var(--line-3, #a3a29c)",
+    color: "var(--fg-3)",
   },
 
   // Wikilink chip widget from wikilink/chip-widget.ts.

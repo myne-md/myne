@@ -5,6 +5,7 @@
 // the relevant update signals. Extract the scaffold so each decoration
 // file only owns its own builder.
 
+import { syntaxTree } from "@codemirror/language";
 import { type Extension } from "@codemirror/state";
 import {
   type DecorationSet,
@@ -13,19 +14,29 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 
-/** Default update trigger: doc / viewport / selection / focus changes —
+/** True when background parsing advanced the tree between the two states —
+ *  the tree is reference-stable, so inequality means a reparse landed. Without
+ *  this, syntax-driven decorations go stale on notes longer than the viewport:
+ *  the rebuild on `docChanged` can run before the incremental parser re-covers
+ *  the edited region, so e.g. a toggled task checkbox renders as raw text until
+ *  the next interaction. (CM6 "Decorating Syntax" recipe.) */
+const treeChanged = (update: ViewUpdate): boolean =>
+  syntaxTree(update.startState) !== syntaxTree(update.state);
+
+/** Default update trigger: doc / viewport / selection / focus / parse changes —
  *  used by every cursor-aware decoration (emphasis, link, inline-code,
  *  heading, blockquote, hr, frontmatter). */
 const cursorAwareUpdate = (update: ViewUpdate): boolean =>
   update.docChanged ||
   update.viewportChanged ||
   update.selectionSet ||
-  update.focusChanged;
+  update.focusChanged ||
+  treeChanged(update);
 
 /** Update trigger for decorations that don't depend on cursor position —
  *  e.g. task-list (checkbox is always rendered). */
 const docOnlyUpdate = (update: ViewUpdate): boolean =>
-  update.docChanged || update.viewportChanged;
+  update.docChanged || update.viewportChanged || treeChanged(update);
 
 export function makeCursorAwareDecorationPlugin(
   build: (view: EditorView) => DecorationSet,
