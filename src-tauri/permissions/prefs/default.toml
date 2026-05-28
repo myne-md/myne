@@ -1,0 +1,28 @@
+# Permissions for the in-app `prefs` Tauri plugin (MYND-160).
+# Picked up under the `prefs:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference
+# these as `prefs:default` (or `prefs:allow-prefs-read` /
+# `prefs:allow-set-screen-capture-protection`).
+#
+# MYND-160 grill Q5.4 — main-window-only invariant. The `default`
+# permission bundle is the only one consumed in v0.1; v0.2 multi-window
+# may grant `prefs:allow-prefs-read` to sub-windows but MUST NOT grant
+# `prefs:allow-set-screen-capture-protection` to any non-main window
+# per `decisions.md` 2026-05-27 "Forward commitment: prefs:write
+# capability stays main-window-only".
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the prefs plugin — both read + per-field setters."
+permissions = ["allow-prefs-read", "allow-set-screen-capture-protection"]
+
+[[permission]]
+identifier = "allow-prefs-read"
+description = "Allow invoking prefs:prefs_read (Slot::Unlocked-gated read of the vault.prefs blob; returns PrefsView with fall-back-to-defaults on absence / AEAD-fail / parse-fail per protocol.md § 9.5.5)."
+commands.allow = ["prefs_read"]
+
+[[permission]]
+identifier = "allow-set-screen-capture-protection"
+description = "Allow invoking prefs:set_screen_capture_protection (Slot::Unlocked-gated per-field setter for the screen_capture_protection bool; atomic-writes vault.prefs FIRST then calls screen_capture::apply for the native side-effect — disk-then-native ordering is load-bearing for UI/disk consistency per MYND-160 grill Q5.2)."
+commands.allow = ["set_screen_capture_protection"]

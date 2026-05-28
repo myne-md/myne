@@ -75,6 +75,21 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["change_password"]),
             )
             .plugin(
+                "prefs",
+                // MYND-160 ships the `prefs_read` + `set_screen_capture_protection`
+                // commands. Both are Slot::Unlocked-gated and consume
+                // the existing `VaultRuntimeState` singleton (registered
+                // by `vault-unlock::init`). v0.1 has a single per-field
+                // setter; future v0.1.x revisions append more
+                // (`set_theme`, `set_font_size`, etc.) each as its own
+                // command with its own `commands.allow` entry. Adding
+                // a command here without a matching `commands.allow`
+                // entry in `permissions/prefs/default.toml` is a
+                // security regression.
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["prefs_read", "set_screen_capture_protection"]),
+            )
+            .plugin(
                 "notes",
                 // The `commands.allow` entries in
                 // `permissions/notes/default.toml` declare all four —

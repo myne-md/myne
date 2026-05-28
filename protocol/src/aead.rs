@@ -184,6 +184,35 @@ pub fn aad_note_item_key_wrap(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -> 
     aad
 }
 
+/// Build the AAD bound into the AEAD encryption of the v0.1
+/// `vault.prefs` blob (spec § 5.2 + § 9.5.3).
+///
+/// Layout (39 bytes):
+///
+/// ```text
+/// "myne.v0.1|"             10 bytes  (AAD prefix, § 5.2)
+/// 0x01                      1 byte   (protocol_version, § 9.3)
+/// u16_be(10) || "prefs-blob" 12 bytes  (length-prefixed role, § 5.2)
+/// account_number_hash      16 bytes  (vault identity binding, § 9.3 offset 6)
+/// ```
+///
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity —
+/// `vault.prefs` lives outside the `items_key` lineage by design,
+/// preserving prefs portability across the v005 epoch-rotation
+/// `items_key` evolution (`decisions.md` 2026-05-27 "Vault preferences
+/// blob: root_key-derived prefs_key").
+pub fn aad_prefs_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_PREFS_BLOB: &[u8] = b"prefs-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_PREFS_BLOB.len() + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PREFS_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///
@@ -587,6 +616,59 @@ mod tests {
         let aad = aad_password_wrap(&DEFAULT_V0_1_KDF_PARAMS);
         assert_eq!(aad[11], 0x00);
         assert_eq!(aad[12], 0x0D);
+    }
+
+    #[test]
+    fn aad_prefs_blob_default_matches_pinned_hex() {
+        // Spec § 5.2 + § 9.5.3: 39 bytes = prefix (10) + version (1) +
+        // u16_be(10) + "prefs-blob" (10) + account_number_hash (16).
+        let account_number_hash: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let aad = aad_prefs_blob(&account_number_hash);
+        let expected: [u8; 39] = [
+            // "myne.v0.1|" — 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version
+            0x01, // length-prefixed role string: u16_be(10) || "prefs-blob"
+            0x00, 0x0A, // u16_be(10)
+            0x70, 0x72, 0x65, 0x66, 0x73, 0x2D, 0x62, 0x6C, 0x6F, 0x62, // "prefs-blob"
+            // account_number_hash
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 39, "spec § 9.5.3 mandates 39-byte AAD");
+    }
+
+    #[test]
+    fn aad_prefs_blob_changes_with_account_number_hash() {
+        // Cross-vault binding: different account_number_hash ⇒
+        // different AAD ⇒ AEAD verification fails when a vault.prefs
+        // from vault A is placed in vault B's directory.
+        let hash_a = [0x00; 16];
+        let mut hash_b = [0x00; 16];
+        hash_b[0] = 1;
+        let aad_a = aad_prefs_blob(&hash_a);
+        let aad_b = aad_prefs_blob(&hash_b);
+        assert_ne!(aad_a, aad_b);
+        // First 23 bytes (prefix + version + length-prefixed role) match —
+        // only the account_number_hash region (bytes 23..39) differs.
+        assert_eq!(&aad_a[..23], &aad_b[..23]);
+    }
+
+    #[test]
+    fn aad_prefs_blob_distinct_from_vault_items_key_wrap_aad() {
+        // Cross-AAD distinctness: even if a future collision aligned the
+        // account_number_hash bytes with an items_key_id byte sequence,
+        // the role string ("prefs-blob" length-prefixed vs no role
+        // string at all) makes the two AADs structurally different.
+        let id: [u8; 16] = [0x00; 16];
+        let prefs_aad = aad_prefs_blob(&id);
+        let items_aad = aad_vault_items_key_wrap(&id);
+        assert_ne!(prefs_aad, items_aad);
+        assert_ne!(prefs_aad.len(), items_aad.len());
     }
 
     #[test]

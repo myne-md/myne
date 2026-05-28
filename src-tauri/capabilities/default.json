@@ -16,6 +16,7 @@
     "vault-recover:default",
     "vault-change-password:default",
     "vault-delete:default",
+    "prefs:default",
     "notes:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",

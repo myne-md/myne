@@ -1245,6 +1245,59 @@ mod tests {
         });
     }
 
+    /// MYND-160 Task 8 extension: `vault_delete` must remove
+    /// `vault.prefs` + `vault.prefs.tmp` alongside the existing
+    /// vault.meta / vault.meta.tmp / notes/*.myn artefact set. The
+    /// recursive `walk_and_remove` walker is artefact-agnostic by
+    /// design — this test pins the behavior so a future refactor that
+    /// introduces a hard-coded artefact allow-list cannot silently
+    /// orphan vault.prefs. Verifies user stories 9 (delete cleans up
+    /// vault.prefs) and 10 (defensive guard catches orphan vault.prefs
+    /// on next vault_create — coupled with the
+    /// `vault_artifacts_present_returns_true_when_vault_prefs_present`
+    /// test in the vault_creation suite).
+    #[test]
+    fn vault_delete_unlocked_removes_vault_prefs_and_vault_prefs_tmp() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-prefs").unwrap();
+            // Populate the full v0.1 artefact set including MYND-160's
+            // vault.prefs + vault.prefs.tmp.
+            std::fs::write(tmp.path().join("vault.meta"), b"meta bytes").unwrap();
+            std::fs::write(tmp.path().join("vault.prefs"), b"prefs bytes").unwrap();
+            std::fs::write(
+                tmp.path().join("vault.prefs.tmp"),
+                b"mid-write prefs crash artefact",
+            )
+            .unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(11, 22, 1),
+                )
+                .await;
+
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+
+            assert!(
+                result.is_ok(),
+                "vault_delete must succeed with MYND-160 artefact set; got {result:?}"
+            );
+            assert!(
+                !tmp.path().join("vault.prefs").exists(),
+                "vault.prefs must be removed by vault_delete"
+            );
+            assert!(
+                !tmp.path().join("vault.prefs.tmp").exists(),
+                "vault.prefs.tmp must be removed by vault_delete"
+            );
+            assert!(
+                !tmp.path().exists(),
+                "vault_dir must be removed recursively (full MYND-160 artefact set + dir itself)"
+            );
+        });
+    }
+
     /// Happy-path test: from `Slot::Unlocked` fixture + populated
     /// vault directory (vault.meta + notes/<uuid>.myn + vault.meta.tmp
     /// orphan from mid-write crash), fires `vault_delete_with_dir`

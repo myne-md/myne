@@ -272,7 +272,16 @@ pub async fn complete_recovery<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<(), VaultRecoveryError> {
     let vault_path = vault_meta_path(&app)?;
-    complete_recovery_with_path(new_password, &vault_path, state.inner()).await
+    complete_recovery_with_path(new_password, &vault_path, state.inner()).await?;
+
+    // MYND-160 fix: post-recovery slot transition to Unlocked must
+    // re-apply persisted prefs (user story 11). Same pattern as
+    // `vault_unlock::commands::unlock` — best-effort post-pipeline
+    // hook; failure does not propagate (vault_complete_recovery's
+    // Ok(()) is already committed by this point).
+    crate::plugins::vault_unlock::commands::apply_persisted_prefs(&app, state.inner()).await;
+
+    Ok(())
 }
 
 /// Testable core of [`complete_recovery`]. The Tauri-command wrapper

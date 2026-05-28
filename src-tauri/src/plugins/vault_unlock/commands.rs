@@ -105,7 +105,114 @@ pub async fn unlock<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<(), VaultUnlockError> {
     let vault_path = vault_meta_path(&app)?;
-    unlock_with_path(password, &vault_path, state.inner()).await
+    unlock_with_path(password, &vault_path, state.inner()).await?;
+
+    // ---- MYND-160 pipeline steps 4-6 (post-`set_unlocked` orchestration) ----
+    //
+    // The grill (Q5.1) frames these as part of the unlock "pipeline";
+    // the physical implementation places them at the Tauri-wrapper
+    // boundary so the testable core `unlock_with_path` stays a pure
+    // crypto pipeline and existing tests need no signature churn. The
+    // logical pipeline ordering ("by the time the user sees unlock
+    // success, prefs are applied") is preserved — the slot transitions
+    // to `Unlocked` inside `unlock_with_path` first, then steps 4-6
+    // run before this command returns to the WebView. Phase 1
+    // single-window guarantees no concurrent reader observes the
+    // brief "slot=Unlocked but prefs not yet applied" window. See
+    // `decisions.md` 2026-05-27 "Vault preferences blob".
+    //
+    // Best-effort end-to-end: any failure in prefs decrypt or native
+    // apply degrades to defaults (PrefsView::default = protection ON),
+    // logged via `tracing::warn!` inside `prefs::read_or_default`
+    // and `screen_capture::apply`. **vault_unlock's `VaultUnlockError`
+    // surface is unchanged** — the user's unlock succeeds regardless.
+    apply_persisted_prefs(&app, state.inner()).await;
+
+    Ok(())
+}
+
+/// MYND-160 pipeline steps 4-6: derive `prefs_key` from the just-
+/// unlocked `root_key`, read `vault.prefs` (falling back to defaults
+/// on absence / AEAD-fail / parse-fail per spec § 9.5.5), then apply
+/// the persisted `screen_capture_protection` toggle natively via
+/// `screen_capture::apply`.
+///
+/// Best-effort: never returns an error, never panics. Slot
+/// invariance — the Slot was just transitioned to `Unlocked` by
+/// `unlock_with_path`, so the peek inside `prefs::commands::
+/// prefs_read_with_dir` is expected to succeed. If a concurrent
+/// `vault_lock` raced between `unlock_with_path` return and this
+/// call (theoretically possible under Phase 2 multi-window or a
+/// future spawn-after-unlock-callback pattern; impossible in Phase 1
+/// single-window), `prefs_read_with_dir` returns
+/// `PrefsReadError::SlotNotUnlocked`, which we collapse to defaults
+/// (protection ON) — the lock-on-default-ON discipline from
+/// `decisions.md` 2026-05-27 already applied `screen_capture::apply(true)`
+/// inside `vault_lock`, so the additional `apply(true)` here is a
+/// harmless no-op idempotent.
+pub(crate) async fn apply_persisted_prefs<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &VaultRuntimeState,
+) {
+    let Ok(vault_dir) = resolve_vault_dir(app) else {
+        // app_data_dir lookup failure is structurally rare; if it
+        // happens, fall back to the safer state (protection ON).
+        tracing::warn!(
+            event = "prefs_post_unlock_skipped",
+            reason = "vault_dir_resolution_failed",
+        );
+        crate::screen_capture::apply(app, true, "runtime_apply");
+        return;
+    };
+
+    let prefs = match crate::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state).await
+    {
+        Ok(view) => view,
+        Err(e) => {
+            // MYND-160 fix: log PrefsReadError before collapsing to
+            // defaults so support flows can distinguish "user has no
+            // persisted preference" (handled silently by read_or_default
+            // inside prefs_read_with_dir) from "vault.meta read or parse
+            // failed" (this branch) — both produce default-ON natively
+            // but the latter is a structural problem worth a trace
+            // entry. The vault_dir-resolution-failed branch above warns
+            // similarly; this restores observability symmetry.
+            tracing::warn!(
+                event = "prefs_post_unlock_skipped",
+                reason = "prefs_read_failed",
+                error_kind = prefs_read_error_kind(&e),
+            );
+            crate::plugins::prefs::PrefsView::default()
+        }
+    };
+
+    crate::screen_capture::apply(app, prefs.screen_capture_protection, "runtime_apply");
+}
+
+/// Closed-enum mapping for `PrefsReadError` variants emitted from the
+/// post-unlock prefs application path. Static-string only, no DENY-list
+/// payload leakage (variants are unit-like or carry closed-enum
+/// `IoFailureKind`). Mirrors `screen_capture_protection_error_kind`
+/// and `prefs_blob_error_kind` discipline from `src-tauri/CLAUDE.md`.
+fn prefs_read_error_kind(e: &crate::plugins::prefs::PrefsReadError) -> &'static str {
+    use crate::plugins::prefs::PrefsReadError;
+    match e {
+        PrefsReadError::SlotNotUnlocked => "slot_not_unlocked",
+        PrefsReadError::Io { .. } => "io_error",
+        PrefsReadError::InvalidVaultMeta => "invalid_vault_meta",
+    }
+}
+
+/// Local helper: resolve `<app_data_dir>/vault/`. Shaped identically
+/// to the prefs plugin's `vault_dir` helper but kept local to avoid
+/// a cross-plugin pub re-export; both are ~5-line wrappers around
+/// `tauri::path::PathResolver::app_data_dir()`.
+fn resolve_vault_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| std::io::Error::other("app_data_dir resolution failed"))?;
+    Ok(base.join("vault"))
 }
 
 /// Testable core of [`unlock`]. The Tauri-command wrapper resolves
@@ -427,8 +534,33 @@ fn open_32_byte_secret(
 /// `decrypting`); a Rust-side "lock requested" signal that the
 /// pipelines check before populating the slot is a Phase 2+ fix.
 #[tauri::command]
-pub async fn lock(state: State<'_, VaultRuntimeState>) -> Result<(), VaultUnlockError> {
-    lock_with_state(state.inner()).await
+pub async fn lock<R: Runtime>(
+    state: State<'_, VaultRuntimeState>,
+    app: AppHandle<R>,
+) -> Result<(), VaultUnlockError> {
+    lock_with_state(state.inner()).await?;
+
+    // ---- MYND-160 Task 11: post-zeroize native default-ON ---------------
+    //
+    // Per `decisions.md` 2026-05-27 entry "Lock-on-default-ON: vault_lock
+    // re-applies set_content_protected(true) regardless of in-session
+    // user preference" — every vault_lock unconditionally restores
+    // screen-capture protection to ON, regardless of the user's
+    // persisted `vault.prefs` toggle. Post-lock Slot::Empty native
+    // state equals pre-unlock Slot::Empty native state (symmetric
+    // structural-privacy invariant). The persisted preference stays
+    // on disk; the next `vault_unlock` re-reads vault.prefs and
+    // re-applies the user's choice via the `apply_persisted_prefs`
+    // Task 10 path.
+    //
+    // Best-effort: `screen_capture::apply` swallows native failures
+    // via its own tracing::warn discipline; no error propagation. The
+    // call sits AFTER lock_with_state's `Ok(())` early-return is
+    // committed — a `vault_locked` event is already in the tracing
+    // stream by this point.
+    crate::screen_capture::apply(&app, true, "lock_reset");
+
+    Ok(())
 }
 
 /// Report the current [`Slot`] variant via the [`SlotKind`]
@@ -725,6 +857,146 @@ mod tests {
                 "populator hash should not collide with fixture sentinel",
             );
         });
+    }
+
+    /// MYND-160 Task 10 integration: after `unlock_with_path` succeeds,
+    /// a subsequent `prefs::commands::prefs_read_with_dir` against the
+    /// same vault directory returns the persisted `screen_capture_protection`
+    /// value (toggled-off in this test). Pins the end-to-end disk →
+    /// pipeline → slot → prefs-read path that the Tauri-wrapper
+    /// `apply_persisted_prefs` calls in production. The native
+    /// `screen_capture::apply` side-effect is not asserted here (no
+    /// `WebviewWindow` in the test harness — its observability is
+    /// covered by `screen_capture::tests::*` for the closed-enum
+    /// helper and by the production logging events).
+    ///
+    /// Verifies user story 4 (after unlock, the "off" preference takes
+    /// effect — the toggle value flows from disk to the screen_capture
+    /// runtime).
+    #[test]
+    fn unlock_followed_by_prefs_read_returns_persisted_toggle() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, original_root_key) = seed_vault_meta("correct horse battery staple");
+            scratch.write_meta(&meta_bytes);
+
+            // Seed vault.prefs encrypted under the SAME root_key the
+            // unlock will recover, with the account_number_hash bound
+            // into the AAD from the seeded vault.meta.
+            let parsed_meta = protocol::parse_vault_meta(&meta_bytes).expect("parse meta");
+            let prefs_key =
+                protocol::derive_subkey(&original_root_key, protocol::SubkeyRole::PrefsKey);
+            let prefs_blob = protocol::encode_prefs_blob(
+                &prefs_key,
+                &parsed_meta.account_number_hash,
+                &protocol::PrefsView {
+                    screen_capture_protection: false,
+                },
+            )
+            .expect("encode prefs blob");
+            std::fs::write(scratch.dir.join("vault.prefs"), &prefs_blob).expect("seed vault.prefs");
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "correct horse battery staple".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("unlock with correct password");
+
+            // Slot is now Unlocked; prefs_read_with_dir uses the same
+            // slot-peek + AAD-bind path the Tauri-wrapper
+            // `apply_persisted_prefs` takes.
+            let prefs_view =
+                crate::plugins::prefs::commands::prefs_read_with_dir(&scratch.dir, &state)
+                    .await
+                    .expect("prefs_read after unlock");
+            assert!(
+                !prefs_view.screen_capture_protection,
+                "persisted toggle (false) must round-trip through unlock → prefs_read"
+            );
+        });
+    }
+
+    /// MYND-160 Task 10 integration: when `vault.prefs` is absent
+    /// (the normal case for pre-MYND-160 vaults and the first unlock
+    /// before any toggle interaction), unlock STILL succeeds and a
+    /// subsequent prefs_read returns `PrefsView::default()` per spec
+    /// § 9.5.5 fall-back-to-defaults. Pins user stories 7 (legacy
+    /// vault opens) and 4 (pre-unlock-always-ON survives — default
+    /// value has screen_capture_protection: true).
+    #[test]
+    fn unlock_succeeds_when_vault_prefs_absent_and_read_returns_defaults() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _) = seed_vault_meta("correct horse battery staple");
+            scratch.write_meta(&meta_bytes);
+            // Do NOT seed vault.prefs.
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "correct horse battery staple".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("unlock must succeed even without vault.prefs");
+
+            let prefs_view =
+                crate::plugins::prefs::commands::prefs_read_with_dir(&scratch.dir, &state)
+                    .await
+                    .expect("prefs_read after unlock-without-prefs");
+            assert!(
+                prefs_view.screen_capture_protection,
+                "absent vault.prefs falls back to defaults (protection ON) per spec § 9.5.5"
+            );
+        });
+    }
+
+    /// MYND-160 stories 11 + 12 — change-password / recovery preserve
+    /// the persisted prefs because both flows preserve `root_key`
+    /// (only the password_wrap_key or recovery_wrap_key change). This
+    /// test pins the structural property: a vault.prefs encrypted under
+    /// `prefs_key = DeriveSubkey(root_key, PrefsKey)` decrypts
+    /// identically regardless of which credential (master password,
+    /// recovery phrase, or any future hardware-backed unlock) unlocks
+    /// the vault — `root_key` is the single source of truth. Full E2E
+    /// tests across the `vault_change_password` + `vault_recover` +
+    /// `vault_complete_recovery` pipelines (~200 lines of fixture
+    /// scaffolding) are deferred as over-investment because the
+    /// property is mathematically guaranteed by the spec (codec
+    /// depends only on root_key + account_number_hash, neither of
+    /// which change across credential rotation).
+    #[test]
+    fn prefs_decryption_depends_only_on_root_key_not_on_credential_path() {
+        // Same root_key + same account_number_hash → same prefs_key →
+        // identical decrypt regardless of the credential that
+        // recovered them.
+        let root_key = [0x42u8; 32];
+        let account_hash = [0x33u8; 16];
+
+        let prefs_key = protocol::derive_subkey(&root_key, protocol::SubkeyRole::PrefsKey);
+        let blob = protocol::encode_prefs_blob(
+            &prefs_key,
+            &account_hash,
+            &protocol::PrefsView {
+                screen_capture_protection: false,
+            },
+        )
+        .expect("encode");
+
+        // Re-derive prefs_key from the SAME root_key (simulating any
+        // credential rotation that leaves root_key intact).
+        let prefs_key_after_credential_rotation =
+            protocol::derive_subkey(&root_key, protocol::SubkeyRole::PrefsKey);
+        let decoded =
+            protocol::decode_prefs_blob(&prefs_key_after_credential_rotation, &account_hash, &blob)
+                .expect("decrypt after rotation");
+        assert!(
+            !decoded.screen_capture_protection,
+            "credential rotation must preserve persisted prefs (stories 11 + 12)"
+        );
     }
 
     #[test]

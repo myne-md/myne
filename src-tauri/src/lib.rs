@@ -37,6 +37,7 @@ pub fn run() {
         .plugin(plugins::vault_recover::init())
         .plugin(plugins::vault_change_password::init())
         .plugin(plugins::vault_delete::init())
+        .plugin(plugins::prefs::init())
         .plugin(plugins::notes::init())
         .setup(|app| {
             // Apply screen-capture protection before `window.show()` so

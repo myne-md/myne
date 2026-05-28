@@ -46,6 +46,7 @@ pub mod error;
 pub mod kdf;
 pub mod password_policy;
 pub mod phrase;
+pub mod prefs;
 pub mod subkey;
 pub mod types;
 pub mod vault_meta;
@@ -54,9 +55,9 @@ pub use account_number::{
     generate_account_number, parse_account_number, AccountNumber, ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_recovery_wrap,
-    aad_vault_items_key_wrap, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
+    aad_recovery_wrap, aad_vault_items_key_wrap, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,
@@ -71,6 +72,11 @@ pub use password_policy::{validate_min_length, MIN_PASSWORD_LEN};
 pub use phrase::{
     generate_recovery_phrase, normalize_user_phrase, RecoveryPhrase, RECOVERY_PHRASE_ENTROPY_BYTES,
     RECOVERY_PHRASE_WORD_COUNT,
+};
+pub use prefs::{
+    decode_prefs_blob, encode_prefs_blob, encode_prefs_blob_raw, PrefsBlobError, PrefsView,
+    MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN, PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC,
+    PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
 };
 pub use subkey::{derive_subkey, SubkeyRole};
 pub use types::{
