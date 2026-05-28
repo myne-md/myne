@@ -24,7 +24,8 @@ const CSS = `
   font-family: var(--font-sans);
   font-size: 13px;
   color: var(--fg-1);
-  overflow: hidden;
+  max-height: 288px;
+  overflow-y: auto;
 }
 .cm-slash-menu-row {
   display: flex;

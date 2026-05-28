@@ -10,10 +10,13 @@
 // (or above if no room below).
 
 import { syntaxTree } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
+import { Prec, type Extension } from "@codemirror/state";
 import {
   EditorView,
   ViewPlugin,
+  keymap,
+  type Command,
+  type KeyBinding,
   type PluginValue,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -88,9 +91,12 @@ class SlashMenuView implements PluginValue {
         }
       });
       if (this.state !== null && !openedFromInsert) {
+        // Reset highlight to the first match whenever the filter changes, so
+        // typing `/todo` + Enter accepts the top result without an arrow press.
         this.state = {
           ...this.state,
           triggerTo: update.view.state.selection.main.head,
+          selectedIndex: 0,
         };
         this.scheduleRender();
       }
@@ -164,13 +170,26 @@ class SlashMenuView implements PluginValue {
       document.body.appendChild(this.container);
     }
     this.container.replaceChildren();
+    let selectedRow: HTMLDivElement | null = null;
     filtered.forEach((cmd, i) => {
       const row = document.createElement("div");
       row.className = "cm-slash-menu-row";
       if (i === this.state!.selectedIndex) {
         row.classList.add("cm-slash-menu-row-selected");
+        selectedRow = row;
       }
       row.setAttribute("role", "menuitem");
+      // Hover sets the highlight (parity with keyboard nav). Update classes
+      // in place rather than re-rendering to avoid teardown mid-pointer-move.
+      row.addEventListener("mouseenter", () => {
+        if (this.state === null || this.state.selectedIndex === i) return;
+        this.state.selectedIndex = i;
+        this.container
+          ?.querySelectorAll(".cm-slash-menu-row")
+          .forEach((r, idx) =>
+            r.classList.toggle("cm-slash-menu-row-selected", idx === i),
+          );
+      });
       const icon = document.createElement("span");
       icon.className = "cm-slash-menu-icon";
       icon.textContent = cmd.icon;
@@ -194,7 +213,9 @@ class SlashMenuView implements PluginValue {
     // Anchor on the cursor coords; fall back to the editor's content
     // rect center if coords aren't measured yet.
     const surfaceWidth = 300;
-    const surfaceHeight = 40 + filtered.length * 32;
+    // Cap to the CSS max-height (.cm-slash-menu) so positioning flips above
+    // the cursor correctly when the full list would overflow below.
+    const surfaceHeight = Math.min(40 + filtered.length * 32, 300);
     const coords = this.view.coordsAtPos(this.state.triggerTo);
     let anchorRect;
     if (coords !== null) {
@@ -224,6 +245,12 @@ class SlashMenuView implements PluginValue {
     this.container.style.top = `${pos.top}px`;
     this.container.style.width = `${surfaceWidth}px`;
     this.container.style.zIndex = "1000";
+
+    // Keep the highlighted row visible when the list scrolls (arrow nav past
+    // the menu's max-height).
+    if (selectedRow !== null) {
+      (selectedRow as HTMLDivElement).scrollIntoView({ block: "nearest" });
+    }
   }
 
   private applyCommand(cmd: SlashCommand): void {
@@ -233,42 +260,44 @@ class SlashMenuView implements PluginValue {
     cmd.apply(this.view, triggerFrom, triggerTo);
   }
 
-  handleKey(e: KeyboardEvent): boolean {
-    if (this.state === null) return false;
+  private currentFiltered(): readonly SlashCommand[] {
+    if (this.state === null) return [];
     const filter = this.view.state.doc.sliceString(
       this.state.triggerFrom + 1,
       this.state.triggerTo,
     );
-    const filtered = filterCommands(this.commands, filter);
-    if (e.key === "Escape") {
+    return filterCommands(this.commands, filter);
+  }
+
+  /** Move the highlight by `delta` (wraps). Returns true if it consumed. */
+  move(delta: number): boolean {
+    if (this.state === null) return false;
+    const n = this.currentFiltered().length;
+    if (n === 0) return false;
+    this.state = {
+      ...this.state,
+      selectedIndex: (this.state.selectedIndex + delta + n) % n,
+    };
+    this.scheduleRender();
+    return true;
+  }
+
+  /** Apply the highlighted command, or close if nothing matches. */
+  confirm(): boolean {
+    if (this.state === null) return false;
+    const cmd = this.currentFiltered()[this.state.selectedIndex];
+    if (cmd !== undefined) {
+      this.applyCommand(cmd);
+    } else {
       this.close();
-      return true;
     }
-    if (e.key === "ArrowDown") {
-      this.state = {
-        ...this.state,
-        selectedIndex: (this.state.selectedIndex + 1) % filtered.length,
-      };
-      this.scheduleRender();
-      return true;
-    }
-    if (e.key === "ArrowUp") {
-      this.state = {
-        ...this.state,
-        selectedIndex:
-          (this.state.selectedIndex - 1 + filtered.length) % filtered.length,
-      };
-      this.scheduleRender();
-      return true;
-    }
-    if (e.key === "Enter") {
-      const cmd = filtered[this.state.selectedIndex];
-      if (cmd !== undefined) {
-        this.applyCommand(cmd);
-      }
-      return true;
-    }
-    return false;
+    return true;
+  }
+
+  dismiss(): boolean {
+    if (this.state === null) return false;
+    this.close();
+    return true;
   }
 
   isOpen(): boolean {
@@ -276,13 +305,28 @@ class SlashMenuView implements PluginValue {
   }
 }
 
+const slashPlugin = ViewPlugin.fromClass(SlashMenuView);
+
+// Nav keys are bound through a `Prec.highest` keymap rather than the plugin's
+// `eventHandlers`, so they reliably win over `defaultKeymap`'s cursor-line
+// and Enter bindings while the menu is open. Each command no-ops (returns
+// false → editor handles the key normally) when the menu is closed.
+function slashKeymap(): readonly KeyBinding[] {
+  const whenOpen =
+    (fn: (v: SlashMenuView) => boolean): Command =>
+    (view) => {
+      const inst = view.plugin(slashPlugin);
+      if (inst === null || !inst.isOpen()) return false;
+      return fn(inst);
+    };
+  return [
+    { key: "ArrowDown", run: whenOpen((v) => v.move(1)) },
+    { key: "ArrowUp", run: whenOpen((v) => v.move(-1)) },
+    { key: "Enter", run: whenOpen((v) => v.confirm()) },
+    { key: "Escape", run: whenOpen((v) => v.dismiss()) },
+  ];
+}
+
 export function slashMenuExtension(): Extension {
-  const plugin = ViewPlugin.fromClass(SlashMenuView, {
-    eventHandlers: {
-      keydown(this: SlashMenuView, e: KeyboardEvent): boolean {
-        return this.handleKey(e);
-      },
-    },
-  });
-  return plugin;
+  return [slashPlugin, Prec.highest(keymap.of(slashKeymap()))];
 }

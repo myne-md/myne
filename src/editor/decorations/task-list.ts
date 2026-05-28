@@ -25,7 +25,11 @@ class TaskCheckboxWidget extends WidgetType {
     super();
   }
   eq(other: TaskCheckboxWidget): boolean {
-    return other.checked === this.checked;
+    // Must compare markerFrom too: the click handler closes over it to target
+    // the toggle. If only `checked` matched, CM6 would reuse an old widget's
+    // DOM (and stale closure) after edits shift the marker, so clicking would
+    // rewrite the wrong document range.
+    return other.checked === this.checked && other.markerFrom === this.markerFrom;
   }
   toDOM(view: EditorView): HTMLElement {
     const span = document.createElement("span");
@@ -37,9 +41,14 @@ class TaskCheckboxWidget extends WidgetType {
     span.style.cursor = "pointer";
     span.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      const from = this.markerFrom;
-      // The marker spans `[ ]` (3 chars) or `[x]` (3 chars).
-      const next = this.checked ? "[ ]" : "[x]";
+      // Resolve the marker position live from the DOM rather than trusting the
+      // closure: if CM6 reused this widget's DOM, the captured `markerFrom`
+      // could be stale and the toggle would rewrite the wrong range. Read the
+      // current 3-char marker (`[ ]` / `[x]`) at that position and flip it.
+      const from = view.posAtDOM(span);
+      const current = view.state.doc.sliceString(from, from + 3);
+      if (current !== "[ ]" && current !== "[x]" && current !== "[X]") return;
+      const next = current === "[ ]" ? "[x]" : "[ ]";
       view.dispatch({
         changes: { from, to: from + 3, insert: next },
         userEvent: "task.toggle",
@@ -63,11 +72,37 @@ function buildTaskListDecorations(view: EditorView): DecorationSet {
         if (node.name !== "TaskMarker") return undefined;
         const marker = view.state.doc.sliceString(node.from, node.to);
         const checked = marker === "[x]" || marker === "[X]";
+        // Hide the Markdown list bullet ("- " / "* " / "+ ") preceding the
+        // checkbox so the rendered line reads as just [checkbox] label, not
+        // "- [checkbox] label". Indentation (leading whitespace) is preserved.
+        const line = view.state.doc.lineAt(node.from);
+        const before = view.state.doc.sliceString(line.from, node.from);
+        const bullet = before.match(/^(\s*)[-*+]\s+$/);
+        if (bullet !== null) {
+          const bulletStart = line.from + (bullet[1] ?? "").length;
+          if (node.from > bulletStart) {
+            decorations.push(Decoration.replace({}).range(bulletStart, node.from));
+          }
+        }
         decorations.push(
           Decoration.replace({
             widget: new TaskCheckboxWidget(checked, node.from),
           }).range(node.from, node.to),
         );
+        // Strike + mute the label text of a completed item so done items
+        // visibly recede (MYND-142). Spans the text after the marker to
+        // end-of-line; skipped for empty todos (no text to strike).
+        if (checked) {
+          const line = view.state.doc.lineAt(node.to);
+          if (line.to > node.to) {
+            decorations.push(
+              Decoration.mark({ class: "cm-task-done-label" }).range(
+                node.to,
+                line.to,
+              ),
+            );
+          }
+        }
         return undefined;
       },
     });

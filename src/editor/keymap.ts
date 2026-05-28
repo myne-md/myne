@@ -5,9 +5,10 @@
 // heading-cycle shortcut); Cmd+Shift+L (wikilink autocomplete — ships in
 // `editor-mvp-wikilinks` PRD).
 
-import { type ChangeSpec } from "@codemirror/state";
+import { type ChangeSpec, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
 import { toggleWrap } from "./wrap-toggle";
+import { cachedLocateFrontmatter } from "./frontmatter-cache";
 
 function wrapCommand(open: string, close: string): Command {
   const cmd = toggleWrap(open, close);
@@ -56,7 +57,39 @@ const toggleListPrefix = (prefix: string): Command => (view) => {
   return true;
 };
 
+// Mod-a (select-all) scoped to the section the cursor sits in, so it never
+// sweeps the Myne-managed YAML frontmatter into a selection the user might
+// then delete (which would wipe canonical `title:` / `updated:` fields —
+// MYND-145). Frontmatter boundaries come from the shared `locateFrontmatter`
+// helper (no duplicate regex). No escalation: a second Mod-a re-selects the
+// same section rather than expanding to the whole document; selecting
+// frontmatter + body together is an explicit manual action.
+//
+// Pure so it's unit-testable without a DOM-backed EditorView. Returns the
+// scoped selection range, or `null` when there's no frontmatter (caller
+// falls back to CodeMirror's default whole-document selectAll).
+export function scopedSelectAllRange(
+  doc: Text,
+  head: number,
+): { anchor: number; head: number } | null {
+  const fm = cachedLocateFrontmatter(doc);
+  if (fm === null) return null;
+  return head < fm.blockEnd
+    ? { anchor: fm.bodyStart, head: fm.bodyEnd } // cursor in FM → YAML only
+    : { anchor: fm.blockEnd, head: doc.length }; // cursor in body → body only
+}
+
+const selectAllScoped: Command = (view) => {
+  const { state } = view;
+  const selection = scopedSelectAllRange(state.doc, state.selection.main.head);
+  if (selection === null) return false; // no frontmatter → default selectAll
+  view.dispatch({ selection, userEvent: "select" });
+  return true;
+};
+
 export const myneKeyBindings: readonly KeyBinding[] = [
+  // Listed first so it shadows defaultKeymap's selectAll (earlier wins).
+  { key: "Mod-a", run: selectAllScoped },
   { key: "Mod-b", run: wrapCommand("**", "**") },
   { key: "Mod-i", run: wrapCommand("*", "*") },
   { key: "Mod-e", run: wrapCommand("`", "`") },
