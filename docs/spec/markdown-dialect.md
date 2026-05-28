@@ -103,7 +103,7 @@ Myne writes two canonical fields to YAML frontmatter from the host, both via the
 | Field | Type | Semantics | Writer | Trigger |
 |---|---|---|---|---|
 | `updated` | RFC 3339 string (UTC) | User-meaningful last-edit timestamp | `src/dialect/surgery.ts::patchUpdatedField` | Every save (per [`decisions.md`](../decisions.md) 2026-05-07 "User-meaningful timestamp storage path") |
-| `title` | YAML string (plain scalar) | User-visible note title surfaced by sidebar / note-titles batch | `src/dialect/surgery.ts::patchTitleField` | Rename action only — invoked by the caller's title-write decision tree per [`decisions.md`](../decisions.md) 2026-05-15 "Note title write target: mirror-existing source-of-truth (β)" |
+| `title` | YAML string (plain scalar) | User-visible note title surfaced by sidebar / note-titles batch | `src/dialect/surgery.ts::patchTitleField` | Rename action only — always writes the FM `title:` field per [`decisions.md`](../decisions.md) 2026-05-28 "Note title is frontmatter-only (no first-`# H1` fallback)" (supersedes 2026-05-15 mirror-existing β tree) |
 
 Mechanics — shared across both fields:
 
@@ -116,7 +116,7 @@ Mechanics — shared across both fields:
 Mechanics — per-field:
 
 - **`updated`** is owned by autosave: a user who manually sets `updated:` to a custom value sees it overwritten on the next save — autosave is Myne's responsibility. Users who want a manually-managed timestamp use a different field name (e.g., `last_reviewed:`).
-- **`title`** is owned by the rename action only — body autosave does NOT write `title:`. The caller's rename decision tree (`src/notes/renameNote.ts` in the v0.1 reference implementation) chooses between writing `title:` and writing the body's first `# H1` line via `patchFirstH1Line` based on which slot the title was already read from. `patchFirstH1Line` is a structural-transform primitive operating on user-authored body content; it is NOT a Myne-managed field. See [`decisions.md`](../decisions.md) 2026-05-15 "Note title write target" for the full mirror-existing source-of-truth (β) decision tree.
+- **`title`** is owned by the rename action only — body autosave does NOT write `title:`. Rename always writes the frontmatter `title:` field (`src/notes/renameNote.ts` → `patchTitleField`, applying the same 3-state matrix as `updated:`). The body's first `# H1` line is **not** a title source or a title write target: a note with no FM `title:` reads as "Untitled" until named, and the read path (`note_titles_batch` / `loadNoteBatch`) derives the title from `title:` only. `patchFirstH1Line` remains a structural-transform primitive in `src/dialect/surgery.ts` (e.g. for the editor's heading-cycle command) but is no longer invoked by rename. See [`decisions.md`](../decisions.md) 2026-05-28 "Note title is frontmatter-only (no first-`# H1` fallback)" (supersedes the 2026-05-15 mirror-existing source-of-truth (β) tree).
 
 ### 3.7 Inline-tag extension
 

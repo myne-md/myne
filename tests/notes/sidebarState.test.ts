@@ -29,6 +29,7 @@ function stateWith(
     selectedId,
     renamingId: null,
     cache,
+    contentReloadNonce: 0,
   };
 }
 

@@ -1,6 +1,7 @@
-// Unit tests for `src/notes/renameNote.ts`. Verifies the β mirror-
-// existing decision tree end-to-end (FM-title / H1-only / neither /
-// both-exist) and that `updated:` always refreshes after rename.
+// Unit tests for `src/notes/renameNote.ts`. Rename always writes the
+// frontmatter `title:` field (replace / insert / inject as needed) — the
+// body `# H1` is never a title source or write target — and `updated:`
+// always refreshes after rename.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,28 +54,30 @@ describe("renameNote — FM-title source-of-truth", () => {
   });
 });
 
-describe("renameNote — H1-only source-of-truth", () => {
-  it("updates body `# H1` when no FM `title:` is present", async () => {
+describe("renameNote — writes FM title, never the body H1", () => {
+  it("injects an FM `title:` block when only a body `# H1` exists", async () => {
     invokeMock.mockResolvedValueOnce(undefined);
     const input = "# Old Heading\nbody text\n";
     await renameNote("id-3", input, "New Heading");
 
     const body = lastUpdateBody();
-    expect(body).toContain("# New Heading");
-    expect(body).toContain("body text\n");
-    expect(body).not.toContain("# Old Heading");
+    expect(body.startsWith("---\n")).toBe(true);
+    expect(body).toContain("title: New Heading");
+    // Body H1 is left untouched — it is not a title write target.
+    expect(body).toContain("# Old Heading");
+    expect(body).toContain("body text");
   });
 
-  it("updates body `# H1` when FM exists but lacks `title:` key", async () => {
+  it("inserts `title:` into an existing FM that lacks it (H1 untouched)", async () => {
     invokeMock.mockResolvedValueOnce(undefined);
     const input = "---\ntags: [a]\n---\n\n# Old H1\nbody\n";
     await renameNote("id-4", input, "New H1");
 
     const body = lastUpdateBody();
-    expect(body).toContain("# New H1");
-    // FM block left untouched (no `title:` injection).
+    expect(body).toContain("title: New H1");
     expect(body).toContain("tags: [a]");
-    expect(body).not.toMatch(/title:/);
+    // Body H1 left untouched.
+    expect(body).toContain("# Old H1");
   });
 });
 
@@ -104,15 +107,17 @@ describe("renameNote — updated: side-effect", () => {
     expect(body).toMatch(/updated: \d{4}-\d{2}-\d{2}T/);
   });
 
-  it("injects `updated:` even when no FM previously existed", async () => {
+  it("injects FM `title:` + `updated:` when no FM previously existed", async () => {
     invokeMock.mockResolvedValueOnce(undefined);
     const input = "# Old\nbody\n";
     await renameNote("id-7", input, "Renamed");
 
     const body = lastUpdateBody();
-    expect(body).toContain("# Renamed");
-    // FM block injected by patchUpdatedField (state-A).
-    expect(body).toMatch(/^---\nupdated: \d{4}-\d{2}-\d{2}T/);
+    expect(body.startsWith("---\n")).toBe(true);
+    expect(body).toContain("title: Renamed");
+    // Body H1 left untouched (not a title target).
+    expect(body).toContain("# Old");
+    expect(body).toMatch(/updated: \d{4}-\d{2}-\d{2}T/);
   });
 });
 

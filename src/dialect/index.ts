@@ -20,7 +20,9 @@ export type {
 } from "./types";
 
 export { parse } from "./parse";
+export { extractFullText } from "./visitors/fullText";
 export {
+  formatYamlScalar,
   patchFirstH1Line,
   patchSourceRanges,
   patchTitleField,

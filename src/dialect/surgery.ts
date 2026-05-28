@@ -35,7 +35,7 @@ function needsYamlQuoting(value: string): boolean {
 
 // Format a string for emission as a YAML value after `<key>: `.
 // Plain-scalar when safe; double-quoted with `\` and `"` escapes when not.
-function formatYamlScalar(value: string): string {
+export function formatYamlScalar(value: string): string {
   if (!needsYamlQuoting(value)) return value;
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;
