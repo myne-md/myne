@@ -31,6 +31,7 @@ import { type Extension } from "@codemirror/state";
 import { Wikilink } from "../dialect/lezer/wikilink";
 import { InlineTag } from "../dialect/lezer/inline-tag";
 import { myneDecorations } from "./decorations";
+import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { slashMenuExtension } from "./slash/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
@@ -51,6 +52,9 @@ export function myneExtensions(): readonly Extension[] {
     selectionToolbarExtension(),
     keymap.of([
       ...myneKeyBindings,
+      // Before defaultKeymap so Arrow Up/Down can enter a table block (which
+      // CM would otherwise skip over) instead of the default vertical move.
+      ...tableKeymap,
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...historyKeymap,

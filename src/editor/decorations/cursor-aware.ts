@@ -10,7 +10,28 @@
 // decoration's range; returns true if any selection range overlaps with the
 // decoration's enclosing line(s).
 
+import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+
+/**
+ * True if any selection head or anchor sits on a line in the inclusive range
+ * `[fromLine, toLine]` (1-based line numbers). Focus-agnostic and view-free so
+ * it can be used from a `StateField` (e.g. block-replace decorations that have
+ * no `view`), as well as from `isCursorLine` below.
+ */
+export function selectionTouchesLines(
+  state: EditorState,
+  fromLine: number,
+  toLine: number,
+): boolean {
+  for (const range of state.selection.ranges) {
+    const head = state.doc.lineAt(range.head).number;
+    if (head >= fromLine && head <= toLine) return true;
+    const anchor = state.doc.lineAt(range.anchor).number;
+    if (anchor >= fromLine && anchor <= toLine) return true;
+  }
+  return false;
+}
 
 export function isCursorLine(view: EditorView, from: number, to: number): boolean {
   // When the editor loses focus (sidebar click, settings modal, OS focus
@@ -20,13 +41,7 @@ export function isCursorLine(view: EditorView, from: number, to: number): boolea
   if (!view.hasFocus) return false;
   const startLine = view.state.doc.lineAt(from).number;
   const endLine = view.state.doc.lineAt(to).number;
-  for (const range of view.state.selection.ranges) {
-    const head = view.state.doc.lineAt(range.head).number;
-    if (head >= startLine && head <= endLine) return true;
-    const anchor = view.state.doc.lineAt(range.anchor).number;
-    if (anchor >= startLine && anchor <= endLine) return true;
-  }
-  return false;
+  return selectionTouchesLines(view.state, startLine, endLine);
 }
 
 /**

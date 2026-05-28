@@ -16,6 +16,7 @@ import { taskListDecorations } from "./task-list";
 import { blockquoteDecorations } from "./blockquote";
 import { horizontalRuleDecorations } from "./horizontal-rule";
 import { frontmatterDecorations } from "./frontmatter";
+import { tableDecorations } from "./table";
 
 export function myneDecorations(): readonly Extension[] {
   return [
@@ -28,5 +29,6 @@ export function myneDecorations(): readonly Extension[] {
     blockquoteDecorations(),
     horizontalRuleDecorations(),
     frontmatterDecorations(),
+    tableDecorations(),
   ];
 }
