@@ -110,6 +110,40 @@ export const myneTheme = EditorView.theme({
     paddingLeft: "12px",
   },
 
+  // GFM table block widget from decorations/table.ts. Read-only grid; the
+  // raw pipe source is reached via cursor-aware whole-table reveal (Task 2).
+  // `.cm-table-scroll` contains horizontal overflow so wide tables scroll in
+  // their own box without breaking the editor's vertical layout.
+  ".cm-table-scroll": {
+    display: "block",
+    overflowX: "auto",
+    maxWidth: "100%",
+    margin: "10px 0",
+  },
+  ".cm-table": {
+    borderCollapse: "collapse",
+    width: "auto",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+    color: "var(--fg-1)",
+  },
+  ".cm-table th, .cm-table td": {
+    border: "1px solid var(--line-1, #d8d5cc)",
+    padding: "6px 12px",
+    textAlign: "left",
+    verticalAlign: "top",
+  },
+  ".cm-table th": {
+    fontWeight: "700",
+    backgroundColor: "var(--paper-3, #ece9e2)",
+  },
+  // Zebra striping on alternating body rows (PRD story 8). Lighter than the
+  // header fill so the header still reads as distinct.
+  ".cm-table-row-alt td": {
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+  },
+
   // Horizontal-rule replacement widget from horizontal-rule.ts.
   ".cm-hr": {
     display: "inline-block",
