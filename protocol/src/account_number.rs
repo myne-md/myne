@@ -622,4 +622,252 @@ mod tests {
         let acct = parse_account_number(&s).unwrap();
         assert_eq!(&acct.canonical, b"0123456789ABCDEFGHJT");
     }
+
+    // ---- KAT vector regenerator (companion repo) ---------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/account-number/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_account_number_vectors.json`.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act.
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_account_number_vectors_for_paste -- --ignored`
+    ///
+    /// 12 cases pin (per MYND-72 / D7):
+    /// - 6 `parse_ok`: canonical / display / lowercase / lowercase-display
+    ///   / missing-MY-prefix / with-surrounding-whitespace — all normalize
+    ///   to the same `AccountNumber { canonical, display, hash }`.
+    /// - 6 `parse_fail`: too-short / too-long / contains-`O` (Crockford
+    ///   strict reject, no `I/L/O/U` substitution per spec §5 step 7) /
+    ///   contains-`I` / Damm-32 single-substitution / Damm-32 adjacent-
+    ///   transposition. All collapse to
+    ///   `ProtocolError::AccountNumberInvalid`.
+    ///
+    /// Baseline canonical: `0123456789ABCDEFGHJT` — already used by
+    /// existing `parse_accepts_*` unit tests in this module; same
+    /// baseline preserves cross-test consistency.
+    #[test]
+    #[ignore]
+    fn emit_account_number_vectors_for_paste() {
+        extern crate std;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        let baseline_canonical: &str = "0123456789ABCDEFGHJT";
+        let baseline_display: &str = "MY-0123-4567-89AB-CDEF-GHJT";
+
+        let baseline = parse_account_number(baseline_canonical)
+            .expect("baseline canonical must parse cleanly");
+        assert_eq!(&baseline.canonical, baseline_canonical.as_bytes());
+        assert_eq!(&baseline.display, baseline_display);
+
+        let expected_canonical_hex = hex_lower(&baseline.canonical);
+        let expected_display_hex = hex_lower(baseline.display.as_bytes());
+        let expected_hash_hex = hex_lower(&baseline.hash);
+
+        struct ParseOkCase {
+            slug: &'static str,
+            description: &'static str,
+            input: alloc::string::String,
+        }
+        struct ParseFailCase {
+            slug: &'static str,
+            description: &'static str,
+            input: alloc::string::String,
+            informational_reason: &'static str,
+        }
+
+        let parse_ok_cases: [ParseOkCase; 6] = [
+            ParseOkCase {
+                slug: "canonical-uppercase",
+                description: "Pure canonical 20-char Crockford-base32 form (19 entropy + Damm-32 check). The baseline shape every other parse_ok case normalizes to.",
+                input: baseline_canonical.into(),
+            },
+            ParseOkCase {
+                slug: "display-with-prefix-and-hyphens",
+                description: "Canonical 27-char display form: 'MY-' prefix + four 4-char Crockford groups + '-' separators + final 4-char group containing 3 entropy + 1 Damm-32 check. Liberal-parse strips prefix + hyphens to recover canonical.",
+                input: baseline_display.into(),
+            },
+            ParseOkCase {
+                slug: "lowercase-canonical",
+                description: "Canonical form with all chars lowercased. Spec §5 normalizes case-insensitively before alphabet validation; output canonical is always uppercase per §3.",
+                input: baseline_canonical.to_lowercase(),
+            },
+            ParseOkCase {
+                slug: "lowercase-display",
+                description: "Display form with all chars (incl. 'MY-' prefix) lowercased. Same case-insensitive normalization applies; prefix strip happens after lowercase.",
+                input: baseline_display.to_lowercase(),
+            },
+            ParseOkCase {
+                slug: "missing-my-prefix",
+                description: "Display form without the 'MY-' prefix (only the four 4-char groups + final 4-char group, hyphen-separated). Spec §5 makes the prefix optional in liberal parse.",
+                input: "0123-4567-89AB-CDEF-GHJT".into(),
+            },
+            ParseOkCase {
+                slug: "with-surrounding-whitespace",
+                description: "Display form with leading + trailing ASCII spaces. Spec §5 strips surrounding + interior whitespace before alphabet validation.",
+                input: "  MY-0123-4567-89AB-CDEF-GHJT  ".into(),
+            },
+        ];
+
+        // Substitution: flip entropy[7] '7' → '8'. Damm-32 catches all
+        // single-character substitutions by design.
+        let substitution_canonical = "0123456889ABCDEFGHJT";
+        // Transposition: swap entropy[2] '2' and entropy[3] '3'.
+        // Damm-32 catches all adjacent-pair transpositions by design.
+        let transposition_canonical = "0132456789ABCDEFGHJT";
+
+        // Guard: if a mutation accidentally rolls back to a valid Damm-
+        // 32 sum, the case would be misleading. Verify it actually
+        // rejects before emitting.
+        assert!(
+            parse_account_number(substitution_canonical).is_err(),
+            "substitution canonical must reject; adjust the entropy mutation if not"
+        );
+        assert!(
+            parse_account_number(transposition_canonical).is_err(),
+            "transposition canonical must reject; adjust the swap positions if not"
+        );
+
+        let parse_fail_cases: [ParseFailCase; 6] = [
+            ParseFailCase {
+                slug: "wrong-length-too-short",
+                description: "18-char input — one char short of canonical 20. Spec §5 step 6 length-check rejects after normalization.",
+                input: "0123456789ABCDEFGH".into(),
+                informational_reason: "wrong length: 18 chars after normalization (expected 20)",
+            },
+            ParseFailCase {
+                slug: "wrong-length-too-long",
+                description: "21-char input — one char over canonical 20. Same length-check rejects.",
+                input: "0123456789ABCDEFGHJTX".into(),
+                informational_reason: "wrong length: 21 chars after normalization (expected 20)",
+            },
+            ParseFailCase {
+                slug: "non-crockford-char-oh",
+                description: "Contains 'O' — Crockford base32 alphabet excludes O (visually conflated with '0'). Spec §5 step 7 rejects STRICTLY — no I/L → 1, O → 0, or U → V lookalike substitution. The Rust parser uses the alphabet exactly as documented.",
+                input: "O123456789ABCDEFGHJT".into(),
+                informational_reason: "contains non-Crockford character 'O' at index 0 — strict reject per spec §5 step 7",
+            },
+            ParseFailCase {
+                slug: "non-crockford-char-eye",
+                description: "Contains 'I' — Crockford base32 alphabet excludes I (visually conflated with '1'). Same strict-reject policy as 'O'.",
+                input: "1I23456789ABCDEFGHJT".into(),
+                informational_reason: "contains non-Crockford character 'I' at index 1 — strict reject per spec §5 step 7",
+            },
+            ParseFailCase {
+                slug: "damm32-substitution-catch",
+                description: "Single entropy character flipped vs the baseline canonical (entropy[7] '7' → '8'); Damm-32 check digit unchanged. Damm-32 by design catches all single-character substitutions; this case proves the implementation honors that property per docs/decisions.md 2026-04-28 polynomial freeze.",
+                input: substitution_canonical.into(),
+                informational_reason: "Damm-32 substitution catch: entropy[7] '7' → '8', check digit 'T' unchanged",
+            },
+            ParseFailCase {
+                slug: "damm32-transposition-catch",
+                description: "Adjacent entropy characters swapped vs the baseline canonical (entropy[2] '2' ↔ entropy[3] '3'); Damm-32 check digit unchanged. Damm-32 by design catches all adjacent-pair transpositions; this case proves it.",
+                input: transposition_canonical.into(),
+                informational_reason: "Damm-32 transposition catch: entropy[2,3] '2','3' → '3','2', check digit 'T' unchanged",
+            },
+        ];
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"account-number\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md + account-number.md §3 + §5\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::parse_account_number byte mapping for cross-implementation conformance: 20-character Crockford-base32 canonical + Damm-32 check digit + display formatter + liberal-parsing normalization (case, hyphens, MY- prefix, whitespace). Damm-32 polynomial form per docs/decisions.md 2026-04-28 freeze. Twelve cases: 6 parse_ok permutations all normalize to the same AccountNumber, 6 parse_fail covering length / non-Crockford-char / Damm-32 substitution + transposition. Cases generated by `cargo test -p protocol --lib emit_account_number_vectors_for_paste -- --ignored`.\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        let total_cases = parse_ok_cases.len() + parse_fail_cases.len();
+        let mut i = 0;
+        for case in parse_ok_cases.iter() {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"account-number/v0.1/{}\",\n",
+                case.slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(case.description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_ok\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_candidate_utf8_hex\": \"{}\",\n",
+                hex_lower(case.input.as_bytes())
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_canonical_utf8_hex\": \"{}\",\n",
+                expected_canonical_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_display_utf8_hex\": \"{}\",\n",
+                expected_display_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_hash_hex\": \"{}\"\n",
+                expected_hash_hex
+            ));
+            i += 1;
+            if i < total_cases {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+        for case in parse_fail_cases.iter() {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"account-number/v0.1/{}\",\n",
+                case.slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(case.description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_candidate_utf8_hex\": \"{}\",\n",
+                hex_lower(case.input.as_bytes())
+            ));
+            dump.push_str("      \"expected_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"informational_failure_reason\": \"{}\"\n",
+                json_escape(case.informational_reason)
+            ));
+            i += 1;
+            if i < total_cases {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_account_number_vectors.json", dump.as_bytes())
+            .expect("write account-number vectors dump");
+    }
 }

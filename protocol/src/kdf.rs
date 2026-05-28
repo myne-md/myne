@@ -501,4 +501,255 @@ mod tests {
                 .unwrap_err();
         assert_eq!(err, ProtocolError::KdfFailure);
     }
+
+    // ---- KAT vector regenerator (companion repo) ---------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/argon2id/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_argon2id_vectors.json`.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act —
+    /// AND because regenerating at canonical params takes ~18 seconds
+    /// (6 cases × ~3s per Argon2id derivation at m=256 MiB, t=3, p=2).
+    /// The shipped vectors run as part of default `cargo test` (NOT
+    /// `#[ignore]`-gated on the runner side) because they are
+    /// protocol-contract assertions; only the regenerator is gated.
+    ///
+    /// 6 cases pin (per MYND-69 / D4):
+    /// - 3 password-path × {short ASCII, long ASCII, raw unicode}
+    /// - 3 recovery-path × {short ASCII, long ASCII, NFKD unicode}
+    ///
+    /// All cases use the canonical Phase 1 Argon2id parameters
+    /// (`m_kib=262144, t=3, p=2, argon2_version=0x13`) — the v0.1
+    /// baseline. Future v0.1.x mobile-profile vectors would land in
+    /// a separate sub-directory with their own KdfParams; not this
+    /// category's scope.
+    #[test]
+    #[ignore]
+    fn emit_argon2id_wrap_vectors_for_paste() {
+        extern crate std;
+        use crate::types::DEFAULT_V0_1_KDF_PARAMS;
+        use unicode_normalization::UnicodeNormalization;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Canonical Phase 1 params. DEFAULT_V0_1_KDF_PARAMS exposed via
+        // crate::types — same constant the production code uses.
+        let canonical_params = DEFAULT_V0_1_KDF_PARAMS;
+
+        // Distinct fixed inputs across cases — same salt + account hash
+        // every case so byte-level differences trace to (path × input).
+        let salt_random: [u8; 16] = [0xEF; 16];
+        let account_number_hash: [u8; 16] = [0x42; 16];
+
+        // Password-path inputs (raw — no normalization by Myne).
+        let pw_short = b"new-pw".to_vec();
+        let pw_long = b"a-deliberately-long-passphrase-with-many-characters".to_vec();
+        // Raw unicode password: "şifre-ñ" in NFC form. Bytes:
+        // 0xC5 0x9F (ş) 0x69 (i) 0x66 (f) 0x72 (r) 0x65 (e) 0x2D (-) 0xC3 0xB1 (ñ)
+        let pw_unicode = "şifre-ñ".as_bytes().to_vec();
+
+        // Recovery-path inputs (caller MUST pre-normalize per spec §3.4
+        // — we pass strings that ARE in NFKD form).
+        let rec_short = b"abandon abandon abandon".to_vec();
+        let rec_long =
+            b"abandon abandon abandon abandon abandon abandon abandon abandon abandon".to_vec();
+        // NFKD decomposition of "şifre-ñ":
+        //   "ş" → "s" (0x73) + COMBINING CEDILLA (U+0327 = 0xCC 0xA7)
+        //   "ifre-" → ASCII bytes
+        //   "ñ" → "n" (0x6E) + COMBINING TILDE (U+0303 = 0xCC 0x83)
+        // Total 11 UTF-8 bytes (vs 9 in NFC).
+        let rec_unicode = "şifre-ñ"
+            .nfkd()
+            .collect::<alloc::string::String>()
+            .into_bytes();
+
+        // Derive all 6 wrap keys. ~3s each at canonical params; total ~18s.
+        let pw_short_key = derive_password_wrap_key(
+            core::str::from_utf8(&pw_short).unwrap(),
+            &salt_random,
+            &account_number_hash,
+            &canonical_params,
+        )
+        .expect("derive password short");
+        let pw_long_key = derive_password_wrap_key(
+            core::str::from_utf8(&pw_long).unwrap(),
+            &salt_random,
+            &account_number_hash,
+            &canonical_params,
+        )
+        .expect("derive password long");
+        let pw_unicode_key = derive_password_wrap_key(
+            core::str::from_utf8(&pw_unicode).unwrap(),
+            &salt_random,
+            &account_number_hash,
+            &canonical_params,
+        )
+        .expect("derive password unicode");
+        let rec_short_key = derive_recovery_wrap_key_from_normalized(
+            core::str::from_utf8(&rec_short).unwrap(),
+            &salt_random,
+            &account_number_hash,
+            &canonical_params,
+        )
+        .expect("derive recovery short");
+        let rec_long_key = derive_recovery_wrap_key_from_normalized(
+            core::str::from_utf8(&rec_long).unwrap(),
+            &salt_random,
+            &account_number_hash,
+            &canonical_params,
+        )
+        .expect("derive recovery long");
+        let rec_unicode_key = derive_recovery_wrap_key_from_normalized(
+            core::str::from_utf8(&rec_unicode).unwrap(),
+            &salt_random,
+            &account_number_hash,
+            &canonical_params,
+        )
+        .expect("derive recovery unicode");
+
+        let salt_hex = hex_lower(&salt_random);
+        let acct_hex = hex_lower(&account_number_hash);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"argon2id\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §3 + §4\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_password_wrap_key + protocol::derive_recovery_wrap_key_from_normalized byte mapping under canonical Phase 1 Argon2id parameters (m=256 MiB, t=3, p=2, v=0x13). 6 cases: password × {short, long, unicode} + recovery × {short, long, NFKD-unicode}. EXPECTED RUNTIME: ~18s total (~3s per case at canonical params). Default-on in `cargo test`; only the regenerator is `#[ignore]`-gated. Cases generated by `cargo test -p protocol --lib emit_argon2id_wrap_vectors_for_paste -- --ignored` (in protocol/src/kdf.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // Helper emit closure.
+        let emit_case = |dump: &mut alloc::string::String,
+                         slug: &str,
+                         description: &str,
+                         path: &str,
+                         password_or_phrase: &[u8],
+                         wrap_key: &[u8],
+                         trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"argon2id/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str(&alloc::format!("      \"input_path\": \"{}\",\n", path));
+            dump.push_str(&alloc::format!(
+                "      \"input_password_or_phrase_utf8_hex\": \"{}\",\n",
+                hex_lower(password_or_phrase)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_salt_random_hex\": \"{}\",\n",
+                salt_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                acct_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_kdf_params\": {{\n        \"m_kib\": {},\n        \"t\": {},\n        \"p\": {},\n        \"argon2_version_hex\": \"{:02x}\"\n      }},\n",
+                canonical_params.m_kib,
+                canonical_params.t,
+                canonical_params.p,
+                canonical_params.argon2_version
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_wrap_key_hex\": \"{}\"\n",
+                hex_lower(wrap_key)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_case(
+            &mut dump,
+            "password-short",
+            "Password-path derivation with 6-byte ASCII password ('new-pw'). Smallest representative password — exercises the Argon2id derive at canonical params with minimal input length.",
+            "password",
+            &pw_short,
+            &*pw_short_key,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "password-long",
+            "Password-path derivation with 51-byte ASCII passphrase. Mid-length representative case; password length does not affect Argon2id memory cost (input is absorbed into the BLAKE2b state regardless), so timing is identical to other cases.",
+            "password",
+            &pw_long,
+            &*pw_long_key,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "password-unicode",
+            "Password-path derivation with raw NFC unicode bytes ('şifre-ñ' = 9 UTF-8 bytes). Myne does NOT normalize passwords on the client side — the bytes the user types are the bytes fed to Argon2id. This case pins the cross-impl byte mapping for non-ASCII passwords.",
+            "password",
+            &pw_unicode,
+            &*pw_unicode_key,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "recovery-short",
+            "Recovery-path derivation with 3-word abandon phrase (NFKD-normalized — caller MUST normalize before invoking derive_recovery_wrap_key_from_normalized per spec §3.4). Smallest valid input.",
+            "recovery",
+            &rec_short,
+            &*rec_short_key,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "recovery-long",
+            "Recovery-path derivation with 9-word abandon phrase. Longer NFKD input — same Argon2id memory cost; cross-impl byte mapping pinned at a representative full-length recovery phrase footprint.",
+            "recovery",
+            &rec_long,
+            &*rec_long_key,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "recovery-nfkd-unicode",
+            "Recovery-path derivation with NFKD-decomposed unicode bytes (11 UTF-8 bytes representing 'şifre-ñ' decomposed via NFKD: 's' + COMBINING CEDILLA U+0327 + 'ifre-' + 'n' + COMBINING TILDE U+0303). Demonstrates the NFKD-output bytes are what reach Argon2id — implementations that skip the NFKD normalization step would feed different bytes (e.g., NFC form 0xC5 0x9F instead of 0x73 0xCC 0xA7 for 'ş') and produce a different wrap key.",
+            "recovery",
+            &rec_unicode,
+            &*rec_unicode_key,
+            false,
+        );
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_argon2id_vectors.json", dump.as_bytes())
+            .expect("write argon2id vectors dump");
+    }
 }
