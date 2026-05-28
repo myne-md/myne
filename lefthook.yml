@@ -1,0 +1,79 @@
+# Lefthook config — Myne main repo.
+# Install once per clone:  brew install lefthook && lefthook install
+# Skip ad-hoc:             LEFTHOOK=0 git commit ...   (or  git commit --no-verify)
+
+pre-commit:
+  parallel: true
+  commands:
+
+    rustfmt:
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+
+    tsc:
+      glob: "*.{ts,tsx}"
+      run: pnpm exec tsc --noEmit
+
+    whitespace:
+      run: git diff --cached --check
+
+    eof-newline:
+      # Skips tool-generated/exported assets: Lucide icons, Penpot brand
+      # exports, design preview specimens, Tauri/Android icon resources.
+      # Those round-trip through external tools that don't emit trailing \n.
+      run: |
+        fail=0
+        for f in {staged_files}; do
+          [ -f "$f" ] || continue
+          case "$f" in
+            docs/design/icons/*|docs/design/assets/*|docs/design/preview/*) continue ;;
+            src-tauri/icons/*|public/*.svg) continue ;;
+          esac
+          if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
+          if [ -n "$(tail -c1 "$f")" ]; then
+            echo "missing EOF newline: $f"
+            fail=1
+          fi
+        done
+        exit $fail
+
+    cargo-lock-singleton:
+      # TB9 audit anchor: workspace must keep a single Cargo.lock at the root.
+      run: |
+        extra=$(find . -name Cargo.lock -not -path './target/*' -not -path './node_modules/*' -not -path './Cargo.lock' 2>/dev/null)
+        if [ -n "$extra" ]; then
+          echo "extra Cargo.lock files outside workspace root:"
+          echo "$extra"
+          exit 1
+        fi
+
+    secret-scan:
+      # Catches accidental private-key and AWS-key paste-ins.
+      # Not a substitute for real secret scanning; just a cheap last-line guard.
+      run: |
+        fail=0
+        for f in {staged_files}; do
+          [ -f "$f" ] || continue
+          if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
+          if grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|aws_secret_access_key[[:space:]]*=' "$f" >/dev/null; then
+            echo "secret-like pattern in: $f"
+            grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|aws_secret_access_key[[:space:]]*=' "$f"
+            fail=1
+          fi
+        done
+        exit $fail
+
+pre-push:
+  # Heavier checks — matches CLAUDE.md's "Common commands" baseline.
+  # No CI yet; this is the safety net before publishing a branch.
+  parallel: false
+  commands:
+
+    clippy:
+      run: cargo clippy --workspace --all-targets -- -D warnings
+
+    cargo-test:
+      run: cargo test --workspace
+
+    pnpm-build:
+      run: pnpm build

@@ -34,7 +34,11 @@ pnpm tauri build        # production desktop bundle
 
 cargo test -p protocol <name>     # one test in protocol crate
 cargo clippy --workspace --all-targets -- -D warnings
+
+brew install lefthook && lefthook install   # one-time per clone; activates git hooks
 ```
+
+Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fast lint set (rustfmt-check, `tsc --noEmit`, whitespace, EOF newline, secret pattern guard, single-Cargo.lock check); `pre-push` runs the full battery (`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `pnpm build`). No CI yet — these hooks are the safety net. Bypass with `git commit --no-verify` only when you understand why.
 
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.
 
