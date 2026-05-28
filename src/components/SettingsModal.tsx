@@ -263,7 +263,7 @@ export function SettingsModal({
         onForceRelock={onForceRelock}
       />
     ),
-    privacy: <PrivacyPanel />,
+    privacy: <PrivacyPanel onShowToast={onShowToast} />,
     appearance: <AppearancePanel />,
     storage: <StoragePanel />,
     about: <AboutPanel />,

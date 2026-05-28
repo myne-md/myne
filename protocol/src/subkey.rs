@@ -29,9 +29,10 @@
 //!
 //! v0.1 registers a single role:
 //!
-//! | Variant                    | Registered string  |
-//! |----------------------------|--------------------|
-//! | [`SubkeyRole::ItemsKeyWrap`] | `itemsKey-wrap`  |
+//! | Variant                      | Registered string  |
+//! |------------------------------|--------------------|
+//! | [`SubkeyRole::ItemsKeyWrap`] | `itemsKey-wrap`    |
+//! | [`SubkeyRole::PrefsKey`]     | `prefs-key`        |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -54,6 +55,10 @@ const HKDF_PREFIX_V0_1: &[u8] = b"myne.v0.1 ";
 /// Registered role string for the singleton v0.1 `itemsKey` wrap.
 const ROLE_STR_ITEMS_KEY_WRAP: &[u8] = b"itemsKey-wrap";
 
+/// Registered role string for the v0.1 `vault.prefs` blob KEK
+/// (spec § 3.4 + § 9.5).
+const ROLE_STR_PREFS_KEY: &[u8] = b"prefs-key";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -67,6 +72,10 @@ pub enum SubkeyRole {
     /// Wraps the singleton v0.1 `itemsKey`
     /// (spec § 3.3 key hierarchy, § 9.3 offset 281).
     ItemsKeyWrap,
+    /// KEK for the v0.1 `vault.prefs` blob (spec § 9.5 + § 3.4).
+    /// Encrypts the canonical-JSON inner plaintext of `vault.prefs`
+    /// under XChaCha20-Poly1305 + CTX commitment.
+    PrefsKey,
 }
 
 impl SubkeyRole {
@@ -76,6 +85,7 @@ impl SubkeyRole {
     pub(crate) fn role_str(self) -> &'static [u8] {
         match self {
             SubkeyRole::ItemsKeyWrap => ROLE_STR_ITEMS_KEY_WRAP,
+            SubkeyRole::PrefsKey => ROLE_STR_PREFS_KEY,
         }
     }
 }
@@ -136,6 +146,28 @@ mod tests {
     fn items_key_wrap_role_string_matches_spec_registry() {
         // Spec § 3.3 key hierarchy + § 3.4 role table.
         assert_eq!(SubkeyRole::ItemsKeyWrap.role_str(), b"itemsKey-wrap");
+    }
+
+    #[test]
+    fn prefs_key_role_string_matches_spec_registry() {
+        // Spec § 3.4 registry entry "myne.v0.1 prefs-key" + § 9.5
+        // vault.prefs blob KEK. The role byte string is the suffix
+        // appended after the "myne.v0.1 " prefix.
+        assert_eq!(SubkeyRole::PrefsKey.role_str(), b"prefs-key");
+    }
+
+    #[test]
+    fn items_key_wrap_and_prefs_key_produce_different_subkeys() {
+        // Spec § 3.2.2 + § 3.4: different registered roles MUST
+        // produce different subkeys from the same root_key. This pins
+        // the cryptographic independence between the per-note encryption
+        // lineage (itemsKey-wrap) and the vault.prefs lineage (prefs-key)
+        // — the HKDF security property that makes the "no items_key
+        // coupling" decision (decisions.md 2026-05-27) load-bearing.
+        let root = [0u8; 32];
+        let items_wrap = derive_subkey(&root, SubkeyRole::ItemsKeyWrap);
+        let prefs = derive_subkey(&root, SubkeyRole::PrefsKey);
+        assert_ne!(*items_wrap, *prefs);
     }
 
     #[test]

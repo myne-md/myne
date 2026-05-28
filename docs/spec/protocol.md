@@ -216,6 +216,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 server-auth"` | Sync-server authentication material — **placeholder** | Derived locally and held in memory between unlock and lock; **not transmitted in Phase 1** because no sync server exists. The exact use of this material (simple verifier transmission vs. OPAQUE `export_key` integration) is **deferred to Phase 2**; see §11.1 for the criteria that will resolve the choice. |
 | `"myne.v0.1 itemsKey-wrap"` | KEK for the persistent itemsKey | Active (wraps itemsKey on disk). |
 | `"myne.v0.1 backup-key"` | Local-encrypted backup file derivation root | Active when user exports a backup. |
+| `"myne.v0.1 prefs-key"` | KEK for `vault.prefs` blob (§9.5) | Active when `vault.prefs` is written. |
 | (future v005 contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
@@ -340,9 +341,14 @@ AAD_wrap_item_key =
 
 AAD_encrypt_content =
   AAD_prefix || protocol_version (1 B) || items_key_id (16 B) || note_uuid (16 B) || content_type
+
+AAD_prefs_blob =
+  AAD_prefix || protocol_version (1 B) || "prefs-blob" || account_number_hash (16 B)
 ```
 
 `AAD_wrap_items_key` is the AAD bound into the AEAD wrap of the singleton v0.1 `itemsKey` (`vault.meta` §9.3 offset 281). It is distinct from `AAD_wrap_item_key`, which binds the per-note `item_key` wrap and additionally carries the per-note UUID. The singleton `itemsKey` has no per-note UUID, so the AAD reduces accordingly.
+
+`AAD_prefs_blob` is the AAD bound into the AEAD wrap of `vault.prefs` (§9.5). The `"prefs-blob"` role string is length-prefixed UTF-8 (2-B big-endian length + 10 ASCII bytes); `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6) and binds the prefs blob to its specific vault. `items_key_id` is **not** bound — `vault.prefs` is independent of the `itemsKey` lineage because its KEK derives directly from `root_key` via `"myne.v0.1 prefs-key"` (§3.4), which preserves prefs portability across the v005 epoch-rotation `itemsKey` evolution.
 
 **Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
 
@@ -689,6 +695,87 @@ Only `vault.meta` and the `.myn` files leave the device in any future sync scena
 - **`account_number_hash`** — required to derive the salt; revealing it gives an attacker the same precomputation difficulty as the user has, no easier.
 - **UUIDv7 file names** — note count and approximate creation times leak. v005 may switch to UUIDv4 if even this is unacceptable.
 
+### 9.5 Vault preferences blob (`vault.prefs`)
+
+`vault.prefs` is a vault-level singleton artifact carrying user-configurable preferences (e.g., the screen-capture-protection toggle of `../threat-model.md` §6). It lives next to `vault.meta` at `<vault-root>/vault.prefs` and is AEAD-encrypted under a `root_key`-derived KEK. The outer envelope follows the same fixed-offset binary discipline as §9.2 and §9.3; the inner plaintext is JSON to keep schema evolution within a major version trivial (additive optional fields), while the outer envelope itself follows the no-JSON-envelope discipline of the rest of §9.
+
+#### 9.5.1 Outer envelope layout
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                Description
+------  ---------  -------------------  ---------------------------------------
+0       4 bytes    magic                ASCII "MYP1"
+4       1 byte     protocol_version     0x01 for this specification
+5       1 byte     reserved             MUST be 0x00; non-zero rejects parse
+6       24 bytes   prefs_nonce          192-bit random nonce used to encrypt the
+                                        inner plaintext under prefs_key.
+30      4 bytes    ciphertext_len       Length M = plaintext_len + 32 of the
+                                        inner ciphertext followed by the
+                                        32-byte CTX commitment tag T'.
+34      M bytes    ciphertext           Inner plaintext (§9.5.2),
+                                        AEAD-encrypted under prefs_key with
+                                        prefs_nonce, followed by the 32-byte
+                                        CTX commitment tag T' (§5.1). The AAD
+                                        binding is defined in §9.5.3.
+```
+
+The KEK is `prefs_key = DeriveSubkey(root_key, "prefs-key")` per §3.2 + §3.4. Because `prefs_key` is derived deterministically from `root_key` (which any unlocked client already has in memory) and no per-blob identifier is required to select it, no public `prefs_key_id` field appears in the header. This keeps the outer envelope minimal (34 bytes header vs §9.2's 50-byte fixed prefix) and faithful to the "plaintext on disk only when functionally required" discipline of §9.4.
+
+#### 9.5.2 Inner plaintext schema
+
+The inner plaintext is **canonical JSON** of an object whose keys are preference names and whose values are the persisted preference data. v0.1 ships with a single field:
+
+```json
+{"screen_capture_protection":true}
+```
+
+**Canonical encoding rules** (load-bearing for cross-implementation byte-stability and for the byte-stable golden vectors in `myne-test-vectors`):
+
+- Object keys MUST be encoded in lexicographic (Unicode-code-point) order.
+- No insignificant whitespace — no spaces around `:` or `,`, no leading/trailing whitespace, no newlines.
+- String values MUST be UTF-8 normalized to NFC before encoding.
+- Integer values MUST be encoded without a trailing `.0`.
+- Floating-point values are FORBIDDEN in v0.1. Implementations MUST reject schemas that introduce float-typed preference fields until a future minor revision specifies a deterministic float encoding.
+- Booleans, integers, strings, and nested objects following the same rules are the only permitted v0.1 value types. Arrays are not used by any v0.1 field but follow the same per-element canonical encoding when a future field needs them.
+
+**Schema evolution within v0.1:** Additive — new fields MAY be appended in any v0.1.x minor revision and are read by older v0.1 clients as unknown-and-ignored (per the implementation's serde discipline; older clients SHOULD NOT reject unknown fields). Field removal, type changes, and structural restructuring are MAJOR-version events (MYP5).
+
+#### 9.5.3 AAD construction
+
+`AAD_prefs_blob` is defined in §5.2:
+
+```
+AAD_prefs_blob =
+  AAD_prefix || protocol_version (1 B) || "prefs-blob" || account_number_hash (16 B)
+```
+
+`"prefs-blob"` is length-prefixed UTF-8 per §5.2's length-prefix discipline (2-B big-endian length + 10 ASCII bytes, total 12 bytes). `account_number_hash` is the same 16-byte field stored in `vault.meta` (§9.3 offset 6); binding it into the AAD makes `vault.prefs` non-portable across vaults at the AEAD-verification layer in addition to the implicit per-vault `root_key`-derived `prefs_key` binding.
+
+Total AAD length: `10 + 1 + 12 + 16 = 39 bytes`.
+
+#### 9.5.4 Size cap and parsing discipline
+
+Implementations SHOULD reject `ciphertext_len > 65536 + 32` (64 KiB plaintext cap + 32-byte CTX commitment tag). The cap exists to bound the parser's pre-AEAD allocation footprint, parallel to the §9.2 `.myn` cap rationale (`../decisions.md` 2026-05-06 entry). v0.1 preferences are bounded to a handful of small typed fields; 64 KiB provides ~13× headroom over any realistic preference set.
+
+The reserved byte at offset 5 MUST be `0x00`. Non-zero values reject the parse, matching the §9.2 and §9.3 discipline. The byte is reserved for v0.1 minor-revision flag carrying.
+
+#### 9.5.5 Migration-less semantic
+
+Reading `vault.prefs` returns the persisted preference set on success, or the **default preference set** on any failure:
+
+- File absent on disk → defaults.
+- File truncated or magic-byte mismatch or non-zero reserved byte → defaults.
+- AEAD verification failure (tampered ciphertext, wrong AAD, wrong `prefs_key`) → defaults.
+- Inner JSON parse failure after a successful AEAD verification → defaults.
+
+This collapses the absence case and the tamper case under a single user-visible behavior (defaults applied), matching the §6.4 non-distinguishing-error discipline. An attacker with disk-write access can therefore only revert preferences to defaults by deleting or tampering the file; arbitrary state injection requires breaking the AEAD, which the security analysis of §6.4 already covers. The local-prefs-replay vector (an attacker restoring a prior valid `vault.prefs` snapshot) is documented as a v0.1 best-effort known limitation in `../threat-model.md` §7.
+
+Cross-vault attack: a `vault.prefs` from vault A placed in vault B's directory fails AEAD verification under vault B's `prefs_key` (different `root_key`) and under vault B's `AAD_prefs_blob` (different `account_number_hash`). Both keys disagree by construction; the AAD binding is defense-in-depth.
+
+A vault has no `vault.prefs` after creation if the implementation chose lazy first-write; recommended practice is eager-write at vault creation (writing `PrefsView::default()` immediately after the `vault.meta` commit) so that the closed invariant "vault.prefs exists for every post-MYND-160 vault" holds. The fall-back-to-defaults semantic above remains the canonical handling for legacy vaults and for any future recovery scenario where the file goes missing.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -707,10 +794,10 @@ This commitment is normative. Implementations MUST refuse to parse blobs that do
 
 This registry is normative. Implementations MUST reject any magic byte / AAD prefix / context prefix that is not in the registry and is not declared by a published successor specification.
 
-| Major version | Per-note magic | Vault-meta magic | AAD prefix          | Context prefix         | Status |
-|---|---|---|---|---|---|
-| v0.1 | `MY01` | `MYV1` | `"myne.v0.1|"`  | `"myne.v0.1 …"`    | This document. Active. |
-| v005 | `NT05` | `NTV5` | `"myne.v005|"` | `"myne.v005 …"`   | Reserved. See `protocol-v005-roadmap.md` (TBD). |
+| Major version | Per-note magic | Vault-meta magic | Vault-prefs magic | AAD prefix          | Context prefix         | Status |
+|---|---|---|---|---|---|---|
+| v0.1 | `MY01` | `MYV1` | `MYP1` | `"myne.v0.1|"`  | `"myne.v0.1 …"`    | This document. Active. |
+| v005 | `NT05` | `NTV5` | `MYP5` | `"myne.v005|"` | `"myne.v005 …"`   | Reserved. See `protocol-v005-roadmap.md` (TBD). |
 
 ### 10.4 Migration procedure (cross-major)
 
@@ -792,6 +879,7 @@ Items deliberately not addressed by this specification. Each entry names where i
 |---|---|
 | Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2 sync server; `sync-protocol.md` (TBD) |
 | Sync wire format, conflict resolution, version vectors | Phase 2; `sync-protocol.md` (TBD) |
+| Cross-device synchronization of `vault.prefs` (carried alongside `vault.meta` + `notes/*.myn` as the v0.1 vault-artifact trio) | Phase 2; `sync-protocol.md` (TBD) |
 | Multi-device coordination, device key management | Phase 2+; `appname-v005` adopts MLS; `protocol-v005-roadmap.md` (TBD) |
 | Inter-user note sharing, prekey bundles, per-recipient wrapping | Phase 4+; `protocol-v005-roadmap.md` (TBD) |
 | Real-time collaborative editing, CRDT integration | Phase 4+; `protocol-v005-roadmap.md` (TBD) |

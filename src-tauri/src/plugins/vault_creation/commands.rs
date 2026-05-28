@@ -176,11 +176,13 @@ pub(crate) fn build_session(
 ///    a. `state.take(token)` consumes the session
 ///       (`SessionNotFound` / `SessionExpired` on absent / TTL-evicted).
 ///    b. Defensive `VaultArtifactsPresent` guard: if any recognized
-///       vault artefact (vault.meta, vault.meta.tmp, notes/*.myn) is
-///       already present at the resolved path, restore the session
-///       and return [`AppError::VaultArtifactsPresent`]. **Expected
-///       to NEVER trigger in normal flow** — see grilling Q12 +
-///       MYND-105 grill Q7 (taxonomy broadening).
+///       vault artefact (vault.meta, vault.meta.tmp, vault.prefs,
+///       vault.prefs.tmp, notes/*.myn) is already present at the
+///       resolved path, restore the session and return
+///       [`AppError::VaultArtifactsPresent`]. **Expected to NEVER
+///       trigger in normal flow** — see grilling Q12 + MYND-105
+///       grill Q7 (taxonomy broadening) + MYND-160 (vault.prefs
+///       extension).
 ///    c. In a `spawn_blocking` worker: AEAD-wrap `root_key` twice,
 ///       derive `itemsKey_wrap_key` via `derive_subkey`, generate
 ///       `itemsKey` + its UUIDv7, AEAD-wrap `itemsKey`, build
@@ -218,6 +220,13 @@ pub async fn commit<R: Runtime>(
 ///   [`crate::atomic_write::atomic_write`]'s tempfile-rename path; same
 ///   class as `vault.meta` because either rename half-completed or the
 ///   process died between tempfile write and rename)
+/// - `vault.prefs` (MYND-160: the v0.1 vault-prefs blob, spec § 9.5 —
+///   encrypted under a prior `root_key`; a fresh vault under a new
+///   `root_key` would AEAD-fail on read and silently return defaults,
+///   which is observable but defeats the closed-invariant intent of
+///   the eager-write at vault_create)
+/// - `vault.prefs.tmp` (MYND-160: mid-write crash leftover for
+///   vault.prefs — parallel to vault.meta.tmp)
 /// - `notes/` directory contains at least one `*.myn` file (orphan
 ///   per-note blobs from a partial-fail `vault_delete` — Plane
 ///   MYND-105, `decisions.md` 2026-05-26 entry "vault_delete
@@ -250,6 +259,17 @@ pub(crate) fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool>
         return Ok(true);
     }
     if vault_dir.join("vault.meta.tmp").is_file() {
+        return Ok(true);
+    }
+    // MYND-160: `vault.prefs` (spec § 9.5) is the v0.1 vault-prefs blob.
+    // Recognized the same way `vault.meta` is — a leftover from a
+    // partial-fail `vault_delete` or manual cleanup must gate a fresh
+    // `vault_create` because the stale blob was encrypted under a prior
+    // `root_key` and would AEAD-fail under the new vault's key.
+    if vault_dir.join("vault.prefs").is_file() {
+        return Ok(true);
+    }
+    if vault_dir.join("vault.prefs.tmp").is_file() {
         return Ok(true);
     }
     let notes = vault_dir.join("notes");
@@ -303,13 +323,17 @@ pub(crate) async fn commit_with_vault_path(
     // [`vault_artifacts_present`] taxonomy): `vault.meta`,
     // `vault.meta.tmp` (mid-write crash leftover from
     // [`crate::atomic_write::atomic_write`]'s tempfile-rename path),
-    // or `notes/` containing one or more `*.myn` files (orphan blobs
+    // `vault.prefs` + `vault.prefs.tmp` (MYND-160 extension — the
+    // vault-prefs blob and its mid-write tempfile, spec § 9.5), or
+    // `notes/` containing one or more `*.myn` files (orphan blobs
     // from a partial-fail `vault_delete`). The alternative — letting
     // the spawn_blocking pipeline reach `atomic_write` — would
     // silently overwrite a prior vault.meta (destroying its
     // `root_key`, recovery phrase derivation salts, and consequently
-    // any sealed `.myn` blobs), or co-mingle a fresh vault with
-    // orphan blobs that surface as ghost notes after unlock.
+    // any sealed `.myn` blobs), co-mingle a fresh vault with
+    // orphan blobs that surface as ghost notes after unlock, or leave
+    // a vault.prefs encrypted under the prior root_key that the new
+    // vault's prefs_key cannot decrypt (silent fall-back-to-defaults).
     // **Expected to NEVER trigger in normal flow**: `vault_status`
     // startup probe + frontend state machine should keep the user out
     // of create-vault when artefacts are present.
@@ -341,7 +365,61 @@ pub(crate) async fn commit_with_vault_path(
             Err(e) => Err((e, session)),
             Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
                 Err(e) => Err((AppError::from(e), session)),
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    // MYND-160 Task 12: eager-write the default vault.prefs
+                    // blob so every post-MYND-160 vault carries the closed
+                    // invariant "vault.prefs exists immediately after
+                    // vault_create completes" (decisions.md 2026-05-27
+                    // "Vault preferences blob"). vault.meta is already on
+                    // disk at this point; if the prefs write fails, fall
+                    // back to the spec § 9.5.5 absence-fallback semantic
+                    // (next prefs_read returns PrefsView::default() and
+                    // first toggle interaction creates the file lazily).
+                    // No rollback of vault.meta — partial state is
+                    // recoverable via the standard vault_delete + retry
+                    // path. The cost of the rare partial-fail (~50ms
+                    // second atomic_write after a ~2-3s Argon2id pipeline)
+                    // is bounded; full atomic rollback would force the
+                    // user to redo the entire Argon2id pipeline on every
+                    // disk hiccup, which is the worse UX.
+                    let prefs_key = protocol::derive_subkey(
+                        &session.root_key,
+                        protocol::SubkeyRole::PrefsKey,
+                    );
+                    let prefs_path = vault_path
+                        .parent()
+                        .expect("vault_path has a parent (vault dir)")
+                        .join("vault.prefs");
+                    match protocol::encode_prefs_blob(
+                        &prefs_key,
+                        &session.account.hash,
+                        &protocol::PrefsView::default(),
+                    ) {
+                        Ok(prefs_bytes) => {
+                            match crate::atomic_write::atomic_write(
+                                &prefs_path,
+                                &prefs_bytes,
+                                false,
+                            ) {
+                                Ok(()) => tracing::info!(
+                                    event = "vault_prefs_eager_written",
+                                    "vault.prefs eager-write succeeded with PrefsView::default()"
+                                ),
+                                Err(e) => tracing::warn!(
+                                    event = "vault_prefs_eager_write_failed",
+                                    io_failure_kind =
+                                        ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                                    "vault.meta written but vault.prefs eager-write failed; vault remains usable via spec § 9.5.5 absence-fallback",
+                                ),
+                            }
+                        }
+                        Err(_e) => tracing::warn!(
+                            event = "vault_prefs_eager_encode_failed",
+                            "vault.prefs encode failed during eager-write; vault remains usable via spec § 9.5.5 absence-fallback",
+                        ),
+                    }
+                    Ok(())
+                }
             },
         })
         .await
@@ -821,6 +899,125 @@ mod tests {
         assert!(
             !vault_artifacts_present(tmp.path()).expect("scan ok"),
             "empty notes/ is not a recognized artefact"
+        );
+    }
+
+    /// MYND-160 Task 12: a successful `commit_with_vault_path` produces
+    /// BOTH `vault.meta` AND `vault.prefs` on disk. Closed invariant
+    /// from `decisions.md` 2026-05-27 "Vault preferences blob" entry.
+    /// Verifies user story 6 (fresh vault default-ON via the persisted
+    /// `PrefsView::default()`) and story 7 (legacy / first-unlock-read
+    /// returns defaults regardless — but eager-write makes the eager
+    /// case the standard path).
+    #[test]
+    fn commit_eager_writes_vault_prefs_alongside_vault_meta() {
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            let result = commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+            assert!(
+                result.is_ok(),
+                "commit happy-path must succeed; got {result:?}"
+            );
+
+            // vault.meta is on disk per the existing pipeline.
+            assert!(
+                scratch.path().exists(),
+                "vault.meta must exist after commit happy-path"
+            );
+            // MYND-160 closed invariant: vault.prefs is on disk too.
+            assert!(
+                scratch.dir.join("vault.prefs").exists(),
+                "vault.prefs must exist after commit happy-path (MYND-160 eager-write)"
+            );
+        });
+    }
+
+    /// MYND-160 Task 12: the eager-written `vault.prefs` decrypts under
+    /// the same `root_key` the just-created vault carries, and the
+    /// plaintext is `PrefsView::default()` (screen_capture_protection
+    /// defaults to `true` per spec § 9.5.5 safer-state semantic).
+    /// Pins the round-trip property: a fresh vault opened immediately
+    /// after creation reads its prefs as the documented defaults — no
+    /// AEAD-fail surprise, no garbage bytes.
+    #[test]
+    fn commit_eager_written_vault_prefs_decrypts_to_defaults() {
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let state = VaultCreationState::default();
+
+            // Build session OUT-OF-BAND so we hold the root_key for
+            // the post-commit decryption assertion. (`seed_session_into_state`
+            // moves the session into state.)
+            let token = Uuid::new_v4();
+            let session = build_session("commit-test-pw", FAST_TEST_KDF).expect("build_session");
+            let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
+            let original_account_hash = session.account.hash;
+            state
+                .try_insert(token, session)
+                .expect("scratch state has room");
+
+            commit_with_vault_path(token, scratch.path().to_path_buf(), &state)
+                .await
+                .expect("commit happy-path");
+
+            // Decrypt the eager-written vault.prefs using the original
+            // root_key and account_number_hash.
+            let prefs_bytes = std::fs::read(scratch.dir.join("vault.prefs"))
+                .expect("vault.prefs must exist after eager-write");
+            let prefs_key =
+                protocol::derive_subkey(&original_root_key, protocol::SubkeyRole::PrefsKey);
+            let prefs_view =
+                protocol::decode_prefs_blob(&prefs_key, &original_account_hash, &prefs_bytes)
+                    .expect(
+                        "eager-written vault.prefs must decrypt under the vault's own root_key",
+                    );
+            assert_eq!(
+                prefs_view,
+                protocol::PrefsView::default(),
+                "eager-written prefs must equal PrefsView::default()"
+            );
+            assert!(
+                prefs_view.screen_capture_protection,
+                "default screen_capture_protection must be on (spec § 9.5.5 safer-state)"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_vault_prefs_present() {
+        // MYND-160 extension: `vault.prefs` is a v0.1 vault artefact
+        // (spec § 9.5). A stale vault.prefs left by a prior partial-fail
+        // `vault_delete` or manual cleanup must gate a fresh
+        // `vault_create` the same way `vault.meta` does — otherwise the
+        // fresh vault co-mingles with a vault.prefs encrypted under a
+        // different root_key (AEAD-fail on read; user sees defaults
+        // instead of a clean fresh state).
+        let tmp = crate::test_support::ScopedTempDir::new("vap-prefs").expect("scoped tempdir");
+        std::fs::write(tmp.path().join("vault.prefs"), b"stale prefs bytes")
+            .expect("seed vault.prefs");
+        assert!(
+            vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "vault.prefs is a recognized v0.1 vault artefact (spec § 9.5)"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_vault_prefs_tmp_present() {
+        // Mid-write crash artefact for vault.prefs (parallel to
+        // vault.meta.tmp for vault.meta), produced by `atomic_write`'s
+        // tempfile-rename path. Same defensive-guard rationale.
+        let tmp = crate::test_support::ScopedTempDir::new("vap-prefs-tmp").expect("scoped tempdir");
+        std::fs::write(
+            tmp.path().join("vault.prefs.tmp"),
+            b"interrupted prefs write",
+        )
+        .expect("seed vault.prefs.tmp");
+        assert!(
+            vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "vault.prefs.tmp is a recognized mid-write crash artefact"
         );
     }
 

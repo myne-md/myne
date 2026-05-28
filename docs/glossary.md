@@ -557,6 +557,12 @@ The literal string `"myne.v0.1 "` (with trailing space) used as the prefix for H
 
 Used in: `spec/protocol.md` §3.2, §5.2, §10.3
 
+### **MYP1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying a v0.1 `vault.prefs` blob. Parallel to `MY01` (per-note) and `MYV1` (vault metadata) in the v0.1 magic-byte family. Registered in `spec/protocol.md` §10.3's major-version registry alongside its v005-reserved sibling `MYP5`. Implementations MUST reject any candidate `vault.prefs` whose first four bytes do not match `MYP1`.
+
+Used in: `spec/protocol.md` §9.5, §10.3
+
 ### **`.myn` file** &nbsp; 📦 *Product*
 
 Myne Note: the binary encrypted blob holding a single note. File extension `.myn`, magic bytes `MY01` for v0.1. Layout in `spec/protocol.md` §9.2: header, items_key_id, item_key_nonce, length-prefixed `enc_item_key`, content_nonce, length-prefixed ciphertext + CTX tag.
@@ -631,6 +637,18 @@ Used in: `e2ee-notes-evaluation.md`; `spec/protocol.md` §11
 Signal's post-quantum-augmented X3DH key-agreement protocol, with hybrid X25519 + ML-KEM-768. Reference design pattern for Myne's `appname-v005` user-to-user key agreement (sharing).
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
+
+### **prefs_key** &nbsp; 🗝️ *Key/identifier*
+
+The 32-byte AEAD KEK encrypting `vault.prefs`. Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "prefs-key")` helper (`spec/protocol.md` §3.2 + §3.4 registry entry `"myne.v0.1 prefs-key"`). Never persisted; re-derived on each `vault_unlock` (in-pipeline) and on each `set_*` prefs writer call. Independent from `items_key` lineage by design — preserves prefs portability across the v005 epoch-rotation `items_key` evolution (`decisions.md` 2026-05-27 "Vault preferences blob: root_key-derived prefs_key").
+
+Used in: `spec/protocol.md` §3.4, §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
+
+### **PrefsView** &nbsp; 🛠️ *Tooling*
+
+Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `vault.prefs` plaintext. Defines the v0.1 preference fields (`screen_capture_protection: bool` in MYND-160) plus the `Default` impl that drives the fall-back-to-defaults semantic on absence / AEAD-fail / parse-fail (`spec/protocol.md` §9.5.5). Serialized via canonical JSON (sorted keys, no whitespace, NFC strings, no floats) before AEAD encryption — drift-detected by the `myne-test-vectors` byte-stable KAT vectors.
+
+Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
 ### **protocol identifier** &nbsp; 📋 *Protocol*
 
@@ -844,6 +862,12 @@ Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation sessio
 The single binary file holding vault-level cryptographic state. Magic bytes `MYV1` for v0.1. Layout per `spec/protocol.md` §9.3: protocol version, account_number_hash, the 11-byte canonical KDF parameters block, both salt-randomness fields (`random_salt_password_16`, `random_salt_recovery_16`), nonces and ciphertexts for both wrapped root-key copies (`enc_root_key_password`, `enc_root_key_recovery`), and the items_key_id, items_key_nonce, and `enc_items_key`. `vault.meta` plus the `.myn` files are the only artifacts that leave the device in any future sync scenario; both are opaque ciphertext plus a small public header.
 
 Used in: `spec/protocol.md` §9.3
+
+### **vault.prefs** &nbsp; 📦 *Product*
+
+Vault-level singleton encrypted blob holding user-configurable preferences (Phase 1: the screen-capture-protection toggle from MYND-55/MYND-160). Magic bytes `MYP1` for v0.1. Lives at `<app_data_dir>/vault/vault.prefs` next to `vault.meta`. Outer envelope is a 34-byte fixed-offset header followed by AEAD-wrapped canonical JSON plaintext under `prefs_key`; layout + AAD construction + canonical encoding rules + size cap + migration-less semantic in `spec/protocol.md` §9.5. Written eagerly at `vault_create` (closed invariant: post-MYND-160 vaults always have `vault.prefs` on disk) and lazily re-read by every `prefs_read` IPC call (disk is canonical; not cached in `Slot::Unlocked`). Read failure (absent / truncated / AEAD-fail / parse-fail) returns `PrefsView::default()` per the §9.5.5 non-distinguishing semantic.
+
+Used in: `spec/protocol.md` §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
 
 ### **vault_<verb_past> tracing event-name pattern** &nbsp; 🛠️ *Tooling*
 

@@ -8,6 +8,7 @@
 //! `vault-unlock` / `change-password` plugins follow the same shape.
 
 pub mod notes;
+pub mod prefs;
 pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;
