@@ -1008,4 +1008,413 @@ mod tests {
             );
         }
     }
+
+    // ---- KAT vector regenerator (companion repo) ---------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/ctx-aead/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_ctx_aead_vectors.json`.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act.
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_ctx_aead_vectors_for_paste -- --ignored`
+    ///
+    /// 11 cases pin (per MYND-68 / D3):
+    /// - 6 `aad_canonical_bytes`: one per pub `aad_*` builder
+    ///   (`aad_password_wrap`, `aad_recovery_wrap`,
+    ///   `aad_vault_items_key_wrap`, `aad_note_item_key_wrap`,
+    ///   `aad_note_content_encrypt`, `aad_prefs_blob`). Pins each
+    ///   builder's canonical AAD byte assembly independently of any
+    ///   AEAD invocation — drift in §5.2 AAD construction surfaces
+    ///   here without requiring a downstream AEAD test to fire.
+    /// - 2 `encrypt`: short empty-AAD + medium content-AAD plaintext
+    ///   cases — exercise `aead_seal_ctx` at the primitive level.
+    /// - 1 `decrypt_ok`: round-trip the medium encrypt case.
+    /// - 2 `decrypt_aead_fail`: (a) ciphertext-tamper flips one byte
+    ///   in the sealed region, (b) AAD-tamper passes a different AAD
+    ///   to the verifier. Both collapse to `ProtocolError::AeadFailure`
+    ///   per spec §6.4 non-distinguishing rule.
+    #[test]
+    #[ignore]
+    fn emit_ctx_aead_vectors_for_paste() {
+        extern crate std;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // FAST_TEST KDF params — match the cross-category fixtures so
+        // a reviewer cross-checks aad_password_wrap output against
+        // the embedded KDF block in vault-meta vectors.
+        let fast_test_kdf = KdfParams {
+            m_kib: 8,
+            t: 1,
+            p: 1,
+            argon2_version: 0x13,
+        };
+
+        // Deterministic fixture inputs across builder calls.
+        let items_key_id: [u8; 16] = [0xAB; 16];
+        let note_uuid: [u8; 16] = [0xCD; 16];
+        let account_number_hash: [u8; 16] = [0x12; 16];
+
+        // AEAD primitive inputs.
+        let key: [u8; AEAD_KEY_LEN] = [0x5A; AEAD_KEY_LEN];
+        let nonce_a: [u8; AEAD_NONCE_LEN] = [0x6B; AEAD_NONCE_LEN];
+        let nonce_b: [u8; AEAD_NONCE_LEN] = [0x7C; AEAD_NONCE_LEN];
+
+        // Short plaintext, no AAD (primitive-level coverage).
+        let pt_short: alloc::vec::Vec<u8> = b"abc".to_vec();
+        let aad_empty: alloc::vec::Vec<u8> = alloc::vec::Vec::new();
+        let sealed_short =
+            aead_seal_ctx(&key, &nonce_a, &pt_short, &aad_empty).expect("aead_seal_ctx short");
+
+        // Medium plaintext, AAD from aad_note_content_encrypt
+        // (a non-trivial 58-byte AAD).
+        let pt_medium: alloc::vec::Vec<u8> = (0..256u32).map(|i| (i % 256) as u8).collect();
+        let aad_content = aad_note_content_encrypt(&items_key_id, &note_uuid);
+        let sealed_medium =
+            aead_seal_ctx(&key, &nonce_b, &pt_medium, &aad_content).expect("aead_seal_ctx medium");
+
+        // Round-trip sanity in the generator.
+        let recovered = aead_open_ctx(&key, &nonce_b, &sealed_medium, &aad_content)
+            .expect("aead_open round-trip");
+        assert_eq!(recovered.as_slice(), pt_medium.as_slice());
+
+        // Tamper variant 1: flip last byte of CTX tag region of sealed_medium.
+        let mut sealed_tag_tamper = sealed_medium.clone();
+        let last_idx = sealed_tag_tamper.len() - 1;
+        sealed_tag_tamper[last_idx] ^= 0xFF;
+        assert!(
+            aead_open_ctx(&key, &nonce_b, &sealed_tag_tamper, &aad_content).is_err(),
+            "tag-tamper must reject"
+        );
+
+        // Tamper variant 2: same sealed_medium but caller passes different AAD.
+        let aad_wrong = aad_prefs_blob(&account_number_hash); // intentionally different
+        assert!(
+            aead_open_ctx(&key, &nonce_b, &sealed_medium, &aad_wrong).is_err(),
+            "AAD-tamper must reject"
+        );
+
+        // Compute canonical AAD bytes for all 6 pub builders.
+        let aad_pw = aad_password_wrap(&fast_test_kdf);
+        let aad_rec = aad_recovery_wrap(&fast_test_kdf);
+        let aad_vik = aad_vault_items_key_wrap(&items_key_id);
+        let aad_nik = aad_note_item_key_wrap(&items_key_id, &note_uuid);
+        // aad_content already computed
+        let aad_pb = aad_prefs_blob(&account_number_hash);
+
+        let key_hex = hex_lower(&key);
+        let nonce_a_hex = hex_lower(&nonce_a);
+        let nonce_b_hex = hex_lower(&nonce_b);
+
+        // ---- Emit JSON ----------------------------------------------
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"ctx-aead\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §5.1 + §5.2 + §6.4\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::aead_seal_ctx + protocol::aead_open_ctx byte mapping (XChaCha20-Poly1305 + CTX commitment outer per Chan & Rogaway 2022) AND each of the 6 pub aad_* builder functions' canonical byte assembly. 11 cases: 6 aad_canonical_bytes (one per builder) + 2 encrypt (short empty-AAD + medium content-AAD plaintext) + 1 decrypt_ok (round-trip) + 2 decrypt_aead_fail (tag-tamper + AAD-tamper). Cases generated by `cargo test -p protocol --lib emit_ctx_aead_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // Helper: emit aad_canonical_bytes case.
+        let emit_aad = |dump: &mut alloc::string::String,
+                        slug: &str,
+                        description: &str,
+                        builder_name: &str,
+                        params_lines: &str,
+                        aad_bytes: &[u8],
+                        trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"ctx-aead/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"aad_canonical_bytes\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_builder_name\": \"{}\",\n",
+                builder_name
+            ));
+            dump.push_str(params_lines);
+            dump.push_str(&alloc::format!(
+                "      \"expected_aad_bytes_hex\": \"{}\"\n",
+                hex_lower(aad_bytes)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        // KDF params block lines for the AAD-canonical-bytes cases.
+        let kdf_params_lines = alloc::format!(
+            "      \"input_kdf_params\": {{\n        \"m_kib\": {},\n        \"t\": {},\n        \"p\": {},\n        \"argon2_version_hex\": \"{:02x}\"\n      }},\n",
+            fast_test_kdf.m_kib,
+            fast_test_kdf.t,
+            fast_test_kdf.p,
+            fast_test_kdf.argon2_version
+        );
+        let items_key_id_lines = alloc::format!(
+            "      \"input_items_key_id_hex\": \"{}\",\n",
+            hex_lower(&items_key_id)
+        );
+        let note_uuid_lines = alloc::format!(
+            "      \"input_note_uuid_hex\": \"{}\",\n",
+            hex_lower(&note_uuid)
+        );
+        let account_hash_lines = alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_number_hash)
+        );
+
+        // 1: aad_password_wrap
+        emit_aad(
+            &mut dump,
+            "aad-password-wrap",
+            "Canonical bytes from aad_password_wrap with FAST_TEST KdfParams (m_kib=8, t=1, p=1, v=0x13). Pins the §5.2 password-wrap AAD assembly: 'myne.v0.1|' prefix + version byte + role 'pw' + serialized 11-byte KDF params block.",
+            "aad_password_wrap",
+            &kdf_params_lines,
+            &aad_pw,
+            true,
+        );
+
+        // 2: aad_recovery_wrap
+        emit_aad(
+            &mut dump,
+            "aad-recovery-wrap",
+            "Canonical bytes from aad_recovery_wrap. Same FAST_TEST KdfParams; differs from aad_password_wrap only in the role byte ('rk' instead of 'pw' — drift detection across the password/recovery split).",
+            "aad_recovery_wrap",
+            &kdf_params_lines,
+            &aad_rec,
+            true,
+        );
+
+        // 3: aad_vault_items_key_wrap
+        emit_aad(
+            &mut dump,
+            "aad-vault-items-key-wrap",
+            "Canonical bytes from aad_vault_items_key_wrap with items_key_id = 0xAB×16. Pins the singleton-itemsKey wrap AAD ('itemsKey' role with NO per-note UUID — distinguishes this builder from aad_note_item_key_wrap whose name differs by one trailing 's').",
+            "aad_vault_items_key_wrap",
+            &items_key_id_lines,
+            &aad_vik,
+            true,
+        );
+
+        // 4: aad_note_item_key_wrap
+        emit_aad(
+            &mut dump,
+            "aad-note-item-key-wrap",
+            "Canonical bytes from aad_note_item_key_wrap with items_key_id = 0xAB×16 + note_uuid = 0xCD×16. Pins the per-note item_key wrap AAD ('item-key' role WITH note_uuid). Visually adjacent to aad_vault_items_key_wrap; one-character difference in name pins a real type-confusion-class hazard (§5.2 spec note).",
+            "aad_note_item_key_wrap",
+            &alloc::format!("{}{}", items_key_id_lines, note_uuid_lines),
+            &aad_nik,
+            true,
+        );
+
+        // 5: aad_note_content_encrypt
+        emit_aad(
+            &mut dump,
+            "aad-note-content-encrypt",
+            "Canonical bytes from aad_note_content_encrypt. Same items_key_id + note_uuid pair; differs from aad_note_item_key_wrap in the role byte AND adds the hardcoded content_type 'text/markdown' (13 ASCII bytes with 2-byte BE length prefix). 58-byte total AAD per spec §5.2.",
+            "aad_note_content_encrypt",
+            &alloc::format!("{}{}", items_key_id_lines, note_uuid_lines),
+            &aad_content,
+            true,
+        );
+
+        // 6: aad_prefs_blob
+        emit_aad(
+            &mut dump,
+            "aad-prefs-blob",
+            "Canonical bytes from aad_prefs_blob with account_number_hash = 0x12×16. Pins the §9.5.3 39-byte vault.prefs AAD: 'myne.v0.1|' prefix (10) + version byte (1) + length-prefixed UTF-8 role 'prefs-blob' (2+10) + account_number_hash (16).",
+            "aad_prefs_blob",
+            &account_hash_lines,
+            &aad_pb,
+            true,
+        );
+
+        // 7: encrypt-short-empty-aad
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"ctx-aead/v0.1/encrypt-short-empty-aad\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Encrypt 3-byte plaintext 'abc' with empty AAD. Primitive-level coverage of aead_seal_ctx without binding to any AAD builder — proves the CTX commitment outer construction works at the bare-bytes layer. Expected sealed = 3-byte ciphertext + 32-byte CTX tag = 35 bytes.")
+        ));
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_key_hex\": \"{}\",\n",
+            key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_nonce_hex\": \"{}\",\n",
+            nonce_a_hex
+        ));
+        dump.push_str("      \"input_aad_hex\": \"\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_hex\": \"{}\",\n",
+            hex_lower(&pt_short)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_sealed_hex\": \"{}\"\n",
+            hex_lower(&sealed_short)
+        ));
+        dump.push_str("    },\n");
+
+        // 8: encrypt-medium-content-aad
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"ctx-aead/v0.1/encrypt-medium-content-aad\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Encrypt 256-byte plaintext (byte i = i mod 256) with AAD = aad_note_content_encrypt(items_key_id=0xAB×16, note_uuid=0xCD×16) (58-byte content-encrypt AAD). Realistic AEAD invocation matching the .myn-blob inner-content layer. Expected sealed = 256-byte ciphertext + 32-byte CTX tag = 288 bytes.")
+        ));
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_key_hex\": \"{}\",\n",
+            key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_nonce_hex\": \"{}\",\n",
+            nonce_b_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_aad_hex\": \"{}\",\n",
+            hex_lower(&aad_content)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_hex\": \"{}\",\n",
+            hex_lower(&pt_medium)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_sealed_hex\": \"{}\"\n",
+            hex_lower(&sealed_medium)
+        ));
+        dump.push_str("    },\n");
+
+        // 9: decrypt-ok-medium
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"ctx-aead/v0.1/decrypt-ok-medium\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Round-trip the sealed blob from encrypt-medium-content-aad back to the 256-byte plaintext under the same key + nonce + AAD. Proves aead_open_ctx recovers exactly the plaintext bytes that aead_seal_ctx consumed.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_key_hex\": \"{}\",\n",
+            key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_nonce_hex\": \"{}\",\n",
+            nonce_b_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_aad_hex\": \"{}\",\n",
+            hex_lower(&aad_content)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_sealed_hex\": \"{}\",\n",
+            hex_lower(&sealed_medium)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_hex\": \"{}\"\n",
+            hex_lower(&pt_medium)
+        ));
+        dump.push_str("    },\n");
+
+        // 10: decrypt-tag-tamper
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"ctx-aead/v0.1/decrypt-tag-tamper\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Last byte of the 32-byte CTX commitment tag flipped via XOR 0xFF. aead_open_ctx MUST surface Err(ProtocolError::AeadFailure) — the CTX commitment construction (SHA-256 over key||nonce||AAD-len||AAD||Poly1305-tag) catches the modification at the constant-time comparison step.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_key_hex\": \"{}\",\n",
+            key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_nonce_hex\": \"{}\",\n",
+            nonce_b_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_aad_hex\": \"{}\",\n",
+            hex_lower(&aad_content)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_sealed_hex\": \"{}\",\n",
+            hex_lower(&sealed_tag_tamper)
+        ));
+        dump.push_str("      \"expected_kind\": \"aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"informational_tamper_description\": \"{}\"\n",
+            json_escape("last byte of 32-byte CTX commitment tag region flipped via XOR 0xFF")
+        ));
+        dump.push_str("    },\n");
+
+        // 11: decrypt-aad-tamper
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"ctx-aead/v0.1/decrypt-aad-tamper\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Sealed blob from encrypt-medium-content-aad with caller passing a DIFFERENT AAD (aad_prefs_blob bytes instead of aad_note_content_encrypt) to the verifier. aead_open_ctx MUST surface Err(ProtocolError::AeadFailure) — the CTX commitment includes the AAD bytes, so swapping AAD invalidates the tag. Same non-distinguishing variant as the tag-tamper case per spec §6.4.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_key_hex\": \"{}\",\n",
+            key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_nonce_hex\": \"{}\",\n",
+            nonce_b_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_aad_hex\": \"{}\",\n",
+            hex_lower(&aad_wrong)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_sealed_hex\": \"{}\",\n",
+            hex_lower(&sealed_medium)
+        ));
+        dump.push_str("      \"expected_kind\": \"aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"informational_tamper_description\": \"{}\"\n",
+            json_escape("AAD swap: caller passes aad_prefs_blob bytes instead of the aad_note_content_encrypt bytes the encoder used")
+        ));
+        dump.push_str("    }\n");
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_ctx_aead_vectors.json", dump.as_bytes())
+            .expect("write ctx-aead vectors dump");
+    }
 }

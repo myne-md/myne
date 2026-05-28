@@ -1847,4 +1847,284 @@ mod tests {
             }
         }
     }
+
+    // ---- KAT vector regenerator (companion repo) ---------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/myn-blob/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_myn_blob_vectors.json`.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act.
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_myn_blob_vectors_for_paste -- --ignored`
+    ///
+    /// 5 cases pin (per MYND-71 / D6):
+    /// - 3 `encrypt` × {10-byte / 1-KB / 100-KB plaintext} — pin the
+    ///   `MY01` byte output across realistic size ranges.
+    /// - 1 `decrypt_ok` (1-KB plaintext round-trip) — proves the
+    ///   decoder recovers the canonical plaintext bytes.
+    /// - 1 `decrypt_aead_fail` — single-byte tamper inside the
+    ///   ciphertext region; surfaces as `DecryptError::CannotDecrypt`
+    ///   non-distinguishing per spec §6.4.
+    ///
+    /// Note: content_type is HARDCODED to `text/markdown` in
+    /// `aad_note_content_encrypt`; there is no v0.1 parameter to vary,
+    /// so the tasks.md "content-type framing variation" case is N/A
+    /// and was replaced by the 5th decrypt-side case.
+    ///
+    /// Output file is ~250 KB due to the 100-KB plaintext vector's
+    /// ~200-KB inlined hex string — git-friendly, `jq`-readable.
+    #[test]
+    #[ignore]
+    fn emit_myn_blob_vectors_for_paste() {
+        extern crate std;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Distinct byte patterns per field — easy visual cross-check.
+        let items_key: [u8; AEAD_KEY_LEN] = [0xAA; AEAD_KEY_LEN];
+        let items_key_id: [u8; ITEMS_KEY_ID_LEN] = [0xBB; ITEMS_KEY_ID_LEN];
+        let note_uuid: [u8; NOTE_UUID_LEN] = [0xCC; NOTE_UUID_LEN];
+        let item_key: [u8; AEAD_KEY_LEN] = [0xDD; AEAD_KEY_LEN];
+        let item_key_nonce: [u8; AEAD_NONCE_LEN] = [0xEE; AEAD_NONCE_LEN];
+        let content_nonce: [u8; AEAD_NONCE_LEN] = [0xFF; AEAD_NONCE_LEN];
+
+        // Deterministic plaintexts.
+        let plaintext_10b: alloc::vec::Vec<u8> = (*b"Hello,Myne").to_vec();
+        let plaintext_1kb: alloc::vec::Vec<u8> = (0..1024u32).map(|i| (i % 256) as u8).collect();
+        let plaintext_100kb: alloc::vec::Vec<u8> =
+            (0..102400u32).map(|i| (i % 256) as u8).collect();
+
+        let blob_10b = encode_new_note_blob_raw(
+            &items_key,
+            &items_key_id,
+            &note_uuid,
+            &item_key,
+            &item_key_nonce,
+            &content_nonce,
+            &plaintext_10b,
+        )
+        .expect("encode 10B");
+        let blob_1kb = encode_new_note_blob_raw(
+            &items_key,
+            &items_key_id,
+            &note_uuid,
+            &item_key,
+            &item_key_nonce,
+            &content_nonce,
+            &plaintext_1kb,
+        )
+        .expect("encode 1KB");
+        let blob_100kb = encode_new_note_blob_raw(
+            &items_key,
+            &items_key_id,
+            &note_uuid,
+            &item_key,
+            &item_key_nonce,
+            &content_nonce,
+            &plaintext_100kb,
+        )
+        .expect("encode 100KB");
+
+        // Round-trip sanity on the 1KB blob — guards against a future
+        // encode/decode pair drift.
+        let decoded = decode_note(&blob_1kb, &note_uuid, &items_key, &items_key_id)
+            .expect("decode 1KB round-trip");
+        assert_eq!(decoded.plaintext(), plaintext_1kb.as_slice());
+
+        // Tampered blob: flip one byte inside the ciphertext region of
+        // the 10B blob. OFFSET_CIPHERTEXT = HEADER_PREFIX_LEN + 24 + 4.
+        let mut blob_tampered = blob_10b.clone();
+        blob_tampered[OFFSET_CIPHERTEXT] ^= 0xFF;
+        assert!(
+            decode_note(&blob_tampered, &note_uuid, &items_key, &items_key_id).is_err(),
+            "tampered blob must reject"
+        );
+
+        let items_key_hex = hex_lower(&items_key);
+        let items_key_id_hex = hex_lower(&items_key_id);
+        let note_uuid_hex = hex_lower(&note_uuid);
+        let item_key_hex = hex_lower(&item_key);
+        let item_key_nonce_hex = hex_lower(&item_key_nonce);
+        let content_nonce_hex = hex_lower(&content_nonce);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"myn-blob\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.2 + §6.4 + §6.5\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_new_note_blob_raw + protocol::decode_note byte mapping for the MY01 per-note blob format across realistic plaintext sizes (10 B / 1 KB / 100 KB) and the non-distinguishing AEAD-stage rejection surface. content_type is HARDCODED to 'text/markdown' in aad_note_content_encrypt — no v0.1 parameter to vary. Cases generated by `cargo test -p protocol --lib emit_myn_blob_vectors_for_paste -- --ignored` (in protocol/src/blob.rs). The 100-KB plaintext case is inlined as a ~200-KB hex string; cases.json total ≈ 250 KB — git-friendly, `jq`-readable.\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // Helper closure for emitting an encrypt case.
+        let emit_encrypt = |dump: &mut alloc::string::String,
+                            slug: &str,
+                            description: &str,
+                            plaintext: &[u8],
+                            blob: &[u8]| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"myn-blob/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"encrypt\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_items_key_hex\": \"{}\",\n",
+                items_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_items_key_id_hex\": \"{}\",\n",
+                items_key_id_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_note_uuid_hex\": \"{}\",\n",
+                note_uuid_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_item_key_hex\": \"{}\",\n",
+                item_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_item_key_nonce_hex\": \"{}\",\n",
+                item_key_nonce_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_content_nonce_hex\": \"{}\",\n",
+                content_nonce_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_plaintext_hex\": \"{}\",\n",
+                hex_lower(plaintext)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_myn_blob_hex\": \"{}\"\n",
+                hex_lower(blob)
+            ));
+        };
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-10-byte",
+            "Encode a 10-byte plaintext `Hello,Myne` (ASCII). Smallest representative case — exercises the encoder's framing without significant ciphertext volume. Expected blob length = 76 (header_prefix + content_nonce + ciphertext_len) + 10 (plaintext) + 32 (CTX tag) = 118 bytes.",
+            &plaintext_10b,
+            &blob_10b,
+        );
+        dump.push_str("    },\n");
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-1kb",
+            "Encode a 1024-byte plaintext where byte i = (i mod 256). Mid-size case — proves the encoder handles a full XChaCha20 keystream block plus tail. Expected blob length = 76 + 1024 + 32 = 1132 bytes.",
+            &plaintext_1kb,
+            &blob_1kb,
+        );
+        dump.push_str("    },\n");
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-100kb",
+            "Encode a 102400-byte plaintext where byte i = (i mod 256). Near-realistic note size; proves the encoder remains correct at scale without the MAX_PLAINTEXT_LEN cap firing (cap is 16 MiB). Expected blob length = 76 + 102400 + 32 = 102508 bytes. The inlined hex string is ~205 KB — the largest single field in any landed cases.json.",
+            &plaintext_100kb,
+            &blob_100kb,
+        );
+        dump.push_str("    },\n");
+
+        // decrypt_ok case (1KB round-trip)
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"myn-blob/v0.1/decrypt-ok-1kb\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Round-trip the 1-KB blob from case 2 back to the same plaintext under the matching items_key + items_key_id + note_uuid. Proves the decoder's structural parse + outer-AEAD unwrap of item_key + inner-AEAD decrypt of ciphertext all reconstruct the canonical plaintext bytes.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_1kb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_note_uuid_hex\": \"{}\",\n",
+            note_uuid_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_hex\": \"{}\",\n",
+            items_key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_id_hex\": \"{}\",\n",
+            items_key_id_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_hex\": \"{}\"\n",
+            hex_lower(&plaintext_1kb)
+        ));
+        dump.push_str("    },\n");
+
+        // decrypt_aead_fail case (tampered ciphertext)
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"myn-blob/v0.1/decrypt-tampered-ciphertext\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Take the 10-byte blob from case 1 and flip one byte at OFFSET_CIPHERTEXT (the first byte of the encrypted content region) via XOR 0xFF. Decoder MUST surface DecryptError::CannotDecrypt — the CTX commitment construction (SHA-256 over key||nonce||AAD-len||AAD||Poly1305-tag) catches the modification: the recomputed Poly1305 tag changes, the recomputed CTX commitment changes, the constant-time comparison fails. Ports MUST NOT distinguish 'tampered ciphertext' from 'wrong key' or 'wrong AAD'; all collapse to the single non-distinguishing variant per spec §6.4.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_tampered)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_note_uuid_hex\": \"{}\",\n",
+            note_uuid_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_hex\": \"{}\",\n",
+            items_key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_id_hex\": \"{}\",\n",
+            items_key_id_hex
+        ));
+        dump.push_str("      \"expected_kind\": \"aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"informational_tamper_description\": \"{}\"\n",
+            json_escape(&alloc::format!(
+                "byte {} (OFFSET_CIPHERTEXT, first byte of encrypted content) flipped via XOR 0xFF",
+                OFFSET_CIPHERTEXT
+            ))
+        ));
+        dump.push_str("    }\n");
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_myn_blob_vectors.json", dump.as_bytes())
+            .expect("write myn-blob vectors dump");
+    }
 }
