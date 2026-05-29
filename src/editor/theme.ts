@@ -144,6 +144,96 @@ export const myneTheme = EditorView.theme({
     backgroundColor: "var(--paper-2, #f3f1eb)",
   },
 
+  // Fenced code-block card from decorations/fenced-code.ts (MYND-154). Built
+  // from per-line decorations so the body stays live document text and the
+  // task-3 nested parser colors it. Side borders run on every body line; the
+  // top/bottom lines round the card. Mono font; tokens colored via --syntax-*.
+  ".cm-code-card-body": {
+    backgroundColor: "var(--paper-2)",
+    borderLeft: "1px solid var(--line-1)",
+    borderRight: "1px solid var(--line-1)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+    padding: "0 16px",
+  },
+  // Editing-state line rounding (raw fence shown): top/bottom body lines round.
+  ".cm-code-card-top": {
+    borderTop: "1px solid var(--line-1)",
+    borderTopLeftRadius: "var(--radius-2, 6px)",
+    borderTopRightRadius: "var(--radius-2, 6px)",
+    paddingTop: "8px",
+  },
+  ".cm-code-card-bottom": {
+    borderBottom: "1px solid var(--line-1)",
+    borderBottomLeftRadius: "var(--radius-2, 6px)",
+    borderBottomRightRadius: "var(--radius-2, 6px)",
+    paddingBottom: "8px",
+  },
+  // Away-state card-top bar widget (replaces the opening fence line); carries
+  // the language badge top-right. Side + top borders + top radius continue the
+  // card around the body lines below.
+  ".cm-code-card-bar": {
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: "10px",
+    backgroundColor: "var(--paper-2)",
+    borderLeft: "1px solid var(--line-1)",
+    borderRight: "1px solid var(--line-1)",
+    borderTop: "1px solid var(--line-1)",
+    borderTopLeftRadius: "var(--radius-2, 6px)",
+    borderTopRightRadius: "var(--radius-2, 6px)",
+    minHeight: "26px",
+    padding: "4px 16px",
+    boxSizing: "border-box",
+  },
+  ".cm-code-card-bar-full": {
+    borderBottom: "1px solid var(--line-1)",
+    borderBottomLeftRadius: "var(--radius-2, 6px)",
+    borderBottomRightRadius: "var(--radius-2, 6px)",
+  },
+  // Language badge inside the bar. Decorative, non-selectable.
+  ".cm-code-badge": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "11px",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "var(--fg-3)",
+    userSelect: "none",
+    pointerEvents: "none",
+  },
+  // Copy control (MYND-154 task 6) — borderless, icon-only. Hidden until the
+  // pointer is anywhere over the block (the `is-hovered` class is toggled on the
+  // bar by the hover tracker in fenced-code.ts), then the bare clipboard icon
+  // fades in; click swaps to a green check.
+  ".cm-code-copy": {
+    opacity: "0",
+    transition:
+      "opacity var(--duration-fast, 120ms) var(--ease-standard, ease), color var(--duration-fast, 120ms) var(--ease-standard, ease)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "18px",
+    height: "18px",
+    padding: "0",
+    color: "var(--fg-3)",
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    userSelect: "none",
+  },
+  ".cm-code-card-bar.is-hovered .cm-code-copy, .cm-code-copy:focus-visible": {
+    opacity: "1",
+  },
+  ".cm-code-copy:hover": {
+    color: "var(--fg-1)",
+  },
+  ".cm-code-copy-done": {
+    opacity: "1",
+    color: "var(--success, #2f6048)",
+  },
+
   // Horizontal-rule replacement widget from horizontal-rule.ts.
   ".cm-hr": {
     display: "inline-block",

@@ -17,6 +17,7 @@ import { blockquoteDecorations } from "./blockquote";
 import { horizontalRuleDecorations } from "./horizontal-rule";
 import { frontmatterDecorations } from "./frontmatter";
 import { tableDecorations } from "./table";
+import { fencedCodeDecorations } from "./fenced-code";
 
 export function myneDecorations(): readonly Extension[] {
   return [
@@ -30,5 +31,6 @@ export function myneDecorations(): readonly Extension[] {
     horizontalRuleDecorations(),
     frontmatterDecorations(),
     tableDecorations(),
+    fencedCodeDecorations(),
   ];
 }

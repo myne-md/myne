@@ -114,6 +114,22 @@
   --info:          #2c4a7a;
   --info-soft:     var(--accent-soft);
 
+  /* -- Color -- Code syntax highlighting (MYND-154) ------------------- */
+  /* Mirrors docs/design/colors_and_type.css. Each hue clears WCAG AA
+     (>=4.5:1) vs --paper-2 in both themes (grill Q15). */
+  --syntax-keyword:  #7a3b8c;
+  --syntax-string:   #3f6a4a;
+  --syntax-comment:  #706f66;
+  --syntax-number:   #9a5d2a;
+  --syntax-variable: #1a1a17;
+  --syntax-property: #2c4a7a;
+  --syntax-function: #1f5c6e;
+  --syntax-type:     #8a5a1f;
+  --syntax-operator: #5c5b54;
+  --syntax-tag:      #8a2a23;
+  --syntax-meta:     #5a5478;
+  --syntax-invalid:  #992018;
+
   /* -- Focus ring ----------------------------------------------------- */
   --ring:        0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent);
   --ring-inset:  inset 0 0 0 2px var(--accent);
@@ -177,6 +193,20 @@
   --success-soft: #1a2620;
   --info:         var(--accent);
   --info-soft:    var(--accent-soft);
+
+  /* -- Code syntax highlighting (MYND-154) -- AA (>=4.5:1) vs --paper-2 (#1a1a17) */
+  --syntax-keyword:  #c79ad4;
+  --syntax-string:   #8cc1a4;
+  --syntax-comment:  #8e8d85;
+  --syntax-number:   #d8b76a;
+  --syntax-variable: #e8e7df;
+  --syntax-property: #8aa4d0;
+  --syntax-function: #7fbfcf;
+  --syntax-type:     #d4a96a;
+  --syntax-operator: #a8a79f;
+  --syntax-tag:      #d99086;
+  --syntax-meta:     #a59fc4;
+  --syntax-invalid:  #e88b80;
 
   --shadow-1: 0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5);
   --shadow-2: 0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5);
