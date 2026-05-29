@@ -30,6 +30,8 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { type Extension } from "@codemirror/state";
 import { Wikilink } from "../dialect/lezer/wikilink";
 import { InlineTag } from "../dialect/lezer/inline-tag";
+import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
+import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { myneDecorations } from "./decorations";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
@@ -44,8 +46,12 @@ export function myneExtensions(): readonly Extension[] {
     closeBrackets(),
     markdown({
       base: markdownLanguage,
-      extensions: [Wikilink, InlineTag],
+      // codeNestMarkdownExtension nests per-language Lezer parsers into closed
+      // fenced blocks (MYND-154). NOT the stock `codeLanguages` option — see
+      // code-highlight.ts. Do not also pass `codeLanguages` (would double-nest).
+      extensions: [Wikilink, InlineTag, codeNestMarkdownExtension],
     }),
+    codeSyntaxHighlighting,
     ...myneDecorations(),
     ...wikilinkChipExtensions(),
     slashMenuExtension(),
@@ -55,6 +61,9 @@ export function myneExtensions(): readonly Extension[] {
       // Before defaultKeymap so Arrow Up/Down can enter a table block (which
       // CM would otherwise skip over) instead of the default vertical move.
       ...tableKeymap,
+      // Before defaultKeymap so Enter on an opening fence completes the block
+      // (inserts the closing ```) instead of a plain newline (MYND-154).
+      ...autoCloseFenceKeymap,
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...historyKeymap,

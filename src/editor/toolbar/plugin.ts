@@ -16,6 +16,7 @@ import {
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
 import { toggleWrap } from "../wrap-toggle";
+import { isSelectionInCode } from "../code-context";
 
 type Mode = "toolbar" | "url-overlay";
 
@@ -77,6 +78,7 @@ class ToolbarView implements PluginValue {
   openUrlOverlay(): void {
     const range = this.view.state.selection.main;
     if (range.empty) return;
+    if (isSelectionInCode(this.view.state)) return; // no link wrapping inside code
     this.savedSelection = { from: range.from, to: range.to };
     this.urlOverlayOpen = true;
     this.mode = "url-overlay";
@@ -85,7 +87,9 @@ class ToolbarView implements PluginValue {
 
   private refresh(): void {
     const range = this.view.state.selection.main;
-    if (range.empty && !this.urlOverlayOpen) {
+    // Suppress inside code (MYND-154): formatting a code selection would inject
+    // literal markdown markers into the source.
+    if ((range.empty || isSelectionInCode(this.view.state)) && !this.urlOverlayOpen) {
       this.dismiss();
       return;
     }

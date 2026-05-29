@@ -168,6 +168,10 @@ export function toggleWrap(open: string, close: string): StateCommand {
     const fmRange = cachedLocateFrontmatter(state.doc);
     const refuse = state.selection.ranges.some((r) => {
       if (isPositionInsideNode(tree, r.from, "InlineCode")) return true;
+      // Fenced / indented code blocks (MYND-154): emphasis markers must not be
+      // injected into code source.
+      if (isPositionInsideNode(tree, r.from, "FencedCode")) return true;
+      if (isPositionInsideNode(tree, r.from, "CodeBlock")) return true;
       if (selectionPartiallyOverlapsNode(tree, r.from, r.to, "URL")) return true;
       if (
         fmRange !== null &&
