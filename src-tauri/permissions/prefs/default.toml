@@ -15,7 +15,11 @@
 
 [default]
 description = "Default permission set for the prefs plugin — both read + per-field setters."
-permissions = ["allow-prefs-read", "allow-set-screen-capture-protection"]
+permissions = [
+  "allow-prefs-read",
+  "allow-set-screen-capture-protection",
+  "allow-set-deliberate-folders",
+]
 
 [[permission]]
 identifier = "allow-prefs-read"
@@ -26,3 +30,11 @@ commands.allow = ["prefs_read"]
 identifier = "allow-set-screen-capture-protection"
 description = "Allow invoking prefs:set_screen_capture_protection (Slot::Unlocked-gated per-field setter for the screen_capture_protection bool; atomic-writes vault.prefs FIRST then calls screen_capture::apply for the native side-effect — disk-then-native ordering is load-bearing for UI/disk consistency per MYND-160 grill Q5.2)."
 commands.allow = ["set_screen_capture_protection"]
+
+# MYND-144: a write setter, so it inherits the same main-window-only
+# invariant as allow-set-screen-capture-protection — v0.2 multi-window
+# MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-deliberate-folders"
+description = "Allow invoking prefs:set_deliberate_folders (Slot::Unlocked-gated setter for the deliberate_folders set — the carrier for empty/deliberately-created folders in the virtual-folder model; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_deliberate_folders"]

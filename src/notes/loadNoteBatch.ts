@@ -25,6 +25,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { load as parseYaml } from "js-yaml";
+import { normalizeFolderPath } from "../dialect/folderPath";
 import type {
   NoteTitleError,
   TitleSlice,
@@ -48,6 +49,12 @@ export const NOTE_TITLES_BATCH_CAP = 100;
 export type TitleRecord = {
   noteUuid: string;
   title: string | null;
+  /**
+   * Canonical folder path (trailing-slash form) parsed from the frontmatter
+   * `folder:` field, or `null` for a root / unfiled note. Consumed by the
+   * sidebar folder-tree derivation (`deriveFolderTree`).
+   */
+  folder: string | null;
   updatedAt: Date | null;
   error?: NoteTitleError;
 };
@@ -119,9 +126,15 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // until the user names it (sidebar rename / Properties title field).
   const titleFromFm =
     typeof parsed["title"] === "string" ? (parsed["title"] as string) : null;
+  // `folder:` → canonical trailing-slash path (or null = root/unfiled). Parse
+  // is tolerant + non-mutating: imported / malformed paths are normalized
+  // structurally only (no segment validation here).
+  const folderRaw =
+    typeof parsed["folder"] === "string" ? (parsed["folder"] as string) : null;
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
+    folder: normalizeFolderPath(folderRaw),
     updatedAt: deriveUpdatedAt(parsed),
   };
 }
@@ -164,6 +177,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
     return {
       noteUuid: fallbackId,
       title: null,
+      folder: null,
       updatedAt: null,
       error: r.Err,
     };

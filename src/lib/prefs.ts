@@ -11,9 +11,16 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-/** Mirrors `protocol::PrefsView` (Rust side). v0.1: one bool field. */
+/** Mirrors `protocol::PrefsView` (Rust side). */
 export interface PrefsView {
   screen_capture_protection: boolean;
+  /**
+   * Deliberately-created folder paths (canonical trailing-slash form) that
+   * persist independently of whether any note carries them — the carrier for
+   * empty folders in the virtual-folder model (MYND-144). Absent in pre-MYND-144
+   * vaults → the Rust decoder defaults it to `[]`.
+   */
+  deliberate_folders: string[];
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -32,4 +39,17 @@ export async function prefsRead(): Promise<PrefsView> {
  */
 export async function setScreenCaptureProtection(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_screen_capture_protection", { enabled });
+}
+
+/**
+ * Persist the full deliberate_folders set (the carrier for empty /
+ * deliberately-created folders, MYND-144). The caller passes the entire
+ * desired set; v0.1 single-device writes it verbatim. Folded-identity dedup
+ * (case-insensitivity) is the caller's responsibility — the Rust codec only
+ * sorts + exact-dedups for canonical byte-stability. No native side-effect; a
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert.
+ */
+export async function setDeliberateFolders(folders: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_deliberate_folders", { folders });
 }

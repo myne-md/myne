@@ -13,6 +13,8 @@
 // the WebView boundary").
 
 import { invoke } from "@tauri-apps/api/core";
+import { buildInitialPlaintext } from "../dialect";
+import { normalizeFolderPath } from "../dialect/folderPath";
 
 /**
  * Encrypt + atomically write a new `.myn` note. Returns the canonical
@@ -25,12 +27,17 @@ export async function noteCreate(plaintext: string): Promise<string> {
 }
 
 /**
- * "+ New Note" action helper. Calls `noteCreate("")` per `decisions.md`
- * 2026-05-15 "Note title write target" + the 2026-05-15 MYND-82 grill
- * Q8 zero-payload decision. Returns the new `NoteId` so the caller can
- * select the new row in the sidebar and trigger the auto-rename UX
- * (Q16 ar1).
+ * "+ New Note" action helper. Returns the new `NoteId` so the caller can
+ * select the new row in the sidebar and trigger the auto-rename UX (Q16 ar1).
+ *
+ * `folder` is the a2 create-timing path (grill 2026-05-29 Q7): a note created
+ * inside a folder gets its `folder:` frontmatter written **at create** (so it
+ * appears in the right place before the first edit), via `buildInitialPlaintext`.
+ * A root note (`folder` omitted / null) sends empty plaintext exactly as before
+ * — `decisions.md` 2026-05-15 "İlk save inject etmez" still holds for root
+ * notes; only the foldered case carries create-time FM. The Rust `note_create`
+ * stays dialect-blind: it receives this as opaque plaintext.
  */
-export async function createNote(): Promise<string> {
-  return await noteCreate("");
+export async function createNote(folder: string | null = null): Promise<string> {
+  return await noteCreate(buildInitialPlaintext(normalizeFolderPath(folder)));
 }

@@ -22,8 +22,10 @@ export type {
 export { parse } from "./parse";
 export { extractFullText } from "./visitors/fullText";
 export {
+  buildInitialPlaintext,
   formatYamlScalar,
   patchFirstH1Line,
+  patchFolderField,
   patchSourceRanges,
   patchTitleField,
   patchUpdatedField,

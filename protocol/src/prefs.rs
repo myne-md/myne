@@ -73,10 +73,12 @@ use crate::aead::{
     CTX_COMMITMENT_TAG_LEN,
 };
 use crate::error::ProtocolError;
+use alloc::string::String;
 use alloc::vec::Vec;
 use getrandom::getrandom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use unicode_normalization::UnicodeNormalization;
 use zeroize::{Zeroize, Zeroizing};
 
 /// Magic bytes at offset 0 — ASCII `"MYP1"` (Myne Prefs v1).
@@ -123,16 +125,28 @@ pub struct PrefsView {
     /// (`threat-model.md` § 6 + `decisions.md` 2026-05-27 entries).
     /// Default `true` matches MYND-78's structural default-ON.
     pub screen_capture_protection: bool,
+
+    /// Deliberately-created folder paths (canonical trailing-slash display
+    /// form) that persist independently of whether any note carries them —
+    /// the carrier for empty folders in the virtual-folder model (MYND-144 /
+    /// grill 2026-05-29). Default empty. Conflict semantics (Phase 2) =
+    /// union + add-wins. Encoded as a canonical JSON string array
+    /// (NFC-normalized, lexicographically sorted, exact-deduped, and **omitted
+    /// entirely when empty** so a vault with no deliberate folders is
+    /// byte-identical to a v0.1.0 `vault.prefs`).
+    #[serde(default)]
+    pub deliberate_folders: Vec<alloc::string::String>,
 }
 
 impl Default for PrefsView {
     /// Spec § 9.5.5 fall-back-to-defaults: `screen_capture_protection`
     /// defaults to `true` so that a missing or corrupt `vault.prefs`
     /// degrades to the safer state (protection on) rather than the
-    /// permissive one.
+    /// permissive one. `deliberate_folders` defaults empty.
     fn default() -> Self {
         Self {
             screen_capture_protection: true,
+            deliberate_folders: Vec::new(),
         }
     }
 }
@@ -258,9 +272,26 @@ impl From<ProtocolError> for PrefsBlobError {
 // `dependency-policy.md` PR review).
 
 fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
-    // Single-field shape: {"screen_capture_protection":<bool>}
-    let mut out = Vec::with_capacity(36);
-    out.extend_from_slice(b"{\"screen_capture_protection\":");
+    // Keys lexicographically sorted (spec § 9.5.2): "deliberate_folders" (d)
+    // precedes "screen_capture_protection" (s). The deliberate_folders array is
+    // OMITTED entirely when empty, so a vault with no deliberate folders is
+    // byte-identical to a v0.1.0 vault.prefs (preserves existing KAT vectors).
+    let mut out = Vec::with_capacity(48);
+    out.push(b'{');
+
+    let folders = canonical_folder_list(&prefs.deliberate_folders);
+    if !folders.is_empty() {
+        out.extend_from_slice(b"\"deliberate_folders\":[");
+        for (i, f) in folders.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, f);
+        }
+        out.extend_from_slice(b"],");
+    }
+
+    out.extend_from_slice(b"\"screen_capture_protection\":");
     out.extend_from_slice(if prefs.screen_capture_protection {
         b"true"
     } else {
@@ -268,6 +299,58 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     });
     out.push(b'}');
     out
+}
+
+/// NFC-normalize, lexicographically sort, and exact-dedupe a folder list so the
+/// canonical encoding is deterministic regardless of caller insertion order or
+/// pre-normalization byte form (spec § 9.5.2 UTF-8 NFC + sorted-keys
+/// discipline, extended per-element to the array). Folded-identity dedup
+/// (case-insensitivity) is the set-management layer's job, NOT the codec's —
+/// the codec preserves distinct display forms and only collapses exact dupes.
+fn canonical_folder_list(folders: &[String]) -> Vec<String> {
+    let mut v: Vec<String> = folders
+        .iter()
+        .map(|s| s.nfc().collect::<String>())
+        .collect();
+    v.sort();
+    v.dedup();
+    v
+}
+
+/// Append `s` as a JSON string literal (with surrounding quotes), escaping `"`,
+/// `\`, and C0 control chars per RFC 8259. `/` is left unescaped (canonical).
+/// Non-control characters pass through as UTF-8.
+fn push_json_string(out: &mut Vec<u8>, s: &str) {
+    out.push(b'"');
+    for ch in s.chars() {
+        match ch {
+            '"' => out.extend_from_slice(b"\\\""),
+            '\\' => out.extend_from_slice(b"\\\\"),
+            '\u{08}' => out.extend_from_slice(b"\\b"),
+            '\u{0c}' => out.extend_from_slice(b"\\f"),
+            '\n' => out.extend_from_slice(b"\\n"),
+            '\r' => out.extend_from_slice(b"\\r"),
+            '\t' => out.extend_from_slice(b"\\t"),
+            c if (c as u32) < 0x20 => {
+                let code = c as u32;
+                out.extend_from_slice(b"\\u00");
+                out.push(hex_nibble((code >> 4) as u8));
+                out.push(hex_nibble((code & 0xF) as u8));
+            }
+            c => {
+                let mut buf = [0u8; 4];
+                out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+            }
+        }
+    }
+    out.push(b'"');
+}
+
+fn hex_nibble(n: u8) -> u8 {
+    match n {
+        0..=9 => b'0' + n,
+        _ => b'a' + (n - 10),
+    }
 }
 
 /// Parse the v0.1 canonical-JSON `vault.prefs` plaintext.
@@ -283,44 +366,150 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
 /// malformation (missing `{...}` wrapper, missing
 /// `screen_capture_protection` key, wrong value type, truncated).
 fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> {
-    // Single-path decoder: locate the known field via substring search
-    // within the wrapping object. Handles both v0.1.0 (single field)
-    // and any future v0.1.x (additive fields the v0.1.0 client should
-    // ignore per spec § 9.5.2 forward-compat).
+    // Substring-located fields within the wrapping object. Handles v0.1.0
+    // (single field), the v0.1.x deliberate_folders addition, and future
+    // additive fields (ignored per spec § 9.5.2 forward-compat). The decoder
+    // runs only AFTER AEAD verification, so any field-content confusion (a
+    // folder name literally containing a key marker) is self-inflicted by the
+    // prefs_key holder and collapses to fall-back-to-defaults — not adversarial.
     //
-    // Acceptable shape: starts with `{`, ends with `}`, contains the
-    // exact key `"screen_capture_protection":` followed by either
-    // `true` or `false` with strict suffix (end-of-object or `,` for
-    // a next field). Anything else (missing wrapper, missing key,
-    // non-bool value, trailing garbage like `truefoo}`) is a parse
-    // failure.
+    // Acceptable shape: starts with `{`, ends with `}`. `screen_capture_protection`
+    // is required (`true`/`false`, strict suffix). `deliberate_folders` is
+    // optional (absent → empty); when present its value must be a well-formed
+    // JSON string array.
     let stripped = plaintext
         .strip_prefix(b"{")
         .and_then(|p| p.strip_suffix(b"}"))
         .ok_or(PrefsBlobError::PlaintextParseFailed)?;
 
-    let key_marker = b"\"screen_capture_protection\":";
-    let idx = find_subslice(stripped, key_marker).ok_or(PrefsBlobError::PlaintextParseFailed)?;
-    let after_key = &stripped[idx + key_marker.len()..];
+    // ---- deliberate_folders (optional) ----
+    let folders_marker = b"\"deliberate_folders\":";
+    let (deliberate_folders, scp_search_from) = match find_subslice(stripped, folders_marker) {
+        Some(idx) => {
+            let array_start = idx + folders_marker.len();
+            let (list, consumed) = parse_json_string_array(&stripped[array_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            // Resume the scp search AFTER the array span so array string content
+            // (which may contain `"screen_capture_protection":`-looking bytes)
+            // cannot fool the marker search.
+            (list, array_start + consumed)
+        }
+        None => (Vec::new(), 0usize),
+    };
 
-    // Strict suffix matching: after `"screen_capture_protection":`,
-    // the value must be exactly `true` or `false` followed by either
-    // end-of-object content (`,` for more fields, or empty if last
-    // field — the wrapper braces were stripped before this point).
-    // `starts_with` alone would accept `truefoo` or `falsehoodxyz`
-    // as valid → silent data-integrity bug on tampered-but-AEAD-OK
-    // plaintexts.
-    if after_key == b"true" || after_key.starts_with(b"true,") {
-        Ok(PrefsView {
-            screen_capture_protection: true,
-        })
+    // ---- screen_capture_protection (required) ----
+    let region = &stripped[scp_search_from..];
+    let key_marker = b"\"screen_capture_protection\":";
+    let idx = find_subslice(region, key_marker).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+    let after_key = &region[idx + key_marker.len()..];
+
+    // Strict suffix: value is exactly `true`/`false` followed by end-of-object
+    // (last field → empty) or `,` (a further field). `starts_with` alone would
+    // accept `truefoo` → silent data-integrity bug on tampered-but-AEAD-OK input.
+    let screen_capture_protection = if after_key == b"true" || after_key.starts_with(b"true,") {
+        true
     } else if after_key == b"false" || after_key.starts_with(b"false,") {
-        Ok(PrefsView {
-            screen_capture_protection: false,
-        })
+        false
     } else {
-        Err(PrefsBlobError::PlaintextParseFailed)
+        return Err(PrefsBlobError::PlaintextParseFailed);
+    };
+
+    Ok(PrefsView {
+        screen_capture_protection,
+        deliberate_folders,
+    })
+}
+
+/// Parse a JSON array of strings starting at `bytes[0] == '['`. Returns the
+/// decoded strings + bytes consumed (through the closing `]`), or `None` on
+/// any malformation. No nesting beyond strings (the only array v0.1 uses).
+fn parse_json_string_array(bytes: &[u8]) -> Option<(Vec<String>, usize)> {
+    if bytes.first() != Some(&b'[') {
+        return None;
     }
+    let mut i = 1;
+    let mut out: Vec<String> = Vec::new();
+    if bytes.get(i) == Some(&b']') {
+        return Some((out, i + 1));
+    }
+    loop {
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (s, consumed) = parse_json_string(&bytes[i..])?;
+        out.push(s);
+        i += consumed;
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b']') => return Some((out, i + 1)),
+            _ => return None,
+        }
+    }
+}
+
+/// Parse a JSON string literal starting at `bytes[0] == '"'`. Returns the
+/// decoded `String` + bytes consumed (through the closing `"`), or `None`.
+/// Unescaped bytes are copied verbatim (multi-byte UTF-8 preserved) and the
+/// accumulated buffer is UTF-8-validated at the close.
+fn parse_json_string(bytes: &[u8]) -> Option<(String, usize)> {
+    if bytes.first() != Some(&b'"') {
+        return None;
+    }
+    let mut buf: Vec<u8> = Vec::new();
+    let mut i = 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'"' => return String::from_utf8(buf).ok().map(|s| (s, i + 1)),
+            b'\\' => {
+                i += 1;
+                match *bytes.get(i)? {
+                    b'"' => buf.push(b'"'),
+                    b'\\' => buf.push(b'\\'),
+                    b'/' => buf.push(b'/'),
+                    b'b' => buf.push(0x08),
+                    b'f' => buf.push(0x0c),
+                    b'n' => buf.push(b'\n'),
+                    b'r' => buf.push(b'\r'),
+                    b't' => buf.push(b'\t'),
+                    b'u' => {
+                        let cp = parse_hex4(bytes.get(i + 1..i + 5)?)?;
+                        let ch = char::from_u32(cp)?;
+                        let mut cb = [0u8; 4];
+                        buf.extend_from_slice(ch.encode_utf8(&mut cb).as_bytes());
+                        i += 4;
+                    }
+                    _ => return None,
+                }
+                i += 1;
+            }
+            b => {
+                buf.push(b);
+                i += 1;
+            }
+        }
+    }
+    None
+}
+
+/// Parse exactly 4 lowercase/uppercase hex digits into a `u32` code point.
+fn parse_hex4(h: &[u8]) -> Option<u32> {
+    if h.len() != 4 {
+        return None;
+    }
+    let mut v = 0u32;
+    for &b in h {
+        let d = match b {
+            b'0'..=b'9' => (b - b'0') as u32,
+            b'a'..=b'f' => (b - b'a' + 10) as u32,
+            b'A'..=b'F' => (b - b'A' + 10) as u32,
+            _ => return None,
+        };
+        v = v * 16 + d;
+    }
+    Some(v)
 }
 
 /// Naive substring search — `slice::windows().position()` equivalent
@@ -483,6 +672,7 @@ mod tests {
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: true,
+            deliberate_folders: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -492,6 +682,7 @@ mod tests {
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            deliberate_folders: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -527,7 +718,8 @@ mod tests {
         assert_eq!(
             parsed,
             PrefsView {
-                screen_capture_protection: true
+                screen_capture_protection: true,
+                deliberate_folders: Vec::new(),
             }
         );
     }
@@ -538,7 +730,8 @@ mod tests {
         assert_eq!(
             parsed,
             PrefsView {
-                screen_capture_protection: false
+                screen_capture_protection: false,
+                deliberate_folders: Vec::new(),
             }
         );
     }
@@ -592,6 +785,164 @@ mod tests {
     fn canonical_json_decoder_rejects_trailing_garbage_after_false() {
         let err = canonical_json_decode(br#"{"screen_capture_protection":falseyyy}"#).unwrap_err();
         assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    // ---- deliberate_folders canonical array (MYND-144) -----------------
+
+    #[test]
+    fn encode_omits_deliberate_folders_when_empty() {
+        // Byte-identical to the v0.1.0 single-field shape → existing vaults +
+        // KAT vectors unchanged.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_sorted_keys_with_nonempty_folders() {
+        // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: alloc::vec![
+                alloc::string::String::from("Projects/"),
+                alloc::string::String::from("Archive/"),
+            ],
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["Archive/","Projects/"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn encode_sorts_and_dedupes_folder_elements() {
+        let prefs = PrefsView {
+            screen_capture_protection: false,
+            deliberate_folders: alloc::vec![
+                alloc::string::String::from("b/"),
+                alloc::string::String::from("a/"),
+                alloc::string::String::from("b/"),
+            ],
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["a/","b/"],"screen_capture_protection":false}"#,
+        );
+    }
+
+    #[test]
+    fn encode_escapes_quote_in_folder_name() {
+        // `"` is allowed in a folder segment (Q5 forbidden set excludes it),
+        // so JSON escaping is load-bearing.
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["a\"b/"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn encode_nfc_normalizes_folder_elements() {
+        // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            "{\"deliberate_folders\":[\"Caf\u{00e9}/\"],\"screen_capture_protection\":true}"
+                .as_bytes(),
+        );
+    }
+
+    #[test]
+    fn decode_backward_compat_absent_folders_is_empty() {
+        // A v0.1.0 blob with no deliberate_folders decodes to an empty list.
+        let parsed = canonical_json_decode(br#"{"screen_capture_protection":true}"#).unwrap();
+        assert_eq!(
+            parsed.deliberate_folders,
+            Vec::<alloc::string::String>::new()
+        );
+        assert!(parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_round_trips_nonempty_folders() {
+        let parsed = canonical_json_decode(
+            br#"{"deliberate_folders":["Archive/","Projects/"],"screen_capture_protection":false}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            parsed.deliberate_folders,
+            alloc::vec![
+                alloc::string::String::from("Archive/"),
+                alloc::string::String::from("Projects/"),
+            ],
+        );
+        assert!(!parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_unescapes_quote_in_folder_name() {
+        let parsed = canonical_json_decode(
+            br#"{"deliberate_folders":["a\"b/"],"screen_capture_protection":true}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            parsed.deliberate_folders,
+            alloc::vec![alloc::string::String::from("a\"b/")],
+        );
+    }
+
+    #[test]
+    fn decode_handles_empty_array() {
+        let parsed =
+            canonical_json_decode(br#"{"deliberate_folders":[],"screen_capture_protection":true}"#)
+                .unwrap();
+        assert!(parsed.deliberate_folders.is_empty());
+    }
+
+    #[test]
+    fn decode_rejects_malformed_folder_array() {
+        // Unterminated array → parse failure (caller collapses to defaults).
+        let err = canonical_json_decode(
+            br#"{"deliberate_folders":["a/","screen_capture_protection":true}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn full_blob_round_trip_with_deliberate_folders() {
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView {
+            screen_capture_protection: false,
+            deliberate_folders: alloc::vec![
+                alloc::string::String::from("Projects/Myne/"),
+                alloc::string::String::from("Archive/2025/"),
+            ],
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        // Decoded list is canonical (sorted) — compare against the sorted form.
+        assert_eq!(
+            decoded.deliberate_folders,
+            alloc::vec![
+                alloc::string::String::from("Archive/2025/"),
+                alloc::string::String::from("Projects/Myne/"),
+            ],
+        );
+        assert!(!decoded.screen_capture_protection);
     }
 
     // ---- outer envelope structural tests -------------------------------
@@ -694,6 +1045,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            deliberate_folders: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -711,6 +1063,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            deliberate_folders: Vec::new(),
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -921,6 +1274,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: true,
+                deliberate_folders: Vec::new(),
             },
             &nonce_default,
         )
@@ -931,6 +1285,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: false,
+                deliberate_folders: Vec::new(),
             },
             &nonce_toggled,
         )

@@ -33,6 +33,7 @@ import {
  */
 const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
+  deliberate_folders: [],
 };
 
 interface UsePrefsResult {

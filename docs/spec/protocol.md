@@ -592,6 +592,7 @@ A Myne vault is a directory on the user's filesystem containing:
 - File extension `.myn` (Myne Note) for per-note ciphertext blobs.
 - File extension `.meta` for vault-level metadata (the wrapped `itemsKey`, the random Argon2id salt, the protocol version, and the account number).
 - File names are the note's UUIDv7 string. UUIDs are not encrypted; they are random and reveal only "this is a note" plus a coarse creation-time bucket. (UUIDv7 chosen for natural sort order; the time component leaks a creation-time millisecond, which is accepted in v0.1; v005 may switch to UUIDv4 if even coarse leakage is unacceptable.)
+- **Folders are virtual (MYND-144).** The `notes/` directory is **always flat** — folder hierarchy is **not** reflected on disk. A note's folder is a path string in its encrypted frontmatter (`folder:`, see [`markdown-dialect.md`](markdown-dialect.md) §3.6.1); the sidebar tree is reconstructed client-side after decryption. This keeps folder structure inside the AEAD-encrypted blob (`threat-model.md` **AS3**, Sensitive) — a filesystem adversary (A4/A7) sees only flat `<uuid>.myn` blobs, never folder names. Deliberately-created (empty) folders are carried in `vault.prefs` (§9.5.2 `deliberate_folders`), also encrypted. No on-disk-format change.
 
 ### 9.2 Per-note blob (`.myn`) binary format
 
@@ -725,10 +726,16 @@ The KEK is `prefs_key = DeriveSubkey(root_key, "prefs-key")` per §3.2 + §3.4. 
 
 #### 9.5.2 Inner plaintext schema
 
-The inner plaintext is **canonical JSON** of an object whose keys are preference names and whose values are the persisted preference data. v0.1 ships with a single field:
+The inner plaintext is **canonical JSON** of an object whose keys are preference names and whose values are the persisted preference data. v0.1 ships two fields — `screen_capture_protection` (bool) and `deliberate_folders` (string array, MYND-144). A vault with no deliberately-created folders encodes to the single-field form (`deliberate_folders` is **omitted entirely when empty**, see below):
 
 ```json
 {"screen_capture_protection":true}
+```
+
+A vault with deliberate folders encodes both keys (lexicographically sorted — `deliberate_folders` precedes `screen_capture_protection`):
+
+```json
+{"deliberate_folders":["Archive/2025/","Projects/Myne/"],"screen_capture_protection":true}
 ```
 
 **Canonical encoding rules** (load-bearing for cross-implementation byte-stability and for the byte-stable golden vectors in `myne-test-vectors`):
@@ -738,7 +745,9 @@ The inner plaintext is **canonical JSON** of an object whose keys are preference
 - String values MUST be UTF-8 normalized to NFC before encoding.
 - Integer values MUST be encoded without a trailing `.0`.
 - Floating-point values are FORBIDDEN in v0.1. Implementations MUST reject schemas that introduce float-typed preference fields until a future minor revision specifies a deterministic float encoding.
-- Booleans, integers, strings, and nested objects following the same rules are the only permitted v0.1 value types. Arrays are not used by any v0.1 field but follow the same per-element canonical encoding when a future field needs them.
+- Booleans, integers, strings, **string arrays**, and nested objects following the same rules are the only permitted v0.1 value types. A string array is encoded `["a","b"]` with no insignificant whitespace; each element follows the string rules above (NFC, plus RFC 8259 escaping of `"`, `\`, and C0 control characters — canonical lowercase `\u00XX` for unnamed controls; `/` left unescaped).
+
+**`deliberate_folders` field (MYND-144).** A JSON array of canonical trailing-slash folder paths (e.g. `["Projects/", "Projects/Myne/"]`) — the carrier for deliberately-created folders that hold no note (the empty-folder case of the virtual-folder model; see [`markdown-dialect.md`](markdown-dialect.md) §3.6.2). Canonical array encoding: elements are **NFC-normalized**, **lexicographically sorted** by their NFC bytes, and **exact-deduplicated** (folded-identity/case-insensitive dedup is the set-management layer's job, not the codec's). The array is **omitted entirely when empty**, so a vault with no deliberate folders is byte-identical to a pre-MYND-144 `vault.prefs` (existing golden vectors unaffected, no outer-envelope change). A decoder that does not find the key MUST treat it as the empty list. Conflict semantics for Phase 2 sync = union + add-wins (set semantics; no wall-clock, AS6-safe).
 
 **Schema evolution within v0.1:** Additive — new fields MAY be appended in any v0.1.x minor revision and are read by older v0.1 clients as unknown-and-ignored (per the implementation's serde discipline; older clients SHOULD NOT reject unknown fields). Field removal, type changes, and structural restructuring are MAJOR-version events (MYP5).
 

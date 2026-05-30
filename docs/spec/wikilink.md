@@ -65,6 +65,8 @@ Paths are **relative to the vault root** — the directory containing `vault.met
 
 **Rationale.** Absolute filesystem paths break the moment the vault moves to another machine, OS, or mount point — defeating `vision.md`'s portability commitment. Vault-relative paths are also already valid Obsidian wikilink syntax (Obsidian supports `[[folder/Note Name]]` natively), so the form round-trips into Obsidian without reinterpretation.
 
+**Virtual-path note (MYND-144).** Under Myne's virtual folders, this "vault-relative path" is itself **virtual** — the on-disk layout is always flat `notes/<uuid>.myn` ([`protocol.md`](protocol.md) §9.1), never a `<folder>/<title>.md` directory tree. The path a Myne-authored wikilink carries is the **derived** form `<folder>/<title>.md` — a note's `folder:` frontmatter ([`markdown-dialect.md`](markdown-dialect.md) §3.6.1) joined with its `title:` — and it resolves through the vault index, not the filesystem. Resolution is therefore **title-keyed** with the folder segment as a disambiguator (§5.3); the path stays in the source bytes as a human-readable, walk-away-friendly cache, not a literal on-disk reference. This refines the original C2 "self-resolving without the index" property from a machine-guarantee to a human-guarantee (the index lookup happens regardless of which key resolution uses, because there is no `<folder>/<title>.md` file on disk to follow).
+
 ### 3.2 Path includes the `.md` extension
 
 The emitted path includes the `.md` file extension. Concretely, `[[notes/2025/01-10.md|Wednesday]]` — never `[[notes/2025/01-10|Wednesday]]`.
@@ -121,7 +123,17 @@ Atomicity applies to **all** recognized wikilink forms.
 
 ### 5.3 Broken-link styling
 
-A wikilink is **broken** when its target cannot be resolved against the current vault index. For title-only forms (1–4), resolution succeeds when at least one note in the vault has a matching title; ties are resolved by Obsidian's "shortest path" heuristic. For path forms (5–7), resolution succeeds when a note exists at exactly the specified vault-relative path.
+Resolution is **title-keyed** for all forms (MYND-144). Under virtual folders there is no `<folder>/<title>.md` file to match on disk (§3.1), so the earlier two-mode rule (title-only via index vs. path-form via exact filesystem path) collapses into a single title-keyed model in which the folder segment of a path-form link is a **disambiguator**, not the primary key. The resolution algorithm:
+
+1. Look up notes whose `title:` matches the target's title component (the final path segment with the `.md` extension stripped).
+2. **Single hit** → resolve to it. (This is why moving a note between folders never breaks a link — the title is unchanged.)
+3. **Multiple hits** (title collision) → use the link's folder segment as a first-tier disambiguator (a note whose `folder:` matches the link's folder prefix wins), ahead of Obsidian's "shortest path" tiebreak.
+4. **No folder match** → fall back to the shortest-path heuristic; surface ambiguity in the hover tooltip (§6.2, "(N matches)").
+5. **Zero hits** → the wikilink is **broken**.
+
+On a conflict between a path-form link's baked-in folder segment and the target note's actual `folder:` frontmatter, the **frontmatter wins** — the path string is a human-facing cache, not the runtime authority. The resolver never rewrites a stale segment at resolution time (that would be the §7.3-forbidden lazy migration); staleness instead surfaces via the R1 hover tooltip (§6.2), which shows the *true* resolved path.
+
+**Accepted residual (slot-reoccupation).** If an inbound-link auto-update (§8) is *missed* and the note that occupied a `<folder>/<title>` slot has left while another note has taken that title in that folder, a stale path-form link will resolve to the new occupant. Only a stable note-UUID key would prevent this, and a UUID key is disqualified by the C2 self-describing / walk-away / Obsidian-round-trip commitments; the title-keyed model is never worse than an exact-path model and recovers more cases, with the window kept narrow by §8 freshness + hover-truth. This residual is accepted for v0.1.
 
 Broken wikilinks render with a distinct chip style: lighter foreground color, no underline, italic display text. The "Create note on click" affordance for broken wikilinks is deferred to v0.1.x.
 
@@ -192,8 +204,8 @@ When a note file is renamed or moved within the vault, Myne walks the vault inde
 
 Auto-update fires on:
 
-- **Editor-internal rename** — sidebar right-click → rename, command palette rename action.
-- **Sidebar drag-move** — dragging a note to a different folder in the sidebar.
+- **Title rename** (correctness-critical) — sidebar right-click → rename, command palette rename action. This rewrites a note's `title:`, which is the resolution **key** (§5.3); a stale inbound link would genuinely break, so the update is **transactional** (§8.3).
+- **Folder move / folder rename** (best-effort, MYND-144) — moving a note to a different folder (sidebar drag-move) or renaming a folder. These change a note's `folder:`, **not** the resolution key, so resolution survives a stale link (title-keyed, §5.3). Inbound path-form links get a **cosmetic** refresh of their folder segment — best-effort, **not** transactional: a partial failure leaves a stale folder segment that the resolver tolerates (and the R1 hover surfaces, §6.2). Title-only imported links are unaffected by a folder move (their title is unchanged).
 
 Auto-update does **not** fire on:
 
@@ -214,7 +226,9 @@ Auto-update never **promotes** a wikilink's syntactic form during a rename. A us
 
 ### 8.3 Transactional rollback
 
-If a rename triggers updates across N files and any update fails (disk full, permission error, encryption error in the per-note save pipeline), **all updates roll back** and the rename is reported as failed. The vault is left in its pre-rename state.
+**This transactional rollback applies to title rename only** (the correctness-critical trigger, §8.1) — title is the resolution key, so a half-applied rename would leave genuinely-broken links. Folder move / folder rename do **not** use this rollback: they get a best-effort, non-transactional cosmetic refresh (§8.1), because a stale folder segment does not break resolution under the title-keyed model.
+
+If a title rename triggers updates across N files and any update fails (disk full, permission error, encryption error in the per-note save pipeline), **all updates roll back** and the rename is reported as failed. The vault is left in its pre-rename state.
 
 The rollback shape requires either:
 
