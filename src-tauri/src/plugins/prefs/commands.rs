@@ -296,6 +296,69 @@ pub(crate) async fn set_deliberate_folders_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `auto_lock_seconds` field (MYND-121).
+/// Read-modify-write under the per-plugin write mutex. Getter is the existing
+/// [`prefs_read`] (the returned `PrefsView` already carries `auto_lock_seconds`).
+#[tauri::command]
+pub async fn set_auto_lock_timeout<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    seconds: u32,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_auto_lock_timeout_with_dir(&dir, state.inner(), seconds).await
+}
+
+/// Testable core of [`set_auto_lock_timeout`]. Persists `auto_lock_seconds`
+/// to `vault.prefs` (disk commit FIRST), then refreshes the idle timer's
+/// cached effective timeout (the "effect"; window-free, so it lives in the
+/// core rather than the wrapper — unlike `set_screen_capture_protection`
+/// whose native effect needs a `WebviewWindow`). The disk-FIRST-then-effect
+/// ordering still holds: a disk-write failure returns before the cache update.
+///
+/// The RAW user value is stored on disk; the protective-envelope clamp
+/// (MYND-121 task 3) is applied only to the in-memory cache + at read time,
+/// so a replayed `vault.prefs` can still only make auto-lock stricter
+/// (`threat-model.md` §7 two-class taxonomy).
+pub(crate) async fn set_auto_lock_timeout_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    seconds: u32,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.auto_lock_seconds = Some(seconds);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    // Disk commit FIRST.
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Effect SECOND (only on disk success): refresh the cached effective
+    // timeout the running idle timer reads, clamped through the envelope so
+    // a live change can never exceed the ceiling.
+    state.set_auto_lock_timeout_secs(crate::auto_lock::effective_auto_lock_secs(Some(seconds)));
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "auto_lock_seconds",
+        value = seconds,
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -415,6 +478,7 @@ mod tests {
                 &PrefsView {
                     screen_capture_protection: false,
                     deliberate_folders: Vec::new(),
+                    auto_lock_seconds: None,
                 },
                 &[0x77; AEAD_NONCE_LEN],
             )
@@ -480,6 +544,62 @@ mod tests {
             let result =
                 set_deliberate_folders_with_dir(tmp.path(), &state, alloc_vec(["Projects/"])).await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    // ---- auto_lock_seconds setter (MYND-121) --------------------------
+
+    #[test]
+    fn set_auto_lock_timeout_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-autolock-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_auto_lock_timeout_with_dir(tmp.path(), &state, 300).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn auto_lock_timeout_round_trips_and_caches_effective() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            set_auto_lock_timeout_with_dir(tmp.path(), &state, 900)
+                .await
+                .expect("write must succeed");
+
+            // Disk: prefs_read returns the raw stored value.
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read must succeed after write");
+            assert_eq!(view.auto_lock_seconds, Some(900));
+
+            // Effect: the cached effective timeout the idle timer reads is
+            // updated (900 is in-range → unchanged by the clamp).
+            assert_eq!(state.auto_lock_timeout_secs(), 900);
+        });
+    }
+
+    #[test]
+    fn set_auto_lock_timeout_stores_raw_but_caches_clamped() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            // A huge value is stored RAW on disk (replay-resistance lives in
+            // the read-time clamp, not the write)...
+            set_auto_lock_timeout_with_dir(tmp.path(), &state, u32::MAX)
+                .await
+                .expect("write must succeed");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read must succeed");
+            assert_eq!(view.auto_lock_seconds, Some(u32::MAX));
+
+            // ...but the cached effective timeout is clamped to the ceiling.
+            assert_eq!(
+                state.auto_lock_timeout_secs(),
+                crate::auto_lock::AUTO_LOCK_CEILING_SECS
+            );
         });
     }
 

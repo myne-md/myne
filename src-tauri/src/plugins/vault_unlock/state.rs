@@ -33,6 +33,7 @@
 
 use protocol::AEAD_KEY_LEN;
 use serde::Serialize;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 use tokio::sync::{RwLock, Semaphore};
 use zeroize::Zeroizing;
@@ -69,6 +70,31 @@ pub struct VaultRuntimeState {
     /// decisions 2026-05-02 — never `acquire().await` (queueing would
     /// silently linearize multi-click DoS into N×Argon2id).
     auth_permits: Semaphore,
+
+    /// Monotonic process-start baseline for the auto-lock activity clock
+    /// (MYND-121). Immutable after construction; read by
+    /// [`Self::monotonic_millis`]. `Instant` (monotonic), not `SystemTime`
+    /// — a security timer must be immune to wall-clock / NTP / DST steps
+    /// (`decisions.md` 2026-05-30 "Auto-lock on idle").
+    start_instant: Instant,
+
+    /// Last user-activity timestamp, in millis since [`Self::start_instant`],
+    /// updated by the lock-free `report_user_activity` heartbeat. A plain
+    /// `AtomicU64` deliberately held OUTSIDE the slot `RwLock` so the
+    /// high-frequency activity signal never serialises against crypto-state
+    /// ops (`decisions.md` 2026-05-30). Meaningful only while
+    /// `Slot::Unlocked`; reset by [`Self::set_unlocked`] so a stale
+    /// pre-unlock value cannot shorten the first post-unlock idle window.
+    last_activity_millis: AtomicU64,
+
+    /// Cached **effective** auto-lock timeout in seconds (MYND-121),
+    /// already resolved through `auto_lock::effective_auto_lock_secs` —
+    /// set at unlock (from `vault.prefs`) and by the timeout-setter IPC
+    /// (task 9). The idle timer reads this lock-free each tick instead of
+    /// re-decrypting `vault.prefs` (prefs are not cached in
+    /// `Slot::Unlocked` — disk is canonical). Held outside the slot
+    /// `RwLock`, same rationale as `last_activity_millis`.
+    auto_lock_timeout_secs: AtomicU32,
 }
 
 impl Default for VaultRuntimeState {
@@ -76,6 +102,9 @@ impl Default for VaultRuntimeState {
         Self {
             slot: RwLock::new(Slot::Empty),
             auth_permits: Semaphore::new(AUTH_PERMITS),
+            start_instant: Instant::now(),
+            last_activity_millis: AtomicU64::new(0),
+            auto_lock_timeout_secs: AtomicU32::new(crate::auto_lock::DEFAULT_AUTO_LOCK_SECS),
         }
     }
 }
@@ -85,6 +114,116 @@ impl VaultRuntimeState {
     /// this in their command's critical-section guard.
     pub fn auth_permits(&self) -> &Semaphore {
         &self.auth_permits
+    }
+
+    /// Record user activity — the lock-free heartbeat sink for auto-lock
+    /// on idle (MYND-121). A single relaxed atomic store of "now" (millis
+    /// since [`Self::start_instant`]) into `last_activity_millis`. It
+    /// **never touches the slot `RwLock`**, so a ~5s-debounced heartbeat
+    /// cannot serialise against note-save / unlock / lock ops
+    /// (`decisions.md` 2026-05-30). Safe in any slot state; the value is
+    /// only consulted while `Slot::Unlocked` (see [`Self::idle_millis`]).
+    pub fn report_activity(&self) {
+        self.last_activity_millis
+            .store(self.monotonic_millis(), Ordering::Relaxed);
+    }
+
+    /// Milliseconds elapsed since the last recorded activity. Lock-free
+    /// load. The authoritative idle timer (MYND-121 task 6) compares this
+    /// against the effective timeout, then re-reads under the slot
+    /// write-lock before the irreversible zeroize (TOCTOU close). The
+    /// value is meaningful only while `Slot::Unlocked`; the timer checks
+    /// the slot kind first.
+    pub fn idle_millis(&self) -> u64 {
+        self.monotonic_millis()
+            .saturating_sub(self.last_activity_millis.load(Ordering::Relaxed))
+    }
+
+    /// Monotonic milliseconds since the process-start baseline. Monotonic
+    /// (`Instant`-derived) — never wall-clock — so the auto-lock timer is
+    /// immune to NTP steps / DST changes (`decisions.md` 2026-05-30).
+    fn monotonic_millis(&self) -> u64 {
+        // u128 -> u64 truncation is irrelevant in practice: u64 millis
+        // spans ~584 million years of process uptime.
+        self.start_instant.elapsed().as_millis() as u64
+    }
+
+    /// Set the cached effective auto-lock timeout (seconds). Lock-free.
+    /// Called at unlock (from `vault.prefs`) and by the timeout-setter IPC
+    /// (MYND-121 task 9). Callers pass the value already through the
+    /// protective envelope (`auto_lock::effective_auto_lock_secs`).
+    pub fn set_auto_lock_timeout_secs(&self, secs: u32) {
+        self.auto_lock_timeout_secs.store(secs, Ordering::Relaxed);
+    }
+
+    /// The cached effective auto-lock timeout (seconds). Lock-free load,
+    /// read by the idle timer each tick.
+    pub fn auto_lock_timeout_secs(&self) -> u32 {
+        self.auto_lock_timeout_secs.load(Ordering::Relaxed)
+    }
+
+    /// TOCTOU-safe idle lock: acquire the slot write-lock and drop the
+    /// `Slot::Unlocked` ONLY if (a) the slot is still `Unlocked` and (b) the
+    /// idle — re-read UNDER the lock via `idle_under_lock` — is still
+    /// `>= timeout`. Returns the dropped `Slot` (whose `Zeroizing` fields
+    /// wipe on the caller's `drop`) when it locks, or `None` when it must
+    /// not (slot not Unlocked, or activity arrived in the check→lock gap).
+    ///
+    /// This is the SAME slot-take mechanism as [`Self::take`] — NOT a
+    /// parallel zeroize path — gated by an under-lock re-read so a heartbeat
+    /// landing between the timer's lock-free pre-check and the write-lock
+    /// acquire correctly aborts the lock (MYND-121 fail-closed + TOCTOU;
+    /// `decisions.md` 2026-05-30). `idle_under_lock` is a closure (not a
+    /// precomputed value) precisely so the read happens while the write-lock
+    /// is held; it reads only the lock-free activity atom, never the slot.
+    pub async fn take_unlocked_if_idle<F>(
+        &self,
+        timeout: core::time::Duration,
+        idle_under_lock: F,
+    ) -> Option<Slot>
+    where
+        F: FnOnce() -> core::time::Duration,
+    {
+        let mut guard = self.slot.write().await;
+        if !matches!(&*guard, Slot::Unlocked(_)) {
+            return None;
+        }
+        if idle_under_lock() < timeout {
+            return None;
+        }
+        Some(core::mem::replace(&mut *guard, Slot::Empty))
+    }
+
+    /// TTL bail for `Slot::Recovering` (MYND-121 story 8/9): acquire the slot
+    /// write-lock and drop the recovery session ONLY if (a) the slot is still
+    /// `Recovering` and (b) its age — `age_of(recovered_at)` — is `>= ttl`.
+    /// Returns the dropped `Slot` (whose `Zeroizing` `root_key`/`items_key`
+    /// wipe on the caller's `drop`) when it bails, else `None`.
+    ///
+    /// This is the SAME slot-take mechanism as [`Self::take`] / the automated
+    /// `recovery-flow.md` §4.3 bail — NOT a parallel zeroize path. The TTL is
+    /// ABSOLUTE from `recovered_at` (a transient-state deadline, not an
+    /// activity-reset idle): a user cannot hold the freshly-recovered
+    /// `root_key` live indefinitely by moving the mouse. `age_of` is a closure
+    /// (the real caller passes `|r| r.elapsed()`) so the age is read while the
+    /// write-lock is held and so tests can inject a deterministic age.
+    pub async fn take_recovering_if_expired<F>(
+        &self,
+        ttl: core::time::Duration,
+        age_of: F,
+    ) -> Option<Slot>
+    where
+        F: FnOnce(Instant) -> core::time::Duration,
+    {
+        let mut guard = self.slot.write().await;
+        let recovered_at = match &*guard {
+            Slot::Recovering { recovered_at, .. } => *recovered_at,
+            Slot::Empty | Slot::Unlocked(_) => return None,
+        };
+        if age_of(recovered_at) < ttl {
+            return None;
+        }
+        Some(core::mem::replace(&mut *guard, Slot::Empty))
     }
 
     /// Acquire a read borrow of the [`Slot`].
@@ -193,6 +332,11 @@ impl VaultRuntimeState {
     /// `Slot::Unlocked`). Returns the previously-held `Slot` for
     /// diagnostics.
     pub async fn set_unlocked(&self, vault: UnlockedVault) -> Slot {
+        // Fresh activity baseline for the new session so a stale pre-unlock
+        // `last_activity_millis` cannot shorten the first idle window
+        // (auto-lock on idle, MYND-121).
+        self.last_activity_millis
+            .store(self.monotonic_millis(), Ordering::Relaxed);
         core::mem::replace(&mut *self.slot.write().await, Slot::Unlocked(vault))
     }
 
@@ -610,6 +754,194 @@ mod tests {
                 }
                 other => panic!("expected Slot::Unlocked, got {:?}", slot_label(&other)),
             }
+        });
+    }
+
+    // ---- auto-lock activity clock (MYND-121) ---------------------------
+
+    #[test]
+    fn fresh_state_has_near_zero_idle() {
+        // last_activity init = 0 and the monotonic baseline was just
+        // captured, so idle is ~0 (well under the generous bound).
+        let state = VaultRuntimeState::default();
+        assert!(state.idle_millis() < 1_000);
+    }
+
+    #[test]
+    fn report_activity_yields_near_zero_idle() {
+        let state = VaultRuntimeState::default();
+        state.report_activity();
+        assert!(state.idle_millis() < 1_000);
+    }
+
+    #[test]
+    fn idle_millis_never_underflows() {
+        // `saturating_sub` guarantees a valid u64 (no panic / underflow)
+        // however the clock and last-activity stamp relate.
+        let state = VaultRuntimeState::default();
+        state.report_activity();
+        let _ = state.idle_millis();
+    }
+
+    #[test]
+    fn report_activity_does_not_acquire_the_slot_lock() {
+        // Hold the slot WRITE lock for the whole call. If report_activity
+        // touched the slot `RwLock` it would deadlock here; lock-free →
+        // returns immediately. Guards the decoupling decision: the
+        // high-frequency heartbeat must never contend with crypto-state.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let _write_guard = state.slot.write().await;
+            state.report_activity();
+            let _ = state.idle_millis();
+            // Reaching here without deadlock proves no slot-lock acquisition.
+        });
+    }
+
+    #[test]
+    fn set_unlocked_resets_the_activity_baseline() {
+        // Unlock starts a fresh activity baseline → idle ~0 right after.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_unlocked(fixture_unlocked()).await;
+            assert!(state.idle_millis() < 1_000);
+        });
+    }
+
+    // ---- TOCTOU-safe idle lock + cached timeout (MYND-121) -------------
+
+    #[test]
+    fn take_unlocked_if_idle_locks_when_idle_exceeds_timeout() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_unlocked(fixture_unlocked()).await;
+            // idle (injected 10s) >= timeout (0) → locks; slot drops to Empty.
+            let dropped = state
+                .take_unlocked_if_idle(core::time::Duration::ZERO, || {
+                    core::time::Duration::from_secs(10)
+                })
+                .await;
+            assert!(matches!(dropped, Some(Slot::Unlocked(_))));
+            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+        });
+    }
+
+    #[test]
+    fn take_unlocked_if_idle_does_not_lock_when_not_yet_idle() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_unlocked(fixture_unlocked()).await;
+            // idle (injected 0) < timeout (1h) → no lock; slot stays Unlocked.
+            let dropped = state
+                .take_unlocked_if_idle(core::time::Duration::from_secs(3600), || {
+                    core::time::Duration::ZERO
+                })
+                .await;
+            assert!(dropped.is_none());
+            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+        });
+    }
+
+    #[test]
+    fn take_unlocked_if_idle_is_noop_when_not_unlocked() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default(); // Empty
+            let dropped = state
+                .take_unlocked_if_idle(core::time::Duration::ZERO, || {
+                    core::time::Duration::from_secs(99)
+                })
+                .await;
+            assert!(dropped.is_none());
+            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+        });
+    }
+
+    #[test]
+    fn take_unlocked_if_idle_aborts_when_activity_arrives_in_the_gap() {
+        // The under-lock re-read returns a tiny idle (< timeout) — simulating
+        // a heartbeat landing in the check→lock gap → abort, slot stays Unlocked.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_unlocked(fixture_unlocked()).await;
+            let dropped = state
+                .take_unlocked_if_idle(core::time::Duration::from_secs(300), || {
+                    core::time::Duration::from_millis(50)
+                })
+                .await;
+            assert!(dropped.is_none());
+            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+        });
+    }
+
+    #[test]
+    fn auto_lock_timeout_secs_round_trips() {
+        let state = VaultRuntimeState::default();
+        state.set_auto_lock_timeout_secs(900);
+        assert_eq!(state.auto_lock_timeout_secs(), 900);
+    }
+
+    // ---- Recovering absolute-TTL bail (MYND-121 task 8) ----------------
+
+    #[test]
+    fn take_recovering_if_expired_bails_when_ttl_elapsed() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_recovering(fixture_recovering()).await;
+            // injected age (9999s) >= ttl (600s) → bail; slot drops to Empty.
+            let bailed = state
+                .take_recovering_if_expired(core::time::Duration::from_secs(600), |_| {
+                    core::time::Duration::from_secs(9999)
+                })
+                .await;
+            assert!(matches!(bailed, Some(Slot::Recovering { .. })));
+            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+        });
+    }
+
+    #[test]
+    fn take_recovering_if_expired_does_not_bail_within_ttl() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_recovering(fixture_recovering()).await;
+            // injected age (0) < ttl (600s) → no bail; slot stays Recovering.
+            let bailed = state
+                .take_recovering_if_expired(core::time::Duration::from_secs(600), |_| {
+                    core::time::Duration::ZERO
+                })
+                .await;
+            assert!(bailed.is_none());
+            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+        });
+    }
+
+    #[test]
+    fn take_recovering_if_expired_is_noop_when_unlocked() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state.set_unlocked(fixture_unlocked()).await;
+            // Even with an "expired" age, an Unlocked slot is untouched (this
+            // path only bails Recovering; Unlocked is the idle-timer's job).
+            let bailed = state
+                .take_recovering_if_expired(core::time::Duration::ZERO, |_| {
+                    core::time::Duration::from_secs(9999)
+                })
+                .await;
+            assert!(bailed.is_none());
+            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+        });
+    }
+
+    #[test]
+    fn take_recovering_if_expired_is_noop_when_empty() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default(); // Empty
+            let bailed = state
+                .take_recovering_if_expired(core::time::Duration::ZERO, |_| {
+                    core::time::Duration::from_secs(9999)
+                })
+                .await;
+            assert!(bailed.is_none());
+            assert_eq!(state.slot_kind().await, SlotKind::Empty);
         });
     }
 

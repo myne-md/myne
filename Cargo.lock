@@ -2397,6 +2397,7 @@ dependencies = [
  "tracing-test",
  "uuid",
  "windows-sys 0.60.2",
+ "x11rb",
  "zeroize",
 ]
 

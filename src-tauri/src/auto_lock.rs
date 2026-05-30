@@ -1,0 +1,503 @@
+//! Auto-lock-on-idle protective envelope (MYND-121).
+//!
+//! This module owns the **code-enforced** part of the auto-lock policy —
+//! deliberately NOT stored in the replayable `vault.prefs` blob. The user's
+//! chosen timeout (`PrefsView::auto_lock_seconds`) is a *preference*; the
+//! always-on flag and the `[MIN, CEILING]` bounds are *code constants*. A
+//! disk-level attacker (A4) who replays, deletes, or tampers `vault.prefs`
+//! can therefore only make auto-lock **stricter** — never disable it or push
+//! it past the ceiling. See `docs/threat-model.md` §7 (two-class prefs
+//! taxonomy) and `docs/decisions.md` 2026-05-30 "Auto-lock on idle".
+//!
+//! The single entry point, [`effective_auto_lock_secs`], returns a plain
+//! `u32` (never an `Option`): there is **no disabled state**. Every possible
+//! prefs input — absent, sentinel-shaped `0`, replayed-huge, or in-range —
+//! maps to a finite, in-range timeout. That total-ness is the structural
+//! realization of the always-on A6 guarantee (stories 16, 18).
+
+use crate::plugins::vault_unlock::state::{Slot, SlotKind, VaultRuntimeState};
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Manager, Runtime};
+
+/// Default auto-lock timeout applied when the user has stored no preference
+/// (or when the `vault.prefs` blob was absent / tampered / replayed and
+/// collapsed to `PrefsView::default()` per `protocol.md` §9.5.5, surfacing
+/// here as `None`).
+///
+/// **PLACEHOLDER — 5 minutes.** The final value is a UX decision owned by
+/// MYND-122 / Penpot (see the feature PRD Open Questions). Chosen as a sane
+/// middle ground: short enough to bound A6 exposure, long enough not to
+/// interrupt active work. Must remain within `[MIN, CEILING]`.
+pub const DEFAULT_AUTO_LOCK_SECS: u32 = 300;
+
+/// Hard upper bound on the effective timeout, enforced in code.
+///
+/// This is the **load-bearing edge** of the protective envelope: because it
+/// lives here and not in the replayable `vault.prefs` blob, a replayed /
+/// deleted / tampered prefs value can only make auto-lock stricter (≤ this
+/// bound), never push it past — so an A4 disk attacker cannot widen the A6
+/// exposure window (`threat-model.md` §7; `decisions.md` 2026-05-30).
+///
+/// **PLACEHOLDER — 60 minutes.** Final value owned by MYND-122.
+pub const AUTO_LOCK_CEILING_SECS: u32 = 3600;
+
+/// Lower bound on the effective timeout.
+///
+/// Unlike the ceiling, this is a **UX-comfort floor, not a security edge** —
+/// an attacker who *shortens* the timeout only causes more-frequent locking
+/// (annoyance), never a privacy break (grill Q6). It exists so an absurdly
+/// small replayed value cannot lock the vault mid-keystroke.
+///
+/// **PLACEHOLDER — 30 seconds.** Final value owned by MYND-122.
+pub const MIN_AUTO_LOCK_SECS: u32 = 30;
+
+// Compile-time invariants on the placeholder constants: a future edit that
+// inverts the bounds or moves DEFAULT outside [MIN, CEILING] fails the BUILD
+// (not just a test) and keeps the `clamp` min<=max contract sound.
+const _: () = assert!(MIN_AUTO_LOCK_SECS > 0);
+const _: () = assert!(MIN_AUTO_LOCK_SECS <= AUTO_LOCK_CEILING_SECS);
+const _: () = assert!(DEFAULT_AUTO_LOCK_SECS >= MIN_AUTO_LOCK_SECS);
+const _: () = assert!(DEFAULT_AUTO_LOCK_SECS <= AUTO_LOCK_CEILING_SECS);
+
+/// Resolve the **effective** auto-lock timeout from the user's stored
+/// preference, applying the code-enforced protective envelope.
+///
+/// `prefs_value` is `PrefsView::auto_lock_seconds` — `None` when the user
+/// never chose a timeout OR when the prefs blob was absent / tampered /
+/// replayed and collapsed to defaults (`protocol.md` §9.5.5).
+///
+/// The return type is `u32` (never `Option`): there is **no disabled
+/// state**. The mapping is:
+///
+/// - `None` → [`DEFAULT_AUTO_LOCK_SECS`] (already in range).
+/// - `Some(0)` → [`MIN_AUTO_LOCK_SECS`] — a sentinel-shaped "off" from a replayed blob cannot disable the lock.
+/// - `Some(huge)` → [`AUTO_LOCK_CEILING_SECS`].
+/// - `Some(in-range)` → the value unchanged.
+///
+/// This is the replay-resistance core (stories 16, 18): every prefs input an
+/// A4 disk attacker can produce lands on a protective state.
+pub fn effective_auto_lock_secs(prefs_value: Option<u32>) -> u32 {
+    prefs_value
+        .unwrap_or(DEFAULT_AUTO_LOCK_SECS)
+        .clamp(MIN_AUTO_LOCK_SECS, AUTO_LOCK_CEILING_SECS)
+}
+
+// ---- machine-level idle reader (MYND-121, stories 2 + 3) --------------
+//
+// "Idle" for the A6 guarantee = MACHINE-level device idle (no input to the
+// whole machine), read per-platform. Window-level idle (the frontend
+// heartbeat → `VaultRuntimeState::idle_millis`) is the FAIL-SECURE fallback
+// when no OS source is available (Wayland / unsupported platform): it is
+// strictly more eager than machine-idle, so A6 is preserved and only
+// usability degrades. The raw OS FFI is best-effort, per-platform
+// MANUAL-VERIFY; the deterministic host-testable logic is
+// [`effective_idle_from`].
+
+/// Combine the optional machine-level idle with the always-available
+/// window-level idle into the effective idle the timer compares against
+/// the configured timeout.
+///
+/// Equivalent to the grill's `now − max(window_last_activity,
+/// machine_last_input?)`: any window activity is also machine input, so
+/// `machine_last_input >= window_last_activity` — when the machine source
+/// is present it is authoritative (`Some` → use it); when absent (Wayland /
+/// unsupported) fall back to window-level idle. Pure + deterministic — the
+/// host-testable core of this task.
+pub fn effective_idle_from(machine_idle: Option<Duration>, window_idle: Duration) -> Duration {
+    machine_idle.unwrap_or(window_idle)
+}
+
+/// Effective idle = machine-level idle when the OS exposes it, else the
+/// window-level fallback. See [`effective_idle_from`] + [`machine_idle`].
+pub fn effective_idle(window_idle: Duration) -> Duration {
+    effective_idle_from(machine_idle(), window_idle)
+}
+
+/// Machine-level idle duration from the OS, or `None` when no portable
+/// source exists for this platform / session (→ window-level fallback).
+///
+/// **Best-effort, per-platform MANUAL-VERIFY** — not unit-tested (the value
+/// depends on live device input):
+/// - macOS: `CGEventSourceSecondsSinceLastEventType(HIDSystemState, Any)`.
+/// - Windows: `GetLastInputInfo` + `GetTickCount` (ms-since-boot, wrap-safe).
+/// - Linux: X11 ScreenSaver `QueryInfo.ms_since_user_input`; `None` on a
+///   Wayland-only session / no `DISPLAY` → fail-secure window-level fallback.
+/// - Other: `None`.
+#[cfg(target_os = "macos")]
+fn machine_idle() -> Option<Duration> {
+    // Stable CoreGraphics C API. No crate dependency — the CoreGraphics
+    // framework is already linked (tao → core-graphics); the `#[link]` here
+    // is belt-and-suspenders and dedups at link time. `#[link_name]` keeps
+    // a snake_case Rust name (no `non_snake_case` lint on the FFI symbol).
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        #[link_name = "CGEventSourceSecondsSinceLastEventType"]
+        fn cg_seconds_since_last_event(state_id: u32, event_type: u32) -> f64;
+    }
+    // kCGEventSourceStateHIDSystemState = 1; kCGAnyInputEventType = 0xFFFFFFFF.
+    const HID_SYSTEM_STATE: u32 = 1;
+    const ANY_INPUT_EVENT: u32 = 0xFFFF_FFFF;
+    // SAFETY: pure C call with POD scalar args (no pointers / allocation).
+    // The function is total and returns a CFTimeInterval (seconds) >= 0.
+    let secs = unsafe { cg_seconds_since_last_event(HID_SYSTEM_STATE, ANY_INPUT_EVENT) };
+    if secs.is_finite() && secs >= 0.0 {
+        Some(Duration::from_secs_f64(secs))
+    } else {
+        None
+    }
+}
+
+#[cfg(windows)]
+fn machine_idle() -> Option<Duration> {
+    use windows_sys::Win32::System::SystemInformation::GetTickCount;
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+
+    let mut info = LASTINPUTINFO {
+        cbSize: core::mem::size_of::<LASTINPUTINFO>() as u32,
+        dwTime: 0,
+    };
+    // SAFETY: `info` is fully initialized with `cbSize` set per the Win32
+    // contract; GetLastInputInfo writes `dwTime` and returns BOOL.
+    if unsafe { GetLastInputInfo(&mut info) } == 0 {
+        return None;
+    }
+    // GetTickCount and dwTime are both ms-since-boot u32 (wraps ~49.7 days);
+    // wrapping_sub yields the correct elapsed delta across a single wrap.
+    // SAFETY: GetTickCount is a pure no-arg syscall wrapper.
+    let now = unsafe { GetTickCount() };
+    Some(Duration::from_millis(u64::from(
+        now.wrapping_sub(info.dwTime),
+    )))
+}
+
+#[cfg(target_os = "linux")]
+fn machine_idle() -> Option<Duration> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::screensaver::ConnectionExt as _;
+
+    // `connect` fails on a Wayland-only session / missing DISPLAY → None →
+    // window-level fail-secure fallback. Every step is `?`-on-error, no panic.
+    let (conn, screen_num) = x11rb::connect(None).ok()?;
+    let root = conn.setup().roots.get(screen_num)?.root;
+    let info = conn.screensaver_query_info(root).ok()?.reply().ok()?;
+    Some(Duration::from_millis(u64::from(info.ms_since_user_input)))
+}
+
+#[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
+fn machine_idle() -> Option<Duration> {
+    None
+}
+
+// ---- authoritative idle-lock timer (MYND-121, stories 1/5/6/7) --------
+
+/// Poll interval for the idle-lock timer. A few seconds is ample — the
+/// per-tick check is two lock-free reads + a cheap slot peek; the lock
+/// fires within one interval of the deadline. (A `sleep_until(deadline)`
+/// refinement is possible later; the periodic poll is simpler and its
+/// wakeup cost is negligible.)
+const IDLE_POLL: Duration = Duration::from_secs(5);
+
+/// Bounded grace between "deadline reached" and the irreversible zeroize,
+/// giving the frontend a chance to flush an unsaved edit (task 11 listens
+/// for `vault-lock-imminent`). Hard-capped — the lock proceeds when it
+/// elapses regardless; and if activity resumes during the grace, the
+/// under-lock re-read aborts the lock. Near-nil cost in practice (idle
+/// means autosave's debounce has already persisted).
+const LOCK_FLUSH_GRACE: Duration = Duration::from_millis(1500);
+
+/// Absolute TTL for the `Slot::Recovering` window (MYND-121 story 8) —
+/// measured from `recovered_at`, NOT activity-reset. A generous code
+/// constant aligned with the 10-minute vault-creation session TTL
+/// (`decisions.md` 2026-04-28; same rationale — bound the RAM-resident
+/// recovered `root_key` window). NOT user-tunable / NOT in `vault.prefs`
+/// → zero replay surface (the task-3 protective envelope is unneeded here).
+const RECOVERING_TTL: Duration = Duration::from_secs(600);
+
+/// Spawn the authoritative idle-lock timer for the process lifetime.
+/// FAIL-CLOSED: silence of the activity heartbeat lets the effective idle
+/// grow until it crosses the cached timeout, then the vault locks.
+///
+/// Wired from the app `setup` hook (`lib.rs`). The loop + AppHandle teardown
+/// are integration-level — exercised by the running app, not unit tests; the
+/// lock decision + TOCTOU drop are unit-tested in `vault_unlock::state`, the
+/// idle combine in this module's tests.
+pub fn spawn_idle_lock_timer<R: Runtime>(app: AppHandle<R>) {
+    tauri::async_runtime::spawn(async move {
+        let mut ticker = tokio::time::interval(IDLE_POLL);
+        loop {
+            ticker.tick().await;
+            idle_lock_tick(&app).await;
+        }
+    });
+}
+
+/// One idle-lock evaluation tick. Locks the vault iff a vault is `Unlocked`
+/// and the effective idle has crossed the cached timeout, routing the drop
+/// through the canonical slot-take (`take_unlocked_if_idle`) + the same
+/// post-lock teardown as `vault_lock`.
+async fn idle_lock_tick<R: Runtime>(app: &AppHandle<R>) {
+    let Some(state) = app.try_state::<VaultRuntimeState>() else {
+        return;
+    };
+    // Peek the slot kind (cheap read-lock) and dispatch. Each path re-checks
+    // under the write-lock before the irreversible drop, so this peek is only
+    // a pre-dispatch — a slot change in the gap is handled by the under-lock
+    // re-read in the take_* method.
+    match state.slot_kind().await {
+        SlotKind::Unlocked => lock_unlocked_if_idle(app, state.inner()).await,
+        SlotKind::Recovering => bail_recovering_if_expired(app, state.inner()).await,
+        SlotKind::Empty => {}
+    }
+}
+
+/// Idle-lock path for `Slot::Unlocked`: lock when the effective idle crosses
+/// the cached timeout. Full leg-1 + leg-2 teardown (open notes may be on
+/// screen). Fail-closed + grace-flush + TOCTOU re-read.
+async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
+    let timeout = Duration::from_secs(u64::from(state.auto_lock_timeout_secs()));
+
+    // Lock-free pre-check: has the effective idle crossed the timeout?
+    if effective_idle(Duration::from_millis(state.idle_millis())) < timeout {
+        return;
+    }
+
+    // Grace window: let the frontend flush an unsaved edit (task 11). The
+    // lock proceeds when it elapses; activity during the grace aborts it at
+    // the under-lock re-read below.
+    let _ = app.emit("vault-lock-imminent", ());
+    tokio::time::sleep(LOCK_FLUSH_GRACE).await;
+
+    // TOCTOU-safe drop: re-read the effective idle UNDER the slot write-lock
+    // and zeroize only if still Unlocked + still idle. Same slot-take as
+    // vault_lock — not a parallel zeroize path.
+    let locked = state
+        .take_unlocked_if_idle(timeout, || {
+            effective_idle(Duration::from_millis(state.idle_millis()))
+        })
+        .await;
+
+    if let Some(prior) = locked {
+        debug_assert!(matches!(prior, Slot::Unlocked(_)));
+        tracing::info!(
+            event = "vault_locked",
+            from_slot_kind = "unlocked",
+            reason = "idle_timeout",
+            "auto-lock on idle dropped the Unlocked slot; Zeroizing fields wipe on Drop"
+        );
+        // Canonical teardown order (decisions 2026-05-30, leg-split): hide
+        // (2a, BEFORE zeroize — renderer-independent cover) → zeroize (leg 1)
+        // → reapply screen-capture → reload (2b, AFTER zeroize). The window
+        // stays hidden until the reloaded frontend re-shows it on the unlock
+        // screen (task 11 fresh-load handshake, gated so a hung renderer can
+        // never re-expose plaintext).
+        run_lock_teardown(&AppTeardown { app }, || drop(prior));
+    }
+}
+
+/// Bail path for `Slot::Recovering` (MYND-121 stories 8/9): drop the recovery
+/// session when the ABSOLUTE TTL from `recovered_at` elapses. A transient-
+/// state deadline (NOT activity-reset, NOT tunable, NOT in prefs →
+/// replay-immune), routed as an automated `recovery-flow.md` §4.3 bail via
+/// the same slot-take as `vault_lock`. LEG-1-ONLY — the recovery form has no
+/// open notes / no V8 plaintext, so leg-2 hide+reload is moot (drop the slot,
+/// then re-apply screen-capture). A timeout firing mid-A8f-commit reuses the
+/// existing post-Argon2id slot-peek + `vault.meta` CAS in
+/// `vault_complete_recovery` (bail without disk write); the frontend resumes
+/// via its existing needs-active-session path on the next commit attempt.
+async fn bail_recovering_if_expired<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
+    let bailed = state
+        .take_recovering_if_expired(RECOVERING_TTL, |recovered_at| recovered_at.elapsed())
+        .await;
+
+    if let Some(prior) = bailed {
+        debug_assert!(matches!(prior, Slot::Recovering { .. }));
+        tracing::info!(
+            event = "vault_locked",
+            from_slot_kind = "recovering",
+            reason = "recovering_ttl",
+            "auto-lock TTL expired the recovery session; root_key + items_key wipe on Drop"
+        );
+        drop(prior); // leg 1 — zeroize the recovered keys (leg-1-only: no notes)
+        crate::screen_capture::apply(app, true, "lock_reset");
+    }
+}
+
+/// Side-effects of an idle-lock teardown, abstracted so the leg ORDER is
+/// unit-testable (the OS effects themselves — OS window-hide / WebView
+/// reload — are runtime / manual-verify).
+trait LockTeardown {
+    /// Leg 2a — synchronous, renderer-INDEPENDENT visual cover.
+    fn hide_window(&self);
+    /// Lock-on-default-ON: re-apply native screen-capture protection.
+    fn reapply_screen_capture(&self);
+    /// Leg 2b — best-effort WebView reload (V8 + DOM teardown).
+    fn reload_webview(&self);
+}
+
+/// Run the canonical idle-lock teardown order: hide (2a, BEFORE zeroize — so
+/// the plaintext pixels vanish even if the renderer is hung) → `zeroize`
+/// (leg 1, gated on NOTHING) → reapply screen-capture → reload (2b, AFTER
+/// zeroize, best-effort). See `decisions.md` 2026-05-30 (leg-split + order).
+fn run_lock_teardown<T: LockTeardown>(t: &T, zeroize: impl FnOnce()) {
+    t.hide_window(); // leg 2a — renderer-independent cover, before the wipe
+    zeroize(); // leg 1 — unconditional, gated on nothing
+    t.reapply_screen_capture();
+    t.reload_webview(); // leg 2b — best-effort, after the wipe
+}
+
+/// Production [`LockTeardown`] over the main window's `AppHandle`.
+struct AppTeardown<'a, R: Runtime> {
+    app: &'a AppHandle<R>,
+}
+
+impl<R: Runtime> LockTeardown for AppTeardown<'_, R> {
+    fn hide_window(&self) {
+        // OS-level window hide — does NOT require a live renderer, so the
+        // plaintext pixels vanish at the deadline even on a hung WebView.
+        if let Some(w) = self.app.get_webview_window("main") {
+            let _ = w.hide();
+        }
+    }
+
+    fn reapply_screen_capture(&self) {
+        crate::screen_capture::apply(self.app, true, "lock_reset");
+    }
+
+    fn reload_webview(&self) {
+        // Best-effort V8 + DOM teardown. `eval` no-ops on a hung renderer →
+        // residual freed-page memory is the accepted A7/A10 boundary, NOT
+        // part of the A6 claim (decisions 2026-05-30, leg 2b). The reloaded
+        // frontend boots to the unlock screen (slot is Empty) and re-shows
+        // the window via the task-11 fresh-load handshake.
+        //
+        // OPEN A6-RISK (PRD): on macOS the hidden window's last frame may
+        // persist in the Cmd+Tab / Mission Control snapshot until the reload
+        // repaints — needs per-platform verification (content-protection may
+        // already cover it; else blank the native layer pre-hide).
+        if let Some(w) = self.app.get_webview_window("main") {
+            let _ = w.eval("window.location.reload()");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn none_resolves_to_default() {
+        assert_eq!(effective_auto_lock_secs(None), DEFAULT_AUTO_LOCK_SECS);
+    }
+
+    #[test]
+    fn in_range_value_passes_through_unchanged() {
+        assert_eq!(effective_auto_lock_secs(Some(600)), 600);
+    }
+
+    #[test]
+    fn zero_clamps_up_to_floor_never_disables() {
+        // A sentinel-shaped "off" from a replayed / old blob CANNOT disable
+        // auto-lock — it clamps to the floor (story 16).
+        assert_eq!(effective_auto_lock_secs(Some(0)), MIN_AUTO_LOCK_SECS);
+    }
+
+    #[test]
+    fn huge_value_clamps_down_to_ceiling() {
+        // A replayed long / "off-via-overflow" timeout cannot exceed the
+        // ceiling — the A6 exposure window stays bounded (story 16).
+        assert_eq!(
+            effective_auto_lock_secs(Some(u32::MAX)),
+            AUTO_LOCK_CEILING_SECS
+        );
+        assert_eq!(
+            effective_auto_lock_secs(Some(999_999)),
+            AUTO_LOCK_CEILING_SECS
+        );
+    }
+
+    #[test]
+    fn every_prefs_input_lands_on_a_protective_state() {
+        // The replay-resistance table (stories 16, 18): NO input — absent,
+        // sentinel-off, replayed-long, above-ceiling, or any in-between —
+        // yields a non-protective (disabled / above-ceiling / below-floor)
+        // result. This is the highest-value test for the feature.
+        for input in [
+            None,
+            Some(0),
+            Some(1),
+            Some(MIN_AUTO_LOCK_SECS),
+            Some(DEFAULT_AUTO_LOCK_SECS),
+            Some(AUTO_LOCK_CEILING_SECS),
+            Some(AUTO_LOCK_CEILING_SECS + 1),
+            Some(u32::MAX),
+        ] {
+            let eff = effective_auto_lock_secs(input);
+            assert!(eff >= MIN_AUTO_LOCK_SECS, "{input:?} -> {eff} below floor");
+            assert!(
+                eff <= AUTO_LOCK_CEILING_SECS,
+                "{input:?} -> {eff} above ceiling"
+            );
+            // Always-on: never zero / disabled.
+            assert!(eff > 0, "{input:?} -> {eff} would disable auto-lock");
+        }
+    }
+
+    // ---- machine/window idle combination (MYND-121) -------------------
+
+    #[test]
+    fn effective_idle_uses_machine_when_present() {
+        // Machine source authoritative when Some — the window value is
+        // ignored (machine input ⊇ window input).
+        let eff = effective_idle_from(Some(Duration::from_secs(42)), Duration::from_secs(999));
+        assert_eq!(eff, Duration::from_secs(42));
+    }
+
+    #[test]
+    fn effective_idle_falls_back_to_window_when_machine_absent() {
+        // Wayland / unsupported platform → None → window-level (fail-secure).
+        let eff = effective_idle_from(None, Duration::from_secs(120));
+        assert_eq!(eff, Duration::from_secs(120));
+    }
+
+    #[test]
+    #[ignore] // manual: depends on live device input; run on a real GUI session
+    fn machine_idle_smoke() {
+        // On a real macOS GUI session this returns Some(small) right after
+        // input. Best-effort FFI smoke — not asserted in CI (env-dependent).
+        let _ = machine_idle();
+    }
+
+    // ---- teardown leg ordering (MYND-121 task 7) ----------------------
+
+    #[test]
+    fn teardown_runs_hide_then_zeroize_then_reapply_then_reload() {
+        use core::cell::RefCell;
+
+        struct Recording {
+            log: RefCell<Vec<&'static str>>,
+        }
+        impl LockTeardown for Recording {
+            fn hide_window(&self) {
+                self.log.borrow_mut().push("hide");
+            }
+            fn reapply_screen_capture(&self) {
+                self.log.borrow_mut().push("reapply");
+            }
+            fn reload_webview(&self) {
+                self.log.borrow_mut().push("reload");
+            }
+        }
+
+        let r = Recording {
+            log: RefCell::new(Vec::new()),
+        };
+        // The `zeroize` closure stands in for `drop(prior)`; recording it
+        // makes the leg-1 position observable in the order.
+        run_lock_teardown(&r, || r.log.borrow_mut().push("zeroize"));
+        assert_eq!(
+            *r.log.borrow(),
+            ["hide", "zeroize", "reapply", "reload"],
+            "leg 2a (hide) must precede leg 1 (zeroize); reload (2b) must follow zeroize"
+        );
+    }
+}

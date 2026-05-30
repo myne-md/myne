@@ -136,17 +136,33 @@ pub struct PrefsView {
     /// byte-identical to a v0.1.0 `vault.prefs`).
     #[serde(default)]
     pub deliberate_folders: Vec<alloc::string::String>,
+
+    /// User-chosen auto-lock-on-idle timeout in **integer seconds**
+    /// (MYND-121). `None` = unset → the caller's protective-envelope
+    /// default applies (spec § 9.5.5 fall-back-to-defaults). The
+    /// always-on flag and the `AUTO_LOCK_CEILING` clamp live in the
+    /// Tauri layer, NOT here — this codec only persists the raw choice.
+    /// Omitted entirely from the canonical JSON when `None`, so a vault
+    /// that never set it is byte-identical to a pre-MYND-121
+    /// `vault.prefs`. Integer-only — floats are FORBIDDEN (spec § 9.5.2);
+    /// the `u32` type enforces this structurally on the encode side, and
+    /// the decoder rejects a fractional value.
+    #[serde(default)]
+    pub auto_lock_seconds: Option<u32>,
 }
 
 impl Default for PrefsView {
     /// Spec § 9.5.5 fall-back-to-defaults: `screen_capture_protection`
     /// defaults to `true` so that a missing or corrupt `vault.prefs`
     /// degrades to the safer state (protection on) rather than the
-    /// permissive one. `deliberate_folders` defaults empty.
+    /// permissive one. `deliberate_folders` defaults empty;
+    /// `auto_lock_seconds` defaults `None` (unset — the Tauri-layer
+    /// protective-envelope default applies).
     fn default() -> Self {
         Self {
             screen_capture_protection: true,
             deliberate_folders: Vec::new(),
+            auto_lock_seconds: None,
         }
     }
 }
@@ -276,8 +292,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     // precedes "screen_capture_protection" (s). The deliberate_folders array is
     // OMITTED entirely when empty, so a vault with no deliberate folders is
     // byte-identical to a v0.1.0 vault.prefs (preserves existing KAT vectors).
-    let mut out = Vec::with_capacity(48);
+    let mut out = Vec::with_capacity(64);
     out.push(b'{');
+
+    // auto_lock_seconds (canonically FIRST — 'a' < 'd' < 's'); omitted
+    // entirely when None so an unset vault is byte-identical to a
+    // pre-MYND-121 vault.prefs (preserves existing KAT vectors).
+    if let Some(secs) = prefs.auto_lock_seconds {
+        out.extend_from_slice(b"\"auto_lock_seconds\":");
+        push_json_uint(&mut out, secs);
+        out.push(b',');
+    }
 
     let folders = canonical_folder_list(&prefs.deliberate_folders);
     if !folders.is_empty() {
@@ -353,6 +378,25 @@ fn hex_nibble(n: u8) -> u8 {
     }
 }
 
+/// Append `n` as a canonical decimal integer (no leading zeros, no
+/// trailing `.0` — spec § 9.5.2). `n == 0` emits `"0"`.
+fn push_json_uint(out: &mut Vec<u8>, n: u32) {
+    // u32::MAX is 10 digits; a fixed buffer avoids any alloc churn and
+    // keeps the encoder hand-rolled/audit-clear like the rest of § 9.5.
+    let mut buf = [0u8; 10];
+    let mut i = buf.len();
+    let mut v = n;
+    loop {
+        i -= 1;
+        buf[i] = b'0' + (v % 10) as u8;
+        v /= 10;
+        if v == 0 {
+            break;
+        }
+    }
+    out.extend_from_slice(&buf[i..]);
+}
+
 /// Parse the v0.1 canonical-JSON `vault.prefs` plaintext.
 ///
 /// Tolerant against future v0.1.x minor revisions that append fields:
@@ -382,12 +426,34 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         .and_then(|p| p.strip_suffix(b"}"))
         .ok_or(PrefsBlobError::PlaintextParseFailed)?;
 
+    // ---- auto_lock_seconds (optional, canonically FIRST) ----
+    // Canonical key order is auto_lock_seconds < deliberate_folders <
+    // screen_capture_protection, so when present this field is a literal
+    // PREFIX of the stripped object — matched by `strip_prefix` rather
+    // than `find_subslice`, so a later folder name containing a
+    // `"auto_lock_seconds":`-looking substring cannot fool it.
+    let auto_marker = b"\"auto_lock_seconds\":";
+    let (auto_lock_seconds, rest) = match stripped.strip_prefix(auto_marker) {
+        Some(after) => {
+            let (val, consumed) = parse_json_uint(after)?;
+            // The integer MUST be followed by `,` — screen_capture_protection
+            // is mandatory and canonically last, so a further field always
+            // follows. A trailing `.` (float, FORBIDDEN per spec § 9.5.2) or
+            // any other non-`,` byte therefore rejects here.
+            let rest = after[consumed..]
+                .strip_prefix(b",")
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            (Some(val), rest)
+        }
+        None => (None, stripped),
+    };
+
     // ---- deliberate_folders (optional) ----
     let folders_marker = b"\"deliberate_folders\":";
-    let (deliberate_folders, scp_search_from) = match find_subslice(stripped, folders_marker) {
+    let (deliberate_folders, scp_search_from) = match find_subslice(rest, folders_marker) {
         Some(idx) => {
             let array_start = idx + folders_marker.len();
-            let (list, consumed) = parse_json_string_array(&stripped[array_start..])
+            let (list, consumed) = parse_json_string_array(&rest[array_start..])
                 .ok_or(PrefsBlobError::PlaintextParseFailed)?;
             // Resume the scp search AFTER the array span so array string content
             // (which may contain `"screen_capture_protection":`-looking bytes)
@@ -398,7 +464,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     };
 
     // ---- screen_capture_protection (required) ----
-    let region = &stripped[scp_search_from..];
+    let region = &rest[scp_search_from..];
     let key_marker = b"\"screen_capture_protection\":";
     let idx = find_subslice(region, key_marker).ok_or(PrefsBlobError::PlaintextParseFailed)?;
     let after_key = &region[idx + key_marker.len()..];
@@ -417,7 +483,30 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     Ok(PrefsView {
         screen_capture_protection,
         deliberate_folders,
+        auto_lock_seconds,
     })
+}
+
+/// Parse a leading run of ASCII decimal digits into a `u32`, returning
+/// `(value, digits_consumed)`. Rejects an empty run (no digit present)
+/// and overflow. It consumes ONLY digit bytes, so a fractional literal
+/// like `300.5` parses `300` and leaves the `.` for the caller's
+/// terminator check to reject — enforcing the spec § 9.5.2 float ban.
+fn parse_json_uint(bytes: &[u8]) -> Result<(u32, usize), PrefsBlobError> {
+    let mut i = 0;
+    let mut val: u32 = 0;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        let d = (bytes[i] - b'0') as u32;
+        val = val
+            .checked_mul(10)
+            .and_then(|v| v.checked_add(d))
+            .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+        i += 1;
+    }
+    if i == 0 {
+        return Err(PrefsBlobError::PlaintextParseFailed);
+    }
+    Ok((val, i))
 }
 
 /// Parse a JSON array of strings starting at `bytes[0] == '['`. Returns the
@@ -673,6 +762,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             deliberate_folders: Vec::new(),
+            auto_lock_seconds: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -683,6 +773,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: false,
             deliberate_folders: Vec::new(),
+            auto_lock_seconds: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -720,6 +811,7 @@ mod tests {
             PrefsView {
                 screen_capture_protection: true,
                 deliberate_folders: Vec::new(),
+                auto_lock_seconds: None,
             }
         );
     }
@@ -732,6 +824,7 @@ mod tests {
             PrefsView {
                 screen_capture_protection: false,
                 deliberate_folders: Vec::new(),
+                auto_lock_seconds: None,
             }
         );
     }
@@ -806,6 +899,7 @@ mod tests {
                 alloc::string::String::from("Projects/"),
                 alloc::string::String::from("Archive/"),
             ],
+            auto_lock_seconds: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -823,6 +917,7 @@ mod tests {
                 alloc::string::String::from("a/"),
                 alloc::string::String::from("b/"),
             ],
+            auto_lock_seconds: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -838,6 +933,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
+            auto_lock_seconds: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -852,6 +948,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
+            auto_lock_seconds: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -929,6 +1026,7 @@ mod tests {
                 alloc::string::String::from("Projects/Myne/"),
                 alloc::string::String::from("Archive/2025/"),
             ],
+            auto_lock_seconds: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -943,6 +1041,168 @@ mod tests {
             ],
         );
         assert!(!decoded.screen_capture_protection);
+    }
+
+    // ---- auto_lock_seconds canonical field (MYND-121) -----------------
+
+    #[test]
+    fn encode_omits_auto_lock_seconds_when_none() {
+        // None → byte-identical to a pre-MYND-121 vault.prefs (preserves
+        // existing KAT vectors + existing vaults).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
+        // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: Vec::new(),
+            auto_lock_seconds: Some(300),
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"auto_lock_seconds":300,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn encode_emits_all_three_fields_in_canonical_order() {
+        // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
+        let prefs = PrefsView {
+            screen_capture_protection: false,
+            deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
+            auto_lock_seconds: Some(900),
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"auto_lock_seconds":900,"deliberate_folders":["Archive/"],"screen_capture_protection":false}"#,
+        );
+    }
+
+    #[test]
+    fn encode_auto_lock_seconds_zero_has_no_leading_zeros() {
+        // Sentinel-shaped 0 encodes as the canonical "0" (no leading zeros,
+        // no trailing ".0"). The clamp/always-on policy lives in the Tauri
+        // layer; the codec faithfully persists whatever integer it is given.
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: Vec::new(),
+            auto_lock_seconds: Some(0),
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"auto_lock_seconds":0,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn decode_round_trips_auto_lock_seconds() {
+        let parsed = canonical_json_decode(
+            br#"{"auto_lock_seconds":900,"screen_capture_protection":false}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.auto_lock_seconds, Some(900));
+        assert!(!parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_absent_auto_lock_seconds_is_none() {
+        // Acceptance: absent key decodes to "no value" (not an error).
+        let parsed = canonical_json_decode(br#"{"screen_capture_protection":true}"#).unwrap();
+        assert_eq!(parsed.auto_lock_seconds, None);
+    }
+
+    #[test]
+    fn decode_auto_lock_seconds_with_folders_and_scp() {
+        let parsed = canonical_json_decode(
+            br#"{"auto_lock_seconds":1800,"deliberate_folders":["Archive/"],"screen_capture_protection":true}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.auto_lock_seconds, Some(1800));
+        assert_eq!(
+            parsed.deliberate_folders,
+            alloc::vec![alloc::string::String::from("Archive/")]
+        );
+        assert!(parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_rejects_float_auto_lock_seconds() {
+        // Spec § 9.5.2: floats FORBIDDEN. `300.5` parses `300` then hits `.`
+        // instead of the required `,` → reject.
+        let err = canonical_json_decode(
+            br#"{"auto_lock_seconds":300.5,"screen_capture_protection":true}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn decode_rejects_non_numeric_auto_lock_seconds() {
+        let err =
+            canonical_json_decode(br#"{"auto_lock_seconds":abc,"screen_capture_protection":true}"#)
+                .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn decode_rejects_empty_auto_lock_seconds() {
+        let err =
+            canonical_json_decode(br#"{"auto_lock_seconds":,"screen_capture_protection":true}"#)
+                .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn decode_rejects_overflow_auto_lock_seconds() {
+        // 99999999999 > u32::MAX → checked_mul/add overflow → reject.
+        let err = canonical_json_decode(
+            br#"{"auto_lock_seconds":99999999999,"screen_capture_protection":true}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn full_blob_round_trip_with_auto_lock_seconds() {
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
+            auto_lock_seconds: Some(1800),
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(decoded.auto_lock_seconds, Some(1800));
+        assert!(decoded.screen_capture_protection);
+        assert_eq!(
+            decoded.deliberate_folders,
+            alloc::vec![alloc::string::String::from("Projects/")]
+        );
+    }
+
+    #[test]
+    fn auto_lock_seconds_none_round_trips_through_full_blob() {
+        // Default (None) survives a full encode/decode unchanged.
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView::default();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(decoded.auto_lock_seconds, None);
+        assert_eq!(original, decoded);
     }
 
     // ---- outer envelope structural tests -------------------------------
@@ -1046,6 +1306,7 @@ mod tests {
         let original = PrefsView {
             screen_capture_protection: false,
             deliberate_folders: Vec::new(),
+            auto_lock_seconds: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -1064,6 +1325,7 @@ mod tests {
         let original = PrefsView {
             screen_capture_protection: false,
             deliberate_folders: Vec::new(),
+            auto_lock_seconds: None,
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -1275,6 +1537,7 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: true,
                 deliberate_folders: Vec::new(),
+                auto_lock_seconds: None,
             },
             &nonce_default,
         )
@@ -1286,6 +1549,7 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: false,
                 deliberate_folders: Vec::new(),
+                auto_lock_seconds: None,
             },
             &nonce_toggled,
         )

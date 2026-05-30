@@ -29,6 +29,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::vault_status,
             commands::vault_is_unlocked,
             commands::vault_slot_kind,
+            commands::report_user_activity,
         ])
         .setup(|app, _api| {
             app.manage(state::VaultRuntimeState::default());
