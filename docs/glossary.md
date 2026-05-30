@@ -128,6 +128,18 @@ A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleto
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **auto-lock on idle** &nbsp; 📦 *Product*
+
+A security control that locks the vault after a period of device inactivity, bounding the exposure window of an unattended unlocked Myne (`threat-model.md` A6). A backend-authoritative, fail-closed idle timer fires at a configurable timeout; the lock has two legs — (1) unconditional in-memory key zeroize ("no further notes decryptable"), and (2) best-effort teardown of the decrypted open note (a synchronous OS-level window hide plus a WebView reload). **"Idle" means machine-level** device idle (no input to the whole machine, not merely the Myne window), read per-platform (`GetLastInputInfo` / `CGEventSourceSecondsSinceLastEventType` / `XScreenSaverQueryInfo`); on Wayland, where no portable OS-idle API exists, it falls back to window-level idle as a fail-secure (more-eager) degradation. The timeout preference lives in the encrypted `vault.prefs` blob (`auto_lock_seconds`); the protection itself is always on (see **AUTO_LOCK_CEILING**). Moves A6 from ❌ Out-of-scope to 🔒 Mitigated — deliberately not a 🛡️ Strong guarantee, since freed-page RAM, swap, and hibernation are not scrubbed (A7/A10).
+
+Used in: `threat-model.md` §1 (A6); `decisions.md` 2026-05-30 "Auto-lock on idle"
+
+### **AUTO_LOCK_CEILING** &nbsp; 📦 *Product*
+
+The code-enforced upper bound on the auto-lock timeout — the load-bearing edge of auto-lock's *protective envelope*. The effective timeout is `clamp(vault.prefs value or default, FLOOR?, AUTO_LOCK_CEILING)` and the enabled flag is a code constant, not a preference. Because the ceiling and the always-on flag live in code rather than the replayable `vault.prefs` blob, a disk-level attacker (A4) who replays, deletes, or tampers the preferences file can only make auto-lock *stricter* — never disable it or push it past the ceiling. This is why auto-lock does **not** inherit the local-prefs-replay limitation (`threat-model.md` §7) that best-effort preferences such as the screen-capture toggle do.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-05-30 "Auto-lock on idle"
+
 ### **backup-key** &nbsp; 🗝️ *Key/identifier*
 
 A subkey derived from `root_key` via the `derive_key` pattern with context string `"myne.v0.1 backup-key"`. Used to encrypt user-initiated backup files exported from the client. Stored only transiently during the backup operation.

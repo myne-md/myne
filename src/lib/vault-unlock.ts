@@ -14,3 +14,14 @@ export async function isVaultUnlocked(): Promise<boolean> {
 export async function lockVault(): Promise<void> {
   await invoke<void>("plugin:vault-unlock|lock");
 }
+
+/**
+ * Report window-level user activity to the auto-lock-on-idle timer
+ * (MYND-121). Lock-free + infallible on the backend (a single relaxed
+ * atomic store, never touches the slot lock). Best-effort from the
+ * frontend — callers swallow transport errors; the backend idle timer
+ * is the authoritative fail-closed clock.
+ */
+export async function reportUserActivity(): Promise<void> {
+  await invoke<void>("plugin:vault-unlock|report_user_activity");
+}

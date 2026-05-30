@@ -42,6 +42,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useReducer, useRef, type CSSProperties, type FormEvent } from "react";
 import { appDataDir, join } from "@tauri-apps/api/path";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
@@ -318,6 +319,24 @@ export function Unlock({
     return () => {
       mountedRef.current = false;
     };
+  }, []);
+
+  // MYND-121 — re-show the window after an idle-lock hid it. Auto-lock on idle
+  // calls `window.hide()` (renderer-independent visual cover) before the
+  // zeroize + WebView reload; the reloaded app boots straight here (slot Empty
+  // → unlock). Re-reveal now that the safe unlock screen is mounted — gating
+  // the show on REACHING this screen means a hung renderer (which never
+  // reloads to here) never re-exposes plaintext. Idempotent on a normal boot
+  // (the window is already shown by `screen_capture::init`). No-op outside
+  // Tauri (browser dev shim).
+  useEffect(() => {
+    void (async () => {
+      try {
+        await getCurrentWindow().show();
+      } catch {
+        // Not inside Tauri, or no main window to reveal.
+      }
+    })();
   }, []);
 
   // MYND-108-bis delete-vault sub-view. Mounts when the user clicks

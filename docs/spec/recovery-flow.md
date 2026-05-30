@@ -133,7 +133,7 @@ Normative properties:
 
 - **No skip affordance.** The chained password-reset form MUST be non-dismissible. There is no "skip", "do this later", or "keep current password" option.
 - **B3a-style form.** The form mirrors the create-time password step (`src/screens/vault-creation/PasswordStep.tsx`): single password field plus zxcvbn strength meter, with the same minimum-strength gating used at create time.
-- **Force-quit is the only bail.** The user can close the window or kill the process; this is bail behavior governed by §4.3.
+- **Force-quit and idle-timeout are the bail paths.** The user can close the window or kill the process; additionally, auto-lock on idle (MYND-121) bails the recovery session after an absolute timeout measured from `recovered_at`. Both route through the same automated `vault_lock` and are bail behavior governed by §4.3. There is still no user-facing "skip" / "cancel" affordance on the form itself.
 
 ### 4.2 vault.meta rewrite atomicity
 

@@ -52,6 +52,8 @@ import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
 import { SidebarStateProvider, useSelectedNote } from "../notes/sidebarState";
 import { useAutosave, type SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { listen } from "@tauri-apps/api/event";
+import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
 
 
 const STATUS_TEXT_STYLE: CSSProperties = {
@@ -333,6 +335,11 @@ function EditorChrome({
 
   const autosave = useAutosave(ctx.selectedId, content, undefined, setContent);
 
+  // MYND-121 — report window-level activity to the backend auto-lock idle
+  // timer. The Editor is mounted iff the vault is Unlocked, so the heartbeat
+  // runs exactly while a lockable session is live.
+  useActivityHeartbeat();
+
   // After every successful save, refresh the sidebar entry for that
   // note so a title/H1 edit in the editor body propagates to the row
   // label (Q13 "action-driven surgical refresh after saveNote"). We
@@ -382,6 +389,38 @@ function EditorChrome({
         // Not running inside Tauri (e.g., `pnpm dev` browser shim) →
         // close-intercept is a no-op. Tests + vite dev mode hit this
         // path; no error surfaced.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, [autosave]);
+
+  // MYND-121 — flush on idle-lock imminent. The backend idle timer emits
+  // `vault-lock-imminent` before its grace window; flush any unsaved edit so
+  // the autosave delta persists before the keys zeroize. Best-effort — the
+  // backend proceeds when the grace elapses regardless. Mirrors the
+  // close-intercept's listen / unlisten + cancelled-guard shape; no-op outside
+  // Tauri (browser dev shim).
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen("vault-lock-imminent", () => {
+          if (cancelled) return;
+          void autosave.flushIfDirty().catch(() => {
+            /* per-flush error already routed through saveStatus */
+          });
+        });
+        if (cancelled) {
+          handle();
+        } else {
+          unlisten = handle;
+        }
+      } catch {
+        // Not inside Tauri (browser dev shim) → no-op.
       }
     })();
     return () => {

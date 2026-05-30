@@ -21,6 +21,12 @@ export interface PrefsView {
    * vaults → the Rust decoder defaults it to `[]`.
    */
   deliberate_folders: string[];
+  /**
+   * Auto-lock-on-idle timeout in integer seconds (MYND-121). `null` when the
+   * user has set no value — the backend then applies its protective-envelope
+   * default for the timer. Serialized from Rust `Option<u32>` (null | number).
+   */
+  auto_lock_seconds: number | null;
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -52,4 +58,15 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
  */
 export async function setDeliberateFolders(folders: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_deliberate_folders", { folders });
+}
+
+/**
+ * Set the auto-lock-on-idle timeout (integer seconds, MYND-121). The backend
+ * writes vault.prefs disk-first, then refreshes the idle timer's cached
+ * effective timeout (clamped through the protective envelope). A rejected
+ * promise means the disk write failed — the caller's optimistic UI must revert
+ * (re-read disk truth, as the screen-capture toggle does).
+ */
+export async function setAutoLockTimeout(seconds: number): Promise<void> {
+  await invoke<void>("plugin:prefs|set_auto_lock_timeout", { seconds });
 }

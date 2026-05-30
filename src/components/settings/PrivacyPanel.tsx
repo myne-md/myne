@@ -1,12 +1,17 @@
 // Settings → Privacy panel: interactive "Screen-capture protection"
-// toggle (MYND-160 ships persistence) + disabled "Auto-lock on idle"
-// (enables with MYND-121 + MYND-122). Disabled-control discipline per
-// `decisions.md` 2026-05-08 — real labels, no "Coming soon" copy.
+// toggle (MYND-160 ships persistence) + interactive "Auto-lock" timeout
+// selector (MYND-121 + MYND-122). The auto-lock control is a native
+// <select> — keyboard-navigable + screen-reader-friendly by construction —
+// offering ENABLED durations only (NO "Off"): auto-lock is an always-on A6
+// guarantee. Supersedes MYND-55's disabled "Auto-lock on idle" placeholder.
 //
 // Penpot canon: `screen------settings--privacy` (frame id
-// `9fb59646-2811-8082-8007-fd1cbf80a20b`). Visual design ships
-// unchanged from MYND-55's disabled-but-ON placeholder per Penpot;
-// MYND-160 turns the existing visual into an interactive toggle.
+// `9fb59646-2811-8082-8007-fd1cbf80a20b`). MYND-121 turned the disabled
+// auto-lock toggle placeholder into the interactive select drawn there.
+//
+// i18n: copy is inline EN, consistent with the rest of the app (no i18n
+// framework exists yet). TR strings ("Otomatik kilit" / "Bu kadar
+// hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
 import type { CSSProperties } from "react";
 import { usePrefs } from "../../hooks/usePrefs";
@@ -132,6 +137,81 @@ function ToggleRow({
   );
 }
 
+// MYND-121 auto-lock-on-idle timeout selector. Options sit within the backend
+// protective-envelope bounds (FLOOR 30s / DEFAULT 5min / CEILING 60min) and
+// offer NO "Off" — auto-lock is an always-on A6 guarantee. The default shown
+// when no value is stored mirrors the Rust `auto_lock::DEFAULT_AUTO_LOCK_SECS`
+// (keep in sync if that constant changes; the backend is authoritative for the
+// actual timer — this is only the selector's display-when-unset).
+const AUTO_LOCK_DEFAULT_SECS = 300;
+
+const AUTO_LOCK_OPTIONS: ReadonlyArray<{ secs: number; label: string }> = [
+  { secs: 60, label: "1 min" },
+  { secs: 300, label: "5 min" },
+  { secs: 900, label: "15 min" },
+  { secs: 1800, label: "30 min" },
+  { secs: 3600, label: "1 hour" },
+];
+
+const SELECT_STYLE: CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  padding: "4px 8px",
+  background: "var(--paper)",
+  color: "var(--fg-1)",
+  border: "1px solid var(--line-2)",
+  borderRadius: 3,
+  cursor: "pointer",
+  flexShrink: 0,
+};
+
+/**
+ * Resolve the value the selector displays: the stored timeout when it matches
+ * an offered option, otherwise the default. Covers both the unset case (`null`
+ * → default) and the defensive case where a replayed / out-of-range stored
+ * value has no matching `<option>` (fall back to default so the native select
+ * always shows a valid selection; the backend clamps the actual timer anyway).
+ */
+function selectedAutoLockSecs(stored: number | null): number {
+  if (stored !== null && AUTO_LOCK_OPTIONS.some((o) => o.secs === stored)) {
+    return stored;
+  }
+  return AUTO_LOCK_DEFAULT_SECS;
+}
+
+interface AutoLockRowProps {
+  seconds: number;
+  onChange: (secs: number) => void;
+}
+
+function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
+  return (
+    <div style={BLOCK_STYLE}>
+      <div style={TOGGLE_ROW_STYLE}>
+        <span style={LABEL_STYLE} id="auto-lock-label">
+          Auto-lock
+        </span>
+        <select
+          aria-labelledby="auto-lock-label"
+          aria-describedby="auto-lock-helper"
+          value={seconds}
+          onChange={(e) => onChange(Number(e.target.value))}
+          style={SELECT_STYLE}
+        >
+          {AUTO_LOCK_OPTIONS.map((o) => (
+            <option key={o.secs} value={o.secs}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p id="auto-lock-helper" style={HELPER_STYLE}>
+        Lock the vault after this much inactivity.
+      </p>
+    </div>
+  );
+}
+
 interface PrivacyPanelProps {
   /**
    * Toast surface — invoked when an optimistic write rolled back
@@ -145,7 +225,7 @@ interface PrivacyPanelProps {
 }
 
 export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
-  const { prefs, toggleScreenCapture } = usePrefs(onShowToast);
+  const { prefs, toggleScreenCapture, setAutoLock } = usePrefs(onShowToast);
   return (
     <div style={PANEL_ROOT_STYLE}>
       <ToggleRow
@@ -158,12 +238,11 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           void toggleScreenCapture(next);
         }}
       />
-      <ToggleRow
-        label="Auto-lock on idle"
-        ariaLabel="Auto-lock on idle (currently unavailable)"
-        ariaDescribedBy="auto-lock-on-idle-helper"
-        helper="Automatically lock the vault after a period of inactivity."
-        checked={false}
+      <AutoLockRow
+        seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
+        onChange={(secs) => {
+          void setAutoLock(secs);
+        }}
       />
     </div>
   );

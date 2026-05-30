@@ -187,6 +187,14 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     };
 
     crate::screen_capture::apply(app, prefs.screen_capture_protection, "runtime_apply");
+
+    // MYND-121: cache the effective auto-lock timeout for the idle timer.
+    // prefs are not held in Slot::Unlocked (disk is canonical), so the timer
+    // reads this lock-free atom rather than re-decrypting vault.prefs each
+    // tick. The setter IPC (task 9) updates it on a live change.
+    state.set_auto_lock_timeout_secs(crate::auto_lock::effective_auto_lock_secs(
+        prefs.auto_lock_seconds,
+    ));
 }
 
 /// Closed-enum mapping for `PrefsReadError` variants emitted from the
@@ -796,6 +804,20 @@ pub(crate) async fn vault_is_unlocked_with_state(
     Ok(matches!(state.slot_kind().await, SlotKind::Unlocked))
 }
 
+/// Record user activity for the auto-lock-on-idle timer (MYND-121).
+///
+/// The frontend's debounced activity heartbeat (mousemove / keydown /
+/// focus / visibilitychange — task 11) invokes this. It is a single
+/// lock-free atomic store on [`VaultRuntimeState`]; it never touches the
+/// slot `RwLock`, so it cannot serialise against note-save / unlock / lock
+/// ops even at heartbeat frequency (`decisions.md` 2026-05-30). Sync +
+/// infallible by construction — there is no failure mode to surface, and
+/// no secret material is read or logged.
+#[tauri::command]
+pub fn report_user_activity(state: State<'_, VaultRuntimeState>) {
+    state.report_activity();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -892,6 +914,7 @@ mod tests {
                 &protocol::PrefsView {
                     screen_capture_protection: false,
                     deliberate_folders: Vec::new(),
+                    auto_lock_seconds: None,
                 },
             )
             .expect("encode prefs blob");
@@ -984,6 +1007,7 @@ mod tests {
             &protocol::PrefsView {
                 screen_capture_protection: false,
                 deliberate_folders: Vec::new(),
+                auto_lock_seconds: None,
             },
         )
         .expect("encode");

@@ -19,6 +19,7 @@ permissions = [
   "allow-prefs-read",
   "allow-set-screen-capture-protection",
   "allow-set-deliberate-folders",
+  "allow-set-auto-lock-timeout",
 ]
 
 [[permission]]
@@ -38,3 +39,10 @@ commands.allow = ["set_screen_capture_protection"]
 identifier = "allow-set-deliberate-folders"
 description = "Allow invoking prefs:set_deliberate_folders (Slot::Unlocked-gated setter for the deliberate_folders set — the carrier for empty/deliberately-created folders in the virtual-folder model; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_deliberate_folders"]
+
+# MYND-121: a write setter, so it inherits the same main-window-only
+# invariant as the other allow-set-* permissions.
+[[permission]]
+identifier = "allow-set-auto-lock-timeout"
+description = "Allow invoking prefs:set_auto_lock_timeout (Slot::Unlocked-gated setter for the auto_lock_seconds field — atomic-writes vault.prefs FIRST then refreshes the idle timer's cached effective timeout, clamped through the protective envelope; MYND-121)."
+commands.allow = ["set_auto_lock_timeout"]

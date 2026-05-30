@@ -1,4 +1,5 @@
 mod atomic_write;
+mod auto_lock;
 mod io_failure_kind;
 mod paths;
 mod plugins;
@@ -45,6 +46,9 @@ pub fn run() {
             // 19041+. The main window is declared `"visible": false` in
             // `tauri.conf.json` so this is the only `show()` call.
             screen_capture::init(app)?;
+            // MYND-121: start the authoritative, fail-closed idle-lock timer.
+            // Runs for the process lifetime; no-op until a vault is Unlocked.
+            auto_lock::spawn_idle_lock_timer(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

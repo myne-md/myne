@@ -726,16 +726,16 @@ The KEK is `prefs_key = DeriveSubkey(root_key, "prefs-key")` per §3.2 + §3.4. 
 
 #### 9.5.2 Inner plaintext schema
 
-The inner plaintext is **canonical JSON** of an object whose keys are preference names and whose values are the persisted preference data. v0.1 ships two fields — `screen_capture_protection` (bool) and `deliberate_folders` (string array, MYND-144). A vault with no deliberately-created folders encodes to the single-field form (`deliberate_folders` is **omitted entirely when empty**, see below):
+The inner plaintext is **canonical JSON** of an object whose keys are preference names and whose values are the persisted preference data. v0.1 ships three fields — `auto_lock_seconds` (integer, optional, MYND-121), `deliberate_folders` (string array, MYND-144), and `screen_capture_protection` (bool). Optional fields are **omitted entirely when unset** (`auto_lock_seconds` when the user has no stored timeout; `deliberate_folders` when empty), so a vault that configured neither encodes to the single-field form:
 
 ```json
 {"screen_capture_protection":true}
 ```
 
-A vault with deliberate folders encodes both keys (lexicographically sorted — `deliberate_folders` precedes `screen_capture_protection`):
+A vault with all three encodes every key (lexicographically sorted — `auto_lock_seconds` precedes `deliberate_folders` precedes `screen_capture_protection`):
 
 ```json
-{"deliberate_folders":["Archive/2025/","Projects/Myne/"],"screen_capture_protection":true}
+{"auto_lock_seconds":300,"deliberate_folders":["Archive/2025/","Projects/Myne/"],"screen_capture_protection":true}
 ```
 
 **Canonical encoding rules** (load-bearing for cross-implementation byte-stability and for the byte-stable golden vectors in `myne-test-vectors`):
@@ -746,6 +746,8 @@ A vault with deliberate folders encodes both keys (lexicographically sorted — 
 - Integer values MUST be encoded without a trailing `.0`.
 - Floating-point values are FORBIDDEN in v0.1. Implementations MUST reject schemas that introduce float-typed preference fields until a future minor revision specifies a deterministic float encoding.
 - Booleans, integers, strings, **string arrays**, and nested objects following the same rules are the only permitted v0.1 value types. A string array is encoded `["a","b"]` with no insignificant whitespace; each element follows the string rules above (NFC, plus RFC 8259 escaping of `"`, `\`, and C0 control characters — canonical lowercase `\u00XX` for unnamed controls; `/` left unescaped).
+
+**`auto_lock_seconds` field (MYND-121).** An optional non-negative integer — the user's chosen auto-lock-on-idle timeout in seconds. **Omitted entirely when unset**, so a vault that never configured auto-lock is byte-identical to a pre-MYND-121 `vault.prefs` (existing golden vectors unaffected, no outer-envelope change). A decoder that does not find the key MUST treat it as unset; the client then applies its protective-envelope default. Per the general canonical-encoding rules above, the value is a bare decimal integer (no leading zeros, no trailing `.0`); **floating-point is FORBIDDEN** and a fractional value rejects the parse. Crucially, the always-on flag and the code-enforced `AUTO_LOCK_CEILING` that clamp this value are **NOT** stored in `vault.prefs` — they live in the client implementation, so a replayed, deleted, or tampered `vault.prefs` can only make auto-lock *stricter*, never disable it or loosen it past the ceiling (the two-class prefs taxonomy of [`../threat-model.md`](../threat-model.md) §7).
 
 **`deliberate_folders` field (MYND-144).** A JSON array of canonical trailing-slash folder paths (e.g. `["Projects/", "Projects/Myne/"]`) — the carrier for deliberately-created folders that hold no note (the empty-folder case of the virtual-folder model; see [`markdown-dialect.md`](markdown-dialect.md) §3.6.2). Canonical array encoding: elements are **NFC-normalized**, **lexicographically sorted** by their NFC bytes, and **exact-deduplicated** (folded-identity/case-insensitive dedup is the set-management layer's job, not the codec's). The array is **omitted entirely when empty**, so a vault with no deliberate folders is byte-identical to a pre-MYND-144 `vault.prefs` (existing golden vectors unaffected, no outer-envelope change). A decoder that does not find the key MUST treat it as the empty list. Conflict semantics for Phase 2 sync = union + add-wins (set semantics; no wall-clock, AS6-safe).
 

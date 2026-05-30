@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   PrefsView,
   prefsRead,
+  setAutoLockTimeout,
   setScreenCaptureProtection,
 } from "../lib/prefs";
 
@@ -34,6 +35,7 @@ import {
 const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
   deliberate_folders: [],
+  auto_lock_seconds: null,
 };
 
 interface UsePrefsResult {
@@ -46,6 +48,13 @@ interface UsePrefsResult {
    * to a toast).
    */
   toggleScreenCapture: (enabled: boolean) => Promise<void>;
+  /**
+   * Set the auto-lock-on-idle timeout (seconds). Optimistic: cache updates
+   * immediately. On IPC rejection, the cache is re-read from disk
+   * (authoritative truth) and `onError` is called (typically a toast).
+   * Same pattern as `toggleScreenCapture`.
+   */
+  setAutoLock: (seconds: number) => Promise<void>;
 }
 
 /**
@@ -106,5 +115,27 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
-  return { prefs, toggleScreenCapture };
+  const setAutoLock = useCallback(
+    async (seconds: number) => {
+      // Optimistic via functional update (no captured-previous staleness).
+      setPrefs((p) => ({ ...p, auto_lock_seconds: seconds }));
+      try {
+        await setAutoLockTimeout(seconds);
+      } catch {
+        // Re-read disk truth instead of rolling back to a captured value —
+        // same convergence discipline as `toggleScreenCapture`.
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+        onError?.("Couldn't save preference — try again");
+      }
+    },
+    [onError],
+  );
+
+  return { prefs, toggleScreenCapture, setAutoLock };
 }
