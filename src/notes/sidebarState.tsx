@@ -90,6 +90,7 @@ export function applyOptimisticCreate(
   return applyCacheUpdate(state, id, {
     noteUuid: id,
     title: null,
+    folder: null,
     updatedAt: null,
   });
 }
@@ -259,7 +260,7 @@ export type UseSelectedNoteReturn = {
     newTitle: string,
   ) => Promise<void>;
   /** Create-from-scratch flow — calls `createNote` + auto-select + auto-rename. */
-  createAndStartRename: () => Promise<NoteId>;
+  createAndStartRename: (folder?: string | null) => Promise<NoteId>;
   /** Delete a note with optimistic remove + rollback on IPC failure. */
   deleteWithRollback: (id: NoteId) => Promise<void>;
   /** Surgical refresh: re-fetch a single note's title slice. */
@@ -351,14 +352,20 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
-  const createAndStartRename = useCallback(async (): Promise<NoteId> => {
-    const newId = await createNote();
-    setState((prev) => {
-      const seeded = applyOptimisticCreate(prev, newId);
-      return { ...seeded, selectedId: newId, renamingId: newId };
-    });
-    return newId;
-  }, []);
+  const createAndStartRename = useCallback(
+    async (folder: string | null = null): Promise<NoteId> => {
+      const newId = await createNote(folder);
+      setState((prev) => {
+        const seeded = applyOptimisticCreate(prev, newId);
+        return { ...seeded, selectedId: newId, renamingId: newId };
+      });
+      // A foldered create writes `folder:` at create (a2); settle it into the
+      // cache so the new row appears under its folder while still in rename mode.
+      if (folder !== null) void refreshOne(newId);
+      return newId;
+    },
+    [refreshOne],
+  );
 
   const deleteWithRollback = useCallback(async (id: NoteId) => {
     let snapshot: DeleteSnapshot = { record: null, wasSelected: false };

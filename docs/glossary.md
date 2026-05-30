@@ -273,6 +273,12 @@ A check-digit algorithm using a totally anti-symmetric quasigroup (Damm 2004), g
 
 Used in: `spec/account-number.md` §4
 
+### **deliberate folder** &nbsp; 📦 *Product*
+
+A folder the user explicitly created that persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). The set is *cold* — written only on explicit folder create / delete, never on note move — and merges as a union (add-wins) under Phase 2 sync. A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2). See also [folder](#folder), [vault root](#vault-root).
+
+Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2; `decisions.md` 2026-05-29
+
 ### **DEM (Data Encapsulation Mechanism)** &nbsp; 🏗️ *Construction*
 
 The symmetric-encryption layer in a hybrid encryption scheme — pairs with a KEM. Myne does not use KEM-DEM in v0.1 (no asymmetric encryption); referenced in the v005 roadmap for sharing operations.
@@ -333,6 +339,12 @@ Used in: `spec/protocol.md` §9.3
 The two on-disk wrapped copies of `root_key` in `vault.meta`. Each is 32 bytes of XChaCha20-Poly1305 ciphertext over `root_key` plus a 32-byte CTX commitment tag. Encrypted respectively under `password_wrap_key` and `recovery_wrap_key`. The dual-credential wrap pattern requires both to exist at vault creation.
 
 Used in: `spec/protocol.md` §3.1, §9.3
+
+### **folder** &nbsp; 📦 *Product*
+
+A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [vault root](#vault-root).
+
+Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
 
 ### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 
@@ -874,6 +886,12 @@ Used in: `spec/protocol.md` §9.1
 The backend-resident state held between the `begin` and `commit` IPC calls of the vault-creation flow. A `VaultCreationSession` (Rust struct in `src-tauri/src/plugins/vault_creation/state.rs`) carries the freshly generated `account_number`, `recovery_phrase`, `root_key`, two Argon2id salts, the cached password and recovery wrap keys, the chosen `KdfParams`, and a `created_at: Instant` timestamp. Lives in a `Mutex<HashMap<Uuid, VaultCreationSession>>` indexed by **session token**. Bounded by `MAX_CONCURRENT_SESSIONS = 4` and `SESSION_TTL_SECS = 600` (10 minutes); evicted by a background `tokio::time::interval(60s)` task whose evicted tokens land in a parallel **tombstone** map for up to `TOMBSTONE_RETENTION_SECS = 3600` (1 hour). `root_key` and the wrap keys never cross the IPC boundary — they live only in this session until `commit` consumes it.
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
+
+### **vault root** &nbsp; 📦 *Product*
+
+The top of the virtual folder tree — the home of *unfiled* notes. A note is at the vault root when its `folder:` frontmatter field is **absent** (`folder: ""` is read as root and normalized to absent; `folder: "/"` is rejected). Distinct from the *vault directory* on the filesystem: the vault root is a logical position in the sidebar tree, not a path on disk (the on-disk layout is always flat `notes/<uuid>.myn`). A new note created with no folder selected, and a note moved out of every folder, both land at the vault root. See also [folder](#folder).
+
+Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2; `decisions.md` 2026-05-29
 
 ### **vault.meta** &nbsp; 📦 *Product* (deep entry)
 

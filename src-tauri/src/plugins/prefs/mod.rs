@@ -56,7 +56,7 @@ use tauri::Runtime;
 
 /// Construct the `prefs` plugin.
 ///
-/// Binds the two IPC commands declared in [`commands`]. Does NOT
+/// Binds the IPC commands declared in [`commands`]. Does NOT
 /// register `VaultRuntimeState` — the unlock plugin owns the
 /// runtime-state singleton; prefs borrows via `Tauri::State<...>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -64,6 +64,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::prefs_read,
             commands::set_screen_capture_protection,
+            commands::set_deliberate_folders,
         ])
         .build()
 }

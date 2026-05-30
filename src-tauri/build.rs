@@ -86,8 +86,11 @@ fn main() {
                 // a command here without a matching `commands.allow`
                 // entry in `permissions/prefs/default.toml` is a
                 // security regression.
-                tauri_build::InlinedPlugin::new()
-                    .commands(&["prefs_read", "set_screen_capture_protection"]),
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "prefs_read",
+                    "set_screen_capture_protection",
+                    "set_deliberate_folders",
+                ]),
             )
             .plugin(
                 "notes",

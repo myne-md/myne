@@ -891,6 +891,7 @@ mod tests {
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
                     screen_capture_protection: false,
+                    deliberate_folders: Vec::new(),
                 },
             )
             .expect("encode prefs blob");
@@ -982,6 +983,7 @@ mod tests {
             &account_hash,
             &protocol::PrefsView {
                 screen_capture_protection: false,
+                deliberate_folders: Vec::new(),
             },
         )
         .expect("encode");

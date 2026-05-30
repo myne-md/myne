@@ -30,6 +30,21 @@ export {
   saveNote,
 } from "./saveNote";
 export { renameNote } from "./renameNote";
+export { moveNote, bulkMoveNotes } from "./moveNote";
+export type { BulkMoveResult } from "./moveNote";
+export {
+  planFolderDelete,
+  deleteFolder,
+  planFolderRename,
+  renameFolder,
+} from "./folderActions";
+export { resolveWikilink } from "./resolveWikilink";
+export type { ResolverNote, WikilinkResolution } from "./resolveWikilink";
+export type {
+  FolderDeletePlan,
+  FolderRenamePlan,
+  FolderRenameResult,
+} from "./folderActions";
 export {
   EMPTY_SIDEBAR_STATE,
   SidebarStateProvider,

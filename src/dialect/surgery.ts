@@ -11,6 +11,7 @@ import type { ByteRange } from "./types";
 
 const UPDATED_KEY_RE = /^([ \t]*updated[ \t]*:[ \t]*)(.*)$/;
 const TITLE_KEY_RE = /^([ \t]*title[ \t]*:[ \t]*)(.*)$/;
+const FOLDER_KEY_RE = /^([ \t]*folder[ \t]*:[ \t]*)(.*)$/;
 
 const utf8Decoder = new TextDecoder("utf-8");
 const utf8Encoder = new TextEncoder();
@@ -340,4 +341,167 @@ export function patchFirstH1Line(
     ? "# " + sanitized + NEWLINE
     : "# " + sanitized + NEWLINE + NEWLINE;
   return utf8Encoder.encode(head + insert + body);
+}
+
+// === patchFolderField — virtual-folder write target for FM `folder:` ===
+//
+// Spec: docs/spec/markdown-dialect.md §3.6.1 (`folder:` joins `updated:` +
+// `title:` as the 3rd Myne-managed canonical frontmatter field). Grill:
+// 2026-05-29-folder-hierarchy-sidebar Q5 (grammar/root convention) + Q7 (a2
+// create-timing, state-D delete, empty-block removal). Write trigger =
+// note-create (via `buildInitialPlaintext`) + move (via `moveNote` → here).
+//
+// Same A/B/C value-surgery as `patchTitleField` (folder values can carry
+// YAML-unsafe chars such as `: `, so `formatYamlScalar` escalates to quoting),
+// plus a 4th state D: delete the folder field (move-to-root). When deleting
+// empties the whole block, the block is removed wholesale so the result is
+// byte-identical to an FM-less root note (Q7 — symmetric with
+// `buildInitialPlaintext(null) === ""`).
+
+function applyStateAFolder(source: string, value: string): string {
+  return (
+    FRONTMATTER_OPENER +
+    "folder: " + formatYamlScalar(value) + NEWLINE +
+    FRONTMATTER_DELIMITER + NEWLINE +
+    NEWLINE +
+    source
+  );
+}
+
+function applyStateBFolder(
+  source: string,
+  bodyEnd: number,
+  value: string,
+): string {
+  const insert = "folder: " + formatYamlScalar(value) + NEWLINE;
+  return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
+}
+
+function applyStateCFolder(
+  source: string,
+  bodyStart: number,
+  bodyEnd: number,
+  value: string,
+): string | null {
+  const fmBody = source.substring(bodyStart, bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = FOLDER_KEY_RE.exec(lines[i] ?? "");
+    if (m === null) continue;
+    const prefix = m[1] ?? "";
+    const valuePortion = m[2] ?? "";
+    const trimmedValue = valuePortion.trim();
+
+    // Block-scalar (|, >) → collapse to canonical single-line form.
+    if (/^[|>]/.test(trimmedValue)) {
+      lines[i] = prefix + formatYamlScalar(value);
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
+      lines.splice(i + 1, j - (i + 1));
+      return lines.join(NEWLINE);
+    }
+
+    // Existing quoted scalar (single or double) → preserve quote style.
+    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
+    if (quotedM !== null) {
+      const quote = quotedM[1] ?? '"';
+      const trailing = quotedM[3] ?? "";
+      const escaped =
+        quote === '"'
+          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          : value.replace(/'/g, "''");
+      lines[i] = prefix + quote + escaped + quote + trailing;
+      return lines.join(NEWLINE);
+    }
+
+    // Existing unquoted + trailing comment → preserve the comment.
+    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+    if (commentM !== null) {
+      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
+      return lines.join(NEWLINE);
+    }
+
+    // Existing plain unquoted scalar.
+    lines[i] = prefix + formatYamlScalar(value);
+    return lines.join(NEWLINE);
+  }
+
+  return null;
+}
+
+// State D — delete the folder field. Removes only the `folder:` line; if that
+// empties the block (no residual key or comment), removes the whole block plus
+// the canonical trailing blank line so the result is byte-identical to a note
+// that never had frontmatter. No-op when there is no FM or no folder line.
+function deleteFolderField(source: string): string {
+  const fm = locateFrontmatter(source);
+  if (fm === null) return source;
+
+  const fmBody = source.substring(fm.bodyStart, fm.bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+  const folderIdx = lines.findIndex((l) => FOLDER_KEY_RE.test(l));
+  if (folderIdx === -1) return source;
+
+  const remaining = lines
+    .slice(0, folderIdx)
+    .concat(lines.slice(folderIdx + 1));
+  const hasResidual = remaining.some((l) => l.trim() !== "");
+
+  if (!hasResidual) {
+    let removalEnd = fm.blockEnd;
+    if (source.charAt(removalEnd) === NEWLINE) removalEnd += NEWLINE.length;
+    return source.substring(removalEnd);
+  }
+
+  const newBody = remaining.join(NEWLINE);
+  return (
+    source.substring(0, fm.bodyStart) + newBody + source.substring(fm.bodyEnd)
+  );
+}
+
+/**
+ * Set, insert, or delete the Myne-managed `folder:` frontmatter field.
+ * `value === null` deletes the field (move-to-root, state D); a string sets it
+ * (states A/B/C, mirroring `patchTitleField`).
+ */
+export function patchFolderField(
+  bytes: Uint8Array,
+  value: string | null,
+): Uint8Array {
+  const source = utf8Decoder.decode(bytes);
+
+  if (value === null) {
+    return utf8Encoder.encode(deleteFolderField(source));
+  }
+
+  const fm = locateFrontmatter(source);
+  if (fm === null) {
+    return utf8Encoder.encode(applyStateAFolder(source, value));
+  }
+
+  const stateCResult = applyStateCFolder(
+    source,
+    fm.bodyStart,
+    fm.bodyEnd,
+    value,
+  );
+  if (stateCResult !== null) {
+    const before = source.substring(0, fm.bodyStart);
+    const after = source.substring(fm.bodyEnd);
+    return utf8Encoder.encode(before + stateCResult + after);
+  }
+
+  return utf8Encoder.encode(applyStateBFolder(source, fm.bodyEnd, value));
+}
+
+/**
+ * Build the initial plaintext for a newly-created note (a2 create-timing,
+ * Q7). A foldered note starts with a single-field FM block carrying `folder:`;
+ * a root note (null / empty) starts empty. The Rust `note_create` stays
+ * dialect-blind — it receives this string as opaque plaintext.
+ */
+export function buildInitialPlaintext(folder: string | null): string {
+  if (folder === null || folder === "") return "";
+  return applyStateAFolder("", folder);
 }
