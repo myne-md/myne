@@ -68,6 +68,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_auto_lock_timeout,
             commands::set_note_order,
             commands::set_folder_order,
+            commands::set_editor_layout,
         ])
         .build()
 }

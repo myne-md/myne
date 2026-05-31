@@ -32,6 +32,8 @@ import {
   useState,
   type CSSProperties,
   type Dispatch,
+  type ReactNode,
+  type RefObject,
   type SetStateAction,
 } from "react";
 import { CMEditor } from "../editor/CMEditor";
@@ -40,6 +42,7 @@ import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
 import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
+import { IconButton } from "../components/primitives/IconButton";
 import { SettingsModal } from "../components/SettingsModal";
 import { Toast } from "../components/Toast";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
@@ -54,6 +57,9 @@ import { useAutosave, type SaveStatus as SaveStatusValue } from "../notes/useAut
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
+import { ResizeHandle } from "../components/primitives/ResizeHandle";
+import { useEditorLayout } from "./editorLayout";
+import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 
 
 const STATUS_TEXT_STYLE: CSSProperties = {
@@ -249,6 +255,13 @@ function EditorChrome({
   const [bodyLoading, setBodyLoading] = useState<boolean>(false);
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [wordCount, setWordCount] = useState<number>(0);
+
+  // Resizable/collapsible sidebar layout (MYND-137). Widths + collapse
+  // flags are persisted to vault.prefs and clamped on load; `rowRef`
+  // measures the three-pane row live so a drag honors the center-pane
+  // minimum.
+  const layout = useEditorLayout();
+  const rowRef = useRef<HTMLDivElement | null>(null);
 
   // Status-bar word counter — recompute on a short debounce so the parse
   // doesn't run on every keystroke. Frontmatter is excluded by
@@ -470,6 +483,7 @@ function EditorChrome({
       }}
     >
       <div
+        ref={rowRef}
         style={{
           display: "flex",
           flexDirection: "row",
@@ -478,7 +492,20 @@ function EditorChrome({
         }}
       >
         <SidebarBootstrap />
-        <NotesSidebarList />
+        <SidebarPane
+          side="left"
+          width={layout.leftWidth}
+          collapsed={layout.leftCollapsed}
+          min={LEFT_BOUNDS.min}
+          max={LEFT_BOUNDS.max}
+          containerRef={rowRef}
+          onResize={layout.setLeftWidth}
+          onToggleCollapse={layout.toggleLeftCollapsed}
+          resizeLabel="Resize notes sidebar"
+          expandLabel="Expand notes sidebar"
+        >
+          <NotesSidebarList onCollapse={layout.toggleLeftCollapsed} />
+        </SidebarPane>
         <CenterPane
           content={content}
           onChange={setContent}
@@ -494,7 +521,20 @@ function EditorChrome({
             void ctx.createAndStartRename().catch(() => {});
           }}
         />
-        <RightSidebar />
+        <SidebarPane
+          side="right"
+          width={layout.rightWidth}
+          collapsed={layout.rightCollapsed}
+          min={RIGHT_BOUNDS.min}
+          max={RIGHT_BOUNDS.max}
+          containerRef={rowRef}
+          onResize={layout.setRightWidth}
+          onToggleCollapse={layout.toggleRightCollapsed}
+          resizeLabel="Resize backlinks sidebar"
+          expandLabel="Expand backlinks sidebar"
+        >
+          <RightSidebar onCollapse={layout.toggleRightCollapsed} />
+        </SidebarPane>
       </div>
       <BottomBar
         onOpenSettings={() => setSettingsOpen(true)}
@@ -788,11 +828,12 @@ function CenterPaneLoading() {
   );
 }
 
-function RightSidebar() {
+function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
   return (
     <aside
       style={{
-        width: 280,
+        // Fills the layout-seam wrapper, which owns the resizable width.
+        width: "100%",
         background: "var(--paper-2)",
         borderLeft: "1px solid var(--line-1)",
         padding: "16px 18px",
@@ -801,12 +842,138 @@ function RightSidebar() {
         gap: 8,
       }}
     >
-      <div style={SECTION_HEADING_STYLE}>Backlinks</div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={SECTION_HEADING_STYLE}>Backlinks</div>
+        {onCollapse && (
+          <IconButton
+            icon="panel-right-close"
+            label="Collapse backlinks sidebar"
+            onClick={onCollapse}
+          />
+        )}
+      </div>
       <div style={{ fontSize: 12, color: "var(--fg-3)" }}>Linked from 0</div>
       <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
         No backlinks yet.
       </div>
     </aside>
+  );
+}
+
+/**
+ * One resizable/collapsible sidebar slot (MYND-137). When collapsed, renders
+ * the {@link CollapsedRail}; otherwise a width-driven `position: relative`
+ * wrapper holding the sidebar `children` plus the inner-edge {@link ResizeHandle}
+ * (the handle is absolutely positioned, so child order is irrelevant). Both the
+ * left (notes) and right (backlinks) panes are this same component, mirrored by
+ * `side`.
+ */
+function SidebarPane({
+  side,
+  width,
+  collapsed,
+  min,
+  max,
+  containerRef,
+  onResize,
+  onToggleCollapse,
+  resizeLabel,
+  expandLabel,
+  children,
+}: {
+  side: "left" | "right";
+  width: number;
+  collapsed: boolean;
+  min: number;
+  max: number;
+  containerRef: RefObject<HTMLDivElement | null>;
+  onResize: (rawWidth: number, containerWidth: number) => void;
+  onToggleCollapse: () => void;
+  resizeLabel: string;
+  expandLabel: string;
+  children: ReactNode;
+}) {
+  if (collapsed) {
+    return (
+      <CollapsedRail side={side} label={expandLabel} onExpand={onToggleCollapse} />
+    );
+  }
+  return (
+    <div
+      style={{
+        position: "relative",
+        width,
+        flexShrink: 0,
+        display: "flex",
+        minHeight: 0,
+      }}
+    >
+      {children}
+      <ResizeHandle
+        side={side}
+        width={width}
+        min={min}
+        max={max}
+        containerRef={containerRef}
+        onResize={onResize}
+        onToggleCollapse={onToggleCollapse}
+        label={resizeLabel}
+      />
+    </div>
+  );
+}
+
+/**
+ * Thin re-expand rail shown in place of a collapsed sidebar (MYND-137) so a
+ * fully-hidden pane stays recoverable. A 14px `--paper-2` strip with the
+ * sidebar's hairline border and an inward-pointing chevron near the top;
+ * clicking (or Enter/Space) re-expands the pane to its remembered width.
+ */
+function CollapsedRail({
+  side,
+  label,
+  onExpand,
+}: {
+  side: "left" | "right";
+  label: string;
+  onExpand: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      aria-label={label}
+      title={label}
+      style={{
+        width: 14,
+        flexShrink: 0,
+        background: "var(--paper-2)",
+        border: 0,
+        ...(side === "left"
+          ? { borderRight: "1px solid var(--line-1)" }
+          : { borderLeft: "1px solid var(--line-1)" }),
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        paddingTop: 16,
+        color: "var(--fg-3)",
+        cursor: "pointer",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "var(--paper-3)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "var(--paper-2)";
+      }}
+    >
+      <Icon name={side === "left" ? "chevron-right" : "chevron-left"} size={14} />
+    </button>
   );
 }
 
