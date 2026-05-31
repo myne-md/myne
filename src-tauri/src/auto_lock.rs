@@ -290,7 +290,15 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
         // stays hidden until the reloaded frontend re-shows it on the unlock
         // screen (task 11 fresh-load handshake, gated so a hung renderer can
         // never re-expose plaintext).
-        run_lock_teardown(&AppTeardown { app }, || drop(prior));
+        run_lock_teardown(&AppTeardown { app }, || {
+            drop(prior); // leg 1 — zeroize the keys
+                         // MYND-29 Task 8: wipe the plaintext-derived search index on the
+                         // SAME leg as the key zeroize (it is as sensitive as the keys).
+                         // Auto-lock deliberately SKIPS persist (decisions.md 2026-05-30
+                         // / grill Q5): no blob-write latency on the fail-closed idle
+                         // path — the index rebuilds on the next unlock.
+            crate::plugins::notes::search_sync::zeroize_search_index(app);
+        });
     }
 }
 

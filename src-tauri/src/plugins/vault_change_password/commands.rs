@@ -46,7 +46,28 @@ pub async fn change_password<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<(), VaultChangePasswordError> {
     let vault_path = vault_meta_path(&app)?;
-    change_password_with_path(current_password, new_password, &vault_path, state.inner()).await
+    let result =
+        change_password_with_path(current_password, new_password, &vault_path, state.inner()).await;
+
+    // MYND-29: wipe the plaintext-derived search index on the force-relock
+    // outcomes — they drop `Slot::Unlocked` to `Empty` and zeroize the keys
+    // (`force_relock_on_invalid_vault_meta` / `force_relock_on_cas_mismatch` /
+    // the post-Argon2id `HashMismatch` inside `commit_unlocked_rewrite`), so
+    // the index (as sensitive as the keys) must wipe on the SAME path —
+    // upholding `spec/protocol.md` §9.6.5 "nothing search-derived survives a
+    // lock". A SUCCESS leaves the slot Unlocked (`root_key` unchanged — only
+    // its wrap rotated), so the index is preserved; `IoError`/`JoinFailure`
+    // also leave the slot Unlocked → must NOT wipe. `VaultLockedDuringChange`
+    // means a concurrent `vault_lock` already dropped + wiped, so it is not
+    // this command's drop to clean up.
+    if matches!(
+        &result,
+        Err(VaultChangePasswordError::InvalidVaultMeta)
+            | Err(VaultChangePasswordError::VaultMetaChangedExternally)
+    ) {
+        crate::plugins::notes::search_sync::zeroize_search_index(&app);
+    }
+    result
 }
 
 /// Testable core of [`change_password`]. The Tauri-command wrapper

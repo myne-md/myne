@@ -281,6 +281,12 @@ pub async fn complete_recovery<R: Runtime>(
     // Ok(()) is already committed by this point).
     crate::plugins::vault_unlock::commands::apply_persisted_prefs(&app, state.inner()).await;
 
+    // MYND-29 Task 7: post-recovery slot transition to Unlocked must hydrate
+    // the search index too (same best-effort, inline post-pipeline hook as
+    // `vault_unlock::commands::unlock`). A recovered user's vault opens with
+    // a working search index — full-rebuild if no blob exists yet.
+    crate::plugins::notes::search_sync::hydrate_search_index(&app, state.inner()).await;
+
     Ok(())
 }
 

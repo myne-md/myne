@@ -5,6 +5,7 @@ mod paths;
 mod plugins;
 mod protocol_error_kind;
 mod screen_capture;
+mod search;
 #[cfg(test)]
 mod test_support;
 mod vault_meta_hash;
@@ -41,6 +42,7 @@ pub fn run() {
         .plugin(plugins::prefs::init())
         .plugin(plugins::notes::init())
         .setup(|app| {
+            use tauri::Manager;
             // Apply screen-capture protection before `window.show()` so
             // the first frame is protected on macOS + Windows 10 build
             // 19041+. The main window is declared `"visible": false` in
@@ -49,8 +51,38 @@ pub fn run() {
             // MYND-121: start the authoritative, fail-closed idle-lock timer.
             // Runs for the process lifetime; no-op until a vault is Unlocked.
             auto_lock::spawn_idle_lock_timer(app.handle().clone());
+            // MYND-29: app-level live in-RAM search-index state, updated
+            // incrementally by the notes lifecycle (create/update/delete) and
+            // queried by the search command; cleared on lock (Task 8).
+            app.manage(search::SearchIndexState::default());
+            // MYND-29 Task 7: periodic best-effort flush of the search index
+            // to its encrypted `vault.search` blob while a vault is Unlocked
+            // (no-op while locked). Bounds how much a hard quit / crash loses
+            // to one flush interval; the next unlock reconciles the delta.
+            // Managed state above must exist first (the timer reads it).
+            plugins::notes::search_sync::spawn_periodic_flush_timer(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // MYND-29 Task 7: best-effort search-index flush on app exit so
+            // the next unlock takes the fast path. Reconcile-on-unlock makes a
+            // missed flush non-fatal (the next unlock re-indexes the
+            // since-last-flush delta), so any failure here is swallowed. The
+            // brief `block_on` is acceptable on the exit path (the run
+            // callback is the main event-loop thread, not a tokio worker).
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                use tauri::Manager;
+                if let Some(state) =
+                    app_handle.try_state::<plugins::vault_unlock::state::VaultRuntimeState>()
+                {
+                    let app = app_handle.clone();
+                    tauri::async_runtime::block_on(async move {
+                        plugins::notes::search_sync::persist_search_index(&app, state.inner())
+                            .await;
+                    });
+                }
+            }
+        });
 }

@@ -35,6 +35,35 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
 # "Secret-handling logging discipline").
 tracing = "0.1"
 
+# Direct-dep widening of the existing workspace-transitive
+# `unicode-normalization` (already pulled in via `protocol`'s vault.prefs
+# NFC folder normalization). Used by the search index (MYND-29) to
+# NFC-normalize tokens so decomposed/precomposed forms match. Pure-Rust,
+# already in Cargo.lock — no new transitive surface. Record in the Task 10
+# dependency-policy finalization.
+unicode-normalization = { version = "0.1.25", default-features = false }
+
+# Snowball stemmers for the search index (MYND-29 Task 2). The same crate
+# tantivy uses internally; pure-Rust, EN/TR/DE among 18 languages. Query
+# terms are multi-stemmed across the supported languages (the query is too
+# short to detect). Record in the Task 10 dependency-policy finalization.
+rust-stemmers = "1"
+
+# Per-note language detection for the search index (MYND-29 Task 3). Pure-Rust
+# trigram model; the index detects each note's language (EN/TR/DE among many)
+# and single-stems it, while the query stays multi-stemmed. Record in the
+# Task 10 dependency-policy finalization.
+whatlang = "0.16"
+
+# Compact binary serialization for the search-index blob (MYND-29 Task 9).
+# The Task 9 benchmark showed serde_json blew the at-rest blob-size (~5×) and
+# warm-unlock budgets; postcard (varint, no field names) shrinks the `MYS1`
+# plaintext ~3-5× and the decode accordingly. Pure-Rust, `no_std`+`alloc`,
+# tiny surface (cobs + serde, already present). Defines the v0.1
+# index_format_version 0x01 payload encoding (nothing shipped yet → no version
+# bump). Record in the Task 10 dependency-policy finalization.
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+
 # Direct-dep widening of the existing workspace-transitive `sha2`
 # (already pulled in via `protocol`'s KDF salt construction). Used
 # desktop-side to compute SHA-256 of `vault.meta` bytes for the

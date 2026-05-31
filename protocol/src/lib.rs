@@ -47,6 +47,7 @@ pub mod kdf;
 pub mod password_policy;
 pub mod phrase;
 pub mod prefs;
+pub mod search_blob;
 pub mod subkey;
 pub mod types;
 pub mod vault_meta;
@@ -56,8 +57,8 @@ pub use account_number::{
 };
 pub use aead::{
     aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
-    aad_recovery_wrap, aad_vault_items_key_wrap, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
-    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap, aead_open_ctx,
+    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,
@@ -77,6 +78,12 @@ pub use prefs::{
     decode_prefs_blob, encode_prefs_blob, encode_prefs_blob_raw, PrefsBlobError, PrefsView,
     MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN, PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC,
     PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
+};
+pub use search_blob::{
+    decode_search_index_blob, encode_search_index_blob, encode_search_index_blob_raw,
+    SearchBlobError, MAX_SEARCH_INDEX_PLAINTEXT_LEN, SEARCH_BLOB_ACCOUNT_HASH_LEN,
+    SEARCH_BLOB_HEADER_LEN, SEARCH_BLOB_INDEX_FORMAT_V1, SEARCH_BLOB_MAGIC,
+    SEARCH_BLOB_PROTOCOL_VERSION,
 };
 pub use subkey::{derive_subkey, SubkeyRole};
 pub use types::{

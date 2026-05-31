@@ -30,7 +30,8 @@
 use crate::atomic_write;
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
-use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
+use crate::plugins::vault_unlock::state::{Slot, SlotKind, VaultRuntimeState};
+use crate::search::SearchIndexState;
 use protocol::{decode_note, encode_new_note, encode_update, DecryptError, ProtocolError};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -42,7 +43,7 @@ use super::error::{
     NoteTitleError, NoteUpdateError,
 };
 use super::note_id::NoteId;
-use super::title_extract::extract_title_slices;
+use super::title_extract::{extract_h1_title, extract_title_slices};
 
 /// Create a new encrypted `.myn` note. See module-level docs for the
 /// full pipeline narration.
@@ -55,8 +56,16 @@ use super::title_extract::extract_title_slices;
 pub async fn note_create<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    search: State<'_, SearchIndexState>,
     plaintext: String,
 ) -> Result<String, NoteCreateError> {
+    // First-line Plaintext-IPC wrap (`src-tauri/CLAUDE.md`): the index needs
+    // the body AFTER the core consumes its own copy, so bound this retained
+    // copy to a `Zeroizing` wrapper — it wipes on every early-return and at
+    // function exit (after the post-write `upsert`) rather than lingering as a
+    // plain `String` across the `.await`. The core takes a fresh plain clone
+    // and re-wraps it first-line.
+    let plaintext = Zeroizing::new(plaintext);
     // Resolve `<vault>/notes/` (lazy `create_dir_all`); map both
     // `NotADirectory` and `AlreadyExists` to the structural defensive
     // variant per the accept-list pinned in `paths::notes_dir_under`'s
@@ -86,7 +95,16 @@ pub async fn note_create<R: Runtime>(
             }
         }
     })?;
-    note_create_with_dir(notes_dir, state.inner(), plaintext).await
+    // MYND-29 Task 4: incremental in-RAM index update — index after a
+    // successful write so the new note is searchable in-session without a
+    // rebuild. Title is best-effort H1; body is the full plaintext. (The
+    // index is plaintext-derived RAM; the lock path clears it — Task 8.)
+    let result = note_create_with_dir(notes_dir, state.inner(), (*plaintext).clone()).await;
+    if let Ok(id) = &result {
+        let title = extract_h1_title(plaintext.as_bytes()).unwrap_or_default();
+        search.upsert(id, &title, &plaintext);
+    }
+    result
 }
 
 /// Inner — pure-and-testable helper. Tauri-aware path resolution is
@@ -483,9 +501,15 @@ fn note_read_error_kind(e: &NoteReadError) -> &'static str {
 pub async fn note_update<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    search: State<'_, SearchIndexState>,
     note_id: String,
     plaintext: String,
 ) -> Result<(), NoteUpdateError> {
+    // First-line Plaintext-IPC wrap (`src-tauri/CLAUDE.md`): bound the
+    // index-feeding copy to `Zeroizing` so it wipes on every early-return and
+    // at function exit rather than lingering as a plain `String` across the
+    // `.await`. The core takes a fresh plain clone and re-wraps it first-line.
+    let plaintext = Zeroizing::new(plaintext);
     let notes_dir = paths::notes_dir(&app).map_err(|e| {
         let kind = e.kind();
         match kind {
@@ -511,7 +535,20 @@ pub async fn note_update<R: Runtime>(
             }
         }
     })?;
-    note_update_with_dir(notes_dir, state.inner(), note_id, plaintext).await
+    // MYND-29 Task 4: re-index the edited note (replace semantics drop the
+    // stale terms and add the new ones) after a successful write.
+    let result = note_update_with_dir(
+        notes_dir,
+        state.inner(),
+        note_id.clone(),
+        (*plaintext).clone(),
+    )
+    .await;
+    if result.is_ok() {
+        let title = extract_h1_title(plaintext.as_bytes()).unwrap_or_default();
+        search.upsert(&note_id, &title, &plaintext);
+    }
+    result
 }
 
 /// Inner — pure-and-testable helper. Mirror of
@@ -742,6 +779,7 @@ fn note_update_error_kind(e: &NoteUpdateError) -> &'static str {
 pub async fn note_delete<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    search: State<'_, SearchIndexState>,
     note_id: String,
 ) -> Result<(), NoteDeleteError> {
     let notes_dir = paths::notes_dir(&app).map_err(|e| {
@@ -769,7 +807,13 @@ pub async fn note_delete<R: Runtime>(
             }
         }
     })?;
-    note_delete_with_dir(notes_dir, state.inner(), note_id).await
+    // MYND-29 Task 4: drop the deleted note from the live index after a
+    // successful delete.
+    let result = note_delete_with_dir(notes_dir, state.inner(), note_id.clone()).await;
+    if result.is_ok() {
+        search.remove(&note_id);
+    }
+    result
 }
 
 /// Inner — pure-and-testable helper. Mirror of
@@ -1395,6 +1439,59 @@ fn extract_one_title_slice(
         frontmatter_bytes,
         first_h1_line,
     })
+}
+
+/// A ranked search result for the WebView (MYND-29 Task 5): the matching
+/// note's id + display title + BM25 score, best score first. Snippet
+/// generation is MYND-40's job — the index stores postings + titles, not the
+/// full body text, so a snippet needs `note_read` on the WebView side.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SearchResult {
+    pub note_id: String,
+    pub title: String,
+    pub score: f32,
+}
+
+/// `note_search` — `Slot::Unlocked`-gated full-text search over the live
+/// in-RAM index (MYND-29 Task 5). Returns BM25-ranked results, or an EMPTY
+/// vec when the vault is not unlocked (no error, no leak). The index is
+/// populated/updated while unlocked (Tasks 4/7) and cleared on lock (Task 8).
+#[tauri::command]
+pub async fn note_search(
+    state: State<'_, VaultRuntimeState>,
+    search: State<'_, SearchIndexState>,
+    query: String,
+) -> Result<Vec<SearchResult>, ()> {
+    // Infallible in practice (the gate yields an empty vec, not an error, when
+    // not unlocked; `query` is infallible). The `Result` is only here because
+    // Tauri requires reference-taking async commands to return a `Result`; the
+    // `Err(())` arm is never produced.
+    Ok(note_search_core(state.inner(), search.inner(), &query).await)
+}
+
+/// Testable core of [`note_search`]: gate on `Slot::Unlocked`, then map the
+/// index's ranked hits to the WebView result shape. Takes plain refs so tests
+/// exercise the slot gate without a Tauri runtime (mirrors the `_with_dir`
+/// testability pattern). No secret material is logged.
+pub(crate) async fn note_search_core(
+    state: &VaultRuntimeState,
+    search: &SearchIndexState,
+    query: &str,
+) -> Vec<SearchResult> {
+    // Gate: search only while Unlocked. Recovering / Empty → empty result, so a
+    // stale-but-not-yet-cleared index (pre-Task-8) cannot leak when locked.
+    if !matches!(state.slot_kind().await, SlotKind::Unlocked) {
+        return Vec::new();
+    }
+    search
+        .query(query)
+        .into_iter()
+        .map(|hit| SearchResult {
+            note_id: hit.id,
+            title: hit.title,
+            score: hit.score,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -3423,5 +3520,54 @@ mod tests {
             note_title_batch_error_kind(&NoteTitleBatchError::JoinFailure),
             "JoinFailure"
         );
+    }
+
+    // ---- note_search (MYND-29 Task 5) -----------------------------------
+
+    #[test]
+    fn note_search_returns_ranked_results_when_unlocked() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+            let search = SearchIndexState::default();
+            search.upsert("note-a", "Rust Guide", "rust async runtime");
+            let results = note_search_core(&state, &search, "rust").await;
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].note_id, "note-a");
+            assert_eq!(results[0].title, "Rust Guide");
+        });
+    }
+
+    #[test]
+    fn note_search_returns_empty_when_locked() {
+        rt().block_on(async {
+            // Slot Empty (locked): even with a populated index, the gate
+            // returns empty — no leak.
+            let state = VaultRuntimeState::default();
+            let search = SearchIndexState::default();
+            search.upsert("note-a", "t", "rust");
+            assert!(note_search_core(&state, &search, "rust").await.is_empty());
+        });
+    }
+
+    #[test]
+    fn note_search_returns_empty_when_recovering() {
+        rt().block_on(async {
+            // Recovering is gated out for note ops (recovery-flow.md §4.1);
+            // search gates it too.
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+            let search = SearchIndexState::default();
+            search.upsert("note-a", "t", "rust");
+            assert!(note_search_core(&state, &search, "rust").await.is_empty());
+        });
     }
 }

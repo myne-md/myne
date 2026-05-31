@@ -109,6 +109,7 @@ fn main() {
                     "note_update",
                     "note_delete",
                     "note_list",
+                    "note_search",
                 ]),
             ),
     )

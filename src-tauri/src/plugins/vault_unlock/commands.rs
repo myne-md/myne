@@ -128,6 +128,19 @@ pub async fn unlock<R: Runtime>(
     // surface is unchanged** — the user's unlock succeeds regardless.
     apply_persisted_prefs(&app, state.inner()).await;
 
+    // ---- MYND-29 Task 7: hydrate the search index ----------------------
+    //
+    // Load `vault.search` (fast path) + incrementally reconcile against the
+    // notes dir's current `.myn` header nonces — re-indexing only changed
+    // notes, full-rebuild on an absent / AEAD-fail blob. Best-effort and
+    // INLINE (awaited before returning to the WebView, like
+    // `apply_persisted_prefs`): a search-persistence failure never blocks
+    // unlock, and running inline keeps it from racing a concurrent
+    // `vault_lock` into repopulating a just-cleared index. A cold first
+    // unlock (no blob) is a full rebuild — a known latency cost the Task 9
+    // benchmark will quantify.
+    crate::plugins::notes::search_sync::hydrate_search_index(&app, state.inner()).await;
+
     Ok(())
 }
 
@@ -546,7 +559,32 @@ pub async fn lock<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<(), VaultUnlockError> {
+    // ---- MYND-29 Task 7: graceful-lock flush ----------------------------
+    //
+    // Persist the search index to its encrypted `vault.search` blob BEFORE
+    // the slot drops — the persist peeks `root_key` from the still-Unlocked
+    // slot, so it MUST run ahead of `lock_with_state`. Best-effort: a flush
+    // failure must never block the lock (the next unlock reconciles the
+    // delta). Idle auto-lock deliberately does NOT call this (Task 8) — it
+    // skips persist to avoid blob-write latency on the fail-closed path.
+    //
+    // NOTE: dropping + zeroizing the plaintext-derived in-RAM index on the
+    // lock path (manual + auto, on the same path as the slot drop) is
+    // Task 8's job. Until then the index lingers post-lock, but `note_search`
+    // gates on `Slot::Unlocked` (returns empty when locked), so there is no
+    // IPC leak — only raw RAM retention that Task 8 zeroizes.
+    crate::plugins::notes::search_sync::persist_search_index(&app, state.inner()).await;
+
     lock_with_state(state.inner()).await?;
+
+    // ---- MYND-29 Task 8: wipe the plaintext-derived search index --------
+    //
+    // On the SAME lock path as the slot drop, immediately after the keys
+    // zeroize in `lock_with_state` — the index is plaintext-derived RAM (as
+    // sensitive as the keys), so it is overwritten + reset here so no terms
+    // survive the manual lock. The persist above already flushed it to the
+    // `vault.search` blob (persist-then-wipe); the next unlock reloads it.
+    crate::plugins::notes::search_sync::zeroize_search_index(&app);
 
     // ---- MYND-160 Task 11: post-zeroize native default-ON ---------------
     //
