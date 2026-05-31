@@ -31,6 +31,7 @@ import { type Extension } from "@codemirror/state";
 import { Wikilink } from "../dialect/lezer/wikilink";
 import { InlineTag } from "../dialect/lezer/inline-tag";
 import { DefinitionList } from "../dialect/lezer/definition-list";
+import { Footnote } from "../dialect/lezer/footnote";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { myneDecorations } from "./decorations";
@@ -51,7 +52,13 @@ export function myneExtensions(): readonly Extension[] {
       // codeNestMarkdownExtension nests per-language Lezer parsers into closed
       // fenced blocks (MYND-154). NOT the stock `codeLanguages` option — see
       // code-highlight.ts. Do not also pass `codeLanguages` (would double-nest).
-      extensions: [Wikilink, InlineTag, DefinitionList, codeNestMarkdownExtension],
+      extensions: [
+        Wikilink,
+        InlineTag,
+        DefinitionList,
+        Footnote,
+        codeNestMarkdownExtension,
+      ],
     }),
     codeSyntaxHighlighting,
     ...myneDecorations(),

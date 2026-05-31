@@ -21,6 +21,7 @@ import { frontmatterDecorations } from "./frontmatter";
 import { tableDecorations } from "./table";
 import { definitionListDecorations } from "./definition-list";
 import { fencedCodeDecorations } from "./fenced-code";
+import { footnoteDecorations } from "./footnote";
 
 export function myneDecorations(): readonly Extension[] {
   return [
@@ -38,5 +39,6 @@ export function myneDecorations(): readonly Extension[] {
     tableDecorations(),
     definitionListDecorations(),
     fencedCodeDecorations(),
+    ...footnoteDecorations(),
   ];
 }
