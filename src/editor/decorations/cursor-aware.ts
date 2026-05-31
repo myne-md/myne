@@ -17,6 +17,7 @@ import {
   type Transaction,
 } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { searchPanelOpen } from "@codemirror/search";
 
 /**
  * True if any selection head or anchor sits on a line in the inclusive range
@@ -126,19 +127,33 @@ export function collapseLineRange(
 }
 
 /**
- * State-only reveal predicate for StateField decorations: true when the editor
- * is focused AND a selection touches the inclusive line range `[fromLine,
- * toLine]`. Focus gate matches `isCursorLine` so a construct the cursor happens
- * to sit in does not stay raw once the editor is unfocused. Requires
- * `editorFocusField` to be installed (it is, via the decorator's extension
- * array — declared before the decoration field so its value is current).
+ * Whether the editor selection should drive cursor-aware reveal of StateField
+ * (block-replace) decorations: true when the editor content is focused, OR the
+ * in-note find panel is open (MYND-175). The find clause is load-bearing: when
+ * you navigate find onto a match inside a folded table, the find input — not the
+ * editor content — holds DOM focus, so a focus-only gate would leave the table
+ * folded and the match hidden behind the widget. A find session is navigating
+ * the editor, so it counts as "active" for reveal. `searchPanelOpen` flips with
+ * a focus change on open/close, which the StateField recompute gate already
+ * tracks via `editorFocusChanged`.
+ */
+export function revealActive(state: EditorState): boolean {
+  return state.field(editorFocusField) || searchPanelOpen(state);
+}
+
+/**
+ * State-only reveal predicate for StateField decorations: true when reveal is
+ * active (editor focused or find open) AND a selection touches the inclusive
+ * line range `[fromLine, toLine]`. Focus gate matches `isCursorLine` so a
+ * construct the cursor happens to sit in does not stay raw once the editor is
+ * unfocused (and find is closed). Requires `editorFocusField` to be installed
+ * (it is, via the decorator's extension array — declared before the decoration
+ * field so its value is current).
  */
 export function linesRevealed(
   state: EditorState,
   fromLine: number,
   toLine: number,
 ): boolean {
-  return (
-    state.field(editorFocusField) && selectionTouchesLines(state, fromLine, toLine)
-  );
+  return revealActive(state) && selectionTouchesLines(state, fromLine, toLine);
 }

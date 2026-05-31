@@ -419,6 +419,12 @@ The convenience-paid tier in Myne's freemium model. Myne-operated zero-knowledge
 
 Used in: `vision.md`, `decisions.md`
 
+### **in-note find** &nbsp; 📦 *Product*
+
+The editor's Cmd/Ctrl+F find bar (MYND-175): a **literal, single-document** search over the one open note's decrypted CodeMirror doc text — exact substring, case-fold toggle, no regex — with all-match highlighting, next/prev navigation (Enter / Shift+Enter, wrapping), and a live "k/N" count. Built on the `@codemirror/search` engine with a Myne-token *docked* panel (not the stock widget); the WebView's native Cmd/Ctrl+F is suppressed app-wide. **Deliberately distinct from the [search index](#search-index)**: that is the stemmed, BM25-ranked, Rust-side *cross-note* surface ("which notes relate to this term"); in-note find is the unranked literal *locate* tool ("exactly where in the note I'm reading"). The count is a read-only projection over the engine's match set (never a filter); matches inside folded tables/code are counted and un-fold on navigation, while a frontmatter match is counted but not raw-revealed (always-on Properties widget). The query + match cache are **WebView-only, never persisted**, released on the lock-time reload — best-effort (V8 strings can't be zeroized; AS1-dominated), **not** "zeroize-on-lock" (which is the Rust-side index). See also [search index](#search-index) (`decisions.md` 2026-05-31).
+
+Used in: `decisions.md` 2026-05-31
+
 ### **in-transit encryption** &nbsp; 🏗️ *Construction*
 
 TLS 1.3 with strict cipher configuration plus client-side certificate pinning. The transport layer in Myne's protocol is TLS-only — no plaintext fallback (`threat-model.md` §3 TB4). Distinct from at-rest encryption and from the AEAD that ciphertext bytes carry inside their TLS payload.

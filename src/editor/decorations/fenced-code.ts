@@ -17,15 +17,16 @@
 // gate, so an unclosed fence shows neither card nor coloring.
 //
 // Focus is threaded into state (a block-replace set lives in a StateField,
-// which has no `view`). A LOCAL focus field is used rather than sharing
-// table.ts's, to avoid touching the shipped table feature.
+// which has no `view`) via the shared `editorFocusField`/`editorFocusTracker`
+// (`cursor-aware.ts`); reveal is gated on `revealActive` (focused OR in-note
+// find open), the same predicate table.ts uses, so a find-navigated match
+// inside a folded fence un-folds (MYND-175).
 
 import { syntaxTree } from "@codemirror/language";
 import {
   type EditorState,
   type Extension,
   type Range,
-  StateEffect,
   StateField,
 } from "@codemirror/state";
 import {
@@ -37,7 +38,13 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { highlightCode } from "@lezer/highlight";
-import { selectionTouchesLines } from "./cursor-aware";
+import {
+  editorFocusChanged,
+  editorFocusField,
+  editorFocusTracker,
+  revealActive,
+  selectionTouchesLines,
+} from "./cursor-aware";
 import { QUOTE_BAR_STEP, quoteBarBackgroundCss } from "./blockquote";
 import { resolveCodeLanguage } from "../code-languages";
 import { codeHighlightStyle } from "../code-highlight";
@@ -299,13 +306,15 @@ function badgeLabel(state: EditorState, node: { node: import("@lezer/common").Sy
 
 /**
  * Decoration set for the current state, as a pure function of `(state,
- * focused)` so the reveal decision is testable without driving DOM focus.
+ * revealAllowed)` so the reveal decision is testable without driving DOM focus.
+ * `revealAllowed` is `revealActive(state)` (editor focused OR in-note find open),
+ * so navigating find onto a match inside a folded fence reveals it (MYND-175).
  * Uses `Decoration.set(_, true)` (self-sorting) rather than a RangeSetBuilder
  * because a card mixes line decorations, block-replace, and a widget.
  */
 export function buildCodeBlockDecorations(
   state: EditorState,
-  focused: boolean,
+  revealAllowed: boolean,
 ): DecorationSet {
   const decos: Range<Decoration>[] = [];
   const doc = state.doc;
@@ -319,7 +328,7 @@ export function buildCodeBlockDecorations(
       const openLine = doc.lineAt(node.from);
       const closeLine = doc.lineAt(node.to);
       const revealed =
-        focused && selectionTouchesLines(state, openLine.number, closeLine.number);
+        revealAllowed && selectionTouchesLines(state, openLine.number, closeLine.number);
 
       // Nested in a blockquote/list → a contained read-only widget (away) that
       // draws bars-in-margin + an inset card; raw source on reveal (the
@@ -408,37 +417,19 @@ export function buildCodeBlockDecorations(
   return Decoration.set(decos, true);
 }
 
-const setCodeFocus = StateEffect.define<boolean>();
-
-const codeFocusField = StateField.define<boolean>({
-  create() {
-    return false;
-  },
-  update(value, tr) {
-    for (const effect of tr.effects) {
-      if (effect.is(setCodeFocus)) return effect.value;
-    }
-    return value;
-  },
-});
-
-const codeFocusTracker = EditorView.focusChangeEffect.of((_state, focusing) =>
-  setCodeFocus.of(focusing),
-);
-
 const codeBlockField = StateField.define<DecorationSet>({
   create(state) {
-    return buildCodeBlockDecorations(state, state.field(codeFocusField));
+    return buildCodeBlockDecorations(state, revealActive(state));
   },
   update(decorations, tr) {
     const selectionChanged = !tr.startState.selection.eq(tr.state.selection);
-    const focusChanged = tr.effects.some((e) => e.is(setCodeFocus));
+    const focusChanged = editorFocusChanged(tr);
     // Lezer parses async; rebuild on background parse advances too (see table.ts).
     const treeChanged = syntaxTree(tr.startState) !== syntaxTree(tr.state);
     if (!tr.docChanged && !selectionChanged && !focusChanged && !treeChanged) {
       return decorations;
     }
-    return buildCodeBlockDecorations(tr.state, tr.state.field(codeFocusField));
+    return buildCodeBlockDecorations(tr.state, revealActive(tr.state));
   },
   provide(field) {
     return EditorView.decorations.from(field);
@@ -497,6 +488,8 @@ const codeBlockHoverTracker = ViewPlugin.fromClass(
 );
 
 export function fencedCodeDecorations(): Extension {
-  // Order: the focus field must update before codeBlockField reads it.
-  return [codeFocusField, codeFocusTracker, codeBlockField, codeBlockHoverTracker];
+  // Order: the shared focus field must update before codeBlockField reads it
+  // (via `revealActive`). `editorFocusField`/`editorFocusTracker` dedupe by
+  // identity with the other cursor-aware decorations that also include them.
+  return [editorFocusField, editorFocusTracker, codeBlockField, codeBlockHoverTracker];
 }

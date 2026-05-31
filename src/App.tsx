@@ -14,6 +14,7 @@ import {
 } from "./lib/stage";
 import { probeVaultStatus } from "./lib/vault-status";
 import { probeSlotKind } from "./lib/vault-slot-kind";
+import { openInNoteFind } from "./editor/find/find-session";
 
 function App() {
   // Initial stage is `null` until the boot probe resolves (loading
@@ -78,6 +79,26 @@ function App() {
     },
     [],
   );
+
+  // Window-level Cmd/Ctrl+F → in-note find (MYND-175). Single owner of the
+  // WebView's native-find suppression: preventDefault fires app-wide on every
+  // stage (the native find scans the rendered DOM — a different text than the
+  // note's canonical markdown — so it must never appear). Opening the bar is
+  // gated to an active editor view (registered only on the editor stage), so on
+  // non-editor stages the key is swallowed but opens nothing. Deliberately NOT
+  // in the CM keymap (a keymap only fires when the editor is focused, leaking
+  // native find otherwise) — this listener is the sole owner.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key !== "f" && e.key !== "F") return;
+      if (e.shiftKey || e.altKey) return; // leave Cmd+Shift+F / Cmd+Alt+F alone
+      e.preventDefault();
+      openInNoteFind();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   if (stage === null) {
     // Loading shim — vault_status probe in flight (~ms on warm disk).

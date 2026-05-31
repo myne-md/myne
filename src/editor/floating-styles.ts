@@ -282,6 +282,145 @@ const CSS = `
   background: var(--paper-2, #f3f1eb);
   color: var(--fg-1);
 }
+
+/* In-note find bar (MYND-175). Docked CM panel chrome, NOT a floating popover:
+   it reflows the editor so it never occludes the current match, so it carries a
+   bottom hairline and NO shadow (DESIGN.md: nothing on the editor surface gets a
+   shadow — the deliberate difference from the floating slash-menu/toolbar above). */
+.cm-find-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  background-color: var(--paper, #fbfbfa);
+  border-bottom: 1px solid var(--line-1, #e3e2dd);
+  font-family: var(--font-sans);
+}
+.cm-find-bar-lead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--fg-3, #6b6a64);
+}
+.cm-find-bar-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-1, 3px);
+  background: var(--paper, #fbfbfa);
+  padding: 0 10px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--fg-1, #1a1a17);
+  outline: none;
+  box-shadow: none;
+}
+.cm-find-bar-input::placeholder {
+  color: var(--fg-3, #6b6a64);
+}
+.cm-find-bar-input:focus,
+.cm-find-bar-input:focus-visible {
+  /* WKWebView applies a default focus ring outline:none alone doesn't always
+     clear; belt-and-suspenders, then a subtle accent border (matches the
+     frontmatter-properties inputs above). */
+  outline: 0 !important;
+  outline-style: none !important;
+  box-shadow: none !important;
+  border-color: var(--accent, #2c4a7a);
+}
+.cm-find-bar-status {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--fg-3, #6b6a64);
+}
+.cm-find-bar-status--count {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-feature-settings: "ss02", "zero", "calt";
+}
+.cm-find-bar-status--nomatch {
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+.cm-find-bar-status--hidden {
+  display: none;
+}
+.cm-find-bar-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 20px;
+  background-color: var(--line-1, #e3e2dd);
+}
+.cm-find-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 0;
+  background-color: transparent;
+  color: var(--fg-2, #3a3934);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.cm-find-bar-btn:hover {
+  background-color: var(--paper-2, #f4f4f2);
+}
+.cm-find-bar-btn:disabled {
+  color: var(--line-3, #a3a29c);
+  cursor: default;
+  background-color: transparent;
+}
+.cm-find-bar-case {
+  width: 30px;
+  font-weight: 500;
+  color: var(--fg-3, #6b6a64);
+}
+.cm-find-bar-close {
+  color: var(--fg-3, #6b6a64);
+}
+.cm-find-bar-btn-active,
+.cm-find-bar-btn-active:hover {
+  background-color: var(--paper-3, #ecebe7);
+  color: var(--fg-1, #1a1a17);
+}
+/* Visually-hidden live region (count / no-match announced to screen readers).
+   Standard clip-rect hide: removed from view but kept in the accessibility tree. */
+.cm-find-bar-a11y {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Opens with a ~180 ms slide-down + fade (the editor reflow is inherent to the
+   docked CM panel taking vertical space). Suppressed under prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .cm-find-bar {
+    animation: cm-find-bar-in var(--duration-base, 180ms) var(--ease-standard, ease);
+  }
+}
+@keyframes cm-find-bar-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 `;
 
 export function ensureFloatingStyles(): void {
