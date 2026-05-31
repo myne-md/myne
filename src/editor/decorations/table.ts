@@ -35,7 +35,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import { editorFocusField, selectionTouchesLines } from "./cursor-aware";
+import { revealActive, selectionTouchesLines } from "./cursor-aware";
 import { makeCursorAwareStateField } from "./plugin-factory";
 
 /** Per-column horizontal alignment; `null` = default (renders left). */
@@ -261,13 +261,15 @@ export function buildTableDecorations(
   return builder.finish();
 }
 
-// Whole-table reveal is gated on focus, threaded into state via the shared
-// `editorFocusField` (`cursor-aware.ts`) since this block-replace StateField has
-// no `view`. `makeCursorAwareStateField` owns the recompute gate + focus
-// field/tracker ordering; the builder just reads the current focus value.
+// Whole-table reveal is gated on `revealActive` (editor focused OR in-note find
+// open — see `cursor-aware.ts`), threaded into state since this block-replace
+// StateField has no `view`. The find clause lets navigating find onto a match
+// inside a folded table un-fold it even though the find input, not the editor
+// content, holds DOM focus (MYND-175). `makeCursorAwareStateField` owns the
+// recompute gate + focus field/tracker ordering.
 export function tableDecorations(): Extension {
   return makeCursorAwareStateField((state) =>
-    buildTableDecorations(state, state.field(editorFocusField)),
+    buildTableDecorations(state, revealActive(state)),
   );
 }
 

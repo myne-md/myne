@@ -38,6 +38,7 @@ import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { slashMenuExtension } from "./slash/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
+import { findExtension } from "./find/find-extension";
 import { myneKeyBindings } from "./keymap";
 import { myneTheme } from "./theme";
 
@@ -57,6 +58,10 @@ export function myneExtensions(): readonly Extension[] {
     ...wikilinkChipExtensions(),
     slashMenuExtension(),
     selectionToolbarExtension(),
+    // In-note find (MYND-175): keeps the @codemirror/search engine, swaps the
+    // stock panel for the Myne-styled docked bar. Cmd/Ctrl+F is owned by the
+    // window-level listener in App.tsx, NOT bound in the keymap below.
+    ...findExtension(),
     keymap.of([
       ...myneKeyBindings,
       // Before defaultKeymap so Arrow Up/Down can enter a table block (which

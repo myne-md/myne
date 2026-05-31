@@ -361,6 +361,37 @@ export const myneTheme = EditorView.theme({
     fontStyle: "italic",
   },
 
+  // In-note find matches (MYND-175). The @codemirror/search engine decorates
+  // every query match with `.cm-searchMatch` and the current/active one with
+  // `.cm-searchMatch-selected`. Per the approved Penpot legend: all matches get
+  // a quiet `--accent-soft` wash; the current match gets a denser accent tint
+  // plus a 1px `--accent` ring. The denser tint is derived from existing tokens
+  // via `color-mix` (so it themes automatically — no new token needed); if a
+  // WebView lacks `color-mix`, the fill is simply dropped and the ring alone
+  // still distinguishes the current match.
+  ".cm-searchMatch": {
+    backgroundColor: "var(--accent-soft, #e8edf5)",
+    borderRadius: "2px",
+  },
+  ".cm-searchMatch-selected": {
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 22%, var(--paper, #fbfbfa))",
+    outline: "1px solid var(--accent, #2c4a7a)",
+    outlineOffset: "-1px",
+    borderRadius: "2px",
+  },
+
+  // Docked find panel chrome. The find bar provides its own `--paper` fill and
+  // `--line-1` bottom hairline (`.cm-find-bar` in floating-styles.ts), so reset
+  // CM's default panel background/border to avoid a double surface. Find is the
+  // only editor panel, so scoping this to `.cm-panels` is safe.
+  ".cm-panels": {
+    backgroundColor: "transparent",
+    color: "var(--fg-1)",
+  },
+  ".cm-panels.cm-panels-top": {
+    borderBottom: "none",
+  },
+
   // Floating UI (slash menu / selection toolbar / URL overlay) styles
   // live in `floating-styles.ts` as global CSS — they mount to
   // document.body to escape ancestor containing-block context, so CM6's
