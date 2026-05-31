@@ -45,17 +45,25 @@
 //! - Integer values without trailing `.0`.
 //! - Floating-point values FORBIDDEN at the type level — the
 //!   [`PrefsView`] struct has no float fields and never will in v0.1.
-//! - UTF-8 NFC for string fields — v0.1's bool-only schema makes this
-//!   a no-op; future string fields go through `unicode-normalization`
-//!   before encoding.
+//! - UTF-8 NFC for string fields — applied per-element to string array
+//!   fields (`deliberate_folders`, `note_order`, `folder_order`) before
+//!   encoding.
+//! - String ARRAY element order: a `set`-semantics array
+//!   (`deliberate_folders`) is sorted + exact-deduped; a `sequence`-
+//!   semantics array (`note_order`, `folder_order` — the manual sidebar
+//!   sort order) is preserved VERBATIM (order is the payload), so it is
+//!   neither sorted nor deduped. Both stay deterministic given the same
+//!   logical value, which is all canonical byte-stability requires.
 //!
 //! ## Schema evolution (spec § 9.5.2)
 //!
-//! Additive within v0.1 — new boolean / integer / string fields can be
-//! appended in any v0.1.x minor revision. Older clients reading newer
-//! plaintexts MUST treat unknown fields as unknown-and-ignored (the
-//! parser below uses a tolerant value-by-value decoder, not a strict
-//! struct-match, for forward-compat). Field removal, type changes,
+//! Additive within v0.1 — new boolean / integer / string / string-array
+//! fields can be appended in any v0.1.x minor revision (v0.1.x has grown
+//! `deliberate_folders`, `auto_lock_seconds`, then `note_order` +
+//! `folder_order`). Older clients reading newer plaintexts MUST treat
+//! unknown fields as unknown-and-ignored (the parser below uses a
+//! tolerant value-by-value decoder keyed on canonical key order, not a
+//! strict struct-match, for forward-compat). Field removal, type changes,
 //! and structural restructuring are MAJOR-version events (MYP5).
 //!
 //! ## Migration-less semantic (spec § 9.5.5)
@@ -149,6 +157,29 @@ pub struct PrefsView {
     /// the decoder rejects a fractional value.
     #[serde(default)]
     pub auto_lock_seconds: Option<u32>,
+
+    /// Manual sidebar sort order for notes — an ordered list of note
+    /// UUIDs. A note present here sorts by its index in this list; a note
+    /// absent (newly created, never reordered) sorts after all listed
+    /// siblings by `updated:` descending. Order is MEANINGFUL, so —
+    /// unlike `deliberate_folders` — the canonical encoder preserves
+    /// element order verbatim (NFC-normalized, but NOT sorted and NOT
+    /// deduped). Default empty; omitted entirely from the canonical JSON
+    /// when empty, so a vault that never reordered a note is byte-
+    /// identical to a pre-reorder `vault.prefs`. The comparison is
+    /// sibling-local on the consuming side (notes are only ever compared
+    /// against same-folder siblings), so a single flat list suffices.
+    #[serde(default)]
+    pub note_order: Vec<alloc::string::String>,
+
+    /// Manual sidebar sort order for folders — an ordered list of
+    /// canonical folder display paths (trailing-slash form). Same
+    /// order-preserving canonical encoding + index-then-name fallback
+    /// semantics as [`PrefsView::note_order`], applied to sibling folders
+    /// (folders are only compared against same-parent siblings). Default
+    /// empty; omitted when empty.
+    #[serde(default)]
+    pub folder_order: Vec<alloc::string::String>,
 }
 
 impl Default for PrefsView {
@@ -161,6 +192,8 @@ impl Default for PrefsView {
     fn default() -> Self {
         Self {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
         }
@@ -316,6 +349,25 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
+    // folder_order (canonical key 'f' — after 'd', before 'n'/'s'). Order
+    // is MEANINGFUL (the manual sidebar sort sequence), so the array is
+    // preserved verbatim — NOT sorted, NOT deduped — unlike
+    // deliberate_folders. Omitted when empty so a vault that never
+    // reordered a folder stays byte-identical to a pre-reorder vault.prefs.
+    if !prefs.folder_order.is_empty() {
+        out.extend_from_slice(b"\"folder_order\":");
+        push_ordered_string_array(&mut out, &prefs.folder_order);
+        out.push(b',');
+    }
+
+    // note_order (canonical key 'n' — after 'f', before 's'). Same
+    // order-preserving discipline as folder_order.
+    if !prefs.note_order.is_empty() {
+        out.extend_from_slice(b"\"note_order\":");
+        push_ordered_string_array(&mut out, &prefs.note_order);
+        out.push(b',');
+    }
+
     out.extend_from_slice(b"\"screen_capture_protection\":");
     out.extend_from_slice(if prefs.screen_capture_protection {
         b"true"
@@ -340,6 +392,28 @@ fn canonical_folder_list(folders: &[String]) -> Vec<String> {
     v.sort();
     v.dedup();
     v
+}
+
+/// Append an ORDER-PRESERVING canonical JSON string array (surrounding
+/// `[` / `]`, comma-joined, each element a `push_json_string` literal).
+/// Unlike [`canonical_folder_list`] (which sorts + dedupes for `set`
+/// semantics), the `note_order` / `folder_order` arrays carry a
+/// meaningful SEQUENCE, so element order is preserved verbatim. Each
+/// element is NFC-normalized for cross-implementation byte-stability
+/// (spec § 9.5.2), but the list is neither sorted nor deduped —
+/// reordering is the whole point of the field, and the output stays
+/// deterministic given the same logical value (which is all canonical
+/// byte-stability requires).
+fn push_ordered_string_array(out: &mut Vec<u8>, items: &[String]) {
+    out.push(b'[');
+    for (i, item) in items.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        let nfc = item.nfc().collect::<String>();
+        push_json_string(out, &nfc);
+    }
+    out.push(b']');
 }
 
 /// Append `s` as a JSON string literal (with surrounding quotes), escaping `"`,
@@ -448,23 +522,21 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         None => (None, stripped),
     };
 
-    // ---- deliberate_folders (optional) ----
-    let folders_marker = b"\"deliberate_folders\":";
-    let (deliberate_folders, scp_search_from) = match find_subslice(rest, folders_marker) {
-        Some(idx) => {
-            let array_start = idx + folders_marker.len();
-            let (list, consumed) = parse_json_string_array(&rest[array_start..])
-                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
-            // Resume the scp search AFTER the array span so array string content
-            // (which may contain `"screen_capture_protection":`-looking bytes)
-            // cannot fool the marker search.
-            (list, array_start + consumed)
-        }
-        None => (Vec::new(), 0usize),
-    };
+    // ---- optional string-array fields (canonical key order) ----
+    // deliberate_folders (d) → folder_order (f) → note_order (n). Each is
+    // located from a MONOTONIC cursor that only advances past already-parsed
+    // array spans, so a later field's key marker is never matched inside a
+    // prior field's array content (JSON `"`-escaping already prevents a
+    // marker from appearing inside a string value, but the cursor keeps the
+    // canonical key-order discipline visible + robust).
+    let mut cursor = 0usize;
+    let deliberate_folders =
+        parse_optional_array_field(rest, &mut cursor, b"\"deliberate_folders\":")?;
+    let folder_order = parse_optional_array_field(rest, &mut cursor, b"\"folder_order\":")?;
+    let note_order = parse_optional_array_field(rest, &mut cursor, b"\"note_order\":")?;
 
-    // ---- screen_capture_protection (required) ----
-    let region = &rest[scp_search_from..];
+    // ---- screen_capture_protection (required, canonically last) ----
+    let region = &rest[cursor..];
     let key_marker = b"\"screen_capture_protection\":";
     let idx = find_subslice(region, key_marker).ok_or(PrefsBlobError::PlaintextParseFailed)?;
     let after_key = &region[idx + key_marker.len()..];
@@ -484,7 +556,33 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         screen_capture_protection,
         deliberate_folders,
         auto_lock_seconds,
+        note_order,
+        folder_order,
     })
+}
+
+/// Parse an OPTIONAL canonical string-array field whose key marker is
+/// `marker`, searching `rest` from `*cursor` onward. On a hit, advances
+/// `*cursor` past the closing `]` and returns the decoded list; on a miss
+/// returns an empty list and leaves `*cursor` unchanged. Searching from a
+/// monotonically-advancing cursor (rather than from 0) keeps the canonical
+/// key-order discipline load-bearing — a later field's key marker is only
+/// matched after the prior field's array span.
+fn parse_optional_array_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Vec<String>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let array_start = *cursor + rel_idx + marker.len();
+            let (list, consumed) = parse_json_string_array(&rest[array_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = array_start + consumed;
+            Ok(list)
+        }
+        None => Ok(Vec::new()),
+    }
 }
 
 /// Parse a leading run of ASCII decimal digits into a `u32`, returning
@@ -761,6 +859,8 @@ mod tests {
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
         };
@@ -772,6 +872,8 @@ mod tests {
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
         };
@@ -810,6 +912,8 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: true,
+                note_order: Vec::new(),
+                folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
             }
@@ -823,6 +927,8 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: false,
+                note_order: Vec::new(),
+                folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
             }
@@ -895,6 +1001,8 @@ mod tests {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("Projects/"),
                 alloc::string::String::from("Archive/"),
@@ -912,6 +1020,8 @@ mod tests {
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("b/"),
                 alloc::string::String::from("a/"),
@@ -932,6 +1042,8 @@ mod tests {
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
             auto_lock_seconds: None,
         };
@@ -947,6 +1059,8 @@ mod tests {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
             auto_lock_seconds: None,
         };
@@ -1022,6 +1136,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("Projects/Myne/"),
                 alloc::string::String::from("Archive/2025/"),
@@ -1043,6 +1159,122 @@ mod tests {
         assert!(!decoded.screen_capture_protection);
     }
 
+    // ---- note_order / folder_order canonical arrays (reorder) ----------
+
+    #[test]
+    fn encode_omits_order_fields_when_empty() {
+        // Empty order lists → byte-identical to the pre-reorder shape.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_folder_and_note_order_in_canonical_key_position() {
+        // Canonical key order: d < f < n < s. With deliberate_folders,
+        // folder_order, note_order, and screen_capture_protection all
+        // present, folder_order sits after deliberate_folders, note_order
+        // after folder_order, screen_capture_protection last.
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
+            auto_lock_seconds: None,
+            note_order: alloc::vec![
+                alloc::string::String::from("n2"),
+                alloc::string::String::from("n1"),
+            ],
+            folder_order: alloc::vec![
+                alloc::string::String::from("Zebra/"),
+                alloc::string::String::from("Apple/"),
+            ],
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["Archive/"],"folder_order":["Zebra/","Apple/"],"note_order":["n2","n1"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn encode_preserves_order_does_not_sort_or_dedupe() {
+        // note_order is a SEQUENCE: element order is the payload, so the
+        // encoder must NOT sort (contrast canonical_folder_list which does).
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: Vec::new(),
+            auto_lock_seconds: None,
+            note_order: alloc::vec![
+                alloc::string::String::from("zzz"),
+                alloc::string::String::from("aaa"),
+                alloc::string::String::from("mmm"),
+            ],
+            folder_order: Vec::new(),
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"note_order":["zzz","aaa","mmm"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn decode_round_trips_note_and_folder_order_preserving_sequence() {
+        let parsed = canonical_json_decode(
+            br#"{"folder_order":["Zebra/","Apple/"],"note_order":["n2","n1"],"screen_capture_protection":true}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            parsed.folder_order,
+            alloc::vec![
+                alloc::string::String::from("Zebra/"),
+                alloc::string::String::from("Apple/"),
+            ],
+        );
+        assert_eq!(
+            parsed.note_order,
+            alloc::vec![
+                alloc::string::String::from("n2"),
+                alloc::string::String::from("n1"),
+            ],
+        );
+        assert!(parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_backward_compat_absent_order_fields_are_empty() {
+        let parsed = canonical_json_decode(br#"{"screen_capture_protection":true}"#).unwrap();
+        assert!(parsed.note_order.is_empty());
+        assert!(parsed.folder_order.is_empty());
+    }
+
+    #[test]
+    fn full_blob_round_trip_with_all_five_fields() {
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView {
+            screen_capture_protection: false,
+            deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
+            auto_lock_seconds: Some(900),
+            note_order: alloc::vec![
+                alloc::string::String::from("0190a000-0000-7000-8000-000000000002"),
+                alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
+            ],
+            folder_order: alloc::vec![
+                alloc::string::String::from("Projects/"),
+                alloc::string::String::from("Archive/"),
+            ],
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        // Sequence fields round-trip VERBATIM; deliberate_folders is canonicalized.
+        assert_eq!(original.note_order, decoded.note_order);
+        assert_eq!(original.folder_order, decoded.folder_order);
+        assert_eq!(decoded.auto_lock_seconds, Some(900));
+        assert!(!decoded.screen_capture_protection);
+    }
+
     // ---- auto_lock_seconds canonical field (MYND-121) -----------------
 
     #[test]
@@ -1058,6 +1290,8 @@ mod tests {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(300),
         };
@@ -1073,6 +1307,8 @@ mod tests {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
             screen_capture_protection: false,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(900),
         };
@@ -1090,6 +1326,8 @@ mod tests {
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(0),
         };
@@ -1175,6 +1413,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: true,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(1800),
         };
@@ -1305,6 +1545,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
         };
@@ -1324,6 +1566,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            note_order: Vec::new(),
+            folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
         };
@@ -1536,6 +1780,8 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: true,
+                note_order: Vec::new(),
+                folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
             },
@@ -1548,6 +1794,8 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: false,
+                note_order: Vec::new(),
+                folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
             },

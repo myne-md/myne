@@ -296,6 +296,104 @@ pub(crate) async fn set_deliberate_folders_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `note_order` sequence — the manual
+/// sidebar sort order for notes (an ordered list of note UUIDs). Read-
+/// modify-write under the per-plugin write mutex; **no native side-effect**
+/// (same shape as `set_deliberate_folders`). The caller passes the full
+/// desired sequence; v0.1 single-device writes it verbatim. Unlike
+/// `deliberate_folders`, the codec preserves element order — the sequence
+/// IS the payload (`protocol::PrefsView::note_order`).
+#[tauri::command]
+pub async fn set_note_order<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_note_order_with_dir(&dir, state.inner(), order).await
+}
+
+/// Testable core of [`set_note_order`].
+pub(crate) async fn set_note_order_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = order.len();
+    prefs.note_order = order;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — never the note IDs (note_id is a per-note vault-stable
+    // correlation tag; see ../../CLAUDE.md "Secret-handling logging discipline").
+    tracing::info!(event = "prefs_written", field = "note_order", count,);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `folder_order` sequence — the manual
+/// sidebar sort order for folders (an ordered list of canonical folder
+/// display paths). Identical read-modify-write + order-preserving + no-
+/// native-side-effect shape as [`set_note_order`], applied to the folder
+/// ordering field.
+#[tauri::command]
+pub async fn set_folder_order<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_folder_order_with_dir(&dir, state.inner(), order).await
+}
+
+/// Testable core of [`set_folder_order`].
+pub(crate) async fn set_folder_order_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = order.len();
+    prefs.folder_order = order;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — never the folder paths (folder structure is AS3 Sensitive;
+    // see ../../CLAUDE.md "Secret-handling logging discipline").
+    tracing::info!(event = "prefs_written", field = "folder_order", count,);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `auto_lock_seconds` field (MYND-121).
 /// Read-modify-write under the per-plugin write mutex. Getter is the existing
 /// [`prefs_read`] (the returned `PrefsView` already carries `auto_lock_seconds`).
@@ -479,6 +577,8 @@ mod tests {
                     screen_capture_protection: false,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
+                    note_order: Vec::new(),
+                    folder_order: Vec::new(),
                 },
                 &[0x77; AEAD_NONCE_LEN],
             )
@@ -635,6 +735,53 @@ mod tests {
                 .await
                 .expect("read after clear");
             assert!(cleared.deliberate_folders.is_empty());
+        });
+    }
+
+    // ---- note_order / folder_order setters (reorder) ------------------
+
+    #[test]
+    fn set_note_order_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-note-order-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_note_order_with_dir(tmp.path(), &state, alloc_vec(["a", "b"])).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn note_and_folder_order_round_trip_preserving_sequence() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            // note_order is a sequence — element order is the payload, so it
+            // round-trips VERBATIM (not sorted, unlike deliberate_folders).
+            set_note_order_with_dir(tmp.path(), &state, alloc_vec(["n-zzz", "n-aaa", "n-mmm"]))
+                .await
+                .expect("write note_order");
+            set_folder_order_with_dir(tmp.path(), &state, alloc_vec(["Zebra/", "Apple/"]))
+                .await
+                .expect("write folder_order");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after order writes");
+            assert_eq!(view.note_order, alloc_vec(["n-zzz", "n-aaa", "n-mmm"]));
+            assert_eq!(view.folder_order, alloc_vec(["Zebra/", "Apple/"]));
+            // The pre-existing screen_capture default is untouched.
+            assert!(view.screen_capture_protection);
+
+            // Clearing note_order round-trips back to empty; folder_order is
+            // an independent field and stays set.
+            set_note_order_with_dir(tmp.path(), &state, Vec::new())
+                .await
+                .expect("clear note_order");
+            let cleared = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert!(cleared.note_order.is_empty());
+            assert_eq!(cleared.folder_order, alloc_vec(["Zebra/", "Apple/"]));
         });
     }
 

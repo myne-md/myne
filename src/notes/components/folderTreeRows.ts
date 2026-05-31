@@ -6,7 +6,7 @@
 // (sidebar render). Ordering: VAULT ROOT (unfiled notes) first, then FOLDERS;
 // within a folder, **child folders before notes** (Obsidian convention).
 
-import { sortBatchIds, type NoteId } from "../sidebarState";
+import { buildRankMap, sortBatchIds, type NoteId } from "../sidebarState";
 import type { TitleRecord } from "../loadNoteBatch";
 import type { FolderNode, FolderTree } from "../folderTree";
 
@@ -31,18 +31,23 @@ function isEmptyFolder(node: FolderNode): boolean {
 /**
  * Flatten `tree` into visible rows. `cache` resolves note records (and gates
  * out ids not yet loaded); `collapsed` is the set of folded folder keys
- * (ephemeral, default empty = all expanded).
+ * (ephemeral, default empty = all expanded). `noteOrder` is the manual sidebar
+ * sort sequence (note_order prefs field) — notes within each folder sort by
+ * their index in it, then by recency for the unlisted remainder.
  */
 export function flattenVisibleRows(
   tree: FolderTree,
   cache: ReadonlyMap<NoteId, TitleRecord>,
   collapsed: ReadonlySet<string>,
+  noteOrder: readonly string[] = [],
 ): VisibleRow[] {
   const rows: VisibleRow[] = [];
+  const rank = buildRankMap(noteOrder);
 
   const unfiled = sortBatchIds(
     tree.unfiledNoteIds.filter((id) => cache.has(id)),
     cache,
+    rank,
   );
   if (unfiled.length > 0) {
     rows.push({ kind: "section", key: "sec-root", label: "Vault root" });
@@ -70,6 +75,7 @@ export function flattenVisibleRows(
         for (const id of sortBatchIds(
           node.noteIds.filter((i) => cache.has(i)),
           cache,
+          rank,
         )) {
           rows.push({ kind: "note", key: `n-${id}`, id, depth: depth + 1 });
         }

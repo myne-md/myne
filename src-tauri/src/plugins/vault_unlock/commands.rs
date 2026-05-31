@@ -953,6 +953,8 @@ mod tests {
                     screen_capture_protection: false,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
+                    note_order: Vec::new(),
+                    folder_order: Vec::new(),
                 },
             )
             .expect("encode prefs blob");
@@ -1046,6 +1048,8 @@ mod tests {
                 screen_capture_protection: false,
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                note_order: Vec::new(),
+                folder_order: Vec::new(),
             },
         )
         .expect("encode");

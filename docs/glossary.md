@@ -698,7 +698,7 @@ Used in: `spec/protocol.md` §3.4, §9.5; `decisions.md` 2026-05-27 "Vault prefe
 
 ### **PrefsView** &nbsp; 🛠️ *Tooling*
 
-Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `vault.prefs` plaintext. Defines the v0.1 preference fields (`screen_capture_protection: bool` in MYND-160) plus the `Default` impl that drives the fall-back-to-defaults semantic on absence / AEAD-fail / parse-fail (`spec/protocol.md` §9.5.5). Serialized via canonical JSON (sorted keys, no whitespace, NFC strings, no floats) before AEAD encryption — drift-detected by the `myne-test-vectors` byte-stable KAT vectors.
+Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `vault.prefs` plaintext. Defines the v0.1 preference fields — `screen_capture_protection: bool` (MYND-160), `deliberate_folders` (set array, MYND-144), `auto_lock_seconds` (optional integer, MYND-121), and the manual sidebar sort sequences `note_order` / `folder_order` (ordered string arrays whose element order is preserved verbatim — a listed sibling sorts by its index, an unlisted one falls back to recency/name) — plus the `Default` impl that drives the fall-back-to-defaults semantic on absence / AEAD-fail / parse-fail (`spec/protocol.md` §9.5.5). Serialized via canonical JSON (sorted keys, no whitespace, NFC strings, no floats; set arrays sorted+deduped, sequence arrays order-preserved) before AEAD encryption — drift-detected by the `myne-test-vectors` byte-stable KAT vectors.
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 

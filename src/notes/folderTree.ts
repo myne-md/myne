@@ -76,6 +76,7 @@ function lastSegment(canonical: string): string {
 export function deriveFolderTree(
   notes: ReadonlyArray<NoteLike>,
   deliberateFolders: ReadonlyArray<string>,
+  folderOrder: ReadonlyArray<string> = [],
 ): FolderTree {
   const byKey = new Map<string, Builder>();
   const unfiledNoteIds: string[] = [];
@@ -161,8 +162,25 @@ export function deriveFolderTree(
     else roots.push(node); // defensive — should not happen
   }
 
+  // Manual folder order (folder_order prefs field): a `foldedPath → index`
+  // map. A sibling listed here sorts by its index; an unlisted sibling sorts
+  // after all listed ones, then alphabetically by folded name. folder_order
+  // entries are display paths, normalized + folded to match each node's `key`.
+  const folderRank = new Map<string, number>();
+  for (let i = 0; i < folderOrder.length; i++) {
+    const norm = normalizeFolderPath(folderOrder[i] ?? "");
+    if (norm === null) continue;
+    const key = foldSegment(norm);
+    if (!folderRank.has(key)) folderRank.set(key, i);
+  }
+
   const sortRec = (nodes: FolderNode[]): void => {
-    nodes.sort((a, b) => foldSegment(a.name).localeCompare(foldSegment(b.name)));
+    nodes.sort((a, b) => {
+      const ra = folderRank.get(a.key) ?? Number.MAX_SAFE_INTEGER;
+      const rb = folderRank.get(b.key) ?? Number.MAX_SAFE_INTEGER;
+      if (ra !== rb) return ra - rb;
+      return foldSegment(a.name).localeCompare(foldSegment(b.name));
+    });
     for (const n of nodes) sortRec(n.children);
   };
   sortRec(roots);

@@ -23,13 +23,33 @@ import {
   type FolderInputRejection,
 } from "../../dialect/folderPath";
 import { usePrefs } from "../../hooks/usePrefs";
-import { setDeliberateFolders } from "../../lib/prefs";
+import {
+  setDeliberateFolders,
+  setFolderOrder as persistFolderOrder,
+  setNoteOrder as persistNoteOrder,
+} from "../../lib/prefs";
 import { deleteFolder, renameFolder } from "../folderActions";
 import { moveNote } from "../moveNote";
 import type { FolderNode, FolderTree } from "../folderTree";
-import type { NoteId, UseSelectedNoteReturn } from "../sidebarState";
+import {
+  buildRankMap,
+  sortBatchIds,
+  type NoteId,
+  type UseSelectedNoteReturn,
+} from "../sidebarState";
 
 const DRAG_MIME = "application/x-myne-note";
+const FOLDER_DRAG_MIME = "application/x-myne-folder";
+
+/** Where a reorder drop lands relative to the hovered row. */
+export type ReorderPlace = "above" | "below";
+
+/** Folded sidebar-tree key for a note's folder value (`""` = vault root). */
+function noteFolderKey(folder: string | null | undefined): string {
+  const norm = normalizeFolderPath(folder ?? null);
+  return norm === null ? "" : foldSegment(norm);
+}
+
 const EMPTY_TREE: FolderTree = { roots: [], unfiledNoteIds: [] };
 
 export type FolderMenuState = { node: FolderNode; x: number; y: number } | null;
@@ -72,10 +92,24 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     setDeliberate(prefs.deliberate_folders);
   }, [prefs.deliberate_folders]);
 
+  // Manual sidebar sort order (note_order / folder_order prefs sequences),
+  // synced from the mount-time prefs read and mutated optimistically by the
+  // reorder drag handlers (best-effort persist, like `deliberate`).
+  const [noteOrder, setNoteOrder] = useState<string[]>([]);
+  const [folderOrder, setFolderOrder] = useState<string[]>([]);
+  useEffect(() => {
+    setNoteOrder(prefs.note_order);
+  }, [prefs.note_order]);
+  useEffect(() => {
+    setFolderOrder(prefs.folder_order);
+  }, [prefs.folder_order]);
+
   // The latest derived tree, kept in a ref so handlers stay referentially
   // stable while still reading current subtree state (delete-emptiness etc.).
   const treeRef = useRef<FolderTree>(EMPTY_TREE);
   const draggedRef = useRef<NoteId | null>(null);
+  // Folded key of the folder being dragged (folder-reorder drags only).
+  const draggedFolderRef = useRef<string | null>(null);
 
   const [menu, setMenu] = useState<FolderMenuState>(null);
   const [newFolder, setNewFolder] = useState<NewFolderState>(null);
@@ -84,6 +118,19 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const [caseMerge, setCaseMerge] = useState<CaseMergeState>(null);
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [rootDropActive, setRootDropActive] = useState(false);
+  // Drag-kind discriminator so rows can branch their drop affordance:
+  // "note" → reorder-between-notes / move-into-folder; "folder" → reorder
+  // sibling folders. Cleared on drag end. Set on the respective drag start.
+  const [dragKind, setDragKind] = useState<"note" | "folder" | null>(null);
+  // Active reorder insertion indicators (the hovered row + which edge).
+  const [reorderTarget, setReorderTarget] = useState<{
+    id: NoteId;
+    place: ReorderPlace;
+  } | null>(null);
+  const [folderReorderTarget, setFolderReorderTarget] = useState<{
+    key: string;
+    place: ReorderPlace;
+  } | null>(null);
 
   const notesForOps = useCallback(
     () =>
@@ -225,30 +272,205 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   }, [blockNotice]);
 
   // ---- drag & drop ---------------------------------------------------------
+  //
+  // Three gestures share the HTML5 drag machinery, discriminated by `dragKind`:
+  //   note  → drop ON a folder row = move into folder; drop BETWEEN note rows =
+  //           reorder (and move into the target's folder when crossing folders).
+  //   folder→ drop BETWEEN sibling folder rows = reorder (same-parent only).
+  // Refs carry the dragged identity (note id / folded folder key); the dropped
+  // payload is read from the ref, not from dataTransfer (single-app drag).
+
   const onNoteDragStart = useCallback((e: DragEvent, id: NoteId) => {
     draggedRef.current = id;
+    draggedFolderRef.current = null;
     e.dataTransfer.setData(DRAG_MIME, id);
     e.dataTransfer.effectAllowed = "move";
+    setDragKind("note");
   }, []);
+
+  const onFolderDragStart = useCallback((e: DragEvent, node: FolderNode) => {
+    draggedFolderRef.current = node.key;
+    draggedRef.current = null;
+    e.dataTransfer.setData(FOLDER_DRAG_MIME, node.path);
+    e.dataTransfer.effectAllowed = "move";
+    setDragKind("folder");
+  }, []);
+
+  // Clears all transient drag UI — fired on dragend (covers drops that land
+  // outside any target, and Esc-cancelled drags).
+  const onDragEndCleanup = useCallback(() => {
+    draggedRef.current = null;
+    draggedFolderRef.current = null;
+    setDragKind(null);
+    setReorderTarget(null);
+    setFolderReorderTarget(null);
+    setDropTargetKey(null);
+    setRootDropActive(false);
+  }, []);
+
+  // Move the insertion indicator to (id/key, place). `onDragOver` fires
+  // continuously, so the functional update returns the SAME reference when the
+  // target is unchanged — React bails out, no re-render per drag pixel.
+  const updateReorderTarget = useCallback((id: NoteId, place: ReorderPlace) => {
+    setReorderTarget((cur) =>
+      cur?.id === id && cur.place === place ? cur : { id, place },
+    );
+  }, []);
+  const updateFolderReorderTarget = useCallback(
+    (key: string, place: ReorderPlace) => {
+      setFolderReorderTarget((cur) =>
+        cur?.key === key && cur.place === place ? cur : { key, place },
+      );
+    },
+    [],
+  );
+
+  // Clear the insertion indicator only when it still points at `id`/`key`, so a
+  // dragleave on the row we just left doesn't erase an indicator a sibling's
+  // dragenter already moved.
+  const clearReorderTarget = useCallback((id: NoteId) => {
+    setReorderTarget((cur) => (cur?.id === id ? null : cur));
+  }, []);
+  const clearFolderReorderTarget = useCallback((key: string) => {
+    setFolderReorderTarget((cur) => (cur?.key === key ? null : cur));
+  }, []);
+
   const onFolderDropNote = useCallback(
     async (folderPath: string) => {
       const id = draggedRef.current;
       draggedRef.current = null;
       setDropTargetKey(null);
+      setDragKind(null);
       if (id === null) return;
       await moveNote(id, folderPath);
       await ctx.refreshOne(id);
     },
     [ctx],
   );
+
   const onRootDrop = useCallback(async () => {
     const id = draggedRef.current;
     draggedRef.current = null;
     setRootDropActive(false);
+    setDragKind(null);
     if (id === null) return;
     await moveNote(id, null);
     await ctx.refreshOne(id);
   }, [ctx]);
+
+  // Reorder a note relative to `targetId`. When the dragged note lives in a
+  // different folder, it is first moved into the target's folder, then placed.
+  // Persists the target folder's full new sequence into the global note_order
+  // (sibling-local comparison keeps other folders' order untouched).
+  const onNoteReorder = useCallback(
+    async (targetId: NoteId, place: ReorderPlace) => {
+      const draggedId = draggedRef.current;
+      draggedRef.current = null;
+      setReorderTarget(null);
+      setDragKind(null);
+      if (draggedId === null || draggedId === targetId) return;
+
+      const targetRec = ctx.cache.get(targetId);
+      const draggedRec = ctx.cache.get(draggedId);
+      if (targetRec === undefined || draggedRec === undefined) return;
+
+      const targetFolderKey = noteFolderKey(targetRec.folder);
+      // Cross-folder drop → move into the target's folder first.
+      if (targetFolderKey !== noteFolderKey(draggedRec.folder)) {
+        await moveNote(draggedId, normalizeFolderPath(targetRec.folder ?? null));
+        await ctx.refreshOne(draggedId);
+      }
+
+      // The target folder's notes in current display order, minus the dragged
+      // note (re-inserted at the chosen slot). Computed from the live cache so
+      // the just-moved note's new siblings are included.
+      const rank = buildRankMap(noteOrder);
+      const siblings = sortBatchIds(
+        Array.from(ctx.cache.values())
+          .filter(
+            (r) =>
+              r.noteUuid !== draggedId &&
+              noteFolderKey(r.folder) === targetFolderKey,
+          )
+          .map((r) => r.noteUuid),
+        ctx.cache,
+        rank,
+      );
+      const targetIdx = siblings.indexOf(targetId);
+      const insertAt =
+        targetIdx === -1
+          ? siblings.length
+          : place === "above"
+            ? targetIdx
+            : targetIdx + 1;
+      const newSeq = [
+        ...siblings.slice(0, insertAt),
+        draggedId,
+        ...siblings.slice(insertAt),
+      ];
+
+      const inFolder = new Set(newSeq);
+      const nextOrder = [
+        ...noteOrder.filter((id) => !inFolder.has(id)),
+        ...newSeq,
+      ];
+      setNoteOrder(nextOrder);
+      void persistNoteOrder(nextOrder).catch(() => {});
+    },
+    [ctx, noteOrder],
+  );
+
+  // Reorder a folder relative to a same-parent sibling `targetNode`.
+  // Cross-parent drops are a reparent (folder MOVE) — out of scope, so no-op.
+  const onFolderReorder = useCallback(
+    async (targetNode: FolderNode, place: ReorderPlace) => {
+      const draggedKey = draggedFolderRef.current;
+      draggedFolderRef.current = null;
+      setFolderReorderTarget(null);
+      setDragKind(null);
+      if (draggedKey === null || draggedKey === targetNode.key) return;
+
+      const tree = treeRef.current;
+      const draggedNode = findByFoldedKey(tree.roots, draggedKey);
+      if (draggedNode === null) return;
+      if (folderParent(draggedNode.path) !== folderParent(targetNode.path)) {
+        return;
+      }
+
+      const parentPath = folderParent(targetNode.path);
+      const siblingNodes =
+        parentPath === ""
+          ? tree.roots
+          : (findByFoldedKey(tree.roots, foldSegment(parentPath))?.children ??
+            []);
+      const siblingPaths = siblingNodes
+        .map((n) => n.path)
+        .filter((p) => foldSegment(p) !== draggedKey);
+      const targetIdx = siblingPaths.findIndex(
+        (p) => foldSegment(p) === targetNode.key,
+      );
+      const insertAt =
+        targetIdx === -1
+          ? siblingPaths.length
+          : place === "above"
+            ? targetIdx
+            : targetIdx + 1;
+      const newSeq = [
+        ...siblingPaths.slice(0, insertAt),
+        draggedNode.path,
+        ...siblingPaths.slice(insertAt),
+      ];
+
+      const inGroup = new Set(newSeq.map((p) => foldSegment(p)));
+      const nextOrder = [
+        ...folderOrder.filter((p) => !inGroup.has(foldSegment(p))),
+        ...newSeq,
+      ];
+      setFolderOrder(nextOrder);
+      void persistFolderOrder(nextOrder).catch(() => {});
+    },
+    [folderOrder],
+  );
 
   return {
     deliberate,
@@ -278,6 +500,20 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     onNoteDragStart,
     onFolderDropNote,
     onRootDrop,
+    // reorder (notes + folders)
+    noteOrder,
+    folderOrder,
+    dragKind,
+    reorderTarget,
+    updateReorderTarget,
+    clearReorderTarget,
+    onNoteReorder,
+    folderReorderTarget,
+    updateFolderReorderTarget,
+    clearFolderReorderTarget,
+    onFolderReorder,
+    onFolderDragStart,
+    onDragEndCleanup,
   };
 }
 

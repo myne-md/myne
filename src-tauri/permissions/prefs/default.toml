@@ -20,6 +20,8 @@ permissions = [
   "allow-set-screen-capture-protection",
   "allow-set-deliberate-folders",
   "allow-set-auto-lock-timeout",
+  "allow-set-note-order",
+  "allow-set-folder-order",
 ]
 
 [[permission]]
@@ -46,3 +48,16 @@ commands.allow = ["set_deliberate_folders"]
 identifier = "allow-set-auto-lock-timeout"
 description = "Allow invoking prefs:set_auto_lock_timeout (Slot::Unlocked-gated setter for the auto_lock_seconds field — atomic-writes vault.prefs FIRST then refreshes the idle timer's cached effective timeout, clamped through the protective envelope; MYND-121)."
 commands.allow = ["set_auto_lock_timeout"]
+
+# Manual sidebar reorder: a write setter, so it inherits the same
+# main-window-only invariant as the other allow-set-* permissions —
+# v0.2 multi-window MUST NOT grant these to any non-main window.
+[[permission]]
+identifier = "allow-set-note-order"
+description = "Allow invoking prefs:set_note_order (Slot::Unlocked-gated setter for the note_order sequence — the manual sidebar sort order for notes; atomic-writes vault.prefs with no native side-effect, preserving element order)."
+commands.allow = ["set_note_order"]
+
+[[permission]]
+identifier = "allow-set-folder-order"
+description = "Allow invoking prefs:set_folder_order (Slot::Unlocked-gated setter for the folder_order sequence — the manual sidebar sort order for folders; atomic-writes vault.prefs with no native side-effect, preserving element order)."
+commands.allow = ["set_folder_order"]
