@@ -31,8 +31,6 @@ export type AppStageName =
  */
 export type CommandContext = {
   stageName: AppStageName;
-  /** Notes cache for the "Switch to note…" sub-palette. */
-  noteTitles: ReadonlyMap<NoteId, string | null>;
   /** Current selection in the editor (or null when not in editor stage). */
   selectedNoteId: NoteId | null;
   /** Invoke the lock-vault flow (mirrors BottomBar Lock button). */

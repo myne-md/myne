@@ -549,15 +549,9 @@ function CommandPaletteHost({
   onLockFlushed,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
-  const titles = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const [id, rec] of ctx.cache.entries()) m.set(id, rec.title);
-    return m;
-  }, [ctx.cache]);
   const commandCtx: CommandContext = useMemo(
     () => ({
       stageName: "editor",
-      noteTitles: titles,
       selectedNoteId: ctx.selectedId,
       onLock: onLockFlushed,
       onOpenSettings,
@@ -567,21 +561,28 @@ function CommandPaletteHost({
         });
       },
     }),
-    [titles, ctx.selectedId, ctx.open, onLockFlushed, onOpenSettings],
+    [ctx.selectedId, ctx.open, onLockFlushed, onOpenSettings],
   );
   return <CommandPalette open={open} onClose={onClose} ctx={commandCtx} />;
 }
 
 /**
- * Global `Cmd+K` / `Ctrl+K` window-level keydown listener for opening
- * the command palette. Sits outside the editor's CM6 keymap so it works
+ * Global window-level keydown listener for the unified command palette
+ * (MYND-86 + MYND-40). Sits outside the editor's CM6 keymap so it works
  * regardless of which pane has focus (sidebar, settings rail, etc.).
+ *
+ * `Cmd/Ctrl+K` and `Cmd/Ctrl+P` BOTH toggle the same palette — it shows
+ * commands + note search together, so there is no separate mode to enter.
+ * `preventDefault` (which fires for both) also suppresses the WebView's native
+ * Print dialog on Cmd+P.
  */
 function CommandPaletteHotkey({ onToggle }: { onToggle: () => void }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
-      if (e.key !== "k" && e.key !== "K") return;
+      if (e.key !== "k" && e.key !== "K" && e.key !== "p" && e.key !== "P") {
+        return;
+      }
       // Skip when typing inside an input or contenteditable field whose
       // intent is to capture all keystrokes (e.g., rename input, URL
       // overlay input). Editor's contentDOM IS contenteditable but the

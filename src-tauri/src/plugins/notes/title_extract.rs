@@ -96,18 +96,68 @@ pub fn extract_title_slices(plaintext: &[u8]) -> TitleSlices<'_> {
     }
 }
 
-/// Best-effort note title for the search index (MYND-29 Task 4): the first
-/// `# H1` line's text (without the `"# "` prefix), trimmed; `None` when there
-/// is no H1 or it is blank. NOTE: frontmatter `title:` resolution (the
-/// sidebar's full FM↳H1↳None precedence) is intentionally NOT applied here —
-/// search title-boost covers the common H1-titled note, and an FM-only-titled
-/// note stays fully searchable via its body. Full title resolution can be
-/// unified later if the benchmark shows title-boost recall matters.
-pub fn extract_h1_title(plaintext: &[u8]) -> Option<String> {
-    let line = extract_title_slices(plaintext).first_h1_line?;
+/// Extract the H1 title from an already-located first-H1 line (`"# "` prefix
+/// stripped, trimmed; `None` when the line is absent or blank). The H1 half of
+/// [`resolve_note_title`]'s `FM title ↳ H1 ↳ None` precedence — takes the slice
+/// the caller already holds so the plaintext is scanned only once.
+fn h1_title_from_line(first_h1_line: Option<&[u8]>) -> Option<String> {
+    let line = first_h1_line?;
     let text = line.strip_prefix(H1_PREFIX).unwrap_or(line);
     let title = String::from_utf8_lossy(text).trim().to_string();
     (!title.is_empty()).then_some(title)
+}
+
+/// Resolve the note title the SAME way the sidebar does (MYND-40 bug fix):
+/// frontmatter `title:` ↳ first `# H1` ↳ None. The search index uses this so a
+/// search result shows the title the sidebar shows — e.g. a note with
+/// `title: Dali` in frontmatter and a `# Done` body heading resolves to "Dali",
+/// not "Done". Frontmatter parsing is a MINIMAL top-level `title:` scan (bare or
+/// single/double-quoted scalar); a block/flow-scalar, empty, or otherwise exotic
+/// `title:` falls back to the first H1 (full YAML resolution stays TS-side, the
+/// sidebar's domain — this module only does byte-level line walks, TB9).
+pub fn resolve_note_title(plaintext: &[u8]) -> Option<String> {
+    let slices = extract_title_slices(plaintext);
+    if let Some(fm) = slices.frontmatter_bytes {
+        if let Some(title) = fm_title(fm) {
+            return Some(title);
+        }
+    }
+    h1_title_from_line(slices.first_h1_line)
+}
+
+/// Minimal top-level `title:` extractor for a YAML frontmatter block. Returns
+/// the trimmed scalar value (surrounding single/double quotes stripped), or
+/// `None` when there is no top-level `title:`, its value is empty, or it begins
+/// a block/flow scalar this scanner deliberately does not parse.
+fn fm_title(frontmatter: &[u8]) -> Option<String> {
+    for line in frontmatter.split(|b| *b == b'\n') {
+        // Top-level key only — a leading space/indent means a nested mapping,
+        // which `strip_prefix(b"title:")` correctly rejects.
+        let Some(rest) = line.strip_prefix(b"title:") else {
+            continue;
+        };
+        let raw = String::from_utf8_lossy(rest).trim().to_string();
+        // Block/flow-scalar indicator or empty inline value → decline; the
+        // caller falls back to the first H1.
+        if raw.is_empty() || raw.starts_with('|') || raw.starts_with('>') {
+            return None;
+        }
+        let trimmed = strip_matching_quotes(&raw).trim();
+        return (!trimmed.is_empty()).then(|| trimmed.to_string());
+    }
+    None
+}
+
+/// Strip one layer of matching surrounding single or double quotes, if present.
+fn strip_matching_quotes(s: &str) -> &str {
+    let b = s.as_bytes();
+    if b.len() >= 2
+        && ((b[0] == b'"' && b[b.len() - 1] == b'"') || (b[0] == b'\'' && b[b.len() - 1] == b'\''))
+    {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    }
 }
 
 #[cfg(test)]
@@ -233,19 +283,78 @@ mod tests {
     }
 
     #[test]
-    fn extract_h1_title_strips_prefix_and_trims() {
+    fn resolve_h1_fallback_strips_prefix_trims_and_drops_empty() {
+        // No frontmatter → H1 fallback: strip "# ", trim.
         assert_eq!(
-            extract_h1_title(b"# My Note\nbody here"),
+            resolve_note_title(b"#   My Note  \nbody here"),
             Some("My Note".to_string())
         );
-        // No H1 → None (search indexes body only, title empty).
-        assert_eq!(extract_h1_title(b"plain body, no heading"), None);
+        // No H1 at all → None.
+        assert_eq!(resolve_note_title(b"plain body, no heading"), None);
         // Empty H1 → None.
-        assert_eq!(extract_h1_title(b"# \nbody"), None);
-        // FM present but H1 used (FM `title:` resolution is out of scope here).
+        assert_eq!(resolve_note_title(b"# \nbody"), None);
+    }
+
+    // ---- resolve_note_title (MYND-40 bug fix: FM title ↳ H1 ↳ None) ------
+
+    #[test]
+    fn resolve_prefers_frontmatter_title_over_h1() {
+        // The real-world bug: FM `title: Dali` + body heading `# Done` → "Dali"
+        // (the search index must match the sidebar's title, not show "Done").
         assert_eq!(
-            extract_h1_title(b"---\ntitle: Foo\n---\n# Real Heading\nx"),
-            Some("Real Heading".to_string())
+            resolve_note_title(
+                b"---\ntitle: Dali\nfolder: 1-PROJECTS/\n---\n# Done\nkortikal here"
+            ),
+            Some("Dali".to_string())
         );
+    }
+
+    #[test]
+    fn resolve_falls_back_to_h1_when_no_fm_title() {
+        assert_eq!(
+            resolve_note_title(b"---\nfolder: x\n---\n# Done\nbody"),
+            Some("Done".to_string())
+        );
+        assert_eq!(
+            resolve_note_title(b"# Done\nbody"),
+            Some("Done".to_string())
+        );
+    }
+
+    #[test]
+    fn resolve_strips_quotes_on_fm_title() {
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: \"Dali\"\n---\n# Done"),
+            Some("Dali".to_string())
+        );
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: 'Dali'\n---\n# Done"),
+            Some("Dali".to_string())
+        );
+    }
+
+    #[test]
+    fn resolve_block_scalar_or_empty_title_falls_back_to_h1() {
+        // Block-scalar title indicator → minimal scanner declines → H1.
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: |\n  Multi\n  line\n---\n# Done\nx"),
+            Some("Done".to_string())
+        );
+        // Empty inline value → H1.
+        assert_eq!(
+            resolve_note_title(b"---\ntitle:\n---\n# Done"),
+            Some("Done".to_string())
+        );
+        // Quoted-empty value → H1.
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: \"\"\n---\n# Done"),
+            Some("Done".to_string())
+        );
+    }
+
+    #[test]
+    fn resolve_none_when_neither_fm_title_nor_h1() {
+        assert_eq!(resolve_note_title(b"plain body, no heading"), None);
+        assert_eq!(resolve_note_title(b"---\nfolder: x\n---\nbody only"), None);
     }
 }

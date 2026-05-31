@@ -33,23 +33,6 @@ const openSettingsAction: CommandAction = {
   },
 };
 
-const switchToNoteAction: CommandAction = {
-  id: "note.switch",
-  label: "Switch to note…",
-  category: "Navigation",
-  // The palette UI special-cases this id and replaces the action list with
-  // a note-picker view when invoked. Hidden when not in editor stage OR
-  // when the title cache is empty (no notes yet — the only path is to
-  // create one via Cmd+N).
-  visibility: (ctx) =>
-    ctx.stageName === "editor" && ctx.noteTitles.size > 0 ? "show" : "hidden",
-  run: () => {
-    // No-op: the palette UI intercepts this action and switches to the
-    // note-picker view instead of calling `run`. The `run` is a fallback
-    // for unusual invocation paths (e.g., synthetic test dispatch).
-  },
-};
-
 const importObsidianAction: CommandAction = {
   id: "vault.import-obsidian",
   label: "Import Obsidian vault…",
@@ -78,7 +61,6 @@ const convertWikilinksAction: CommandAction = {
 export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
-  switchToNoteAction,
   importObsidianAction,
   convertWikilinksAction,
 ]);

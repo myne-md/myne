@@ -48,7 +48,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::commands::{enumerate_notes_dir, note_read_with_dir};
-use super::title_extract::extract_h1_title;
+use super::title_extract::resolve_note_title;
 
 // The account-hash we read from `vault.meta` (`VAULT_META_ACCOUNT_HASH_LEN`)
 // is fed straight into the snapshot codec, which binds it as
@@ -217,7 +217,7 @@ pub(crate) async fn hydrate_search_index_with_dir(
         }
         match note_read_with_dir(notes_dir.clone(), state, id.clone()).await {
             Ok(plaintext) => {
-                let title = extract_h1_title(plaintext.as_bytes()).unwrap_or_default();
+                let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
                 fetched.insert(id.clone(), (title, plaintext));
             }
             Err(_) => {
