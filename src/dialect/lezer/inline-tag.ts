@@ -8,6 +8,7 @@
 // isn't invoked there.
 
 import type { MarkdownConfig } from "@lezer/markdown";
+import { isWhitespace } from "./whitespace";
 
 const CHAR_HASH = 35;
 
@@ -43,21 +44,6 @@ const DENY_ASCII: ReadonlySet<number> = new Set([
   0x7d, // }
   0x7e, // ~
 ]);
-
-function isWhitespace(charCode: number): boolean {
-  if (
-    charCode === 0x20 ||
-    charCode === 0x09 ||
-    charCode === 0x0a ||
-    charCode === 0x0d ||
-    charCode === 0x0b ||
-    charCode === 0x0c
-  ) {
-    return true;
-  }
-  if (charCode < 0x80) return false;
-  return /\s/u.test(String.fromCharCode(charCode));
-}
 
 function isAllowedTagChar(charCode: number): boolean {
   if (DENY_ASCII.has(charCode)) return false;

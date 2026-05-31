@@ -361,6 +361,111 @@ export const myneTheme = EditorView.theme({
     fontStyle: "italic",
   },
 
+  // Footnotes (MYND-153) — decorations/footnote.ts.
+  // Inline `[^N]` reference marker: a raised, smaller, link-colored glyph; the
+  // `[^` `]` brackets are hidden off-cursor via Decoration.replace. Clickable
+  // (jumps to the definition), so a pointer cursor reads the affordance.
+  ".cm-footnote-ref": {
+    verticalAlign: "super",
+    fontSize: "0.75em",
+    lineHeight: "0",
+    color: "var(--accent, #2c4a7a)",
+    cursor: "pointer",
+  },
+  // Orphan reference (no matching definition): muted error tint, still raised.
+  ".cm-footnote-ref-orphan": {
+    color: "var(--danger, #8a2a23)",
+    opacity: "0.8",
+  },
+  // In-source `[^N]: …` definition line, de-emphasized off-cursor (left in
+  // place, never moved/deleted — §6 C1). Reveals at full prominence when the
+  // cursor is on its line (the mark lifts).
+  ".cm-footnote-def": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "0.92em",
+  },
+  // The definition's identifier rendered as a superscript marker (brackets +
+  // colon hidden off-cursor) so each in-source definition is identifiable
+  // without showing the raw `[^N]:` syntax. Mirrors the inline reference marker
+  // but is not itself a click target.
+  ".cm-footnote-def-marker": {
+    verticalAlign: "super",
+    fontSize: "0.75em",
+    lineHeight: "0",
+    color: "var(--accent, #2c4a7a)",
+    marginRight: "0.25em",
+  },
+
+  // EOD "Footnotes" block widget — a derived read-only VIEW appended at document
+  // end. The source definition lines stay byte-stable; this list never writes.
+  ".cm-footnote-list": {
+    marginTop: "28px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    lineHeight: "1.6",
+    color: "var(--fg-2)",
+  },
+  ".cm-footnote-list-rule": {
+    height: "1px",
+    backgroundColor: "var(--line-1, #e3e2dd)",
+    margin: "0 0 12px 0",
+  },
+  ".cm-footnote-list-heading": {
+    fontSize: "11px",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "var(--fg-3, #6b6a64)",
+    marginBottom: "8px",
+  },
+  // Two-column grid so every entry's body text starts at the same x regardless
+  // of identifier width (col 1 sizes to the widest marker — fixes the `1` vs
+  // `long-note` misalignment). `.cm-footnote-item` is display:contents so its
+  // marker + body become the grid cells.
+  ".cm-footnote-list-items": {
+    listStyle: "none",
+    margin: "0",
+    padding: "0",
+    display: "grid",
+    gridTemplateColumns: "max-content 1fr",
+    columnGap: "10px",
+    rowGap: "6px",
+    alignItems: "baseline",
+  },
+  ".cm-footnote-item": {
+    display: "contents",
+  },
+  ".cm-footnote-item-marker": {
+    textAlign: "right",
+    whiteSpace: "nowrap",
+    color: "var(--fg-3, #6b6a64)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  ".cm-footnote-item-body": {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "8px",
+    minWidth: "0", // let the text wrap inside the grid column
+  },
+  ".cm-footnote-item-text": {
+    flex: "1 1 auto",
+  },
+  // Unreferenced (orphan) definition badge — amber, low-key.
+  ".cm-footnote-item-badge": {
+    flex: "0 0 auto",
+    fontSize: "10px",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "var(--warning, #8a6a1f)",
+    backgroundColor: "var(--warning-soft, #f5efde)",
+    borderRadius: "var(--radius-1, 3px)",
+    padding: "1px 6px",
+  },
+  // Back-affordance (↩) to the originating reference.
+  ".cm-footnote-item-backref": {
+    flex: "0 0 auto",
+    color: "var(--accent, #2c4a7a)",
+    cursor: "pointer",
+    userSelect: "none",
   // In-note find matches (MYND-175). The @codemirror/search engine decorates
   // every query match with `.cm-searchMatch` and the current/active one with
   // `.cm-searchMatch-selected`. Per the approved Penpot legend: all matches get

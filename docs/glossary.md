@@ -370,6 +370,18 @@ A *virtual* organizational container for notes, shown as a nested tree in the si
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
 
+### **footnote definition** &nbsp; 📦 *Product*
+
+A `[^N]: definition text` block in the Myne dialect (`spec/markdown-dialect.md` §3.4), where `N` is any non-whitespace identifier. Recognized by a custom footnote `MarkdownConfig` (`src/dialect/lezer/footnote.ts`, MYND-153) as a `FootnoteDefinition` **composite** block; position is not normative (§3.4). The body continues onto blank or ≥4-column-indented following lines (Pandoc / GitHub continuation), so a footnote may hold multiple paragraphs, fenced code, or blockquotes; a footnote-definition line interrupts an open paragraph so consecutive `[^1]:`/`[^2]:` lines are distinct. In the Phase 1 editor the in-source line is left byte-stable in place (never moved or rewritten — D1 hard rule C1), de-emphasized off-cursor and revealed at full prominence on-cursor, while a derived read-only "Footnotes" list at document end renders every definition's text (the list is a VIEW, not a serialization). A definition that no [footnote reference](#footnote-reference) points at is collected and flagged *unreferenced*. Distinct from a [reference link definition](#link-reference-definition) (`[ref]: url`), which a footnote definition outranks at parse.
+
+Used in: `spec/markdown-dialect.md` §3.4, §8; `decisions.md` 2026-05-31; `src/dialect/lezer/footnote.ts`, `src/editor/decorations/footnote.ts`
+
+### **footnote reference** &nbsp; 📦 *Product*
+
+An inline `[^N]` marker in the Myne dialect (`spec/markdown-dialect.md` §3.4), where `N` is any non-whitespace identifier (typically an integer, but `[^note]` / `[^a1]` are permitted). Recognized as a `FootnoteReference` node (`src/dialect/lezer/footnote.ts`, MYND-153) and rendered in the Phase 1 editor as a small superscript glyph (the identifier) with the `[^` / `]` brackets hidden off-cursor; the cursor entering the span reveals raw `[^N]` for editing (the cursor-aware reveal shared with links). Clicking a reference whose [footnote definition](#footnote-definition) exists jumps the cursor to that definition; an *orphan reference* (no matching definition) renders a muted error-tinted variant and clicking is a safe no-op.
+
+Used in: `spec/markdown-dialect.md` §3.4, §8; `decisions.md` 2026-05-31; `src/dialect/lezer/footnote.ts`, `src/editor/decorations/footnote.ts`
+
 ### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 
 Myne's architectural commitment that each major protocol version (v0.1, v005, v006, …) is a closed, complete specification with distinct magic bytes, AAD prefix, and context-string prefix. Cross-major reads happen only via explicit user-initiated migration (`spec/protocol.md` §10.4); a v005 client refuses to silently parse a v0.1 blob, and vice versa. The choice contradicts the additive-extension model common in TLS 1.0–1.2 and OpenPGP; the reasoning is that those protocols' downgrade-attack history (POODLE, FREAK, Logjam, MEGA-2022) shows additive extension to be a structural risk. v005's anticipated changes (PQ hybrid wrap, MLS multi-device, OPAQUE auth, KT log) are too deep to be additive in any honest sense.

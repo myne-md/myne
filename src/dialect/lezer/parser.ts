@@ -6,10 +6,12 @@ import { parser as baseParser, GFM } from "@lezer/markdown";
 import { Wikilink } from "./wikilink";
 import { InlineTag } from "./inline-tag";
 import { DefinitionList } from "./definition-list";
+import { Footnote } from "./footnote";
 
 export const parser = baseParser.configure([
   GFM,
   Wikilink,
   InlineTag,
   DefinitionList,
+  Footnote,
 ]);
