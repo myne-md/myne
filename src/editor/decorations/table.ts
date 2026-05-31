@@ -26,8 +26,6 @@ import {
   type EditorState,
   type Extension,
   RangeSetBuilder,
-  StateEffect,
-  StateField,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -37,7 +35,8 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import { selectionTouchesLines } from "./cursor-aware";
+import { editorFocusField, selectionTouchesLines } from "./cursor-aware";
+import { makeCursorAwareStateField } from "./plugin-factory";
 
 /** Per-column horizontal alignment; `null` = default (renders left). */
 export type ColumnAlign = "left" | "center" | "right" | null;
@@ -262,57 +261,14 @@ export function buildTableDecorations(
   return builder.finish();
 }
 
-// Editor focus, threaded into state so the block-replace StateField (which has
-// no `view`) can gate reveal on it. `EditorView.focusChangeEffect` maps a DOM
-// focus/blur into this effect; `tableFocusField` records it. Kept local for
-// now; if a second StateField block decoration ever needs focus-in-state, lift
-// this field + tracker into `cursor-aware.ts` as shared infra (the
-// view-agnostic `selectionTouchesLines` already lives there).
-const setTableFocus = StateEffect.define<boolean>();
-
-const tableFocusField = StateField.define<boolean>({
-  create() {
-    return false;
-  },
-  update(value, tr) {
-    for (const effect of tr.effects) {
-      if (effect.is(setTableFocus)) return effect.value;
-    }
-    return value;
-  },
-});
-
-const tableFocusTracker = EditorView.focusChangeEffect.of((_state, focusing) =>
-  setTableFocus.of(focusing),
-);
-
-const tableField = StateField.define<DecorationSet>({
-  create(state) {
-    return buildTableDecorations(state, state.field(tableFocusField));
-  },
-  update(decorations, tr) {
-    const selectionChanged = !tr.startState.selection.eq(tr.state.selection);
-    const focusChanged = tr.effects.some((e) => e.is(setTableFocus));
-    // CM6 parses asynchronously; the lezer tree this field depends on is not
-    // ready at `create()` time on load. The Language package dispatches a
-    // transaction when background parsing advances — rebuild on that too, or
-    // tables never render until some other transaction (a click) forces it.
-    const treeChanged = syntaxTree(tr.startState) !== syntaxTree(tr.state);
-    if (!tr.docChanged && !selectionChanged && !focusChanged && !treeChanged) {
-      return decorations;
-    }
-    // `tableFocusField` updates before this field (declared earlier in the
-    // extension array), so its value already reflects this transaction.
-    return buildTableDecorations(tr.state, tr.state.field(tableFocusField));
-  },
-  provide(field) {
-    return EditorView.decorations.from(field);
-  },
-});
-
+// Whole-table reveal is gated on focus, threaded into state via the shared
+// `editorFocusField` (`cursor-aware.ts`) since this block-replace StateField has
+// no `view`. `makeCursorAwareStateField` owns the recompute gate + focus
+// field/tracker ordering; the builder just reads the current focus value.
 export function tableDecorations(): Extension {
-  // Order matters: the focus field must update before `tableField` reads it.
-  return [tableFocusField, tableFocusTracker, tableField];
+  return makeCursorAwareStateField((state) =>
+    buildTableDecorations(state, state.field(editorFocusField)),
+  );
 }
 
 // --- Arrow-into-table navigation ----------------------------------------
