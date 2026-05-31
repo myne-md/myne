@@ -955,6 +955,7 @@ mod tests {
                     auto_lock_seconds: None,
                     note_order: Vec::new(),
                     folder_order: Vec::new(),
+                    editor_layout: None,
                 },
             )
             .expect("encode prefs blob");
@@ -1050,6 +1051,7 @@ mod tests {
                 auto_lock_seconds: None,
                 note_order: Vec::new(),
                 folder_order: Vec::new(),
+                editor_layout: None,
             },
         )
         .expect("encode");

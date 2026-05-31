@@ -11,6 +11,20 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+/**
+ * Editor three-pane layout — sidebar widths (px) + collapsed flags (MYND-137).
+ * Mirrors `protocol::EditorLayout`. The widths carry the *last non-collapsed*
+ * width so a re-expand restores it. `null` on {@link PrefsView.editor_layout}
+ * means the user never customized the layout (the field is omitted from the
+ * encrypted blob), and the caller applies its default widths.
+ */
+export interface EditorLayout {
+  left_width: number;
+  right_width: number;
+  left_collapsed: boolean;
+  right_collapsed: boolean;
+}
+
 /** Mirrors `protocol::PrefsView` (Rust side). */
 export interface PrefsView {
   screen_capture_protection: boolean;
@@ -42,6 +56,13 @@ export interface PrefsView {
    * Absent in pre-reorder vaults → defaults to `[]`.
    */
   folder_order: string[];
+  /**
+   * Editor three-pane layout (sidebar widths + collapsed flags, MYND-137).
+   * `null` when the user never customized the layout — the field is omitted
+   * from the encrypted blob, byte-identical to a pre-MYND-137 vault. Serialized
+   * from Rust `Option<EditorLayout>` (null | object).
+   */
+  editor_layout: EditorLayout | null;
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -106,4 +127,17 @@ export async function setNoteOrder(order: string[]): Promise<void> {
  */
 export async function setFolderOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_folder_order", { order });
+}
+
+/**
+ * Persist the editor three-pane layout (sidebar widths + collapsed flags,
+ * MYND-137). The caller passes the full desired layout; the backend
+ * atomic-writes vault.prefs with no native side-effect. The codec stores the
+ * raw value — the min/max clamp lives on the client, re-applied on read, so a
+ * replayed/tampered blob is re-clamped into range rather than trusted. A
+ * rejected promise means the disk write failed; the caller's in-memory layout
+ * state remains the source of truth until the next successful write.
+ */
+export async function setEditorLayout(layout: EditorLayout): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_layout", { layout });
 }

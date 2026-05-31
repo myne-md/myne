@@ -58,9 +58,10 @@
 //! ## Schema evolution (spec § 9.5.2)
 //!
 //! Additive within v0.1 — new boolean / integer / string / string-array
-//! fields can be appended in any v0.1.x minor revision (v0.1.x has grown
-//! `deliberate_folders`, `auto_lock_seconds`, then `note_order` +
-//! `folder_order`). Older clients reading newer plaintexts MUST treat
+//! / nested-object fields can be appended in any v0.1.x minor revision
+//! (v0.1.x has grown `deliberate_folders`, `auto_lock_seconds`, then
+//! `note_order` + `folder_order`, then the `editor_layout` nested
+//! object). Older clients reading newer plaintexts MUST treat
 //! unknown fields as unknown-and-ignored (the parser below uses a
 //! tolerant value-by-value decoder keyed on canonical key order, not a
 //! strict struct-match, for forward-compat). Field removal, type changes,
@@ -120,11 +121,43 @@ pub const PREFS_BLOB_HEADER_LEN: usize = 34;
 /// [`crate::MAX_PLAINTEXT_LEN`] cap on `.myn` blobs. See spec § 9.5.4.
 pub const MAX_PREFS_PLAINTEXT_LEN: usize = 64 * 1024;
 
+/// Editor three-pane layout state — sidebar widths + collapsed flags
+/// (MYND-137). Persisted as a nested JSON object under the
+/// `editor_layout` key of [`PrefsView`]. Present **only** when the user
+/// has customized the layout (resized or collapsed a pane); a pristine
+/// layout omits the whole field so a vault that never touched the
+/// sidebars is byte-identical to a pre-MYND-137 `vault.prefs` (existing
+/// golden vectors unaffected).
+///
+/// `*_width` are integer pixels (no floats per spec § 9.5.2; the `u32`
+/// type enforces this on encode and the decoder rejects a fractional
+/// value). The widths carry the **last non-collapsed** width so a
+/// re-expand restores it; the collapse policy + min/max clamps live in
+/// the client (the UI layer), NOT here — this codec faithfully persists
+/// whatever the client wrote, exactly like `auto_lock_seconds`. These
+/// are AS3-low-sensitivity (window-layout metadata) and ride inside the
+/// AEAD-encrypted blob like every other field. Conflict semantics for
+/// Phase 2 sync are deferred (last-writer-wins on the whole object is
+/// the likely shape).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EditorLayout {
+    /// Left (notes) sidebar width in integer pixels — the last
+    /// non-collapsed width.
+    pub left_width: u32,
+    /// Right (backlinks) sidebar width in integer pixels — the last
+    /// non-collapsed width.
+    pub right_width: u32,
+    /// Whether the left sidebar is currently collapsed (hidden).
+    pub left_collapsed: bool,
+    /// Whether the right sidebar is currently collapsed (hidden).
+    pub right_collapsed: bool,
+}
+
 /// In-memory representation of the v0.1 `vault.prefs` plaintext.
 ///
 /// v0.1 has a single field. Future v0.1.x minor revisions append
-/// optional fields here (boolean / integer / string only — no floats
-/// per spec § 9.5.2). The `Default` impl supplies the
+/// optional fields here (boolean / integer / string / nested-object —
+/// no floats per spec § 9.5.2). The `Default` impl supplies the
 /// fall-back-to-defaults value the caller uses on read failure
 /// (spec § 9.5.5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -180,6 +213,17 @@ pub struct PrefsView {
     /// empty; omitted when empty.
     #[serde(default)]
     pub folder_order: Vec<alloc::string::String>,
+
+    /// Editor three-pane layout (sidebar widths + collapsed flags,
+    /// MYND-137). `None` = the user never customized the layout → the
+    /// field is omitted entirely from the canonical JSON, so a vault
+    /// that never touched the sidebars is byte-identical to a
+    /// pre-MYND-137 `vault.prefs`. When `Some`, encoded as a nested
+    /// object whose four keys are emitted in canonical (lexicographic)
+    /// order: `left_collapsed`, `left_width`, `right_collapsed`,
+    /// `right_width`. See [`EditorLayout`].
+    #[serde(default)]
+    pub editor_layout: Option<EditorLayout>,
 }
 
 impl Default for PrefsView {
@@ -196,6 +240,7 @@ impl Default for PrefsView {
             folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            editor_layout: None,
         }
     }
 }
@@ -347,6 +392,32 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
             push_json_string(&mut out, f);
         }
         out.extend_from_slice(b"],");
+    }
+
+    // editor_layout (canonical key 'e' — after 'd', before 'f'/'n'/'s').
+    // A nested object; omitted entirely when None so a vault that never
+    // customized the sidebar layout stays byte-identical to a pre-MYND-137
+    // vault.prefs. The four nested keys are emitted in canonical
+    // (lexicographic) order: left_collapsed < left_width < right_collapsed
+    // < right_width.
+    if let Some(layout) = prefs.editor_layout {
+        out.extend_from_slice(b"\"editor_layout\":{\"left_collapsed\":");
+        out.extend_from_slice(if layout.left_collapsed {
+            b"true"
+        } else {
+            b"false"
+        });
+        out.extend_from_slice(b",\"left_width\":");
+        push_json_uint(&mut out, layout.left_width);
+        out.extend_from_slice(b",\"right_collapsed\":");
+        out.extend_from_slice(if layout.right_collapsed {
+            b"true"
+        } else {
+            b"false"
+        });
+        out.extend_from_slice(b",\"right_width\":");
+        push_json_uint(&mut out, layout.right_width);
+        out.extend_from_slice(b"},");
     }
 
     // folder_order (canonical key 'f' — after 'd', before 'n'/'s'). Order
@@ -532,6 +603,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let mut cursor = 0usize;
     let deliberate_folders =
         parse_optional_array_field(rest, &mut cursor, b"\"deliberate_folders\":")?;
+    // editor_layout (canonical key 'e') sits between deliberate_folders (d)
+    // and folder_order (f); parsed from the same monotonic cursor so a later
+    // field's key marker is never matched inside the nested object.
+    let editor_layout = parse_optional_editor_layout(rest, &mut cursor, b"\"editor_layout\":")?;
     let folder_order = parse_optional_array_field(rest, &mut cursor, b"\"folder_order\":")?;
     let note_order = parse_optional_array_field(rest, &mut cursor, b"\"note_order\":")?;
 
@@ -558,7 +633,76 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         auto_lock_seconds,
         note_order,
         folder_order,
+        editor_layout,
     })
+}
+
+/// Parse the OPTIONAL `editor_layout` nested object, searching `rest`
+/// from `*cursor` onward (canonical key order: it follows
+/// `deliberate_folders` and precedes `folder_order`). On a hit, advances
+/// `*cursor` past the closing `}` and returns `Some(EditorLayout)`; on a
+/// miss returns `None` and leaves `*cursor` unchanged. The nested object
+/// has a fixed canonical shape (four keys in lexicographic order); any
+/// structural deviation rejects with [`PrefsBlobError::PlaintextParseFailed`]
+/// (the caller collapses to defaults per spec § 9.5.5).
+fn parse_optional_editor_layout(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Option<EditorLayout>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let obj_start = *cursor + rel_idx + marker.len();
+            let (layout, consumed) = parse_editor_layout_object(&rest[obj_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = obj_start + consumed;
+            Ok(Some(layout))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Parse the fixed-shape `editor_layout` nested object starting at
+/// `bytes[0] == '{'`. Expects exactly the canonical key order
+/// `{"left_collapsed":<bool>,"left_width":<uint>,"right_collapsed":<bool>,"right_width":<uint>}`.
+/// Returns the decoded [`EditorLayout`] + bytes consumed (through the
+/// closing `}`), or `None` on any malformation. A fractional width (e.g.
+/// `260.5`) parses the integer part then fails the required `,`/`}`
+/// terminator — enforcing the spec § 9.5.2 float ban structurally.
+fn parse_editor_layout_object(bytes: &[u8]) -> Option<(EditorLayout, usize)> {
+    let rest = bytes.strip_prefix(b"{\"left_collapsed\":")?;
+    let (left_collapsed, rest) = parse_json_bool(rest)?;
+    let rest = rest.strip_prefix(b",\"left_width\":")?;
+    let (left_width, n) = parse_json_uint(rest).ok()?;
+    let rest = &rest[n..];
+    let rest = rest.strip_prefix(b",\"right_collapsed\":")?;
+    let (right_collapsed, rest) = parse_json_bool(rest)?;
+    let rest = rest.strip_prefix(b",\"right_width\":")?;
+    let (right_width, n) = parse_json_uint(rest).ok()?;
+    let rest = &rest[n..];
+    let rest = rest.strip_prefix(b"}")?;
+    let consumed = bytes.len() - rest.len();
+    Some((
+        EditorLayout {
+            left_width,
+            right_width,
+            left_collapsed,
+            right_collapsed,
+        },
+        consumed,
+    ))
+}
+
+/// Parse a leading `true` / `false` literal, returning `(value, remaining)`.
+/// Strict — any other byte sequence is `None`.
+fn parse_json_bool(bytes: &[u8]) -> Option<(bool, &[u8])> {
+    if let Some(r) = bytes.strip_prefix(b"true") {
+        Some((true, r))
+    } else if let Some(r) = bytes.strip_prefix(b"false") {
+        Some((false, r))
+    } else {
+        None
+    }
 }
 
 /// Parse an OPTIONAL canonical string-array field whose key marker is
@@ -863,6 +1007,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -876,6 +1021,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -916,6 +1062,7 @@ mod tests {
                 folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                editor_layout: None,
             }
         );
     }
@@ -931,6 +1078,7 @@ mod tests {
                 folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                editor_layout: None,
             }
         );
     }
@@ -1008,6 +1156,7 @@ mod tests {
                 alloc::string::String::from("Archive/"),
             ],
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1028,6 +1177,7 @@ mod tests {
                 alloc::string::String::from("b/"),
             ],
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1046,6 +1196,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1063,6 +1214,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1143,6 +1295,7 @@ mod tests {
                 alloc::string::String::from("Archive/2025/"),
             ],
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -1186,6 +1339,7 @@ mod tests {
                 alloc::string::String::from("Zebra/"),
                 alloc::string::String::from("Apple/"),
             ],
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1208,6 +1362,7 @@ mod tests {
                 alloc::string::String::from("mmm"),
             ],
             folder_order: Vec::new(),
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1263,6 +1418,7 @@ mod tests {
                 alloc::string::String::from("Projects/"),
                 alloc::string::String::from("Archive/"),
             ],
+            editor_layout: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -1294,6 +1450,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(300),
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1311,6 +1468,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(900),
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1330,6 +1488,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(0),
+            editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1417,6 +1576,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(1800),
+            editor_layout: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -1443,6 +1603,187 @@ mod tests {
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
         assert_eq!(decoded.auto_lock_seconds, None);
         assert_eq!(original, decoded);
+    }
+
+    // ---- editor_layout nested object (MYND-137) ------------------------
+
+    fn sample_layout() -> EditorLayout {
+        EditorLayout {
+            left_width: 312,
+            right_width: 288,
+            left_collapsed: false,
+            right_collapsed: true,
+        }
+    }
+
+    #[test]
+    fn encode_omits_editor_layout_when_none() {
+        // None → byte-identical to the pre-MYND-137 shape (preserves
+        // existing vaults + KAT vectors).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_editor_layout_in_canonical_key_position() {
+        // Canonical top-level key order: d < e < f < n < s. With
+        // deliberate_folders, editor_layout, folder_order, note_order, and
+        // screen_capture_protection all present, editor_layout sits between
+        // deliberate_folders and folder_order. Nested keys are themselves in
+        // canonical order: left_collapsed < left_width < right_collapsed <
+        // right_width.
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
+            auto_lock_seconds: None,
+            note_order: alloc::vec![alloc::string::String::from("n1")],
+            folder_order: alloc::vec![alloc::string::String::from("Apple/")],
+            editor_layout: Some(sample_layout()),
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"folder_order":["Apple/"],"note_order":["n1"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn encode_editor_layout_alone_with_scp() {
+        let prefs = PrefsView {
+            editor_layout: Some(EditorLayout {
+                left_width: 260,
+                right_width: 280,
+                left_collapsed: false,
+                right_collapsed: false,
+            }),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"editor_layout":{"left_collapsed":false,"left_width":260,"right_collapsed":false,"right_width":280},"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn decode_round_trips_editor_layout() {
+        let parsed = canonical_json_decode(
+            br#"{"editor_layout":{"left_collapsed":true,"left_width":200,"right_collapsed":false,"right_width":460},"screen_capture_protection":true}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            parsed.editor_layout,
+            Some(EditorLayout {
+                left_width: 200,
+                right_width: 460,
+                left_collapsed: true,
+                right_collapsed: false,
+            })
+        );
+    }
+
+    #[test]
+    fn decode_absent_editor_layout_is_none() {
+        let parsed = canonical_json_decode(br#"{"screen_capture_protection":true}"#).unwrap();
+        assert_eq!(parsed.editor_layout, None);
+    }
+
+    #[test]
+    fn decode_rejects_float_editor_layout_width() {
+        // Spec § 9.5.2: floats FORBIDDEN. `left_width":260.5` parses 260 then
+        // hits `.` instead of the required `,` → reject.
+        let err = canonical_json_decode(
+            br#"{"editor_layout":{"left_collapsed":false,"left_width":260.5,"right_collapsed":false,"right_width":280},"screen_capture_protection":true}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn decode_rejects_editor_layout_with_wrong_key_order() {
+        // Non-canonical nested key order rejects (the writer is always
+        // canonical; a deviation is corruption → fall-back-to-defaults).
+        let err = canonical_json_decode(
+            br#"{"editor_layout":{"left_width":260,"left_collapsed":false,"right_collapsed":false,"right_width":280},"screen_capture_protection":true}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn decode_rejects_editor_layout_missing_field() {
+        let err = canonical_json_decode(
+            br#"{"editor_layout":{"left_collapsed":false,"left_width":260,"right_collapsed":false},"screen_capture_protection":true}"#,
+        )
+        .unwrap_err();
+        assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
+    }
+
+    #[test]
+    fn full_blob_round_trip_with_editor_layout() {
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView {
+            editor_layout: Some(sample_layout()),
+            ..PrefsView::default()
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(original, decoded);
+        assert_eq!(decoded.editor_layout, Some(sample_layout()));
+    }
+
+    #[test]
+    fn editor_layout_none_round_trips_through_full_blob() {
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView::default();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(decoded.editor_layout, None);
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn decode_editor_layout_coexists_with_all_other_fields() {
+        // Full field-mix smoke: a < d < e < f < n < s all present, parsed
+        // through the monotonic cursor without cross-field marker confusion.
+        let parsed = canonical_json_decode(
+            br#"{"auto_lock_seconds":900,"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":320,"right_collapsed":true,"right_width":300},"folder_order":["Zebra/"],"note_order":["n2","n1"],"screen_capture_protection":false}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.auto_lock_seconds, Some(900));
+        assert_eq!(
+            parsed.deliberate_folders,
+            alloc::vec![alloc::string::String::from("Archive/")]
+        );
+        assert_eq!(
+            parsed.editor_layout,
+            Some(EditorLayout {
+                left_width: 320,
+                right_width: 300,
+                left_collapsed: false,
+                right_collapsed: true,
+            })
+        );
+        assert_eq!(
+            parsed.folder_order,
+            alloc::vec![alloc::string::String::from("Zebra/")]
+        );
+        assert_eq!(
+            parsed.note_order,
+            alloc::vec![
+                alloc::string::String::from("n2"),
+                alloc::string::String::from("n1"),
+            ]
+        );
+        assert!(!parsed.screen_capture_protection);
     }
 
     // ---- outer envelope structural tests -------------------------------
@@ -1549,6 +1890,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -1570,6 +1912,7 @@ mod tests {
             folder_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            editor_layout: None,
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -1784,6 +2127,7 @@ mod tests {
                 folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                editor_layout: None,
             },
             &nonce_default,
         )
@@ -1798,6 +2142,7 @@ mod tests {
                 folder_order: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                editor_layout: None,
             },
             &nonce_toggled,
         )

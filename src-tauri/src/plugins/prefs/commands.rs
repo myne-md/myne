@@ -14,8 +14,8 @@
 use super::error::{PrefsReadError, PrefsWriteError};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, PrefsBlobError,
-    PrefsView, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, EditorLayout,
+    PrefsBlobError, PrefsView, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -457,6 +457,62 @@ pub(crate) async fn set_auto_lock_timeout_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `editor_layout` field (MYND-137) —
+/// the editor three-pane sidebar widths + collapsed flags. Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** (same shape as
+/// `set_note_order`). The caller passes the full desired layout; v0.1
+/// single-device writes it verbatim. The codec persists the RAW client value;
+/// the min/max clamp + collapse policy live in the UI layer (a replayed /
+/// tampered `vault.prefs` is re-clamped on the client at read time), so this
+/// command only persists the choice.
+#[tauri::command]
+pub async fn set_editor_layout<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    layout: EditorLayout,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_editor_layout_with_dir(&dir, state.inner(), layout).await
+}
+
+/// Testable core of [`set_editor_layout`].
+pub(crate) async fn set_editor_layout_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    layout: EditorLayout,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let (left_collapsed, right_collapsed) = (layout.left_collapsed, layout.right_collapsed);
+    prefs.editor_layout = Some(layout);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Collapsed flags only — window-layout metadata (AS3-low), never note
+    // content; widths are equally benign but omitted to keep the line minimal.
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_layout",
+        left_collapsed,
+        right_collapsed,
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -579,6 +635,7 @@ mod tests {
                     auto_lock_seconds: None,
                     note_order: Vec::new(),
                     folder_order: Vec::new(),
+                    editor_layout: None,
                 },
                 &[0x77; AEAD_NONCE_LEN],
             )
@@ -631,6 +688,74 @@ mod tests {
                 view.screen_capture_protection,
                 "toggled-on value must round-trip"
             );
+        });
+    }
+
+    // ---- editor_layout setter (MYND-137) ------------------------------
+
+    #[test]
+    fn set_editor_layout_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-layout-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_editor_layout_with_dir(
+                tmp.path(),
+                &state,
+                EditorLayout {
+                    left_width: 260,
+                    right_width: 280,
+                    left_collapsed: false,
+                    right_collapsed: false,
+                },
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn editor_layout_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            let layout = EditorLayout {
+                left_width: 312,
+                right_width: 248,
+                left_collapsed: false,
+                right_collapsed: true,
+            };
+            set_editor_layout_with_dir(tmp.path(), &state, layout)
+                .await
+                .expect("write must succeed");
+
+            assert!(
+                tmp.path().join("vault.prefs").exists(),
+                "set_editor_layout must create vault.prefs"
+            );
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read must succeed after write");
+            assert_eq!(
+                view.editor_layout,
+                Some(layout),
+                "editor_layout value must round-trip through disk"
+            );
+
+            // A second write overwrites (last-write-wins on the whole object).
+            let layout2 = EditorLayout {
+                left_width: 200,
+                right_width: 460,
+                left_collapsed: true,
+                right_collapsed: false,
+            };
+            set_editor_layout_with_dir(tmp.path(), &state, layout2)
+                .await
+                .expect("second write must succeed");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read must succeed after second write");
+            assert_eq!(view.editor_layout, Some(layout2));
         });
     }
 

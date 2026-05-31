@@ -22,6 +22,7 @@ permissions = [
   "allow-set-auto-lock-timeout",
   "allow-set-note-order",
   "allow-set-folder-order",
+  "allow-set-editor-layout",
 ]
 
 [[permission]]
@@ -61,3 +62,11 @@ commands.allow = ["set_note_order"]
 identifier = "allow-set-folder-order"
 description = "Allow invoking prefs:set_folder_order (Slot::Unlocked-gated setter for the folder_order sequence — the manual sidebar sort order for folders; atomic-writes vault.prefs with no native side-effect, preserving element order)."
 commands.allow = ["set_folder_order"]
+
+# MYND-137: a write setter, so it inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window
+# MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-editor-layout"
+description = "Allow invoking prefs:set_editor_layout (Slot::Unlocked-gated setter for the editor_layout object — the editor three-pane sidebar widths + collapsed flags; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_layout"]

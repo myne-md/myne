@@ -30,6 +30,7 @@ import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
 import { VirtualList } from "./VirtualList";
+import { IconButton } from "../../components/primitives/IconButton";
 import {
   flattenVisibleRows,
   visibleNoteIds,
@@ -217,6 +218,14 @@ const HEADER_ACTIONS_STYLE: CSSProperties = {
   gap: 2,
 };
 
+/** Leading group: the collapse chevron + the "Notes" eyebrow, kept together
+ *  so the header stays a clean two-group `space-between` row (MYND-137). */
+const HEADER_LEAD_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+};
+
 const EMPTY_WRAPPER_STYLE: CSSProperties = {
   display: "flex",
   flex: 1,
@@ -248,7 +257,8 @@ const EMPTY_CTA_STYLE: CSSProperties = {
 };
 
 const SIDEBAR_OUTER_STYLE: CSSProperties = {
-  width: 260,
+  // Fills the layout-seam wrapper, which owns the resizable width (MYND-137).
+  width: "100%",
   background: "var(--paper-2)",
   borderRight: "1px solid var(--line-1)",
   display: "flex",
@@ -346,7 +356,14 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
   marginTop: 8,
 };
 
-export function NoteList() {
+/** Optional props. `onCollapse` wires the header chevron that hides the
+ *  sidebar (MYND-137); omitted when the list is hosted outside the
+ *  resizable editor seam. */
+interface NoteListProps {
+  onCollapse?: () => void;
+}
+
+export function NoteList({ onCollapse }: NoteListProps = {}) {
   const ctx = useSelectedNote();
   // Folder-management state + handlers (deliberate_folders set, context menu,
   // create / rename / delete / drag-drop). Owns the deliberate set.
@@ -426,7 +443,7 @@ export function NoteList() {
   return (
     <aside style={SIDEBAR_OUTER_STYLE}>
       {isEmpty ? (
-        <EmptyState onCreate={handleCreate} fm={fm} />
+        <EmptyState onCreate={handleCreate} fm={fm} onCollapse={onCollapse} />
       ) : (
         <PopulatedList
           rows={rows}
@@ -434,6 +451,7 @@ export function NoteList() {
           onToggleFolder={toggleFolder}
           onCreate={handleCreate}
           fm={fm}
+          onCollapse={onCollapse}
         />
       )}
     </aside>
@@ -443,14 +461,25 @@ export function NoteList() {
 function EmptyState({
   onCreate,
   fm,
+  onCollapse,
 }: {
   onCreate: () => void;
   fm: FolderManagement;
+  onCollapse?: () => void;
 }) {
   return (
     <div style={LIST_OUTER_STYLE}>
       <div style={HEADER_ROW_STYLE}>
-        <div style={SECTION_HEADING_STYLE}>Notes</div>
+        <div style={HEADER_LEAD_STYLE}>
+          {onCollapse && (
+            <IconButton
+              icon="panel-left-close"
+              label="Collapse notes sidebar"
+              onClick={onCollapse}
+            />
+          )}
+          <div style={SECTION_HEADING_STYLE}>Notes</div>
+        </div>
         <div style={HEADER_ACTIONS_STYLE}>
           <button
             type="button"
@@ -489,12 +518,14 @@ function PopulatedList({
   onToggleFolder,
   onCreate,
   fm,
+  onCollapse,
 }: {
   rows: VisibleRow[];
   navIds: NoteId[];
   onToggleFolder: (key: string) => void;
   onCreate: () => void;
   fm: FolderManagement;
+  onCollapse?: () => void;
 }) {
   const ctx = useSelectedNote();
   const [menu, setMenu] = useState<ContextMenuState>(null);
@@ -634,7 +665,16 @@ function PopulatedList({
   return (
     <div style={LIST_OUTER_STYLE} onContextMenu={handleBackgroundContextMenu}>
       <div style={HEADER_ROW_STYLE}>
-        <div style={SECTION_HEADING_STYLE}>Notes</div>
+        <div style={HEADER_LEAD_STYLE}>
+          {onCollapse && (
+            <IconButton
+              icon="panel-left-close"
+              label="Collapse notes sidebar"
+              onClick={onCollapse}
+            />
+          )}
+          <div style={SECTION_HEADING_STYLE}>Notes</div>
+        </div>
         <div style={HEADER_ACTIONS_STYLE}>
           <button
             type="button"

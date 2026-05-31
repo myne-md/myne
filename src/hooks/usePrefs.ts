@@ -38,6 +38,7 @@ const DEFAULT_PREFS: PrefsView = {
   auto_lock_seconds: null,
   note_order: [],
   folder_order: [],
+  editor_layout: null,
 };
 
 interface UsePrefsResult {
