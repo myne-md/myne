@@ -53,12 +53,28 @@ pub struct Document {
     pub body: String,
 }
 
-/// A ranked search result: the document id, its display title, and BM25 score.
+/// Which field(s) a query matched in for a given hit (MYND-40). Drives the
+/// UI's "matched in body" badge: a body-only hit (`{title:false, body:true}`)
+/// is a note whose title does NOT contain the query, so the palette marks it
+/// — the match is never a mystery. Computed from the per-field term
+/// frequencies the index already stores while scoring, so it is precise
+/// (uses the engine's own stemming) and carries no plaintext, no extra pass,
+/// and no on-disk-format change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct MatchedIn {
+    pub title: bool,
+    pub body: bool,
+}
+
+/// A ranked search result: the document id, its display title, the BM25 score,
+/// and which field(s) the query matched in.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchHit {
     pub id: String,
     pub title: String,
     pub score: f32,
+    /// Which field(s) the query matched in — drives the UI body-match badge.
+    pub matched_in: MatchedIn,
 }
 
 /// Engine-agnostic search-index surface. The v0.1 implementation is
@@ -294,10 +310,22 @@ pub struct InvertedIndex {
 }
 
 impl InvertedIndex {
-    /// BM25 contribution of a single `term` to `docid`'s score. Returns 0 if
-    /// the term is absent or the document does not contain it. Uses the
+    /// BM25 contribution of a single `term` to `docid`'s score, AND — in the
+    /// same lookup — OR-accumulate which field(s) `term` occurs in for `docid`
+    /// into `matched_in`. Folding field-presence into the scoring lookup means a
+    /// single `postings`/`docid` probe per (term, doc) feeds BOTH the score and
+    /// [`SearchHit::matched_in`] (no second pass). Returns 0 — and leaves
+    /// `matched_in` untouched — when the term/doc pair is absent. Uses the
     /// title-boosted effective term frequency.
-    fn bm25_term(&self, term: &str, docid: u32, dl: f32, avgdl: f32, n: f32) -> f32 {
+    fn score_term(
+        &self,
+        term: &str,
+        docid: u32,
+        dl: f32,
+        avgdl: f32,
+        n: f32,
+        matched_in: &mut MatchedIn,
+    ) -> f32 {
         let Some(plist) = self.postings.get(term) else {
             return 0.0;
         };
@@ -305,6 +333,8 @@ impl InvertedIndex {
         let Some(ff) = plist.get(&docid) else {
             return 0.0;
         };
+        matched_in.title |= ff.tf_title > 0;
+        matched_in.body |= ff.tf_body > 0;
         let etf = ff.tf_body as f32 + TITLE_BOOST * ff.tf_title as f32;
         if etf <= 0.0 {
             return 0.0;
@@ -496,25 +526,34 @@ impl SearchIndex for InvertedIndex {
             .map(|docid| {
                 let entry = &self.docs[&docid];
                 let dl = entry.len as f32;
-                // Each exact term contributes its best-matching form's BM25.
-                let mut score = exact_terms
-                    .iter()
-                    .map(|forms| {
-                        forms
-                            .iter()
-                            .map(|f| self.bm25_term(f, docid, dl, avgdl, n))
-                            .fold(0.0_f32, f32::max)
-                    })
-                    .sum::<f32>();
-                // Last (prefix) term: best over the prefix-matched index terms.
-                score += last_terms
-                    .iter()
-                    .map(|t| self.bm25_term(t, docid, dl, avgdl, n))
-                    .fold(0.0_f32, f32::max);
+                // One lookup per (term, doc) feeds BOTH the score and matched_in
+                // (see `score_term`). Each exact term contributes its best-
+                // matching form's BM25 (max over forms); the last term is the
+                // best over its prefix-matched index keys. Exact terms match by
+                // FORM (forms are posting keys); the last term matched by PREFIX,
+                // so it iterates the already-resolved `last_terms` index keys (a
+                // form like "prog" is not a posting key — "programming" is).
+                let mut matched_in = MatchedIn::default();
+                let mut score = 0.0_f32;
+                for forms in exact_terms {
+                    let mut best = 0.0_f32;
+                    for f in forms {
+                        best = best.max(self.score_term(f, docid, dl, avgdl, n, &mut matched_in));
+                    }
+                    score += best;
+                }
+                let mut last_best = 0.0_f32;
+                for t in &last_terms {
+                    last_best =
+                        last_best.max(self.score_term(t, docid, dl, avgdl, n, &mut matched_in));
+                }
+                score += last_best;
+
                 SearchHit {
                     id: entry.id.clone(),
                     title: entry.title.clone(),
                     score,
+                    matched_in,
                 }
             })
             .collect();
@@ -683,6 +722,68 @@ mod tests {
         idx.add(doc("many", "t", "rust rust rust everywhere"));
         idx.add(doc("few", "t", "a little rust here"));
         assert_eq!(ids(&idx.query("rust")), vec!["many", "few"]);
+    }
+
+    // ---- matched_in (MYND-40): which field a hit matched in --------------
+
+    #[test]
+    fn matched_in_title_only_when_term_is_in_title_not_body() {
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("a", "rust guide", "lorem ipsum dolor"));
+        let hits = idx.query("rust");
+        assert_eq!(
+            hits[0].matched_in,
+            MatchedIn {
+                title: true,
+                body: false
+            }
+        );
+    }
+
+    #[test]
+    fn matched_in_body_only_when_term_is_in_body_not_title() {
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("a", "notes", "rust async runtime"));
+        let hits = idx.query("rust");
+        assert_eq!(
+            hits[0].matched_in,
+            MatchedIn {
+                title: false,
+                body: true
+            }
+        );
+    }
+
+    #[test]
+    fn matched_in_both_when_term_is_in_title_and_body() {
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("a", "rust notes", "rust async"));
+        let hits = idx.query("rust");
+        assert_eq!(
+            hits[0].matched_in,
+            MatchedIn {
+                title: true,
+                body: true
+            }
+        );
+    }
+
+    #[test]
+    fn matched_in_title_true_via_stem_where_substring_check_would_fail() {
+        // Title token "run" is matched by the query "running" through the
+        // engine's English stemmer (running -> run) as a non-last EXACT term.
+        // A frontend `title.includes("running")` would be false; matched_in
+        // must still report title:true — proving it is computed with the
+        // engine's stemmer, not a substring check (MYND-40 grill Q9).
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("a", "run guide", "lorem ipsum dolor sit"));
+        let hits = idx.query("running guide");
+        assert_eq!(ids(&hits), vec!["a"]);
+        assert!(
+            hits[0].matched_in.title,
+            "stemmed title match must set title:true"
+        );
+        assert!(!hits[0].matched_in.body, "term is not in the body");
     }
 
     // ---- AND semantics ------------------------------------------------

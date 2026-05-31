@@ -1,19 +1,20 @@
-// Global command palette modal — MYND-86.
+// Global command palette modal — MYND-86 + MYND-40.
 //
-// Keyboard-first discoverable entry point for v1 actions. Per the work
-// item acceptance: keyboard shortcut opens it; fuzzy search; typed
-// registry; respects state guards; never exposes unavailable actions; no
-// plugin / scripting surface.
+// Keyboard-first entry point. `Cmd/Ctrl+K` or `Cmd/Ctrl+P` opens it (both toggle
+// the same palette). As you type, results appear in two fixed sections:
+// COMMANDS (the typed action registry, frontend fuzzy — instant) and NOTES
+// (backend full-text `note_search`, BM25, debounced). Arrow keys navigate across
+// both sections, Enter runs the highlighted row (run a command / open a note),
+// Esc dismisses, backdrop click dismisses. An empty query shows the command
+// list; note results appear once you type.
 //
-// UI: centered modal over a dim backdrop, input at top, scrollable action
-// list with category labels + kbd hints. ArrowUp/Down navigates, Enter
-// runs the highlighted action, Esc dismisses. Backdrop click dismisses.
-//
-// Special action `note.switch` toggles the palette into a note-picker
-// view: input filters by note title, Enter selects the highlighted note.
-// Backspace at empty query returns to the main action list.
+// A note hit that matched only in the body carries a "↳ matched in body"
+// marker (from the backend `matched_in` field) so a title that doesn't contain
+// the query is never a mystery. Per-keystroke note search is debounced +
+// generation-guarded (a stale response never overwrites a fresher one).
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -29,6 +30,8 @@ import type {
   CommandContext,
 } from "../commands";
 import type { NoteId } from "../notes/sidebarState";
+import { searchNotes, shouldApplyNoteSearchResult } from "../notes/searchNotes";
+import type { NoteMatchedIn, NoteSearchResult } from "../types/note-search-result";
 
 const BACKDROP_STYLE: CSSProperties = {
   position: "fixed",
@@ -114,6 +117,17 @@ const HINT_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
 };
 
+// Section divider label ("Commands" / "Notes"). Shown only when BOTH sections
+// have rows, so a single-section list stays unlabeled.
+const SECTION_LABEL_STYLE: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--fg-3)",
+  padding: "8px 10px 4px",
+};
+
 const EMPTY_STYLE: CSSProperties = {
   padding: "20px 16px",
   fontSize: 13,
@@ -127,49 +141,104 @@ export type CommandPaletteProps = {
   ctx: CommandContext;
 };
 
-type Mode =
-  | { kind: "actions" }
-  | { kind: "note-picker" };
-
 type Row =
   | { kind: "action"; action: CommandAction; visibility: ActionVisibility }
-  | { kind: "note"; id: NoteId; title: string };
+  | { kind: "note"; id: NoteId; title: string; matchedIn: NoteMatchedIn };
+
+/**
+ * Trailing debounce for the note-search dispatch (MYND-40): coalesces a
+ * keystroke burst into one IPC per typing pause. ~120ms sits below the
+ * ~100-150ms "instant" perception band, so the NOTES section still feels live
+ * while cutting per-keystroke IPC. Flushed immediately on Enter.
+ */
+const NOTE_SEARCH_DEBOUNCE_MS = 120;
 
 export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<Mode>({ kind: "actions" });
   const [selectedIndex, setSelectedIndex] = useState(0);
+  // Backend full-text results for the NOTES section (MYND-40). Populated by the
+  // search effect below; empty while the query is empty.
+  const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Monotonic dispatch counter for the note-search generation-guard (MYND-40):
+  // each query dispatch claims the next value; only the latest-dispatched
+  // response is applied (see `shouldApplyNoteSearchResult`).
+  const latestSearchSeq = useRef(0);
+  // Pending trailing-debounce timer for the note-search dispatch; cleared on
+  // each query change and flushed on Enter.
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset state every time the palette opens.
   useEffect(() => {
     if (open) {
       setQuery("");
-      setMode({ kind: "actions" });
       setSelectedIndex(0);
+      setNoteHits([]);
       // Focus input on next tick (after mount + portal append).
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
 
-  // Build the row list per mode + apply fuzzy filter.
-  const rows: Row[] = useMemo(() => {
-    if (mode.kind === "note-picker") {
-      const candidates = Array.from(ctx.noteTitles.entries()).map(
-        ([id, title]) => ({
-          item: { id, title: title ?? "" },
-          haystacks: [title ?? "Untitled"],
-        }),
-      );
-      const matches = fuzzyFilter(candidates, query);
-      return matches.map(
-        (m): Row => ({
-          kind: "note",
-          id: m.item.id,
-          title: m.item.title === "" ? "Untitled" : m.item.title,
-        }),
-      );
+  // Dispatch one backend full-text search for `q`, applying its result ONLY if
+  // it is still the latest (generation-guard, MYND-40) — Tauri invoke is not
+  // cancelable, so an earlier query's late response is dropped rather than
+  // overwriting fresher results.
+  const runNoteSearch = useCallback((q: string) => {
+    const seq = (latestSearchSeq.current += 1);
+    void searchNotes(q)
+      .then((hits) => {
+        if (shouldApplyNoteSearchResult(seq, latestSearchSeq.current)) {
+          setNoteHits(hits);
+        }
+      })
+      .catch(() => {
+        if (shouldApplyNoteSearchResult(seq, latestSearchSeq.current)) {
+          setNoteHits([]);
+        }
+      });
+  }, []);
+
+  // Debounced NOTES-section search. A ~120ms trailing timer coalesces a
+  // keystroke burst into one IPC per typing pause; the cleanup clears the
+  // pending timer on every query change so only the last keystroke's timer
+  // survives. An empty query searches nothing (the NOTES section is empty until
+  // you type; COMMANDS still show). Composes with the generation-guard in
+  // `runNoteSearch`. Enter flushes the timer (see `flushNoteSearch`).
+  useEffect(() => {
+    if (!open) return;
+    if (query.trim() === "") {
+      setNoteHits([]);
+      return;
     }
+    const timer = setTimeout(() => {
+      searchTimer.current = null;
+      runNoteSearch(query);
+    }, NOTE_SEARCH_DEBOUNCE_MS);
+    searchTimer.current = timer;
+    return () => {
+      clearTimeout(timer);
+      searchTimer.current = null;
+    };
+  }, [open, query, runNoteSearch]);
+
+  // Flush a pending debounced search immediately — the Enter handler calls this
+  // so a fast "type then Enter" fires the search now instead of waiting out the
+  // remaining debounce window.
+  const flushNoteSearch = useCallback(() => {
+    if (searchTimer.current !== null) {
+      clearTimeout(searchTimer.current);
+      searchTimer.current = null;
+      runNoteSearch(query);
+    }
+  }, [query, runNoteSearch]);
+
+  // Unified row list (MYND-40): COMMANDS (frontend fuzzy over the visible action
+  // registry) followed by NOTES (backend full-text hits, only while the query is
+  // non-empty). Scores are NOT mixed across sections — each is sorted by its own
+  // engine and the sections render in a fixed order, so a command never competes
+  // with a BM25 note score. Arrow nav iterates this flat list across both
+  // sections; section labels are injected at render time and are not selectable.
+  const { rows, commandCount } = useMemo(() => {
     const visibleActions: Array<{
       action: CommandAction;
       visibility: ActionVisibility;
@@ -183,15 +252,31 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
       item: e,
       haystacks: [e.action.label, e.action.id, e.action.category ?? ""],
     }));
-    const matches = fuzzyFilter(candidates, query);
-    return matches.map(
+    const commandRows: Row[] = fuzzyFilter(candidates, query).map(
       (m): Row => ({
         kind: "action",
         action: m.item.action,
         visibility: m.item.visibility,
       }),
     );
-  }, [mode.kind, query, ctx]);
+
+    const noteRows: Row[] =
+      query.trim() === ""
+        ? []
+        : noteHits.map(
+            (h): Row => ({
+              kind: "note",
+              id: h.note_id,
+              title: h.title === "" ? "Untitled" : h.title,
+              matchedIn: h.matched_in,
+            }),
+          );
+
+    // `commandCount` is the fixed boundary between the COMMANDS and NOTES
+    // sections in the flat list (commands always lead) — used for section
+    // labels without re-scanning `rows`.
+    return { rows: [...commandRows, ...noteRows], commandCount: commandRows.length };
+  }, [query, ctx, noteHits]);
 
   // Clamp selected index when row count changes.
   useEffect(() => {
@@ -202,7 +287,6 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
 
   const close = useCallback(() => {
     setQuery("");
-    setMode({ kind: "actions" });
     setSelectedIndex(0);
     onClose();
   }, [onClose]);
@@ -211,13 +295,6 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
     async (row: Row) => {
       if (row.kind === "action") {
         if (row.visibility === "disabled") return;
-        if (row.action.id === "note.switch") {
-          setMode({ kind: "note-picker" });
-          setQuery("");
-          setSelectedIndex(0);
-          requestAnimationFrame(() => inputRef.current?.focus());
-          return;
-        }
         close();
         try {
           await row.action.run(ctx);
@@ -257,22 +334,15 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
       }
       if (e.key === "Enter") {
         e.preventDefault();
+        // Fire any pending debounced search now (don't make selection wait the
+        // remaining window); then act on the current selection.
+        flushNoteSearch();
         const row = rows[selectedIndex];
         if (row !== undefined) void runRow(row);
         return;
       }
-      if (
-        e.key === "Backspace" &&
-        mode.kind === "note-picker" &&
-        query === ""
-      ) {
-        e.preventDefault();
-        setMode({ kind: "actions" });
-        setSelectedIndex(0);
-        return;
-      }
     },
-    [rows, selectedIndex, runRow, mode.kind, query, close],
+    [rows, selectedIndex, runRow, close, flushNoteSearch],
   );
 
   const onBackdropClick = useCallback(
@@ -284,22 +354,14 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
 
   if (!open) return null;
 
-  const placeholder =
-    mode.kind === "note-picker"
-      ? "Search notes by title…"
-      : "Type a command — Esc to dismiss";
+  // Label the sections only when both are present — a single-section list reads
+  // cleaner unlabeled. The flat `rows` list is `[...commands, ...notes]`, so the
+  // NOTES section starts at index `commandCount`.
+  const showSectionLabels = commandCount > 0 && rows.length > commandCount;
 
   return (
-    <div
-      style={BACKDROP_STYLE}
-      onClick={onBackdropClick}
-      role="presentation"
-    >
-      <div
-        style={MODAL_STYLE}
-        role="dialog"
-        aria-label="Command palette"
-      >
+    <div style={BACKDROP_STYLE} onClick={onBackdropClick} role="presentation">
+      <div style={MODAL_STYLE} role="dialog" aria-label="Command palette">
         <input
           ref={inputRef}
           type="text"
@@ -309,7 +371,7 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
             setSelectedIndex(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder={placeholder}
+          placeholder="Search notes or run a command — Esc to dismiss"
           style={INPUT_STYLE}
           autoComplete="off"
           autoCorrect="off"
@@ -317,13 +379,29 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
         />
         <div style={LIST_STYLE} role="listbox">
           {rows.length === 0 ? (
-            <div style={EMPTY_STYLE}>
-              {mode.kind === "note-picker"
-                ? "No notes match"
-                : "No commands match"}
-            </div>
+            <div style={EMPTY_STYLE}>No matches</div>
           ) : (
-            rows.map((row, i) => renderRow(row, i, i === selectedIndex, runRow))
+            rows.map((row, i) => {
+              // Inject a section label before the first command row and before
+              // the first note row (only when both sections are present).
+              const label = !showSectionLabels
+                ? null
+                : i === 0
+                  ? "Commands"
+                  : i === commandCount
+                    ? "Notes"
+                    : null;
+              const key =
+                row.kind === "action" ? row.action.id : `note:${row.id}`;
+              return (
+                <Fragment key={key}>
+                  {label !== null && (
+                    <div style={SECTION_LABEL_STYLE}>{label}</div>
+                  )}
+                  {renderRow(row, i, i === selectedIndex, runRow)}
+                </Fragment>
+              );
+            })
           )}
         </div>
       </div>
@@ -343,10 +421,8 @@ function renderRow(
     : selected
       ? ROW_SELECTED_STYLE
       : ROW_STYLE;
-  const key = row.kind === "action" ? row.action.id : `note:${row.id}`;
   return (
     <div
-      key={key}
       style={style}
       role="option"
       aria-selected={selected}
@@ -371,7 +447,18 @@ function renderRow(
           )}
         </>
       ) : (
-        <span style={{ flex: 1 }}>{row.title}</span>
+        <>
+          <span style={{ flex: 1 }}>{row.title}</span>
+          {/* Body-only match (MYND-40): the query matched in the note body but
+              not its title, so the title here does not contain the query — a
+              quiet right-aligned marker (reusing the palette's hint slot) tells
+              the user why the row appeared. Title matches need no marker (the
+              term is in the visible title). Drives off the precise backend
+              `matched_in`, so it is correct even for stemmed/Turkish-cased hits. */}
+          {row.matchedIn.body && !row.matchedIn.title && (
+            <span style={HINT_STYLE}>↳ matched in body</span>
+          )}
+        </>
       )}
     </div>
   );

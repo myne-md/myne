@@ -31,7 +31,7 @@ use crate::atomic_write;
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
 use crate::plugins::vault_unlock::state::{Slot, SlotKind, VaultRuntimeState};
-use crate::search::SearchIndexState;
+use crate::search::{MatchedIn, SearchIndexState};
 use protocol::{decode_note, encode_new_note, encode_update, DecryptError, ProtocolError};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -43,7 +43,7 @@ use super::error::{
     NoteTitleError, NoteUpdateError,
 };
 use super::note_id::NoteId;
-use super::title_extract::{extract_h1_title, extract_title_slices};
+use super::title_extract::{extract_title_slices, resolve_note_title};
 
 /// Create a new encrypted `.myn` note. See module-level docs for the
 /// full pipeline narration.
@@ -101,7 +101,7 @@ pub async fn note_create<R: Runtime>(
     // index is plaintext-derived RAM; the lock path clears it — Task 8.)
     let result = note_create_with_dir(notes_dir, state.inner(), (*plaintext).clone()).await;
     if let Ok(id) = &result {
-        let title = extract_h1_title(plaintext.as_bytes()).unwrap_or_default();
+        let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
         search.upsert(id, &title, &plaintext);
     }
     result
@@ -545,7 +545,7 @@ pub async fn note_update<R: Runtime>(
     )
     .await;
     if result.is_ok() {
-        let title = extract_h1_title(plaintext.as_bytes()).unwrap_or_default();
+        let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
         search.upsert(&note_id, &title, &plaintext);
     }
     result
@@ -1441,16 +1441,29 @@ fn extract_one_title_slice(
     })
 }
 
-/// A ranked search result for the WebView (MYND-29 Task 5): the matching
-/// note's id + display title + BM25 score, best score first. Snippet
-/// generation is MYND-40's job — the index stores postings + titles, not the
-/// full body text, so a snippet needs `note_read` on the WebView side.
+/// A ranked search result for the WebView (MYND-29 Task 5; `matched_in` +
+/// cap added in MYND-40): the matching note's id + display title + BM25 score,
+/// best score first, plus which field(s) the query matched in. `matched_in`
+/// drives the palette's "matched in body" badge — a body-only hit is a note
+/// whose title does not contain the query. Match-context SNIPPET rendering is
+/// deferred to Phase 2 (the index stores postings + titles, not the full body,
+/// and decrypting per hit to build a snippet is rejected on threat-model
+/// grounds); v0.1 ranks over the body but renders title + the body-match badge.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SearchResult {
     pub note_id: String,
     pub title: String,
     pub score: f32,
+    pub matched_in: MatchedIn,
 }
+
+/// Upper bound on results returned to the WebView per query (MYND-40). The
+/// index returns the full BM25-ranked match set; a broad type-ahead prefix on
+/// a large vault can match thousands of notes, so the command caps to the
+/// top-N highest-scored — the palette renders ~10-20 rows, and an unbounded
+/// result set is wasted IPC + render. Result-shaping only: the index
+/// data-model and the `MYS1` blob are untouched.
+pub(crate) const NOTE_SEARCH_RESULT_CAP: usize = 50;
 
 /// `note_search` — `Slot::Unlocked`-gated full-text search over the live
 /// in-RAM index (MYND-29 Task 5). Returns BM25-ranked results, or an EMPTY
@@ -1486,10 +1499,12 @@ pub(crate) async fn note_search_core(
     search
         .query(query)
         .into_iter()
+        .take(NOTE_SEARCH_RESULT_CAP)
         .map(|hit| SearchResult {
             note_id: hit.id,
             title: hit.title,
             score: hit.score,
+            matched_in: hit.matched_in,
         })
         .collect()
 }
@@ -3568,6 +3583,57 @@ mod tests {
             let search = SearchIndexState::default();
             search.upsert("note-a", "t", "rust");
             assert!(note_search_core(&state, &search, "rust").await.is_empty());
+        });
+    }
+
+    #[test]
+    fn note_search_caps_results_at_top_n() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+            let search = SearchIndexState::default();
+            // More matching notes than the cap → the result set must be bounded.
+            for i in 0..(NOTE_SEARCH_RESULT_CAP + 5) {
+                search.upsert(&format!("note-{i:03}"), "rust note", "rust body text");
+            }
+            let results = note_search_core(&state, &search, "rust").await;
+            assert_eq!(results.len(), NOTE_SEARCH_RESULT_CAP);
+            // BM25-ordered: scores are non-increasing across the capped set.
+            assert!(results.windows(2).all(|w| w[0].score >= w[1].score));
+        });
+    }
+
+    #[test]
+    fn note_search_reports_matched_in_field() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+            let search = SearchIndexState::default();
+            search.upsert("title-hit", "rust guide", "lorem ipsum");
+            search.upsert("body-hit", "notes", "rust async");
+            let results = note_search_core(&state, &search, "rust").await;
+            let title_hit = results
+                .iter()
+                .find(|r| r.note_id == "title-hit")
+                .expect("title-hit present");
+            let body_hit = results
+                .iter()
+                .find(|r| r.note_id == "body-hit")
+                .expect("body-hit present");
+            assert!(title_hit.matched_in.title && !title_hit.matched_in.body);
+            assert!(body_hit.matched_in.body && !body_hit.matched_in.title);
         });
     }
 }
