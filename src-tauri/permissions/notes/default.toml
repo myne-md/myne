@@ -19,6 +19,7 @@ permissions = [
     "allow-note-delete",
     "allow-note-list",
     "allow-note-titles-batch",
+    "allow-note-search",
 ]
 
 [[permission]]
@@ -50,3 +51,8 @@ commands.allow = ["note_list"]
 identifier = "allow-note-titles-batch"
 description = "Allow invoking notes:note_titles_batch (per-item decrypt of <=100 .myn blobs returning hybrid byte-range slices — frontmatter block + first H1 line — for sidebar title/updated_at extraction; TS dialect parses the slices on the WebView side per the MYND-82 grill Q3 hybrid byte-range decision)."
 commands.allow = ["note_titles_batch"]
+
+[[permission]]
+identifier = "allow-note-search"
+description = "Allow invoking notes:note_search (Slot::Unlocked-gated full-text search over the live in-RAM index — MYND-29; returns BM25-ranked {note_id, title, score}, or empty when not unlocked; no decryption, no secret material logged)."
+commands.allow = ["note_search"]

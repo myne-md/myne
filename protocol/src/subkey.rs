@@ -27,12 +27,13 @@
 //!
 //! ## Role registry (spec § 3.4)
 //!
-//! v0.1 registers a single role:
+//! v0.1 registers these roles:
 //!
-//! | Variant                      | Registered string  |
-//! |------------------------------|--------------------|
-//! | [`SubkeyRole::ItemsKeyWrap`] | `itemsKey-wrap`    |
-//! | [`SubkeyRole::PrefsKey`]     | `prefs-key`        |
+//! | Variant                        | Registered string   |
+//! |--------------------------------|---------------------|
+//! | [`SubkeyRole::ItemsKeyWrap`]   | `itemsKey-wrap`     |
+//! | [`SubkeyRole::PrefsKey`]       | `prefs-key`         |
+//! | [`SubkeyRole::SearchIndexKey`] | `search-index-key`  |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -59,6 +60,11 @@ const ROLE_STR_ITEMS_KEY_WRAP: &[u8] = b"itemsKey-wrap";
 /// (spec § 3.4 + § 9.5).
 const ROLE_STR_PREFS_KEY: &[u8] = b"prefs-key";
 
+/// Registered role string for the v0.1 search-index blob KEK
+/// (MYND-29; encrypts the `vault.search` index blob — `search_blob.rs`,
+/// `protocol.md` § 9.6). Load-bearing: drift silently changes the KEK.
+const ROLE_STR_SEARCH_INDEX_KEY: &[u8] = b"search-index-key";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -76,6 +82,11 @@ pub enum SubkeyRole {
     /// Encrypts the canonical-JSON inner plaintext of `vault.prefs`
     /// under XChaCha20-Poly1305 + CTX commitment.
     PrefsKey,
+    /// KEK for the v0.1 search-index blob (`vault.search`, MYND-29).
+    /// Encrypts the serialized full-text index under XChaCha20-Poly1305
+    /// (CTX commitment outer). Distinct from `PrefsKey` so the two blobs
+    /// are domain-separated.
+    SearchIndexKey,
 }
 
 impl SubkeyRole {
@@ -86,6 +97,7 @@ impl SubkeyRole {
         match self {
             SubkeyRole::ItemsKeyWrap => ROLE_STR_ITEMS_KEY_WRAP,
             SubkeyRole::PrefsKey => ROLE_STR_PREFS_KEY,
+            SubkeyRole::SearchIndexKey => ROLE_STR_SEARCH_INDEX_KEY,
         }
     }
 }
@@ -154,6 +166,13 @@ mod tests {
         // vault.prefs blob KEK. The role byte string is the suffix
         // appended after the "myne.v0.1 " prefix.
         assert_eq!(SubkeyRole::PrefsKey.role_str(), b"prefs-key");
+    }
+
+    #[test]
+    fn search_index_key_role_string_matches_spec_registry() {
+        // MYND-29 registry entry "myne.v0.1 search-index-key" (§ 9.6).
+        // Frozen + load-bearing: drift silently changes the search-blob KEK.
+        assert_eq!(SubkeyRole::SearchIndexKey.role_str(), b"search-index-key");
     }
 
     #[test]
@@ -317,6 +336,7 @@ mod tests {
             match role {
                 SubkeyRole::ItemsKeyWrap => "itemsKey-wrap",
                 SubkeyRole::PrefsKey => "prefs-key",
+                SubkeyRole::SearchIndexKey => "search-index-key",
             }
         }
 

@@ -352,6 +352,12 @@ The two on-disk wrapped copies of `root_key` in `vault.meta`. Each is 32 bytes o
 
 Used in: `spec/protocol.md` §3.1, §9.3
 
+### **fall-to-rebuild** &nbsp; 📋 *Protocol*
+
+The fallback path for loading the [search index](#search-index) when the cached `vault.search` blob (`spec/protocol.md` §9.6) cannot be trusted or used — blob absent, magic / version mismatch, AEAD-verification failure, or an unreadable staleness manifest. Instead of incrementally reconciling the cached index against the notes, the client **rebuilds it from scratch** by decrypting every `.myn`. Rebuild always recovers the correct index, so `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more. The complement of the **incremental reconcile** happy path (re-index only the notes whose `content_nonce` changed) — fall-to-rebuild is the always-correct safety net beneath it (`decisions.md` 2026-05-31).
+
+Used in: `spec/protocol.md` §9.6.4
+
 ### **folder** &nbsp; 📦 *Product*
 
 A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [vault root](#vault-root).
@@ -591,6 +597,12 @@ The 4-byte ASCII magic identifying a v0.1 `vault.prefs` blob. Parallel to `MY01`
 
 Used in: `spec/protocol.md` §9.5, §10.3
 
+### **MYS1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying a v0.1 `vault.search` (search-index) blob. Parallel to `MY01` (per-note), `MYV1` (vault metadata), and `MYP1` (preferences) in the v0.1 magic-byte family. Registered in `spec/protocol.md` §10.3's major-version registry alongside its v005-reserved sibling `MYS5`. Implementations MUST reject any candidate `vault.search` whose first four bytes do not match `MYS1` — and [fall to rebuild](#fall-to-rebuild) rather than treating the rejection as data loss.
+
+Used in: `spec/protocol.md` §9.6, §10.3
+
 ### **`.myn` file** &nbsp; 📦 *Product*
 
 Myne Note: the binary encrypted blob holding a single note. File extension `.myn`, magic bytes `MY01` for v0.1. Layout in `spec/protocol.md` §9.2: header, items_key_id, item_key_nonce, length-prefixed `enc_item_key`, content_nonce, length-prefixed ciphertext + CTX tag.
@@ -745,6 +757,18 @@ Used in: `spec/protocol.md` §3.1
 Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (macOS `NSWindowSharingNone`, Windows `WDA_EXCLUDEFROMCAPTURE`). Platform support: macOS (all Tauri-supported versions), Windows 10 build 19041+. Unavailable on Linux v0.1.
 
 Used in: `threat-model.md` §6, §7
+
+### **search index** &nbsp; 📦 *Product*
+
+Myne's full-text search over note content (MYND-29). A custom in-memory **BM25 inverted index** (AND-of-terms with a last-term prefix match for type-ahead, plus a title-boost) built from decrypted note plaintext while the vault is unlocked, queried in RAM, and persisted as the encrypted `vault.search` blob. Index-side, each note's language is detected (whatlang, EN/TR/DE) and single-stemmed (the raw token is always indexed too); query-side, terms are multi-stemmed across all supported languages (the query is too short to detect a language) — a deliberate index/query asymmetry. The index is **plaintext-derived RAM**, as sensitive as the open notes: zeroized on lock (`threat-model.md` A6), and never the source of truth (the `.myn` files are). Engine choice sits behind a swappable trait; the MYND-29 benchmark (`decisions.md` 2026-05-31) selected the custom engine over tantivy on the budget table. See also [search-index-key](#search-index-key), [fall-to-rebuild](#fall-to-rebuild).
+
+Used in: `spec/protocol.md` §9.6; `decisions.md` 2026-05-31
+
+### **search-index-key** &nbsp; 🗝️ *Key/identifier*
+
+The 32-byte AEAD KEK encrypting `vault.search`. Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "search-index-key")` helper (`spec/protocol.md` §3.4 registry entry `"myne.v0.1 search-index-key"`). Never persisted; re-derived on each unlock (to load / reconcile the index) and on each persist (graceful lock / periodic flush). Independent from the `itemsKey` lineage by design — like `prefs_key` it derives straight from `root_key`, so it survives the v005 epoch-rotation `itemsKey` evolution. The AAD `AAD_search_index_blob` (role `"search-index-blob"`, `spec/protocol.md` §5.2) binds the blob to its vault via `account_number_hash`.
+
+Used in: `spec/protocol.md` §3.4, §5.2, §9.6
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 
@@ -916,6 +940,12 @@ Used in: `spec/protocol.md` §9.3
 Vault-level singleton encrypted blob holding user-configurable preferences (Phase 1: the screen-capture-protection toggle from MYND-55/MYND-160). Magic bytes `MYP1` for v0.1. Lives at `<app_data_dir>/vault/vault.prefs` next to `vault.meta`. Outer envelope is a 34-byte fixed-offset header followed by AEAD-wrapped canonical JSON plaintext under `prefs_key`; layout + AAD construction + canonical encoding rules + size cap + migration-less semantic in `spec/protocol.md` §9.5. Written eagerly at `vault_create` (closed invariant: post-MYND-160 vaults always have `vault.prefs` on disk) and lazily re-read by every `prefs_read` IPC call (disk is canonical; not cached in `Slot::Unlocked`). Read failure (absent / truncated / AEAD-fail / parse-fail) returns `PrefsView::default()` per the §9.5.5 non-distinguishing semantic.
 
 Used in: `spec/protocol.md` §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
+
+### **vault.search** &nbsp; 📦 *Product*
+
+Vault-level singleton encrypted blob caching the [search index](#search-index) (MYND-29). Magic bytes `MYS1` for v0.1. Lives at `<app_data_dir>/vault/vault.search` next to `vault.meta` and `vault.prefs`. Outer envelope is a 34-byte fixed-offset header (magic, protocol_version, an `index_format_version` byte where `vault.prefs` carries a reserved byte, nonce, ciphertext_len) followed by AEAD-wrapped plaintext under [search-index-key](#search-index-key); layout + AAD + staleness/reconcile + size cap in `spec/protocol.md` §9.6. The inner plaintext is **engine-opaque** (postcard-serialized `{note_id → content_nonce}` staleness manifest + the serialized inverted index) — distinct from `vault.prefs`'s canonical JSON, because the index is large and never field-validated. A pure **cache**: a warm unlock loads it and incrementally reconciles via the decryption-free `content_nonce` diff; on absence / AEAD-fail it [falls to rebuild](#fall-to-rebuild) (the `.myn` files are the source of truth). Flushed on graceful lock/quit + a periodic timer; idle auto-lock skips the flush (fail-closed). At-rest blob size leaks a coarse vocabulary/volume signal, accepted (`threat-model.md` A5).
+
+Used in: `spec/protocol.md` §9.6; `decisions.md` 2026-05-31
 
 ### **vault_<verb_past> tracing event-name pattern** &nbsp; 🛠️ *Tooling*
 

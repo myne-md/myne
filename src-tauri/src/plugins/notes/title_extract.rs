@@ -96,6 +96,20 @@ pub fn extract_title_slices(plaintext: &[u8]) -> TitleSlices<'_> {
     }
 }
 
+/// Best-effort note title for the search index (MYND-29 Task 4): the first
+/// `# H1` line's text (without the `"# "` prefix), trimmed; `None` when there
+/// is no H1 or it is blank. NOTE: frontmatter `title:` resolution (the
+/// sidebar's full FM↳H1↳None precedence) is intentionally NOT applied here —
+/// search title-boost covers the common H1-titled note, and an FM-only-titled
+/// note stays fully searchable via its body. Full title resolution can be
+/// unified later if the benchmark shows title-boost recall matters.
+pub fn extract_h1_title(plaintext: &[u8]) -> Option<String> {
+    let line = extract_title_slices(plaintext).first_h1_line?;
+    let text = line.strip_prefix(H1_PREFIX).unwrap_or(line);
+    let title = String::from_utf8_lossy(text).trim().to_string();
+    (!title.is_empty()).then_some(title)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,5 +230,22 @@ mod tests {
         let input = b"# \nbody\n";
         let result = extract_title_slices(input);
         assert_eq!(result.first_h1_line, Some(b"# ".as_ref()));
+    }
+
+    #[test]
+    fn extract_h1_title_strips_prefix_and_trims() {
+        assert_eq!(
+            extract_h1_title(b"# My Note\nbody here"),
+            Some("My Note".to_string())
+        );
+        // No H1 → None (search indexes body only, title empty).
+        assert_eq!(extract_h1_title(b"plain body, no heading"), None);
+        // Empty H1 → None.
+        assert_eq!(extract_h1_title(b"# \nbody"), None);
+        // FM present but H1 used (FM `title:` resolution is out of scope here).
+        assert_eq!(
+            extract_h1_title(b"---\ntitle: Foo\n---\n# Real Heading\nx"),
+            Some("Real Heading".to_string())
+        );
     }
 }

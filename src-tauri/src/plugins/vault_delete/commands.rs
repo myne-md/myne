@@ -134,7 +134,21 @@ pub async fn vault_delete<R: Runtime>(
     let vault_dir = crate::paths::vault_dir(&app).map_err(|_| VaultDeleteError::Io {
         io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
     })?;
-    vault_delete_with_dir(vault_dir, state.inner()).await
+    let result = vault_delete_with_dir(vault_dir, state.inner()).await;
+
+    // MYND-29 Task 8: the slot was dropped iff the delete actually proceeded
+    // (full `Ok` or a `PartialDelete`) — wipe the plaintext-derived search
+    // index on that same path so it does not outlive the deleted vault. A
+    // rejected delete (`BusyAuth` / `VaultNotFound`) left the slot untouched,
+    // so any live index belongs to a still-unlocked session and MUST NOT be
+    // wiped.
+    if matches!(
+        &result,
+        Ok(()) | Err(VaultDeleteError::PartialDelete { .. })
+    ) {
+        crate::plugins::notes::search_sync::zeroize_search_index(&app);
+    }
+    result
 }
 
 /// Testable core of [`vault_delete`]. The Tauri-command wrapper
