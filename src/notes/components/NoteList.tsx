@@ -35,6 +35,7 @@ import {
   visibleNoteIds,
   type VisibleRow,
 } from "./folderTreeRows";
+import { dragEdge, insertionLineStyle } from "./reorderDnd";
 import {
   useFolderManagement,
   type FolderManagement,
@@ -374,14 +375,15 @@ export function NoteList() {
           folder: r.folder,
         })),
         fm.deliberate,
+        fm.folderOrder,
       ),
-    [ctx.cache, fm.deliberate],
+    [ctx.cache, fm.deliberate, fm.folderOrder],
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;
   const rows = useMemo(
-    () => flattenVisibleRows(tree, ctx.cache, collapsed),
-    [tree, ctx.cache, collapsed],
+    () => flattenVisibleRows(tree, ctx.cache, collapsed, fm.noteOrder),
+    [tree, ctx.cache, collapsed, fm.noteOrder],
   );
   // Keyboard navigation traverses the *visible* notes in tree order.
   const navIds = useMemo(() => visibleNoteIds(rows), [rows]);
@@ -721,10 +723,25 @@ function PopulatedList({
                   empty={row.empty}
                   dropTarget={fm.dropTargetKey === row.node.key}
                   renaming={fm.renamingFolderKey === row.node.key}
+                  dragKind={fm.dragKind}
+                  reorderPlace={
+                    fm.folderReorderTarget?.key === row.node.key
+                      ? fm.folderReorderTarget.place
+                      : null
+                  }
                   onToggle={onToggleFolder}
                   onContextMenu={fm.openMenu}
                   onDragTarget={fm.setDropTargetKey}
                   onDropNote={(folderPath) => void fm.onFolderDropNote(folderPath)}
+                  onDragStartFolder={fm.onFolderDragStart}
+                  onFolderReorderOver={(node, place) =>
+                    fm.updateFolderReorderTarget(node.key, place)
+                  }
+                  onFolderReorderLeave={fm.clearFolderReorderTarget}
+                  onFolderReorderDrop={(node, place) =>
+                    void fm.onFolderReorder(node, place)
+                  }
+                  onDragEnd={fm.onDragEndCleanup}
                   onCommitRename={(node, newName) =>
                     void fm.commitRenameFolder(node, newName)
                   }
@@ -735,12 +752,38 @@ function PopulatedList({
             const record = ctx.cache.get(row.id);
             if (record === undefined) return null;
             const id = row.id;
+            const reorderPlace =
+              fm.dragKind === "note" && fm.reorderTarget?.id === id
+                ? fm.reorderTarget.place
+                : null;
             return (
               <div
-                style={{ paddingLeft: row.depth * NOTE_INDENT_PER_LEVEL }}
+                style={{
+                  position: "relative",
+                  paddingLeft: row.depth * NOTE_INDENT_PER_LEVEL,
+                }}
                 draggable={ctx.renamingId === null}
                 onDragStart={(e) => fm.onNoteDragStart(e, id)}
+                onDragEnd={fm.onDragEndCleanup}
+                onDragOver={(e) => {
+                  if (fm.dragKind !== "note") return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  fm.updateReorderTarget(id, dragEdge(e));
+                }}
+                onDragLeave={() => fm.clearReorderTarget(id)}
+                onDrop={(e) => {
+                  if (fm.dragKind !== "note") return;
+                  e.preventDefault();
+                  void fm.onNoteReorder(id, dragEdge(e));
+                }}
               >
+                {reorderPlace && (
+                  <div
+                    style={insertionLineStyle(reorderPlace)}
+                    aria-hidden="true"
+                  />
+                )}
                 <NoteRow
                   record={record}
                   selected={ctx.selectedId === id}

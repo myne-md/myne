@@ -36,6 +36,8 @@ const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
   deliberate_folders: [],
   auto_lock_seconds: null,
+  note_order: [],
+  folder_order: [],
 };
 
 interface UsePrefsResult {

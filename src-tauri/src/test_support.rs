@@ -65,14 +65,13 @@ pub(crate) struct ScopedTempDir {
 
 impl ScopedTempDir {
     pub(crate) fn new(label: &str) -> std::io::Result<Self> {
-        let mut p = std::env::temp_dir();
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        p.push(format!("myne-test-{label}-{nanos}"));
-        std::fs::create_dir_all(&p)?;
-        Ok(Self { path: p })
+        // UUID suffix (not a timestamp) so parallel tests sharing a label never
+        // collide on one directory — a collision lets one test's `Drop`
+        // `remove_dir_all` delete another's `vault.meta` mid-run. Mirrors the
+        // sibling `ScratchVault::new` above.
+        let path = std::env::temp_dir().join(format!("myne-test-{label}-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&path)?;
+        Ok(Self { path })
     }
 
     pub(crate) fn path(&self) -> &Path {

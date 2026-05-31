@@ -10,9 +10,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent,
 } from "react";
 import type { FolderNode } from "../folderTree";
+import { dragEdge, insertionLineStyle } from "./reorderDnd";
 
 const INDENT_PER_LEVEL = 18;
 const BASE_PADDING_LEFT = 12;
@@ -115,10 +117,14 @@ export type FolderRowProps = {
   depth: number;
   collapsed: boolean;
   empty: boolean;
-  /** Active drag-drop target highlight. */
+  /** Active drag-drop target highlight (a note is being dragged onto it). */
   dropTarget?: boolean;
   /** Inline-rename mode (edit the last path segment). */
   renaming?: boolean;
+  /** What is currently being dragged — gates note-move vs folder-reorder. */
+  dragKind?: "note" | "folder" | null;
+  /** Folder-reorder insertion edge when this row is the reorder target. */
+  reorderPlace?: "above" | "below" | null;
   onToggle: (key: string) => void;
   onContextMenu?: (
     node: FolderNode,
@@ -128,6 +134,16 @@ export type FolderRowProps = {
   onDragTarget?: (key: string | null) => void;
   /** A note (or notes) dropped onto this folder. */
   onDropNote?: (folderPath: string) => void;
+  /** This folder row started being dragged (folder reorder). */
+  onDragStartFolder?: (e: ReactDragEvent, node: FolderNode) => void;
+  /** A folder is hovering over this row at `place` (reorder indicator). */
+  onFolderReorderOver?: (node: FolderNode, place: "above" | "below") => void;
+  /** A folder drag left this row. */
+  onFolderReorderLeave?: (key: string) => void;
+  /** A dragged folder was dropped relative to this row (reorder). */
+  onFolderReorderDrop?: (node: FolderNode, place: "above" | "below") => void;
+  /** Any drag originating from this row ended (cleanup transient UI). */
+  onDragEnd?: () => void;
   /** Commit an inline rename to `newName` (last-segment name). */
   onCommitRename?: (node: FolderNode, newName: string) => void;
   onCancelRename?: () => void;
@@ -140,10 +156,17 @@ export function FolderRow({
   empty,
   dropTarget = false,
   renaming = false,
+  dragKind = null,
+  reorderPlace = null,
   onToggle,
   onContextMenu,
   onDragTarget,
   onDropNote,
+  onDragStartFolder,
+  onFolderReorderOver,
+  onFolderReorderLeave,
+  onFolderReorderDrop,
+  onDragEnd,
   onCommitRename,
   onCancelRename,
 }: FolderRowProps) {
@@ -181,10 +204,12 @@ export function FolderRow({
     <div
       style={{
         ...rowBaseStyle,
+        position: "relative",
         paddingLeft,
         background,
         boxShadow: dropTarget ? "inset 0 0 0 1px var(--accent)" : undefined,
       }}
+      draggable={!renaming}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       onClick={() => {
@@ -195,23 +220,43 @@ export function FolderRow({
         e.preventDefault();
         onContextMenu?.(node, { x: e.clientX, y: e.clientY });
       }}
+      onDragStart={(e) => onDragStartFolder?.(e, node)}
+      onDragEnd={onDragEnd}
       onDragOver={(e) => {
-        if (onDropNote) {
+        // Folder drag → reorder among siblings; note drag → move-into-folder.
+        if (dragKind === "folder") {
+          if (!onFolderReorderOver) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          onFolderReorderOver(node, dragEdge(e));
+        } else if (onDropNote) {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
         }
       }}
-      onDragEnter={() => onDragTarget?.(node.key)}
-      onDragLeave={() => onDragTarget?.(null)}
+      onDragEnter={() => {
+        if (dragKind !== "folder") onDragTarget?.(node.key);
+      }}
+      onDragLeave={() => {
+        if (dragKind === "folder") onFolderReorderLeave?.(node.key);
+        else onDragTarget?.(null);
+      }}
       onDrop={(e) => {
         e.preventDefault();
-        onDragTarget?.(null);
-        onDropNote?.(node.path);
+        if (dragKind === "folder") {
+          onFolderReorderDrop?.(node, dragEdge(e));
+        } else {
+          onDragTarget?.(null);
+          onDropNote?.(node.path);
+        }
       }}
       role="treeitem"
       aria-expanded={empty ? undefined : expanded}
       title={node.path}
     >
+      {reorderPlace && (
+        <div style={insertionLineStyle(reorderPlace)} aria-hidden="true" />
+      )}
       {empty ? (
         <span style={{ width: 12, flexShrink: 0 }} aria-hidden="true" />
       ) : (

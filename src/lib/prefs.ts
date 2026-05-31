@@ -27,6 +27,21 @@ export interface PrefsView {
    * default for the timer. Serialized from Rust `Option<u32>` (null | number).
    */
   auto_lock_seconds: number | null;
+  /**
+   * Manual sidebar sort order for notes — an ordered list of note UUIDs. A
+   * note present here sorts by its index; a note absent (newly created, never
+   * reordered) sorts after all listed siblings by `updated:` descending.
+   * Order is meaningful and the backend preserves it verbatim. Absent in
+   * pre-reorder vaults → the Rust decoder defaults it to `[]`.
+   */
+  note_order: string[];
+  /**
+   * Manual sidebar sort order for folders — an ordered list of canonical
+   * folder display paths (trailing-slash form). Same index-then-name fallback
+   * semantics as {@link PrefsView.note_order}, applied to sibling folders.
+   * Absent in pre-reorder vaults → defaults to `[]`.
+   */
+  folder_order: string[];
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -69,4 +84,26 @@ export async function setDeliberateFolders(folders: string[]): Promise<void> {
  */
 export async function setAutoLockTimeout(seconds: number): Promise<void> {
   await invoke<void>("plugin:prefs|set_auto_lock_timeout", { seconds });
+}
+
+/**
+ * Persist the full note_order sequence — the manual sidebar sort order for
+ * notes. The caller passes the entire desired order; v0.1 single-device
+ * writes it verbatim (the backend preserves element order — the sequence IS
+ * the payload, unlike the sorted+deduped `deliberate_folders`). No native
+ * side-effect; a rejected promise means the disk write failed and the
+ * caller's optimistic UI must revert.
+ */
+export async function setNoteOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_note_order", { order });
+}
+
+/**
+ * Persist the full folder_order sequence — the manual sidebar sort order for
+ * folders (canonical folder display paths). Same order-preserving, no-native-
+ * side-effect contract as {@link setNoteOrder}. A rejected promise means the
+ * disk write failed and the caller's optimistic UI must revert.
+ */
+export async function setFolderOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_folder_order", { order });
 }

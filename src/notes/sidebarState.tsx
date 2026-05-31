@@ -217,20 +217,49 @@ export function uuidv7Ms(id: NoteId): number | null {
 }
 
 /**
- * Sort comparator for batch IDs in sidebar render order: `updatedAt`
- * descending, falling back to UUIDv7-derived creation time descending.
- * Per `decisions.md` 2026-05-07 "User-meaningful timestamp storage path"
- * sort key + 2026-05-15 MYND-82 grill Q1.
+ * Sort comparator for batch IDs in sidebar render order.
+ *
+ * When a manual `orderRank` map (note_id → index, derived from the
+ * `note_order` prefs sequence) is supplied, it is the PRIMARY key: a note
+ * listed in `note_order` sorts by its index; an unlisted note (newly created,
+ * never reordered) sorts after all listed siblings. Within either group the
+ * tiebreak is `updatedAt` descending, falling back to UUIDv7-derived creation
+ * time descending. With no `orderRank` (or when neither note is listed) this
+ * collapses to the original updatedAt-desc behavior. Per `decisions.md`
+ * 2026-05-07 "User-meaningful timestamp storage path" sort key + 2026-05-15
+ * MYND-82 grill Q1, extended with the manual-reorder primary key.
  */
+/**
+ * Build the `id → index` rank map a manual-order sequence (note_order /
+ * folder_order) feeds into {@link sortBatchIds}'s `orderRank` (and the folder
+ * comparator). First occurrence wins — defensive against accidental duplicates.
+ */
+export function buildRankMap<K extends string>(
+  order: readonly K[],
+): Map<K, number> {
+  const m = new Map<K, number>();
+  for (let i = 0; i < order.length; i++) {
+    const k = order[i]!;
+    if (!m.has(k)) m.set(k, i);
+  }
+  return m;
+}
+
 export function sortBatchIds(
   ids: readonly NoteId[],
   cache: ReadonlyMap<NoteId, TitleRecord>,
+  orderRank?: ReadonlyMap<NoteId, number>,
 ): NoteId[] {
   return [...ids].sort((a, b) => {
-    const ra = cache.get(a);
-    const rb = cache.get(b);
-    const ta = ra?.updatedAt?.getTime() ?? uuidv7Ms(a) ?? 0;
-    const tb = rb?.updatedAt?.getTime() ?? uuidv7Ms(b) ?? 0;
+    if (orderRank !== undefined) {
+      const ra = orderRank.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const rb = orderRank.get(b) ?? Number.MAX_SAFE_INTEGER;
+      if (ra !== rb) return ra - rb;
+    }
+    const recA = cache.get(a);
+    const recB = cache.get(b);
+    const ta = recA?.updatedAt?.getTime() ?? uuidv7Ms(a) ?? 0;
+    const tb = recB?.updatedAt?.getTime() ?? uuidv7Ms(b) ?? 0;
     return tb - ta; // desc
   });
 }
