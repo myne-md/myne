@@ -8,8 +8,10 @@
 
 import type { Extension } from "@codemirror/state";
 import { headingDecorations } from "./heading";
+import { setextHeadingDecorations } from "./setext-heading";
 import { emphasisDecorations } from "./emphasis";
 import { linkDecorations } from "./link";
+import { referenceLinkDecorations } from "./reference-link";
 import { autolinkDecorations } from "./autolink";
 import { inlineCodeDecorations } from "./inline-code";
 import { taskListDecorations } from "./task-list";
@@ -17,13 +19,16 @@ import { blockquoteDecorations } from "./blockquote";
 import { horizontalRuleDecorations } from "./horizontal-rule";
 import { frontmatterDecorations } from "./frontmatter";
 import { tableDecorations } from "./table";
+import { definitionListDecorations } from "./definition-list";
 import { fencedCodeDecorations } from "./fenced-code";
 
 export function myneDecorations(): readonly Extension[] {
   return [
     headingDecorations(),
+    setextHeadingDecorations(),
     emphasisDecorations(),
     linkDecorations(),
+    referenceLinkDecorations(),
     ...autolinkDecorations(),
     inlineCodeDecorations(),
     taskListDecorations(),
@@ -31,6 +36,7 @@ export function myneDecorations(): readonly Extension[] {
     horizontalRuleDecorations(),
     frontmatterDecorations(),
     tableDecorations(),
+    definitionListDecorations(),
     fencedCodeDecorations(),
   ];
 }

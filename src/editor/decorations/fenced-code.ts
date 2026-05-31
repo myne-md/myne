@@ -36,29 +36,33 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import { highlightCode } from "@lezer/highlight";
 import { selectionTouchesLines } from "./cursor-aware";
+import { QUOTE_BAR_STEP, quoteBarBackgroundCss } from "./blockquote";
 import { resolveCodeLanguage } from "../code-languages";
+import { codeHighlightStyle } from "../code-highlight";
 
-const NESTING_CONTAINERS = new Set([
-  "Blockquote",
-  "ListItem",
-  "BulletList",
-  "OrderedList",
-]);
-
-// A fence inside a list item or blockquote shares its lines with a list marker
-// or quote bar; the always-on card (block-replace + line decorations) would
-// collide with those (`Decoration.line` stacking, block-replace over a `> `
-// line). The card is therefore gated to TOP-LEVEL fences (MYND-154 task 9 /
-// grill: pixel-perfect nested cards are deferred). Nested fences still get
-// syntax COLORING — that rides the separate parseMixed wrap in code-highlight.ts,
-// which is unaffected by this gate.
-function isNestedFence(node: SyntaxNode): boolean {
+/** Number of `Blockquote` ancestors above this fence (0 = top-level). > 0 routes
+ *  the away-state render to `CodeInQuoteWidget` (a contained block widget that
+ *  draws the quote's left bar(s) in a margin + an inset card), since the card
+ *  block-replaces the fence lines and a block-replaced line can't carry the
+ *  blockquote bar. Top-level (0) keeps the live per-line card. */
+function quoteDepthOf(node: SyntaxNode): number {
+  let depth = 0;
   for (let p = node.parent; p; p = p.parent) {
-    if (NESTING_CONTAINERS.has(p.name)) return true;
+    if (p.name === "Blockquote") depth++;
   }
-  return false;
+  return depth;
 }
+
+// MYND-154's `isNestedFence` top-level-only gate is lifted (MYND-155 follow-up):
+// code inside a BLOCKQUOTE now renders via `CodeInQuoteWidget` (a read-only
+// contained block widget matching Penpot `e--bq--code-inside`: bars in a left
+// margin, code in an inset boxed card), keyed off `quoteDepthOf`. Everything
+// else — top-level code AND code nested only in a plain list (no quote, so
+// `quoteDepth === 0`) — keeps the live per-line card below. `blockquote.ts`
+// paints the quote bars on the surrounding code lines so they align with the
+// widget's margin bars.
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -94,6 +98,70 @@ function makeCopyIcon(kind: "copy" | "check"): SVGSVGElement {
   return svg;
 }
 
+// Borderless icon-only copy button that writes `source` (the inner code) to the
+// clipboard and flips to a check for 1.2s. Shared by the top-level card-top bar
+// and the nested code-in-quote card.
+function makeCopyButton(source: string): HTMLButtonElement {
+  const copy = document.createElement("button");
+  copy.className = "cm-code-copy";
+  copy.type = "button";
+  copy.setAttribute("aria-label", "Copy code");
+  copy.appendChild(makeCopyIcon("copy"));
+  copy.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void navigator.clipboard
+      ?.writeText(source)
+      .then(() => {
+        copy.replaceChildren(makeCopyIcon("check"));
+        copy.classList.add("cm-code-copy-done");
+        setTimeout(() => {
+          copy.replaceChildren(makeCopyIcon("copy"));
+          copy.classList.remove("cm-code-copy-done");
+        }, 1200);
+      })
+      .catch(() => {
+        /* clipboard denied — leave the icon unchanged */
+      });
+  });
+  return copy;
+}
+
+// Render `code` into `container` as one `<div>` per line, syntax-highlighted via
+// the shared code HighlightStyle classes (colored by the injected
+// `codeSyntaxHighlighting` stylesheet) when the language is known, else plain.
+// textContent only — never innerHTML (TB2).
+function renderHighlightedCode(
+  container: HTMLElement,
+  code: string,
+  info: string,
+): void {
+  const lang = resolveCodeLanguage(info);
+  let line = document.createElement("div");
+  container.appendChild(line);
+  const putText = (text: string, classes: string): void => {
+    const span = document.createElement("span");
+    if (classes) span.className = classes;
+    span.textContent = text;
+    line.appendChild(span);
+  };
+  const putBreak = (): void => {
+    line = document.createElement("div");
+    container.appendChild(line);
+  };
+  if (lang?.support) {
+    const tree = lang.support.language.parser.parse(code);
+    highlightCode(code, tree, codeHighlightStyle, putText, putBreak);
+  } else {
+    // Unknown / untagged language: plain monospace, split on newlines.
+    const lines = code.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) putBreak();
+      putText(lines[i]!, "");
+    }
+  }
+}
+
 // Card-top bar that replaces the opening fence line in the away state. Carries
 // the language badge + a hover-revealed copy control (top-right). Decorative —
 // never part of the document text, so a fence-to-fence copy stays byte-stable;
@@ -123,29 +191,7 @@ class CodeCardBarWidget extends WidgetType {
     // copy control's visibility when the mouse is anywhere over the block.
     bar.dataset.blockFrom = String(this.from);
 
-    const copy = document.createElement("button");
-    copy.className = "cm-code-copy";
-    copy.type = "button";
-    copy.setAttribute("aria-label", "Copy code");
-    copy.appendChild(makeCopyIcon("copy")); // icon-only — no text label
-    const source = this.source;
-    copy.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void navigator.clipboard
-        ?.writeText(source)
-        .then(() => {
-          copy.replaceChildren(makeCopyIcon("check"));
-          copy.classList.add("cm-code-copy-done");
-          setTimeout(() => {
-            copy.replaceChildren(makeCopyIcon("copy"));
-            copy.classList.remove("cm-code-copy-done");
-          }, 1200);
-        })
-        .catch(() => {
-          /* clipboard denied — leave the icon unchanged */
-        });
-    });
+    const copy = makeCopyButton(this.source);
 
     const badge = document.createElement("span");
     badge.className = "cm-code-badge";
@@ -168,6 +214,81 @@ const cardBodyBottom = Decoration.line({ class: "cm-code-card-body cm-code-card-
 const cardBodyOnly = Decoration.line({
   class: "cm-code-card-body cm-code-card-top cm-code-card-bottom",
 });
+
+// Read-only contained card for a fenced code block nested in a blockquote/list
+// (Penpot `e--bq--code-inside`). The block is block-replaced by this single
+// element (away state), so we re-highlight the code here (it is no longer live
+// document text). DOM: a wrapper padded by the quote margin, an absolutely-
+// positioned bars strip painting `depth` `--line-2` bars in that margin (aligned
+// with blockquote.ts's bars on the lines above/below), and an inset boxed card
+// with the language badge + copy top-right and the highlighted code.
+class CodeInQuoteWidget extends WidgetType {
+  constructor(
+    private readonly label: string,
+    private readonly info: string,
+    private readonly code: string,
+    private readonly quoteDepth: number,
+    private readonly from: number,
+  ) {
+    super();
+  }
+  eq(other: CodeInQuoteWidget): boolean {
+    return (
+      other.label === this.label &&
+      other.info === this.info &&
+      other.code === this.code &&
+      other.quoteDepth === this.quoteDepth &&
+      other.from === this.from
+    );
+  }
+  toDOM(view: EditorView): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-code-quote-wrap";
+    const margin = this.quoteDepth * QUOTE_BAR_STEP;
+    wrap.style.paddingLeft = `${margin}px`;
+
+    // Click-to-edit: the widget is a block-replace (read-only), so clicking it
+    // places the cursor at the block's source start and focuses — that touches
+    // the block's lines, which drops the widget and reveals raw `> ```…` source
+    // for editing (same pattern as the table widget). The copy button stops its
+    // own clicks, so skip when the target is inside it.
+    wrap.addEventListener("mousedown", (event) => {
+      if ((event.target as HTMLElement).closest(".cm-code-copy")) return;
+      event.preventDefault();
+      view.dispatch({ selection: { anchor: this.from } });
+      view.focus();
+    });
+
+    const bars = document.createElement("div");
+    bars.className = "cm-code-quote-bars";
+    bars.style.cssText = `width:${margin}px;${quoteBarBackgroundCss(this.quoteDepth)}`;
+    wrap.appendChild(bars);
+
+    const card = document.createElement("div");
+    card.className = "cm-code-quote-card";
+
+    const badgeWrap = document.createElement("div");
+    badgeWrap.className = "cm-code-quote-badge";
+    const badge = document.createElement("span");
+    badge.className = "cm-code-badge";
+    badge.textContent = this.label; // textContent — never innerHTML (TB2)
+    badge.setAttribute("aria-hidden", "true");
+    badgeWrap.appendChild(badge);
+    badgeWrap.appendChild(makeCopyButton(this.code));
+    card.appendChild(badgeWrap);
+
+    const codeEl = document.createElement("div");
+    // Strip a single trailing newline so the last code row isn't an empty line.
+    renderHighlightedCode(codeEl, this.code.replace(/\n$/, ""), this.info);
+    card.appendChild(codeEl);
+
+    wrap.appendChild(card);
+    return wrap;
+  }
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
 
 function badgeLabel(state: EditorState, node: { node: import("@lezer/common").SyntaxNode }): string {
   const infoNode = node.node.getChild("CodeInfo");
@@ -193,14 +314,37 @@ export function buildCodeBlockDecorations(
       if (node.name !== "FencedCode") return undefined;
       // Closed fence only (>= 2 CodeMark). Unclosed → no card (grill Q11).
       if (node.node.getChildren("CodeMark").length < 2) return false;
-      // Nested in a list/blockquote → skip the card (coloring still applies);
-      // see isNestedFence. Non-breaking; pixel-perfect nested card deferred.
-      if (isNestedFence(node.node)) return false;
 
+      const quoteDepth = quoteDepthOf(node.node);
       const openLine = doc.lineAt(node.from);
       const closeLine = doc.lineAt(node.to);
       const revealed =
         focused && selectionTouchesLines(state, openLine.number, closeLine.number);
+
+      // Nested in a blockquote/list → a contained read-only widget (away) that
+      // draws bars-in-margin + an inset card; raw source on reveal (the
+      // surrounding quote bars are painted by blockquote.ts). Top-level (depth 0)
+      // falls through to the live per-line card below.
+      if (quoteDepth > 0) {
+        if (revealed) return false;
+        const infoNode = node.node.getChild("CodeInfo");
+        const info = infoNode ? doc.sliceString(infoNode.from, infoNode.to) : "";
+        const codeText = node.node.getChild("CodeText");
+        const code = codeText ? doc.sliceString(codeText.from, codeText.to) : "";
+        decos.push(
+          Decoration.replace({
+            block: true,
+            widget: new CodeInQuoteWidget(
+              badgeLabel(state, node),
+              info,
+              code,
+              quoteDepth,
+              node.from,
+            ),
+          }).range(openLine.from, closeLine.to),
+        );
+        return false;
+      }
 
       if (revealed) {
         // Editing: show raw fence + body, card every line, no bar/badge.

@@ -6,13 +6,22 @@
 // file only owns its own builder.
 
 import { syntaxTree } from "@codemirror/language";
-import { type Extension } from "@codemirror/state";
+import {
+  type EditorState,
+  type Extension,
+  StateField,
+} from "@codemirror/state";
 import {
   type DecorationSet,
   EditorView,
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
+import {
+  editorFocusChanged,
+  editorFocusField,
+  editorFocusTracker,
+} from "./cursor-aware";
 
 /** True when background parsing advanced the tree between the two states —
  *  the tree is reference-stable, so inequality means a reparse landed. Without
@@ -48,6 +57,43 @@ export function makeDocOnlyDecorationPlugin(
   build: (view: EditorView) => DecorationSet,
 ): Extension {
   return makeDecorationPlugin(build, docOnlyUpdate);
+}
+
+/**
+ * StateField analog of `makeCursorAwareDecorationPlugin`, for decorations that
+ * CM6 forbids from a ViewPlugin — block-replace or any replace crossing a line
+ * break (setext underline collapse, reference-definition-line collapse, the
+ * table widget). Owns the recompute gate (doc / selection / focus / parse), the
+ * `provide`, and — crucially — bundles the shared `editorFocusField` + tracker
+ * BEFORE the decoration field so `linesRevealed`/focus reads are current. Pass a
+ * pure `build(state) -> DecorationSet`. Returns the extension trio (the focus
+ * field/tracker dedup by identity when several decorators include them).
+ */
+export function makeCursorAwareStateField(
+  build: (state: EditorState) => DecorationSet,
+): Extension {
+  const field = StateField.define<DecorationSet>({
+    create(state) {
+      return build(state);
+    },
+    update(decorations, tr) {
+      const selectionChanged = !tr.startState.selection.eq(tr.state.selection);
+      const treeChanged = syntaxTree(tr.startState) !== syntaxTree(tr.state);
+      if (
+        !tr.docChanged &&
+        !selectionChanged &&
+        !editorFocusChanged(tr) &&
+        !treeChanged
+      ) {
+        return decorations;
+      }
+      return build(tr.state);
+    },
+    provide(f) {
+      return EditorView.decorations.from(f);
+    },
+  });
+  return [editorFocusField, editorFocusTracker, field];
 }
 
 function makeDecorationPlugin(

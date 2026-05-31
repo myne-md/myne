@@ -75,7 +75,10 @@ export const codeNestMarkdownExtension: MarkdownConfig = {
 
 // Code-only highlight style. Tag groups map to the `--syntax-*` palette (task 2).
 // processingInstruction + monospace are intentionally absent (see header).
-const codeHighlightStyle = HighlightStyle.define([
+// Exported so the read-only code-in-blockquote widget (fenced-code.ts) can
+// re-highlight its (block-replaced, no-longer-live) code with the SAME classes —
+// the injected stylesheet from `codeSyntaxHighlighting` colors them identically.
+export const codeHighlightStyle = HighlightStyle.define([
   {
     tag: [
       t.keyword,

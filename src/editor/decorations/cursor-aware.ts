@@ -10,8 +10,13 @@
 // decoration's range; returns true if any selection range overlaps with the
 // decoration's enclosing line(s).
 
-import type { EditorState } from "@codemirror/state";
-import type { EditorView } from "@codemirror/view";
+import {
+  type EditorState,
+  StateEffect,
+  StateField,
+  type Transaction,
+} from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 
 /**
  * True if any selection head or anchor sits on a line in the inclusive range
@@ -65,4 +70,75 @@ export function isInsideRange(view: EditorView, from: number, to: number): boole
     if (range.anchor >= from && range.anchor <= to) return true;
   }
   return false;
+}
+
+// --- Editor focus, threaded into state -----------------------------------
+//
+// `StateField`-backed decorations (block / line-break-crossing replaces, which
+// CM6 forbids from a `ViewPlugin`) have no `view`, so they can't read
+// `view.hasFocus`. This effect + field carries DOM focus into state so those
+// fields can gate cursor-aware reveal on focus the same way `isCursorLine` /
+// `isInsideRange` do for ViewPlugins. Originally local to `table.ts`; lifted
+// here as shared infra when setext-heading + reference-link definition hiding
+// became the second/third StateField decorations needing it.
+
+const setEditorFocus = StateEffect.define<boolean>();
+
+export const editorFocusField = StateField.define<boolean>({
+  create() {
+    return false;
+  },
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setEditorFocus)) return effect.value;
+    }
+    return value;
+  },
+});
+
+export const editorFocusTracker = EditorView.focusChangeEffect.of(
+  (_state, focusing) => setEditorFocus.of(focusing),
+);
+
+/** True if this transaction carried an editor focus/blur change — for a
+ *  StateField's `update` recompute gate (mirrors `treeChanged` / `docChanged`). */
+export function editorFocusChanged(tr: Transaction): boolean {
+  return tr.effects.some((e) => e.is(setEditorFocus));
+}
+
+/**
+ * Byte range that collapses the logical lines `[fromLine, toLine]` out of the
+ * rendered flow without leaving a blank gap, for a line-break-crossing
+ * `Decoration.replace` (StateField only). Eats the newline PRECEDING the range
+ * (so the lines merge upward); at document start there is none, so it eats the
+ * trailing newline instead. Shared by setext (underline collapse) and
+ * reference-definition-line hiding.
+ */
+export function collapseLineRange(
+  state: EditorState,
+  fromLine: number,
+  toLine: number,
+): { from: number; to: number } {
+  const first = state.doc.line(fromLine);
+  const last = state.doc.line(toLine);
+  if (first.from > 0) return { from: first.from - 1, to: last.to };
+  return { from: first.from, to: Math.min(last.to + 1, state.doc.length) };
+}
+
+/**
+ * State-only reveal predicate for StateField decorations: true when the editor
+ * is focused AND a selection touches the inclusive line range `[fromLine,
+ * toLine]`. Focus gate matches `isCursorLine` so a construct the cursor happens
+ * to sit in does not stay raw once the editor is unfocused. Requires
+ * `editorFocusField` to be installed (it is, via the decorator's extension
+ * array — declared before the decoration field so its value is current).
+ */
+export function linesRevealed(
+  state: EditorState,
+  fromLine: number,
+  toLine: number,
+): boolean {
+  return (
+    state.field(editorFocusField) && selectionTouchesLines(state, fromLine, toLine)
+  );
 }

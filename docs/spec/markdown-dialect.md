@@ -32,7 +32,7 @@ The parser recognizes the union of CommonMark + GFM extensions + footnote extens
 
 ### 3.1 Block elements (CommonMark base)
 
-- ATX headings `# H1` … `###### H6` (only ATX is canonical for new writes; Setext `===` / `---` underline form is recognized on parse for round-trip but never emitted)
+- ATX headings `# H1` … `###### H6` (only ATX is canonical for new writes; Setext `===` / `---` underline form is recognized on parse for round-trip and, since MYND-146, **rendered** with a cursor-aware decoration — the title takes H1/H2 typography and the underline line hides off-cursor — but is still **never emitted**. Rendering ≠ emitting: the bytes are preserved per §6 C1 and a new heading still writes the ATX form.)
 - Paragraphs (text separated by blank lines)
 - Indented code blocks (4-space indent) — recognized for round-trip but **never emitted**; new code blocks always use fenced form
 - Fenced code blocks (`` ``` `` or `~~~`) with optional language label (` ```ts `)
@@ -41,13 +41,14 @@ The parser recognizes the union of CommonMark + GFM extensions + footnote extens
 - Ordered lists (`1. ` / `1) `; canonical emit form is `1. `)
 - Horizontal rules (`---` / `***` / `___`; canonical emit form is `---`)
 - HTML blocks (raw HTML — recognized at parse, rendered as plain monospace by default; full sanitized rendering is out of scope for v0.1)
+- Definition lists (Pandoc-style `Term` then `: Definition`) — **recognized and rendered** since MYND-152 (scope reversal, `decisions.md` 2026-05-30; previously §7 out-of-scope). The pinned v0.1 subset is **tight only**: a single term line immediately followed (no blank line between) by one or more definition lines, each `:` + a space + the definition text (a bare `:` is an empty definition); multiple consecutive `:` lines attach as multiple definitions of that term. **Not** in the subset (preserved byte-stably as ordinary paragraphs, not parsed as definition lists): the blank-line-separated "loose" form, lazy continuation lines (a definition wrapping onto a non-`:` line), and multiple terms sharing one definition block. Rendered with a cursor-aware decoration (term styled, definitions indented, leading `:` hidden off-cursor); **never emitted** — no authoring affordance produces a definition list, and bytes are preserved per §6 C1. The custom parser node is informative in §8.
 
 ### 3.2 Inline elements (CommonMark base)
 
 - Emphasis: `*italic*`, `_italic_`, `**bold**`, `__bold__` (canonical emit forms: `*italic*` and `**bold**` — see §5)
 - Inline code: `` `code` ``
 - Inline links: `[text](url)` and `[text](url "title")`
-- Reference links: `[text][ref]` + `[ref]: url` — recognized for round-trip but **never emitted**; new links use inline form
+- Reference links: `[text][ref]` (and collapsed `[text][]` / shortcut `[ref]`) + `[ref]: url` — recognized for round-trip and, since MYND-148, **rendered** with a cursor-aware decoration: a resolved usage shows its visible text as a link and the resolved `[ref]: url` definition line hides off-cursor; a dangling reference (no matching definition) stays plain text. Still **never emitted** — new links use inline form, bytes preserved per §6 C1. A `[ref]: url` definition is matched to its uses by CommonMark reference rules (case-folded, internal whitespace collapsed). See also the shared **link reference definition** collector consumed by reference images (§7, MYND-149/MYND-164).
 - Autolinks: `<https://example.com>` (CommonMark form) and bare `https://example.com` (GFM extension)
 - Hard line breaks: trailing two spaces or `\` at line end
 - Raw inline HTML (recognized; rendered as plain text)
@@ -244,6 +245,8 @@ When Myne authors new content (slash command, selection toolbar, keyboard shortc
 - HTML embeds
 - inline `#tag` bytes (per §3.7 — recognizer-only; never rewritten)
 
+**Rendering does not weaken C1.** Several of the forms above are now *rendered* with cursor-aware decorations (Setext headings — MYND-146; reference links — MYND-148; and, post-2026-05-30, definition lists — MYND-152, §3.1). Rendering is purely visual: the decoration hides or restyles glyphs on screen but never mutates the buffer, and the cursor-aware reveal restores the raw source for editing. A note containing any of these forms that is rendered, focus/blur-cycled, and exported untouched is byte-identical. C1 binds every decoration in the editor — reaffirmed, not relaxed, by the rendering work.
+
 **Implication for Myne authoring.** When a user imports a vault and then edits a note, only the lines they directly change adopt canonical emit forms. Untouched lines stay as written by the original author.
 
 **Implication for migration.** Lazy migration on edit (rewriting all non-canonical syntax in a touched file on save) is **explicitly forbidden** by C1. A user who wants to migrate an imported note's syntax to Myne canonical forms must invoke an explicit, transparent conversion command (the wikilink-specific R2 command is the only such command in v0.1; see [`wikilink.md`](wikilink.md) §7).
@@ -254,18 +257,18 @@ The following syntax is **not** parsed or rendered in v0.1. Authoring affordance
 
 - **Math.** `$inline$` and `$$display$$` LaTeX-style math. Deferred to v0.1.x ("second step"); KaTeX integration is the implementation path.
 - **Attribute syntax.** `{#id .class key=value}` Pandoc-style attributes. Not native to GFM; not in v0.1.
-- **Definition lists.** `Term\n: Definition` Pandoc-style. Not in v0.1.
 - **Callouts / admonitions.** `> [!NOTE]` GitHub/Obsidian convention. Recognized at parse for round-trip; the v0.1 baseline editor renders the callout block as a normal block quote (the `[!NOTE]` marker stays as plain text inside the quote). Full callout decoration is deferred to v0.1.x.
 - **Iframes / embeds.** Raw `<iframe>` HTML. Recognized as raw HTML; rendered as plain monospace; sandboxing is out of scope until the attachment-encryption pipeline lands.
 - **Custom container blocks.** `:::` div containers (Pandoc / Djot syntax). Not in v0.1.
 - **Mermaid / PlantUML diagrams.** Recognized as fenced code blocks with `mermaid` / `plantuml` language label; rendered as monospace code; diagram rendering is deferred.
-- **Inline images.** `![alt](path)` and `![[image.png]]` are parsed and round-trip-stable, but inline image rendering is gated on the attachment-encryption pipeline that is not part of v0.1.
+- **Inline images.** `![alt](path)` and `![[image.png]]` are parsed and round-trip-stable, but inline image rendering is gated on the attachment-encryption pipeline that is not part of v0.1. **Reference-style images** (`![alt][ref]`) resolve against the same link reference definition table as reference links (§3.2) — but their v0.1 rider (hiding a definition line referenced only by an image, even though no `<img>` is drawn) is **deferred to MYND-164**, tracked alongside the attachment-encryption pipeline. Until then, a definition referenced only by an image stays visible.
 
 ## 8. Parser configuration (informative)
 
 For the v0.1 reference implementation in the desktop client:
 
 - Parser: `@codemirror/lang-markdown` configured with `markdownLanguage` (CodeMirror's GFM-bundled base language) plus a footnote `MarkdownConfig` extension plus the Wikilink `MarkdownConfig` extension defined in [`wikilink.md`](wikilink.md) plus a frontmatter-recognizer that tags the leading `---\n…\n---` block as a special node.
+- Definition lists (§3.1) use a custom `MarkdownConfig` extension (a `LeafBlockParser`, the same hook CommonMark uses for setext headings and link references) that emits a `DefinitionList` block node with `DefinitionTerm` / `DefinitionMarker` (`:`) / `DefinitionDesc` children for the pinned tight subset. GFM has no definition-list node, so this extension is the sole producer; it is registered both in the shared serialization parser and in the editor's `markdown({ extensions })` so the editor's `syntaxTree` carries the node for decoration. Setext headings and reference links require **no** parser extension — `markdownLanguage` already produces `SetextHeading1`/`SetextHeading2` and reference-style `Link` nodes; MYND-146/148 are decoration-only.
 - The frontmatter recognizer is single-pass and does not parse the YAML body; it only delimits the block. YAML parsing happens in a separate pass (when the Properties UI lands; deferred).
 - HTML embedded inside markdown is recognized via `@codemirror/lang-html` (forced transitive of `lang-markdown`); v0.1 renders raw HTML as plain monospace, with no sanitization (because nothing is rendered beyond plain monospace, there is no XSS surface).
 

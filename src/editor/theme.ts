@@ -96,11 +96,23 @@ export const myneTheme = EditorView.theme({
   },
 
   // Block decorations — line classes from blockquote.ts / frontmatter.ts.
+  // Left bar(s) + indent are painted per-line by blockquote.ts as a
+  // `--line-2` gradient background (one bar per nesting level, Penpot spec),
+  // so the static border/padding live there, not here. This rule carries only
+  // the shared body treatment.
   ".cm-blockquote": {
-    borderLeft: "3px solid var(--line-2, #c8c7c1)",
-    paddingLeft: "14px",
     color: "var(--fg-2)",
     fontStyle: "italic",
+  },
+  // Definition lists — line classes from definition-list.ts (MYND-152). Term
+  // reads as a label; definition rows indent under it with the `:` hidden.
+  ".cm-def-term": {
+    fontWeight: "700",
+    color: "var(--fg-1)",
+  },
+  ".cm-def-desc": {
+    paddingLeft: "20px",
+    color: "var(--fg-2)",
   },
   ".cm-frontmatter": {
     backgroundColor: "var(--paper-2, #f3f1eb)",
@@ -232,6 +244,45 @@ export const myneTheme = EditorView.theme({
   ".cm-code-copy-done": {
     opacity: "1",
     color: "var(--success, #2f6048)",
+  },
+
+  // Code block nested inside a blockquote / list (read-only contained widget
+  // from fenced-code.ts, Penpot `e--bq--code-inside`). The quote bar(s) run in a
+  // left margin (painted on `.cm-code-quote-bars`, depth-driven inline style) and
+  // the code card is inset to their right as a boxed, rounded `--paper-2` card.
+  ".cm-code-quote-wrap": {
+    position: "relative",
+  },
+  ".cm-code-quote-bars": {
+    position: "absolute",
+    left: "0",
+    top: "0",
+    bottom: "0",
+    // width + bar gradient set inline by the widget (depth-dependent).
+  },
+  ".cm-code-quote-card": {
+    position: "relative",
+    backgroundColor: "var(--paper-2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    borderRadius: "var(--radius-2, 6px)",
+    padding: "14px 16px",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+    color: "var(--fg-1)",
+    overflowX: "auto",
+  },
+  // Badge + copy cluster, pinned top-right inside the card (Penpot spec).
+  ".cm-code-quote-badge": {
+    position: "absolute",
+    top: "10px",
+    right: "12px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  ".cm-code-quote-card:hover .cm-code-copy, .cm-code-quote-card .cm-code-copy:focus-visible": {
+    opacity: "1",
   },
 
   // Horizontal-rule replacement widget from horizontal-rule.ts.

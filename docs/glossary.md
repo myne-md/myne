@@ -273,6 +273,12 @@ The CodeMirror 6 render overlay that hides or replaces ranges of the markdown bu
 
 Used in: `vision.md` Phase 1 Scope
 
+### **definition list** &nbsp; 📦 *Product*
+
+A Pandoc-style block construct: a *term* line immediately followed by one or more *definition* lines, each introduced by a leading `:` marker (`Term` ⏎ `: Definition`). Myne v0.1 recognizes and renders a **pinned tight subset** — term immediately followed (no blank line) by `:`-prefixed definition line(s), multiple definitions allowed; the loose/blank-line-separated form, lazy continuation, and multiple-terms-per-block are excluded and preserved byte-stably as ordinary paragraphs. The GFM grammar has no definition-list node, so a custom `MarkdownConfig` block parser produces a `DefinitionList` node (`DefinitionTerm` / `DefinitionMarker` / `DefinitionDesc` children); the editor renders the term styled with the definitions indented and the leading `:` hidden off-cursor. Recognized and rendered but **never emitted** — no authoring affordance produces one. Moved into v0.1 scope by a 2026-05-30 scope reversal (previously out of scope per the D1 dialect entry). See also [decoration layer](#decoration-layer), [reference link](#reference-link).
+
+Used in: `spec/markdown-dialect.md` §3.1, §8; `decisions.md` 2026-05-30
+
 ### **DecryptedNote** &nbsp; 📦 *Product*
 
 The opaque Rust handle returned by `protocol::decode_note` on a successful per-note decryption (`spec/protocol.md` §6.4). Carries — privately — the original 112-byte header slab from the source `.myn` blob (bytes 0..47+N: magic + version + reserved + items_key_id + item_key_nonce + enc_item_key_len + enc_item_key), the unwrapped 32-byte `item_key` in `Zeroizing<[u8; 32]>`, the decrypted markdown plaintext in `Zeroizing<Vec<u8>>`, and the `note_uuid` carried out-of-band per §9.1 (the `.myn` filename, not in the blob bytes). All four fields are private; consumers reach the non-secret subsets through accessor methods that slice into the slab. The slab retention is load-bearing for §6.3's "bytes 0..47+N byte-identical across revisions" invariant: `encode_update` splices the slab verbatim into the new blob, never reconstructs the prefix from fields. `Drop` zeroizes both `item_key` and `plaintext`; the `Debug` impl is hand-written and emits redacted markers (a regression test pins the no-leak property). `encode_update` consumes the handle by value (typestate "one decode, one update"); `encode_update_blob_raw` borrows for D6-style nonce-permutation tests.
@@ -520,6 +526,12 @@ Rust FFI bindings to the libsodium C library. The desktop crypto layer uses one 
 
 Used in: `decisions.md` (Tauri stack realignment)
 
+### **link reference definition** &nbsp; 📦 *Product*
+
+A `[label]: url` line (CommonMark "link reference definition") that supplies the destination for a [reference link](#reference-link) (`[text][label]`) or a reference-style image (`![alt][label]`) elsewhere in the same note. Labels match by CommonMark rules — case-folded with internal whitespace collapsed — and the first definition of a given label wins. In the Myne editor a shared collector scans all such definition lines into a `label → { target, range }` map; a definition referenced by a resolved reference link is hidden off-cursor (it reads as body noise otherwise) and revealed when the cursor enters its line. The definition bytes are preserved (§6 C1) and the form is never emitted by an authoring affordance. See also [reference link](#reference-link).
+
+Used in: `spec/markdown-dialect.md` §3.2; `decisions.md` 2026-05-30
+
 ### **magic bytes** &nbsp; 📋 *Protocol*
 
 Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. Reserved for v005: `NT05`, `NTV5`. Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
@@ -726,6 +738,12 @@ Used in: `spec/protocol.md` §7, `spec/recovery-flow.md`
 The 32-byte key derived from the recovery phrase via Argon2id with `salt_recovery`. Encrypts the second of the two copies of `root_key` in `vault.meta` (`enc_root_key_recovery`).
 
 Used in: `spec/protocol.md` §3.1, §7
+
+### **reference link** &nbsp; 📦 *Product*
+
+A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
+
+Used in: `spec/markdown-dialect.md` §3.2, §5; `decisions.md` 2026-05-30
 
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 
