@@ -466,6 +466,8 @@ export const myneTheme = EditorView.theme({
     color: "var(--accent, #2c4a7a)",
     cursor: "pointer",
     userSelect: "none",
+  },
+
   // In-note find matches (MYND-175). The @codemirror/search engine decorates
   // every query match with `.cm-searchMatch` and the current/active one with
   // `.cm-searchMatch-selected`. Per the approved Penpot legend: all matches get
