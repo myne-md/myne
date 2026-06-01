@@ -85,6 +85,7 @@ A2/A3/A4/A5/A6 merged without test vectors. The `myne-test-vectors/` companion r
 - `vectors/aad-construction/` (per-AEAD AAD assembly)
 - `vault.meta` byte-string vectors (D5 → A6)
 - `.myn` blob vectors (D6 → MYND-25, blob.rs landed; D6 ready)
+- `vectors/vault-search/` (D8 → MYND-29, `search_blob.rs` `MYS1` codec; landed). Also extended `hkdf-sha256` with the `SearchIndexKey` role and `ctx-aead` with the `aad_search_index_blob` builder in lockstep — the search path's KEK derivation + AAD assembly + blob framing are all now pinned.
 
 When you change a primitive: regenerate the relevant vector file in the companion repo and bump it in the same PR. CI (Plan 1 §C2) will pull `myne-test-vectors` and re-run vectors against the current Rust impl.
 

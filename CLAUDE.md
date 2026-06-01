@@ -93,6 +93,8 @@ Bound into AEAD tags or magic-byte checks. Changing any is a major-version event
 | Salt domain prefix (recovery) | `"myne.v0.1 argon2id-recovery\|"` |
 | Per-note blob magic | `MY01` (extension `.myn`) |
 | Vault metadata magic | `MYV1` (file `vault.meta`) |
+| Vault prefs blob magic | `MYP1` (file `vault.prefs`; §9.5) |
+| Search-index blob magic | `MYS1` (file `vault.search`; §9.6) |
 | Protocol identifier string | `myne-protocol-v0.1` |
 | Account-number display prefix | `MY-XXXX-XXXX-XXXX-XXXX-X` |
 

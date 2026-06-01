@@ -360,4 +360,410 @@ mod tests {
             Err(SearchBlobError::CiphertextLenOverflow)
         );
     }
+
+    // ---- KAT vector regenerator (companion repo) ----------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/vault-search/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_vault_search_vectors.json`,
+    /// ready to copy verbatim into the companion repo.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act, not a
+    /// side effect of `cargo test`. Run with:
+    /// `cargo test -p protocol --lib emit_vault_search_vectors_for_paste -- --ignored`
+    ///
+    /// 12 cases pin (MYND-29 / §9.6):
+    /// - 3 `encrypt` × {empty / small / 1-KB opaque plaintext} — pin the
+    ///   `MYS1` byte output. The empty case is a fresh-vault index;
+    ///   `search_index_key` is derived from `root_key` via
+    ///   `SubkeyRole::SearchIndexKey` so the vector exercises the full
+    ///   root_key → KEK → blob lineage.
+    /// - 1 `decrypt_ok` (1-KB round-trip) — proves the decoder recovers
+    ///   the opaque inner plaintext.
+    /// - 2 `decrypt_aead_fail` — (a) single-byte CTX-tag tamper, (b)
+    ///   cross-vault (wrong `account_number_hash` via the AAD binding).
+    ///   Both collapse to `SearchBlobError::CannotDecrypt`
+    ///   non-distinguishing per spec §6.4.
+    /// - 6 `parse_fail` — one per distinguishable pre-decryption reject
+    ///   (`MagicMismatch`, `ProtocolVersionMismatch`,
+    ///   `IndexFormatUnsupported`, `HeaderTooShort`, `CiphertextTruncated`,
+    ///   `CiphertextLenOverflow`). Distinct from the AEAD-failure surface:
+    ///   these run BEFORE decryption and a port MUST surface the specific
+    ///   reject so the caller can fall to a full index rebuild (§9.6.4).
+    ///
+    /// `PlaintextTooLarge` + `RandomnessUnavailable` are encode-side and
+    /// cannot be expressed as a decode-a-blob case, so they are not
+    /// vectored (documented in the category's `schema.md`).
+    #[test]
+    #[ignore]
+    fn emit_vault_search_vectors_for_paste() {
+        extern crate std;
+        use crate::subkey::{derive_subkey, SubkeyRole};
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Distinct byte patterns per field — easy visual cross-check.
+        // root_key (NOT the KEK): the runner derives search_index_key from
+        // this via derive_subkey(SubkeyRole::SearchIndexKey), exactly as a
+        // production caller would. account_hash binds via the AAD.
+        let root_key: [u8; 32] = [0x42; 32];
+        let account_hash: [u8; SEARCH_BLOB_ACCOUNT_HASH_LEN] = [0x7c; SEARCH_BLOB_ACCOUNT_HASH_LEN];
+        let other_account_hash: [u8; SEARCH_BLOB_ACCOUNT_HASH_LEN] =
+            [0x7d; SEARCH_BLOB_ACCOUNT_HASH_LEN];
+        let nonce: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
+
+        let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
+
+        // Deterministic opaque plaintexts (the codec is payload-agnostic).
+        let plaintext_empty: alloc::vec::Vec<u8> = alloc::vec::Vec::new();
+        let plaintext_small: alloc::vec::Vec<u8> =
+            (*b"\x00\x01serialized index + manifest bytes\xff").to_vec();
+        let plaintext_1kb: alloc::vec::Vec<u8> = (0..1024u32).map(|i| (i % 256) as u8).collect();
+
+        let blob_empty = encode_search_index_blob_raw(
+            &search_index_key,
+            &account_hash,
+            &plaintext_empty,
+            &nonce,
+        )
+        .expect("encode empty");
+        let blob_small = encode_search_index_blob_raw(
+            &search_index_key,
+            &account_hash,
+            &plaintext_small,
+            &nonce,
+        )
+        .expect("encode small");
+        let blob_1kb =
+            encode_search_index_blob_raw(&search_index_key, &account_hash, &plaintext_1kb, &nonce)
+                .expect("encode 1kb");
+
+        // Round-trip sanity on the 1-KB blob.
+        let decoded = decode_search_index_blob(&search_index_key, &account_hash, &blob_1kb)
+            .expect("decode 1kb round-trip");
+        assert_eq!(decoded.as_slice(), plaintext_1kb.as_slice());
+
+        // decrypt_aead_fail (a): flip the final byte (inside the CTX tag).
+        let mut blob_tag_tamper = blob_small.clone();
+        let last = blob_tag_tamper.len() - 1;
+        blob_tag_tamper[last] ^= 0xFF;
+        assert_eq!(
+            decode_search_index_blob(&search_index_key, &account_hash, &blob_tag_tamper),
+            Err(SearchBlobError::CannotDecrypt),
+            "tag tamper must reject"
+        );
+        // decrypt_aead_fail (b): valid blob, wrong account_hash (AAD bind).
+        assert_eq!(
+            decode_search_index_blob(&search_index_key, &other_account_hash, &blob_small),
+            Err(SearchBlobError::CannotDecrypt),
+            "cross-vault account_hash must reject"
+        );
+
+        // parse_fail blobs: corrupt a valid blob per structural reject.
+        let mut pf_magic = blob_small.clone();
+        pf_magic[0] = b'X';
+        let mut pf_version = blob_small.clone();
+        pf_version[4] = 0x02;
+        let mut pf_index_format = blob_small.clone();
+        pf_index_format[5] = 0x02;
+        let pf_header_short: alloc::vec::Vec<u8> = SEARCH_BLOB_MAGIC.to_vec(); // 4 bytes < 34
+        let mut pf_truncated = blob_small.clone();
+        pf_truncated.truncate(pf_truncated.len() - 1);
+        let mut pf_len_overflow = blob_small.clone();
+        pf_len_overflow[30..34].copy_from_slice(&0xFFFF_FFFFu32.to_be_bytes());
+
+        let root_key_hex = hex_lower(&root_key);
+        let account_hash_hex = hex_lower(&account_hash);
+        let other_account_hash_hex = hex_lower(&other_account_hash);
+        let nonce_hex = hex_lower(&nonce);
+        let search_index_key_hex = hex_lower(&*search_index_key);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"vault-search\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.6 + §3.4 + §5.2 + §6.4\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_search_index_blob_raw + protocol::decode_search_index_blob byte mapping for the MYS1 vault.search encrypted search-index codec (MYND-29). The inner plaintext is OPAQUE (engine-serialized index + manifest) — no canonical-JSON discipline, unlike vault-prefs. search_index_key = derive_subkey(root_key, SubkeyRole::SearchIndexKey) (role 'search-index-key'); account_number_hash binds via aad_search_index_blob (role 'search-index-blob'). 12 cases: 3 encrypt (empty / small / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4) + 6 parse_fail (one per distinguishable pre-decryption structural reject). Cases generated by `cargo test -p protocol --lib emit_vault_search_vectors_for_paste -- --ignored` (in protocol/src/search_blob.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // ---- encrypt closure ----------------------------------------
+        let emit_encrypt = |dump: &mut alloc::string::String,
+                            slug: &str,
+                            description: &str,
+                            plaintext: &[u8],
+                            blob: &[u8],
+                            include_info: bool,
+                            trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-search/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"encrypt\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                root_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                account_hash_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_plaintext_hex\": \"{}\",\n",
+                hex_lower(plaintext)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_nonce_hex\": \"{}\",\n",
+                nonce_hex
+            ));
+            if include_info {
+                dump.push_str(&alloc::format!(
+                    "      \"informational_search_index_key_hex\": \"{}\",\n",
+                    search_index_key_hex
+                ));
+            }
+            dump.push_str(&alloc::format!(
+                "      \"expected_search_blob_hex\": \"{}\"\n",
+                hex_lower(blob)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-empty",
+            "Encode an empty inner plaintext (fresh vault, no notes indexed). The smallest valid MYS1 blob: 34-byte header + 0-byte ciphertext + 32-byte CTX tag = 66 bytes. ciphertext_len field = 32.",
+            &plaintext_empty,
+            &blob_empty,
+            true,
+            true,
+        );
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-small",
+            "Encode a 38-byte opaque payload (a stand-in for a serialized index + manifest snapshot, with leading/trailing non-ASCII bytes to prove the codec is byte-transparent). Expected blob = 34 + 38 + 32 = 104 bytes.",
+            &plaintext_small,
+            &blob_small,
+            false,
+            true,
+        );
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-1kb",
+            "Encode a 1024-byte plaintext where byte i = (i mod 256). Mid-size case — exercises a full XChaCha20 keystream block plus tail. Expected blob = 34 + 1024 + 32 = 1090 bytes.",
+            &plaintext_1kb,
+            &blob_1kb,
+            false,
+            true,
+        );
+
+        // ---- decrypt_ok ---------------------------------------------
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-search/v0.1/decrypt-ok-1kb\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Round-trip the 1-KB blob back to its opaque plaintext under the matching root_key (→ search_index_key) + account_number_hash. Proves the decoder's header parse + AEAD unwrap reconstruct the exact inner bytes the desktop layer will deserialize.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_1kb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            root_key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            account_hash_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_hex\": \"{}\"\n",
+            hex_lower(&plaintext_1kb)
+        ));
+        dump.push_str("    },\n");
+
+        // ---- decrypt_aead_fail closure ------------------------------
+        let emit_aead_fail = |dump: &mut alloc::string::String,
+                              slug: &str,
+                              description: &str,
+                              blob: &[u8],
+                              account_hash_arg_hex: &str,
+                              tamper_desc: &str,
+                              trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-search/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"decrypt_aead_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                root_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                account_hash_arg_hex
+            ));
+            dump.push_str("      \"expected_kind\": \"aead_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"informational_tamper_description\": \"{}\"\n",
+                json_escape(tamper_desc)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_aead_fail(
+            &mut dump,
+            "decrypt-tampered-ctx-tag",
+            "Take the small blob and flip the final byte (inside the 32-byte CTX commitment tag) via XOR 0xFF. The decoder MUST surface a non-distinguishing CannotDecrypt — the recomputed CTX commitment no longer matches. Same observable outcome as the cross-vault case below (spec §6.4).",
+            &blob_tag_tamper,
+            &account_hash_hex,
+            "final byte (inside CTX tag) flipped via XOR 0xFF",
+            true,
+        );
+
+        emit_aead_fail(
+            &mut dump,
+            "decrypt-cross-vault-account-hash",
+            "Take the intact small blob but decrypt under a DIFFERENT account_number_hash (0x7d×16 instead of 0x7c×16). aad_search_index_blob binds the account hash, so the AAD differs and AEAD verification fails — a blob from vault A cannot be opened against vault B. Collapses to the same CannotDecrypt as the tamper case; ports MUST NOT distinguish the two.",
+            &blob_small,
+            &other_account_hash_hex,
+            "intact blob decrypted under wrong account_number_hash (0x7d×16)",
+            true,
+        );
+
+        // ---- parse_fail closure -------------------------------------
+        let emit_parse_fail = |dump: &mut alloc::string::String,
+                               slug: &str,
+                               description: &str,
+                               blob: &[u8],
+                               expected_error: &str,
+                               trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-search/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_error\": \"{}\"\n",
+                expected_error
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-magic-mismatch",
+            "First byte of the MYS1 magic corrupted to 'X'. Rejected at offset 0 before any decryption (magic-byte-before-decrypt discipline, §9.6.1).",
+            &pf_magic,
+            "magic_mismatch",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-protocol-version-mismatch",
+            "protocol_version byte (offset 4) set to 0x02 instead of 0x01. A v0.1 decoder rejects an unknown protocol version before decrypting.",
+            &pf_version,
+            "protocol_version_mismatch",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-index-format-unsupported",
+            "index_format_version byte (offset 5) set to 0x02 — a future inverted-index serialization a v0.1 engine does not understand. The decoder rejects cleanly so the caller rebuilds the index from notes (§9.6.4). This is the forward-migration hook and is load-bearing.",
+            &pf_index_format,
+            "index_format_unsupported",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-header-too-short",
+            "Only the 4-byte MYS1 magic, no room for the 34-byte header. Rejected before any field read.",
+            &pf_header_short,
+            "header_too_short",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-ciphertext-truncated",
+            "Valid header advertising ciphertext_len = N, but the blob is one byte shorter than header + N. Rejected before the AEAD stage.",
+            &pf_truncated,
+            "ciphertext_truncated",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-ciphertext-len-overflow",
+            "ciphertext_len field (offset 30..34) set to 0xFFFFFFFF, far above MAX_SEARCH_INDEX_PLAINTEXT_LEN + 32. The overflow guard rejects before any slice indexing — a port MUST bound-check ciphertext_len before allocating or indexing.",
+            &pf_len_overflow,
+            "ciphertext_len_overflow",
+            false,
+        );
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_vault_search_vectors.json", dump.as_bytes())
+            .expect("write vault-search vectors dump");
+    }
 }
