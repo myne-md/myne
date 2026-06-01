@@ -66,6 +66,32 @@ fn assert_unique_vector_ids(category: &str, cases: &[serde_json::Value]) {
     }
 }
 
+/// Parse a case's `input_kdf_params` object (`{ m_kib, t, p, argon2_version_hex }`)
+/// into a `KdfParams`. Shared by the argon2id / bip39-recovery / aad-construction
+/// runners, all of which bind the canonical Argon2id param block.
+fn parse_kdf_params(case: &serde_json::Value, id: &str) -> protocol::KdfParams {
+    let obj = case
+        .get("input_kdf_params")
+        .unwrap_or_else(|| panic!("[{id}] missing input_kdf_params"));
+    let argon2_version_bytes = hex_decode(
+        obj["argon2_version_hex"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing kdf_params.argon2_version_hex")),
+    );
+    protocol::KdfParams {
+        m_kib: obj["m_kib"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("[{id}] missing kdf_params.m_kib")) as u32,
+        t: obj["t"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("[{id}] missing kdf_params.t")) as u32,
+        p: obj["p"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("[{id}] missing kdf_params.p")) as u8,
+        argon2_version: argon2_version_bytes[0],
+    }
+}
+
 #[test]
 fn phrase_normalize_vectors() {
     let path = companion_vectors_root()
@@ -782,7 +808,7 @@ fn account_number_vectors() {
 
 #[test]
 fn myn_blob_vectors() {
-    use protocol::{decode_note, encode_new_note_blob_raw, DecryptError};
+    use protocol::{decode_note, encode_new_note_blob_raw, encode_update_blob_raw, DecryptError};
 
     let path = companion_vectors_root()
         .join("myn-blob")
@@ -884,6 +910,65 @@ fn myn_blob_vectors() {
                     expected.len(),
                 );
             }
+            "encrypt_update" => {
+                // §6.3 note-update path: decode the source blob, then
+                // re-encode its content under a new content_nonce. The
+                // 112-byte header_prefix MUST be spliced verbatim (§3.3).
+                let source_blob = hex_decode(
+                    case["input_source_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_source_blob_hex")),
+                );
+                let note_uuid: [u8; 16] = hex_decode_array(
+                    case["input_note_uuid_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_note_uuid_hex")),
+                );
+                let items_key: [u8; 32] = hex_decode_array(
+                    case["input_items_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_items_key_hex")),
+                );
+                let items_key_id: [u8; 16] = hex_decode_array(
+                    case["input_items_key_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_items_key_id_hex")),
+                );
+                let new_content_nonce: [u8; 24] = hex_decode_array(
+                    case["input_new_content_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_new_content_nonce_hex")),
+                );
+                let new_plaintext = hex_decode(
+                    case["input_new_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_new_plaintext_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_myn_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_myn_blob_hex")),
+                );
+
+                let handle = decode_note(&source_blob, &note_uuid, &items_key, &items_key_id)
+                    .unwrap_or_else(|e| panic!("[{id}] decode_note (source) failed: {e:?}"));
+                let actual = encode_update_blob_raw(&handle, &new_content_nonce, &new_plaintext)
+                    .unwrap_or_else(|e| panic!("[{id}] encode_update_blob_raw failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] myn-blob update mismatch ({} bytes)",
+                    expected.len(),
+                );
+                // §3.3 invariant: header_prefix (first 112 bytes) is spliced
+                // verbatim from the source — enc_item_key never re-wraps.
+                assert_eq!(
+                    &actual[..protocol::blob::HEADER_PREFIX_LEN],
+                    &source_blob[..protocol::blob::HEADER_PREFIX_LEN],
+                    "[{id}] update must preserve header_prefix byte-for-byte",
+                );
+            }
             "decrypt_ok" => {
                 let blob = hex_decode(
                     case["input_blob_hex"]
@@ -963,6 +1048,84 @@ fn myn_blob_vectors() {
                 }
             }
             other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+}
+
+#[test]
+fn password_policy_vectors() {
+    use protocol::{validate_min_length, ProtocolError};
+
+    let path = companion_vectors_root()
+        .join("password-policy")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] password-policy: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "password-policy");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "password-policy must have at least one case"
+    );
+    assert_unique_vector_ids("password-policy", cases);
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let expected_kind = case["expected_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing expected_kind"));
+        let password_bytes = hex_decode(
+            case["input_password_utf8_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_password_utf8_hex")),
+        );
+        let password = std::str::from_utf8(&password_bytes)
+            .unwrap_or_else(|e| panic!("[{id}] input_password_utf8_hex is not valid UTF-8: {e}"));
+
+        // Cross-check the pinned informational counts against the canonical
+        // impl — guards the USV-not-bytes contract: a port computing
+        // chars().count() must agree with the vector's recorded USV count,
+        // and the byte length must agree with the hex byte count.
+        let usv = password.chars().count() as u64;
+        let byte_len = password_bytes.len() as u64;
+        if let Some(expected_usv) = case["informational_usv_count"].as_u64() {
+            assert_eq!(usv, expected_usv, "[{id}] informational_usv_count mismatch");
+        }
+        if let Some(expected_byte) = case["informational_byte_len"].as_u64() {
+            assert_eq!(
+                byte_len, expected_byte,
+                "[{id}] informational_byte_len mismatch"
+            );
+        }
+
+        let result = validate_min_length(password);
+        match expected_kind {
+            "accept" => assert!(
+                result.is_ok(),
+                "[{id}] expected accept, validate_min_length returned {result:?}"
+            ),
+            "reject_too_short" => assert_eq!(
+                result,
+                Err(ProtocolError::PasswordTooShort),
+                "[{id}] expected reject_too_short"
+            ),
+            other => panic!("[{id}] unknown expected_kind '{other}' — schema enforces enum"),
         }
     }
 }
@@ -1264,7 +1427,7 @@ fn ctx_aead_vectors() {
 
 #[test]
 fn argon2id_wrap_vectors() {
-    use protocol::{derive_password_wrap_key, derive_recovery_wrap_key_from_normalized, KdfParams};
+    use protocol::{derive_password_wrap_key, derive_recovery_wrap_key_from_normalized};
 
     let path = companion_vectors_root()
         .join("argon2id")
@@ -1320,30 +1483,7 @@ fn argon2id_wrap_vectors() {
                 .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
         );
 
-        let kdf_params_obj = case
-            .get("input_kdf_params")
-            .unwrap_or_else(|| panic!("[{id}] missing input_kdf_params"));
-        let m_kib = kdf_params_obj["m_kib"]
-            .as_u64()
-            .unwrap_or_else(|| panic!("[{id}] missing kdf_params.m_kib"))
-            as u32;
-        let t = kdf_params_obj["t"]
-            .as_u64()
-            .unwrap_or_else(|| panic!("[{id}] missing kdf_params.t")) as u32;
-        let p = kdf_params_obj["p"]
-            .as_u64()
-            .unwrap_or_else(|| panic!("[{id}] missing kdf_params.p")) as u8;
-        let argon2_version_bytes = hex_decode(
-            kdf_params_obj["argon2_version_hex"]
-                .as_str()
-                .unwrap_or_else(|| panic!("[{id}] missing kdf_params.argon2_version_hex")),
-        );
-        let kdf_params = KdfParams {
-            m_kib,
-            t,
-            p,
-            argon2_version: argon2_version_bytes[0],
-        };
+        let kdf_params = parse_kdf_params(case, id);
         let expected: [u8; 32] = hex_decode_array(
             case["expected_wrap_key_hex"]
                 .as_str()
@@ -1376,6 +1516,252 @@ fn argon2id_wrap_vectors() {
             "[{id}] argon2id wrap-key mismatch (path={path})\n  expected_hex: {}\n  actual_hex:   {}",
             hex_encode(&expected),
             hex_encode(&*actual),
+        );
+    }
+}
+
+#[test]
+fn bip39_recovery_vectors() {
+    use protocol::{derive_recovery_wrap_key_from_normalized, normalize_user_phrase};
+
+    let path = companion_vectors_root()
+        .join("bip39-recovery")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] bip39-recovery: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "bip39-recovery");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "bip39-recovery must have at least one case"
+    );
+    assert_unique_vector_ids("bip39-recovery", cases);
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+
+        let raw_phrase_bytes = hex_decode(
+            case["input_raw_phrase_utf8_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_raw_phrase_utf8_hex")),
+        );
+        let raw_phrase = core::str::from_utf8(&raw_phrase_bytes)
+            .unwrap_or_else(|e| panic!("[{id}] raw phrase not valid UTF-8: {e}"));
+        let salt_random: [u8; 16] = hex_decode_array(
+            case["input_salt_random_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_salt_random_hex")),
+        );
+        let account_number_hash: [u8; 16] = hex_decode_array(
+            case["input_account_number_hash_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+        );
+
+        let kdf_params = parse_kdf_params(case, id);
+        let expected: [u8; 32] = hex_decode_array(
+            case["expected_recovery_wrap_key_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing expected_recovery_wrap_key_hex")),
+        );
+
+        // §7.4 normalization, then §3.1 derivation — the composition.
+        let normalized = normalize_user_phrase(raw_phrase);
+
+        // Cross-check the pinned normalized form (catches a normalize bug
+        // before it silently changes the derived key).
+        if let Some(expected_norm_hex) = case["informational_normalized_phrase_utf8_hex"].as_str() {
+            let expected_norm = hex_decode(expected_norm_hex);
+            assert_eq!(
+                normalized.as_bytes(),
+                expected_norm.as_slice(),
+                "[{id}] normalized phrase mismatch — normalize_user_phrase drift",
+            );
+        }
+
+        let actual = derive_recovery_wrap_key_from_normalized(
+            normalized.as_str(),
+            &salt_random,
+            &account_number_hash,
+            &kdf_params,
+        )
+        .unwrap_or_else(|e| {
+            panic!("[{id}] derive_recovery_wrap_key_from_normalized failed: {e:?}")
+        });
+
+        assert_eq!(
+            actual.as_slice(),
+            expected.as_slice(),
+            "[{id}] bip39-recovery wrap-key mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+            hex_encode(&expected),
+            hex_encode(&*actual),
+        );
+    }
+}
+
+#[test]
+fn aad_construction_vectors() {
+    use protocol::{
+        aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
+        aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap,
+    };
+
+    let path = companion_vectors_root()
+        .join("aad-construction")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] aad-construction: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "aad-construction");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "aad-construction must have at least one case"
+    );
+    assert_unique_vector_ids("aad-construction", cases);
+
+    let mut pinned_builders = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let builder_name = case["input_builder_name"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing input_builder_name"));
+        let expected = hex_decode(
+            case["expected_aad_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing expected_aad_hex")),
+        );
+
+        // Re-derive the AAD via the named builder with the case's inputs.
+        let items_key_id = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_items_key_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_items_key_id_hex")),
+            )
+        };
+        let note_uuid = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_note_uuid_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_note_uuid_hex")),
+            )
+        };
+        let account_number_hash = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_account_number_hash_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+            )
+        };
+        let kdf_params = || parse_kdf_params(case, id);
+
+        let actual = match builder_name {
+            "aad_password_wrap" => aad_password_wrap(&kdf_params()),
+            "aad_recovery_wrap" => aad_recovery_wrap(&kdf_params()),
+            "aad_vault_items_key_wrap" => aad_vault_items_key_wrap(&items_key_id()),
+            "aad_note_item_key_wrap" => aad_note_item_key_wrap(&items_key_id(), &note_uuid()),
+            "aad_prefs_blob" => aad_prefs_blob(&account_number_hash()),
+            "aad_search_index_blob" => aad_search_index_blob(&account_number_hash()),
+            "aad_note_content_encrypt" => aad_note_content_encrypt(&items_key_id(), &note_uuid()),
+            other => panic!(
+                "[{id}] unknown input_builder_name '{other}' — schema enforces enum; update this match arm in lockstep with the schema"
+            ),
+        };
+
+        assert_eq!(
+            actual.as_slice(),
+            expected.as_slice(),
+            "[{id}] {builder_name} AAD byte mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+            hex_encode(&expected),
+            hex_encode(&actual),
+        );
+
+        // Validate the per-call-site segment decomposition: segments must
+        // be contiguous from offset 0, each length must match its bytes,
+        // and the concatenation must reproduce the full AAD byte-for-byte.
+        let segments = case["informational_aad_segments"]
+            .as_array()
+            .unwrap_or_else(|| panic!("[{id}] missing informational_aad_segments"));
+        let mut reassembled: Vec<u8> = Vec::with_capacity(expected.len());
+        let mut next_offset = 0u64;
+        for (i, seg) in segments.iter().enumerate() {
+            let offset = seg["offset"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("[{id}] segment {i} missing offset"));
+            let length = seg["length"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("[{id}] segment {i} missing length"));
+            let bytes = hex_decode(
+                seg["bytes_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] segment {i} missing bytes_hex")),
+            );
+            assert_eq!(offset, next_offset, "[{id}] segment {i} not contiguous");
+            assert_eq!(
+                length as usize,
+                bytes.len(),
+                "[{id}] segment {i} length != bytes_hex byte count"
+            );
+            reassembled.extend_from_slice(&bytes);
+            next_offset += length;
+        }
+        assert_eq!(
+            reassembled.as_slice(),
+            expected.as_slice(),
+            "[{id}] segment concatenation must reproduce the full AAD",
+        );
+
+        pinned_builders.insert(builder_name.to_string());
+    }
+
+    // Structural guarantee: every pub aad_* builder must have a decomposition
+    // case — drift in either the schema enum or the cases.json surfaces here.
+    let required: [&str; 7] = [
+        "aad_password_wrap",
+        "aad_recovery_wrap",
+        "aad_vault_items_key_wrap",
+        "aad_note_item_key_wrap",
+        "aad_prefs_blob",
+        "aad_search_index_blob",
+        "aad_note_content_encrypt",
+    ];
+    for builder in required {
+        assert!(
+            pinned_builders.contains(builder),
+            "aad-construction missing decomposition case for {builder} — every pub aad_* builder must have one"
         );
     }
 }
