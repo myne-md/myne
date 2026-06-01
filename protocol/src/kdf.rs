@@ -752,4 +752,217 @@ mod tests {
         std::fs::write("/tmp/myne_argon2id_vectors.json", dump.as_bytes())
             .expect("write argon2id vectors dump");
     }
+
+    /// Vector generator for the `bip39-recovery` companion category.
+    /// `#[ignore]`-gated — emits ready-to-copy JSON to
+    /// `/tmp/myne_bip39_recovery_vectors.json`. Composes
+    /// [`crate::phrase::normalize_user_phrase`] (§7.4) →
+    /// [`derive_recovery_wrap_key_from_normalized`] (§3.1) end-to-end: a
+    /// raw user-typed 24-word phrase is normalized, then fed **directly**
+    /// to Argon2id (NOT through BIP-39's PBKDF2 step). The three cases
+    /// type the SAME 24 words three ways (canonical / mixed-case+messy
+    /// whitespace / NFKD-foldable full-width + exotic whitespace) and the
+    /// generator asserts all three normalize identically and derive the
+    /// SAME wrap key — pinning the NFKD-before-Argon2id ordering. ~3s per
+    /// case at canonical params.
+    #[test]
+    #[ignore = "vector generator — run explicitly to refresh bip39-recovery cases.json"]
+    fn emit_bip39_recovery_vectors_for_paste() {
+        extern crate std;
+        use crate::phrase::normalize_user_phrase;
+        use crate::types::DEFAULT_V0_1_KDF_PARAMS;
+        use alloc::string::String;
+        use alloc::vec::Vec;
+
+        fn hex_lower(bytes: &[u8]) -> String {
+            let mut s = String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> String {
+            let mut out = String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => out.push_str(&alloc::format!("\\u{:04x}", c as u32)),
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        let params = DEFAULT_V0_1_KDF_PARAMS;
+        // Distinct from the argon2id category's fixtures so a key collision
+        // across categories can never mask a bug.
+        let salt_random: [u8; 16] = [0x5A; 16];
+        let account_number_hash: [u8; 16] = [0xA5; 16];
+
+        // The canonical BIP-39 all-zero-entropy 24-word phrase: 23×abandon
+        // + the checksum word `art`. Already in normalized form (lowercase,
+        // single ASCII spaces, trimmed).
+        let mut words: Vec<&str> = alloc::vec!["abandon"; 23];
+        words.push("art");
+        let canonical: String = words.join(" ");
+
+        // Variant 2: same 24 words, UPPERCASED, with leading/trailing pad
+        // and irregular interior whitespace (double space + tab). Exercises
+        // ASCII-lowercase + whitespace-coalesce + trim.
+        let messy: String = alloc::format!(
+            "   {}   ",
+            words
+                .iter()
+                .map(|w| w.to_uppercase())
+                .collect::<Vec<_>>()
+                .join("  \t ")
+        );
+
+        // Variant 3: same 24 words, but the last word `art` typed in
+        // full-width Latin (U+FF41 U+FF52 U+FF54) and two separators using
+        // a no-break space (U+00A0) and an ideographic space (U+3000).
+        // NFKD folds full-width letters → ASCII and both exotic spaces →
+        // regular space. Pins NFKD-before-Argon2id: a port that skips NFKD
+        // feeds different bytes and derives a different key.
+        let nfkd_raw: String = alloc::format!(
+            "{}\u{00A0}{}\u{3000}{}",
+            words[..22].join(" "),
+            words[22],
+            "\u{FF41}\u{FF52}\u{FF54}"
+        );
+
+        // Normalize each, assert all three collapse to the canonical form.
+        let norm_canonical = normalize_user_phrase(&canonical);
+        let norm_messy = normalize_user_phrase(&messy);
+        let norm_nfkd = normalize_user_phrase(&nfkd_raw);
+        assert_eq!(
+            norm_canonical.as_str(),
+            canonical.as_str(),
+            "canonical input must be a fixed point of normalize_user_phrase"
+        );
+        assert_eq!(
+            norm_messy.as_str(),
+            canonical.as_str(),
+            "messy variant must normalize to the canonical phrase"
+        );
+        assert_eq!(
+            norm_nfkd.as_str(),
+            canonical.as_str(),
+            "NFKD variant must normalize to the canonical phrase"
+        );
+
+        // Derive a wrap key per case (the full §3.1 recovery composition).
+        let derive = |normalized: &str| {
+            derive_recovery_wrap_key_from_normalized(
+                normalized,
+                &salt_random,
+                &account_number_hash,
+                &params,
+            )
+            .expect("derive recovery wrap key")
+        };
+        let key_canonical = derive(norm_canonical.as_str());
+        let key_messy = derive(norm_messy.as_str());
+        let key_nfkd = derive(norm_nfkd.as_str());
+        // The whole point: three different raw inputs, one wrap key.
+        assert_eq!(&*key_messy, &*key_canonical, "messy must derive same key");
+        assert_eq!(&*key_nfkd, &*key_canonical, "NFKD must derive same key");
+
+        let salt_hex = hex_lower(&salt_random);
+        let acct_hex = hex_lower(&account_number_hash);
+
+        let mut dump = String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"bip39-recovery\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §3.1 + §7.4\",\n");
+        dump.push_str("  \"description\": \"Pins the end-to-end recovery composition protocol::phrase::normalize_user_phrase (§7.4) -> protocol::derive_recovery_wrap_key_from_normalized (§3.1): a raw user-typed 24-word phrase is NFKD-normalized then fed DIRECTLY to Argon2id (NOT BIP-39's PBKDF2 step). 3 cases type the SAME 24 words three ways (canonical / mixed-case+messy-whitespace / NFKD-foldable full-width+exotic-whitespace); all three MUST derive the identical wrap key, pinning the NFKD-before-Argon2id ordering. EXPECTED RUNTIME: ~9s total (~3s per case at canonical params m=256 MiB, t=3, p=2). Default-on in `cargo test`; only the regenerator is `#[ignore]`-gated. Cases generated by `cargo test -p protocol --lib emit_bip39_recovery_vectors_for_paste -- --ignored` (in protocol/src/kdf.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        let emit_case = |dump: &mut String,
+                         slug: &str,
+                         description: &str,
+                         raw_phrase: &str,
+                         normalized: &str,
+                         wrap_key: &[u8],
+                         trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"bip39-recovery/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_raw_phrase_utf8_hex\": \"{}\",\n",
+                hex_lower(raw_phrase.as_bytes())
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_salt_random_hex\": \"{}\",\n",
+                salt_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                acct_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_kdf_params\": {{\n        \"m_kib\": {},\n        \"t\": {},\n        \"p\": {},\n        \"argon2_version_hex\": \"{:02x}\"\n      }},\n",
+                params.m_kib, params.t, params.p, params.argon2_version
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"informational_normalized_phrase_utf8_hex\": \"{}\",\n",
+                hex_lower(normalized.as_bytes())
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_recovery_wrap_key_hex\": \"{}\"\n",
+                hex_lower(wrap_key)
+            ));
+            dump.push_str(if trailing_comma {
+                "    },\n"
+            } else {
+                "    }\n"
+            });
+        };
+
+        emit_case(
+            &mut dump,
+            "canonical-24w",
+            "The canonical BIP-39 all-zero-entropy 24-word phrase (23x abandon + checksum word 'art'), typed already in normalized form (lowercase, single ASCII spaces, no padding). Baseline: normalize_user_phrase is a fixed point here, so this pins the recovery_wrap_key for the canonical normalized string fed straight to Argon2id.",
+            &canonical,
+            norm_canonical.as_str(),
+            &*key_canonical,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "messy-case-whitespace-24w",
+            "The SAME 24 words, fully UPPERCASED, with leading/trailing whitespace padding and irregular interior whitespace (double space + tab between every word). normalize_user_phrase ASCII-lowercases, coalesces whitespace runs to a single U+0020, and trims — yielding the identical normalized string as the canonical case, hence the IDENTICAL wrap key. Pins that case-folding + whitespace normalization happen BEFORE Argon2id.",
+            &messy,
+            norm_messy.as_str(),
+            &*key_messy,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "nfkd-fullwidth-24w",
+            "The SAME 24 words, but the checksum word 'art' typed in full-width Latin (U+FF41 U+FF52 U+FF54) and two word separators replaced by a no-break space (U+00A0) and an ideographic space (U+3000). NFKD compatibility-decomposition folds the full-width letters to ASCII and both exotic spaces to regular spaces; the result normalizes to the canonical phrase and derives the IDENTICAL wrap key. Pins NFKD-before-Argon2id: a port that skips the NFKD pass would feed the raw full-width/NBSP bytes to Argon2id and derive a DIFFERENT (wrong) key.",
+            &nfkd_raw,
+            norm_nfkd.as_str(),
+            &*key_nfkd,
+            false,
+        );
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_bip39_recovery_vectors.json", dump.as_bytes())
+            .expect("write bip39-recovery vectors dump");
+    }
 }

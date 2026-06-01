@@ -1965,19 +1965,97 @@ mod tests {
             "tampered blob must reject"
         );
 
+        // ---- §6.3 update-path fixtures (encode_update_blob_raw) ----------
+        // A 2-KB source blob for the shrink case (2 KB → 10 B). The 10-B
+        // and 1-KB sources reuse blob_10b / blob_1kb above.
+        let plaintext_2kb_src: alloc::vec::Vec<u8> =
+            (0..2048u32).map(|i| (i % 256) as u8).collect();
+        let blob_2kb = encode_new_note_blob_raw(
+            &items_key,
+            &items_key_id,
+            &note_uuid,
+            &item_key,
+            &item_key_nonce,
+            &content_nonce,
+            &plaintext_2kb_src,
+        )
+        .expect("encode 2KB source");
+
+        // Fresh content nonces for the update path — distinct from the
+        // 0xFF create-time content_nonce so the re-randomization is visible
+        // in the diff. enc_item_key / item_key_nonce / header are spliced
+        // verbatim (§3.3); only content_nonce + ciphertext move.
+        let update_nonce_same: [u8; AEAD_NONCE_LEN] = [0x11; AEAD_NONCE_LEN];
+        let update_nonce_grow: [u8; AEAD_NONCE_LEN] = [0x12; AEAD_NONCE_LEN];
+        let update_nonce_shrink: [u8; AEAD_NONCE_LEN] = [0x13; AEAD_NONCE_LEN];
+
+        let update_plaintext_1kb: alloc::vec::Vec<u8> =
+            (0..1024u32).map(|i| ((i * 3 + 1) % 256) as u8).collect();
+        let update_plaintext_2kb: alloc::vec::Vec<u8> =
+            (0..2048u32).map(|i| (i % 256) as u8).collect();
+        let update_plaintext_10b: alloc::vec::Vec<u8> = (*b"Shrunk!Myn").to_vec();
+
+        // Decode each source, then re-encode its content via the §6.3
+        // update path. decode_note yields the DecryptedNote handle that
+        // encode_update_blob_raw splices.
+        let handle_same = decode_note(&blob_1kb, &note_uuid, &items_key, &items_key_id)
+            .expect("decode 1KB source for update");
+        let updated_same =
+            encode_update_blob_raw(&handle_same, &update_nonce_same, &update_plaintext_1kb)
+                .expect("update 1KB→1KB");
+
+        let handle_grow = decode_note(&blob_10b, &note_uuid, &items_key, &items_key_id)
+            .expect("decode 10B source for update");
+        let updated_grow =
+            encode_update_blob_raw(&handle_grow, &update_nonce_grow, &update_plaintext_2kb)
+                .expect("update 10B→2KB");
+
+        let handle_shrink = decode_note(&blob_2kb, &note_uuid, &items_key, &items_key_id)
+            .expect("decode 2KB source for update");
+        let updated_shrink =
+            encode_update_blob_raw(&handle_shrink, &update_nonce_shrink, &update_plaintext_10b)
+                .expect("update 2KB→10B");
+
+        // Invariant the vectors pin: header_prefix (first 112 bytes:
+        // magic||version||reserved||items_key_id||item_key_nonce||
+        // enc_item_key_len||enc_item_key) is byte-identical across an
+        // update — only content_nonce + ciphertext change (§3.3).
+        assert_eq!(
+            &updated_same[..HEADER_PREFIX_LEN],
+            &blob_1kb[..HEADER_PREFIX_LEN],
+            "update must splice header_prefix verbatim"
+        );
+        assert_eq!(
+            &updated_grow[..HEADER_PREFIX_LEN],
+            &blob_10b[..HEADER_PREFIX_LEN]
+        );
+        assert_eq!(
+            &updated_shrink[..HEADER_PREFIX_LEN],
+            &blob_2kb[..HEADER_PREFIX_LEN]
+        );
+
+        // Round-trip an updated blob to confirm it decodes to the new
+        // plaintext (feeds the decrypt-ok-after-update case).
+        let decoded_updated = decode_note(&updated_same, &note_uuid, &items_key, &items_key_id)
+            .expect("decode updated 1KB blob");
+        assert_eq!(decoded_updated.plaintext(), update_plaintext_1kb.as_slice());
+
         let items_key_hex = hex_lower(&items_key);
         let items_key_id_hex = hex_lower(&items_key_id);
         let note_uuid_hex = hex_lower(&note_uuid);
         let item_key_hex = hex_lower(&item_key);
         let item_key_nonce_hex = hex_lower(&item_key_nonce);
         let content_nonce_hex = hex_lower(&content_nonce);
+        let update_nonce_same_hex = hex_lower(&update_nonce_same);
+        let update_nonce_grow_hex = hex_lower(&update_nonce_grow);
+        let update_nonce_shrink_hex = hex_lower(&update_nonce_shrink);
 
         let mut dump = alloc::string::String::new();
         dump.push_str("{\n");
         dump.push_str("  \"schema\": \"myn-blob\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
-        dump.push_str("  \"spec_section\": \"protocol.md §9.2 + §6.4 + §6.5\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::encode_new_note_blob_raw + protocol::decode_note byte mapping for the MY01 per-note blob format across realistic plaintext sizes (10 B / 1 KB / 100 KB) and the non-distinguishing AEAD-stage rejection surface. content_type is HARDCODED to 'text/markdown' in aad_note_content_encrypt — no v0.1 parameter to vary. Cases generated by `cargo test -p protocol --lib emit_myn_blob_vectors_for_paste -- --ignored` (in protocol/src/blob.rs). The 100-KB plaintext case is inlined as a ~200-KB hex string; cases.json total ≈ 250 KB — git-friendly, `jq`-readable.\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.2 + §6.3 + §6.4 + §6.5\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_new_note_blob_raw + protocol::encode_update_blob_raw + protocol::decode_note byte mapping for the MY01 per-note blob format across realistic plaintext sizes (10 B / 1 KB / 100 KB), the §6.3 note-update path (header_prefix spliced verbatim; only content_nonce + ciphertext change), and the non-distinguishing AEAD-stage rejection surface. content_type is HARDCODED to 'text/markdown' in aad_note_content_encrypt — no v0.1 parameter to vary. Cases generated by `cargo test -p protocol --lib emit_myn_blob_vectors_for_paste -- --ignored` (in protocol/src/blob.rs). The 100-KB plaintext case is inlined as a ~200-KB hex string; cases.json total ≈ 250 KB — git-friendly, `jq`-readable.\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // Helper closure for emitting an encrypt case.
@@ -2028,6 +2106,57 @@ mod tests {
                 "      \"expected_myn_blob_hex\": \"{}\"\n",
                 hex_lower(blob)
             ));
+        };
+
+        // Helper closure for emitting a §6.3 update case. Inputs carry the
+        // source blob + decode context; a port decodes it, re-encodes the
+        // content under the new content_nonce, and compares byte-equal.
+        let emit_update = |dump: &mut alloc::string::String,
+                           slug: &str,
+                           description: &str,
+                           source_blob: &[u8],
+                           new_content_nonce_hex: &str,
+                           new_plaintext: &[u8],
+                           expected_blob: &[u8]| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"myn-blob/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"encrypt_update\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_source_blob_hex\": \"{}\",\n",
+                hex_lower(source_blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_note_uuid_hex\": \"{}\",\n",
+                note_uuid_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_items_key_hex\": \"{}\",\n",
+                items_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_items_key_id_hex\": \"{}\",\n",
+                items_key_id_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_new_content_nonce_hex\": \"{}\",\n",
+                new_content_nonce_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_new_plaintext_hex\": \"{}\",\n",
+                hex_lower(new_plaintext)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_myn_blob_hex\": \"{}\",\n",
+                hex_lower(expected_blob)
+            ));
+            dump.push_str("      \"informational_header_prefix_preserved\": true\n");
         };
 
         emit_encrypt(
@@ -2118,6 +2247,70 @@ mod tests {
                 "byte {} (OFFSET_CIPHERTEXT, first byte of encrypted content) flipped via XOR 0xFF",
                 OFFSET_CIPHERTEXT
             ))
+        ));
+        dump.push_str("    },\n");
+
+        // ---- §6.3 update-path cases -------------------------------------
+        emit_update(
+            &mut dump,
+            "update-1kb-from-1kb",
+            "Update the 1-KB blob from case 2 (decode_note → encode_update_blob_raw) with 1024 fresh bytes (byte i = (i*3+1) mod 256) under a new content_nonce (0x11×24). Same plaintext size, so total length is unchanged (1132 bytes). The 112-byte header_prefix — magic, version, reserved, items_key_id, item_key_nonce, enc_item_key_len, enc_item_key — MUST be byte-identical to the source blob's; only content_nonce + ciphertext change. This is the §3.3 invariant that lets password rotation leave every .myn file untouched.",
+            &blob_1kb,
+            &update_nonce_same_hex,
+            &update_plaintext_1kb,
+            &updated_same,
+        );
+        dump.push_str("    },\n");
+
+        emit_update(
+            &mut dump,
+            "update-grow-10b-to-2kb",
+            "Update the 10-byte blob from case 1 (decode_note → encode_update_blob_raw) with 2048 bytes (byte i = i mod 256) under a new content_nonce (0x12×24). Plaintext grows 10 B → 2 KB, so ciphertext_len at offset [136..140] (BE-u32) and total length both grow while header_prefix [0..112] stays byte-identical. Proves the update encoder tracks a growing payload without disturbing the spliced header.",
+            &blob_10b,
+            &update_nonce_grow_hex,
+            &update_plaintext_2kb,
+            &updated_grow,
+        );
+        dump.push_str("    },\n");
+
+        emit_update(
+            &mut dump,
+            "update-shrink-2kb-to-10b",
+            "Update a 2-KB source blob (decode_note → encode_update_blob_raw) with the 10-byte plaintext `Shrunk!Myn` under a new content_nonce (0x13×24). Plaintext shrinks 2 KB → 10 B, so ciphertext_len at [136..140] and total length both shrink while header_prefix [0..112] stays byte-identical. Proves the update encoder tracks a shrinking payload — the mirror of the grow case.",
+            &blob_2kb,
+            &update_nonce_shrink_hex,
+            &update_plaintext_10b,
+            &updated_shrink,
+        );
+        dump.push_str("    },\n");
+
+        // decrypt_ok after update (round-trip the updated 1KB blob)
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"myn-blob/v0.1/decrypt-ok-after-update-1kb\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Round-trip the updated 1-KB blob produced by `update-1kb-from-1kb` back to its NEW plaintext (byte i = (i*3+1) mod 256). Proves the §6.3 update path produces a structurally valid, decodable MY01 blob: the spliced header_prefix still unwraps item_key under itemsKey, and the re-encrypted content decrypts under the same item_key with the new content_nonce.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&updated_same)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_note_uuid_hex\": \"{}\",\n",
+            note_uuid_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_hex\": \"{}\",\n",
+            items_key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_id_hex\": \"{}\",\n",
+            items_key_id_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_hex\": \"{}\"\n",
+            hex_lower(&update_plaintext_1kb)
         ));
         dump.push_str("    }\n");
 

@@ -82,10 +82,14 @@ A2/A3/A4/A5/A6 merged without test vectors. The `myne-test-vectors/` companion r
 - `vectors/xchacha20-poly1305-ctx/` (D3 → A3)
 - `vectors/hkdf-sha256/` (D2 → A2)
 - `vectors/account-number/` (D7 → A5)
-- `vectors/aad-construction/` (per-AEAD AAD assembly)
 - `vault.meta` byte-string vectors (D5 → A6)
-- `.myn` blob vectors (D6 → MYND-25, blob.rs landed; D6 ready)
+- `.myn` blob vectors (D6 → MYND-25, blob.rs landed). The `myn-blob` category now also pins the **§6.3 update path** (`encode_update_blob_raw`) via `encrypt_update` cases — the spliced-`header_prefix` (verbatim `enc_item_key`) invariant is the cross-impl contract. Generator: `emit_myn_blob_vectors_for_paste`.
 - `vectors/vault-search/` (D8 → MYND-29, `search_blob.rs` `MYS1` codec; landed). Also extended `hkdf-sha256` with the `SearchIndexKey` role and `ctx-aead` with the `aad_search_index_blob` builder in lockstep — the search path's KEK derivation + AAD assembly + blob framing are all now pinned.
+- `vectors/password-policy/` (`validate_min_length` floor; boolean accept/reject, counts USVs not bytes). Generator: `emit_password_policy_vectors_for_paste` (`password_policy.rs`).
+- `vectors/bip39-recovery/` (end-to-end `normalize_user_phrase` → `derive_recovery_wrap_key_from_normalized`; pins NFKD-before-Argon2id). Generator: `emit_bip39_recovery_vectors_for_paste` (`kdf.rs`); **~9 s** default-on.
+- `vectors/aad-construction/` (per-call-site AAD framing decomposition for all 7 pub `aad_*` builders — full bytes + labeled segment offsets, a layer atop `ctx-aead`'s builder-byte pins). Generator: `emit_aad_construction_vectors_for_paste` (`aead.rs`).
+
+**All cross-impl-relevant deterministic surfaces are now vectored.** The remaining unvectored public functions are randomized (`generate_account_number`, `generate_recovery_phrase`) or `getrandom`-pulling convenience wrappers (`encode_new_note`, `encode_update`, `encode_prefs_blob`, `encode_search_index_blob`) whose deterministic `_raw` siblings carry the contract.
 
 When you change a primitive: regenerate the relevant vector file in the companion repo and bump it in the same PR. CI (Plan 1 §C2) will pull `myne-test-vectors` and re-run vectors against the current Rust impl.
 
