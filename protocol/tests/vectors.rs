@@ -440,6 +440,7 @@ fn hkdf_sha256_vectors() {
         let role = match role_str {
             "itemsKey-wrap" => SubkeyRole::ItemsKeyWrap,
             "prefs-key" => SubkeyRole::PrefsKey,
+            "search-index-key" => SubkeyRole::SearchIndexKey,
             other => panic!(
                 "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
             ),
@@ -970,8 +971,8 @@ fn myn_blob_vectors() {
 fn ctx_aead_vectors() {
     use protocol::{
         aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
-        aad_recovery_wrap, aad_vault_items_key_wrap, aead_open_ctx, aead_seal_ctx, KdfParams,
-        ProtocolError,
+        aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap, aead_open_ctx,
+        aead_seal_ctx, KdfParams, ProtocolError,
     };
 
     let path = companion_vectors_root()
@@ -1213,6 +1214,14 @@ fn ctx_aead_vectors() {
                         );
                         aad_prefs_blob(&account_number_hash)
                     }
+                    "aad_search_index_blob" => {
+                        let account_number_hash: [u8; 16] = hex_decode_array(
+                            case["input_account_number_hash_hex"].as_str().unwrap_or_else(
+                                || panic!("[{id}] missing input_account_number_hash_hex"),
+                            ),
+                        );
+                        aad_search_index_blob(&account_number_hash)
+                    }
                     other => panic!(
                         "[{id}] unknown input_builder_name '{other}' — schema enforces enum; update this match arm in lockstep with the schema"
                     ),
@@ -1236,13 +1245,14 @@ fn ctx_aead_vectors() {
     // one aad_canonical_bytes pin in the cases array. Drift in either
     // the schema's input_builder_name enum or the cases.json coverage
     // surfaces here.
-    let required: [&str; 6] = [
+    let required: [&str; 7] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
         "aad_note_item_key_wrap",
         "aad_note_content_encrypt",
         "aad_prefs_blob",
+        "aad_search_index_blob",
     ];
     for builder in required {
         assert!(
@@ -1366,6 +1376,248 @@ fn argon2id_wrap_vectors() {
             "[{id}] argon2id wrap-key mismatch (path={path})\n  expected_hex: {}\n  actual_hex:   {}",
             hex_encode(&expected),
             hex_encode(&*actual),
+        );
+    }
+}
+
+#[test]
+fn vault_search_vectors() {
+    use protocol::{
+        decode_search_index_blob, derive_subkey, encode_search_index_blob_raw, SearchBlobError,
+        SubkeyRole,
+    };
+
+    let path = companion_vectors_root()
+        .join("vault-search")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] vault-search: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "vault-search");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 12,
+        "vault-search must carry at least 12 vectors (3 encrypt + 1 decrypt_ok + 2 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("vault-search", cases);
+
+    // Coverage guards (mirrors ctx-aead's required-builders array): assert
+    // the category actually pins every case_kind and every structural
+    // reject, so a future regeneration that silently drops — e.g. all 6
+    // parse_fail cases — fails loudly instead of passing on the survivors.
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let plaintext = hex_decode(
+                    case["input_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_plaintext_hex")),
+                );
+                let nonce: [u8; 24] = hex_decode_array(
+                    case["input_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_nonce_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_search_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_search_blob_hex")),
+                );
+
+                let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
+
+                // Defensive cross-check: if the case carries the optional
+                // `informational_search_index_key_hex` field, verify it
+                // matches the helper's own derivation. The HKDF role string
+                // "search-index-key" is DISTINCT from the AAD role string
+                // "search-index-blob"; this catches a typo in the
+                // informational field that would mislead porters.
+                if let Some(info_hex) = case
+                    .get("informational_search_index_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        search_index_key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_search_index_key_hex disagrees with derive_subkey(root_key, SearchIndexKey)",
+                    );
+                }
+
+                let actual = encode_search_index_blob_raw(
+                    &search_index_key,
+                    &account_hash,
+                    &plaintext,
+                    &nonce,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] vault-search encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let expected_plaintext = hex_decode(
+                    case["expected_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_plaintext_hex")),
+                );
+
+                let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
+                let decoded = decode_search_index_blob(&search_index_key, &account_hash, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] vault-search decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+
+                let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
+                match decode_search_index_blob(&search_index_key, &account_hash, &blob) {
+                    Err(SearchBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected SearchBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode_search_index_blob returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => SearchBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => SearchBlobError::ProtocolVersionMismatch,
+                    "index_format_unsupported" => SearchBlobError::IndexFormatUnsupported,
+                    "header_too_short" => SearchBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => SearchBlobError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => SearchBlobError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with SearchBlobError"
+                    ),
+                };
+
+                // Structural rejects run BEFORE decryption, so the key /
+                // account hash are irrelevant — pass throwaway zeros.
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                match decode_search_index_blob(&dummy_key, &dummy_hash, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_search_index_blob returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "vault-search missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "index_format_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "vault-search missing parse_fail coverage for SearchBlobError '{err}' — every structural reject must be pinned"
         );
     }
 }
