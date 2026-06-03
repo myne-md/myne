@@ -46,6 +46,13 @@ export type NoteRowProps = {
   onCommitRename: (id: string, trimmedNewTitle: string) => void;
   /** Inline-rename cancel (Esc). */
   onCancelRename: () => void;
+  /** Whether this note is in the Favorites list — drives the star state
+   *  (filled vs hover-outline). MYND-183. */
+  favorited?: boolean;
+  /** Toggle favorite membership (star click). When omitted the star is a
+   *  non-interactive filled badge shown only on favorited rows (render-only;
+   *  the toggle handler is wired in the favorites-membership task). */
+  onToggleFavorite?: (id: string) => void;
 };
 
 // ─── Token-bound style constants ──────────────────────────────────
@@ -56,9 +63,9 @@ export type NoteRowProps = {
 
 const rowBaseStyle: CSSProperties = {
   display: "flex",
-  flexDirection: "column",
-  justifyContent: "center",
-  gap: 2,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
   padding: "8px 14px",
   minHeight: 52,
   cursor: "pointer",
@@ -69,6 +76,53 @@ const rowBaseStyle: CSSProperties = {
   // we toggle via state below (`hovering`) so design-token bg shifts
   // are explicit.
 };
+
+/** Inner column (title + subtitle), so the star affordance can sit to the
+ *  right of the row without disturbing the stacked text. */
+const rowContentStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  gap: 2,
+  flex: 1,
+  minWidth: 0,
+};
+
+/** Right-aligned star affordance — favorite indicator / toggle (MYND-183). */
+const starButtonStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+  width: 22,
+  height: 22,
+  padding: 0,
+  background: "transparent",
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  cursor: "pointer",
+};
+
+/** Lucide `star` — `filled` paints the accent fill (favorited); otherwise a
+ *  hollow ink-3 outline (hover-to-favorite). Inline like FolderRow's icons so
+ *  the fill/outline split is local. */
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width={15}
+      height={15}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
 
 const rowSelectedStyle: CSSProperties = {
   background: "var(--accent-soft)",
@@ -149,9 +203,15 @@ export function NoteRow(props: NoteRowProps) {
     onContextMenu,
     onCommitRename,
     onCancelRename,
+    favorited = false,
+    onToggleFavorite,
   } = props;
 
   const [hovering, setHovering] = useState(false);
+  // Star shows when favorited (filled badge) or, when the toggle is wired,
+  // on hover (hollow outline = "add to favorites"). Hidden during rename.
+  const showStar =
+    !renaming && (favorited || (onToggleFavorite !== undefined && hovering));
   // 30s shared tick — re-renders relative-time strings.
   useTick();
 
@@ -202,16 +262,43 @@ export function NoteRow(props: NoteRowProps) {
       aria-selected={selected}
       tabIndex={-1}
     >
-      {renaming ? (
-        <NoteRowRenameInput
-          initialValue={record.title ?? ""}
-          onCommit={(v) => onCommitRename(record.noteUuid, v)}
-          onCancel={onCancelRename}
-        />
-      ) : (
-        <TitleLine record={record} />
-      )}
-      <div style={subtitleStyle}>{subtitleText}</div>
+      <div style={rowContentStyle}>
+        {renaming ? (
+          <NoteRowRenameInput
+            initialValue={record.title ?? ""}
+            onCommit={(v) => onCommitRename(record.noteUuid, v)}
+            onCancel={onCancelRename}
+          />
+        ) : (
+          <TitleLine record={record} />
+        )}
+        <div style={subtitleStyle}>{subtitleText}</div>
+      </div>
+      {showStar &&
+        (onToggleFavorite !== undefined ? (
+          <button
+            type="button"
+            style={{
+              ...starButtonStyle,
+              color: favorited ? "var(--accent)" : "var(--fg-3)",
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(record.noteUuid);
+            }}
+            aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+            title={favorited ? "Remove from favorites" : "Add to favorites"}
+          >
+            <StarIcon filled={favorited} />
+          </button>
+        ) : (
+          <span
+            style={{ ...starButtonStyle, cursor: "default", color: "var(--accent)" }}
+            aria-hidden="true"
+          >
+            <StarIcon filled />
+          </span>
+        ))}
     </div>
   );
 }

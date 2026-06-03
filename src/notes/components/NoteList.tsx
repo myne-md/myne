@@ -29,9 +29,11 @@ import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
+import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
 import { IconButton } from "../../components/primitives/IconButton";
 import {
+  buildFavoriteRows,
   flattenVisibleRows,
   visibleNoteIds,
   type VisibleRow,
@@ -226,6 +228,22 @@ const HEADER_LEAD_STYLE: CSSProperties = {
   gap: 6,
 };
 
+/** "Favorites" eyebrow row — pinned above the "Notes" header (MYND-183). Same
+ *  eyebrow treatment as the Notes header, no action icons. */
+const FAV_HEADER_STYLE: CSSProperties = {
+  padding: "14px 14px 6px",
+  flexShrink: 0,
+};
+
+/** Hairline divider between the Favorites section and the Notes tree below. */
+const FAV_DIVIDER_STYLE: CSSProperties = {
+  height: 1,
+  background: "var(--line-1)",
+  opacity: 0.65,
+  margin: "6px 14px 0",
+  flexShrink: 0,
+};
+
 const EMPTY_WRAPPER_STYLE: CSSProperties = {
   display: "flex",
   flex: 1,
@@ -273,37 +291,9 @@ const LIST_OUTER_STYLE: CSSProperties = {
   flexDirection: "column",
 };
 
-/** In-list eyebrow divider (VAULT ROOT / FOLDERS) — same token bundle as the
- *  Editor section headings, with list padding. */
-const SECTION_DIVIDER_STYLE: CSSProperties = {
-  ...SECTION_HEADING_STYLE,
-  padding: "12px 14px 4px",
-};
-
 /** Horizontal indent applied to a note row per tree depth level (matches the
  *  folder-row indent). */
 const NOTE_INDENT_PER_LEVEL = 18;
-
-const SECTION_DIVIDER_ROW_STYLE: CSSProperties = {
-  ...SECTION_HEADING_STYLE,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "12px 12px 4px 14px",
-};
-
-const SECTION_ACTION_BUTTON_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  fontWeight: 600,
-  letterSpacing: "0.04em",
-  color: "var(--fg-3)",
-  background: "transparent",
-  border: 0,
-  padding: "1px 5px",
-  borderRadius: 3,
-  cursor: "pointer",
-};
 
 const NEW_FOLDER_ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -392,19 +382,30 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
           folder: r.folder,
         })),
         fm.deliberate,
-        fm.folderOrder,
       ),
-    [ctx.cache, fm.deliberate, fm.folderOrder],
+    [ctx.cache, fm.deliberate],
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;
+  // Unified manual order (item_order) interleaves folders + loose notes per
+  // container (MYND-183); flatten owns all display ordering.
   const rows = useMemo(
-    () => flattenVisibleRows(tree, ctx.cache, collapsed, fm.noteOrder),
-    [tree, ctx.cache, collapsed, fm.noteOrder],
+    () => flattenVisibleRows(tree, ctx.cache, collapsed, fm.itemOrder),
+    [tree, ctx.cache, collapsed, fm.itemOrder],
   );
-  // Keyboard navigation traverses the *visible* notes in tree order.
-  const navIds = useMemo(() => visibleNoteIds(rows), [rows]);
-  const isEmpty = rows.length === 0;
+  // Favorites section rows (MYND-183) — note rows keyed `fav-<id>`, rendered
+  // above the tree. Stale-UUID GC (render half) is in `buildFavoriteRows`.
+  const favRows = useMemo(
+    () => buildFavoriteRows(fm.favorites, ctx.cache),
+    [fm.favorites, ctx.cache],
+  );
+  // Keyboard navigation: Favorites first, then the tree; `visibleNoteIds`
+  // dedupes a note shown in both down to its (reachable) Favorites copy.
+  const navIds = useMemo(
+    () => visibleNoteIds([...favRows, ...rows]),
+    [favRows, rows],
+  );
+  const isEmpty = rows.length === 0 && favRows.length === 0;
 
   // F2 global keymap → enter inline-rename on the selected row.
   useEffect(() => {
@@ -447,6 +448,7 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
       ) : (
         <PopulatedList
           rows={rows}
+          favRows={favRows}
           navIds={navIds}
           onToggleFolder={toggleFolder}
           onCreate={handleCreate}
@@ -481,15 +483,12 @@ function EmptyState({
           <div style={SECTION_HEADING_STYLE}>Notes</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <button
-            type="button"
+          <IconButton
+            icon="folder-plus"
+            label="New folder"
             onClick={() => fm.startNewFolder("")}
-            style={HEADER_BUTTON_STYLE}
-            aria-label="New folder"
-            title="New folder"
-          >
-            + Folder
-          </button>
+          />
+          <IconButton icon="file-plus" label="New note" onClick={onCreate} />
         </div>
       </div>
       {fm.newFolder !== null && (
@@ -514,6 +513,7 @@ type DeleteModalState = { id: NoteId; title: string | null } | null;
 
 function PopulatedList({
   rows,
+  favRows,
   navIds,
   onToggleFolder,
   onCreate,
@@ -521,6 +521,7 @@ function PopulatedList({
   onCollapse,
 }: {
   rows: VisibleRow[];
+  favRows: VisibleRow[];
   navIds: NoteId[];
   onToggleFolder: (key: string) => void;
   onCreate: () => void;
@@ -557,6 +558,37 @@ function PopulatedList({
       setMenu({ id, x: pos.x, y: pos.y });
     },
     [ctx],
+  );
+
+  // Favorite-membership lookup — one Set shared by the tree rows + the context
+  // menu (avoids a per-row `favorites.includes` array scan).
+  const favSet = useMemo(() => new Set(fm.favorites), [fm.favorites]);
+
+  // Shared <NoteRow> renderer — the Favorites section and the tree render an
+  // identical NoteRow (only the `favorited` flag + the surrounding drag wrapper
+  // differ). Keeping the prop wiring in one place stops the two sites drifting.
+  const renderNoteRow = useCallback(
+    (record: TitleRecord, id: NoteId, favorited: boolean) => (
+      <NoteRow
+        record={record}
+        selected={ctx.selectedId === id}
+        renaming={ctx.renamingId === id}
+        onSelect={(noteId) => {
+          void ctx.open(noteId).catch(() => {
+            /* T30 wires editor body load; ignore here */
+          });
+        }}
+        onStartRename={ctx.startRename}
+        onContextMenu={handleContextMenu}
+        onCommitRename={async (noteId, newTitle) => {
+          await executeRenameCommit(noteId, newTitle, ctx);
+        }}
+        onCancelRename={ctx.cancelRename}
+        favorited={favorited}
+        onToggleFavorite={fm.toggleFavorite}
+      />
+    ),
+    [ctx, handleContextMenu, fm.toggleFavorite],
   );
 
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -598,13 +630,20 @@ function PopulatedList({
         onSelect: () => ctx.startRename(menu.id),
       },
       {
+        id: "favorite",
+        label: favSet.has(menu.id)
+          ? "Remove from favorites"
+          : "Add to favorites",
+        onSelect: () => fm.toggleFavorite(menu.id),
+      },
+      {
         id: "delete",
         label: "Delete",
         destructive: true,
         onSelect: () => openDeleteModal(menu.id),
       },
     ];
-  }, [menu, ctx, openDeleteModal]);
+  }, [menu, ctx, openDeleteModal, fm, favSet]);
 
   // Folder context-menu items (right-click a folder row).
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -664,6 +703,74 @@ function PopulatedList({
 
   return (
     <div style={LIST_OUTER_STYLE} onContextMenu={handleBackgroundContextMenu}>
+      {favRows.length > 0 && (
+        <div
+          style={{
+            flexShrink: 0,
+            boxShadow: fm.favoritesDropActive
+              ? "inset 0 0 0 2px var(--accent-soft)"
+              : undefined,
+          }}
+          onDragOver={(e) => {
+            // Drop in the section's non-row area = add to favorites. A favorite
+            // row that handled the drag already called preventDefault (reorder),
+            // so skip when over a row.
+            if (e.defaultPrevented) return;
+            if (fm.dragKind !== "note") return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            fm.setFavoritesDropActive(true);
+          }}
+          onDragLeave={() => fm.setFavoritesDropActive(false)}
+          onDrop={(e) => {
+            if (e.defaultPrevented) return; // a favorite row reorder handled it
+            if (fm.dragKind !== "note") return;
+            e.preventDefault();
+            void fm.onFavoritesDropNote();
+          }}
+        >
+          <div style={FAV_HEADER_STYLE}>
+            <div style={SECTION_HEADING_STYLE}>Favorites</div>
+          </div>
+          {favRows.map((row) => {
+            if (row.kind !== "note") return null;
+            const record = ctx.cache.get(row.id);
+            if (record === undefined) return null;
+            const id = row.id;
+            const favPlace =
+              fm.favReorderTarget?.id === id ? fm.favReorderTarget.place : null;
+            return (
+              <div
+                key={row.key}
+                style={{ position: "relative" }}
+                draggable={ctx.renamingId === null}
+                onDragStart={(e) => fm.onNoteDragStart(e, id)}
+                onDragEnd={fm.onDragEndCleanup}
+                onDragOver={(e) => {
+                  // Drop on a favorite row edge = place (add-or-reorder) at that
+                  // slot. preventDefault stops the section's add-at-end handler.
+                  if (fm.dragKind !== "note") return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  fm.updateFavReorderTarget(id, dragEdge(e));
+                }}
+                onDragLeave={() => fm.clearFavReorderTarget(id)}
+                onDrop={(e) => {
+                  if (fm.dragKind !== "note") return;
+                  e.preventDefault();
+                  void fm.reorderFavorite(id, dragEdge(e));
+                }}
+              >
+                {favPlace && (
+                  <div style={insertionLineStyle(favPlace)} aria-hidden="true" />
+                )}
+                {renderNoteRow(record, id, true)}
+              </div>
+            );
+          })}
+          <div style={FAV_DIVIDER_STYLE} aria-hidden="true" />
+        </div>
+      )}
       <div style={HEADER_ROW_STYLE}>
         <div style={HEADER_LEAD_STYLE}>
           {onCollapse && (
@@ -676,24 +783,16 @@ function PopulatedList({
           <div style={SECTION_HEADING_STYLE}>Notes</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
-          <button
-            type="button"
+          <IconButton
+            icon="folder-plus"
+            label="New folder"
             onClick={() => fm.startNewFolder("")}
-            style={HEADER_BUTTON_STYLE}
-            aria-label="New folder"
-            title="New folder"
-          >
-            + Folder
-          </button>
-          <button
-            type="button"
+          />
+          <IconButton
+            icon="file-plus"
+            label="New note (⌘N)"
             onClick={onCreate}
-            style={HEADER_BUTTON_STYLE}
-            aria-label="Create a new note"
-            title="New note (⌘N)"
-          >
-            + New Note
-          </button>
+          />
         </div>
       </div>
       {fm.newFolder !== null && (
@@ -703,57 +802,36 @@ function PopulatedList({
           onCancel={fm.cancelNewFolder}
         />
       )}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          boxShadow: fm.rootDropActive
+            ? "inset 0 0 0 2px var(--accent-soft)"
+            : undefined,
+        }}
+        onDragOver={(e) => {
+          // Empty root AREA drop = unfile (folder:null). A row that handled the
+          // drag already called preventDefault, so skip when over a row.
+          if (e.defaultPrevented) return;
+          if (fm.dragKind !== "note") return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          fm.setRootDropActive(true);
+        }}
+        onDragLeave={() => fm.setRootDropActive(false)}
+        onDrop={(e) => {
+          if (e.defaultPrevented) return; // a row handled the drop
+          if (fm.dragKind !== "note") return;
+          e.preventDefault();
+          void fm.onRootDrop();
+        }}
+      >
         <VirtualList
           items={rows}
           keyOf={(row) => row.key}
           estimatedRowHeight={44}
           renderItem={(row) => {
-            if (row.kind === "section") {
-              if (row.label === "Folders") {
-                return (
-                  <div style={SECTION_DIVIDER_ROW_STYLE}>
-                    <span>{row.label}</span>
-                    <button
-                      type="button"
-                      onClick={() => fm.startNewFolder("")}
-                      style={SECTION_ACTION_BUTTON_STYLE}
-                      aria-label="New folder"
-                      title="New folder"
-                    >
-                      + Folder
-                    </button>
-                  </div>
-                );
-              }
-              // "Vault root" — also the drop zone for unfiling a dragged note.
-              return (
-                <div
-                  style={{
-                    ...SECTION_DIVIDER_STYLE,
-                    borderRadius: 3,
-                    background: fm.rootDropActive
-                      ? "var(--accent-soft)"
-                      : undefined,
-                    boxShadow: fm.rootDropActive
-                      ? "inset 0 0 0 1px var(--accent)"
-                      : undefined,
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                  }}
-                  onDragEnter={() => fm.setRootDropActive(true)}
-                  onDragLeave={() => fm.setRootDropActive(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    void fm.onRootDrop();
-                  }}
-                >
-                  {row.label}
-                </div>
-              );
-            }
             if (row.kind === "folder") {
               return (
                 <FolderRow
@@ -793,9 +871,7 @@ function PopulatedList({
             if (record === undefined) return null;
             const id = row.id;
             const reorderPlace =
-              fm.dragKind === "note" && fm.reorderTarget?.id === id
-                ? fm.reorderTarget.place
-                : null;
+              fm.reorderTarget?.id === id ? fm.reorderTarget.place : null;
             return (
               <div
                 style={{
@@ -806,14 +882,16 @@ function PopulatedList({
                 onDragStart={(e) => fm.onNoteDragStart(e, id)}
                 onDragEnd={fm.onDragEndCleanup}
                 onDragOver={(e) => {
-                  if (fm.dragKind !== "note") return;
+                  // Accept both kinds: a note reorders here; a folder reorders
+                  // past this loose note (same-container). MYND-183 Task 6b.
+                  if (fm.dragKind === null) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   fm.updateReorderTarget(id, dragEdge(e));
                 }}
                 onDragLeave={() => fm.clearReorderTarget(id)}
                 onDrop={(e) => {
-                  if (fm.dragKind !== "note") return;
+                  if (fm.dragKind === null) return;
                   e.preventDefault();
                   void fm.onNoteReorder(id, dragEdge(e));
                 }}
@@ -824,22 +902,7 @@ function PopulatedList({
                     aria-hidden="true"
                   />
                 )}
-                <NoteRow
-                  record={record}
-                  selected={ctx.selectedId === id}
-                  renaming={ctx.renamingId === id}
-                  onSelect={(noteId) => {
-                    void ctx.open(noteId).catch(() => {
-                      /* T30 wires editor body load; ignore here */
-                    });
-                  }}
-                  onStartRename={ctx.startRename}
-                  onContextMenu={handleContextMenu}
-                  onCommitRename={async (noteId, newTitle) => {
-                    await executeRenameCommit(noteId, newTitle, ctx);
-                  }}
-                  onCancelRename={ctx.cancelRename}
-                />
+                {renderNoteRow(record, id, favSet.has(id))}
               </div>
             );
           }}

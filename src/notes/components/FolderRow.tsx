@@ -14,7 +14,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { FolderNode } from "../folderTree";
-import { dragEdge, insertionLineStyle } from "./reorderDnd";
+import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
 
 const INDENT_PER_LEVEL = 18;
 const BASE_PADDING_LEFT = 12;
@@ -223,32 +223,42 @@ export function FolderRow({
       onDragStart={(e) => onDragStartFolder?.(e, node)}
       onDragEnd={onDragEnd}
       onDragOver={(e) => {
-        // Folder drag → reorder among siblings; note drag → move-into-folder.
         if (dragKind === "folder") {
+          // Folder drag → reorder among sibling folders (2-edge).
           if (!onFolderReorderOver) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
           onFolderReorderOver(node, dragEdge(e));
         } else if (onDropNote) {
+          // Note drag → 3-zone: top/bottom quarter reorders the note as a
+          // sibling of this folder (insertion line); the middle half moves it
+          // INTO the folder (row highlight). MYND-183 Task 6b.
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
+          const zone = dragZone(e);
+          if (zone === "into") {
+            onDragTarget?.(node.key);
+            onFolderReorderLeave?.(node.key);
+          } else {
+            onFolderReorderOver?.(node, zone);
+            onDragTarget?.(null);
+          }
         }
       }}
-      onDragEnter={() => {
-        if (dragKind !== "folder") onDragTarget?.(node.key);
-      }}
       onDragLeave={() => {
-        if (dragKind === "folder") onFolderReorderLeave?.(node.key);
-        else onDragTarget?.(null);
+        onFolderReorderLeave?.(node.key);
+        onDragTarget?.(null);
       }}
       onDrop={(e) => {
         e.preventDefault();
         if (dragKind === "folder") {
           onFolderReorderDrop?.(node, dragEdge(e));
-        } else {
-          onDragTarget?.(null);
-          onDropNote?.(node.path);
+          return;
         }
+        const zone = dragZone(e);
+        onDragTarget?.(null);
+        if (zone === "into") onDropNote?.(node.path);
+        else onFolderReorderDrop?.(node, zone);
       }}
       role="treeitem"
       aria-expanded={empty ? undefined : expanded}

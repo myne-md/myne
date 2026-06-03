@@ -20,8 +20,8 @@ permissions = [
   "allow-set-screen-capture-protection",
   "allow-set-deliberate-folders",
   "allow-set-auto-lock-timeout",
-  "allow-set-note-order",
-  "allow-set-folder-order",
+  "allow-set-item-order",
+  "allow-set-favorites",
   "allow-set-editor-layout",
 ]
 
@@ -50,18 +50,18 @@ identifier = "allow-set-auto-lock-timeout"
 description = "Allow invoking prefs:set_auto_lock_timeout (Slot::Unlocked-gated setter for the auto_lock_seconds field — atomic-writes vault.prefs FIRST then refreshes the idle timer's cached effective timeout, clamped through the protective envelope; MYND-121)."
 commands.allow = ["set_auto_lock_timeout"]
 
-# Manual sidebar reorder: a write setter, so it inherits the same
-# main-window-only invariant as the other allow-set-* permissions —
-# v0.2 multi-window MUST NOT grant these to any non-main window.
+# Unified manual sidebar order + favorites (MYND-183): write setters, so they
+# inherit the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant these to any non-main window.
 [[permission]]
-identifier = "allow-set-note-order"
-description = "Allow invoking prefs:set_note_order (Slot::Unlocked-gated setter for the note_order sequence — the manual sidebar sort order for notes; atomic-writes vault.prefs with no native side-effect, preserving element order)."
-commands.allow = ["set_note_order"]
+identifier = "allow-set-item-order"
+description = "Allow invoking prefs:set_item_order (Slot::Unlocked-gated setter for the item_order sequence — the unified manual sidebar order across the interleaved file-tree, a heterogeneous list of note UUIDs + folder paths; atomic-writes vault.prefs with no native side-effect, preserving element order)."
+commands.allow = ["set_item_order"]
 
 [[permission]]
-identifier = "allow-set-folder-order"
-description = "Allow invoking prefs:set_folder_order (Slot::Unlocked-gated setter for the folder_order sequence — the manual sidebar sort order for folders; atomic-writes vault.prefs with no native side-effect, preserving element order)."
-commands.allow = ["set_folder_order"]
+identifier = "allow-set-favorites"
+description = "Allow invoking prefs:set_favorites (Slot::Unlocked-gated setter for the favorites sequence — the user's favorited notes shown in the sidebar's Favorites section; atomic-writes vault.prefs with no native side-effect, preserving element order)."
+commands.allow = ["set_favorites"]
 
 # MYND-137: a write setter, so it inherits the same main-window-only
 # invariant as the other allow-set-* permissions — v0.2 multi-window

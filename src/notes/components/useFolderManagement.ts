@@ -25,18 +25,24 @@ import {
 import { usePrefs } from "../../hooks/usePrefs";
 import {
   setDeliberateFolders,
-  setFolderOrder as persistFolderOrder,
-  setNoteOrder as persistNoteOrder,
+  setFavorites as persistFavorites,
+  setItemOrder as persistItemOrder,
 } from "../../lib/prefs";
 import { deleteFolder, renameFolder } from "../folderActions";
 import { moveNote } from "../moveNote";
 import type { FolderNode, FolderTree } from "../folderTree";
+import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
-  buildRankMap,
-  sortBatchIds,
-  type NoteId,
-  type UseSelectedNoteReturn,
-} from "../sidebarState";
+  buildItemRankMap,
+  orderContainerChildren,
+  pruneFavorites,
+  toggleFavoriteList,
+} from "./folderTreeRows";
+import {
+  applyReorderWrite,
+  computeItemOrderAfterReorder,
+  itemOrderKey,
+} from "./itemOrderReorder";
 
 const DRAG_MIME = "application/x-myne-note";
 const FOLDER_DRAG_MIME = "application/x-myne-folder";
@@ -92,17 +98,20 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     setDeliberate(prefs.deliberate_folders);
   }, [prefs.deliberate_folders]);
 
-  // Manual sidebar sort order (note_order / folder_order prefs sequences),
-  // synced from the mount-time prefs read and mutated optimistically by the
-  // reorder drag handlers (best-effort persist, like `deliberate`).
-  const [noteOrder, setNoteOrder] = useState<string[]>([]);
-  const [folderOrder, setFolderOrder] = useState<string[]>([]);
+  // Unified manual sidebar order (`item_order` prefs sequence) + favorites
+  // (`favorites` prefs sequence, MYND-183), synced from the mount-time prefs
+  // read and mutated optimistically by the reorder drag handlers (best-effort
+  // persist, like `deliberate`). Favorites membership/reorder wiring lands in a
+  // later task; here we expose the read so the tree + Favorites section consume
+  // a single source.
+  const [itemOrder, setItemOrder] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   useEffect(() => {
-    setNoteOrder(prefs.note_order);
-  }, [prefs.note_order]);
+    setItemOrder(prefs.item_order);
+  }, [prefs.item_order]);
   useEffect(() => {
-    setFolderOrder(prefs.folder_order);
-  }, [prefs.folder_order]);
+    setFavorites(prefs.favorites);
+  }, [prefs.favorites]);
 
   // The latest derived tree, kept in a ref so handlers stay referentially
   // stable while still reading current subtree state (delete-emptiness etc.).
@@ -118,6 +127,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const [caseMerge, setCaseMerge] = useState<CaseMergeState>(null);
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [rootDropActive, setRootDropActive] = useState(false);
+  // Drop-target highlight when a note is dragged over the Favorites section
+  // (drag-into-add). MYND-183 Task 9.
+  const [favoritesDropActive, setFavoritesDropActive] = useState(false);
   // Drag-kind discriminator so rows can branch their drop affordance:
   // "note" → reorder-between-notes / move-into-folder; "folder" → reorder
   // sibling folders. Cleared on drag end. Set on the respective drag start.
@@ -131,6 +143,12 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     key: string;
     place: ReorderPlace;
   } | null>(null);
+  // Reorder insertion indicator WITHIN the Favorites section (kept separate from
+  // `reorderTarget` so a note shown in both Favorites + tree doesn't cross-light).
+  const [favReorderTarget, setFavReorderTarget] = useState<{
+    id: NoteId;
+    place: ReorderPlace;
+  } | null>(null);
 
   const notesForOps = useCallback(
     () =>
@@ -139,6 +157,26 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         folder: r.folder,
       })),
     [ctx.cache],
+  );
+
+  // The target container's children (sub-folders + notes) in current display
+  // order, as `item_order` keys (folder display path / note UUID). Reuses the
+  // flatten comparator so the sidebar's render order IS the reorder baseline.
+  // `containerKey` is the folded folder key, or `""` for the root container.
+  const containerChildKeys = useCallback(
+    (containerKey: string): string[] => {
+      const tree = treeRef.current;
+      const node =
+        containerKey === "" ? null : findByFoldedKey(tree.roots, containerKey);
+      const folders = containerKey === "" ? tree.roots : (node?.children ?? []);
+      const noteIds =
+        containerKey === "" ? tree.unfiledNoteIds : (node?.noteIds ?? []);
+      const rank = buildItemRankMap(itemOrder);
+      return orderContainerChildren(folders, noteIds, ctx.cache, rank).map((c) =>
+        c.kind === "folder" ? c.node.path : c.id,
+      );
+    },
+    [ctx.cache, itemOrder],
   );
 
   const addDeliberate = useCallback((path: string) => {
@@ -304,8 +342,22 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     setDragKind(null);
     setReorderTarget(null);
     setFolderReorderTarget(null);
+    setFavReorderTarget(null);
     setDropTargetKey(null);
     setRootDropActive(false);
+    setFavoritesDropActive(false);
+  }, []);
+
+  const updateFavReorderTarget = useCallback(
+    (id: NoteId, place: ReorderPlace) => {
+      setFavReorderTarget((cur) =>
+        cur?.id === id && cur.place === place ? cur : { id, place },
+      );
+    },
+    [],
+  );
+  const clearFavReorderTarget = useCallback((id: NoteId) => {
+    setFavReorderTarget((cur) => (cur?.id === id ? null : cur));
   }, []);
 
   // Move the insertion indicator to (id/key, place). `onDragOver` fires
@@ -348,128 +400,212 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     [ctx],
   );
 
+  // Drop into the empty root AREA → unfile (`folder: null`) + place at the end
+  // of the root container. The replacement for the removed "Vault root" section
+  // drop-zone (MYND-183 Task 6b). Note drags only.
   const onRootDrop = useCallback(async () => {
     const id = draggedRef.current;
     draggedRef.current = null;
     setRootDropActive(false);
     setDragKind(null);
     if (id === null) return;
-    await moveNote(id, null);
-    await ctx.refreshOne(id);
-  }, [ctx]);
+    const draggedRec = ctx.cache.get(id);
+    const crossContainer =
+      draggedRec === undefined || noteFolderKey(draggedRec.folder) !== "";
+    const prevOrder = itemOrder;
+    await applyReorderWrite({
+      moveFirst: crossContainer
+        ? async () => {
+            await moveNote(id, null);
+            await ctx.refreshOne(id);
+          }
+        : null,
+      computeNext: () =>
+        computeItemOrderAfterReorder({
+          itemOrder: prevOrder,
+          containerChildKeys: containerChildKeys("").filter((k) => k !== id),
+          draggedKey: id,
+          targetKey: "", // no row target → appends at the root end
+          place: "below",
+        }),
+      prevOrder,
+      setOrder: setItemOrder,
+      persist: persistItemOrder,
+    });
+  }, [ctx, itemOrder, containerChildKeys]);
 
-  // Reorder a note relative to `targetId`. When the dragged note lives in a
-  // different folder, it is first moved into the target's folder, then placed.
-  // Persists the target folder's full new sequence into the global note_order
-  // (sibling-local comparison keeps other folders' order untouched).
-  const onNoteReorder = useCallback(
-    async (targetId: NoteId, place: ReorderPlace) => {
-      const draggedId = draggedRef.current;
+  // Unified reorder: place the dragged item (note OR folder — derived from which
+  // drag ref is set) adjacent to `target` (a note OR a folder row) in the
+  // unified `item_order`. The four drag/target kind combinations all route here,
+  // so a note can land in a folder-folder gap and a folder can reorder past a
+  // loose note (MYND-183 Task 6b). A note crossing containers moves first
+  // (`folder:` is the atomic source of truth); a folder reorders within its own
+  // parent only (cross-parent reparent is out of scope — no-op). Dual-write +
+  // failure semantics live in `applyReorderWrite`.
+  const reorderRelativeTo = useCallback(
+    async (
+      target:
+        | { kind: "note"; id: NoteId }
+        | { kind: "folder"; node: FolderNode },
+      place: ReorderPlace,
+    ) => {
+      const noteDrag = draggedRef.current;
+      const folderDrag = draggedFolderRef.current;
       draggedRef.current = null;
+      draggedFolderRef.current = null;
       setReorderTarget(null);
+      setFolderReorderTarget(null);
+      setDropTargetKey(null);
       setDragKind(null);
-      if (draggedId === null || draggedId === targetId) return;
 
-      const targetRec = ctx.cache.get(targetId);
-      const draggedRec = ctx.cache.get(draggedId);
-      if (targetRec === undefined || draggedRec === undefined) return;
-
-      const targetFolderKey = noteFolderKey(targetRec.folder);
-      // Cross-folder drop → move into the target's folder first.
-      if (targetFolderKey !== noteFolderKey(draggedRec.folder)) {
-        await moveNote(draggedId, normalizeFolderPath(targetRec.folder ?? null));
-        await ctx.refreshOne(draggedId);
+      // Resolve the target's container (folded key + path) + its order-key.
+      let containerKey: string;
+      let containerPath: string | null;
+      let targetKey: string;
+      if (target.kind === "note") {
+        const rec = ctx.cache.get(target.id);
+        if (rec === undefined) return;
+        containerKey = noteFolderKey(rec.folder);
+        containerPath = normalizeFolderPath(rec.folder ?? null);
+        targetKey = target.id;
+      } else {
+        const parent = folderParent(target.node.path);
+        containerKey = noteFolderKey(parent);
+        containerPath = parent === "" ? null : normalizeFolderPath(parent);
+        targetKey = target.node.path;
       }
 
-      // The target folder's notes in current display order, minus the dragged
-      // note (re-inserted at the chosen slot). Computed from the live cache so
-      // the just-moved note's new siblings are included.
-      const rank = buildRankMap(noteOrder);
-      const siblings = sortBatchIds(
-        Array.from(ctx.cache.values())
-          .filter(
-            (r) =>
-              r.noteUuid !== draggedId &&
-              noteFolderKey(r.folder) === targetFolderKey,
-          )
-          .map((r) => r.noteUuid),
-        ctx.cache,
-        rank,
-      );
-      const targetIdx = siblings.indexOf(targetId);
-      const insertAt =
-        targetIdx === -1
-          ? siblings.length
-          : place === "above"
-            ? targetIdx
-            : targetIdx + 1;
-      const newSeq = [
-        ...siblings.slice(0, insertAt),
-        draggedId,
-        ...siblings.slice(insertAt),
-      ];
+      const prevOrder = itemOrder;
 
-      const inFolder = new Set(newSeq);
-      const nextOrder = [
-        ...noteOrder.filter((id) => !inFolder.has(id)),
-        ...newSeq,
-      ];
-      setNoteOrder(nextOrder);
-      void persistNoteOrder(nextOrder).catch(() => {});
-    },
-    [ctx, noteOrder],
-  );
-
-  // Reorder a folder relative to a same-parent sibling `targetNode`.
-  // Cross-parent drops are a reparent (folder MOVE) — out of scope, so no-op.
-  const onFolderReorder = useCallback(
-    async (targetNode: FolderNode, place: ReorderPlace) => {
-      const draggedKey = draggedFolderRef.current;
-      draggedFolderRef.current = null;
-      setFolderReorderTarget(null);
-      setDragKind(null);
-      if (draggedKey === null || draggedKey === targetNode.key) return;
-
-      const tree = treeRef.current;
-      const draggedNode = findByFoldedKey(tree.roots, draggedKey);
-      if (draggedNode === null) return;
-      if (folderParent(draggedNode.path) !== folderParent(targetNode.path)) {
+      if (noteDrag !== null) {
+        if (target.kind === "note" && noteDrag === target.id) return;
+        const draggedRec = ctx.cache.get(noteDrag);
+        if (draggedRec === undefined) return;
+        const crossContainer = noteFolderKey(draggedRec.folder) !== containerKey;
+        await applyReorderWrite({
+          moveFirst: crossContainer
+            ? async () => {
+                await moveNote(noteDrag, containerPath);
+                await ctx.refreshOne(noteDrag);
+              }
+            : null,
+          computeNext: () =>
+            computeItemOrderAfterReorder({
+              itemOrder: prevOrder,
+              containerChildKeys: containerChildKeys(containerKey).filter(
+                (k) => k !== noteDrag,
+              ),
+              draggedKey: noteDrag,
+              targetKey,
+              place,
+            }),
+          prevOrder,
+          setOrder: setItemOrder,
+          persist: persistItemOrder,
+        });
         return;
       }
 
-      const parentPath = folderParent(targetNode.path);
-      const siblingNodes =
-        parentPath === ""
-          ? tree.roots
-          : (findByFoldedKey(tree.roots, foldSegment(parentPath))?.children ??
-            []);
-      const siblingPaths = siblingNodes
-        .map((n) => n.path)
-        .filter((p) => foldSegment(p) !== draggedKey);
-      const targetIdx = siblingPaths.findIndex(
-        (p) => foldSegment(p) === targetNode.key,
-      );
-      const insertAt =
-        targetIdx === -1
-          ? siblingPaths.length
-          : place === "above"
-            ? targetIdx
-            : targetIdx + 1;
-      const newSeq = [
-        ...siblingPaths.slice(0, insertAt),
-        draggedNode.path,
-        ...siblingPaths.slice(insertAt),
-      ];
-
-      const inGroup = new Set(newSeq.map((p) => foldSegment(p)));
-      const nextOrder = [
-        ...folderOrder.filter((p) => !inGroup.has(foldSegment(p))),
-        ...newSeq,
-      ];
-      setFolderOrder(nextOrder);
-      void persistFolderOrder(nextOrder).catch(() => {});
+      if (folderDrag !== null) {
+        if (target.kind === "folder" && folderDrag === target.node.key) return;
+        const draggedNode = findByFoldedKey(treeRef.current.roots, folderDrag);
+        if (draggedNode === null) return;
+        // Same-parent only — cross-parent reparent is out of scope (no-op).
+        if (noteFolderKey(folderParent(draggedNode.path)) !== containerKey) {
+          return;
+        }
+        await applyReorderWrite({
+          moveFirst: null,
+          computeNext: () =>
+            computeItemOrderAfterReorder({
+              itemOrder: prevOrder,
+              containerChildKeys: containerChildKeys(containerKey).filter(
+                (k) => itemOrderKey(k) !== folderDrag,
+              ),
+              draggedKey: draggedNode.path,
+              targetKey,
+              place,
+            }),
+          prevOrder,
+          setOrder: setItemOrder,
+          persist: persistItemOrder,
+        });
+      }
     },
-    [folderOrder],
+    [ctx, itemOrder, containerChildKeys],
+  );
+
+  // Row-facing wrappers keyed by TARGET kind (the dragged kind is derived inside
+  // `reorderRelativeTo`), so a note row accepts a folder drag and vice-versa.
+  const onNoteReorder = useCallback(
+    (targetId: NoteId, place: ReorderPlace) =>
+      reorderRelativeTo({ kind: "note", id: targetId }, place),
+    [reorderRelativeTo],
+  );
+  const onFolderReorder = useCallback(
+    (targetNode: FolderNode, place: ReorderPlace) =>
+      reorderRelativeTo({ kind: "folder", node: targetNode }, place),
+    [reorderRelativeTo],
+  );
+
+  // ---- favorites (MYND-183 Task 9) ----------------------------------------
+  // Optimistic prefs write with revert + stale-UUID GC on write. Reuses the
+  // move-less dual-write helper, so the persist-reject → revert contract is
+  // identical to the reorder path (and covered by the same unit test).
+  const writeFavorites = useCallback(
+    async (next: string[]) => {
+      const pruned = pruneFavorites(next, ctx.cache);
+      await applyReorderWrite({
+        moveFirst: null,
+        computeNext: () => pruned,
+        prevOrder: favorites,
+        setOrder: setFavorites,
+        persist: persistFavorites,
+      });
+    },
+    [ctx.cache, favorites],
+  );
+
+  // Star / context-menu toggle — the ONLY remove path. Add when absent, remove
+  // when present (`folder:` untouched — favoriting is pure view-state).
+  const toggleFavorite = useCallback(
+    (id: NoteId) => void writeFavorites(toggleFavoriteList(favorites, id)),
+    [favorites, writeFavorites],
+  );
+
+  // Drop a note onto the Favorites section's non-row area → add at the end
+  // (never removes; no-op if already favorited). `folder:` untouched.
+  const onFavoritesDropNote = useCallback(() => {
+    const id = draggedRef.current;
+    draggedRef.current = null;
+    setFavoritesDropActive(false);
+    setDragKind(null);
+    if (id === null || favorites.includes(id)) return;
+    void writeFavorites([...favorites, id]);
+  }, [favorites, writeFavorites]);
+
+  // Drop a note onto a favorite ROW edge → place it at that slot. Uniform
+  // add-or-reorder: a non-favorite is ADDED at the slot; an existing favorite
+  // is moved (filtered out then re-inserted). Never removes — drag-out-to-remove
+  // does not exist (removal is star/menu only).
+  const reorderFavorite = useCallback(
+    (targetId: NoteId, place: ReorderPlace) => {
+      const draggedId = draggedRef.current;
+      draggedRef.current = null;
+      setFavReorderTarget(null);
+      setReorderTarget(null);
+      setDragKind(null);
+      if (draggedId === null || draggedId === targetId) return;
+      const next = computeItemOrderAfterReorder({
+        itemOrder: favorites,
+        containerChildKeys: favorites.filter((f) => f !== draggedId),
+        draggedKey: draggedId,
+        targetKey: targetId,
+        place,
+      });
+      void writeFavorites(next);
+    },
+    [favorites, writeFavorites],
   );
 
   return {
@@ -500,9 +636,18 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     onNoteDragStart,
     onFolderDropNote,
     onRootDrop,
-    // reorder (notes + folders)
-    noteOrder,
-    folderOrder,
+    // reorder (unified item_order) + favorites
+    itemOrder,
+    favorites,
+    // favorites membership (Task 9)
+    toggleFavorite,
+    onFavoritesDropNote,
+    reorderFavorite,
+    favoritesDropActive,
+    setFavoritesDropActive,
+    favReorderTarget,
+    updateFavReorderTarget,
+    clearFavReorderTarget,
     dragKind,
     reorderTarget,
     updateReorderTarget,

@@ -42,20 +42,23 @@ export interface PrefsView {
    */
   auto_lock_seconds: number | null;
   /**
-   * Manual sidebar sort order for notes — an ordered list of note UUIDs. A
-   * note present here sorts by its index; a note absent (newly created, never
-   * reordered) sorts after all listed siblings by `updated:` descending.
-   * Order is meaningful and the backend preserves it verbatim. Absent in
-   * pre-reorder vaults → the Rust decoder defaults it to `[]`.
+   * Favorited notes — an ordered list of note UUIDs surfaced in the sidebar's
+   * Favorites section, in display order (MYND-183). A sequence: the backend
+   * preserves element order verbatim. UUIDs only (folders are not favoritable).
+   * Absent in vaults with no favorites → the Rust decoder defaults it to `[]`.
    */
-  note_order: string[];
+  favorites: string[];
   /**
-   * Manual sidebar sort order for folders — an ordered list of canonical
-   * folder display paths (trailing-slash form). Same index-then-name fallback
-   * semantics as {@link PrefsView.note_order}, applied to sibling folders.
-   * Absent in pre-reorder vaults → defaults to `[]`.
+   * Unified manual sidebar order across the single interleaved file-tree
+   * (MYND-183, superseding `note_order` + `folder_order`) — a flat,
+   * heterogeneous list of note UUIDs and canonical trailing-slash folder paths
+   * (discriminated by the trailing `/`). Each container sorts its own children
+   * (sub-folders + notes, freely interleaved) by their index here; unlisted
+   * children fall back to recency / folded name. Order is the payload — the
+   * backend preserves it verbatim. Absent in pre-reorder vaults → defaults to
+   * `[]`.
    */
-  folder_order: string[];
+  item_order: string[];
   /**
    * Editor three-pane layout (sidebar widths + collapsed flags, MYND-137).
    * `null` when the user never customized the layout — the field is omitted
@@ -108,25 +111,27 @@ export async function setAutoLockTimeout(seconds: number): Promise<void> {
 }
 
 /**
- * Persist the full note_order sequence — the manual sidebar sort order for
- * notes. The caller passes the entire desired order; v0.1 single-device
- * writes it verbatim (the backend preserves element order — the sequence IS
- * the payload, unlike the sorted+deduped `deliberate_folders`). No native
- * side-effect; a rejected promise means the disk write failed and the
- * caller's optimistic UI must revert.
+ * Persist the full item_order sequence — the unified manual sidebar order
+ * across the interleaved file-tree (a heterogeneous list of note UUIDs +
+ * canonical folder paths, MYND-183, superseding `setNoteOrder`/`setFolderOrder`).
+ * The caller passes the entire desired order; v0.1 single-device writes it
+ * verbatim (the backend preserves element order — the sequence IS the payload,
+ * unlike the sorted+deduped `deliberate_folders`). No native side-effect; a
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert.
  */
-export async function setNoteOrder(order: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_note_order", { order });
+export async function setItemOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_item_order", { order });
 }
 
 /**
- * Persist the full folder_order sequence — the manual sidebar sort order for
- * folders (canonical folder display paths). Same order-preserving, no-native-
- * side-effect contract as {@link setNoteOrder}. A rejected promise means the
- * disk write failed and the caller's optimistic UI must revert.
+ * Persist the full favorites sequence — the user's favorited notes (note UUIDs)
+ * in display order, shown in the sidebar's Favorites section. Same order-
+ * preserving, no-native-side-effect contract as {@link setItemOrder}. A rejected
+ * promise means the disk write failed and the caller's optimistic UI must revert.
  */
-export async function setFolderOrder(order: string[]): Promise<void> {
-  await invoke<void>("plugin:prefs|set_folder_order", { order });
+export async function setFavorites(favorites: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_favorites", { order: favorites });
 }
 
 /**

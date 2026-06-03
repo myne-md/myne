@@ -1,6 +1,12 @@
 // Command-palette action registry tests — covers MYND-86 acceptance:
 // "actions respect app state guards; palette never exposes actions
 // unavailable in the current state."
+//
+// MYND-40 follow-up: the dedicated "Switch to note…" action + its note-picker
+// sub-palette were removed when full-text note search moved INLINE into the
+// palette (a NOTES section backed by the `note_search` IPC, tested in
+// command-palette.test.tsx). The registry is now four actions; note selection
+// is no longer an action. These tests track that shape.
 
 import { describe, expect, it, vi } from "vitest";
 import { COMMAND_ACTIONS } from "../../src/commands";
@@ -13,7 +19,6 @@ import type {
 function makeContext(over: Partial<CommandContext> = {}): CommandContext {
   return {
     stageName: "editor",
-    noteTitles: new Map(),
     selectedNoteId: null,
     onLock: vi.fn(async () => {}),
     onOpenSettings: vi.fn(),
@@ -27,6 +32,17 @@ function find(id: string): CommandAction {
   if (a === undefined) throw new Error(`Action ${id} not found`);
   return a;
 }
+
+describe("Command palette action registry", () => {
+  it("exposes exactly the four v1 actions (note picking moved to inline search, MYND-40)", () => {
+    expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
+      "app.open-settings",
+      "vault.import-obsidian",
+      "vault.lock",
+      "wikilinks.convert-in-this-note",
+    ]);
+  });
+});
 
 describe("Command palette action visibility per Stage", () => {
   const editorStages: AppStageName[] = ["editor"];
@@ -45,13 +61,6 @@ describe("Command palette action visibility per Stage", () => {
     it(`"Open settings…" is HIDDEN when stage = ${stage}`, () => {
       const ctx = makeContext({ stageName: stage });
       expect(find("app.open-settings").visibility(ctx)).toBe("hidden");
-    });
-    it(`"Switch to note…" is HIDDEN when stage = ${stage}`, () => {
-      const ctx = makeContext({
-        stageName: stage,
-        noteTitles: new Map([["note-1", "Foo"]]),
-      });
-      expect(find("note.switch").visibility(ctx)).toBe("hidden");
     });
     it(`"Convert wikilinks…" is HIDDEN when stage = ${stage}`, () => {
       const ctx = makeContext({
@@ -74,22 +83,6 @@ describe("Command palette action visibility per Stage", () => {
       expect(find("app.open-settings").visibility(ctx)).toBe("show");
     });
   }
-
-  it("\"Switch to note…\" is HIDDEN when cache is empty (no notes to pick)", () => {
-    const ctx = makeContext({
-      stageName: "editor",
-      noteTitles: new Map(),
-    });
-    expect(find("note.switch").visibility(ctx)).toBe("hidden");
-  });
-
-  it("\"Switch to note…\" is SHOWN when cache has at least one note", () => {
-    const ctx = makeContext({
-      stageName: "editor",
-      noteTitles: new Map([["note-1", "Foo"]]),
-    });
-    expect(find("note.switch").visibility(ctx)).toBe("show");
-  });
 
   it("\"Convert wikilinks…\" is HIDDEN when no note selected", () => {
     const ctx = makeContext({
