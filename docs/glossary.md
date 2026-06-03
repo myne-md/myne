@@ -293,7 +293,7 @@ Used in: `spec/account-number.md` §4
 
 ### **deliberate folder** &nbsp; 📦 *Product*
 
-A folder the user explicitly created that persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). The set is *cold* — written only on explicit folder create / delete, never on note move — and merges as a union (add-wins) under Phase 2 sync. A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2). See also [folder](#folder), [vault root](#vault-root).
+A folder the user explicitly created that persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). The set is *cold* — written only on explicit folder create / delete, never on note move — and merges as a union (add-wins) under Phase 2 sync. A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2). See also [folder](#folder), [item order](#item-order).
 
 Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2; `decisions.md` 2026-05-29
 
@@ -364,9 +364,15 @@ The fallback path for loading the [search index](#search-index) when the cached 
 
 Used in: `spec/protocol.md` §9.6.4
 
+### **favorites** &nbsp; 📦 *Product*
+
+The user's chosen shortcut list of notes, surfaced in a dedicated Favorites section pinned above the sidebar tree. Persisted as the `favorites` field of `vault.prefs` — a **sequence** array of note UUIDs only (display order is the payload; NFC-normalized, not sorted, not deduped, omitted-when-empty), so favoriting is cheap view-state (a prefs write, no `.myn` re-encrypt) that reverts to empty on a tampered/absent blob (`spec/protocol.md` §9.5.2, §9.5.5). A favorited note **also** keeps its normal position in the tree — favoriting is a shortcut, not a move — so it renders in two rows (disambiguated by section-qualified keys); selection is keyed by note-id (both rows highlight) and keyboard navigation visits it once. Add via a hover star, the context menu, or dragging a note into the section; remove via star/menu only. A favorite UUID with no live note is ignored at render and pruned on the next write. See also [item order](#item-order), [PrefsView](#prefsview). (MYND-183)
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-02
+
 ### **folder** &nbsp; 📦 *Product*
 
-A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [vault root](#vault-root).
+A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Folders and folderless notes share a single interleaved tree at every level, ordered by [item order](#item-order) (MYND-183) — a folderless note is not bucketed into a separate section but renders at the root level alongside top-level folders. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [item order](#item-order).
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
 
@@ -454,6 +460,12 @@ Used in: `spec/markdown-dialect.md` §3.7, §6 C1
 Adversary class A11: a Myne team member acting maliciously. The architecture grants the team no privileged read access — keys never leave the client. The single privileged asset is the code-signing key (TB8); compromise reduces to A9 (compromised distribution).
 
 Used in: `threat-model.md` §1 (A11)
+
+### **item order** &nbsp; 📦 *Product*
+
+The user's manual order across the unified sidebar file-tree, persisted as the `item_order` field of `vault.prefs`. A single **sequence** array — a flat, heterogeneous, sibling-local list whose elements are either note UUIDs or canonical trailing-slash [folder](#folder) paths, discriminated by the trailing `/`. Container membership is *structural* (a note's container is its `folder:`; a folder's container is its parent path); the list supplies only a global rank, and each container sorts its own children (sub-folders + notes **together, freely interleaved**) by their index in the one list, unlisted children falling back to recency (notes) / folded name (folders). A single flat list therefore expresses **recursive interleaving** at every level. Canonical encoding: NFC-normalized, order preserved verbatim, not sorted, not deduped, omitted-when-empty (`spec/protocol.md` §9.5.2). **Supersedes** the separate `note_order` + `folder_order` arrays of the pre-MYND-183 schema (`decisions.md` 2026-06-02, which retires the two-array model). See also [favorites](#favorites), [PrefsView](#prefsview). (MYND-183)
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-02
 
 ### **item_key** &nbsp; 🗝️ *Key/identifier*
 
@@ -716,7 +728,7 @@ Used in: `spec/protocol.md` §3.4, §9.5; `decisions.md` 2026-05-27 "Vault prefe
 
 ### **PrefsView** &nbsp; 🛠️ *Tooling*
 
-Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `vault.prefs` plaintext. Defines the v0.1 preference fields — `screen_capture_protection: bool` (MYND-160), `deliberate_folders` (set array, MYND-144), `auto_lock_seconds` (optional integer, MYND-121), and the manual sidebar sort sequences `note_order` / `folder_order` (ordered string arrays whose element order is preserved verbatim — a listed sibling sorts by its index, an unlisted one falls back to recency/name) — plus the `Default` impl that drives the fall-back-to-defaults semantic on absence / AEAD-fail / parse-fail (`spec/protocol.md` §9.5.5). Serialized via canonical JSON (sorted keys, no whitespace, NFC strings, no floats; set arrays sorted+deduped, sequence arrays order-preserved) before AEAD encryption — drift-detected by the `myne-test-vectors` byte-stable KAT vectors.
+Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `vault.prefs` plaintext. Defines the v0.1 preference fields — `screen_capture_protection: bool` (MYND-160), `deliberate_folders` (set array, MYND-144), `auto_lock_seconds` (optional integer, MYND-121), `editor_layout` (optional nested object, MYND-137), the unified manual sidebar sequence [`item_order`](#item-order) (MYND-183, superseding the earlier `note_order` / `folder_order` pair), and [`favorites`](#favorites) (MYND-183) — the latter two ordered string arrays whose element order is preserved verbatim — plus the `Default` impl that drives the fall-back-to-defaults semantic on absence / AEAD-fail / parse-fail (`spec/protocol.md` §9.5.5). Serialized via canonical JSON (sorted keys, no whitespace, NFC strings, no floats; set arrays sorted+deduped, sequence arrays order-preserved) before AEAD encryption — drift-detected by the `myne-test-vectors` byte-stable KAT vectors.
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
@@ -959,7 +971,9 @@ The backend-resident state held between the `begin` and `commit` IPC calls of th
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
 
-### **vault root** &nbsp; 📦 *Product*
+### **vault root** &nbsp; 📦 *Product* *(retired 2026-06-02)*
+
+*Retired as a named sidebar section by MYND-183 (`decisions.md` 2026-06-02): folderless notes are no longer bucketed under a separate "Vault root" header but render at the root level of the unified [item-order](#item-order) tree, alongside top-level folders. The **logical root position** it described — a note whose `folder:` frontmatter is **absent** — remains first-class and unchanged (`spec/markdown-dialect.md` §3.6 still uses "root / unfiled" for that state); only the dedicated sidebar section is gone. Unrelated: "vault root" in `spec/wikilink.md` means the on-disk vault directory (the folder holding `vault.meta`), a different sense untouched here. Preserved for audit trail.*
 
 The top of the virtual folder tree — the home of *unfiled* notes. A note is at the vault root when its `folder:` frontmatter field is **absent** (`folder: ""` is read as root and normalized to absent; `folder: "/"` is rejected). Distinct from the *vault directory* on the filesystem: the vault root is a logical position in the sidebar tree, not a path on disk (the on-disk layout is always flat `notes/<uuid>.myn`). A new note created with no folder selected, and a note moved out of every folder, both land at the vault root. See also [folder](#folder).
 

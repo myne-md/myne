@@ -1,10 +1,18 @@
 // @vitest-environment jsdom
 //
-// Fenced code nested in a list item / blockquote (MYND-154 task 9).
-// The card is gated to top-level fences (non-breaking); a nested fence still
-// parses as FencedCode (so coloring applies via the parseMixed wrap) but gets
-// no card chrome — avoiding a collision with the list marker / quote bar.
-// Pixel-perfect nested cards are deferred per the grill.
+// Fenced code nested in a list item / blockquote.
+//
+// MYND-154 task 9 originally gated the card to TOP-LEVEL fences only (a nested
+// fence parsed as FencedCode but got NO card chrome, to avoid colliding with
+// the list marker / quote bar). MYND-155 lifted that gate, keyed off
+// `quoteDepthOf`:
+//   - A BLOCKQUOTE-nested fence renders as a single read-only contained widget
+//     (`CodeInQuoteWidget`: bars in a left margin + an inset boxed card) — one
+//     block-replace decoration spanning the whole block.
+//   - A fence nested only in a plain LIST (no blockquote, so quoteDepth === 0)
+//     falls through to the standard top-level card (bar + carded body + hidden
+//     close fence) — multiple decorations.
+// Either way the document text stays byte-stable (the card is decoration only).
 
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
@@ -48,39 +56,51 @@ function hasFenced(view: EditorView): boolean {
   return found;
 }
 
-function cardDecoCount(view: EditorView): number {
-  let n = 0;
-  buildCodeBlockDecorations(view.state, false).between(0, view.state.doc.length, () => {
-    n++;
-  });
-  return n;
+// Card decoration ranges in the away state (revealAllowed = false).
+function cardDecos(view: EditorView): { from: number; to: number }[] {
+  const out: { from: number; to: number }[] = [];
+  buildCodeBlockDecorations(view.state, false).between(
+    0,
+    view.state.doc.length,
+    (from, to) => {
+      out.push({ from, to });
+    },
+  );
+  return out;
 }
 
-describe("nested fenced code (task 9)", () => {
+describe("nested fenced code (MYND-155: blockquote → contained card, list → standard card)", () => {
   let m: Mounted | null = null;
   afterEach(() => {
     if (m) teardown(m);
     m = null;
   });
 
-  it("a top-level fence DOES get the card (contrast control)", () => {
+  it("a top-level fence gets the standard multi-part card (contrast control)", () => {
     m = mount("```rust\nlet x = 1;\n```");
-    expect(cardDecoCount(m.view)).toBeGreaterThan(0);
+    // Bar (open-fence replace) + carded body line + hidden close fence.
+    expect(cardDecos(m.view).length).toBeGreaterThan(1);
   });
 
-  it("a blockquote-nested fence parses as FencedCode but gets NO card", () => {
+  it("a blockquote-nested fence renders as one contained card widget", () => {
     const doc = "> ```rust\n> let x = 1;\n> ```";
     m = mount(doc);
     expect(hasFenced(m.view)).toBe(true); // parser control: it IS a FencedCode
-    expect(cardDecoCount(m.view)).toBe(0); // card skipped (gated to top-level)
+    const decos = cardDecos(m.view);
+    // Exactly one block-replace spanning the whole block (CodeInQuoteWidget),
+    // NOT the per-line standard card.
+    expect(decos.length).toBe(1);
+    expect(decos[0]).toEqual({ from: 0, to: m.view.state.doc.length });
     expect(m.view.state.doc.toString()).toBe(doc); // byte-stable
   });
 
-  it("a list-nested fence parses as FencedCode but gets NO card", () => {
+  it("a list-nested fence (no blockquote) gets the standard card", () => {
     const doc = "- item\n  ```rust\n  let x = 1;\n  ```";
     m = mount(doc);
     expect(hasFenced(m.view)).toBe(true);
-    expect(cardDecoCount(m.view)).toBe(0);
-    expect(m.view.state.doc.toString()).toBe(doc);
+    // quoteDepth === 0 → falls through to the standard top-level card
+    // (more than one decoration), unlike the single-widget blockquote case.
+    expect(cardDecos(m.view).length).toBeGreaterThan(1);
+    expect(m.view.state.doc.toString()).toBe(doc); // byte-stable
   });
 });

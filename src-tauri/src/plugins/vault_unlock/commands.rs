@@ -953,8 +953,8 @@ mod tests {
                     screen_capture_protection: false,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
-                    note_order: Vec::new(),
-                    folder_order: Vec::new(),
+                    favorites: Vec::new(),
+                    item_order: Vec::new(),
                     editor_layout: None,
                 },
             )
@@ -1049,8 +1049,8 @@ mod tests {
                 screen_capture_protection: false,
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
-                note_order: Vec::new(),
-                folder_order: Vec::new(),
+                favorites: Vec::new(),
+                item_order: Vec::new(),
                 editor_layout: None,
             },
         )

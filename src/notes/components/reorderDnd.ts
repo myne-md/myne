@@ -10,6 +10,21 @@ export function dragEdge(e: DragEvent<HTMLElement>): "above" | "below" {
   return e.clientY < rect.top + rect.height / 2 ? "above" : "below";
 }
 
+/**
+ * Three-zone hit test for a row that is BOTH a reorder target and a drop-INTO
+ * target (folder rows under a note drag, MYND-183): the top/bottom quarters
+ * reorder the dragged item as a sibling (`"above"` / `"below"`), the middle half
+ * drops it INTO the folder (`"into"`). Pairs with `dragEdge` (2-zone) for rows
+ * that have no "into" affordance (note rows).
+ */
+export function dragZone(e: DragEvent<HTMLElement>): "above" | "into" | "below" {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  if (y < rect.height * 0.25) return "above";
+  if (y > rect.height * 0.75) return "below";
+  return "into";
+}
+
 /** Top/bottom 2px accent bar marking a reorder insertion point. */
 export function insertionLineStyle(edge: "above" | "below"): CSSProperties {
   return {

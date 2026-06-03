@@ -1,23 +1,45 @@
 // @vitest-environment jsdom
 //
-// CommandPalette UI integration tests — covers MYND-86 acceptance:
+// CommandPalette UI integration tests — covers MYND-86 + MYND-40 acceptance:
 // "keyboard shortcut opens command palette; fuzzy search actions; …
-// palette never exposes actions unavailable in the current state."
+// palette never exposes actions unavailable in the current state" and the
+// MYND-40 unified two-section list (COMMANDS fuzzy + NOTES full-text).
 //
-// Tests focus on user-visible behavior: filter, keyboard navigation, the
-// note-picker sub-palette, dismissal paths. Not the parent Cmd+K hotkey
-// wiring (that's an `EditorChrome`-internal listener tested via manual
-// smoke).
+// Tests focus on user-visible behavior: command filter, keyboard navigation,
+// the inline NOTES section (backed by the mocked `note_search` IPC), and
+// dismissal paths. Not the parent Cmd+K hotkey wiring (that's an
+// `EditorChrome`-internal listener tested via manual smoke).
+//
+// `searchNotes` is mocked so the NOTES section is deterministic without a
+// backend; `shouldApplyNoteSearchResult` (the generation-guard) keeps its real
+// implementation.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { CommandPalette } from "../../src/components/CommandPalette";
 import type { CommandContext } from "../../src/commands";
+import { searchNotes } from "../../src/notes/searchNotes";
+import type { NoteSearchResult } from "../../src/types/note-search-result";
+
+vi.mock("../../src/notes/searchNotes", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../src/notes/searchNotes")
+  >("../../src/notes/searchNotes");
+  return { ...actual, searchNotes: vi.fn() };
+});
+
+const mockedSearch = vi.mocked(searchNotes);
 
 function buildCtx(over: Partial<CommandContext> = {}): CommandContext {
   return {
     stageName: "editor",
-    noteTitles: new Map(),
     selectedNoteId: null,
     onLock: vi.fn(async () => {}),
     onOpenSettings: vi.fn(),
@@ -28,7 +50,10 @@ function buildCtx(over: Partial<CommandContext> = {}): CommandContext {
 
 describe("CommandPalette UI", () => {
   beforeEach(() => {
-    // Mount a fresh DOM root per test.
+    // Default: the NOTES section is empty unless a test opts into hits. Keeps
+    // the debounced search from throwing on the default vi.fn() return.
+    mockedSearch.mockReset();
+    mockedSearch.mockResolvedValue([]);
   });
   afterEach(() => {
     cleanup();
@@ -41,29 +66,30 @@ describe("CommandPalette UI", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders the action list when open with editor stage", () => {
+  it("renders the command list when open with editor stage", () => {
     render(
       <CommandPalette
         open
         onClose={vi.fn()}
         ctx={buildCtx({
           stageName: "editor",
-          noteTitles: new Map([["note-1", "Foo"]]),
           selectedNoteId: "note-1",
         })}
       />,
     );
     expect(screen.getByRole("dialog")).toBeTruthy();
-    // "Lock vault" + "Open settings…" + "Switch to note…" → 3 active rows.
-    // Plus "Import Obsidian vault…" + "Convert wikilinks…" as disabled stubs.
+    // The four v1 actions: "Lock vault" + "Open settings…" active, plus
+    // "Import Obsidian vault…" + "Convert wikilinks…" as disabled stubs (the
+    // latter visible because a note is selected). Note picking is no longer an
+    // action — it surfaces inline once you type (see NOTES-section tests below).
     expect(screen.getByText("Lock vault")).toBeTruthy();
     expect(screen.getByText("Open settings…")).toBeTruthy();
-    expect(screen.getByText("Switch to note…")).toBeTruthy();
     expect(screen.getByText("Import Obsidian vault…")).toBeTruthy();
     expect(screen.getByText("Convert wikilinks in this note…")).toBeTruthy();
+    expect(screen.queryByText("Switch to note…")).toBeNull();
   });
 
-  it("filters actions on typing (fuzzy match)", () => {
+  it("filters commands on typing (fuzzy match)", () => {
     render(
       <CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />,
     );
@@ -71,10 +97,10 @@ describe("CommandPalette UI", () => {
     fireEvent.change(input, { target: { value: "lock" } });
     expect(screen.queryByText("Lock vault")).toBeTruthy();
     expect(screen.queryByText("Open settings…")).toBeNull();
-    expect(screen.queryByText("Switch to note…")).toBeNull();
+    expect(screen.queryByText("Import Obsidian vault…")).toBeNull();
   });
 
-  it("Enter invokes the highlighted action", async () => {
+  it("Enter invokes the highlighted command", async () => {
     const onLock = vi.fn(async () => {});
     const onClose = vi.fn();
     render(
@@ -107,53 +133,43 @@ describe("CommandPalette UI", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("Switch to note… transitions to note-picker view + lists notes", () => {
-    render(
-      <CommandPalette
-        open
-        onClose={vi.fn()}
-        ctx={buildCtx({
-          noteTitles: new Map([
-            ["note-1", "Alpha note"],
-            ["note-2", "Beta note"],
-            ["note-3", null], // null title → "Untitled"
-          ]),
-        })}
-      />,
-    );
+  it("typing surfaces backend note hits in the NOTES section", async () => {
+    const hits: NoteSearchResult[] = [
+      // Title match → no marker.
+      { note_id: "n1", title: "Alpha note", score: 3, matched_in: { title: true, body: false } },
+      // Body-only match → "matched in body" marker.
+      { note_id: "n2", title: "Beta note", score: 2, matched_in: { title: false, body: true } },
+      // Empty title → rendered as "Untitled".
+      { note_id: "n3", title: "", score: 1, matched_in: { title: true, body: true } },
+    ];
+    mockedSearch.mockResolvedValue(hits);
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
     const input = screen.getByRole("dialog").querySelector("input")!;
-    fireEvent.change(input, { target: { value: "switch" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    // Now in note-picker mode — input placeholder changes.
-    expect(input.placeholder).toBe("Search notes by title…");
-    expect(screen.getByText("Alpha note")).toBeTruthy();
+    fireEvent.change(input, { target: { value: "note" } });
+    // findBy* polls past the ~120ms debounce + the mocked promise resolution.
+    expect(await screen.findByText("Alpha note")).toBeTruthy();
     expect(screen.getByText("Beta note")).toBeTruthy();
     expect(screen.getByText("Untitled")).toBeTruthy();
+    // Exactly the one body-only hit carries the marker.
+    expect(screen.getByText("↳ matched in body")).toBeTruthy();
+    expect(mockedSearch).toHaveBeenCalledWith("note");
   });
 
-  it("note-picker Enter calls onSelectNote with the highlighted note id", async () => {
+  it("clicking a note hit calls onSelectNote with its id and closes", async () => {
     const onSelectNote = vi.fn(async () => {});
     const onClose = vi.fn();
+    mockedSearch.mockResolvedValue([
+      { note_id: "note-2", title: "Beta note", score: 1, matched_in: { title: true, body: false } },
+    ]);
     render(
-      <CommandPalette
-        open
-        onClose={onClose}
-        ctx={buildCtx({
-          noteTitles: new Map([
-            ["note-1", "Alpha"],
-            ["note-2", "Beta"],
-          ]),
-          onSelectNote,
-        })}
-      />,
+      <CommandPalette open onClose={onClose} ctx={buildCtx({ onSelectNote })} />,
     );
     const input = screen.getByRole("dialog").querySelector("input")!;
-    // Enter note-picker mode.
-    fireEvent.change(input, { target: { value: "switch" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    // Filter to Beta.
-    fireEvent.change(input, { target: { value: "Beta" } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.change(input, { target: { value: "beta" } });
+    const row = (await screen.findByText("Beta note")).closest(
+      "[role='option']",
+    )!;
+    fireEvent.mouseDown(row);
     await Promise.resolve();
     expect(onSelectNote).toHaveBeenCalledWith("note-2");
     expect(onClose).toHaveBeenCalledTimes(1);
