@@ -139,6 +139,14 @@ export type CommandPaletteProps = {
   open: boolean;
   onClose: () => void;
   ctx: CommandContext;
+  /**
+   * Predicate identifying notes in the vault trash (MYND-133). When provided,
+   * trashed note IDs are dropped from the NOTES search section — the BM25 index
+   * still matches a trashed note's body, so this is the exclusion gate. Omitted
+   * (e.g. in isolation tests) → no filtering. Wired by `CommandPaletteHost`
+   * from the sidebar cache's value-strict `trashed:` marker.
+   */
+  isTrashed?: (noteId: string) => boolean;
 };
 
 type Row =
@@ -153,7 +161,12 @@ type Row =
  */
 const NOTE_SEARCH_DEBOUNCE_MS = 120;
 
-export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
+export function CommandPalette({
+  open,
+  onClose,
+  ctx,
+  isTrashed,
+}: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   // Backend full-text results for the NOTES section (MYND-40). Populated by the
@@ -263,20 +276,27 @@ export function CommandPalette({ open, onClose, ctx }: CommandPaletteProps) {
     const noteRows: Row[] =
       query.trim() === ""
         ? []
-        : noteHits.map(
-            (h): Row => ({
-              kind: "note",
-              id: h.note_id,
-              title: h.title === "" ? "Untitled" : h.title,
-              matchedIn: h.matched_in,
-            }),
-          );
+        : noteHits
+            // Exclude trashed notes from search results (MYND-133). The Rust
+            // BM25 index still matches a trashed note's body (trashing is a
+            // content edit), so the sidebar's value-strict `trashed:` marker —
+            // surfaced via the `isTrashed` predicate — is the filter; restore
+            // re-includes it.
+            .filter((h) => !(isTrashed?.(h.note_id) ?? false))
+            .map(
+              (h): Row => ({
+                kind: "note",
+                id: h.note_id,
+                title: h.title === "" ? "Untitled" : h.title,
+                matchedIn: h.matched_in,
+              }),
+            );
 
     // `commandCount` is the fixed boundary between the COMMANDS and NOTES
     // sections in the flat list (commands always lead) — used for section
     // labels without re-scanning `rows`.
     return { rows: [...commandRows, ...noteRows], commandCount: commandRows.length };
-  }, [query, ctx, noteHits]);
+  }, [query, ctx, noteHits, isTrashed]);
 
   // Clamp selected index when row count changes.
   useEffect(() => {

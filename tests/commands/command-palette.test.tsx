@@ -155,6 +155,26 @@ describe("CommandPalette UI", () => {
     expect(mockedSearch).toHaveBeenCalledWith("note");
   });
 
+  it("excludes trashed notes from the NOTES section (MYND-133 isTrashed)", async () => {
+    const hits: NoteSearchResult[] = [
+      { note_id: "live", title: "Live note", score: 3, matched_in: { title: true, body: false } },
+      { note_id: "gone", title: "Trashed note", score: 2, matched_in: { title: true, body: false } },
+    ];
+    mockedSearch.mockResolvedValue(hits);
+    render(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        ctx={buildCtx()}
+        isTrashed={(id) => id === "gone"}
+      />,
+    );
+    const input = screen.getByRole("dialog").querySelector("input")!;
+    fireEvent.change(input, { target: { value: "note" } });
+    expect(await screen.findByText("Live note")).toBeTruthy();
+    expect(screen.queryByText("Trashed note")).toBeNull();
+  });
+
   it("clicking a note hit calls onSelectNote with its id and closes", async () => {
     const onSelectNote = vi.fn(async () => {});
     const onClose = vi.fn();

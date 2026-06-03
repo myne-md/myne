@@ -12,6 +12,7 @@ import type { ByteRange } from "./types";
 const UPDATED_KEY_RE = /^([ \t]*updated[ \t]*:[ \t]*)(.*)$/;
 const TITLE_KEY_RE = /^([ \t]*title[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_KEY_RE = /^([ \t]*folder[ \t]*:[ \t]*)(.*)$/;
+const TRASHED_KEY_RE = /^([ \t]*trashed[ \t]*:[ \t]*)(.*)$/;
 
 const utf8Decoder = new TextDecoder("utf-8");
 const utf8Encoder = new TextEncoder();
@@ -504,4 +505,201 @@ export function patchFolderField(
 export function buildInitialPlaintext(folder: string | null): string {
   if (folder === null || folder === "") return "";
   return applyStateAFolder("", folder);
+}
+
+// === patchTrashedField — soft-trash write target for FM `trashed:` ===
+//
+// Spec: docs/spec/markdown-dialect.md §3.6.1 (`trashed:` is the 4th Myne-managed
+// canonical FM field). Write trigger = trash (`src/notes/trashNote.ts`) + restore
+// (state-D delete). MYND-133. Structurally identical to `patchFolderField`: the set
+// path is A/B/C value-surgery, plus state D (delete on restore) with empty-block
+// collapse. Values are always RFC 3339 (plain-scalar safe), so `formatYamlScalar`
+// is a passthrough for Myne-written values; the quoting/comment branches in state C
+// only matter for a pre-existing user-authored `trashed:` line.
+//
+// (NOTE: this mirrors the updated/title/folder field-families nearly verbatim — a
+// `/simplify` candidate is to generalize the four into one keyed helper. Kept
+// per-field here to match the surrounding pattern and minimise regression risk.)
+
+function applyStateATrashed(source: string, value: string): string {
+  return (
+    FRONTMATTER_OPENER +
+    "trashed: " + formatYamlScalar(value) + NEWLINE +
+    FRONTMATTER_DELIMITER + NEWLINE +
+    NEWLINE +
+    source
+  );
+}
+
+function applyStateBTrashed(
+  source: string,
+  bodyEnd: number,
+  value: string,
+): string {
+  const insert = "trashed: " + formatYamlScalar(value) + NEWLINE;
+  return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
+}
+
+function applyStateCTrashed(
+  source: string,
+  bodyStart: number,
+  bodyEnd: number,
+  value: string,
+): string | null {
+  const fmBody = source.substring(bodyStart, bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = TRASHED_KEY_RE.exec(lines[i] ?? "");
+    if (m === null) continue;
+    const prefix = m[1] ?? "";
+    const valuePortion = m[2] ?? "";
+    const trimmedValue = valuePortion.trim();
+
+    if (/^[|>]/.test(trimmedValue)) {
+      lines[i] = prefix + formatYamlScalar(value);
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
+      lines.splice(i + 1, j - (i + 1));
+      return lines.join(NEWLINE);
+    }
+
+    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
+    if (quotedM !== null) {
+      const quote = quotedM[1] ?? '"';
+      const trailing = quotedM[3] ?? "";
+      const escaped =
+        quote === '"'
+          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          : value.replace(/'/g, "''");
+      lines[i] = prefix + quote + escaped + quote + trailing;
+      return lines.join(NEWLINE);
+    }
+
+    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+    if (commentM !== null) {
+      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
+      return lines.join(NEWLINE);
+    }
+
+    lines[i] = prefix + formatYamlScalar(value);
+    return lines.join(NEWLINE);
+  }
+
+  return null;
+}
+
+// State D — delete the trashed field (restore). Mirrors `deleteFolderField`:
+// removes only the `trashed:` line; if the block empties (no residual key or
+// comment), removes the whole block + the canonical trailing blank line so the
+// result is byte-identical to a note that never had frontmatter.
+function deleteTrashedField(source: string): string {
+  const fm = locateFrontmatter(source);
+  if (fm === null) return source;
+
+  const fmBody = source.substring(fm.bodyStart, fm.bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+  const trashedIdx = lines.findIndex((l) => TRASHED_KEY_RE.test(l));
+  if (trashedIdx === -1) return source;
+
+  const remaining = lines
+    .slice(0, trashedIdx)
+    .concat(lines.slice(trashedIdx + 1));
+  const hasResidual = remaining.some((l) => l.trim() !== "");
+
+  if (!hasResidual) {
+    let removalEnd = fm.blockEnd;
+    if (source.charAt(removalEnd) === NEWLINE) removalEnd += NEWLINE.length;
+    return source.substring(removalEnd);
+  }
+
+  const newBody = remaining.join(NEWLINE);
+  return (
+    source.substring(0, fm.bodyStart) + newBody + source.substring(fm.bodyEnd)
+  );
+}
+
+/**
+ * Set, insert, or delete the Myne-managed `trashed:` frontmatter field.
+ * `value === null` deletes the field (restore, state D); a string sets it
+ * (states A/B/C). `note_trash` passes an RFC 3339 timestamp; `note_restore`
+ * passes `null`. Mirrors {@link patchFolderField}.
+ */
+export function patchTrashedField(
+  bytes: Uint8Array,
+  value: string | null,
+): Uint8Array {
+  const source = utf8Decoder.decode(bytes);
+
+  if (value === null) {
+    return utf8Encoder.encode(deleteTrashedField(source));
+  }
+
+  const fm = locateFrontmatter(source);
+  if (fm === null) {
+    return utf8Encoder.encode(applyStateATrashed(source, value));
+  }
+
+  const stateCResult = applyStateCTrashed(
+    source,
+    fm.bodyStart,
+    fm.bodyEnd,
+    value,
+  );
+  if (stateCResult !== null) {
+    const before = source.substring(0, fm.bodyStart);
+    const after = source.substring(fm.bodyEnd);
+    return utf8Encoder.encode(before + stateCResult + after);
+  }
+
+  return utf8Encoder.encode(applyStateBTrashed(source, fm.bodyEnd, value));
+}
+
+// RFC 3339 timestamp — the only value shape that marks a note trashed. The
+// regex screens the structural shape; `Date.parse` rejects impossible dates
+// (e.g. month 13) that the regex alone would admit.
+const RFC3339_RE =
+  /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$/;
+
+function isValidRfc3339(value: string): boolean {
+  if (!RFC3339_RE.test(value)) return false;
+  return !Number.isNaN(Date.parse(value));
+}
+
+// Extract the scalar value of a `trashed:` line into its logical string,
+// stripping quotes / trailing comments. Returns null for block-scalar forms
+// (`trashed: |`) — a Myne-written marker is never a block scalar.
+function extractTrashedScalar(valuePortion: string): string | null {
+  const trimmed = valuePortion.trim();
+  if (trimmed === "") return null;
+  if (/^[|>]/.test(trimmed)) return null;
+
+  const quotedM = /^(["'])(.*?)\1[ \t]*(?:#.*)?$/.exec(trimmed);
+  if (quotedM !== null) return quotedM[2] ?? null;
+
+  const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+  const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
+  return raw.trim();
+}
+
+/**
+ * Read the Myne-managed `trashed:` marker, **value-strict**, from a frontmatter
+ * **body** — the text between the `---` fences (no delimiters), which is the
+ * slice shape the Rust `note_titles_batch` returns (`title_extract.rs`
+ * `body_start..cursor`) and what `loadNoteBatch` parses. Returns the RFC 3339
+ * timestamp string iff a `trashed:` field carries a valid RFC 3339 value, else
+ * `null` (live). A user's own non-timestamp `trashed:` (e.g. `trashed: true`)
+ * leaves the note live — the documented mitigation for the unprefixed-field
+ * collision footgun (§3.6.1; MYND-133 Q7).
+ */
+export function readTrashedFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = TRASHED_KEY_RE.exec(line);
+    if (m === null) continue;
+    const value = extractTrashedScalar(m[2] ?? "");
+    if (value !== null && isValidRfc3339(value)) return value;
+    return null;
+  }
+  return null;
 }

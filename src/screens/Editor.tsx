@@ -603,7 +603,14 @@ function CommandPaletteHost({
     }),
     [ctx.selectedId, ctx.open, onLockFlushed, onOpenSettings],
   );
-  return <CommandPalette open={open} onClose={onClose} ctx={commandCtx} />;
+  return (
+    <CommandPalette
+      open={open}
+      onClose={onClose}
+      ctx={commandCtx}
+      isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
+    />
+  );
 }
 
 /**
