@@ -24,6 +24,8 @@ import {
 } from "react";
 import { createNote } from "./createNote";
 import { deleteNote } from "./deleteNote";
+import { emptyTrash, type EmptyTrashResult } from "./emptyTrash";
+import { restoreNote, trashNote } from "./trashNote";
 import {
   loadNoteBatch,
   type TitleRecord,
@@ -92,7 +94,38 @@ export function applyOptimisticCreate(
     title: null,
     folder: null,
     updatedAt: null,
+    trashed: null,
   });
+}
+
+/**
+ * Live (non-trashed) entries of the cache as a fresh `Map`, for the sidebar
+ * tree / folder derivation / favorites. A record is in the trash iff its
+ * value-strict `trashed:` marker is non-null (MYND-133). The complement —
+ * {@link trashedRecords} — backs the Trash panel + count.
+ */
+export function liveCache(
+  cache: ReadonlyMap<NoteId, TitleRecord>,
+): Map<NoteId, TitleRecord> {
+  const live = new Map<NoteId, TitleRecord>();
+  for (const [id, record] of cache) {
+    // `== null` (loose) treats a missing marker as live — defensive against a
+    // record constructed without the field.
+    if (record.trashed == null) live.set(id, record);
+  }
+  return live;
+}
+
+/** Trashed entries of the cache (the Trash panel view), newest-trashed first. */
+export function trashedRecords(
+  cache: ReadonlyMap<NoteId, TitleRecord>,
+): TitleRecord[] {
+  const out: TitleRecord[] = [];
+  for (const record of cache.values()) {
+    if (record.trashed != null) out.push(record);
+  }
+  out.sort((a, b) => (b.trashed ?? "").localeCompare(a.trashed ?? ""));
+  return out;
 }
 
 /**
@@ -200,6 +233,48 @@ export function rollbackOptimisticRename(
   return { ...state, cache };
 }
 
+export type TrashedFlagSnapshot = { prev: string | null };
+
+/**
+ * Optimistic trash/restore: set (`value` = RFC 3339 string) or clear
+ * (`value` = null) the cache record's `trashed:` marker immediately, so the
+ * row leaves the live tree (trash) or re-enters it (restore) before the IPC
+ * resolves (MYND-133). No-op if the entry is not cached. Paired with
+ * [`rollbackOptimisticTrashedFlag`] for IPC-failure recovery. Mirrors the
+ * `applyOptimisticRename` snapshot idiom (prev-value capture, cache-lookup
+ * rollback).
+ */
+export function applyOptimisticTrashedFlag(
+  state: SidebarState,
+  id: NoteId,
+  value: string | null,
+): { next: SidebarState; snapshot: TrashedFlagSnapshot } {
+  const existing = state.cache.get(id);
+  if (existing === undefined) {
+    return { next: state, snapshot: { prev: null } };
+  }
+  const cache = new Map(state.cache);
+  cache.set(id, { ...existing, trashed: value });
+  return { next: { ...state, cache }, snapshot: { prev: existing.trashed } };
+}
+
+/**
+ * Rollback for [`applyOptimisticTrashedFlag`] — restores the prior marker.
+ * No-op if the cache entry vanished in the meantime (mirrors
+ * `rollbackOptimisticRename`).
+ */
+export function rollbackOptimisticTrashedFlag(
+  state: SidebarState,
+  id: NoteId,
+  snapshot: TrashedFlagSnapshot,
+): SidebarState {
+  const existing = state.cache.get(id);
+  if (existing === undefined) return state;
+  const cache = new Map(state.cache);
+  cache.set(id, { ...existing, trashed: snapshot.prev });
+  return { ...state, cache };
+}
+
 /**
  * UUIDv7 first-48-bit unix-ms decoder. Per `protocol.md` §9.1 the
  * file name IS the UUIDv7; the leak of "approximate creation time"
@@ -292,6 +367,12 @@ export type UseSelectedNoteReturn = {
   createAndStartRename: (folder?: string | null) => Promise<NoteId>;
   /** Delete a note with optimistic remove + rollback on IPC failure. */
   deleteWithRollback: (id: NoteId) => Promise<void>;
+  /** Move a note to the trash (optimistic `trashed:` set + rollback). MYND-133. */
+  trashWithRollback: (id: NoteId) => Promise<void>;
+  /** Restore a note from the trash (optimistic `trashed:` clear + rollback). */
+  restoreWithRollback: (id: NoteId) => Promise<void>;
+  /** Permanently delete every id (empty trash); drops purged ids from the cache. */
+  emptyTrashWithSync: (ids: readonly NoteId[]) => Promise<EmptyTrashResult>;
   /** Surgical refresh: re-fetch a single note's title slice. */
   refreshOne: (id: NoteId) => Promise<void>;
   /** Initial-boot full refresh: load `note_list` + chunked title batch. */
@@ -411,6 +492,71 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Move a note to the trash: optimistically set its `trashed:` marker (the
+  // row leaves the live tree at once), call `trashNote`, then refresh to the
+  // canonical timestamp. Rollback restores the prior marker on IPC failure.
+  const trashWithRollback = useCallback(
+    async (id: NoteId) => {
+      const iso = new Date().toISOString();
+      let snapshot: TrashedFlagSnapshot = { prev: null };
+      setState((prev) => {
+        const result = applyOptimisticTrashedFlag(prev, id, iso);
+        snapshot = result.snapshot;
+        return result.next;
+      });
+      try {
+        await trashNote(id);
+        await refreshOne(id);
+      } catch (err) {
+        setState((prev) => rollbackOptimisticTrashedFlag(prev, id, snapshot));
+        throw err;
+      }
+    },
+    [refreshOne],
+  );
+
+  // Restore a note from the trash: optimistically clear `trashed:` (the row
+  // re-enters the live tree), call `restoreNote`, then refresh. Rollback
+  // re-applies the marker on IPC failure. Backs both the undo toast and the
+  // Trash panel's Restore action.
+  const restoreWithRollback = useCallback(
+    async (id: NoteId) => {
+      let snapshot: TrashedFlagSnapshot = { prev: null };
+      setState((prev) => {
+        const result = applyOptimisticTrashedFlag(prev, id, null);
+        snapshot = result.snapshot;
+        return result.next;
+      });
+      try {
+        await restoreNote(id);
+        await refreshOne(id);
+      } catch (err) {
+        setState((prev) => rollbackOptimisticTrashedFlag(prev, id, snapshot));
+        throw err;
+      }
+    },
+    [refreshOne],
+  );
+
+  // Permanently delete every id in `ids` (empty trash). Best-effort
+  // (`emptyTrash` never rejects); the purged ids are dropped from the cache so
+  // the Trash panel + count update. Returns the result for remaining-count UX.
+  const emptyTrashWithSync = useCallback(
+    async (ids: readonly NoteId[]): Promise<EmptyTrashResult> => {
+      const result = await emptyTrash([...ids]);
+      if (result.purged.length > 0) {
+        const purged = new Set(result.purged);
+        setState((prev) => {
+          const cache = new Map(prev.cache);
+          for (const id of purged) cache.delete(id);
+          return { ...prev, cache };
+        });
+      }
+      return result;
+    },
+    [],
+  );
+
   const value = useMemo<UseSelectedNoteReturn>(
     () => ({
       selectedId: state.selectedId,
@@ -424,6 +570,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       commitRename,
       createAndStartRename,
       deleteWithRollback,
+      trashWithRollback,
+      restoreWithRollback,
+      emptyTrashWithSync,
       refreshOne,
       refreshAll,
     }),
@@ -436,6 +585,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       commitRename,
       createAndStartRename,
       deleteWithRollback,
+      trashWithRollback,
+      restoreWithRollback,
+      emptyTrashWithSync,
       refreshOne,
       refreshAll,
     ],

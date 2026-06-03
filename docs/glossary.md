@@ -929,6 +929,12 @@ Adversary class A13: a server-side or network observer correlating sync timing, 
 
 Used in: `threat-model.md` §1 (A13), §7
 
+### **Trash** &nbsp; 📦 *Product*
+
+The vault-internal soft-delete state introduced in v0.2 (MYND-133): deleting a note moves it to the Trash (recoverable) instead of erasing it; a separate Trash panel lets the user restore a note or permanently delete it (single, or "empty trash"). Represented **inside the encrypted blob** as the Myne-managed `trashed:` frontmatter field (an RFC 3339 timestamp), not as a `<vault>/.trash/` directory — so a filesystem adversary (A4/A7) learns nothing new and the on-disk layout stays flat (`protocol.md` §9.1 unchanged), preserving the same AS3 posture as virtual folders (MYND-144). Trash/restore are **TS orchestrators** (`src/notes/trashNote.ts` — set/clear `trashed:` via the existing `note_update`), not new backend commands; "empty trash" hard-deletes each trashed note via the existing `note_delete` (`src/notes/emptyTrash.ts`). Trash is **manual-only** — nothing auto-expires. Because every state is either a note-content edit (`trashed:` set/clear) or the existing delete-tombstone, soft-trash adds no new Phase 2 sync wire-format state. Distinct from **hard-delete** (`note_delete`, the v0.1 permanent erase that the Trash panel's "Delete permanently" still invokes) and from OS-level "Move to Trash" (permanently rejected, `decisions.md` 2026-05-07). See [markdown-dialect.md](spec/markdown-dialect.md) §3.6.1 (`trashed:` field), [decisions.md](decisions.md) 2026-06-03 (the implementing entry) + 2026-05-07 (the deferral).
+
+Used in: `spec/markdown-dialect.md` §3.6.1, `decisions.md` 2026-06-03 + 2026-05-07 (MYND-133)
+
 ### **trust boundary** &nbsp; ⚠️ *Threat*
 
 A line in the system where the security model changes — what is trusted on one side is not trusted on the other. Myne catalogs nine boundaries (TB1–TB9). See `threat-model.md` §3 for the full table.

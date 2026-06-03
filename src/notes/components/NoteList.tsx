@@ -20,13 +20,15 @@ import {
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
 import {
+  liveCache,
   useSelectedNote,
   type NoteId,
   type UseSelectedNoteReturn,
 } from "../sidebarState";
+import { TrashPanel } from "./TrashPanel";
 import { deriveFolderTree } from "../folderTree";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
-import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
 import type { TitleRecord } from "../loadNoteBatch";
@@ -284,6 +286,30 @@ const SIDEBAR_OUTER_STYLE: CSSProperties = {
   minHeight: 0,
 };
 
+// Trash entry — sidebar footer, pinned to the bottom (MYND-133).
+const TRASH_ENTRY_STYLE: CSSProperties = {
+  marginTop: "auto",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  width: "100%",
+  padding: "var(--space-3) var(--space-4)",
+  border: "none",
+  borderTop: "1px solid var(--line-1)",
+  background: "transparent",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const TRASH_COUNT_BADGE_STYLE: CSSProperties = {
+  marginLeft: "auto",
+  fontSize: 11,
+  color: "var(--fg-3)",
+};
+
 const LIST_OUTER_STYLE: CSSProperties = {
   flex: 1,
   minHeight: 0,
@@ -374,30 +400,36 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
   // The folder tree is a derived view of each note's `folder:` field unioned
   // with the deliberate-folder set (Task 3 `deriveFolderTree`). Memo on cache
   // identity (mutations replace the Map) + the deliberate set.
+  // Trashed notes (value-strict `trashed:` marker) are excluded from the live
+  // sidebar everywhere — tree, rows, favorites — via a single derived
+  // `live` view of the cache (MYND-133). The Trash panel reads the complement
+  // (`trashedRecords`). Restore clears the marker → the note re-enters `live`.
+  const live = useMemo(() => liveCache(ctx.cache), [ctx.cache]);
   const tree = useMemo(
     () =>
       deriveFolderTree(
-        Array.from(ctx.cache.values()).map((r) => ({
+        Array.from(live.values()).map((r) => ({
           noteUuid: r.noteUuid,
           folder: r.folder,
         })),
         fm.deliberate,
       ),
-    [ctx.cache, fm.deliberate],
+    [live, fm.deliberate],
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;
   // Unified manual order (item_order) interleaves folders + loose notes per
   // container (MYND-183); flatten owns all display ordering.
   const rows = useMemo(
-    () => flattenVisibleRows(tree, ctx.cache, collapsed, fm.itemOrder),
-    [tree, ctx.cache, collapsed, fm.itemOrder],
+    () => flattenVisibleRows(tree, live, collapsed, fm.itemOrder),
+    [tree, live, collapsed, fm.itemOrder],
   );
   // Favorites section rows (MYND-183) — note rows keyed `fav-<id>`, rendered
-  // above the tree. Stale-UUID GC (render half) is in `buildFavoriteRows`.
+  // above the tree. Stale-UUID GC (render half) is in `buildFavoriteRows`; a
+  // trashed favorite is absent from `live` so it is hidden until restore.
   const favRows = useMemo(
-    () => buildFavoriteRows(fm.favorites, ctx.cache),
-    [fm.favorites, ctx.cache],
+    () => buildFavoriteRows(fm.favorites, live),
+    [fm.favorites, live],
   );
   // Keyboard navigation: Favorites first, then the tree; `visibleNoteIds`
   // dedupes a note shown in both down to its (reachable) Favorites copy.
@@ -406,6 +438,15 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
     [favRows, rows],
   );
   const isEmpty = rows.length === 0 && favRows.length === 0;
+
+  // Trash entry (MYND-133): a sidebar footer showing the trashed-note count,
+  // opening the Trash panel. Visible in both the empty + populated states so a
+  // user can always reach the trash. The count comes from the same value-strict
+  // `trashed:` marker that excludes these notes from the live tree above.
+  const [trashOpen, setTrashOpen] = useState(false);
+  // A trashed note is exactly a cached note absent from `live`, so the count is
+  // the size delta — no second full-cache scan (the `liveCache` pass already ran).
+  const trashCount = ctx.cache.size - live.size;
 
   // F2 global keymap → enter inline-rename on the selected row.
   useEffect(() => {
@@ -456,6 +497,18 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
           onCollapse={onCollapse}
         />
       )}
+      <button
+        type="button"
+        style={TRASH_ENTRY_STYLE}
+        onClick={() => setTrashOpen(true)}
+        title="Open the trash"
+      >
+        <span>Trash</span>
+        {trashCount > 0 && (
+          <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
+        )}
+      </button>
+      <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
     </aside>
   );
 }
@@ -509,7 +562,6 @@ function EmptyState({
 }
 
 type ContextMenuState = { id: NoteId; x: number; y: number } | null;
-type DeleteModalState = { id: NoteId; title: string | null } | null;
 
 function PopulatedList({
   rows,
@@ -530,7 +582,11 @@ function PopulatedList({
 }) {
   const ctx = useSelectedNote();
   const [menu, setMenu] = useState<ContextMenuState>(null);
-  const [deleteModal, setDeleteModal] = useState<DeleteModalState>(null);
+  // Undo-toast target: the id of the note just moved to the trash. "Undo"
+  // restores it (MYND-133). Replaced when another note is trashed.
+  const [undoToast, setUndoToast] = useState<NoteId | null>(null);
+  // Non-blocking error toast shown when a trash IPC fails after rollback.
+  const [trashError, setTrashError] = useState<string | null>(null);
   // Right-click on the sidebar background (not a row) → root-level menu
   // ("New folder" / "New note"). Story F2. A row's own context-menu handler
   // calls `preventDefault`, so we bail when the event was already handled.
@@ -541,14 +597,6 @@ function PopulatedList({
     setBgMenu({ x: e.clientX, y: e.clientY });
   }, []);
   const closeBgMenu = useCallback(() => setBgMenu(null), []);
-
-  const openDeleteModal = useCallback(
-    (id: NoteId) => {
-      const record = ctx.cache.get(id);
-      setDeleteModal({ id, title: record?.title ?? null });
-    },
-    [ctx.cache],
-  );
 
   const handleContextMenu = useCallback(
     (id: NoteId, pos: { x: number; y: number }) => {
@@ -592,34 +640,54 @@ function PopulatedList({
   );
 
   const closeMenu = useCallback(() => setMenu(null), []);
-  const closeDeleteModal = useCallback(() => setDeleteModal(null), []);
 
-  const confirmDelete = useCallback(async () => {
-    if (deleteModal === null) return;
-    const victimId = deleteModal.id;
-    // Pick adjacent BEFORE the delete fires — the optimistic remove
-    // in `ctx.deleteWithRollback` drops the row from the cache; if we
-    // compute adjacent after, we'd pick from a list that no longer
-    // contains the victim.
-    const wasSelected = ctx.selectedId === victimId;
-    const adjacent = wasSelected
-      ? pickAdjacentAfterDelete(navIds, victimId)
-      : null;
-    setDeleteModal(null);
-    try {
-      await ctx.deleteWithRollback(victimId);
-      if (wasSelected && adjacent !== null) {
-        void ctx.open(adjacent).catch(() => {
-          /* T30 wires editor body load; ignore here */
-        });
+  // Move a note to the trash (MYND-133). Reversible — no confirmation modal;
+  // an undo toast offers immediate restore. If the trashed note was open, move
+  // selection to an adjacent row (or clear it) so the editor doesn't dwell on a
+  // note that just left the live tree. `pickAdjacentAfterDelete` runs against
+  // the pre-trash nav list (the victim is still live at click time).
+  const handleTrash = useCallback(
+    async (id: NoteId) => {
+      const wasSelected = ctx.selectedId === id;
+      const adjacent = wasSelected ? pickAdjacentAfterDelete(navIds, id) : null;
+      setMenu(null);
+      try {
+        await ctx.trashWithRollback(id);
+        setUndoToast(id);
+        if (wasSelected) {
+          if (adjacent !== null) {
+            void ctx.open(adjacent).catch(() => {
+              /* editor body load failure surfaces via its own UX */
+            });
+          } else {
+            ctx.select(null);
+          }
+        }
+      } catch (err) {
+        // Rollback already restored the row inside trashWithRollback; surface
+        // a non-blocking error so the user knows it didn't take.
+        setTrashError("Couldn't move the note to Trash.");
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[NoteList] trashWithRollback failed:", err);
+        }
       }
-    } catch (err) {
+    },
+    [ctx, navIds],
+  );
+
+  // "Undo" on the trash toast → restore the just-trashed note.
+  const handleUndoTrash = useCallback(() => {
+    if (undoToast === null) return;
+    const id = undoToast;
+    setUndoToast(null);
+    void ctx.restoreWithRollback(id).catch((err) => {
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.warn("[NoteList] deleteWithRollback failed:", err);
+        console.warn("[NoteList] restore (undo) failed:", err);
       }
-    }
-  }, [deleteModal, ctx, navIds]);
+    });
+  }, [undoToast, ctx]);
 
   const menuItems: ContextMenuItem[] = useMemo(() => {
     if (menu === null) return [];
@@ -640,10 +708,10 @@ function PopulatedList({
         id: "delete",
         label: "Delete",
         destructive: true,
-        onSelect: () => openDeleteModal(menu.id),
+        onSelect: () => void handleTrash(menu.id),
       },
     ];
-  }, [menu, ctx, openDeleteModal, fm, favSet]);
+  }, [menu, ctx, handleTrash, fm, favSet]);
 
   // Folder context-menu items (right-click a folder row).
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -695,11 +763,11 @@ function PopulatedList({
         if (target.isContentEditable) return;
       }
       e.preventDefault();
-      openDeleteModal(ctx.selectedId);
+      void handleTrash(ctx.selectedId);
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [ctx.selectedId, ctx.renamingId, openDeleteModal]);
+  }, [ctx.selectedId, ctx.renamingId, handleTrash]);
 
   return (
     <div style={LIST_OUTER_STYLE} onContextMenu={handleBackgroundContextMenu}>
@@ -965,13 +1033,13 @@ function PopulatedList({
           onClose={closeBgMenu}
         />
       )}
-      {deleteModal !== null && (
-        <DeleteConfirmModal
-          noteTitle={deleteModal.title}
-          onCancel={closeDeleteModal}
-          onConfirm={() => void confirmDelete()}
-        />
-      )}
+      <Toast
+        message={undoToast === null ? null : "Note moved to Trash"}
+        onDone={() => setUndoToast(null)}
+        durationMs={6000}
+        action={{ label: "Undo", onAction: handleUndoTrash }}
+      />
+      <Toast message={trashError} onDone={() => setTrashError(null)} />
     </div>
   );
 }

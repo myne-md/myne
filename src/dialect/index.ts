@@ -28,7 +28,9 @@ export {
   patchFolderField,
   patchSourceRanges,
   patchTitleField,
+  patchTrashedField,
   patchUpdatedField,
+  readTrashedFromFmBody,
 } from "./surgery";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";

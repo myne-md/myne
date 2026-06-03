@@ -2,8 +2,19 @@
 // the message state; setting a new message replaces the previous.
 // `role="status"` + `aria-live="polite"` so screen readers announce
 // without interrupting.
+//
+// Optional `action` renders an inline button (e.g. "Undo") — used by the
+// soft-trash flow's undo toast (MYND-133). Invoking the action does NOT
+// auto-dismiss; the parent clears the message in the action handler.
 
 import { useEffect, type CSSProperties } from "react";
+
+interface ToastAction {
+  /** Button label (e.g. "Undo"). */
+  label: string;
+  /** Invoked on click. The parent is responsible for dismissing the toast. */
+  onAction: () => void;
+}
 
 interface ToastProps {
   /** The message to display. When null, nothing renders. */
@@ -12,12 +23,17 @@ interface ToastProps {
   onDone: () => void;
   /** Auto-dismiss timeout in milliseconds. Default: 2500. */
   durationMs?: number;
+  /** Optional inline action button (e.g. an undo affordance). */
+  action?: ToastAction;
 }
 
 const TOAST_STYLE: CSSProperties = {
   position: "fixed",
   bottom: "var(--space-5)",
   right: "var(--space-5)",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-3)",
   background: "var(--bg-2)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
@@ -29,7 +45,20 @@ const TOAST_STYLE: CSSProperties = {
   zIndex: 1100,
 };
 
-export function Toast({ message, onDone, durationMs = 2500 }: ToastProps) {
+const ACTION_STYLE: CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  margin: 0,
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: 600,
+  color: "var(--accent, var(--fg-1))",
+  cursor: "pointer",
+  textDecoration: "underline",
+};
+
+export function Toast({ message, onDone, durationMs = 2500, action }: ToastProps) {
   useEffect(() => {
     if (message === null) return;
     const id = window.setTimeout(onDone, durationMs);
@@ -40,7 +69,12 @@ export function Toast({ message, onDone, durationMs = 2500 }: ToastProps) {
 
   return (
     <div role="status" aria-live="polite" style={TOAST_STYLE}>
-      {message}
+      <span>{message}</span>
+      {action !== undefined && (
+        <button type="button" style={ACTION_STYLE} onClick={action.onAction}>
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }

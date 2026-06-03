@@ -21,7 +21,9 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
-const BACKDROP_STYLE: CSSProperties = {
+// Shared modal backdrop envelope — also imported by `<TrashPanel>` so the two
+// trash-related modals don't re-declare the same fixed-inset dim layer.
+export const BACKDROP_STYLE: CSSProperties = {
   position: "fixed",
   inset: 0,
   background: "rgba(0, 0, 0, 0.4)",
@@ -96,14 +98,23 @@ const DELETE_BUTTON_STYLE: CSSProperties = {
 };
 
 export type DeleteConfirmModalProps = {
-  /** Title of the note being deleted (or null → "Untitled"). */
-  noteTitle: string | null;
+  /**
+   * Single-note mode: the note title (or null → "Untitled"), rendered quoted
+   * as the body line. Omit when supplying a custom `body` (e.g. empty-trash).
+   */
+  noteTitle?: string | null;
+  /** Heading override. Default: "Delete this note?". */
+  title?: string;
+  /** Body line override (shown above the warning). Default: the quoted note title. */
+  body?: string;
+  /** Confirm-button label override. Default: "Delete". */
+  confirmLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 };
 
 export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
-  const { noteTitle, onCancel, onConfirm } = props;
+  const { noteTitle, title, body, confirmLabel, onCancel, onConfirm } = props;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
 
   // Default-focus on Cancel (safer destructive UX).
@@ -131,9 +142,11 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     [onCancel],
   );
 
-  const displayTitle = noteTitle === null || noteTitle.trim() === ""
-    ? "Untitled"
-    : noteTitle;
+  const displayTitle =
+    noteTitle === null || noteTitle === undefined || noteTitle.trim() === ""
+      ? "Untitled"
+      : noteTitle;
+  const bodyLine = body ?? `“${displayTitle}”`;
 
   return (
     <div style={BACKDROP_STYLE} onClick={handleBackdropClick} role="presentation">
@@ -144,10 +157,10 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
         aria-describedby="delete-confirm-body"
       >
         <h2 id="delete-confirm-title" style={TITLE_STYLE}>
-          Delete this note?
+          {title ?? "Delete this note?"}
         </h2>
         <p id="delete-confirm-body" style={BODY_TITLE_STYLE}>
-          “{displayTitle}”
+          {bodyLine}
         </p>
         <p style={BODY_WARNING_STYLE}>This cannot be undone.</p>
         <div style={BUTTON_ROW_STYLE}>
@@ -164,7 +177,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             onClick={onConfirm}
             style={DELETE_BUTTON_STYLE}
           >
-            Delete
+            {confirmLabel ?? "Delete"}
           </button>
         </div>
       </div>

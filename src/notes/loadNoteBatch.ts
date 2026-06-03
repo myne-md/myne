@@ -25,6 +25,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { load as parseYaml } from "js-yaml";
+import { readTrashedFromFmBody } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import type {
   NoteTitleError,
@@ -56,6 +57,14 @@ export type TitleRecord = {
    */
   folder: string | null;
   updatedAt: Date | null;
+  /**
+   * Value-strict `trashed:` marker (RFC 3339 UTC string) when the note is in
+   * the vault trash, else `null` (live). MYND-133. Consumers exclude
+   * `trashed !== null` records from the live sidebar tree / folder derivation /
+   * search; the Trash panel reads the complement. A user's own non-timestamp
+   * `trashed:` value reads as `null` here (value-strict — `readTrashedFromFmBody`).
+   */
+  trashed: string | null;
   error?: NoteTitleError;
 };
 
@@ -131,11 +140,16 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // structurally only (no segment validation here).
   const folderRaw =
     typeof parsed["folder"] === "string" ? (parsed["folder"] as string) : null;
+  // `trashed:` is read value-strict from the raw FM slice (NOT the js-yaml
+  // object) so the sidebar path and the dialect `readTrashedField` share one
+  // definition — js-yaml would coerce a date-only value to a Date and diverge.
+  const trashed = readTrashedFromFmBody(slice.frontmatter_bytes ?? "");
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
     folder: normalizeFolderPath(folderRaw),
     updatedAt: deriveUpdatedAt(parsed),
+    trashed,
   };
 }
 
@@ -179,6 +193,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       title: null,
       folder: null,
       updatedAt: null,
+      trashed: null,
       error: r.Err,
     };
   });
