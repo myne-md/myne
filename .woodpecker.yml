@@ -104,6 +104,18 @@ steps:
       - pnpm build
       - cargo test -p myne-desktop --no-fail-fast
 
-  # ─── (deferred) Vector verification ──────────────────────────
-  # Will pull myne-test-vectors and re-run Lane D vectors against current Rust impl.
-  # Wire when the vector-schema work lands (tracked in Plane: plane.myne.md).
+  # ─── Cross-impl vector verification ──────────────────────────
+  # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
+  # byte-equality of the public API; without the companion checked out those 13
+  # runners skip. This step pulls the (public) companion so they actually run:
+  # argon2id, ctx-aead, hkdf-sha256, account-number, phrase_normalize, myn-blob,
+  # vault-meta(+rewrite), vault-prefs, vault-search, password-policy,
+  # bip39-recovery, aad-construction. See protocol/CLAUDE.md "Vector verification".
+  # Runs after cargo-test so it reuses the compiled target/ in the shared workspace.
+  vector-verification:
+    image: rust:1.90.0-slim
+    depends_on: [cargo-test]
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+      - git clone --depth 1 https://github.com/myne-md/myne-test-vectors.git myne-test-vectors
+      - cargo test -p protocol --test vectors
