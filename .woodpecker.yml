@@ -61,6 +61,11 @@ steps:
   # does NOT type-check or run them — Vitest is their only CI gate.
   vitest:
     image: node:25
+    # Serialized after pnpm-build: both run `pnpm install` into the shared
+    # workspace node_modules; running them concurrently corrupts pnpm's temp
+    # dirs (ERR_PNPM_ENOENT). The pnpm-install steps form one linear chain:
+    # pnpm-build → vitest → tauri-compile → cargo-test-tauri.
+    depends_on: [pnpm-build]
     commands:
       - npm install -g pnpm@9
       - pnpm install --frozen-lockfile
@@ -71,7 +76,9 @@ steps:
   # Does NOT produce a signed bundle — release pipeline (Plan 1 §C-launch) handles cross-platform signed builds.
   tauri-compile:
     image: rust:1.90.0-slim
-    depends_on: [cargo-clippy, pnpm-build]
+    # depends_on vitest (not pnpm-build) to keep the pnpm-install steps serial —
+    # see the vitest step comment.
+    depends_on: [cargo-clippy, vitest]
     environment:
       # Woodpecker sets CI=woodpecker, but the Tauri CLI's `--ci` flag is
       # env-bound and only accepts true/false → normalize it, otherwise
