@@ -9,6 +9,7 @@ mod search;
 #[cfg(test)]
 mod test_support;
 mod vault_meta_hash;
+mod vault_sweep;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -39,6 +40,7 @@ pub fn run() {
         .plugin(plugins::vault_recover::init())
         .plugin(plugins::vault_change_password::init())
         .plugin(plugins::vault_delete::init())
+        .plugin(plugins::vault_repair::init())
         .plugin(plugins::prefs::init())
         .plugin(plugins::notes::init())
         .setup(|app| {

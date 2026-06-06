@@ -59,6 +59,17 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["vault_delete"]),
             )
             .plugin(
+                "vault-repair",
+                // Task 3 of `vault-repair` (MYND-159) ships the read-only
+                // `vault_residue_scan` command (orphan-artefact detection
+                // for the Welcome banner). The destructive sweep command
+                // lands in Task 4. Adding a command here without a matching
+                // `commands.allow` entry in
+                // `permissions/vault-repair/default.toml` is a security
+                // regression.
+                tauri_build::InlinedPlugin::new().commands(&["vault_residue_scan", "vault_repair"]),
+            )
+            .plugin(
                 "vault-change-password",
                 // Task 7 of `vault-change-password` (MYND-22) ships
                 // the `change_password` command (scaffolding stub;

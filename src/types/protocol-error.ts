@@ -107,7 +107,21 @@ export type AppError =
    * PRD + grill Q12 (original variant) + MYND-105 PRD + grill Q7
    * (semantic broadening).
    */
-  | { kind: "VaultArtifactsPresent" };
+  | { kind: "VaultArtifactsPresent" }
+  /**
+   * Another vault.meta-lifecycle operation holds the single
+   * `auth_permits` mutex. As of MYND-159 (`vault_repair`), `commit` is
+   * pulled into the same capacity-1 semaphore that serializes
+   * `vault_unlock` / `vault_recover_*` / `vault_change_password` /
+   * `vault_delete`, so a concurrent `vault_repair` sweep can never race a
+   * fresh `commit` (TOCTOU). `try_acquire` (reject, never queue); the
+   * permit releases before `commit` returns so the auto-unlock chain's
+   * `vault_unlock` acquires cleanly. **Normally unreachable in the create
+   * flow** — at creation time there is no vault to unlock / change /
+   * delete; this only fires against a racing `vault_repair`. Shares the
+   * variant name with `VaultDeleteError::VaultBusyAuth`.
+   */
+  | { kind: "VaultBusyAuth" };
 
 /**
  * Type-narrowing helper. `if (isProtocolError(e)) { e.detail.kind ... }`.
