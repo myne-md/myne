@@ -951,6 +951,7 @@ mod tests {
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
                     screen_capture_protection: false,
+                    theme: None,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
                     favorites: Vec::new(),
@@ -1047,6 +1048,7 @@ mod tests {
             &account_hash,
             &protocol::PrefsView {
                 screen_capture_protection: false,
+                theme: None,
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
                 favorites: Vec::new(),

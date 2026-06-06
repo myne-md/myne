@@ -39,6 +39,7 @@ const DEFAULT_PREFS: PrefsView = {
   favorites: [],
   item_order: [],
   editor_layout: null,
+  theme: null,
 };
 
 interface UsePrefsResult {

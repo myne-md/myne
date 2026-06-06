@@ -76,8 +76,8 @@ pub use phrase::{
 };
 pub use prefs::{
     decode_prefs_blob, encode_prefs_blob, encode_prefs_blob_raw, EditorLayout, PrefsBlobError,
-    PrefsView, MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN, PREFS_BLOB_HEADER_LEN,
-    PREFS_BLOB_MAGIC, PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
+    PrefsView, ThemeChoice, MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN,
+    PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC, PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
 };
 pub use search_blob::{
     decode_search_index_blob, encode_search_index_blob, encode_search_index_blob_raw,

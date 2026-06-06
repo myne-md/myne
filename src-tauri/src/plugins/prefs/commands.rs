@@ -15,7 +15,7 @@ use super::error::{PrefsReadError, PrefsWriteError};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
     decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, EditorLayout,
-    PrefsBlobError, PrefsView, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN,
+    PrefsBlobError, PrefsView, SubkeyRole, ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -516,6 +516,76 @@ pub(crate) async fn set_editor_layout_with_dir(
     Ok(())
 }
 
+/// Static label for the theme preference, for non-secret structured
+/// logging. `theme` is an AS3-low cosmetic UI preference (light / dark /
+/// system), so the value itself is safe to emit (unlike the DENY-listed
+/// secret material in ../../CLAUDE.md "Secret-handling logging discipline").
+fn theme_label(theme: Option<ThemeChoice>) -> &'static str {
+    match theme {
+        None => "system",
+        Some(ThemeChoice::Light) => "light",
+        Some(ThemeChoice::Dark) => "dark",
+    }
+}
+
+/// Slot::Unlocked-gated setter for the `theme` field (MYND-110) — the
+/// user's Light / Dark / System choice. Read-modify-write under the
+/// per-plugin write mutex; **no native side-effect** (same shape as
+/// [`set_favorites`]). The argument is `Option<ThemeChoice>`: `None` ≡
+/// **system** (clears the field so the client follows the OS
+/// `prefers-color-scheme`), `Some(Light/Dark)` is an explicit choice that
+/// the client maps to `<html data-theme="…">`. `theme` is a
+/// **non-load-bearing** cosmetic preference — no protective-envelope clamp
+/// (a tampered / replayed `vault.prefs` can at worst surface the wrong
+/// color). The getter is the existing [`prefs_read`] — the returned
+/// `PrefsView` already carries `theme`. Disk-first ordering is trivial
+/// here (nothing is sequenced after the write).
+#[tauri::command]
+pub async fn set_theme<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    theme: Option<ThemeChoice>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_theme_with_dir(&dir, state.inner(), theme).await
+}
+
+/// Testable core of [`set_theme`].
+pub(crate) async fn set_theme_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    theme: Option<ThemeChoice>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.theme = theme;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Theme is a non-secret cosmetic preference (AS3-low) — the resolved
+    // label is safe to emit.
+    tracing::info!(
+        event = "prefs_written",
+        field = "theme",
+        value = theme_label(theme),
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -634,6 +704,7 @@ mod tests {
                 &account_hash,
                 &PrefsView {
                     screen_capture_protection: false,
+                    theme: None,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
                     favorites: Vec::new(),
@@ -917,6 +988,58 @@ mod tests {
 
     fn alloc_vec(items: impl IntoIterator<Item = &'static str>) -> Vec<String> {
         items.into_iter().map(String::from).collect()
+    }
+
+    // ---- theme setter (MYND-110) --------------------------------------
+
+    #[test]
+    fn set_theme_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-theme-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Dark)).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn theme_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            // Explicit Dark persists (disk-first) + round-trips.
+            set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Dark))
+                .await
+                .expect("write theme");
+            assert!(
+                tmp.path().join("vault.prefs").exists(),
+                "set_theme must create vault.prefs"
+            );
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after theme write");
+            assert_eq!(view.theme, Some(ThemeChoice::Dark));
+            // The pre-existing screen_capture default is untouched.
+            assert!(view.screen_capture_protection);
+
+            // Switching to Light overwrites.
+            set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Light))
+                .await
+                .expect("write light");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after light");
+            assert_eq!(view.theme, Some(ThemeChoice::Light));
+
+            // System (None) clears the field back to "no explicit choice".
+            set_theme_with_dir(tmp.path(), &state, None)
+                .await
+                .expect("write system");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after system");
+            assert_eq!(view.theme, None);
+        });
     }
 
     // ---- vault.meta IO failure surfaces ------------------------------

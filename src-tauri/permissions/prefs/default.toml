@@ -23,6 +23,7 @@ permissions = [
   "allow-set-item-order",
   "allow-set-favorites",
   "allow-set-editor-layout",
+  "allow-set-theme",
 ]
 
 [[permission]]
@@ -70,3 +71,11 @@ commands.allow = ["set_favorites"]
 identifier = "allow-set-editor-layout"
 description = "Allow invoking prefs:set_editor_layout (Slot::Unlocked-gated setter for the editor_layout object — the editor three-pane sidebar widths + collapsed flags; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_editor_layout"]
+
+# MYND-110: a write setter, so it inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window
+# MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-theme"
+description = "Allow invoking prefs:set_theme (Slot::Unlocked-gated setter for the theme field — the user's Light/Dark/System choice; Option<ThemeChoice> where None ≡ system clears the field; atomic-writes vault.prefs with no native side-effect, no protective-envelope clamp since theme is non-load-bearing)."
+commands.allow = ["set_theme"]

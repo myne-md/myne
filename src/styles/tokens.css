@@ -6,8 +6,10 @@
    Source: docs/design/colors_and_type.css (canonical home moves to src/styles/
    for the desktop client; the design subtree retains its copy as reference).
 
-   Themes: ships light by default; add `data-theme="dark"` to <html>
-   for dark mode. Both are first-class -- neither dominates.
+   Themes (MYND-110): light is the bare-:root default. With NO `data-theme`
+   on <html> the UI follows the OS `prefers-color-scheme` live (System mode +
+   all pre-unlock screens). `data-theme="dark"`/`"light"` on <html> is an
+   explicit override. Both themes are first-class -- neither dominates.
    ========================================================================= */
 
 /* -- Fonts ----------------------------------------------------------------
@@ -163,54 +165,164 @@
   --duration-fast: 120ms;
   --duration-base: 180ms;
   --duration-slow: 260ms;
+
+  /* -- Dark palette source values (MYND-110) -------------------------- */
+  /* Single source for the dark token VALUES. The two application blocks
+     below (:root[data-theme="dark"] + the prefers-color-scheme:dark @media)
+     only repeat `--token: var(--_token-dark)` assignments — never the literal
+     hex — so a value retune touches ONE place and the worst possible drift is
+     a missed assignment (one token stuck light in one mode, caught by visual /
+     Penpot-diff review), never two diverging colors. AA (>=4.5:1) vs the dark
+     --paper-2 (#1a1a17) is preserved for the syntax hues (MYND-154). */
+  --_paper-dark:    #121210;
+  --_paper-2-dark:  #1a1a17;
+  --_paper-3-dark:  #232220;
+  --_line-1-dark:   #2c2b28;
+  --_line-2-dark:   #3a3935;
+  --_line-3-dark:   #5a5852;
+
+  --_ink-3-dark:    #8d8c85;
+  --_ink-2-dark:    #c2c1b9;
+  --_ink-1-dark:    #e8e7df;
+  --_ink-0-dark:    #f7f6ee;
+
+  --_accent-dark:        #8aa4d0;
+  --_accent-hover-dark:  #a3b8de;
+  --_accent-press-dark:  #6e8dc0;
+  --_accent-soft-dark:   #1f2735;
+  --_accent-on-dark:     #0b0b09;
+
+  --_danger-dark:       #d99086;
+  --_danger-soft-dark:  #2e1f1d;
+  --_warning-dark:      #d8b76a;
+  --_warning-soft-dark: #2c2618;
+  --_success-dark:      #8cc1a4;
+  --_success-soft-dark: #1a2620;
+
+  --_syntax-keyword-dark:  #c79ad4;
+  --_syntax-string-dark:   #8cc1a4;
+  --_syntax-comment-dark:  #8e8d85;
+  --_syntax-number-dark:   #d8b76a;
+  --_syntax-variable-dark: #e8e7df;
+  --_syntax-property-dark: #8aa4d0;
+  --_syntax-function-dark: #7fbfcf;
+  --_syntax-type-dark:     #d4a96a;
+  --_syntax-operator-dark: #a8a79f;
+  --_syntax-tag-dark:      #d99086;
+  --_syntax-meta-dark:     #a59fc4;
+  --_syntax-invalid-dark:  #e88b80;
+
+  --_shadow-1-dark: 0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5);
+  --_shadow-2-dark: 0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5);
+  --_shadow-3-dark: 0 8px 16px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6);
 }
 
-/* -- Dark theme (manual via [data-theme="dark"]) ------------------------ */
+/* =========================================================================
+   Theme application (MYND-110) — pure CSS, no JS.
+
+   Light is the bare :root default above. Dark is applied by repeating the
+   `--token: var(--_token-dark)` assignments (values single-sourced in :root):
+     1. :root[data-theme="dark"] — explicit Dark choice (overrides the OS).
+     2. @media (prefers-color-scheme: dark) on a :root with NO explicit
+        light/dark attribute — System mode + every pre-unlock screen follow
+        the OS live, with zero JS matchMedia / zero FOUC.
+   An explicit :root[data-theme="light"] matches NEITHER block, so it falls
+   through to the bare :root light defaults — Light overrides a dark OS.
+   Semantic aliases (--bg-1: var(--paper), …) re-resolve automatically when a
+   raw token flips, so only the raw tokens are reassigned here.
+   ========================================================================= */
 :root[data-theme="dark"] {
-  --paper:    #121210;
-  --paper-2:  #1a1a17;
-  --paper-3:  #232220;
-  --line-1:   #2c2b28;
-  --line-2:   #3a3935;
-  --line-3:   #5a5852;
+  --paper:    var(--_paper-dark);
+  --paper-2:  var(--_paper-2-dark);
+  --paper-3:  var(--_paper-3-dark);
+  --line-1:   var(--_line-1-dark);
+  --line-2:   var(--_line-2-dark);
+  --line-3:   var(--_line-3-dark);
 
-  --ink-3:    #8d8c85;
-  --ink-2:    #c2c1b9;
-  --ink-1:    #e8e7df;
-  --ink-0:    #f7f6ee;
+  --ink-3:    var(--_ink-3-dark);
+  --ink-2:    var(--_ink-2-dark);
+  --ink-1:    var(--_ink-1-dark);
+  --ink-0:    var(--_ink-0-dark);
 
-  --accent:        #8aa4d0;
-  --accent-hover:  #a3b8de;
-  --accent-press:  #6e8dc0;
-  --accent-soft:   #1f2735;
-  --accent-on:     #0b0b09;
+  --accent:        var(--_accent-dark);
+  --accent-hover:  var(--_accent-hover-dark);
+  --accent-press:  var(--_accent-press-dark);
+  --accent-soft:   var(--_accent-soft-dark);
+  --accent-on:     var(--_accent-on-dark);
 
-  --danger:       #d99086;
-  --danger-soft:  #2e1f1d;
-  --warning:      #d8b76a;
-  --warning-soft: #2c2618;
-  --success:      #8cc1a4;
-  --success-soft: #1a2620;
+  --danger:       var(--_danger-dark);
+  --danger-soft:  var(--_danger-soft-dark);
+  --warning:      var(--_warning-dark);
+  --warning-soft: var(--_warning-soft-dark);
+  --success:      var(--_success-dark);
+  --success-soft: var(--_success-soft-dark);
   --info:         var(--accent);
   --info-soft:    var(--accent-soft);
 
-  /* -- Code syntax highlighting (MYND-154) -- AA (>=4.5:1) vs --paper-2 (#1a1a17) */
-  --syntax-keyword:  #c79ad4;
-  --syntax-string:   #8cc1a4;
-  --syntax-comment:  #8e8d85;
-  --syntax-number:   #d8b76a;
-  --syntax-variable: #e8e7df;
-  --syntax-property: #8aa4d0;
-  --syntax-function: #7fbfcf;
-  --syntax-type:     #d4a96a;
-  --syntax-operator: #a8a79f;
-  --syntax-tag:      #d99086;
-  --syntax-meta:     #a59fc4;
-  --syntax-invalid:  #e88b80;
+  --syntax-keyword:  var(--_syntax-keyword-dark);
+  --syntax-string:   var(--_syntax-string-dark);
+  --syntax-comment:  var(--_syntax-comment-dark);
+  --syntax-number:   var(--_syntax-number-dark);
+  --syntax-variable: var(--_syntax-variable-dark);
+  --syntax-property: var(--_syntax-property-dark);
+  --syntax-function: var(--_syntax-function-dark);
+  --syntax-type:     var(--_syntax-type-dark);
+  --syntax-operator: var(--_syntax-operator-dark);
+  --syntax-tag:      var(--_syntax-tag-dark);
+  --syntax-meta:     var(--_syntax-meta-dark);
+  --syntax-invalid:  var(--_syntax-invalid-dark);
 
-  --shadow-1: 0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5);
-  --shadow-2: 0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5);
-  --shadow-3: 0 8px 16px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6);
+  --shadow-1: var(--_shadow-1-dark);
+  --shadow-2: var(--_shadow-2-dark);
+  --shadow-3: var(--_shadow-3-dark);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --paper:    var(--_paper-dark);
+    --paper-2:  var(--_paper-2-dark);
+    --paper-3:  var(--_paper-3-dark);
+    --line-1:   var(--_line-1-dark);
+    --line-2:   var(--_line-2-dark);
+    --line-3:   var(--_line-3-dark);
+
+    --ink-3:    var(--_ink-3-dark);
+    --ink-2:    var(--_ink-2-dark);
+    --ink-1:    var(--_ink-1-dark);
+    --ink-0:    var(--_ink-0-dark);
+
+    --accent:        var(--_accent-dark);
+    --accent-hover:  var(--_accent-hover-dark);
+    --accent-press:  var(--_accent-press-dark);
+    --accent-soft:   var(--_accent-soft-dark);
+    --accent-on:     var(--_accent-on-dark);
+
+    --danger:       var(--_danger-dark);
+    --danger-soft:  var(--_danger-soft-dark);
+    --warning:      var(--_warning-dark);
+    --warning-soft: var(--_warning-soft-dark);
+    --success:      var(--_success-dark);
+    --success-soft: var(--_success-soft-dark);
+    --info:         var(--accent);
+    --info-soft:    var(--accent-soft);
+
+    --syntax-keyword:  var(--_syntax-keyword-dark);
+    --syntax-string:   var(--_syntax-string-dark);
+    --syntax-comment:  var(--_syntax-comment-dark);
+    --syntax-number:   var(--_syntax-number-dark);
+    --syntax-variable: var(--_syntax-variable-dark);
+    --syntax-property: var(--_syntax-property-dark);
+    --syntax-function: var(--_syntax-function-dark);
+    --syntax-type:     var(--_syntax-type-dark);
+    --syntax-operator: var(--_syntax-operator-dark);
+    --syntax-tag:      var(--_syntax-tag-dark);
+    --syntax-meta:     var(--_syntax-meta-dark);
+    --syntax-invalid:  var(--_syntax-invalid-dark);
+
+    --shadow-1: var(--_shadow-1-dark);
+    --shadow-2: var(--_shadow-2-dark);
+    --shadow-3: var(--_shadow-3-dark);
+  }
 }
 
 /* =========================================================================
