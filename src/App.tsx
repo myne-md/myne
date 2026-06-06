@@ -15,6 +15,8 @@ import {
 import { probeVaultStatus } from "./lib/vault-status";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { openInNoteFind } from "./editor/find/find-session";
+import { prefsRead } from "./lib/prefs";
+import { applyTheme } from "./lib/theme";
 
 function App() {
   // Initial stage is `null` until the boot probe resolves (loading
@@ -99,6 +101,38 @@ function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Theme application chokepoint (MYND-110). `App` is the single owner of
+  // `<html data-theme>` across stage transitions. On the editor stage (the
+  // only post-unlock stage) read the stored theme from the encrypted
+  // vault.prefs and apply it; on ANY other stage — boot loading, every
+  // pre-unlock screen, and lock (editor → unlock) — remove the attribute so
+  // the UI follows the OS `prefers-color-scheme`. This keeps the invariant
+  // "data-theme present ⟺ vault unlocked & explicit pref" (the UI-layer image
+  // of zeroize-on-lock, A6): a locked vault never shows the user's chosen
+  // theme, and the post-lock Unlock screen is identical to the cold-boot one.
+  // In-session changes from Settings → Appearance call `applyTheme` directly
+  // (disk-first), so this effect only handles the stage-transition path.
+  const stageName = stage?.name;
+  useEffect(() => {
+    if (stageName !== "editor") {
+      applyTheme(null);
+      return;
+    }
+    let cancelled = false;
+    void prefsRead()
+      .then((prefs) => {
+        if (!cancelled) applyTheme(prefs.theme);
+      })
+      .catch(() => {
+        // prefs_read should not reject on the editor stage (slot is unlocked),
+        // but if it does, fall back to OS-follow rather than a stale attribute.
+        if (!cancelled) applyTheme(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stageName]);
 
   if (stage === null) {
     // Loading shim — vault_status probe in flight (~ms on warm disk).

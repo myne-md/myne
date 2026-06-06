@@ -25,6 +25,15 @@ export interface EditorLayout {
   right_collapsed: boolean;
 }
 
+/**
+ * User theme preference (MYND-110). Mirrors `protocol::ThemeChoice` (Rust
+ * side, serialized lowercase). `null` on {@link PrefsView.theme} means the
+ * user made no explicit choice — i.e. **system** (follow the OS
+ * `prefers-color-scheme`); the field is omitted from the encrypted blob in
+ * that case, byte-identical to a pre-MYND-110 vault.
+ */
+export type ThemeChoice = "light" | "dark";
+
 /** Mirrors `protocol::PrefsView` (Rust side). */
 export interface PrefsView {
   screen_capture_protection: boolean;
@@ -66,6 +75,14 @@ export interface PrefsView {
    * from Rust `Option<EditorLayout>` (null | object).
    */
   editor_layout: EditorLayout | null;
+  /**
+   * User theme preference (MYND-110). `null` ≡ **system** (follow the OS
+   * `prefers-color-scheme`) — the canonical encoding of "no explicit choice",
+   * omitted from the encrypted blob. `"light"` / `"dark"` are explicit
+   * choices the client applies as `<html data-theme="…">`. Serialized from
+   * Rust `Option<ThemeChoice>` (null | "light" | "dark").
+   */
+  theme: ThemeChoice | null;
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -145,4 +162,17 @@ export async function setFavorites(favorites: string[]): Promise<void> {
  */
 export async function setEditorLayout(layout: EditorLayout): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_layout", { layout });
+}
+
+/**
+ * Persist the user's theme choice (MYND-110). Pass `"light"` / `"dark"` for an
+ * explicit choice, or `null` for **system** (follow the OS) — `null` clears the
+ * field on disk so the vault stays byte-identical to one that never picked a
+ * theme. The backend atomic-writes vault.prefs disk-first with no native
+ * side-effect; a rejected promise means the disk write failed, so the caller
+ * must not treat the new theme as persisted (re-read disk truth). `theme` is a
+ * non-load-bearing cosmetic preference — no clamp, no in-flight gating.
+ */
+export async function setTheme(theme: ThemeChoice | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_theme", { theme });
 }

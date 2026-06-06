@@ -124,6 +124,28 @@ pub const PREFS_BLOB_HEADER_LEN: usize = 34;
 /// [`crate::MAX_PLAINTEXT_LEN`] cap on `.myn` blobs. See spec § 9.5.4.
 pub const MAX_PREFS_PLAINTEXT_LEN: usize = 64 * 1024;
 
+/// User theme preference (MYND-110). Persisted as a JSON string under
+/// the `theme` key of [`PrefsView`]. **`None` ≡ system** — this enum has
+/// no `System` variant; absence of the field is the canonical encoding of
+/// "follow the OS `prefers-color-scheme`". That gives a fresh vault the
+/// "fallback system" default for free and keeps a vault that never chose
+/// an explicit theme byte-identical to a pre-MYND-110 `vault.prefs`. A
+/// **non-load-bearing** cosmetic preference (a tampered / replayed
+/// `vault.prefs` can at worst surface the wrong color), so unlike
+/// `auto_lock_seconds` it carries no protective-envelope clamp. Serialized
+/// lowercase (`"light"` / `"dark"`) on both the canonical-JSON disk path
+/// and the IPC `serde` path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeChoice {
+    /// Explicit light theme — the client sets `<html data-theme="light">`,
+    /// overriding the OS preference.
+    Light,
+    /// Explicit dark theme — the client sets `<html data-theme="dark">`,
+    /// overriding the OS preference.
+    Dark,
+}
+
 /// Editor three-pane layout state — sidebar widths + collapsed flags
 /// (MYND-137). Persisted as a nested JSON object under the
 /// `editor_layout` key of [`PrefsView`]. Present **only** when the user
@@ -237,6 +259,17 @@ pub struct PrefsView {
     /// `right_width`. See [`EditorLayout`].
     #[serde(default)]
     pub editor_layout: Option<EditorLayout>,
+
+    /// User theme preference (MYND-110). `None` ≡ **system** (follow the OS
+    /// `prefers-color-scheme`) and is the canonical encoding of "no explicit
+    /// choice" — the field is omitted entirely from the canonical JSON when
+    /// `None`, so a vault that never picked a theme is byte-identical to a
+    /// pre-MYND-110 `vault.prefs` (existing golden vectors unaffected). When
+    /// `Some`, encoded as a JSON string `"light"` / `"dark"` under the
+    /// canonical key `theme` (lexicographically LAST — `t` > `s`). See
+    /// [`ThemeChoice`].
+    #[serde(default)]
+    pub theme: Option<ThemeChoice>,
 }
 
 impl Default for PrefsView {
@@ -249,6 +282,7 @@ impl Default for PrefsView {
     fn default() -> Self {
         Self {
             screen_capture_protection: true,
+            theme: None,
             favorites: Vec::new(),
             item_order: Vec::new(),
             deliberate_folders: Vec::new(),
@@ -459,6 +493,21 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     } else {
         b"false"
     });
+
+    // theme (canonical key 't' — LAST, after 's'). Omitted entirely when
+    // None so an unset vault (≡ system) is byte-identical to a pre-MYND-110
+    // vault.prefs (preserves existing KAT vectors). When Some, a JSON string
+    // value "light"/"dark".
+    if let Some(theme) = prefs.theme {
+        out.extend_from_slice(b",\"theme\":\"");
+        let value: &[u8] = match theme {
+            ThemeChoice::Light => b"light",
+            ThemeChoice::Dark => b"dark",
+        };
+        out.extend_from_slice(value);
+        out.push(b'"');
+    }
+
     out.push(b'}');
     out
 }
@@ -624,15 +673,16 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let favorites = parse_optional_array_field(rest, &mut cursor, b"\"favorites\":")?;
     let item_order = parse_optional_array_field(rest, &mut cursor, b"\"item_order\":")?;
 
-    // ---- screen_capture_protection (required, canonically last) ----
+    // ---- screen_capture_protection (required) ----
     let region = &rest[cursor..];
     let key_marker = b"\"screen_capture_protection\":";
     let idx = find_subslice(region, key_marker).ok_or(PrefsBlobError::PlaintextParseFailed)?;
     let after_key = &region[idx + key_marker.len()..];
 
     // Strict suffix: value is exactly `true`/`false` followed by end-of-object
-    // (last field → empty) or `,` (a further field). `starts_with` alone would
-    // accept `truefoo` → silent data-integrity bug on tampered-but-AEAD-OK input.
+    // (no further field → empty) or `,` (a further field — e.g. theme, or a
+    // future v0.1.x field). `starts_with` alone would accept `truefoo` →
+    // silent data-integrity bug on tampered-but-AEAD-OK input.
     let screen_capture_protection = if after_key == b"true" || after_key.starts_with(b"true,") {
         true
     } else if after_key == b"false" || after_key.starts_with(b"false,") {
@@ -641,6 +691,16 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         return Err(PrefsBlobError::PlaintextParseFailed);
     };
 
+    // ---- theme (optional, canonically LAST — key 't' > 's') ----
+    // Tolerant: an absent key OR an unrecognized value decodes to `None`
+    // (≡ system), treated like an unknown field per spec § 9.5.2
+    // forward-compat rather than failing the whole parse — `theme` is a
+    // non-load-bearing cosmetic preference, so a future "sepia" value read
+    // by a v0.1 client must not strand the other (load-bearing) fields.
+    // Located by marker in the region after screen_capture_protection's
+    // boolean, so a future field sorting between `s` and `t` cannot hide it.
+    let theme = parse_optional_theme(after_key);
+
     Ok(PrefsView {
         screen_capture_protection,
         deliberate_folders,
@@ -648,7 +708,29 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         favorites,
         item_order,
         editor_layout,
+        theme,
     })
+}
+
+/// Parse the OPTIONAL `theme` field from `region` (the bytes from
+/// screen_capture_protection's value to the end of the object). Tolerant:
+/// returns `None` when the key is absent OR when the value is a JSON string
+/// other than `"light"` / `"dark"`. An unrecognized value is treated as an
+/// unknown field (forward-compat, spec § 9.5.2) rather than a parse
+/// failure, because `theme` is a non-load-bearing cosmetic preference and
+/// `None` ≡ follow-the-OS. Located by `find_subslice` on the key marker so
+/// a future field sorting between `screen_capture_protection` and `theme`
+/// does not hide it.
+fn parse_optional_theme(region: &[u8]) -> Option<ThemeChoice> {
+    let marker = b"\"theme\":";
+    let idx = find_subslice(region, marker)?;
+    let after = &region[idx + marker.len()..];
+    let (value, _consumed) = parse_json_string(after)?;
+    match value.as_str() {
+        "light" => Some(ThemeChoice::Light),
+        "dark" => Some(ThemeChoice::Dark),
+        _ => None,
+    }
 }
 
 /// Parse the OPTIONAL `editor_layout` nested object, searching `rest`
@@ -1017,6 +1099,7 @@ mod tests {
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
@@ -1031,6 +1114,7 @@ mod tests {
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
@@ -1072,6 +1156,7 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: true,
+                theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
@@ -1088,6 +1173,7 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: false,
+                theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
@@ -1101,12 +1187,15 @@ mod tests {
     fn canonical_json_decoder_tolerates_future_unknown_fields() {
         // Spec § 9.5.2 forward-compat: a v0.1.0 client reading a
         // v0.1.1+ plaintext with extra fields must still recover the
-        // known field rather than rejecting.
+        // known fields rather than rejecting. `theme` is now KNOWN (so it
+        // parses), while `zoom_level` (sorting after `theme`) is a genuinely
+        // unknown future field that must be ignored.
         let parsed = canonical_json_decode(
-            br#"{"screen_capture_protection":true,"theme":"dark","font_size":14}"#,
+            br#"{"screen_capture_protection":true,"theme":"dark","zoom_level":2}"#,
         )
         .unwrap();
         assert!(parsed.screen_capture_protection);
+        assert_eq!(parsed.theme, Some(ThemeChoice::Dark));
     }
 
     #[test]
@@ -1148,6 +1237,137 @@ mod tests {
         assert_eq!(err, PrefsBlobError::PlaintextParseFailed);
     }
 
+    // ---- theme canonical field (MYND-110) -----------------------------
+
+    #[test]
+    fn encode_omits_theme_when_none() {
+        // None ≡ system → byte-identical to a pre-MYND-110 vault.prefs
+        // (preserves existing KAT vectors + existing vaults).
+        let encoded = canonical_json_encode(&PrefsView {
+            theme: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_theme_last_light() {
+        // Canonical key order: theme (t) is LAST, after screen_capture_protection (s).
+        let encoded = canonical_json_encode(&PrefsView {
+            theme: Some(ThemeChoice::Light),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"screen_capture_protection":true,"theme":"light"}"#,
+        );
+    }
+
+    #[test]
+    fn encode_emits_theme_last_dark_with_scp_false() {
+        let encoded = canonical_json_encode(&PrefsView {
+            screen_capture_protection: false,
+            theme: Some(ThemeChoice::Dark),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"screen_capture_protection":false,"theme":"dark"}"#,
+        );
+    }
+
+    #[test]
+    fn encode_emits_theme_after_all_other_fields() {
+        // Full field-mix: a < d < e < f < i < s < t. theme sits last.
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
+            auto_lock_seconds: Some(300),
+            favorites: alloc::vec![alloc::string::String::from("f1")],
+            item_order: alloc::vec![alloc::string::String::from("n1")],
+            editor_layout: Some(EditorLayout {
+                left_width: 312,
+                right_width: 288,
+                left_collapsed: false,
+                right_collapsed: true,
+            }),
+            theme: Some(ThemeChoice::Dark),
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"auto_lock_seconds":300,"deliberate_folders":["Archive/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"favorites":["f1"],"item_order":["n1"],"screen_capture_protection":true,"theme":"dark"}"#,
+        );
+    }
+
+    #[test]
+    fn decode_round_trips_theme_dark() {
+        let parsed =
+            canonical_json_decode(br#"{"screen_capture_protection":true,"theme":"dark"}"#).unwrap();
+        assert_eq!(parsed.theme, Some(ThemeChoice::Dark));
+        assert!(parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_round_trips_theme_light_with_scp_false() {
+        let parsed =
+            canonical_json_decode(br#"{"screen_capture_protection":false,"theme":"light"}"#)
+                .unwrap();
+        assert_eq!(parsed.theme, Some(ThemeChoice::Light));
+        assert!(!parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_absent_theme_is_none() {
+        let parsed = canonical_json_decode(br#"{"screen_capture_protection":true}"#).unwrap();
+        assert_eq!(parsed.theme, None);
+    }
+
+    #[test]
+    fn decode_unknown_theme_value_is_none_tolerant() {
+        // A future / unrecognized theme value decodes to None (≡ system),
+        // treated as an unknown field per forward-compat — NOT a parse
+        // failure that would strand the load-bearing screen_capture_protection.
+        let parsed =
+            canonical_json_decode(br#"{"screen_capture_protection":true,"theme":"sepia"}"#)
+                .unwrap();
+        assert_eq!(parsed.theme, None);
+        assert!(parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn full_blob_round_trip_with_theme() {
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView {
+            theme: Some(ThemeChoice::Dark),
+            ..PrefsView::default()
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(original, decoded);
+        assert_eq!(decoded.theme, Some(ThemeChoice::Dark));
+    }
+
+    #[test]
+    fn theme_none_round_trips_through_full_blob() {
+        // Default (None ≡ system) survives a full encode/decode unchanged
+        // and stays byte-identical to a pre-MYND-110 blob (omit-when-None).
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView::default();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(decoded.theme, None);
+        assert_eq!(original, decoded);
+    }
+
     // ---- deliberate_folders canonical array (MYND-144) -----------------
 
     #[test]
@@ -1163,6 +1383,7 @@ mod tests {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![
@@ -1183,6 +1404,7 @@ mod tests {
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![
@@ -1206,6 +1428,7 @@ mod tests {
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
@@ -1224,6 +1447,7 @@ mod tests {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
@@ -1302,6 +1526,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![
@@ -1344,6 +1569,7 @@ mod tests {
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
             favorites: alloc::vec![
@@ -1371,6 +1597,7 @@ mod tests {
         // which does both). The duplicate "zzz" must survive verbatim.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
             favorites: Vec::new(),
@@ -1427,6 +1654,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(900),
             favorites: alloc::vec![alloc::string::String::from(
@@ -1465,6 +1693,7 @@ mod tests {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
@@ -1483,6 +1712,7 @@ mod tests {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
             screen_capture_protection: false,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
@@ -1503,6 +1733,7 @@ mod tests {
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
@@ -1591,6 +1822,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
@@ -1653,6 +1885,7 @@ mod tests {
         // right_width.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
@@ -1905,6 +2138,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
@@ -1927,6 +2161,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
@@ -2145,6 +2380,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: true,
+                theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
@@ -2160,6 +2396,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: false,
+                theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
@@ -2177,6 +2414,7 @@ mod tests {
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
             screen_capture_protection: true,
+            theme: None,
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("Archive/2025/"),
                 alloc::string::String::from("Projects/Myne/"),
@@ -2207,6 +2445,18 @@ mod tests {
             &nonce_populated,
         )
         .expect("encode populated");
+
+        // Themed case (MYND-110): screen_capture_protection=true + an explicit
+        // theme=dark. Distinct nonce (0xAA×24). theme is canonical key LAST.
+        let prefs_themed = PrefsView {
+            theme: Some(ThemeChoice::Dark),
+            ..PrefsView::default()
+        };
+        let nonce_themed: [u8; AEAD_NONCE_LEN] = [0xAA; AEAD_NONCE_LEN];
+        let canonical_themed = canonical_json_encode(&prefs_themed);
+        let blob_themed =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_themed, &nonce_themed)
+                .expect("encode themed");
 
         // Tampered blob: flip one byte in the ciphertext region (header
         // is 34 bytes; ciphertext starts at offset 34).
@@ -2334,6 +2584,44 @@ mod tests {
             "expected_prefs_blob_hex: {}\n\n",
             hex_lower(&blob_populated)
         ));
+
+        dump.push_str("# case 7/8: encrypt-themed-dark (theme=dark, MYND-110)\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_themed)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical_themed).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!(
+            "prefs_nonce_hex: {}\n",
+            hex_lower(&nonce_themed)
+        ));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob_themed)
+        ));
+
+        dump.push_str("# case 8/8: decrypt-themed-dark (round-trip with case 7)\n");
+        dump.push_str(&alloc::format!(
+            "input_blob_hex: {}\n",
+            hex_lower(&blob_themed)
+        ));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(
+            "expected_prefs_view: { \"screen_capture_protection\": true, \"theme\": \"dark\" }\n\n",
+        );
 
         dump.push_str("---end prefs vectors---\n");
         std::fs::write("/tmp/myne_vault_prefs_vectors.txt", dump.as_bytes())
