@@ -13,4 +13,5 @@ pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;
 pub mod vault_recover;
+pub mod vault_repair;
 pub mod vault_unlock;

@@ -6,6 +6,7 @@
 
 use super::error::AppError;
 use super::state::{SessionLookup, VaultCreationSession, VaultCreationState};
+use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
     KdfParams, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, DEFAULT_V0_1_KDF_PARAMS,
     VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
@@ -199,6 +200,7 @@ pub(crate) fn build_session(
 pub async fn commit<R: Runtime>(
     session_token: String,
     state: State<'_, VaultCreationState>,
+    runtime_state: State<'_, VaultRuntimeState>,
     app: tauri::AppHandle<R>,
 ) -> Result<(), AppError> {
     let token = Uuid::parse_str(&session_token).map_err(|_| AppError::SessionNotFound)?;
@@ -208,7 +210,55 @@ pub async fn commit<R: Runtime>(
     // a future retry once the underlying condition is fixed).
     let vault_dir = crate::paths::vault_dir(&app)?;
     let vault_path = vault_dir.join("vault.meta");
-    commit_with_vault_path(token, vault_path, state.inner()).await
+    commit_with_permit(
+        token,
+        vault_path,
+        state.inner(),
+        runtime_state.auth_permits(),
+    )
+    .await
+}
+
+/// `auth_permits`-gated wrapper around [`commit_with_vault_path`].
+///
+/// MYND-159: `vault_create::commit` is pulled into the single capacity-1
+/// `auth_permits` semaphore that already serializes every other
+/// vault.meta-lifecycle command (`vault_unlock` / `vault_recover_*` /
+/// `vault_change_password` / `vault_delete`). This generalizes the permit
+/// from an Argon2id throttle into a **vault.meta-lifecycle mutex** and
+/// closes the `vault_repair` ↔ `commit` TOCTOU: while `commit` holds the
+/// permit a concurrent `vault_repair` sweep busy-rejects, and vice-versa.
+///
+/// `try_acquire` (reject, never queue) matches the family posture. The RAII
+/// permit guard is scoped to this function, so it drops on **every** return
+/// path — crucially **before** the frontend's auto-unlock chain
+/// (`commit` → `vault_unlock`) fires, so the subsequent `vault_unlock`
+/// acquires the permit cleanly rather than self-deadlocking into a
+/// busy-reject.
+///
+/// Normally a no-op gate in the create flow (no concurrent peer exists at
+/// creation time — there is no vault to unlock / change / delete); it only
+/// bites the pathological `vault_repair`-race case.
+pub(crate) async fn commit_with_permit(
+    token: Uuid,
+    vault_path: PathBuf,
+    state: &VaultCreationState,
+    auth_permits: &tokio::sync::Semaphore,
+) -> Result<(), AppError> {
+    let _permit = match auth_permits.try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(
+                stage = "auth_permits",
+                error_kind = "VaultBusyAuth",
+                "vault_create commit rejected: another vault.meta-lifecycle op in flight"
+            );
+            return Err(AppError::VaultBusyAuth);
+        }
+    };
+    commit_with_vault_path(token, vault_path, state).await
+    // `_permit` drops here on every return path → released before the
+    // frontend's subsequent auto-unlock `vault_unlock` acquires.
 }
 
 /// Recognized-artefact predicate consumed by the
@@ -816,6 +866,88 @@ mod tests {
                 "expected SessionNotFound, got {result:?}"
             );
         });
+    }
+
+    // ---- MYND-159: commit pulled into auth_permits ----------------------
+
+    /// `commit` is pulled into the `auth_permits` mutex (MYND-159). When the
+    /// permit is already held (e.g. a racing `vault_repair` sweep), commit
+    /// busy-rejects with `VaultBusyAuth` rather than queuing. The reject
+    /// path fires before the session is consumed, so it is non-destructive.
+    #[test]
+    fn commit_with_permit_returns_busy_auth_when_permit_held() {
+        rt().block_on(async {
+            let runtime = VaultRuntimeState::default();
+            let creation = VaultCreationState::default();
+            let tmp =
+                crate::test_support::ScopedTempDir::new("commit-busy").expect("scoped tempdir");
+            // Hold the single permit, simulating a concurrent
+            // vault.meta-lifecycle op (vault_repair / unlock / delete).
+            let _held = runtime.auth_permits().acquire().await.unwrap();
+
+            let result = commit_with_permit(
+                Uuid::new_v4(),
+                tmp.path().join("vault.meta"),
+                &creation,
+                runtime.auth_permits(),
+            )
+            .await;
+
+            assert!(
+                matches!(result, Err(AppError::VaultBusyAuth)),
+                "expected VaultBusyAuth when permit held, got {result:?}"
+            );
+        });
+    }
+
+    /// MYND-159 self-deadlock regression. The frontend auto-unlock chain is
+    /// `commit` → `vault_unlock`. commit's permit guard MUST be released on
+    /// return so the subsequent `vault_unlock` can acquire — otherwise
+    /// auto-unlock self-deadlocks into `VaultBusyAuth`. Drive commit to a
+    /// fast terminal return (unknown token → `SessionNotFound`) and assert
+    /// the permit is free afterward.
+    #[test]
+    fn commit_with_permit_releases_permit_before_return_for_autounlock() {
+        rt().block_on(async {
+            let runtime = VaultRuntimeState::default();
+            let creation = VaultCreationState::default();
+            let tmp =
+                crate::test_support::ScopedTempDir::new("commit-release").expect("scoped tempdir");
+
+            let result = commit_with_permit(
+                Uuid::new_v4(),
+                tmp.path().join("vault.meta"),
+                &creation,
+                runtime.auth_permits(),
+            )
+            .await;
+            assert!(
+                matches!(result, Err(AppError::SessionNotFound)),
+                "expected SessionNotFound terminal return, got {result:?}"
+            );
+
+            // The permit MUST be free now — the auto-unlock `vault_unlock`
+            // would otherwise self-deadlock into VaultBusyAuth.
+            assert_eq!(
+                runtime.auth_permits().available_permits(),
+                1,
+                "commit must release the permit before returning (auto-unlock self-deadlock guard)"
+            );
+            assert!(
+                runtime.auth_permits().try_acquire().is_ok(),
+                "subsequent vault_unlock must be able to acquire the permit"
+            );
+        });
+    }
+
+    /// IPC wire contract for the new variant: `{"kind":"VaultBusyAuth"}` —
+    /// bare unit variant, externally tagged, matching
+    /// `VaultDeleteError::VaultBusyAuth`'s encoding. Frontend
+    /// `vault-creation-errors.ts` matches on this.
+    #[test]
+    fn vault_busy_auth_serializes_with_kind_tag() {
+        let json = serde_json::to_string(&AppError::VaultBusyAuth).expect("serialize variant");
+        assert_eq!(json, r#"{"kind":"VaultBusyAuth"}"#);
     }
 
     #[test]

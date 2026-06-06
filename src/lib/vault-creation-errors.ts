@@ -190,6 +190,18 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
         primaryAction: "restart",
         displayMode: "dedicated",
       };
+    case "VaultBusyAuth":
+      // MYND-159: `commit` now shares the `auth_permits` mutex with the
+      // other vault.meta-lifecycle commands. Normally unreachable in the
+      // create flow (no concurrent peer at creation time); only fires
+      // against a racing `vault_repair` sweep. A plain retry clears it —
+      // the racing op finishes in milliseconds and releases the permit.
+      return {
+        title: "Vault busy",
+        body: "Another vault operation is in progress. Try again in a moment.",
+        primaryAction: "retry",
+        displayMode: "inline",
+      };
     default:
       return assertNever(error);
   }

@@ -36,16 +36,16 @@
 //!   computationally unrecoverable — recursive unlink converts
 //!   computationally-unrecoverable bytes into no-bytes, strictly
 //!   stronger.
-//! - **Partial-fail surface:** hand-rolled post-order recursive
-//!   `unlink_walk` collects per-entry `(PathBuf, io::Result<()>)`
-//!   without short-circuit; `emit_per_unlink_failure_trace` emits
-//!   `tracing::warn!(stage = "unlink_blob", io_failure_kind = ?kind)`
-//!   per failure (DENY-list clean, no paths); `aggregate_unlink_results`
-//!   produces `Ok(())` or `Err(PartialDelete { remaining_count })`.
-//! - **Durability:** Unix `parent_dir.sync_all()` journal-commit
-//!   hint (best-effort, never propagates) via `try_parent_dir_sync`;
-//!   Windows `#[cfg(unix)]`-gated no-op (matches `note_delete`
-//!   2026-05-07 asymmetry precedent).
+//! - **Partial-fail surface:** the shared `crate::vault_sweep::sweep`
+//!   pipeline runs a post-order recursive walk without short-circuit,
+//!   emits `tracing::warn!(stage = "unlink_blob", io_failure_kind = ?kind)`
+//!   per failure (DENY-list clean, no paths), and returns a neutral
+//!   `SweepOutcome`; `sweep_outcome_to_delete_result` maps it to
+//!   `Ok(())` or `Err(PartialDelete { remaining_count })`.
+//! - **Durability:** Unix dir `sync_all()` journal-commit hint
+//!   (best-effort, never propagates) inside `vault_sweep`; Windows
+//!   `#[cfg(unix)]`-gated no-op (matches `note_delete` 2026-05-07
+//!   asymmetry precedent).
 //! - **Tracing taxonomy:** `event = "vault_deleted"` on success;
 //!   `event = "vault_delete_partial"` with `remaining_count` on
 //!   partial-fail; per-file `stage = "unlink_blob"`; durability
@@ -167,11 +167,12 @@ pub async fn vault_delete<R: Runtime>(
 /// 4. `Slot::Unlocked` / `Slot::Recovering` arm: delegate to
 ///    [`VaultRuntimeState::take_and_run_blocking`] which holds the
 ///    slot write-lock across the spawn_blocking closure. The
-///    closure runs the post-order [`unlink_walk`] →
-///    [`emit_per_unlink_failure_trace`] → [`try_parent_dir_sync`]
-///    (Unix-only) → [`aggregate_unlink_results`] pipeline. Returns
-///    Ok(()) on full success, `PartialDelete{remaining_count}` on
-///    any per-file failure.
+///    closure runs the shared [`crate::vault_sweep::sweep`] pipeline
+///    (post-order unlink walk + per-file DENY-list tracing + Unix
+///    journal-commit) with [`crate::vault_sweep::RootDisposal::Remove`],
+///    then maps the neutral `SweepOutcome` via
+///    [`sweep_outcome_to_delete_result`]. Returns Ok(()) on full
+///    success, `PartialDelete{remaining_count}` on any per-file failure.
 /// 5. On `TakeAndRunError::SlotEmpty` (concurrent `vault_lock`
 ///    raced between our peek and the write-lock acquire) the unlink
 ///    did NOT run; the racing `vault_lock`'s `Drop` already zeroized
@@ -228,14 +229,17 @@ pub(crate) async fn vault_delete_with_dir(
             let vault_dir_for_blocking = vault_dir.clone();
             match state
                 .take_and_run_blocking(move || -> Result<(), VaultDeleteError> {
-                    let results = unlink_walk(&vault_dir_for_blocking);
-                    emit_per_unlink_failure_trace(&results);
-                    // Task 8: best-effort Unix parent-dir journal
-                    // commit. Always runs (regardless of success or
-                    // partial-fail outcome); never changes the return
-                    // value (sync_all is a hint, not a safety gate).
-                    try_parent_dir_sync(&vault_dir_for_blocking);
-                    aggregate_unlink_results(&results)
+                    // Shared sweep pipeline (`crate::vault_sweep`): post-order
+                    // unlink walk + DENY-list-clean per-file tracing +
+                    // best-effort Unix journal commit. `RootDisposal::Remove`
+                    // keeps vault_delete's "destroy the directory too"
+                    // behavior. The neutral `SweepOutcome` is mapped into
+                    // `VaultDeleteError` here.
+                    let outcome = crate::vault_sweep::sweep(
+                        &vault_dir_for_blocking,
+                        crate::vault_sweep::RootDisposal::Remove,
+                    );
+                    sweep_outcome_to_delete_result(outcome)
                 })
                 .await
             {
@@ -357,10 +361,11 @@ pub(crate) async fn delete_vault_files_no_zeroize(
     );
     let vault_dir_for_blocking = vault_dir.clone();
     let join_result = tokio::task::spawn_blocking(move || -> Result<(), VaultDeleteError> {
-        let results = unlink_walk(&vault_dir_for_blocking);
-        emit_per_unlink_failure_trace(&results);
-        try_parent_dir_sync(&vault_dir_for_blocking);
-        aggregate_unlink_results(&results)
+        let outcome = crate::vault_sweep::sweep(
+            &vault_dir_for_blocking,
+            crate::vault_sweep::RootDisposal::Remove,
+        );
+        sweep_outcome_to_delete_result(outcome)
     })
     .await;
     match join_result {
@@ -398,174 +403,23 @@ pub(crate) async fn delete_vault_files_no_zeroize(
     }
 }
 
-/// Recursive post-order unlink walker over `vault_dir`. Returns the
-/// per-entry outcome as `Vec<(PathBuf, io::Result<()>)>` — one entry
-/// per file or directory the walk touched, in **bottom-up order**
-/// (children before parents, parents removed after their children
-/// have been removed so `remove_dir` does not see non-empty dirs).
+/// Map the neutral [`crate::vault_sweep::SweepOutcome`] returned by the
+/// shared sweep pipeline into a [`VaultDeleteError`] verdict: `Ok(())`
+/// when the sweep removed everything, else
+/// `VaultDeleteError::PartialDelete { remaining_count }`.
 ///
-/// Symlinks: uses `symlink_metadata` so symlinks themselves are
-/// treated as files (`remove_file` unlinks the link, not the
-/// target). Matches `std::fs::remove_dir_all`'s no-follow semantics,
-/// preserving the v0.1 single-vault single-user assumption per
-/// `decisions.md` 2026-05-26 "vault_delete cryptographic-erase claim"
-/// (Phase 2 symlink-aware revisit hook).
-///
-/// Per-entry failures do NOT short-circuit the walk — every entry is
-/// attempted, results aggregated by [`aggregate_unlink_results`].
-/// This is the partial-fail posture from `decisions.md` 2026-05-26
-/// "vault_delete partial-fail posture".
-fn unlink_walk(vault_dir: &std::path::Path) -> Vec<(std::path::PathBuf, std::io::Result<()>)> {
-    let mut results = Vec::new();
-    walk_and_remove(vault_dir, &mut results);
-    results
-}
-
-fn walk_and_remove(
-    path: &std::path::Path,
-    results: &mut Vec<(std::path::PathBuf, std::io::Result<()>)>,
-) {
-    let meta = match std::fs::symlink_metadata(path) {
-        Ok(m) => m,
-        Err(e) => {
-            results.push((path.to_path_buf(), Err(e)));
-            return;
-        }
-    };
-    if meta.is_dir() {
-        match std::fs::read_dir(path) {
-            Ok(entries) => {
-                for entry_result in entries {
-                    match entry_result {
-                        Ok(entry) => walk_and_remove(&entry.path(), results),
-                        Err(e) => results.push((path.to_path_buf(), Err(e))),
-                    }
-                }
-                let r = std::fs::remove_dir(path);
-                results.push((path.to_path_buf(), r));
-            }
-            Err(e) => results.push((path.to_path_buf(), Err(e))),
-        }
-    } else {
-        // File or symlink (symlink_metadata did not follow links).
-        let r = std::fs::remove_file(path);
-        results.push((path.to_path_buf(), r));
-    }
-}
-
-/// Best-effort journal-commit hint after the unlink walk completes.
-/// Opens the parent of `vault_dir` (i.e., `app_data_dir`) and calls
-/// `sync_all()` to flush the directory-entry removal to the OS
-/// journal.
-///
-/// **Unix-only.** On non-Unix targets this is an explicit no-op
-/// (matches `note_delete` 2026-05-07 durability asymmetry precedent
-/// — no `windows-sys` dep extension, no `FlushFileBuffers`
-/// parent-handle machinery). Power-loss between `remove` and the
-/// next OS commit on Windows may make the vault reappear after
-/// reboot; the user re-fires `vault_delete`; cryptographic-erase is
-/// unaffected because keys are already zeroized.
-///
-/// **Never propagates errors.** sync_all is a journal-commit *hint*,
-/// not a safety gate — the unlinks already happened. On open or
-/// sync_all failure, a `tracing::warn!(stage = "parent_dir_sync",
-/// io_failure_kind = ?kind, ...)` event fires for oncall
-/// observability, but the IPC return value (Ok / PartialDelete /
-/// Io) is decided by the walk + aggregate pipeline upstream of this
-/// call.
-///
-/// Path leakage discipline: the parent path is opened via
-/// `File::open(parent)` — `std::io::Error::Display` for that error
-/// MAY include the path on some kernels, but we never `?e`-format
-/// the error; we reduce to `IoFailureKind` first per the
-/// `src-tauri/CLAUDE.md` "Closed-enum mapping rule".
-pub(crate) fn try_parent_dir_sync(vault_dir: &std::path::Path) {
-    #[cfg(unix)]
-    {
-        let Some(parent) = vault_dir.parent() else {
-            return;
-        };
-        match std::fs::File::open(parent) {
-            Ok(file) => match file.sync_all() {
-                Ok(()) => {
-                    tracing::debug!(
-                        stage = "parent_dir_sync",
-                        "vault_delete parent-dir journal-commit succeeded"
-                    );
-                }
-                Err(e) => {
-                    let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
-                    tracing::warn!(
-                        stage = "parent_dir_sync",
-                        io_failure_kind = ?kind,
-                        "vault_delete parent-dir sync_all failed (best-effort, not propagated)"
-                    );
-                }
-            },
-            Err(e) => {
-                let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
-                tracing::warn!(
-                    stage = "parent_dir_sync",
-                    io_failure_kind = ?kind,
-                    "vault_delete parent-dir open failed (best-effort, not propagated)"
-                );
-            }
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        // Suppress unused-variable warning on non-Unix targets.
-        let _ = vault_dir;
-    }
-}
-
-/// Emit a `tracing::warn!(stage = "unlink_blob", io_failure_kind = ?kind)`
-/// event for each failed entry in `results`. Path is **never**
-/// included in the payload (DENY-list discipline per
-/// `src-tauri/CLAUDE.md` "Secret-handling logging discipline" — full
-/// filesystem path is on the DENY list).
-///
-/// Helper carved out from the spawn_blocking closure so the L2
-/// tracing emission can be unit-tested directly with synthetic
-/// `Vec<(PathBuf, io::Result<()>)>` inputs. Production caller
-/// (`vault_delete_with_dir`) invokes this between the walk and the
-/// aggregate.
-pub(crate) fn emit_per_unlink_failure_trace(results: &[(std::path::PathBuf, std::io::Result<()>)]) {
-    for (_path, r) in results {
-        if let Err(io_err) = r {
-            let kind = crate::io_failure_kind::from_io_error_kind(io_err.kind());
-            tracing::warn!(
-                stage = "unlink_blob",
-                io_failure_kind = ?kind,
-                "vault_delete unlink failed"
-            );
-        }
-    }
-}
-
-/// Aggregate per-file unlink outcomes into a single
-/// [`VaultDeleteError`] verdict.
-///
-/// Returns `Ok(())` when every entry in `results` is `Ok(())`, else
-/// `Err(VaultDeleteError::PartialDelete { remaining_count })` where
-/// `remaining_count` is the count of failures. **Pure function** —
-/// no I/O, no async, no tracing — the per-failure tracing emission
-/// is the [`emit_per_unlink_failure_trace`] helper's job, and the
-/// I/O surface is [`unlink_walk`]. Three small composable functions
-/// keep each side independently testable.
-///
-/// L1 layer of the L1+L2+L3 test hybrid pinned by PRD §"Testing
-/// Decisions" (synthetic `Vec<(PathBuf, io::Result<()>)>` inputs
-/// drive all-success / all-fail / mixed / edge-count branches).
-pub(crate) fn aggregate_unlink_results(
-    results: &[(std::path::PathBuf, std::io::Result<()>)],
+/// This is the seam that keeps the shared `vault_sweep` layer
+/// plugin-agnostic — the sweep never knows about `VaultDeleteError`; this
+/// thin mapper is `vault_delete`'s view of the outcome. `vault_repair`
+/// (MYND-159) has its own equivalent mapper into `VaultRepairError`.
+pub(crate) fn sweep_outcome_to_delete_result(
+    outcome: crate::vault_sweep::SweepOutcome,
 ) -> Result<(), VaultDeleteError> {
-    let failed: usize = results.iter().filter(|(_, r)| r.is_err()).count();
-    if failed == 0 {
+    if outcome.is_complete() {
         Ok(())
     } else {
         Err(VaultDeleteError::PartialDelete {
-            remaining_count: failed,
+            remaining_count: outcome.remaining_count(),
         })
     }
 }
@@ -726,205 +580,6 @@ mod tests {
                 "auth_permits check must run before slot peek; got {result:?}"
             );
         });
-    }
-
-    // ---- L1: aggregate_unlink_results pure function (Task 7) -------------
-    //
-    // Pure aggregation: count failures, return Ok(()) when zero else
-    // PartialDelete{remaining_count}. No I/O, no async, no tracing.
-    // Synthetic Vec<(PathBuf, io::Result<()>)> drives the cases.
-
-    fn ok(p: &str) -> (std::path::PathBuf, std::io::Result<()>) {
-        (std::path::PathBuf::from(p), Ok(()))
-    }
-
-    fn err(p: &str, kind: std::io::ErrorKind) -> (std::path::PathBuf, std::io::Result<()>) {
-        (std::path::PathBuf::from(p), Err(std::io::Error::from(kind)))
-    }
-
-    #[test]
-    fn aggregate_unlink_empty_input_returns_ok() {
-        let results: Vec<(std::path::PathBuf, std::io::Result<()>)> = vec![];
-        assert!(aggregate_unlink_results(&results).is_ok());
-    }
-
-    #[test]
-    fn aggregate_unlink_all_ok_returns_ok() {
-        let results = vec![ok("a"), ok("b"), ok("c")];
-        assert!(aggregate_unlink_results(&results).is_ok());
-    }
-
-    #[test]
-    fn aggregate_unlink_single_fail_returns_partial_with_count_one() {
-        let results = vec![
-            ok("a"),
-            err("b", std::io::ErrorKind::PermissionDenied),
-            ok("c"),
-        ];
-        match aggregate_unlink_results(&results) {
-            Err(VaultDeleteError::PartialDelete { remaining_count }) => {
-                assert_eq!(remaining_count, 1);
-            }
-            other => panic!("expected PartialDelete{{1}}, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn aggregate_unlink_all_fail_returns_partial_with_full_count() {
-        let results = vec![
-            err("a", std::io::ErrorKind::PermissionDenied),
-            err("b", std::io::ErrorKind::NotFound),
-            err("c", std::io::ErrorKind::Other),
-        ];
-        match aggregate_unlink_results(&results) {
-            Err(VaultDeleteError::PartialDelete { remaining_count }) => {
-                assert_eq!(remaining_count, 3);
-            }
-            other => panic!("expected PartialDelete{{3}}, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn aggregate_unlink_mixed_returns_partial_with_failure_count() {
-        // 5 entries, 2 failures.
-        let results = vec![
-            ok("a"),
-            err("b", std::io::ErrorKind::PermissionDenied),
-            ok("c"),
-            err("d", std::io::ErrorKind::Other),
-            ok("e"),
-        ];
-        match aggregate_unlink_results(&results) {
-            Err(VaultDeleteError::PartialDelete { remaining_count }) => {
-                assert_eq!(remaining_count, 2);
-            }
-            other => panic!("expected PartialDelete{{2}}, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn aggregate_unlink_single_ok_returns_ok() {
-        let results = vec![ok("a")];
-        assert!(aggregate_unlink_results(&results).is_ok());
-    }
-
-    // ---- L2: try_parent_dir_sync — durability hook (Task 8) ---------------
-    //
-    // Unix-only `parent_dir.sync_all()` journal-commit hint fired
-    // after the unlink walk. Windows is `#[cfg(unix)]`-explicit no-op
-    // (matches `note_delete` 2026-05-07 asymmetry precedent — no
-    // `windows-sys` dep extension). Tests only run the Unix branch.
-
-    #[cfg(unix)]
-    #[test]
-    #[tracing_test::traced_test]
-    fn try_parent_dir_sync_emits_debug_event_on_success() {
-        let tmp = ScopedTempDir::new("vd-sync-ok").unwrap();
-        // tmp.path() exists; its parent (/tmp or platform equivalent)
-        // is open-able and sync_all-able. We point the helper at
-        // tmp.path().join("vault") whose parent is tmp.path() (real).
-        let vault_dir = tmp.path().join("vault");
-        try_parent_dir_sync(&vault_dir);
-        assert!(
-            logs_contain("stage=\"parent_dir_sync\""),
-            "expected parent_dir_sync stage in tracing"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    #[tracing_test::traced_test]
-    fn try_parent_dir_sync_emits_warn_on_missing_parent() {
-        // Parent path that does not exist → File::open fails.
-        // The helper should emit a warn (with io_failure_kind=NotFound)
-        // but NOT panic, NOT propagate.
-        let missing =
-            std::path::PathBuf::from("/this/path/intentionally/does/not/exist/for/myne/test/vault");
-        try_parent_dir_sync(&missing);
-        assert!(
-            logs_contain("stage=\"parent_dir_sync\""),
-            "expected parent_dir_sync stage in tracing"
-        );
-        assert!(
-            logs_contain("NotFound"),
-            "expected NotFound IoFailureKind label"
-        );
-    }
-
-    /// Windows no-op variant: the helper should compile and do
-    /// nothing on non-Unix targets. Test is gated to the negation
-    /// so it runs on whatever non-Unix platform happens to compile
-    /// (likely none in practice for this repo, but the gate is
-    /// load-bearing for the `#[cfg(unix)]` discipline). Skipped on
-    /// Unix.
-    #[cfg(not(unix))]
-    #[test]
-    fn try_parent_dir_sync_is_noop_on_non_unix() {
-        let p = std::path::PathBuf::from("doesnt_matter");
-        try_parent_dir_sync(&p);
-        // No panic, no IO, no events. Just here so the call site
-        // compiles on Windows.
-    }
-
-    // ---- L2: emit_per_unlink_failure_trace (Task 7) ----------------------
-    //
-    // For each failed unlink in the results, emit a tracing::warn!
-    // with stage = "unlink_blob" + io_failure_kind = ?<IoFailureKind>.
-    // Path is NEVER emitted (DENY-list discipline). Synthetic
-    // io::Error inputs verify the right IoFailureKind label crosses
-    // the tracing boundary.
-
-    #[test]
-    #[tracing_test::traced_test]
-    fn emit_per_unlink_failure_trace_emits_permission_denied_kind() {
-        let results = vec![err(
-            "any/path/should/not/appear",
-            std::io::ErrorKind::PermissionDenied,
-        )];
-        emit_per_unlink_failure_trace(&results);
-        assert!(
-            logs_contain("stage=\"unlink_blob\""),
-            "expected stage=unlink_blob in tracing"
-        );
-        assert!(
-            logs_contain("PermissionDenied"),
-            "expected PermissionDenied IoFailureKind label in tracing"
-        );
-        // DENY-list: path must NOT appear.
-        assert!(
-            !logs_contain("any/path/should/not/appear"),
-            "path leaked into tracing payload"
-        );
-    }
-
-    #[test]
-    #[tracing_test::traced_test]
-    fn emit_per_unlink_failure_trace_emits_not_found_kind() {
-        let results = vec![err("p", std::io::ErrorKind::NotFound)];
-        emit_per_unlink_failure_trace(&results);
-        assert!(logs_contain("NotFound"));
-    }
-
-    #[test]
-    #[tracing_test::traced_test]
-    fn emit_per_unlink_failure_trace_emits_other_for_unmapped_kind() {
-        let results = vec![err("p", std::io::ErrorKind::AlreadyExists)];
-        emit_per_unlink_failure_trace(&results);
-        // AlreadyExists maps to IoFailureKind::Other per
-        // io_failure_kind::from_io_error_kind.
-        assert!(logs_contain("Other"));
-    }
-
-    #[test]
-    #[tracing_test::traced_test]
-    fn emit_per_unlink_failure_trace_silent_on_all_ok() {
-        let results = vec![ok("a"), ok("b")];
-        emit_per_unlink_failure_trace(&results);
-        // No unlink_blob events should fire when all entries are Ok.
-        assert!(
-            !logs_contain("unlink_blob"),
-            "no tracing events should fire for all-Ok input"
-        );
     }
 
     // ---- Happy-path matrix arms (Task 6) ---------------------------------

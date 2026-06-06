@@ -30,6 +30,7 @@ use thiserror::Error;
 /// | `JoinFailure`                | `{"kind":"JoinFailure"}`                                     |
 /// | `Io { kind }`                | `{"kind":"Io","detail":{"kind":"PermissionDenied"}}`         |
 /// | `VaultArtifactsPresent`      | `{"kind":"VaultArtifactsPresent"}`                           |
+/// | `VaultBusyAuth`              | `{"kind":"VaultBusyAuth"}`                                   |
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum AppError {
@@ -108,6 +109,27 @@ pub enum AppError {
     /// `{"kind":"WeakNewPassword"}`.
     #[error("weak new password")]
     WeakNewPassword,
+
+    /// Another vault.meta-lifecycle operation holds the `auth_permits`
+    /// capacity-1 semaphore. As of MYND-159 (`vault_repair`), `commit` is
+    /// pulled into the same single-permit mutex that already serializes
+    /// `vault_unlock` / `vault_recover_*` / `vault_change_password` /
+    /// `vault_delete` — generalizing `auth_permits` from an Argon2id
+    /// throttle into a **vault.meta-lifecycle mutex** so a concurrent
+    /// `vault_repair` sweep can never race a fresh `commit` (TOCTOU). The
+    /// command uses `try_acquire` (reject, never queue); the permit is
+    /// released **before** `commit` returns so the frontend's subsequent
+    /// auto-unlock `vault_unlock` acquires cleanly (no self-deadlock).
+    /// Normally unreachable in the create flow — at creation time there is
+    /// no vault to unlock / change / delete, so nothing else holds the
+    /// permit; it fires only against a racing `vault_repair`.
+    ///
+    /// Cross-plugin shared variant name with
+    /// `VaultDeleteError::VaultBusyAuth` per the "naming-discipline >
+    /// scenario-optimization" rule (MYND-22 grill Q6). Distinct Rust type,
+    /// identical JSON wire encoding `{"kind":"VaultBusyAuth"}`.
+    #[error("vault busy with auth operation")]
+    VaultBusyAuth,
 }
 
 /// Bounded categorization of IO failures surfaced from `std::io::Error`.

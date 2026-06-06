@@ -20,12 +20,24 @@ use tauri::{AppHandle, Manager, Runtime};
 /// `PathBuf` always points at `<app_data_dir>/vault/` and the
 /// directory is `create_dir_all`'d before return.
 pub fn vault_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppError> {
+    // The non-creating resolver owns the base-path lookup + error mapping;
+    // this adds only the `create_dir_all` side effect.
+    let dir = vault_dir_path(app)?;
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
+/// Resolve the vault directory path **without creating it**.
+///
+/// Used by read-only probes — `vault_repair`'s residue scan (MYND-159) —
+/// that must not have the side effect of materializing an empty `vault/`
+/// directory on a device that never created a vault. [`vault_dir`] (which
+/// `create_dir_all`s) stays the canonical resolver for write paths.
+pub fn vault_dir_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppError> {
     let base = app.path().app_data_dir().map_err(|_| AppError::Io {
         kind: crate::plugins::vault_creation::error::IoErrorKind::Other,
     })?;
-    let dir = base.join("vault");
-    std::fs::create_dir_all(&dir)?;
-    Ok(dir)
+    Ok(base.join("vault"))
 }
 
 /// Resolve `<vault-root>/notes/` and ensure it exists. The returned

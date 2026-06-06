@@ -1,5 +1,6 @@
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
+import { RepairResidueBanner } from "../components/RepairResidueBanner";
 
 interface WelcomeProps {
   onCreateVault: () => void;
@@ -64,6 +65,12 @@ export function Welcome({ onCreateVault }: WelcomeProps) {
           Your notes are encrypted on this device before they leave it. The
           server only stores ciphertext.
         </div>
+
+        {/* Orphan-residue cleanup (MYND-159). Renders nothing unless a
+            partial-fail vault_delete left artefacts behind — surfaced here,
+            on Welcome, because that is exactly where the user lands when
+            vault.meta is gone (Settings is unreachable without a vault). */}
+        <RepairResidueBanner />
 
         <div
           style={{
