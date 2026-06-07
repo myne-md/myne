@@ -69,6 +69,40 @@ pre-push:
   parallel: false
   commands:
 
+    damm32-table-drift:
+      # MYND-74: the frozen Damm-32 quasigroup table is generated into two
+      # sentinel-delimited regions — the DAMM32_TABLE const in
+      # protocol/src/account_number.rs and the §4.2 block in
+      # docs/spec/account-number.md. Regenerate and compare; fail on drift so
+      # the two representations can never diverge from the construction.
+      #
+      # Division of labor: the const's *values* are already locked to the
+      # runtime by the ordinary unit test `damm32_table_matches_runtime_construction`
+      # (runs under `cargo-test` below). This hook owns what no `cargo test` can
+      # reach — the *textual* sync of both sentinel blocks (const formatting +
+      # the .md spec block) against the generator output. Migrate to Woodpecker
+      # CI when it lands.
+      run: |
+        set -e
+        cargo test -p protocol --lib emit_damm32_table_for_paste -- --ignored >/dev/null 2>&1
+        # Anchor on the real sentinel lines (start with `//` or `<!--`), not the
+        # same substring inside the generator's string literals further down.
+        extract() { awk '/^(\/\/|<!--).*BEGIN GENERATED damm32-table/{f=1} f{print} /^(\/\/|<!--).*END GENERATED damm32-table/{if(f)exit}' "$1"; }
+        fail=0
+        if ! extract protocol/src/account_number.rs | diff -u - /tmp/myne_damm32_table_const.rs; then
+          echo "DRIFT: protocol/src/account_number.rs DAMM32_TABLE const differs from the generator."
+          fail=1
+        fi
+        if ! extract docs/spec/account-number.md | diff -u - /tmp/myne_damm32_table_spec.md; then
+          echo "DRIFT: docs/spec/account-number.md §4.2 table block differs from the generator."
+          fail=1
+        fi
+        if [ "$fail" -ne 0 ]; then
+          echo "Fix: cargo test -p protocol --lib emit_damm32_table_for_paste -- --ignored"
+          echo "     then paste /tmp/myne_damm32_table_const.rs (const) and /tmp/myne_damm32_table_spec.md (spec §4.2)."
+        fi
+        exit $fail
+
     clippy:
       run: cargo clippy --workspace --all-targets -- -D warnings
 

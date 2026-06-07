@@ -83,7 +83,7 @@ Active Phase 1 work is tracked in Plane: **plane.myne.md** (self-hosted). Lane I
 
 ## Cryptographically load-bearing identifiers
 
-Bound into AEAD tags or magic-byte checks. Changing any is a major-version event:
+Identifiers and constants whose change is a major-version event. Most are bound into AEAD tags or magic-byte checks; some (e.g. the account-number display prefix, the Damm-32 table) are load-bearing through account identity or presentation rather than an AEAD/magic boundary — the mechanism is noted per row:
 
 | Use site | Value |
 |---|---|
@@ -96,7 +96,8 @@ Bound into AEAD tags or magic-byte checks. Changing any is a major-version event
 | Vault prefs blob magic | `MYP1` (file `vault.prefs`; §9.5) |
 | Search-index blob magic | `MYS1` (file `vault.search`; §9.6) |
 | Protocol identifier string | `myne-protocol-v0.1` |
-| Account-number display prefix | `MY-XXXX-XXXX-XXXX-XXXX-X` |
+| Account-number display prefix | `MY-XXXX-XXXX-XXXX-XXXX-X` (display-only) |
+| Damm-32 quasigroup table | frozen literal, `account-number.md` §4.2 — determines which 20-char strings are valid and which check char generation emits; changing it rejects already-distributed account numbers and breaks cross-impl validity agreement |
 
 v005 reservations: `NT05`/`NTV5` (per-note / vault-meta) + `MYP5`/`MYS5` (prefs / search) magic, `"myne.v005|"` AAD prefix, `"myne.v005 "` HKDF context prefix — see the normative registry in `docs/spec/protocol.md` §10.3. v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.
 
