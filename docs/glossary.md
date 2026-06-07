@@ -201,6 +201,12 @@ The code-editor framework used as the markdown editor in Myne's Phase 1 desktop 
 
 Used in: `vision.md` Phase 1 Scope
 
+### **color label** &nbsp; 📦 *Product*
+
+A user-assigned color on a sidebar note or [folder](#folder) row, rendered as a small dot (the title text stays in the ink ramp; a colored left-border is banned by `PRODUCT.md`). Persisted as the `item_colors` field of [`vault.prefs`](#vaultprefs) — an optional nested-object map from a note UUID **or** canonical trailing-slash folder path (discriminated by the trailing `/`, like [item order](#item-order)) to a [label slot](#label-slot) name; NFC-normalized, lexicographically-keyed, omitted-when-empty (`spec/protocol.md` §9.5.2). Note-keyed entries survive note rename/move (the UUID is the filename); folder-keyed entries are prefix-rewritten on folder rename/move and pruned on delete; a stale entry is ignored at render and pruned on the next write. **Non-load-bearing** (cosmetic, AS-low) — a tampered/replayed blob can at worst surface the wrong color. Notes **and** folders both take a color (contrast [custom folder icon](#custom-folder-icon), folders only). See also [label slot](#label-slot), [PrefsView](#prefsview). (MYND-184)
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07
+
 ### **command palette** &nbsp; 📦 *Product*
 
 Global keyboard-first action launcher in the Phase 1 desktop client, opened via `Cmd+K` / `Ctrl+K`. Renders a centered modal with a fuzzy-match input + scrollable action list; ArrowUp/Down navigates, Enter runs the highlighted action, Esc dismisses. v1 ships five actions across Vault / App / Navigation / Editor categories: Lock vault, Open settings, Switch to note (transitions into a note-picker sub-palette), Import Obsidian vault (disabled stub for Phase 1.x), Convert wikilinks in this note (disabled stub for `editor-mvp-wikilinks`). Action visibility respects the current `Stage` — non-editor stages hide editor-only actions; the palette never exposes actions unavailable in the current state. The action registry is a frozen `readonly CommandAction[]`; no plugin / scripting API is introduced (acceptance criterion enforced structurally). Distinct from the editor's **slash command** menu, which is editor-internal (cursor-anchored) and bound to insertable markdown elements.
@@ -262,6 +268,12 @@ Reference: Chan & Rogaway, "On Committing Authenticated Encryption", ESORICS 202
 The Phase 1 editor pattern where decorations on the line containing the cursor lift to expose the underlying markdown source for editing, then reapply when the cursor leaves the line. There is no separate "rendered view" / "source view" mode-switch — cursor location *is* the reveal. Headings show their leading `#`s on the active line and hide them off-line; bold and italic delimiters reveal on entry; inline link URLs become editable when the cursor enters their parent line. Wikilink chips are an exception per `spec/wikilink.md` §5.4 (chips stay atomic regardless of cursor position).
 
 Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`
+
+### **custom folder icon** &nbsp; 📦 *Product*
+
+A user-chosen icon replacing a [folder](#folder)'s default sidebar glyph, rendered in `currentColor` (icons are never colored independently, `PRODUCT.md`). Persisted as the `folder_icons` field of [`vault.prefs`](#vaultprefs) — an optional nested-object map from a canonical trailing-slash folder path to an icon name drawn from a curated client-side stroke-glyph set (no arbitrary/uploaded icon, no emoji); NFC-normalized, lexicographically-keyed, omitted-when-empty (`spec/protocol.md` §9.5.2). Folder-keyed entries are prefix-rewritten on folder rename/move and pruned on delete; a stale or unknown-icon entry is ignored at render and pruned on the next write. **Non-load-bearing** (cosmetic, AS-low). Folders only — notes get a [color label](#color-label) but not a custom icon. See also [color label](#color-label), [PrefsView](#prefsview). (MYND-185)
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07
 
 ### **Cytoscape.js** &nbsp; 🛠️ *Tooling*
 
@@ -539,6 +551,12 @@ Reference: Chan & Rogaway 2022.
 A mechanism for publishing user-key bindings to a verifiable log so that clients can detect malicious server-side key substitution. Out of scope for v0.1 (no multi-device or multi-user identity); a `appname-v005` deliverable.
 
 Used in: `spec/protocol.md` §11; `e2ee-notes-evaluation.md`
+
+### **label slot** &nbsp; 📦 *Product*
+
+One of a fixed, bounded set of named, theme-aware colors a [color label](#color-label) may take — six muted hue-named slots (matched to Myne's iron/ochre/brick/forest register, not bright Finder tags) plus "none". Defined as `--label-*` design tokens in `docs/design/colors_and_type.css` with light/dark value pairs mirroring the state tokens; the dot is a solid fill (no `-soft` variant). Slots are fixed and hue-named, **not** user-renamable, and are **not** a repurpose of the semantic state colors (`--danger` etc.) — a label must not read as a state. See also [color label](#color-label). (MYND-184)
+
+Used in: `decisions.md` 2026-06-07
 
 ### **language pack (Tier 1)** &nbsp; 🛠️ *Tooling*
 A per-language CodeMirror 6 grammar package (`@codemirror/lang-*`, or a CM5 stream-mode from `@codemirror/legacy-modes`) that provides syntax tokenization for a fenced code block's body. "Tier 1" distinguishes these from the Tier-0 core editor packs: they are **hand-curated** (not pulled via `@codemirror/language-data`) to keep the dependency tree minimal (TB9), and **eager-imported** (revised 2026-05-29 from the original lazy plan, which didn't color reliably in the Tauri WebView). Adopted in the 2026-05-29 decision (MYND-154).

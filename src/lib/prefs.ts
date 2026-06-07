@@ -100,6 +100,22 @@ export interface PrefsView {
    * Rust `Option<ThemeChoice>` (null | "light" | "dark").
    */
   theme: ThemeChoice | null;
+  /**
+   * Per-folder custom sidebar icon (MYND-185) — a map from a canonical
+   * trailing-slash folder path to an icon name (the client's curated stroke-glyph
+   * set), replacing that folder's default glyph. Absent in vaults with no custom
+   * folder icon → the Rust decoder defaults it to `{}`. Folders only. Serialized
+   * from Rust `BTreeMap<String, String>`.
+   */
+  folder_icons: Record<string, string>;
+  /**
+   * Per-item color label (MYND-184) — a map from a sidebar item key (a note UUID
+   * **or** a canonical trailing-slash folder path, discriminated by the trailing
+   * `/`) to a color-slot name. Notes and folders both take a color (folders also
+   * get an icon; notes do not). Absent in vaults with no color → the Rust decoder
+   * defaults it to `{}`. Serialized from Rust `BTreeMap<String, String>`.
+   */
+  item_colors: Record<string, string>;
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -220,4 +236,26 @@ export async function setDailyFolder(folder: string): Promise<void> {
  */
 export async function setDailyTemplate(templateId: string | null): Promise<void> {
   await invoke<void>("plugin:prefs|set_daily_template", { templateId });
+}
+
+/**
+ * Persist the full item_colors map (MYND-184) — per-item color labels keyed by
+ * note UUID or canonical trailing-slash folder path. The caller passes the
+ * entire desired map; v0.1 single-device writes it verbatim. Clearing a color =
+ * omit its key (an empty map omits the field on disk). Stale-key pruning (deleted
+ * note/folder) is the caller's job. No native side-effect; a rejected promise
+ * means the disk write failed and the caller's optimistic UI must revert.
+ */
+export async function setItemColors(colors: Record<string, string>): Promise<void> {
+  await invoke<void>("plugin:prefs|set_item_colors", { colors });
+}
+
+/**
+ * Persist the full folder_icons map (MYND-185) — per-folder custom icons keyed
+ * by canonical trailing-slash folder path. The caller passes the entire desired
+ * map; resetting a folder to its default glyph = omit its key. Same
+ * order-irrelevant, no-native-side-effect contract as {@link setItemColors}.
+ */
+export async function setFolderIcons(icons: Record<string, string>): Promise<void> {
+  await invoke<void>("plugin:prefs|set_folder_icons", { icons });
 }

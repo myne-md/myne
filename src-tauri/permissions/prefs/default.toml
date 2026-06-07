@@ -27,6 +27,8 @@ permissions = [
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
+  "allow-set-item-colors",
+  "allow-set-folder-icons",
 ]
 
 [[permission]]
@@ -102,3 +104,19 @@ commands.allow = ["set_daily_folder"]
 identifier = "allow-set-daily-template"
 description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_daily_template"]
+
+# MYND-184 / MYND-185 sidebar decorations: two write setters for the
+# decoration maps (item_colors = per-item color labels; folder_icons =
+# per-folder custom icons). Both inherit the same main-window-only invariant
+# as the other allow-set-* permissions — v0.2 multi-window MUST NOT grant
+# these to any non-main window. Both atomic-write vault.prefs with no native
+# side-effect; non-load-bearing (cosmetic, AS-low).
+[[permission]]
+identifier = "allow-set-item-colors"
+description = "Allow invoking prefs:set_item_colors (Slot::Unlocked-gated setter for the item_colors map — per-item color labels keyed by note UUID or canonical folder path; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_item_colors"]
+
+[[permission]]
+identifier = "allow-set-folder-icons"
+description = "Allow invoking prefs:set_folder_icons (Slot::Unlocked-gated setter for the folder_icons map — per-folder custom sidebar icons keyed by canonical folder path; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_folder_icons"]

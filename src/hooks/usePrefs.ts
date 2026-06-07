@@ -43,6 +43,8 @@ const DEFAULT_PREFS: PrefsView = {
   item_order: [],
   editor_layout: null,
   theme: null,
+  folder_icons: {},
+  item_colors: {},
 };
 
 interface UsePrefsResult {

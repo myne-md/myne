@@ -85,6 +85,7 @@ use crate::aead::{
     CTX_COMMITMENT_TAG_LEN,
 };
 use crate::error::ProtocolError;
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use getrandom::getrandom;
@@ -296,6 +297,37 @@ pub struct PrefsView {
     /// [`ThemeChoice`].
     #[serde(default)]
     pub theme: Option<ThemeChoice>,
+
+    /// Per-folder custom sidebar icon (MYND-185) — a map from a canonical
+    /// trailing-slash folder path to an icon name drawn from the client's
+    /// curated stroke-glyph set, replacing that folder's default glyph. A
+    /// `BTreeMap` so the canonical encoder emits keys in lexicographic order
+    /// for free; keys + values are NFC-normalized at encode time. Default
+    /// empty; **omitted entirely from the canonical JSON when empty**, so a
+    /// vault that assigned no folder icon is byte-identical to a pre-MYND-185
+    /// `vault.prefs` (existing golden vectors unaffected). Folder-keyed, so a
+    /// rename/move prefix-rewrite + a delete prune are the client's job (the
+    /// `deliberate_folders` discipline); a stale/unknown-icon entry is ignored
+    /// at render and pruned on the next write (no codec-level GC).
+    /// **Non-load-bearing** (cosmetic, AS-low) — no protective-envelope clamp.
+    /// Canonical key 'f' — sorts after `favorites`, before `item_colors`.
+    #[serde(default)]
+    pub folder_icons: BTreeMap<String, String>,
+
+    /// Per-item color label (MYND-184) — a map from a sidebar item key to a
+    /// color-slot name. Keys are heterogeneous: a note UUID **or** a canonical
+    /// trailing-slash folder path, discriminated by the trailing `/` exactly as
+    /// [`PrefsView::item_order`] discriminates its elements (notes + folders
+    /// both take a color). A `BTreeMap` so the canonical encoder emits keys in
+    /// lexicographic order for free; keys + values are NFC-normalized at encode
+    /// time. Default empty; **omitted entirely from the canonical JSON when
+    /// empty**, so a vault that assigned no color is byte-identical to a
+    /// pre-MYND-184 `vault.prefs`. A note-keyed entry is UUID-stable across note
+    /// rename/move; a folder-keyed entry rides the folder prefix-rewrite + prune
+    /// (client-side). **Non-load-bearing** (cosmetic, AS-low).
+    /// Canonical key 'i' — sorts after `folder_icons`, before `item_order`.
+    #[serde(default)]
+    pub item_colors: BTreeMap<String, String>,
 }
 
 impl Default for PrefsView {
@@ -308,6 +340,8 @@ impl Default for PrefsView {
     fn default() -> Self {
         Self {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             favorites: Vec::new(),
             item_order: Vec::new(),
@@ -528,6 +562,28 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // folder_icons (canonical key 'f' — after 'favorites' [fa < fo], before
+    // 'item_colors'). A nested string→string object (folder path → icon name);
+    // omitted entirely when empty so a vault with no custom folder icon stays
+    // byte-identical to a pre-MYND-185 vault.prefs. Keys emitted in lexicographic
+    // order, NFC-normalized (push_canonical_string_map).
+    if !prefs.folder_icons.is_empty() {
+        out.extend_from_slice(b"\"folder_icons\":");
+        push_canonical_string_map(&mut out, &prefs.folder_icons);
+        out.push(b',');
+    }
+
+    // item_colors (canonical key 'i' — after 'folder_icons', before 'item_order'
+    // ['item_c' < 'item_o']). A nested string→string object whose keys are
+    // heterogeneous note UUIDs OR folder paths (color labels for notes + folders);
+    // omitted entirely when empty so a vault with no color stays byte-identical to
+    // a pre-MYND-184 vault.prefs.
+    if !prefs.item_colors.is_empty() {
+        out.extend_from_slice(b"\"item_colors\":");
+        push_canonical_string_map(&mut out, &prefs.item_colors);
+        out.push(b',');
+    }
+
     // item_order (canonical key 'i' — after 'f', before 's'). The unified
     // sidebar order: a heterogeneous sequence of note UUIDs + folder paths.
     // Same order-preserving discipline as favorites.
@@ -598,6 +654,34 @@ fn push_ordered_string_array(out: &mut Vec<u8>, items: &[String]) {
         push_json_string(out, &nfc);
     }
     out.push(b']');
+}
+
+/// Append a canonical JSON object of string→string pairs (surrounding
+/// `{` / `}`, comma-joined `"key":"value"` members) for the
+/// decoration maps (`folder_icons`, `item_colors`). Keys + values are
+/// NFC-normalized, and the members are emitted in lexicographic KEY
+/// order per spec § 9.5.2. Collecting the NFC-normalized pairs into a
+/// fresh [`BTreeMap`] both re-sorts by the normalized key (a key whose
+/// pre-normalization byte form sorted differently is re-placed) and
+/// collapses any post-NFC duplicate keys deterministically (last-wins),
+/// keeping the output byte-stable given the same logical value — all the
+/// canonical discipline requires. The caller omits the field entirely
+/// when the map is empty, so this never emits `{}`.
+fn push_canonical_string_map(out: &mut Vec<u8>, map: &BTreeMap<String, String>) {
+    let normalized: BTreeMap<String, String> = map
+        .iter()
+        .map(|(k, v)| (k.nfc().collect::<String>(), v.nfc().collect::<String>()))
+        .collect();
+    out.push(b'{');
+    for (i, (k, v)) in normalized.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        push_json_string(out, k);
+        out.push(b':');
+        push_json_string(out, v);
+    }
+    out.push(b'}');
 }
 
 /// Append `s` as a JSON string literal (with surrounding quotes), escaping `"`,
@@ -728,6 +812,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // field's key marker is never matched inside the nested object.
     let editor_layout = parse_optional_editor_layout(rest, &mut cursor, b"\"editor_layout\":")?;
     let favorites = parse_optional_array_field(rest, &mut cursor, b"\"favorites\":")?;
+    // folder_icons (key 'f') + item_colors (key 'i') — the decoration string
+    // maps, sitting between favorites and item_order in canonical order. Parsed
+    // from the same monotonic cursor so a later field's key marker is never
+    // matched inside a prior field's object/array content.
+    let folder_icons = parse_optional_string_map_field(rest, &mut cursor, b"\"folder_icons\":")?;
+    let item_colors = parse_optional_string_map_field(rest, &mut cursor, b"\"item_colors\":")?;
     let item_order = parse_optional_array_field(rest, &mut cursor, b"\"item_order\":")?;
 
     // ---- screen_capture_protection (required) ----
@@ -760,6 +850,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
 
     Ok(PrefsView {
         screen_capture_protection,
+        folder_icons,
+        item_colors,
         deliberate_folders,
         auto_lock_seconds,
         daily_date_format,
@@ -906,6 +998,71 @@ fn parse_optional_array_field(
             Ok(list)
         }
         None => Ok(Vec::new()),
+    }
+}
+
+/// Parse an OPTIONAL canonical string→string object field whose key marker is
+/// `marker` (the decoration maps `folder_icons` / `item_colors`), searching
+/// `rest` from `*cursor` onward. On a hit, advances `*cursor` past the closing
+/// `}` and returns the decoded map; on a miss returns an empty map and leaves
+/// `*cursor` unchanged. Mirrors [`parse_optional_array_field`] for an object
+/// value, keeping the same monotonic-cursor canonical-key-order discipline.
+fn parse_optional_string_map_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<BTreeMap<String, String>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let obj_start = *cursor + rel_idx + marker.len();
+            let (map, consumed) = parse_json_string_map(&rest[obj_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = obj_start + consumed;
+            Ok(map)
+        }
+        None => Ok(BTreeMap::new()),
+    }
+}
+
+/// Parse a JSON object of string→string members starting at `bytes[0] == '{'`.
+/// Returns the decoded map + bytes consumed (through the closing `}`), or `None`
+/// on any malformation. Mirrors [`parse_json_string_array`] for `"key":"value"`
+/// members; values nest no deeper than strings (the only object shape the
+/// decoration maps use). Duplicate keys collapse last-wins via `BTreeMap::insert`
+/// (canonical input never produces them).
+fn parse_json_string_map(bytes: &[u8]) -> Option<(BTreeMap<String, String>, usize)> {
+    if bytes.first() != Some(&b'{') {
+        return None;
+    }
+    let mut i = 1;
+    let mut out: BTreeMap<String, String> = BTreeMap::new();
+    if bytes.get(i) == Some(&b'}') {
+        return Some((out, i + 1));
+    }
+    loop {
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (key, consumed) = parse_json_string(&bytes[i..])?;
+        i += consumed;
+        if bytes.get(i) != Some(&b':') {
+            return None;
+        }
+        i += 1;
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (value, consumed) = parse_json_string(&bytes[i..])?;
+        i += consumed;
+        out.insert(key, value);
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b'}') => return Some((out, i + 1)),
+            _ => return None,
+        }
     }
 }
 
@@ -1183,6 +1340,8 @@ mod tests {
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1201,6 +1360,8 @@ mod tests {
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1237,6 +1398,99 @@ mod tests {
         assert_eq!(a, b);
     }
 
+    // ---- decoration maps: folder_icons + item_colors (MYND-184 / 185) ----
+
+    fn map_of(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (String::from(*k), String::from(*v)))
+            .collect()
+    }
+
+    #[test]
+    fn canonical_json_encodes_decoration_maps_in_canonical_position() {
+        // folder_icons ('f') sorts after favorites, item_colors ('i') after
+        // folder_icons — both BEFORE screen_capture_protection ('s'). Keys
+        // within each object are emitted in lexicographic order.
+        let prefs = PrefsView {
+            folder_icons: map_of(&[("Projects/Myne/", "book"), ("Archive/2025/", "archive")]),
+            item_colors: map_of(&[
+                ("Projects/Myne/", "slate"),
+                ("0190a000-0000-7000-8000-000000000001", "moss"),
+            ]),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"folder_icons":{"Archive/2025/":"archive","Projects/Myne/":"book"},"item_colors":{"0190a000-0000-7000-8000-000000000001":"moss","Projects/Myne/":"slate"},"screen_capture_protection":true}"#
+        );
+    }
+
+    #[test]
+    fn canonical_json_omits_empty_decoration_maps() {
+        // Default (empty maps) must be byte-identical to the screen_capture-only
+        // form — the omit-when-empty discipline that keeps pre-feature golden
+        // vectors unaffected.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn decoration_maps_round_trip_through_blob() {
+        let original = PrefsView {
+            folder_icons: map_of(&[("Archive/2025/", "archive"), ("Projects/Myne/", "book")]),
+            item_colors: map_of(&[
+                ("0190a000-0000-7000-8000-000000000001", "moss"),
+                ("Projects/Myne/", "slate"),
+            ]),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .expect("encode");
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn decode_parses_hand_written_decoration_maps() {
+        let plaintext = br#"{"folder_icons":{"Projects/":"code"},"item_colors":{"0190a000-0000-7000-8000-000000000002":"clay"},"screen_capture_protection":false}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert_eq!(parsed.folder_icons, map_of(&[("Projects/", "code")]));
+        assert_eq!(
+            parsed.item_colors,
+            map_of(&[("0190a000-0000-7000-8000-000000000002", "clay")])
+        );
+        assert!(!parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decoration_map_keys_and_values_are_nfc_normalized() {
+        // A folder key supplied in NFD ("e" + U+0301 combining acute) must be
+        // emitted in NFC (U+00E9) — byte-stability discipline.
+        let prefs = PrefsView {
+            folder_icons: map_of(&[("Cafe\u{301}/", "book")]),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        // NFC "é" = 0xC3 0xA9; the NFD combining mark 0xCC 0x81 must be absent.
+        assert!(find_subslice(&encoded, &[0xC3, 0xA9]).is_some());
+        assert!(find_subslice(&encoded, &[0xCC, 0x81]).is_none());
+    }
+
+    #[test]
+    fn empty_decoration_map_object_decodes_to_empty() {
+        // A literal `{}` value (the codec never emits this — caller omits the
+        // key — but a hand-tampered-but-AEAD-OK blob could) decodes to empty.
+        let plaintext = br#"{"folder_icons":{},"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert!(parsed.folder_icons.is_empty());
+        assert!(parsed.item_colors.is_empty());
+    }
+
     // ---- canonical JSON decoder ----------------------------------------
 
     #[test]
@@ -1246,6 +1500,8 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: true,
+                folder_icons: Default::default(),
+                item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -1266,6 +1522,8 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: false,
+                folder_icons: Default::default(),
+                item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -1363,6 +1621,8 @@ mod tests {
     fn encode_emits_theme_last_dark_with_scp_false() {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: Some(ThemeChoice::Dark),
             ..PrefsView::default()
         });
@@ -1377,6 +1637,8 @@ mod tests {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(300),
             daily_date_format: None,
@@ -1482,6 +1744,8 @@ mod tests {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1506,6 +1770,8 @@ mod tests {
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1533,6 +1799,8 @@ mod tests {
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1555,6 +1823,8 @@ mod tests {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1637,6 +1907,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1683,6 +1955,8 @@ mod tests {
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
@@ -1714,6 +1988,8 @@ mod tests {
         // which does both). The duplicate "zzz" must survive verbatim.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
@@ -1774,6 +2050,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(900),
@@ -1816,6 +2094,8 @@ mod tests {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1838,6 +2118,8 @@ mod tests {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1862,6 +2144,8 @@ mod tests {
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1954,6 +2238,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2020,6 +2306,8 @@ mod tests {
         // right_width.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
@@ -2276,6 +2564,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2302,6 +2592,8 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2502,6 +2794,71 @@ mod tests {
     /// - `encrypt-populated` (MYND-183): all fields incl. heterogeneous
     ///   `item_order` (note UUIDs + folder paths interleaved) + `favorites` →
     ///   expected blob bytes; canonical plaintext computed to self-validate key order
+    ///
+    /// (The MYND-184/185 decoration-maps vector is emitted separately by
+    /// [`emit_decorations_prefs_vector`] to keep this generator stable.)
+    #[test]
+    #[ignore]
+    fn emit_decorations_prefs_vector() {
+        extern crate std;
+
+        // Vault A — same fixed inputs as the sibling generator, distinct nonce
+        // (0xCC×24) so the decorations blob diverges from every other case.
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xCC; AEAD_NONCE_LEN];
+
+        let mut folder_icons = BTreeMap::new();
+        folder_icons.insert(String::from("Archive/2025/"), String::from("archive"));
+        folder_icons.insert(String::from("Projects/Myne/"), String::from("book"));
+        let mut item_colors = BTreeMap::new();
+        item_colors.insert(
+            String::from("0190a000-0000-7000-8000-000000000001"),
+            String::from("moss"),
+        );
+        item_colors.insert(String::from("Projects/Myne/"), String::from("slate"));
+
+        let prefs = PrefsView {
+            folder_icons,
+            item_colors,
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode decorations");
+        // Self-validate the round-trip before emitting.
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("\n---begin decorations vector---\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex: {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_str: {}\n",
+            std::string::String::from_utf8_lossy(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("---end decorations vector---\n");
+        std::println!("{dump}");
+    }
+
     #[test]
     #[ignore]
     fn emit_prefs_vectors_for_paste() {
@@ -2524,6 +2881,8 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: true,
+                folder_icons: Default::default(),
+                item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -2543,6 +2902,8 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: false,
+                folder_icons: Default::default(),
+                item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -2564,6 +2925,8 @@ mod tests {
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
             screen_capture_protection: true,
+            folder_icons: Default::default(),
+            item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("Archive/2025/"),

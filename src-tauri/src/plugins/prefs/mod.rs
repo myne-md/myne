@@ -73,6 +73,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_daily_date_format,
             commands::set_daily_folder,
             commands::set_daily_template,
+            commands::set_item_colors,
+            commands::set_folder_icons,
         ])
         .build()
 }

@@ -116,6 +116,17 @@
   --info:          #2c4a7a;
   --info-soft:     var(--accent-soft);
 
+  /* -- Color -- Label slots (MYND-184; sidebar color labels) ---------- */
+  /* Six muted, hue-named DECORATIVE slots for note/folder color dots — NOT a
+     repurpose of the semantic state colors. Solid-fill dots, no `-soft`
+     variant. Mirrors docs/design/colors_and_type.css. decisions.md 2026-06-07. */
+  --label-clay:   #b0543f;   /* warm brick-red  */
+  --label-ochre:  #94701c;   /* amber / gold    */
+  --label-moss:   #4d7a55;   /* forest green    */
+  --label-slate:  #46688a;   /* iron blue-grey  */
+  --label-plum:   #7e4d76;   /* muted purple    */
+  --label-stone:  #6f6d64;   /* warm grey       */
+
   /* -- Color -- Code syntax highlighting (MYND-154) ------------------- */
   /* Mirrors docs/design/colors_and_type.css. Each hue clears WCAG AA
      (>=4.5:1) vs --paper-2 in both themes (grill Q15). */
@@ -199,6 +210,14 @@
   --_success-dark:      #8cc1a4;
   --_success-soft-dark: #1a2620;
 
+  /* Label slots — dark-surface values (MYND-184). Mirrors colors_and_type.css. */
+  --_label-clay-dark:   #d99683;
+  --_label-ochre-dark:  #d4b46a;
+  --_label-moss-dark:   #8cc1a4;
+  --_label-slate-dark:  #93b4d6;
+  --_label-plum-dark:   #c79cc0;
+  --_label-stone-dark:  #a8a69d;
+
   --_syntax-keyword-dark:  #c79ad4;
   --_syntax-string-dark:   #8cc1a4;
   --_syntax-comment-dark:  #8e8d85;
@@ -259,6 +278,13 @@
   --info:         var(--accent);
   --info-soft:    var(--accent-soft);
 
+  --label-clay:   var(--_label-clay-dark);
+  --label-ochre:  var(--_label-ochre-dark);
+  --label-moss:   var(--_label-moss-dark);
+  --label-slate:  var(--_label-slate-dark);
+  --label-plum:   var(--_label-plum-dark);
+  --label-stone:  var(--_label-stone-dark);
+
   --syntax-keyword:  var(--_syntax-keyword-dark);
   --syntax-string:   var(--_syntax-string-dark);
   --syntax-comment:  var(--_syntax-comment-dark);
@@ -305,6 +331,13 @@
     --success-soft: var(--_success-soft-dark);
     --info:         var(--accent);
     --info-soft:    var(--accent-soft);
+
+    --label-clay:   var(--_label-clay-dark);
+    --label-ochre:  var(--_label-ochre-dark);
+    --label-moss:   var(--_label-moss-dark);
+    --label-slate:  var(--_label-slate-dark);
+    --label-plum:   var(--_label-plum-dark);
+    --label-stone:  var(--_label-stone-dark);
 
     --syntax-keyword:  var(--_syntax-keyword-dark);
     --syntax-string:   var(--_syntax-string-dark);

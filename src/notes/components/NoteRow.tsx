@@ -29,6 +29,7 @@ import {
 } from "react";
 import type { TitleRecord } from "../loadNoteBatch";
 import { uuidv7Ms } from "../sidebarState";
+import { ColorDot } from "./ColorDot";
 import { formatRelativeTime, useTick } from "./relativeTime";
 
 export type NoteRowProps = {
@@ -53,6 +54,9 @@ export type NoteRowProps = {
    *  non-interactive filled badge shown only on favorited rows (render-only;
    *  the toggle handler is wired in the favorites-membership task). */
   onToggleFavorite?: (id: string) => void;
+  /** Color-label slot (MYND-184) — renders a small leading dot before the
+   *  title. Undefined when the note has no color. */
+  colorSlot?: string;
 };
 
 // ─── Token-bound style constants ──────────────────────────────────
@@ -205,6 +209,7 @@ export function NoteRow(props: NoteRowProps) {
     onCancelRename,
     favorited = false,
     onToggleFavorite,
+    colorSlot,
   } = props;
 
   const [hovering, setHovering] = useState(false);
@@ -270,7 +275,7 @@ export function NoteRow(props: NoteRowProps) {
             onCancel={onCancelRename}
           />
         ) : (
-          <TitleLine record={record} />
+          <TitleLine record={record} colorSlot={colorSlot} />
         )}
         <div style={subtitleStyle}>{subtitleText}</div>
       </div>
@@ -305,19 +310,37 @@ export function NoteRow(props: NoteRowProps) {
 
 // ─── TitleLine — handles Untitled placeholder + error indicator ───
 
-function TitleLine({ record }: { record: TitleRecord }) {
+function TitleLine({
+  record,
+  colorSlot,
+}: {
+  record: TitleRecord;
+  colorSlot?: string;
+}) {
+  const dot = <ColorDot slot={colorSlot} style={{ marginRight: 6, verticalAlign: "middle" }} />;
   if (record.error !== undefined) {
     return (
       <div style={titleUntitledStyle} title="Couldn't load this note">
+        {dot}
         <span style={errorIndicatorStyle} aria-hidden="true" />
         Untitled
       </div>
     );
   }
   if (record.title === null) {
-    return <div style={titleUntitledStyle}>Untitled</div>;
+    return (
+      <div style={titleUntitledStyle}>
+        {dot}
+        Untitled
+      </div>
+    );
   }
-  return <div style={titleStyle}>{record.title}</div>;
+  return (
+    <div style={titleStyle}>
+      {dot}
+      {record.title}
+    </div>
+  );
 }
 
 // ─── Inline-rename input (T20) ────────────────────────────────────
