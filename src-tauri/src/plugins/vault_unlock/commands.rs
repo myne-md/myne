@@ -586,6 +586,13 @@ pub async fn lock<R: Runtime>(
     // `vault.search` blob (persist-then-wipe); the next unlock reloads it.
     crate::plugins::notes::search_sync::zeroize_search_index(&app);
 
+    // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
+    //
+    // Same lock path as the search-index wipe — the wikilink graph + tag
+    // index are plaintext-derived RAM (as sensitive as the keys), wiped here
+    // so nothing survives the manual lock. Rebuilt on the next unlock.
+    crate::plugins::vault_indices::zeroize_vault_indices(&app);
+
     // ---- MYND-160 Task 11: post-zeroize native default-ON ---------------
     //
     // Per `decisions.md` 2026-05-27 entry "Lock-on-default-ON: vault_lock

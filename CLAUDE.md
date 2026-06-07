@@ -98,7 +98,7 @@ Bound into AEAD tags or magic-byte checks. Changing any is a major-version event
 | Protocol identifier string | `myne-protocol-v0.1` |
 | Account-number display prefix | `MY-XXXX-XXXX-XXXX-XXXX-X` |
 
-v005 reservations: `MY05`/`MYV5` magic, `"myne.v005 "` HKDF prefix. v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.
+v005 reservations: `NT05`/`NTV5` (per-note / vault-meta) + `MYP5`/`MYS5` (prefs / search) magic, `"myne.v005|"` AAD prefix, `"myne.v005 "` HKDF context prefix — see the normative registry in `docs/spec/protocol.md` §10.3. v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.
 
 ## Crypto primitives baseline (summary)
 

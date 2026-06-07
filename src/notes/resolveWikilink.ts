@@ -35,8 +35,13 @@ export type WikilinkResolution =
     }
   | { status: "broken"; matchCount: 0 };
 
-/** Split a wikilink target into its title component + (for path forms) folder. */
-function parseTarget(ref: WikilinkRef): { title: string; folder: string | null } {
+/** Split a wikilink target into its title component + (for path forms) folder.
+ *  Exported so the VaultIndices edge extractor derives the folded title-key
+ *  from the SAME parse the resolver uses (single source — no divergence). */
+export function parseTarget(ref: WikilinkRef): {
+  title: string;
+  folder: string | null;
+} {
   if (ref.targetKind === "title") {
     return { title: ref.target, folder: null };
   }

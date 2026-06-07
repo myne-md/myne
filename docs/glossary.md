@@ -903,6 +903,12 @@ Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships m
 
 Used in: `threat-model.md` §1 (A8), §7
 
+### **tag index** &nbsp; 📦 *Product*
+
+The derived index of a vault's tags — inline `#tags` ∪ frontmatter `tags:` (source-agnostic union) — part of VaultIndices (MYND-31). Tags are folded to a canonical key (`foldSegment` = NFC + Unicode lowercase, the §3.7.8 tag-identity rule) on the TS side; the index stores the exact folded tag and derives a hierarchy by splitting nested `#a/b/c` on `/` (direct + subtree counts). `by_tag` is subtree-inclusive — a parent tag includes its descendants. The Rust index is trash-blind; trashed members are excluded TS-side via the `isTrashed` live-set.
+
+Used in: VaultIndices (MYND-31), `spec/markdown-dialect.md` §3.7
+
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 
 A Rust-based framework for building cross-platform desktop applications with web-technology UIs. Myne's Phase 1 desktop-client framework (`decisions.md` Deferred #5 resolution). Supersedes the prior Electron baseline. Advantages: small TCB, ~10 MB binary vs ~150 MB Electron, ~40 MB idle RAM vs ~250 MB, achievable reproducible builds, structural memory hygiene via Rust's `zeroize`/`secrecy`/`subtle` crates, smaller updater attack surface.
@@ -1026,6 +1032,12 @@ Used in: `src-tauri/src/plugins/vault_unlock/state.rs::UnlockedVault.vault_meta_
 The Tauri command `vault_unlock:status` that returns the current [`SlotKind`]. Read-only (`tokio::sync::RwLock::read`); never fails in practice — the `Result<SlotKind, VaultUnlockError>` return is purely IPC-contract uniformity with the rest of the unlock plugin. Lives in `vault_unlock` because the plugin owns the runtime-state singleton; permission `vault-unlock:default allow-status`. Frontend boot-time and post-WebView-reload routing call `vault_status` to recover from the case where Tauri's Rust state outlives the WebView's JS state across Cmd+R / hot-reload — `Empty` routes to unlock (or vault-creation if no `vault.meta` exists), `Recovering` routes to the password-reset form, `Unlocked` routes to the editor. Explicitly NOT part of the post-recovery happy path: a defensive round-trip after `vault_complete_recovery` would be paranoia per `decisions.md` 2026-05-02 (the IPC contract pins `Slot::Unlocked` as the success postcondition).
 
 Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/slot-kind.ts`
+
+### **VaultIndices** &nbsp; 📦 *Product*
+
+The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext (a benchmark-gated `MYI1` encrypted-persistence blob is a deferred follow-up). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
+
+Used in: `decisions.md` 2026-06-07 (MYND-31)
 
 ### **Vite** &nbsp; 🛠️ *Tooling*
 

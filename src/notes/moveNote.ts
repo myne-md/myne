@@ -25,6 +25,7 @@ import { patchFolderField, patchUpdatedField } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
+import { reindexNoteFromBody } from "./vaultIndices";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -43,7 +44,11 @@ export async function moveNote(
   const norm = normalizeFolderPath(folder);
   const moved = patchFolderField(encoder.encode(current), norm);
   const stamped = patchUpdatedField(moved, new Date().toISOString());
-  await noteUpdate(noteId, decoder.decode(stamped));
+  const next = decoder.decode(stamped);
+  await noteUpdate(noteId, next);
+  // MYND-31: the folder changed → re-index (live, decrypt-free) so
+  // collision-disambiguation tracks the new folder. Best-effort.
+  void reindexNoteFromBody(noteId, next);
 }
 
 /** Outcome of a {@link bulkMoveNotes} call — moved IDs + per-note failures. */

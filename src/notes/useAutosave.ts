@@ -26,6 +26,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS, saveNote } from "./saveNote";
+import { reindexNoteFromBody } from "./vaultIndices";
 
 export type SaveStatus =
   | { status: "clean" }
@@ -161,6 +162,10 @@ export function useAutosave(
         savedBodyRef.current = patchedBody;
         dirtyRef.current = false;
         setStatus({ status: "saved", at: new Date() });
+        // MYND-31: live re-index from the just-saved body (decrypt-free —
+        // the body is already in V8). Best-effort, fire-and-forget so a
+        // VaultIndices hiccup never affects the save status.
+        void reindexNoteFromBody(id, patchedBody);
         if (onSaved !== undefined && patchedBody !== bodyAtFire) {
           onSaved(patchedBody);
         }
