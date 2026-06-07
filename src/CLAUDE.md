@@ -40,7 +40,7 @@ src/
 │   ├── vault-creation/  ← multi-step flow (PasswordStep, PhraseStep, ConfirmStep, ...)
 │   └── vault-recover/   ← recover-from-phrase flow
 ├── components/          ← reusable UI primitives
-│   ├── primitives/      ← Button, Input, Icon, CenteredCard, MyneMark
+│   ├── primitives/      ← Button, Input, Icon, CenteredCard, MyneMark, ModalShell (shared modal carve-out chrome)
 │   ├── BlockingProgressStep.tsx
 │   ├── DestructiveBanner.tsx
 │   ├── ErrorBanner.tsx
@@ -50,6 +50,7 @@ src/
 │   ├── PasswordInput.tsx       ← single-field primitive: Input + eye toggle + optional zxcvbn meter slot; exports MIN_PASSWORD_LEN/MIN_ZXCVBN_SCORE + usePasswordStrength hook
 │   ├── PasswordStrength.tsx
 │   ├── SettingsModal.tsx       ← Settings shell modal (5-panel rail; carve-out per decisions.md 2026-05-08)
+│   ├── TemplatesManager.tsx    ← Note-template management modal (MYND-189; modal carve-out, opened by the "Manage templates…" palette action)
 │   ├── settings/               ← per-panel content components rendered by SettingsModal
 │   │   ├── AboutPanel.tsx
 │   │   ├── AccountPanel.tsx
@@ -131,6 +132,43 @@ The Settings UI is **not** a Stage variant. It mounts as a modal overlay inside 
 **Force-relock plumbing:** AccountPanel's change-password error handler pattern-matches on `VaultChangePasswordError` variants: `InvalidVaultMeta` → `setStageWithSuspicion({kind:"Corrupted"})`; `VaultMetaChangedExternally` → `setStageWithSuspicion({kind:"Exists"}, "vault-meta-changed-externally")`; `VaultLockedDuringChange` → `setStageWithSuspicion({kind:"Exists"}, "vault-locked-during-change")`. Modal closes via Editor unmount cascade after Stage transitions away from `editor`.
 
 **Disabled-control discipline:** disabled toggles / buttons in Privacy / Appearance / Storage / About panels carry **real labels**, not "Coming soon" copy. Each disabled control corresponds to a tracked Plane work item and enables on the same PR that lands the backing feature. This is **distinct** from MYND-130's `ComingSoonPill` removal — that was a marketing-style hope label on a Phase-2+ scope; these are tracked-feature stubs. Don't reflexively delete them. Rationale: `design-notes.md` 2026-05-08 "Desktop modal carve-out + Settings 5-panel taxonomy + disabled-control discipline".
+
+## Note templates (MYND-182 epic)
+
+Templates are ordinary `.myn` notes carrying a value-strict `template: true`
+frontmatter flag (the inverse-visibility twin of `trashed:`; `markdown-dialect.md`
+§3.6.1). Surfaces and patterns added by the epic:
+
+- **Management surface** (`components/TemplatesManager.tsx`): a modal-class
+  surface mounted from `Editor.tsx` via an Editor-local boolean (`templatesOpen`)
+  — the **same desktop modal carve-out as SettingsModal**, NOT a Stage variant,
+  NOT a 6th Settings panel, NOT a sidebar surface. Opened by the
+  `templates.manage` command-palette action ("Manage templates…", `editor`-stage
+  guarded) → `CommandContext.onManageTemplates` → `setTemplatesOpen(true)`.
+  Lists `listTemplates()` (the `template: true` filter, trashed excluded); row
+  actions map 1:1 to the SYNC-9 surface in `src/notes/templates.ts` — New
+  (`createTemplate` → open in editor), Edit (row click → open), Remove from
+  templates (`convertTemplateToNote`, non-destructive), Delete (`deleteTemplate`
+  → soft-trash, recoverable). Esc / backdrop / close dismiss; first-run empty
+  state (start-empty, no seeding). Design canon: Penpot page "4 — Desktop UI
+  Kit", `screen------templates--manage` frames.
+- **`{{` token autocomplete** (`editor/template-tokens/plugin.ts`): a CM6
+  ViewPlugin modeled on `editor/slash/plugin.ts`, composed in `editor/extensions.ts`
+  alongside the slash menu. **Active only inside a `template: true` note** (reads
+  the doc's own frontmatter via `cachedLocateFrontmatter` + the dialect's
+  value-strict `readTemplateFromFmBody`) — in an ordinary note `{{date}}` stays
+  literal. It is **closeBrackets-aware** (detects `{{` before the cursor robustly,
+  and consumes a trailing auto-closed `}}` on insert so the result is one clean
+  `{{token}}`). Menu items come from the engine's `SUPPORTED_TOKENS`
+  (`dialect/templateEngine.ts`) — **never hard-coded here**, so adding a token to
+  the engine surfaces it with no second edit site. Inserting only inserts the
+  token text; it never evaluates (anti-scripting, SYNC-6-R).
+- **Variable engine TS mirror** (`dialect/templateEngine.ts`): the Phase-1
+  desktop runtime engine (`renderTemplate` + `SUPPORTED_TOKENS`), a hand-mirror
+  of the canonical Rust engine `protocol/src/template.rs` (the spec/wasm-future
+  source). The hand-mirror reaches the engine WITHOUT a Tauri command crossing
+  the WebView boundary — same Rust↔TS discipline as `MIN_PASSWORD_LEN`
+  (drift-check is the follow-up safety net; both sides pinned by equivalent tests).
 
 ## Common commands
 

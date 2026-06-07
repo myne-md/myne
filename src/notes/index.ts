@@ -30,6 +30,26 @@ export {
   saveNote,
 } from "./saveNote";
 export { renameNote } from "./renameNote";
+export {
+  createTemplate,
+  convertNoteToTemplate,
+  convertTemplateToNote,
+  deleteTemplate,
+  listTemplates,
+} from "./templates";
+export {
+  buildRenderContext,
+  extractTemplateBody,
+  createNoteFromTemplate,
+  createBlankNamedNote,
+} from "./newNoteFromTemplate";
+export {
+  resolveTodayNote,
+  formatDailyDate,
+  DEFAULT_DAILY_FOLDER,
+  DEFAULT_DAILY_DATE_FORMAT,
+  type DailyResolution,
+} from "./dailyNote";
 export { moveNote, bulkMoveNotes } from "./moveNote";
 export type { BulkMoveResult } from "./moveNote";
 export {
@@ -56,6 +76,8 @@ export {
   rollbackOptimisticDelete,
   rollbackOptimisticRename,
   sortBatchIds,
+  templateRecords,
+  trashedCount,
   useSelectedNote,
 } from "./sidebarState";
 export type {

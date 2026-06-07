@@ -93,6 +93,37 @@ describe("loadNoteBatch — title derivation (frontmatter `title:` only)", () =>
     expect(rec.title).toBe("FM Title");
   });
 
+  // Regression (MYND-191): a date-shaped title MUST be quoted on write, else
+  // js-yaml re-types the bare `2026-06-07` to a Date and the title reads back as
+  // null → "Untitled" (and daily-note title-keyed matching never finds it).
+  it("reads a quoted date-shaped title back as the string", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "daily",
+          frontmatter_bytes: 'title: "2026-06-07"\n',
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["daily"]);
+    expect(rec.title).toBe("2026-06-07");
+  });
+
+  it("an UNquoted date-shaped title is mis-typed to null (the bug the quoting fix prevents)", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "daily-bad",
+          frontmatter_bytes: "title: 2026-06-07\n",
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["daily-bad"]);
+    expect(rec.title).toBeNull();
+  });
+
   it("yields null when frontmatter has no title field (no H1 fallback)", async () => {
     invokeMock.mockResolvedValueOnce([
       {

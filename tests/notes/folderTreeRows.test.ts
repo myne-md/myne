@@ -24,6 +24,8 @@ const rec = (id: string, folder: string | null, ms = 0): TitleRecord => ({
   title: id,
   folder,
   updatedAt: new Date(ms),
+  trashed: null,
+  template: false,
 });
 
 function build(records: TitleRecord[], deliberate: string[] = []) {

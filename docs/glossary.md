@@ -291,6 +291,12 @@ A check-digit algorithm using a totally anti-symmetric quasigroup (Damm 2004), g
 
 Used in: `spec/account-number.md` §4
 
+### **daily note** &nbsp; 📦 *Product*
+
+An ordinary `.myn` note representing one calendar day, identified by **folder + date-title** (e.g. a note titled `2026-06-07` inside the `Daily/` folder) — **not** a calendar object, date-object model, or date-indexed database. The "Open today's note" command resolves today's note idempotently: it computes today's date-title from `now` via the `daily_date_format` pref and looks for a non-trashed, non-template note matching the daily folder + date-title under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2); found → open, not found → create (from the [note template](#note-template) the `daily_template` pref points at, or blank with the date as title) and open. Three `vault.prefs` fields configure it (`spec/protocol.md` §9.5.2): **daily folder** (`daily_folder`, default `Daily/`, also registered as a [deliberate folder](#deliberate-folder) so it survives empty), **daily date format** (`daily_date_format`, default `YYYY-MM-DD`), and **daily template** (`daily_template`, a template UUID or unset). Past days are reached via the ordinary sidebar folder — no date-picker, no jump-to-date. Bounded as a plain-markdown skeleton + date navigation by construction, respecting the anti-Notion / no-calendar commitment (`vision.md`). See [decisions.md](decisions.md) 2026-06-07 (MYND-191).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07 (MYND-182 / MYND-191)
+
 ### **deliberate folder** &nbsp; 📦 *Product*
 
 A folder the user explicitly created that persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). The set is *cold* — written only on explicit folder create / delete, never on note move — and merges as a union (add-wins) under Phase 2 sync. A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2). See also [folder](#folder), [item order](#item-order).
@@ -604,6 +610,12 @@ Used in: `spec/protocol.md` §3.1, §7.4
 A non-repeating value used with a key in an encryption scheme. Myne nonces are 192-bit random values from the OS CSPRNG, drawn fresh for each AEAD call and stored alongside the ciphertext on disk. The 192-bit width makes random-nonce collisions negligible at any realistic vault size, removing the operational burden of nonce uniqueness tracking.
 
 Used in: `spec/protocol.md` §5.3
+
+### **note template** &nbsp; 📦 *Product*
+
+A reusable note skeleton the user picks at note-creation time. Stored as an ordinary AEAD-sealed [`.myn`](#myn-file) note carrying the value-strict Myne-managed `template:` flag (`spec/markdown-dialect.md` §3.6.1) — **not** a `vault.prefs` field, so it inherits the 16 MiB/note ceiling, per-note fault isolation, and a free [UUIDv7](#note_uuid) identity (rename-safe; the template's name is its `title:` field, its content is the note body). A note template is the inverse-visibility twin of [Trash](#trash): excluded from the sidebar file-tree, folder-tree, and search, surfaced **only** in the template picker and the management UI. Location-agnostic (no target-folder baked in) and minimal: no declared-variables field — the [template variable](#template-variable) engine infers `{{...}}` tokens from the body at fill time. Myne ships **none** — a fresh vault has zero templates (start-empty). See [markdown-dialect.md](spec/markdown-dialect.md) §3.6.1 (`template:` row), [decisions.md](decisions.md) 2026-06-07 (MYND-186).
+
+Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-06-07 (MYND-186)
 
 ### **note_uuid** &nbsp; 🗝️ *Key/identifier*
 
@@ -922,6 +934,12 @@ Used in: `src/editor/code-highlight.ts`, `design-notes.md` (2026-05-29).
 ### **syntax palette (`--syntax-*` tokens)** &nbsp; 📦 *Product*
 The family of CSS design tokens (`--syntax-keyword`, `--syntax-string`, `--syntax-comment`, …) defining the syntax-highlighting colors, with a light and a dark value each. Every hue clears WCAG AA (≥4.5:1) contrast against the `--paper-2` code-card fill in both themes. The editor's code `HighlightStyle` maps Lezer code tags onto these tokens; no ad-hoc hex. Defined in the runtime `src/styles/tokens.css` (what the app loads) and mirrored in the canonical `docs/design/colors_and_type.css`. Introduced MYND-154.
 Used in: `src/styles/tokens.css`, `docs/design/colors_and_type.css`, `src/editor/code-highlight.ts`.
+
+### **template variable** &nbsp; 📦 *Product*
+
+A `{{token}}` placeholder in a [note template](#note-template) body that the variable engine substitutes against a fixed built-in registry at note-creation time. The v1 registry is `{{date}}`, `{{time}}`, `{{title}}`, `{{datetime}}`, `{{weekday}}` (lowercase-only; unknown tokens are left literal, which doubles as the escape mechanism). Substitution is **deterministic, one-shot, eager** — parse → registry lookup → substitute, never an expression, formula, callback, or format-argument mini-language (the anti-plugin / no-scripting commitment, `vision.md`). The engine is inferred-not-declared: it scans the template body for tokens at fill time rather than reading a declared-variables field, and reads no clock or locale itself (the host injects the time-derived values). Output is plain markdown — a rendered token emits only literal text. See `spec/markdown-dialect.md` §3.6.1, the variable-engine module in `protocol/`, MYND-188.
+
+Used in: `protocol/` variable engine (MYND-188); `spec/markdown-dialect.md` §3.6.1
 
 ### **test vector** &nbsp; 📋 *Protocol*
 

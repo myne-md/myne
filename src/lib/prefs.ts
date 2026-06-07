@@ -51,6 +51,23 @@ export interface PrefsView {
    */
   auto_lock_seconds: number | null;
   /**
+   * Daily-notes date-format string (MYND-191) — e.g. `YYYY-MM-DD`. `null` ≡ the
+   * canonical default `YYYY-MM-DD`, applied host-side (blank-when-default).
+   * Serialized from Rust `Option<String>`.
+   */
+  daily_date_format: string | null;
+  /**
+   * Daily-notes folder path (MYND-191), canonical trailing-slash form — e.g.
+   * `Daily/`. `null` ≡ the canonical default `Daily/`, applied host-side.
+   * Designating a folder also registers it in `deliberate_folders`.
+   */
+  daily_folder: string | null;
+  /**
+   * Daily-notes template pointer (MYND-191) — the UUIDv7 of a template note to
+   * instantiate today's note from. `null` ≡ the "blank daily note" state.
+   */
+  daily_template: string | null;
+  /**
    * Favorited notes — an ordered list of note UUIDs surfaced in the sidebar's
    * Favorites section, in display order (MYND-183). A sequence: the backend
    * preserves element order verbatim. UUIDs only (folders are not favoritable).
@@ -175,4 +192,32 @@ export async function setEditorLayout(layout: EditorLayout): Promise<void> {
  */
 export async function setTheme(theme: ThemeChoice | null): Promise<void> {
   await invoke<void>("plugin:prefs|set_theme", { theme });
+}
+
+/**
+ * Set the daily-notes date-format string (MYND-191), e.g. `YYYY-MM-DD`. The
+ * backend atomic-writes vault.prefs disk-first with no native side-effect; a
+ * rejected promise means the disk write failed. Non-load-bearing.
+ */
+export async function setDailyDateFormat(format: string): Promise<void> {
+  await invoke<void>("plugin:prefs|set_daily_date_format", { format });
+}
+
+/**
+ * Set the daily-notes folder path (MYND-191), canonical trailing-slash form
+ * (e.g. `Daily/`). Designating it also registers the folder in
+ * `deliberate_folders` so it survives empty. Disk-first, no native side-effect.
+ */
+export async function setDailyFolder(folder: string): Promise<void> {
+  await invoke<void>("plugin:prefs|set_daily_folder", { folder });
+}
+
+/**
+ * Set (or clear) the daily-notes template pointer (MYND-191). Pass a template
+ * UUID to designate it, or `null` to clear it back to the "blank daily note"
+ * state. Disk-first, no native side-effect; a rejected promise means the write
+ * failed.
+ */
+export async function setDailyTemplate(templateId: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_daily_template", { templateId });
 }

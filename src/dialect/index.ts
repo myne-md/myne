@@ -27,10 +27,13 @@ export {
   patchFirstH1Line,
   patchFolderField,
   patchSourceRanges,
+  patchTemplateField,
   patchTitleField,
   patchTrashedField,
   patchUpdatedField,
+  readTemplateFromFmBody,
   readTrashedFromFmBody,
+  TEMPLATE_FLAG_VALUE,
 } from "./surgery";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";

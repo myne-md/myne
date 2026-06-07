@@ -15,6 +15,7 @@
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { Button } from "../primitives/Button";
 import { ControlBlock } from "./ControlBlock";
+import { DailyNotesSettings } from "./DailyNotesSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { prefsRead, setTheme, type ThemeChoice } from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
@@ -169,6 +170,9 @@ export function AppearancePanel() {
           </div>
         }
       />
+
+      {/* Daily-notes configuration (MYND-191) — folder / date-format / template. */}
+      <DailyNotesSettings />
     </div>
   );
 }

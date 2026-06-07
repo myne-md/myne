@@ -44,6 +44,44 @@ const importObsidianAction: CommandAction = {
   },
 };
 
+const manageTemplatesAction: CommandAction = {
+  id: "templates.manage",
+  label: "Manage templates…",
+  category: "Editor",
+  // Editor-only, like Open settings — the management surface mounts inside the
+  // Editor (modal carve-out). Free + local; no paywall, no hosted-sync gate.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onManageTemplates();
+  },
+};
+
+const newNoteFromTemplateAction: CommandAction = {
+  id: "templates.new-note",
+  label: "New note from template…",
+  category: "Editor",
+  // Editor-only; opens the picker → prompt-first name → render+create flow. The
+  // instant-blank path (bare Cmd+N + the five instant-create surfaces) is
+  // untouched — this is the deliberate, opt-in template path (split-path).
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onNewNoteFromTemplate();
+  },
+};
+
+const openTodayNoteAction: CommandAction = {
+  id: "daily.open-today",
+  label: "Open today's note",
+  category: "Editor",
+  // Idempotent open-or-create over ordinary notes (folder + date-title key).
+  // Palette-only in v1 — no sidebar button, no built-in hotkey; past days are
+  // reached via the ordinary Daily/ sidebar folder (no calendar, no date-picker).
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onOpenTodayNote();
+  },
+};
+
 const convertWikilinksAction: CommandAction = {
   id: "wikilinks.convert-in-this-note",
   label: "Convert wikilinks in this note…",
@@ -61,6 +99,9 @@ const convertWikilinksAction: CommandAction = {
 export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
+  newNoteFromTemplateAction,
+  openTodayNoteAction,
+  manageTemplatesAction,
   importObsidianAction,
   convertWikilinksAction,
 ]);

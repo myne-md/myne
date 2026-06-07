@@ -1,6 +1,7 @@
 // Spec: docs/spec/markdown-dialect.md §3.6.1 (Myne-managed canonical
 // frontmatter fields); decisions.md 2026-05-09 (TS-owned surgery).
 
+import { load as parseYaml } from "js-yaml";
 import {
   FRONTMATTER_DELIMITER,
   FRONTMATTER_OPENER,
@@ -13,6 +14,14 @@ const UPDATED_KEY_RE = /^([ \t]*updated[ \t]*:[ \t]*)(.*)$/;
 const TITLE_KEY_RE = /^([ \t]*title[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_KEY_RE = /^([ \t]*folder[ \t]*:[ \t]*)(.*)$/;
 const TRASHED_KEY_RE = /^([ \t]*trashed[ \t]*:[ \t]*)(.*)$/;
+const TEMPLATE_KEY_RE = /^([ \t]*template[ \t]*:[ \t]*)(.*)$/;
+
+// The single canonical value that marks a note a template. Value-strict:
+// `readTemplateFromFmBody` accepts only this literal, unquoted form
+// (§3.6.1 `template:` row) — `template: 1` / `yes` / `True` / `"true"` all
+// read as an ordinary note, mirroring how `trashed:` admits only a valid
+// RFC 3339 value.
+export const TEMPLATE_FLAG_VALUE = "true";
 
 const utf8Decoder = new TextDecoder("utf-8");
 const utf8Encoder = new TextEncoder();
@@ -41,6 +50,39 @@ export function formatYamlScalar(value: string): string {
   if (!needsYamlQuoting(value)) return value;
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;
+}
+
+// Would YAML re-type the bare scalar `value` to something other than the exact
+// string? A title like `2026-06-07` is a YAML timestamp, `5` an int, `true` a
+// bool, `null` the null value — all parse back as non-strings (or a different
+// string), so an unquoted emission round-trips wrong when the reader
+// (`loadNoteBatch` via js-yaml) parses the frontmatter. We test against the
+// actual reader (js-yaml, default schema) rather than enumerating YAML's many
+// coercible forms (dates, ints, floats, hex/octal, sexagesimal, inf/nan, bools,
+// null). Parse errors → treat as unsafe (quote).
+function yamlReTypesPlainScalar(value: string): boolean {
+  try {
+    return parseYaml(value) !== value;
+  } catch {
+    return true;
+  }
+}
+
+// Format a `title:` value. Like {@link formatYamlScalar}, but ALSO quotes a
+// value that YAML would re-type away from a string — a note title is always a
+// string, so a date-/number-/bool-shaped title (e.g. a daily note titled
+// `2026-06-07`) MUST be quoted or the reader parses it as a non-string and the
+// sidebar shows "Untitled" (and daily-note idempotency breaks, since the
+// title-keyed match never finds it). Only `title:` needs this — `trashed:`
+// (RFC 3339, value-strict raw read) and `template:` (literal `true`, value-strict
+// raw read) are read without js-yaml and must stay unquoted, so they keep
+// {@link formatYamlScalar}.
+function formatYamlTitleScalar(value: string): string {
+  if (needsYamlQuoting(value) || yamlReTypesPlainScalar(value)) {
+    const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `"${escaped}"`;
+  }
+  return value;
 }
 
 function applyStateA(source: string, iso: string): string {
@@ -195,7 +237,7 @@ export function patchUpdatedField(bytes: Uint8Array, iso: string): Uint8Array {
 function applyStateATitle(source: string, value: string): string {
   return (
     FRONTMATTER_OPENER +
-    "title: " + formatYamlScalar(value) + NEWLINE +
+    "title: " + formatYamlTitleScalar(value) + NEWLINE +
     FRONTMATTER_DELIMITER + NEWLINE +
     NEWLINE +
     source
@@ -229,7 +271,7 @@ function applyStateCTitle(
 
     // Block-scalar (|, >) → collapse to canonical single-line form.
     if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlScalar(value);
+      lines[i] = prefix + formatYamlTitleScalar(value);
       let j = i + 1;
       while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
       lines.splice(i + 1, j - (i + 1));
@@ -252,12 +294,12 @@ function applyStateCTitle(
     // Existing unquoted + trailing comment → preserve the comment.
     const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
     if (commentM !== null) {
-      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
+      lines[i] = prefix + formatYamlTitleScalar(value) + (commentM[2] ?? "");
       return lines.join(NEWLINE);
     }
 
     // Existing plain unquoted scalar.
-    lines[i] = prefix + formatYamlScalar(value);
+    lines[i] = prefix + formatYamlTitleScalar(value);
     return lines.join(NEWLINE);
   }
 
@@ -702,4 +744,188 @@ export function readTrashedFromFmBody(fmBody: string): string | null {
     return null;
   }
   return null;
+}
+
+// === patchTemplateField — note-template write target for FM `template:` ===
+//
+// Spec: docs/spec/markdown-dialect.md §3.6.1 (`template:` is the 5th Myne-managed
+// canonical FM field — the inverse-visibility twin of `trashed:`). Write trigger =
+// template create / convert actions (`src/notes/templates.ts`) only — never body
+// autosave. MYND-186. Structurally identical to `patchTrashedField`: the set path
+// is A/B/C value-surgery, plus state D (delete on convert-back) with empty-block
+// collapse. The only value Myne ever writes is the canonical boolean
+// `TEMPLATE_FLAG_VALUE` (`true`), which `formatYamlScalar` emits as a plain scalar;
+// the quoting/comment branches in state C only matter for a pre-existing
+// user-authored `template:` line.
+//
+// `template:` and `trashed:` are independent flags that compose on the same blob
+// without clobbering (the §3.6 unknown-field-preservation rule): each patcher only
+// ever touches its own line. A note can therefore be simultaneously
+// `template: true` and `trashed: <ts>`.
+
+function applyStateATemplate(source: string, value: string): string {
+  return (
+    FRONTMATTER_OPENER +
+    "template: " + formatYamlScalar(value) + NEWLINE +
+    FRONTMATTER_DELIMITER + NEWLINE +
+    NEWLINE +
+    source
+  );
+}
+
+function applyStateBTemplate(
+  source: string,
+  bodyEnd: number,
+  value: string,
+): string {
+  const insert = "template: " + formatYamlScalar(value) + NEWLINE;
+  return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
+}
+
+function applyStateCTemplate(
+  source: string,
+  bodyStart: number,
+  bodyEnd: number,
+  value: string,
+): string | null {
+  const fmBody = source.substring(bodyStart, bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = TEMPLATE_KEY_RE.exec(lines[i] ?? "");
+    if (m === null) continue;
+    const prefix = m[1] ?? "";
+    const valuePortion = m[2] ?? "";
+    const trimmedValue = valuePortion.trim();
+
+    if (/^[|>]/.test(trimmedValue)) {
+      lines[i] = prefix + formatYamlScalar(value);
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
+      lines.splice(i + 1, j - (i + 1));
+      return lines.join(NEWLINE);
+    }
+
+    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
+    if (quotedM !== null) {
+      const quote = quotedM[1] ?? '"';
+      const trailing = quotedM[3] ?? "";
+      const escaped =
+        quote === '"'
+          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          : value.replace(/'/g, "''");
+      lines[i] = prefix + quote + escaped + quote + trailing;
+      return lines.join(NEWLINE);
+    }
+
+    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+    if (commentM !== null) {
+      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
+      return lines.join(NEWLINE);
+    }
+
+    lines[i] = prefix + formatYamlScalar(value);
+    return lines.join(NEWLINE);
+  }
+
+  return null;
+}
+
+// State D — delete the template field (convert-back-to-note). Mirrors
+// `deleteTrashedField`: removes only the `template:` line; if the block empties
+// (no residual key or comment), removes the whole block + the canonical trailing
+// blank line so the result is byte-identical to a note that never had frontmatter.
+function deleteTemplateField(source: string): string {
+  const fm = locateFrontmatter(source);
+  if (fm === null) return source;
+
+  const fmBody = source.substring(fm.bodyStart, fm.bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+  const templateIdx = lines.findIndex((l) => TEMPLATE_KEY_RE.test(l));
+  if (templateIdx === -1) return source;
+
+  const remaining = lines
+    .slice(0, templateIdx)
+    .concat(lines.slice(templateIdx + 1));
+  const hasResidual = remaining.some((l) => l.trim() !== "");
+
+  if (!hasResidual) {
+    let removalEnd = fm.blockEnd;
+    if (source.charAt(removalEnd) === NEWLINE) removalEnd += NEWLINE.length;
+    return source.substring(removalEnd);
+  }
+
+  const newBody = remaining.join(NEWLINE);
+  return (
+    source.substring(0, fm.bodyStart) + newBody + source.substring(fm.bodyEnd)
+  );
+}
+
+/**
+ * Set, insert, or delete the Myne-managed `template:` frontmatter field.
+ * `value === null` deletes the field (convert-template-to-note, state D); a
+ * string sets it (states A/B/C). `convertNoteToTemplate` passes
+ * {@link TEMPLATE_FLAG_VALUE}; `convertTemplateToNote` passes `null`. Mirrors
+ * {@link patchTrashedField} — touches only the `template:` line, so it composes
+ * with `trashed:` and any user-authored fields without clobbering them.
+ */
+export function patchTemplateField(
+  bytes: Uint8Array,
+  value: string | null,
+): Uint8Array {
+  const source = utf8Decoder.decode(bytes);
+
+  if (value === null) {
+    return utf8Encoder.encode(deleteTemplateField(source));
+  }
+
+  const fm = locateFrontmatter(source);
+  if (fm === null) {
+    return utf8Encoder.encode(applyStateATemplate(source, value));
+  }
+
+  const stateCResult = applyStateCTemplate(
+    source,
+    fm.bodyStart,
+    fm.bodyEnd,
+    value,
+  );
+  if (stateCResult !== null) {
+    const before = source.substring(0, fm.bodyStart);
+    const after = source.substring(fm.bodyEnd);
+    return utf8Encoder.encode(before + stateCResult + after);
+  }
+
+  return utf8Encoder.encode(applyStateBTemplate(source, fm.bodyEnd, value));
+}
+
+/**
+ * Read the Myne-managed `template:` marker, **value-strict**, from a frontmatter
+ * **body** — the text between the `---` fences (the slice shape `loadNoteBatch`
+ * parses, identical to {@link readTrashedFromFmBody}). Returns `true` iff a
+ * `template:` field carries the canonical, unquoted boolean
+ * {@link TEMPLATE_FLAG_VALUE} (`true`), else `false`. A user's own non-canonical
+ * `template:` value (`template: 1`, `template: yes`, `template: "true"`,
+ * `template: True`) leaves the note an ordinary note — the documented mitigation
+ * for the unprefixed-field collision footgun (§3.6.1; inverse-visibility twin of
+ * the value-strict `trashed:` rule).
+ */
+export function readTemplateFromFmBody(fmBody: string): boolean {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = TEMPLATE_KEY_RE.exec(line);
+    if (m === null) continue;
+    return isCanonicalTemplateFlag(m[2] ?? "");
+  }
+  return false;
+}
+
+// Value-strict canonical check for a `template:` scalar. Strips a trailing
+// `# comment` (the only thing Myne never writes but a user might leave) and
+// requires the literal unquoted `true`. A quoted `"true"` is a YAML string, not
+// the canonical boolean, so it is rejected.
+function isCanonicalTemplateFlag(valuePortion: string): boolean {
+  const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+  const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
+  return raw.trim() === TEMPLATE_FLAG_VALUE;
 }

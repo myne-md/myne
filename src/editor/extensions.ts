@@ -38,6 +38,7 @@ import { myneDecorations } from "./decorations";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { slashMenuExtension } from "./slash/plugin";
+import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
 import { findExtension } from "./find/find-extension";
 import { myneKeyBindings } from "./keymap";
@@ -64,6 +65,9 @@ export function myneExtensions(): readonly Extension[] {
     ...myneDecorations(),
     ...wikilinkChipExtensions(),
     slashMenuExtension(),
+    // `{{` token autocomplete — active only inside a `template: true` note
+    // (MYND-189). Sits alongside the slash menu; both are floating menus.
+    templateTokenMenuExtension(),
     selectionToolbarExtension(),
     // In-note find (MYND-175): keeps the @codemirror/search engine, swaps the
     // stock panel for the Myne-styled docked bar. Cmd/Ctrl+F is owned by the

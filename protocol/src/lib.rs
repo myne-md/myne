@@ -49,6 +49,7 @@ pub mod phrase;
 pub mod prefs;
 pub mod search_blob;
 pub mod subkey;
+pub mod template;
 pub mod types;
 pub mod vault_meta;
 
@@ -86,6 +87,7 @@ pub use search_blob::{
     SEARCH_BLOB_PROTOCOL_VERSION,
 };
 pub use subkey::{derive_subkey, SubkeyRole};
+pub use template::{render, supported_tokens, RenderContext};
 pub use types::{
     generate_root_key, parse_kdf_params, serialize_kdf_params, KdfParams, DEFAULT_V0_1_KDF_PARAMS,
     KDF_PARAMS_CANONICAL_LEN,

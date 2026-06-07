@@ -24,6 +24,9 @@ permissions = [
   "allow-set-favorites",
   "allow-set-editor-layout",
   "allow-set-theme",
+  "allow-set-daily-date-format",
+  "allow-set-daily-folder",
+  "allow-set-daily-template",
 ]
 
 [[permission]]
@@ -79,3 +82,23 @@ commands.allow = ["set_editor_layout"]
 identifier = "allow-set-theme"
 description = "Allow invoking prefs:set_theme (Slot::Unlocked-gated setter for the theme field — the user's Light/Dark/System choice; Option<ThemeChoice> where None ≡ system clears the field; atomic-writes vault.prefs with no native side-effect, no protective-envelope clamp since theme is non-load-bearing)."
 commands.allow = ["set_theme"]
+
+# MYND-191 daily-notes: three write setters, so they inherit the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. All three are
+# non-load-bearing (cold/derivable) prefs, atomic-writing vault.prefs with no
+# native side-effect.
+[[permission]]
+identifier = "allow-set-daily-date-format"
+description = "Allow invoking prefs:set_daily_date_format (Slot::Unlocked-gated setter for the daily_date_format field — the daily-notes date-format string; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_daily_date_format"]
+
+[[permission]]
+identifier = "allow-set-daily-folder"
+description = "Allow invoking prefs:set_daily_folder (Slot::Unlocked-gated setter for the daily_folder field — the daily-notes folder path; also registers it as a deliberate folder so it survives empty; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_daily_folder"]
+
+[[permission]]
+identifier = "allow-set-daily-template"
+description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_daily_template"]

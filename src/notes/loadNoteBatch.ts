@@ -25,7 +25,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { load as parseYaml } from "js-yaml";
-import { readTrashedFromFmBody } from "../dialect";
+import { readTemplateFromFmBody, readTrashedFromFmBody } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import type {
   NoteTitleError,
@@ -65,6 +65,18 @@ export type TitleRecord = {
    * `trashed:` value reads as `null` here (value-strict — `readTrashedFromFmBody`).
    */
   trashed: string | null;
+  /**
+   * Value-strict `template:` marker (MYND-186) — `true` iff the note carries the
+   * canonical `template: true` flag, marking it a reusable template skeleton.
+   * The inverse-visibility twin of `trashed:`: template records are excluded from
+   * the live sidebar tree / folder derivation / search (like trashed notes) but
+   * surfaced by the template picker + management UI (unlike trashed notes). A
+   * note that is both `template:` and `trashed:` is in the Trash (restorable) and
+   * absent from the template enumeration until restored. A user's own
+   * non-canonical `template:` value reads as `false` (value-strict —
+   * `readTemplateFromFmBody`).
+   */
+  template: boolean;
   error?: NoteTitleError;
 };
 
@@ -144,12 +156,17 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // object) so the sidebar path and the dialect `readTrashedField` share one
   // definition — js-yaml would coerce a date-only value to a Date and diverge.
   const trashed = readTrashedFromFmBody(slice.frontmatter_bytes ?? "");
+  // `template:` is read value-strict from the raw FM slice (NOT the js-yaml
+  // object) so the sidebar/list path and the dialect read helper share one
+  // definition — mirrors the `trashed:` rationale above.
+  const template = readTemplateFromFmBody(slice.frontmatter_bytes ?? "");
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
     folder: normalizeFolderPath(folderRaw),
     updatedAt: deriveUpdatedAt(parsed),
     trashed,
+    template,
   };
 }
 
@@ -194,6 +211,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       folder: null,
       updatedAt: null,
       trashed: null,
+      template: false,
       error: r.Err,
     };
   });

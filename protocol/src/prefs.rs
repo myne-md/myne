@@ -216,6 +216,32 @@ pub struct PrefsView {
     #[serde(default)]
     pub auto_lock_seconds: Option<u32>,
 
+    /// Daily-notes date-format string (MYND-191) — e.g. `YYYY-MM-DD`. `None` ≡
+    /// the canonical default `YYYY-MM-DD`, which the host applies at read time
+    /// (blank-when-default). Omitted entirely from the canonical JSON when
+    /// `None`, so a vault that never customized the daily format is
+    /// byte-identical to a pre-MYND-191 `vault.prefs`. A **non-load-bearing**
+    /// cold/derivable preference — a tampered/replayed value can at worst format
+    /// the daily note's title differently, so no protective-envelope clamp.
+    #[serde(default)]
+    pub daily_date_format: Option<alloc::string::String>,
+
+    /// Daily-notes folder path (MYND-191) — canonical trailing-slash form, e.g.
+    /// `Daily/`. `None` ≡ the canonical default `Daily/`, applied host-side
+    /// (blank-when-default). Designating a daily folder also registers it as a
+    /// deliberate folder (host-side, not here) so it survives empty. Omitted
+    /// when `None`. Non-load-bearing (cold/derivable) — no clamp.
+    #[serde(default)]
+    pub daily_folder: Option<alloc::string::String>,
+
+    /// Daily-notes template pointer (MYND-191) — the UUIDv7 of a template note
+    /// to instantiate today's note from. `None` ≡ the canonical "blank daily
+    /// note" state (created blank with only the date as its title). Omitted when
+    /// `None`, so a vault that never set a daily template is byte-identical to a
+    /// pre-MYND-191 `vault.prefs`. Non-load-bearing (cold/derivable) — no clamp.
+    #[serde(default)]
+    pub daily_template: Option<alloc::string::String>,
+
     /// Favorited notes — an ordered list of note UUIDs surfaced in the
     /// sidebar's Favorites section, in display order (MYND-183). A
     /// **sequence** (order is the payload): the canonical encoder preserves
@@ -287,6 +313,9 @@ impl Default for PrefsView {
             item_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         }
     }
@@ -426,6 +455,27 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if let Some(secs) = prefs.auto_lock_seconds {
         out.extend_from_slice(b"\"auto_lock_seconds\":");
         push_json_uint(&mut out, secs);
+        out.push(b',');
+    }
+
+    // daily-notes fields (MYND-191), canonical key order:
+    // daily_date_format < daily_folder < daily_template (all 'dai…' sort before
+    // 'del…' = deliberate_folders). Each omitted when None, so a vault that
+    // never set a daily preference is byte-identical to a pre-MYND-191
+    // vault.prefs.
+    if let Some(ref fmt) = prefs.daily_date_format {
+        out.extend_from_slice(b"\"daily_date_format\":");
+        push_json_string(&mut out, &fmt.nfc().collect::<String>());
+        out.push(b',');
+    }
+    if let Some(ref folder) = prefs.daily_folder {
+        out.extend_from_slice(b"\"daily_folder\":");
+        push_json_string(&mut out, &folder.nfc().collect::<String>());
+        out.push(b',');
+    }
+    if let Some(ref tmpl) = prefs.daily_template {
+        out.extend_from_slice(b"\"daily_template\":");
+        push_json_string(&mut out, &tmpl.nfc().collect::<String>());
         out.push(b',');
     }
 
@@ -664,6 +714,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // already prevents a marker from appearing inside a string value, but the
     // cursor keeps the canonical key-order discipline visible + robust).
     let mut cursor = 0usize;
+    // daily-notes string fields (MYND-191), canonical key order:
+    // daily_date_format (dai…) < daily_folder < daily_template, all before
+    // deliberate_folders (del…). Optional → None when the key is absent.
+    let daily_date_format =
+        parse_optional_string_field(rest, &mut cursor, b"\"daily_date_format\":")?;
+    let daily_folder = parse_optional_string_field(rest, &mut cursor, b"\"daily_folder\":")?;
+    let daily_template = parse_optional_string_field(rest, &mut cursor, b"\"daily_template\":")?;
     let deliberate_folders =
         parse_optional_array_field(rest, &mut cursor, b"\"deliberate_folders\":")?;
     // editor_layout (canonical key 'e') sits between deliberate_folders (d)
@@ -705,11 +762,38 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         screen_capture_protection,
         deliberate_folders,
         auto_lock_seconds,
+        daily_date_format,
+        daily_folder,
+        daily_template,
         favorites,
         item_order,
         editor_layout,
         theme,
     })
+}
+
+/// Parse an OPTIONAL canonical JSON string-valued field whose key marker is
+/// `marker`, searching `rest` from `*cursor` onward. On a hit, advances
+/// `*cursor` past the closing `"` and returns `Some(value)`; on a miss returns
+/// `None` and leaves `*cursor` unchanged. Mirrors
+/// [`parse_optional_array_field`] for a single-string value (the daily-notes
+/// fields, MYND-191), keeping the same monotonic-cursor canonical-key-order
+/// discipline.
+fn parse_optional_string_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Option<String>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (value, consumed) = parse_json_string(&rest[val_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = val_start + consumed;
+            Ok(Some(value))
+        }
+        None => Ok(None),
+    }
 }
 
 /// Parse the OPTIONAL `theme` field from `region` (the bytes from
@@ -1104,6 +1188,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1119,6 +1206,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1161,6 +1251,9 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                daily_date_format: None,
+                daily_folder: None,
+                daily_template: None,
                 editor_layout: None,
             }
         );
@@ -1178,6 +1271,9 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                daily_date_format: None,
+                daily_folder: None,
+                daily_template: None,
                 editor_layout: None,
             }
         );
@@ -1283,6 +1379,9 @@ mod tests {
             screen_capture_protection: true,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(300),
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             editor_layout: Some(EditorLayout {
@@ -1391,6 +1490,9 @@ mod tests {
                 alloc::string::String::from("Archive/"),
             ],
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1413,6 +1515,9 @@ mod tests {
                 alloc::string::String::from("b/"),
             ],
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1433,6 +1538,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1452,6 +1560,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1534,6 +1645,9 @@ mod tests {
                 alloc::string::String::from("Archive/2025/"),
             ],
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let blob =
@@ -1572,6 +1686,9 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             favorites: alloc::vec![
                 alloc::string::String::from("f2"),
                 alloc::string::String::from("f1"),
@@ -1600,6 +1717,9 @@ mod tests {
             theme: None,
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             favorites: Vec::new(),
             item_order: alloc::vec![
                 alloc::string::String::from("zzz"),
@@ -1657,6 +1777,9 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(900),
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             favorites: alloc::vec![alloc::string::String::from(
                 "0190a000-0000-7000-8000-000000000002",
             )],
@@ -1698,6 +1821,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(300),
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1717,6 +1843,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(900),
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1738,6 +1867,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(0),
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1827,6 +1959,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(1800),
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let blob =
@@ -1888,6 +2023,9 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             editor_layout: Some(sample_layout()),
@@ -2143,6 +2281,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let blob =
@@ -2166,6 +2307,9 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             editor_layout: None,
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
@@ -2385,6 +2529,9 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                daily_date_format: None,
+                daily_folder: None,
+                daily_template: None,
                 editor_layout: None,
             },
             &nonce_default,
@@ -2401,6 +2548,9 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                daily_date_format: None,
+                daily_folder: None,
+                daily_template: None,
                 editor_layout: None,
             },
             &nonce_toggled,
@@ -2420,6 +2570,9 @@ mod tests {
                 alloc::string::String::from("Projects/Myne/"),
             ],
             auto_lock_seconds: Some(300),
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
             favorites: alloc::vec![alloc::string::String::from(
                 "0190a000-0000-7000-8000-000000000002",
             )],
@@ -2634,5 +2787,75 @@ mod tests {
             s.push_str(&alloc::format!("{:02x}", b));
         }
         s
+    }
+
+    // ---- daily-notes fields (MYND-191) ---------------------------------
+
+    #[test]
+    fn daily_fields_omitted_when_default_are_byte_stable() {
+        // A vault with all-default (None) daily fields encodes byte-identical to
+        // one that never had them — preserving pre-MYND-191 golden vectors.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn daily_fields_encode_in_canonical_key_order() {
+        // daily_date_format < daily_folder < daily_template < deliberate_folders
+        // < screen_capture_protection.
+        let prefs = PrefsView {
+            daily_date_format: Some("YYYY-MM-DD".into()),
+            daily_folder: Some("Journal/".into()),
+            daily_template: Some("0190-aaaa".into()),
+            deliberate_folders: alloc::vec!["Journal/".into()],
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"daily_date_format":"YYYY-MM-DD","daily_folder":"Journal/","daily_template":"0190-aaaa","deliberate_folders":["Journal/"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn daily_fields_round_trip_through_encode_decode() {
+        let prefs = PrefsView {
+            daily_date_format: Some("YYYY-MM-DD".into()),
+            daily_folder: Some("Daily/".into()),
+            daily_template: Some("0190-tmpl-uuid".into()),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, prefs);
+    }
+
+    #[test]
+    fn daily_template_absent_decodes_to_none() {
+        // The canonical "blank daily note" state — no daily_template key.
+        let parsed =
+            canonical_json_decode(br#"{"daily_folder":"Daily/","screen_capture_protection":true}"#)
+                .unwrap();
+        assert_eq!(parsed.daily_folder, Some("Daily/".into()));
+        assert_eq!(parsed.daily_template, None);
+        assert_eq!(parsed.daily_date_format, None);
+    }
+
+    #[test]
+    fn daily_fields_compose_with_other_prefs() {
+        // Round-trip alongside auto_lock_seconds (before) + theme (after) to pin
+        // the cursor discipline across the full canonical key range.
+        let prefs = PrefsView {
+            auto_lock_seconds: Some(300),
+            daily_folder: Some("Journal/".into()),
+            theme: Some(ThemeChoice::Dark),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
+        assert_eq!(decode_prefs_blob(&prefs_key, &hash, &blob).unwrap(), prefs);
     }
 }

@@ -147,6 +147,14 @@ export type CommandPaletteProps = {
    * from the sidebar cache's value-strict `trashed:` marker.
    */
   isTrashed?: (noteId: string) => boolean;
+  /**
+   * Predicate identifying notes that are templates (MYND-186). When provided,
+   * template note IDs are dropped from the NOTES search section — the BM25 index
+   * still matches a template's body, so this is the exclusion gate (the inverse-
+   * visibility twin of `isTrashed`). Omitted → no template filtering. Wired by
+   * the Editor from the sidebar cache's value-strict `template:` flag.
+   */
+  isTemplate?: (noteId: string) => boolean;
 };
 
 type Row =
@@ -166,6 +174,7 @@ export function CommandPalette({
   onClose,
   ctx,
   isTrashed,
+  isTemplate,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -277,12 +286,17 @@ export function CommandPalette({
       query.trim() === ""
         ? []
         : noteHits
-            // Exclude trashed notes from search results (MYND-133). The Rust
-            // BM25 index still matches a trashed note's body (trashing is a
-            // content edit), so the sidebar's value-strict `trashed:` marker —
-            // surfaced via the `isTrashed` predicate — is the filter; restore
-            // re-includes it.
-            .filter((h) => !(isTrashed?.(h.note_id) ?? false))
+            // Exclude trashed notes (MYND-133) and templates (MYND-186) from
+            // search results. The Rust BM25 index still matches their bodies
+            // (trashing / templating is a content edit), so the sidebar's
+            // value-strict `trashed:` / `template:` markers — surfaced via the
+            // `isTrashed` / `isTemplate` predicates — are the filter; restore /
+            // convert-to-note re-includes the note.
+            .filter(
+              (h) =>
+                !(isTrashed?.(h.note_id) ?? false) &&
+                !(isTemplate?.(h.note_id) ?? false),
+            )
             .map(
               (h): Row => ({
                 kind: "note",
@@ -296,7 +310,7 @@ export function CommandPalette({
     // sections in the flat list (commands always lead) — used for section
     // labels without re-scanning `rows`.
     return { rows: [...commandRows, ...noteRows], commandCount: commandRows.length };
-  }, [query, ctx, noteHits, isTrashed]);
+  }, [query, ctx, noteHits, isTrashed, isTemplate]);
 
   // Clamp selected index when row count changes.
   useEffect(() => {
