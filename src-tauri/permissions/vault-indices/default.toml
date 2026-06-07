@@ -1,0 +1,55 @@
+# Permissions for the in-app `vault-indices` Tauri plugin (MYND-31 / A11).
+# Picked up under the `vault-indices:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `vault-indices:default` (or the per-command
+# `vault-indices:allow-vault-indices-apply`, etc.).
+#
+# All commands are Slot::Unlocked-gated and consume the existing
+# `VaultRuntimeState` singleton (registered by `vault-unlock::init`); the
+# index itself (`VaultIndicesState`) is registered in `lib.rs` setup. The
+# index is plaintext-derived RAM, so every command requires an unlocked
+# vault. These are write commands → main-window-only invariant, same as
+# the prefs setters (v0.2 multi-window MUST NOT grant them to sub-windows).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-indices plugin — apply + remove + forward."
+permissions = [
+  "allow-vault-indices-apply",
+  "allow-vault-indices-remove",
+  "allow-vault-indices-forward",
+  "allow-vault-indices-backlink-candidates",
+  "allow-vault-indices-by-tag",
+  "allow-vault-indices-tag-tree",
+]
+
+[[permission]]
+identifier = "allow-vault-indices-apply"
+description = "Allow invoking vault-indices:vault_indices_apply (Slot::Unlocked-gated upsert of a note's index contribution — title + folder in Task 1, extended with wikilink edges + tags in later tasks; replace-on-apply)."
+commands.allow = ["vault_indices_apply"]
+
+[[permission]]
+identifier = "allow-vault-indices-remove"
+description = "Allow invoking vault-indices:vault_indices_remove (Slot::Unlocked-gated removal of a hard-deleted note from the index; trash does NOT route here — trashed notes stay indexed and are filtered TS-side via isTrashed)."
+commands.allow = ["vault_indices_remove"]
+
+[[permission]]
+identifier = "allow-vault-indices-forward"
+description = "Allow invoking vault-indices:vault_indices_forward (Slot::Unlocked-gated read of a note's raw outbound wikilink edges; the TS forward() wrapper resolves them via the single resolver into resolved + broken targets)."
+commands.allow = ["vault_indices_forward"]
+
+[[permission]]
+identifier = "allow-vault-indices-backlink-candidates"
+description = "Allow invoking vault-indices:vault_indices_backlink_candidates (Slot::Unlocked-gated read of all candidate backlink edges naming a folded title-key; the TS backlinks() wrapper resolves each via the single resolver, keeps those resolving to the queried note, and groups by source)."
+commands.allow = ["vault_indices_backlink_candidates"]
+
+[[permission]]
+identifier = "allow-vault-indices-by-tag"
+description = "Allow invoking vault-indices:vault_indices_by_tag (Slot::Unlocked-gated subtree-inclusive lookup of note ids by folded tag — a parent tag includes descendants; the query is folded TS-side before the call)."
+commands.allow = ["vault_indices_by_tag"]
+
+[[permission]]
+identifier = "allow-vault-indices-tag-tree"
+description = "Allow invoking vault-indices:vault_indices_tag_tree (Slot::Unlocked-gated read of the full tag tree — nodes with direct + subtree counts and a deterministic display, derived from the stored exact folded tags)."
+commands.allow = ["vault_indices_tag_tree"]

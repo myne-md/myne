@@ -21,6 +21,7 @@
     "vault-repair:default",
     "prefs:default",
     "notes:default",
+    "vault-indices:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-clear",

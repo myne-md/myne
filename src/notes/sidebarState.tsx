@@ -32,6 +32,11 @@ import {
 } from "./loadNoteBatch";
 import { noteRead } from "./readNote";
 import { renameNote } from "./renameNote";
+import {
+  rebuildVaultIndices,
+  reindexNote,
+  vaultIndicesRemove,
+} from "./vaultIndices";
 
 export type NoteId = string;
 
@@ -426,6 +431,10 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
         }
         return { ...prev, cache };
       });
+      // MYND-31: rebuild-on-unlock sweep — re-index every note into the Rust
+      // VaultIndices (Build-B). Best-effort + fire-and-forget so it never
+      // blocks the sidebar boot; the index is a rebuildable cache.
+      void rebuildVaultIndices(records.map((r) => r.noteUuid));
     },
     [],
   );
@@ -445,6 +454,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
         // matches what we just wrote, but updatedAt only refreshes
         // after the round-trip).
         await refreshOne(id);
+        // MYND-31: the title changed → re-index so backlink resolution
+        // tracks the new title-key (live).
+        void reindexNote(id);
         // If we just renamed the OPEN note, its on-disk body now carries
         // the new title but the editor's local content (and the autosave
         // writer's view of it) is stale — a subsequent autosave would
@@ -465,6 +477,8 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
   const createAndStartRename = useCallback(
     async (folder: string | null = null): Promise<NoteId> => {
       const newId = await createNote(folder);
+      // MYND-31: register the new note in the index (live).
+      void reindexNote(newId);
       setState((prev) => {
         const seeded = applyOptimisticCreate(prev, newId);
         return { ...seeded, selectedId: newId, renamingId: newId };
@@ -486,6 +500,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     });
     try {
       await deleteNote(id);
+      // MYND-31: drop the hard-deleted note from the index (live; trash
+      // does NOT route here — trashed notes stay indexed, filtered TS-side).
+      void vaultIndicesRemove(id);
     } catch (err) {
       setState((prev) => rollbackOptimisticDelete(prev, id, snapshot));
       throw err;
@@ -551,6 +568,8 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
           for (const id of purged) cache.delete(id);
           return { ...prev, cache };
         });
+        // MYND-31: drop every purged note from the index (live).
+        for (const id of result.purged) void vaultIndicesRemove(id);
       }
       return result;
     },

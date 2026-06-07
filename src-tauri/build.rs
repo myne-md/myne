@@ -122,6 +122,26 @@ fn main() {
                     "note_list",
                     "note_search",
                 ]),
+            )
+            .plugin(
+                "vault-indices",
+                // MYND-31 (A11 — VaultIndices) ships `vault_indices_apply`
+                // + `vault_indices_remove` (Task 1). Later tasks add the
+                // query surface (`vault_indices_backlink_candidates`,
+                // `vault_indices_forward`, `vault_indices_by_tag`,
+                // `vault_indices_tag_tree`). Adding a command here without a
+                // matching `commands.allow` entry in
+                // `permissions/vault-indices/default.toml` is a security
+                // regression (the InlinedPlugin mirror is load-bearing per
+                // the `vault-creation` note above).
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "vault_indices_apply",
+                    "vault_indices_remove",
+                    "vault_indices_forward",
+                    "vault_indices_backlink_candidates",
+                    "vault_indices_by_tag",
+                    "vault_indices_tag_tree",
+                ]),
             ),
     )
     .unwrap();

@@ -43,6 +43,7 @@ pub fn run() {
         .plugin(plugins::vault_repair::init())
         .plugin(plugins::prefs::init())
         .plugin(plugins::notes::init())
+        .plugin(plugins::vault_indices::init())
         .setup(|app| {
             use tauri::Manager;
             // Apply screen-capture protection before `window.show()` so
@@ -57,6 +58,11 @@ pub fn run() {
             // incrementally by the notes lifecycle (create/update/delete) and
             // queried by the search command; cleared on lock (Task 8).
             app.manage(search::SearchIndexState::default());
+            // MYND-31: app-level live in-RAM VaultIndices state (wikilink
+            // graph + backlinks + tag index), rebuilt on unlock by the
+            // TS-orchestrated sweep and wiped on lock alongside the search
+            // index. Twin of SearchIndexState above.
+            app.manage(plugins::vault_indices::VaultIndicesState::default());
             // MYND-29 Task 7: periodic best-effort flush of the search index
             // to its encrypted `vault.search` blob while a vault is Unlocked
             // (no-op while locked). Bounds how much a hard quit / crash loses
