@@ -44,15 +44,28 @@ import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
 import { IconButton } from "../components/primitives/IconButton";
 import { SettingsModal } from "../components/SettingsModal";
+import { TemplatesManager } from "../components/TemplatesManager";
+import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast } from "../components/Toast";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
-import { noteList } from "../notes";
+import {
+  noteList,
+  loadNoteBatch,
+  createNoteFromTemplate,
+  createBlankNamedNote,
+  resolveTodayNote,
+} from "../notes";
+import { prefsRead } from "../lib/prefs";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
 import { SECTION_HEADING_STYLE } from "../notes/components/sharedStyles";
 import { noteRead } from "../notes/readNote";
 import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
-import { SidebarStateProvider, useSelectedNote } from "../notes/sidebarState";
+import {
+  SidebarStateProvider,
+  useSelectedNote,
+  type NoteId,
+} from "../notes/sidebarState";
 import { useAutosave, type SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
@@ -254,6 +267,8 @@ function EditorChrome({
   const [content, setContent] = useState<string>("");
   const [bodyLoading, setBodyLoading] = useState<boolean>(false);
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
+  const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
+  const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   const [wordCount, setWordCount] = useState<number>(0);
 
   // Resizable/collapsible sidebar layout (MYND-137). Widths + collapse
@@ -504,7 +519,10 @@ function EditorChrome({
           resizeLabel="Resize notes sidebar"
           expandLabel="Expand notes sidebar"
         >
-          <NotesSidebarList onCollapse={layout.toggleLeftCollapsed} />
+          <NotesSidebarList
+            onCollapse={layout.toggleLeftCollapsed}
+            onNewFromTemplate={() => setNewFromTemplateOpen(true)}
+          />
         </SidebarPane>
         <CenterPane
           content={content}
@@ -551,12 +569,46 @@ function EditorChrome({
         onForceRelock={onForceRelock}
         onDeleteVaultSuccess={onDeleteVaultSuccess}
       />
+      <TemplatesManager
+        open={templatesOpen}
+        onClose={() => setTemplatesOpen(false)}
+        onOpenNote={(id) => {
+          void ctx.open(id).catch(() => {
+            /* selection failure surfaces via sidebar UX */
+          });
+        }}
+      />
+      <NewNoteFromTemplateModal
+        open={newFromTemplateOpen}
+        onClose={() => setNewFromTemplateOpen(false)}
+        onBlankNote={() => {
+          // Zero-templates degrade → the existing instant-blank path, unchanged.
+          void ctx.createAndStartRename().catch(() => {});
+        }}
+        onCreateFromTemplate={(templateId, name) => {
+          // Location-agnostic: lands at the root, where the header new-note
+          // button's blank note would land (folder = null).
+          void createNoteFromTemplate(templateId, name, null)
+            .then((id) => ctx.open(id as NoteId))
+            .catch(() => {
+              /* creation failure surfaces via sidebar UX */
+            });
+        }}
+      />
       <CommandPaletteHost
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         onOpenSettings={() => {
           setPaletteOpen(false);
           setSettingsOpen(true);
+        }}
+        onManageTemplates={() => {
+          setPaletteOpen(false);
+          setTemplatesOpen(true);
+        }}
+        onNewNoteFromTemplate={() => {
+          setPaletteOpen(false);
+          setNewFromTemplateOpen(true);
         }}
         onLockFlushed={async () => {
           setPaletteOpen(false);
@@ -579,6 +631,8 @@ type CommandPaletteHostProps = {
   open: boolean;
   onClose: () => void;
   onOpenSettings: () => void;
+  onManageTemplates: () => void;
+  onNewNoteFromTemplate: () => void;
   onLockFlushed: () => Promise<void>;
 };
 
@@ -586,22 +640,74 @@ function CommandPaletteHost({
   open,
   onClose,
   onOpenSettings,
+  onManageTemplates,
+  onNewNoteFromTemplate,
   onLockFlushed,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
+  // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
+  // set (authoritative note_list + loadNoteBatch, not the partial sidebar cache).
+  // Found → open; not found → create (from the daily template if set, else a
+  // blank note titled today's date, the eager-title specialization of #5) in the
+  // daily folder, then open. Past days are reached via the ordinary sidebar
+  // folder — no calendar.
+  const onOpenTodayNote = useCallback(async () => {
+    try {
+      const prefs = await prefsRead();
+      const ids = await noteList();
+      const notes = await loadNoteBatch(ids);
+      const res = resolveTodayNote(
+        new Date(),
+        prefs.daily_date_format,
+        prefs.daily_folder,
+        notes,
+      );
+      let id: NoteId;
+      if (res.kind === "open") {
+        id = res.id;
+      } else if (prefs.daily_template) {
+        // Daily template set → instantiate from it (date as eager title).
+        id = (await createNoteFromTemplate(
+          prefs.daily_template,
+          res.dateTitle,
+          res.folder,
+        )) as NoteId;
+      } else {
+        // No daily template → a blank note titled with the date.
+        id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
+      }
+      await ctx.open(id);
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[Editor] open today's note failed:", err);
+      }
+    }
+  }, [ctx]);
   const commandCtx: CommandContext = useMemo(
     () => ({
       stageName: "editor",
       selectedNoteId: ctx.selectedId,
       onLock: onLockFlushed,
       onOpenSettings,
+      onManageTemplates,
+      onNewNoteFromTemplate,
+      onOpenTodayNote,
       onSelectNote: async (id) => {
         await ctx.open(id).catch(() => {
           /* selection failure surfaces via sidebar UX */
         });
       },
     }),
-    [ctx.selectedId, ctx.open, onLockFlushed, onOpenSettings],
+    [
+      ctx.selectedId,
+      ctx.open,
+      onLockFlushed,
+      onOpenSettings,
+      onManageTemplates,
+      onNewNoteFromTemplate,
+      onOpenTodayNote,
+    ],
   );
   return (
     <CommandPalette
@@ -609,6 +715,7 @@ function CommandPaletteHost({
       onClose={onClose}
       ctx={commandCtx}
       isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
+      isTemplate={(id) => ctx.cache.get(id)?.template === true}
     />
   );
 }

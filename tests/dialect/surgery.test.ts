@@ -154,6 +154,22 @@ describe("patchTitleField — invariants", () => {
     expect(result).toContain('title: "Has: colon and space"');
   });
 
+  it("quotes a value YAML would re-type away from a string (date / number / bool)", () => {
+    // Regression (MYND-191): a daily note titled `2026-06-07` reads back as a
+    // YAML Date (→ Untitled) unless quoted. Same for number- / bool- / null-
+    // shaped titles. needsYamlQuoting alone misses these (no reserved char).
+    const input = enc.encode("---\ntitle: Plain\n---\n\nbody");
+    const date = dec.decode(patchTitleField(input, "2026-06-07"));
+    expect(date).toContain('title: "2026-06-07"');
+    const num = dec.decode(patchTitleField(input, "42"));
+    expect(num).toContain('title: "42"');
+    const bool = dec.decode(patchTitleField(input, "true"));
+    expect(bool).toContain('title: "true"');
+    // A normal title stays unquoted (no behavior change for ordinary titles).
+    const plain = dec.decode(patchTitleField(input, "Meeting notes"));
+    expect(plain).toContain("title: Meeting notes\n");
+  });
+
   it("escapes embedded double-quotes and backslashes when quoting is forced", () => {
     const input = enc.encode("---\ntitle: Plain\n---\n");
     // Leading `-` is a YAML-reserved start char → forces double-quoting,

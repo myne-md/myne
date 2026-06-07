@@ -26,7 +26,14 @@ function rec(
   folder: string | null,
   trashed: string | null,
 ): TitleRecord {
-  return { noteUuid: uuid, title: null, folder, updatedAt: null, trashed };
+  return {
+    noteUuid: uuid,
+    title: null,
+    folder,
+    updatedAt: null,
+    trashed,
+    template: false,
+  };
 }
 
 function cacheOf(records: TitleRecord[]): Map<string, TitleRecord> {

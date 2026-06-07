@@ -21,6 +21,7 @@ import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
 import {
   liveCache,
+  trashedCount,
   useSelectedNote,
   type NoteId,
   type UseSelectedNoteReturn,
@@ -374,12 +375,14 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
 
 /** Optional props. `onCollapse` wires the header chevron that hides the
  *  sidebar (MYND-137); omitted when the list is hosted outside the
- *  resizable editor seam. */
+ *  resizable editor seam. `onNewFromTemplate` wires the new-note caret that
+ *  opens the template flow (MYND-190); omitted → the caret is not rendered. */
 interface NoteListProps {
   onCollapse?: () => void;
+  onNewFromTemplate?: () => void;
 }
 
-export function NoteList({ onCollapse }: NoteListProps = {}) {
+export function NoteList({ onCollapse, onNewFromTemplate }: NoteListProps = {}) {
   const ctx = useSelectedNote();
   // Folder-management state + handlers (deliberate_folders set, context menu,
   // create / rename / delete / drag-drop). Owns the deliberate set.
@@ -444,9 +447,12 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
   // user can always reach the trash. The count comes from the same value-strict
   // `trashed:` marker that excludes these notes from the live tree above.
   const [trashOpen, setTrashOpen] = useState(false);
-  // A trashed note is exactly a cached note absent from `live`, so the count is
-  // the size delta — no second full-cache scan (the `liveCache` pass already ran).
-  const trashCount = ctx.cache.size - live.size;
+  // Count the value-strict `trashed:` set directly: `live` now also excludes
+  // templates (MYND-186), so the old `cache.size - live.size` delta would
+  // over-count the trash by the template population. Memoized on cache identity
+  // (like `live`) so the scan runs once per mutation, not on every re-render
+  // (NoteList re-renders on selection / rename-toggle, which don't touch cache).
+  const trashCount = useMemo(() => trashedCount(ctx.cache), [ctx.cache]);
 
   // F2 global keymap → enter inline-rename on the selected row.
   useEffect(() => {
@@ -485,7 +491,12 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
   return (
     <aside style={SIDEBAR_OUTER_STYLE}>
       {isEmpty ? (
-        <EmptyState onCreate={handleCreate} fm={fm} onCollapse={onCollapse} />
+        <EmptyState
+          onCreate={handleCreate}
+          fm={fm}
+          onCollapse={onCollapse}
+          onNewFromTemplate={onNewFromTemplate}
+        />
       ) : (
         <PopulatedList
           rows={rows}
@@ -495,6 +506,7 @@ export function NoteList({ onCollapse }: NoteListProps = {}) {
           onCreate={handleCreate}
           fm={fm}
           onCollapse={onCollapse}
+          onNewFromTemplate={onNewFromTemplate}
         />
       )}
       <button
@@ -517,10 +529,12 @@ function EmptyState({
   onCreate,
   fm,
   onCollapse,
+  onNewFromTemplate,
 }: {
   onCreate: () => void;
   fm: FolderManagement;
   onCollapse?: () => void;
+  onNewFromTemplate?: () => void;
 }) {
   return (
     <div style={LIST_OUTER_STYLE}>
@@ -542,6 +556,13 @@ function EmptyState({
             onClick={() => fm.startNewFolder("")}
           />
           <IconButton icon="file-plus" label="New note" onClick={onCreate} />
+          {onNewFromTemplate && (
+            <IconButton
+              icon="chevron-down"
+              label="New note from template…"
+              onClick={onNewFromTemplate}
+            />
+          )}
         </div>
       </div>
       {fm.newFolder !== null && (
@@ -571,6 +592,7 @@ function PopulatedList({
   onCreate,
   fm,
   onCollapse,
+  onNewFromTemplate,
 }: {
   rows: VisibleRow[];
   favRows: VisibleRow[];
@@ -579,6 +601,7 @@ function PopulatedList({
   onCreate: () => void;
   fm: FolderManagement;
   onCollapse?: () => void;
+  onNewFromTemplate?: () => void;
 }) {
   const ctx = useSelectedNote();
   const [menu, setMenu] = useState<ContextMenuState>(null);
@@ -861,6 +884,13 @@ function PopulatedList({
             label="New note (⌘N)"
             onClick={onCreate}
           />
+          {onNewFromTemplate && (
+            <IconButton
+              icon="chevron-down"
+              label="New note from template…"
+              onClick={onNewFromTemplate}
+            />
+          )}
         </div>
       </div>
       {fm.newFolder !== null && (

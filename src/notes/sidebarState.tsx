@@ -100,14 +100,18 @@ export function applyOptimisticCreate(
     folder: null,
     updatedAt: null,
     trashed: null,
+    template: false,
   });
 }
 
 /**
- * Live (non-trashed) entries of the cache as a fresh `Map`, for the sidebar
- * tree / folder derivation / favorites. A record is in the trash iff its
- * value-strict `trashed:` marker is non-null (MYND-133). The complement —
- * {@link trashedRecords} — backs the Trash panel + count.
+ * Live (working-set) entries of the cache as a fresh `Map`, for the sidebar
+ * tree / folder derivation / favorites. A record is excluded when it is in the
+ * trash (value-strict `trashed:` marker non-null, MYND-133) OR is a template
+ * (value-strict `template:` flag, MYND-186) — templates are the inverse-
+ * visibility twin of trash: hidden from every working view, surfaced only by the
+ * template picker + management UI ({@link templateRecords}). The trash complement
+ * ({@link trashedRecords} / {@link trashedCount}) backs the Trash panel + count.
  */
 export function liveCache(
   cache: ReadonlyMap<NoteId, TitleRecord>,
@@ -115,13 +119,16 @@ export function liveCache(
   const live = new Map<NoteId, TitleRecord>();
   for (const [id, record] of cache) {
     // `== null` (loose) treats a missing marker as live — defensive against a
-    // record constructed without the field.
-    if (record.trashed == null) live.set(id, record);
+    // record constructed without the field. Templates are excluded regardless of
+    // trash state (a template is never part of the working set).
+    if (record.trashed == null && record.template !== true) live.set(id, record);
   }
   return live;
 }
 
-/** Trashed entries of the cache (the Trash panel view), newest-trashed first. */
+/** Trashed entries of the cache (the Trash panel view), newest-trashed first.
+ * Includes trashed templates — a deleted template is restorable from Trash and
+ * re-enters the template set on restore (MYND-186). */
 export function trashedRecords(
   cache: ReadonlyMap<NoteId, TitleRecord>,
 ): TitleRecord[] {
@@ -130,6 +137,42 @@ export function trashedRecords(
     if (record.trashed != null) out.push(record);
   }
   out.sort((a, b) => (b.trashed ?? "").localeCompare(a.trashed ?? ""));
+  return out;
+}
+
+/** Count of trashed entries — the Trash footer count. Independent of the
+ * template flag (a trashed template still occupies the Trash), so this is the
+ * correct count now that {@link liveCache} also excludes templates and the old
+ * `cache.size - live.size` delta would over-count by the template population. */
+export function trashedCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
+  let n = 0;
+  for (const record of cache.values()) {
+    if (record.trashed != null) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Template entries of the cache — the canonical enumeration the template picker
+ * (#5) and management UI (#4) read (MYND-186; SYNC-9 `listTemplates`). A record
+ * is a template iff its value-strict `template:` flag is set; trashed templates
+ * are **excluded** (a deleted template leaves the picker but stays restorable in
+ * Trash). Ordered newest-updated first, falling back to title for records
+ * without an `updated:` timestamp.
+ */
+export function templateRecords(
+  cache: ReadonlyMap<NoteId, TitleRecord>,
+): TitleRecord[] {
+  const out: TitleRecord[] = [];
+  for (const record of cache.values()) {
+    if (record.template === true && record.trashed == null) out.push(record);
+  }
+  out.sort((a, b) => {
+    const at = a.updatedAt?.getTime() ?? 0;
+    const bt = b.updatedAt?.getTime() ?? 0;
+    if (at !== bt) return bt - at;
+    return (a.title ?? "").localeCompare(b.title ?? "");
+  });
   return out;
 }
 

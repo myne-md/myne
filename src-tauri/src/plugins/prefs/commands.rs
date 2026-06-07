@@ -349,6 +349,149 @@ pub(crate) async fn set_item_order_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `daily_date_format` field (MYND-191) —
+/// the daily-notes date-format string (e.g. `YYYY-MM-DD`). Read-modify-write
+/// under the per-plugin write mutex; no native side-effect. Disk-first. The
+/// field is non-load-bearing (cold/derivable); no protective-envelope clamp.
+#[tauri::command]
+pub async fn set_daily_date_format<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    format: String,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_daily_date_format_with_dir(&dir, state.inner(), format).await
+}
+
+/// Testable core of [`set_daily_date_format`].
+pub(crate) async fn set_daily_date_format_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    format: String,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.daily_date_format = Some(format);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(event = "prefs_written", field = "daily_date_format");
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `daily_folder` field (MYND-191) — the
+/// daily-notes folder path. Beyond writing the pointer, designating a daily
+/// folder ALSO registers it as a deliberate folder (union, exact-dedup) so the
+/// folder survives empty (the virtual-folder model, MYND-144). Read-modify-write
+/// under the write mutex; no native side-effect; disk-first. Non-load-bearing.
+#[tauri::command]
+pub async fn set_daily_folder<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    folder: String,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_daily_folder_with_dir(&dir, state.inner(), folder).await
+}
+
+/// Testable core of [`set_daily_folder`].
+pub(crate) async fn set_daily_folder_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    folder: String,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.daily_folder = Some(folder.clone());
+    // Register as a deliberate folder so the daily folder survives empty
+    // (MYND-144). Exact-dedup here; the codec sorts + exact-dedups on encode.
+    if !prefs.deliberate_folders.contains(&folder) {
+        prefs.deliberate_folders.push(folder);
+    }
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Field name only — never the path (folder structure is AS3 Sensitive; see
+    // ../../CLAUDE.md "Secret-handling logging discipline").
+    tracing::info!(event = "prefs_written", field = "daily_folder");
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `daily_template` pointer (MYND-191) — the
+/// UUIDv7 of the template to instantiate today's note from. `Some(id)` sets it;
+/// `None` clears it (the canonical "blank daily note" state). Read-modify-write
+/// under the write mutex; no native side-effect; disk-first. Non-load-bearing.
+#[tauri::command]
+pub async fn set_daily_template<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    template_id: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_daily_template_with_dir(&dir, state.inner(), template_id).await
+}
+
+/// Testable core of [`set_daily_template`].
+pub(crate) async fn set_daily_template_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    template_id: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let cleared = template_id.is_none();
+    prefs.daily_template = template_id;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Field name + set/cleared only — never the UUID (note_id is a vault-stable
+    // correlation tag; see ../../CLAUDE.md "Secret-handling logging discipline").
+    tracing::info!(event = "prefs_written", field = "daily_template", cleared);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `favorites` sequence — the user's
 /// favorited notes (an ordered list of note UUIDs surfaced in the sidebar's
 /// Favorites section, MYND-183). Identical read-modify-write + order-
@@ -707,6 +850,9 @@ mod tests {
                     theme: None,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
+                    daily_date_format: None,
+                    daily_folder: None,
+                    daily_template: None,
                     favorites: Vec::new(),
                     item_order: Vec::new(),
                     editor_layout: None,

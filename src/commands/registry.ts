@@ -37,6 +37,12 @@ export type CommandContext = {
   onLock: () => Promise<void>;
   /** Open the Settings modal (mirrors gear button). */
   onOpenSettings: () => void;
+  /** Open the template-management surface (MYND-189). */
+  onManageTemplates: () => void;
+  /** Open the new-note-from-template flow (picker → name → create) (MYND-190). */
+  onNewNoteFromTemplate: () => void;
+  /** Open (or idempotently create) today's daily note (MYND-191). */
+  onOpenTodayNote: () => void;
   /** Switch active selection to the given note id (mirrors sidebar click). */
   onSelectNote: (id: NoteId) => Promise<void>;
   /** Drive Stage transitions for force-relock paths. */

@@ -22,6 +22,9 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     selectedNoteId: null,
     onLock: vi.fn(async () => {}),
     onOpenSettings: vi.fn(),
+    onManageTemplates: vi.fn(),
+    onNewNoteFromTemplate: vi.fn(),
+    onOpenTodayNote: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -34,9 +37,12 @@ function find(id: string): CommandAction {
 }
 
 describe("Command palette action registry", () => {
-  it("exposes exactly the four v1 actions (note picking moved to inline search, MYND-40)", () => {
+  it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190)", () => {
     expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
       "app.open-settings",
+      "daily.open-today",
+      "templates.manage",
+      "templates.new-note",
       "vault.import-obsidian",
       "vault.lock",
       "wikilinks.convert-in-this-note",
