@@ -9,16 +9,18 @@
 //!
 //! ## Damm-32 quasigroup
 //!
-//! Spec `account-number.md` § 4 mandates a 32×32 quasigroup table that
-//! is "frozen in this document" before v1.0 ship; § 9 marks the table
-//! source as an open issue. This implementation uses the
-//! polynomial-multiplication construction (no inline 1024-element
-//! table required): the running checksum is multiplied by α in
-//! GF(2⁵) ≅ GF(2)[x] / (x⁵ + x² + 1) and XORed with the next symbol.
-//! The irreducible polynomial `x⁵ + x² + 1` corresponds to the bitmask
-//! `0b100101 = 37`. The construction is mathematically equivalent to a
-//! single fixed 32×32 quasigroup; pinning a literal table is a layout
-//! convenience for the spec, not a correctness change.
+//! Spec `account-number.md` § 4.2 freezes the 32×32 quasigroup table.
+//! This implementation uses the equivalent polynomial-multiplication
+//! construction (no need to consult the 1024-element table at runtime):
+//! the running checksum is XORed with the next symbol, multiplied by α in
+//! `GF(2⁵) ≅ GF(2)[x] / (x⁵ + x² + 1)`, and reduced. The irreducible
+//! polynomial `x⁵ + x² + 1` corresponds to the bitmask `0b100101 = 37`.
+//! The construction is mathematically equivalent to the single fixed
+//! quasigroup in § 4.2; the frozen `DAMM32_TABLE` const mirrors it,
+//! is golden-locked to `damm32_step` (drift-lock) and proven a valid
+//! weak-TA quasigroup (exhaustive property test) by the `damm32_table_*`
+//! tests below, and `emit_damm32_table_for_paste` regenerates both the
+//! const and the spec § 4.2 markdown block from this construction.
 //!
 //! Reference port: `srobo/damm32` (MIT, Python),
 //! <https://github.com/srobo/damm32>. The five-line core
@@ -27,10 +29,6 @@
 //! re-implement here against the Crockford alphabet (`srobo/damm32`
 //! itself uses the RFC 4648 alphabet — alphabet choice is independent
 //! of the Damm-32 mathematics).
-//!
-//! v1.0 spec ship may inline the table verbatim; when that lands, add a
-//! golden test in this module that compares the literal table against
-//! the runtime-derived one to lock the two representations together.
 
 use crate::error::ProtocolError;
 use alloc::string::String;
@@ -70,6 +68,87 @@ const DAMM32_BIT_MASK: u8 = 37;
 /// Modulus boundary; values ≥ 32 (bit 5 set after the doubling step)
 /// must be reduced.
 const DAMM32_MODULUS: u8 = 32;
+
+/// Frozen canonical Damm-32 quasigroup table (`account-number.md` § 4.2).
+///
+/// This const is the in-crate copy of the **normative literal table** published
+/// in `account-number.md` § 4.2 (and pinned as a 1024-byte cross-implementation
+/// hex vector in `myne-test-vectors`). It is exposed read-only via
+/// [`damm32_table`] for conformance/introspection; production validation runs
+/// the equivalent runtime `damm32_step`, which the `damm32_table_*` golden
+/// tests lock to this literal. Orientation: `DAMM32_TABLE[interim][digit]` —
+/// the outer index is the running interim digit (row), the inner index is the
+/// input symbol index (column); both are 0..32 Crockford-base32 positions.
+///
+/// It is a **weak** totally anti-symmetric quasigroup with zero diagonal: every
+/// row and column is a permutation of 0..32, `T[i][i] == 0`, and
+/// `T[T[c][x]][y] != T[T[c][y]][x]` for all `x != y`. The table is commutative
+/// (`T[a][b] == T[b][a]`), hence it is NOT *fully* totally anti-symmetric — which
+/// is correct, because the Damm check equation needs only weak total
+/// anti-symmetry (the source of all single-substitution + adjacent-transposition
+/// detection); zero diagonal gives the check = interim property. The
+/// `damm32_table_*` tests below pin both legs (drift-lock vs `damm32_step` and
+/// the exhaustive quasigroup properties).
+///
+/// Regenerate with
+/// `cargo test -p protocol --lib emit_damm32_table_for_paste -- --ignored`
+/// (emits both this Rust const and the `account-number.md` § 4 markdown block).
+/// A lefthook pre-push step re-runs the generator and fails on drift. **Changing
+/// this table is a major-version event** (root `CLAUDE.md` load-bearing registry):
+/// it would reject already-distributed account numbers and break cross-impl
+/// validity agreement.
+// BEGIN GENERATED damm32-table (emit_damm32_table_for_paste) — do not edit by hand
+#[rustfmt::skip]
+const DAMM32_TABLE: [[u8; 32]; 32] = [
+    [ 0,  2,  4,  6,  8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30,  5,  7,  1,  3, 13, 15,  9, 11, 21, 23, 17, 19, 29, 31, 25, 27],
+    [ 2,  0,  6,  4, 10,  8, 14, 12, 18, 16, 22, 20, 26, 24, 30, 28,  7,  5,  3,  1, 15, 13, 11,  9, 23, 21, 19, 17, 31, 29, 27, 25],
+    [ 4,  6,  0,  2, 12, 14,  8, 10, 20, 22, 16, 18, 28, 30, 24, 26,  1,  3,  5,  7,  9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31],
+    [ 6,  4,  2,  0, 14, 12, 10,  8, 22, 20, 18, 16, 30, 28, 26, 24,  3,  1,  7,  5, 11,  9, 15, 13, 19, 17, 23, 21, 27, 25, 31, 29],
+    [ 8, 10, 12, 14,  0,  2,  4,  6, 24, 26, 28, 30, 16, 18, 20, 22, 13, 15,  9, 11,  5,  7,  1,  3, 29, 31, 25, 27, 21, 23, 17, 19],
+    [10,  8, 14, 12,  2,  0,  6,  4, 26, 24, 30, 28, 18, 16, 22, 20, 15, 13, 11,  9,  7,  5,  3,  1, 31, 29, 27, 25, 23, 21, 19, 17],
+    [12, 14,  8, 10,  4,  6,  0,  2, 28, 30, 24, 26, 20, 22, 16, 18,  9, 11, 13, 15,  1,  3,  5,  7, 25, 27, 29, 31, 17, 19, 21, 23],
+    [14, 12, 10,  8,  6,  4,  2,  0, 30, 28, 26, 24, 22, 20, 18, 16, 11,  9, 15, 13,  3,  1,  7,  5, 27, 25, 31, 29, 19, 17, 23, 21],
+    [16, 18, 20, 22, 24, 26, 28, 30,  0,  2,  4,  6,  8, 10, 12, 14, 21, 23, 17, 19, 29, 31, 25, 27,  5,  7,  1,  3, 13, 15,  9, 11],
+    [18, 16, 22, 20, 26, 24, 30, 28,  2,  0,  6,  4, 10,  8, 14, 12, 23, 21, 19, 17, 31, 29, 27, 25,  7,  5,  3,  1, 15, 13, 11,  9],
+    [20, 22, 16, 18, 28, 30, 24, 26,  4,  6,  0,  2, 12, 14,  8, 10, 17, 19, 21, 23, 25, 27, 29, 31,  1,  3,  5,  7,  9, 11, 13, 15],
+    [22, 20, 18, 16, 30, 28, 26, 24,  6,  4,  2,  0, 14, 12, 10,  8, 19, 17, 23, 21, 27, 25, 31, 29,  3,  1,  7,  5, 11,  9, 15, 13],
+    [24, 26, 28, 30, 16, 18, 20, 22,  8, 10, 12, 14,  0,  2,  4,  6, 29, 31, 25, 27, 21, 23, 17, 19, 13, 15,  9, 11,  5,  7,  1,  3],
+    [26, 24, 30, 28, 18, 16, 22, 20, 10,  8, 14, 12,  2,  0,  6,  4, 31, 29, 27, 25, 23, 21, 19, 17, 15, 13, 11,  9,  7,  5,  3,  1],
+    [28, 30, 24, 26, 20, 22, 16, 18, 12, 14,  8, 10,  4,  6,  0,  2, 25, 27, 29, 31, 17, 19, 21, 23,  9, 11, 13, 15,  1,  3,  5,  7],
+    [30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10,  8,  6,  4,  2,  0, 27, 25, 31, 29, 19, 17, 23, 21, 11,  9, 15, 13,  3,  1,  7,  5],
+    [ 5,  7,  1,  3, 13, 15,  9, 11, 21, 23, 17, 19, 29, 31, 25, 27,  0,  2,  4,  6,  8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30],
+    [ 7,  5,  3,  1, 15, 13, 11,  9, 23, 21, 19, 17, 31, 29, 27, 25,  2,  0,  6,  4, 10,  8, 14, 12, 18, 16, 22, 20, 26, 24, 30, 28],
+    [ 1,  3,  5,  7,  9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31,  4,  6,  0,  2, 12, 14,  8, 10, 20, 22, 16, 18, 28, 30, 24, 26],
+    [ 3,  1,  7,  5, 11,  9, 15, 13, 19, 17, 23, 21, 27, 25, 31, 29,  6,  4,  2,  0, 14, 12, 10,  8, 22, 20, 18, 16, 30, 28, 26, 24],
+    [13, 15,  9, 11,  5,  7,  1,  3, 29, 31, 25, 27, 21, 23, 17, 19,  8, 10, 12, 14,  0,  2,  4,  6, 24, 26, 28, 30, 16, 18, 20, 22],
+    [15, 13, 11,  9,  7,  5,  3,  1, 31, 29, 27, 25, 23, 21, 19, 17, 10,  8, 14, 12,  2,  0,  6,  4, 26, 24, 30, 28, 18, 16, 22, 20],
+    [ 9, 11, 13, 15,  1,  3,  5,  7, 25, 27, 29, 31, 17, 19, 21, 23, 12, 14,  8, 10,  4,  6,  0,  2, 28, 30, 24, 26, 20, 22, 16, 18],
+    [11,  9, 15, 13,  3,  1,  7,  5, 27, 25, 31, 29, 19, 17, 23, 21, 14, 12, 10,  8,  6,  4,  2,  0, 30, 28, 26, 24, 22, 20, 18, 16],
+    [21, 23, 17, 19, 29, 31, 25, 27,  5,  7,  1,  3, 13, 15,  9, 11, 16, 18, 20, 22, 24, 26, 28, 30,  0,  2,  4,  6,  8, 10, 12, 14],
+    [23, 21, 19, 17, 31, 29, 27, 25,  7,  5,  3,  1, 15, 13, 11,  9, 18, 16, 22, 20, 26, 24, 30, 28,  2,  0,  6,  4, 10,  8, 14, 12],
+    [17, 19, 21, 23, 25, 27, 29, 31,  1,  3,  5,  7,  9, 11, 13, 15, 20, 22, 16, 18, 28, 30, 24, 26,  4,  6,  0,  2, 12, 14,  8, 10],
+    [19, 17, 23, 21, 27, 25, 31, 29,  3,  1,  7,  5, 11,  9, 15, 13, 22, 20, 18, 16, 30, 28, 26, 24,  6,  4,  2,  0, 14, 12, 10,  8],
+    [29, 31, 25, 27, 21, 23, 17, 19, 13, 15,  9, 11,  5,  7,  1,  3, 24, 26, 28, 30, 16, 18, 20, 22,  8, 10, 12, 14,  0,  2,  4,  6],
+    [31, 29, 27, 25, 23, 21, 19, 17, 15, 13, 11,  9,  7,  5,  3,  1, 26, 24, 30, 28, 18, 16, 22, 20, 10,  8, 14, 12,  2,  0,  6,  4],
+    [25, 27, 29, 31, 17, 19, 21, 23,  9, 11, 13, 15,  1,  3,  5,  7, 28, 30, 24, 26, 20, 22, 16, 18, 12, 14,  8, 10,  4,  6,  0,  2],
+    [27, 25, 31, 29, 19, 17, 23, 21, 11,  9, 15, 13,  3,  1,  7,  5, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10,  8,  6,  4,  2,  0],
+];
+// END GENERATED damm32-table
+
+/// Returns a reference to the frozen canonical Damm-32 quasigroup table
+/// (`account-number.md` § 4.2), the `DAMM32_TABLE` const.
+///
+/// Read-only accessor exposed for **cross-implementation conformance**: an
+/// independent port can derive its order-32 quasigroup over GF(2⁵) and diff it
+/// against this table cell-for-cell (the same check the `myne-test-vectors`
+/// `damm32-table` category pins). Indexing is `table[interim][symbol]`
+/// (row = running interim digit, column = input symbol's 0..32 Crockford
+/// index). Returns a `'static` reference — the table is a compile-time const,
+/// so this never copies. Changing this table is a major-version event (root
+/// `CLAUDE.md` load-bearing registry).
+pub fn damm32_table() -> &'static [[u8; 32]; 32] {
+    &DAMM32_TABLE
+}
 
 /// Self-generated user identifier per `docs/spec/account-number.md`.
 ///
@@ -358,6 +437,97 @@ mod tests {
             digits[i] = crockford_index(VALID_CANONICAL[i]).unwrap();
         }
         assert_eq!(damm32_checksum(&digits), 0);
+    }
+
+    #[test]
+    fn damm32_table_matches_runtime_construction() {
+        // Golden-lock leg 1 (TEMPORAL independence): the frozen literal
+        // `DAMM32_TABLE` must equal the runtime polynomial construction at
+        // every one of the 1024 cells. A future edit to `damm32_step` that
+        // shifts any entry fails here — the table is a major-version-event
+        // artifact (root `CLAUDE.md` load-bearing registry). Orientation:
+        // `DAMM32_TABLE[interim][digit] == damm32_step(interim, digit)`.
+        //
+        // NOTE: at t=0 this is a tautology (the const was minted from
+        // `damm32_step`). Its value is purely temporal — catching later
+        // drift. The METHODOLOGICAL leg — proving the table is a valid Damm
+        // quasigroup regardless of how it was minted — lives in
+        // `damm32_table_is_valid_weak_ta_quasigroup`.
+        for interim in 0u8..32 {
+            for digit in 0u8..32 {
+                assert_eq!(
+                    DAMM32_TABLE[interim as usize][digit as usize],
+                    damm32_step(interim, digit),
+                    "table/runtime drift at [interim={interim}][digit={digit}]"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn damm32_table_is_valid_weak_ta_quasigroup() {
+        // Golden-lock leg 2 (METHODOLOGICAL independence): prove the frozen
+        // DAMM32_TABLE is a valid Damm quasigroup regardless of HOW it was
+        // minted. Runs on the CONST, not `damm32_step`, so a t=0 generator
+        // error (which would have minted into both the const AND the runtime,
+        // leaving the drift-lock green) is caught here. At n=32 every check is
+        // EXHAUSTIVE over the whole space, not sampled.
+
+        // (a) Latin square — every row AND every column is a permutation of
+        //     0..32 (each value appears exactly once). Checking only rows is a
+        //     common, insufficient shortcut.
+        for (i, row) in DAMM32_TABLE.iter().enumerate() {
+            let mut seen_row = [false; 32];
+            let mut seen_col = [false; 32];
+            for (j, &val) in row.iter().enumerate() {
+                let r = val as usize;
+                let c = DAMM32_TABLE[j][i] as usize;
+                assert!(!seen_row[r], "row {i} repeats value {r}");
+                assert!(!seen_col[c], "column {i} repeats value {c}");
+                seen_row[r] = true;
+                seen_col[c] = true;
+            }
+        }
+
+        // (b) Zero diagonal — T[i][i] == 0. Gives the Damm "check = interim"
+        //     property (validating entropy||check returns interim 0).
+        for (i, row) in DAMM32_TABLE.iter().enumerate() {
+            assert_eq!(row[i], 0, "non-zero diagonal at {i}");
+        }
+
+        // (c) WEAK total anti-symmetry — for all c and all x != y:
+        //     T[T[c][x]][y] != T[T[c][y]][x]. This is EXACTLY the property that
+        //     makes every adjacent transposition detectable. 32³ triples.
+        //
+        //     We assert WEAK-TA ONLY. The full-TA second condition
+        //     (`x∗y == y∗x  ⇒  x == y`) is DELIBERATELY NOT asserted: this
+        //     table is commutative by construction (`2·(x⊕y) == 2·(y⊕x)`), so
+        //     full-TA is false for it — and asserting it would FALSELY fail a
+        //     correct table. Weak-TA + zero diagonal is the precise and
+        //     sufficient requirement for the Damm check equation.
+        for c in 0..32 {
+            for x in 0..32 {
+                for y in 0..32 {
+                    if x != y {
+                        let lhs = DAMM32_TABLE[DAMM32_TABLE[c][x] as usize][y];
+                        let rhs = DAMM32_TABLE[DAMM32_TABLE[c][y] as usize][x];
+                        assert_ne!(lhs, rhs, "weak-TA violated at c={c} x={x} y={y}");
+                    }
+                }
+            }
+        }
+
+        // (d) Document the commutativity that makes (c) weak-TA and not full-TA.
+        //     Asserted positively so a future non-commutative re-mint is a
+        //     visible, intentional change rather than a silent one.
+        for (a, row) in DAMM32_TABLE.iter().enumerate() {
+            for (b, &val) in row.iter().enumerate() {
+                assert_eq!(
+                    val, DAMM32_TABLE[b][a],
+                    "table unexpectedly non-commutative at ({a},{b})"
+                );
+            }
+        }
     }
 
     #[test]
@@ -869,5 +1039,233 @@ mod tests {
 
         std::fs::write("/tmp/myne_account_number_vectors.json", dump.as_bytes())
             .expect("write account-number vectors dump");
+    }
+
+    /// Emits the frozen `DAMM32_TABLE` Rust const block AND the
+    /// `account-number.md` § 4 markdown table block — both delimited by
+    /// `BEGIN/END GENERATED damm32-table` sentinels — derived from the
+    /// runtime [`damm32_step`] construction. One generator authors both
+    /// representations so the spec table and the code const cannot diverge;
+    /// a lefthook pre-push step re-runs this and `git diff --exit-code`s.
+    ///
+    /// Writes:
+    /// - `/tmp/myne_damm32_table_const.rs` — the Rust const block
+    /// - `/tmp/myne_damm32_table_spec.md` — the spec markdown block
+    ///
+    /// Derives the full 32×32 table from the runtime [`damm32_step`]
+    /// construction. Shared by the two `#[ignore]` generators below.
+    fn build_damm32_table() -> [[u8; 32]; 32] {
+        let mut table = [[0u8; 32]; 32];
+        for interim in 0u8..32 {
+            for digit in 0u8..32 {
+                table[interim as usize][digit as usize] = damm32_step(interim, digit);
+            }
+        }
+        table
+    }
+
+    /// `#[ignore]` — regenerating the frozen table is a deliberate act. Run:
+    /// `cargo test -p protocol --lib emit_damm32_table_for_paste -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_damm32_table_for_paste() {
+        extern crate std;
+
+        let table = build_damm32_table();
+
+        // --- Rust const block (must match the in-file block byte-for-byte) ---
+        let mut rs = alloc::string::String::new();
+        rs.push_str(
+            "// BEGIN GENERATED damm32-table (emit_damm32_table_for_paste) — do not edit by hand\n",
+        );
+        rs.push_str("#[rustfmt::skip]\n");
+        rs.push_str("const DAMM32_TABLE: [[u8; 32]; 32] = [\n");
+        for row in table.iter() {
+            rs.push_str("    [");
+            for (j, v) in row.iter().enumerate() {
+                if j > 0 {
+                    rs.push_str(", ");
+                }
+                rs.push_str(&alloc::format!("{:2}", v));
+            }
+            rs.push_str("],\n");
+        }
+        rs.push_str("];\n");
+        rs.push_str("// END GENERATED damm32-table\n");
+
+        // --- spec markdown block (paste verbatim into account-number.md §4) ---
+        let mut md = alloc::string::String::new();
+        md.push_str(
+            "<!-- BEGIN GENERATED damm32-table (emit_damm32_table_for_paste) — do not edit by hand -->\n",
+        );
+        md.push_str("```text\n");
+        md.push_str("  i\\j │");
+        for j in 0..32 {
+            md.push_str(&alloc::format!(" {:2}", j));
+        }
+        md.push('\n');
+        md.push_str("  ────┼");
+        for _ in 0..32 {
+            md.push_str("───");
+        }
+        md.push('\n');
+        for (i, row) in table.iter().enumerate() {
+            md.push_str(&alloc::format!("  {:3} │", i));
+            for v in row.iter() {
+                md.push_str(&alloc::format!(" {:2}", v));
+            }
+            md.push('\n');
+        }
+        md.push_str("```\n");
+        md.push_str("<!-- END GENERATED damm32-table -->\n");
+
+        std::fs::write("/tmp/myne_damm32_table_const.rs", rs.as_bytes())
+            .expect("write damm32 const block");
+        std::fs::write("/tmp/myne_damm32_table_spec.md", md.as_bytes())
+            .expect("write damm32 spec block");
+        std::println!("{rs}\n{md}");
+    }
+
+    /// Emits the `damm32-table` cross-implementation vector set for
+    /// `myne-test-vectors/vectors/damm32-table/v0.1/cases.json` as ready-to-copy
+    /// JSON at `/tmp/myne_damm32_table_vectors.json`.
+    ///
+    /// One `table` case pins the full 1024-byte quasigroup table (row-major,
+    /// `table[interim][symbol]`) as hex — the only ground truth independent of a
+    /// port's own GF(2⁵) implementation. Three `checksum` cases pin the
+    /// running-checksum direction/orientation at the index level.
+    ///
+    /// **Provenance cross-check at mint:** the table is asserted equal to an
+    /// independent transcription of the published `srobo/damm32` (MIT) step
+    /// before emitting, so the vector's `informational_provenance` claim
+    /// ("matches published srobo/damm32 reference (MIT)") is true by
+    /// construction. This is provenance/citability — `srobo`'s step is the same
+    /// algorithm as `damm32_step`, so it is NOT independent verification of
+    /// correctness; that is carried by `damm32_table_is_valid_weak_ta_quasigroup`.
+    ///
+    /// `#[ignore]`. Run:
+    /// `cargo test -p protocol --lib emit_damm32_table_vectors_for_paste -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_damm32_table_vectors_for_paste() {
+        extern crate std;
+        use alloc::format;
+        use alloc::string::String;
+
+        // Independent transcription of srobo/damm32's `_calculate_from_digits`
+        // inner loop (MIT): `checkdigit ^= digit; checkdigit <<= 1;
+        // if checkdigit >= BASE_SIZE { checkdigit ^= BIT_MASK }`, BASE_SIZE=32,
+        // BIT_MASK=37. Transcribed from the published source, NOT calling
+        // `damm32_step` — so equality is a provenance assertion.
+        let srobo_step = |running: u8, digit: u8| -> u8 {
+            let mut c = running ^ digit;
+            c <<= 1;
+            if c >= 32 {
+                c ^= 37;
+            }
+            c
+        };
+
+        let table = build_damm32_table();
+
+        // Provenance cross-check: every cell must equal the independent srobo
+        // transcription before we emit, making the provenance metadata true by
+        // construction. The checksum cases below fold over this table, so this
+        // cell-level check transitively covers them too.
+        for (interim, row) in table.iter().enumerate() {
+            for (digit, &v) in row.iter().enumerate() {
+                assert_eq!(
+                    v,
+                    srobo_step(interim as u8, digit as u8),
+                    "table cell [{interim}][{digit}] disagrees with srobo/damm32 transcription"
+                );
+            }
+        }
+
+        // Row-major hex of all 1024 cells.
+        let mut table_hex = String::with_capacity(2048);
+        for row in table.iter() {
+            for v in row.iter() {
+                table_hex.push_str(&format!("{v:02x}"));
+            }
+        }
+
+        // Checksum cases: (slug, description, indices, informational note).
+        let single_step: alloc::vec::Vec<u8> = alloc::vec![1];
+        let baseline: alloc::vec::Vec<u8> = (0u8..19).collect();
+        let all_high: alloc::vec::Vec<u8> = alloc::vec![31u8; 19];
+        let checksum_cases: [(&str, &str, alloc::vec::Vec<u8>, &str); 3] = [
+            (
+                "checksum-single-step",
+                "Single symbol from interim 0: pins orientation table[0][1] = 2 (row = interim, column = symbol).",
+                single_step,
+                "interim 0, one symbol index 1 -> check index 2",
+            ),
+            (
+                "checksum-baseline-19",
+                "The 19 entropy indices 0..18 (Crockford `0123456789ABCDEFGHJ`); matches the account-number baseline canonical whose check char is `T` (index 26).",
+                baseline,
+                "indices 0..18 -> check index 26 (Crockford 'T')",
+            ),
+            (
+                "checksum-all-high-19",
+                "Nineteen copies of the highest index (31). Stress case far from the baseline.",
+                all_high,
+                "index 31 x19 -> check index per the frozen table",
+            ),
+        ];
+
+        let mut dump = String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"damm32-table\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"account-number.md §4\",\n");
+        dump.push_str("  \"description\": \"Pins the frozen Damm-32 order-32 quasigroup table (account-number.md §4.2) for cross-implementation byte-identity, plus running-checksum orientation cases. The table is GF(2⁵) ≅ GF(2)[x]/(x⁵+x²+1) with x∗y = α·(x⊕y) (α=2, reduction bitmask 0b100101=37) over Crockford-base32 indices. The literal table is the normative artifact; an independent port derives its table and diffs against expected_table_hex. Generated by `cargo test -p protocol --lib emit_damm32_table_vectors_for_paste -- --ignored`, with a mint-time cross-check against an independent transcription of the published srobo/damm32 (MIT) step.\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // --- table case ---
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"damm32-table/v0.1/canonical-table\",\n");
+        dump.push_str("      \"description\": \"The full 1024-byte (32x32) frozen Damm-32 quasigroup table, row-major: byte (32*interim + symbol) is table[interim][symbol]. Each value is a Crockford-base32 index 0..31. A port derives its own table over GF(2⁵) and asserts byte-equality.\",\n");
+        dump.push_str("      \"case_kind\": \"table\",\n");
+        dump.push_str(&format!("      \"expected_table_hex\": \"{table_hex}\",\n"));
+        dump.push_str("      \"informational_polynomial\": \"x^5 + x^2 + 1 (0b100101 = 37)\",\n");
+        dump.push_str("      \"informational_alphabet\": \"0123456789ABCDEFGHJKMNPQRSTVWXYZ\",\n");
+        dump.push_str("      \"informational_provenance\": \"matches published srobo/damm32 reference (MIT)\"\n");
+        dump.push_str("    },\n");
+
+        // --- checksum cases ---
+        for (i, (slug, desc, indices, note)) in checksum_cases.iter().enumerate() {
+            let check = damm32_checksum(indices);
+
+            let indices_json = indices
+                .iter()
+                .map(|d| format!("{d}"))
+                .collect::<alloc::vec::Vec<_>>()
+                .join(", ");
+            dump.push_str("    {\n");
+            dump.push_str(&format!(
+                "      \"vector_id\": \"damm32-table/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&format!("      \"description\": \"{desc}\",\n"));
+            dump.push_str("      \"case_kind\": \"checksum\",\n");
+            dump.push_str(&format!(
+                "      \"input_entropy_indices\": [{indices_json}],\n"
+            ));
+            dump.push_str(&format!("      \"expected_check_index\": {check},\n"));
+            dump.push_str(&format!("      \"informational_note\": \"{note}\"\n"));
+            if i + 1 < checksum_cases.len() {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_damm32_table_vectors.json", dump.as_bytes())
+            .expect("write damm32-table vectors dump");
+        std::println!("{dump}");
     }
 }

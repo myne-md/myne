@@ -299,7 +299,7 @@ Used in: `spec/protocol.md` §6, `decisions.md` 2026-05-05 "`item_key` persisten
 
 ### **Damm-32 / Damm algorithm** &nbsp; 🏗️ *Construction*
 
-A check-digit algorithm using a totally anti-symmetric quasigroup (Damm 2004), generalized here to a 32-character alphabet matching Crockford base32. Myne appends one Damm-32 character to the 19-character account-number payload to catch single-character substitutions, all adjacent transpositions, and a high fraction of two-character errors. The 32×32 quasigroup table itself is an open issue in `spec/account-number.md` §4 — it must be selected from a published source and frozen before v1.0 ship.
+A check-digit algorithm using a **weak** totally anti-symmetric quasigroup with zero diagonal (Damm 2004), generalized here to a 32-character alphabet matching Crockford base32. Myne appends one Damm-32 character to the 19-character account-number payload to catch single-character substitutions, all adjacent transpositions, and a high fraction of two-character errors. The 32×32 quasigroup table is frozen in `spec/account-number.md` §4.2 — derived over GF(2⁵) (x⁵+x²+1, bitmask 37) and pinned both as a literal table and a `myne-test-vectors` `damm32-table` vector. The operation is commutative (hence weak — not fully — anti-symmetric), which is correct: the Damm check equation requires only weak total anti-symmetry. Changing the table is a major-version event.
 
 Used in: `spec/account-number.md` §4
 
@@ -1149,7 +1149,7 @@ Used in: `spec/protocol.md` §4.1
 | SHA-256 | CTX commitment outer hash, account hash, salt construction | libsodium / stdlib |
 | BIP-39 (encoding only) | Recovery phrase presentation | `@scure/bip39` |
 | Crockford base32 | Account number alphabet | hand-rolled |
-| Damm-32 | Account number check digit | hand-rolled (open issue) |
+| Damm-32 | Account number check digit | hand-rolled (frozen table, `account-number.md` §4.2) |
 
 ### Index 2 — Myne-specific keys and where they live
 

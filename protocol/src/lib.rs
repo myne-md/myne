@@ -54,7 +54,8 @@ pub mod types;
 pub mod vault_meta;
 
 pub use account_number::{
-    generate_account_number, parse_account_number, AccountNumber, ACCOUNT_NUMBER_HASH_LEN,
+    damm32_table, generate_account_number, parse_account_number, AccountNumber,
+    ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
     aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,

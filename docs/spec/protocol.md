@@ -1042,7 +1042,6 @@ Each deferred item has a v0.1 baseline that is internally consistent with this s
 
 **Open risks**
 
-- **Damm-32 quasigroup table is not yet inlined** in `account-number.md`; must be selected from a published source and frozen before v1.0 ship.
 - **No formal verification model** (Tamarin / ProVerif) accompanies v0.1. The compensating-controls plan (`../threat-model.md` §6) is the v1.0 substitute. Formal verification is an `appname-v005` deliverable.
 - **No external cryptographer review** has occurred at draft time. Plan: pre-launch informal review by at least one independent reviewer per `../threat-model.md` §6.
 - **Migration tool from v0.1 to v005 has not been written**. The §10.4 procedure describes the intent; concrete code lands when v005 work begins.

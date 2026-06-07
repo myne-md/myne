@@ -2007,3 +2007,112 @@ fn vault_search_vectors() {
         );
     }
 }
+
+#[test]
+fn damm32_table_vectors() {
+    use protocol::damm32_table;
+
+    let path = companion_vectors_root()
+        .join("damm32-table")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] damm32-table: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "damm32-table");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "damm32-table must have at least one case"
+    );
+    assert_unique_vector_ids("damm32-table", cases);
+
+    // The reference table (frozen const, exposed via the public accessor).
+    let table = damm32_table();
+
+    let mut saw_table = false;
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+
+        match case_kind {
+            "table" => {
+                saw_table = true;
+                let expected = hex_decode(
+                    case["expected_table_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_table_hex")),
+                );
+                assert_eq!(
+                    expected.len(),
+                    1024,
+                    "[{id}] expected_table_hex must decode to 1024 bytes, got {}",
+                    expected.len()
+                );
+                // Row-major flatten of the reference table.
+                let mut actual = Vec::with_capacity(1024);
+                for row in table.iter() {
+                    actual.extend_from_slice(row);
+                }
+                assert_eq!(
+                    actual,
+                    expected,
+                    "[{id}] damm32 table mismatch (row-major)\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "checksum" => {
+                let indices: Vec<u8> = case["input_entropy_indices"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_entropy_indices"))
+                    .iter()
+                    .map(|v| {
+                        let n = v
+                            .as_u64()
+                            .unwrap_or_else(|| panic!("[{id}] index not an integer"));
+                        assert!(n < 32, "[{id}] index {n} out of range 0..32");
+                        n as u8
+                    })
+                    .collect();
+                let expected = case["expected_check_index"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_check_index"));
+                assert!(expected < 32, "[{id}] expected_check_index out of range");
+
+                // Fold left from interim 0 through the reference table — the
+                // same operation a port runs against its derived table.
+                let mut interim = 0usize;
+                for &d in &indices {
+                    interim = table[interim][d as usize] as usize;
+                }
+                assert_eq!(
+                    interim as u64, expected,
+                    "[{id}] checksum mismatch: folded {interim}, expected {expected}"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}'"),
+        }
+    }
+
+    assert!(
+        saw_table,
+        "damm32-table must include the full 'table' case (the cross-impl ground truth)"
+    );
+}

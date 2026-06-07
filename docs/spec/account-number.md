@@ -1,6 +1,6 @@
 # Myne Account Number Scheme v0.1
 
-> **Status: skeleton.** This document fills in the details summarized in `protocol.md` §8. The format and normalization rules below are normative. The Damm-32 quasigroup table is referenced but not yet inlined; it will be added before v1.0 ship.
+> **Status: skeleton.** This document fills in the details summarized in `protocol.md` §8. The format and normalization rules below are normative. The Damm-32 quasigroup table is inlined and frozen in §4.2.
 
 ---
 
@@ -53,26 +53,92 @@ The 95-bit entropy is encoded as the first 19 base32 characters by:
 
 ## 4. Damm-32 check character
 
-The Damm algorithm uses a **totally anti-symmetric quasigroup** of order 32. Computing the check character:
+The check character is one Damm-32 digit over a fixed order-32 quasigroup. The quasigroup is **weak totally anti-symmetric with zero diagonal** — the precise (and sufficient) property the Damm check equation requires. Computing the check character:
 
 ```
-damm32_check(s):
-  digit := 0
-  for c in s:                                # left-to-right
-      digit := QUASIGROUP[digit][index_of(c)]
-  return alphabet[digit]
+damm32_check(s):                             # s = entropy indices, left-to-right
+  interim := 0
+  for c in s:
+      interim := DAMM32_TABLE[interim][index_of(c)]   # row = interim, col = symbol index
+  return alphabet[interim]
 ```
 
-A check is verified by appending the candidate check character to the 19-char string and running the same loop on all 20 characters; if the final `digit` is `0`, the check passes.
+A check is verified by appending the candidate check character to the 19-character string and running the same loop over all 20 characters; the check passes iff the final `interim` is `0` (this is what the zero diagonal guarantees).
 
-**Properties**: catches all single-character substitutions, all single-character adjacent transpositions, and a high fraction of two-character errors. Stronger than Luhn for alphanumeric alphabets.
+**Properties.** Catches **all** single-character substitutions and **all** adjacent transpositions (including transposition of the trailing check character with its neighbour), plus a high fraction of two-character errors. Stronger than Luhn for alphanumeric alphabets. Account numbers are fixed-length (20 characters), so the leading-zero weakness common to Damm/Luhn does not apply here.
 
-The 32×32 quasigroup table is to be inlined in this document before v1.0 ship. Reference implementations:
+### 4.1 Construction (informative)
 
-- Damm's original paper (2004): "Total Anti-Symmetrische Quasigruppe", H. Michael Damm.
-- A pre-built Damm-32 table: TBD reference (multiple GitHub implementations exist, requires audit before adoption).
+The table is derived over the finite field GF(2⁵) ≅ GF(2)[x] / (x⁵ + x² + 1). Map each character to its 0–31 Crockford index (§2); the quasigroup operation is
 
-> **Open issue.** The Damm-32 quasigroup MUST be a single canonical table chosen for Myne and frozen in this document. The table will be selected from a published source and pasted in before v1.0 ship.
+```
+x ∗ y = α · (x ⊕ y)        over GF(2⁵),  α = the field element 2 (the polynomial x)
+```
+
+i.e. each step XORs the running interim with the next symbol index, multiplies by α, and reduces modulo the irreducible polynomial. `x⁵ + x² + 1` is the canonical low-weight (and primitive) irreducible of degree 5, encoded as the bitmask `0b100101 = 37`; reduction is "if the doubled value ≥ 32, XOR 37". In code:
+
+```
+step(interim, symbol):
+  t := (interim XOR symbol) << 1
+  if t >= 32: t := t XOR 37
+  return t
+```
+
+**The literal table in §4.2 is normative**; this construction is the informative derivation. An independent implementation MAY either paste the table verbatim or implement the construction and verify it against the table — the two are byte-identical.
+
+**Commutativity note.** The operation is commutative (`x ∗ y = y ∗ x`), so the quasigroup is **not** *fully* totally anti-symmetric — only **weakly** so. This is correct and intended: the Damm check equation needs only weak total anti-symmetry (the source of the all-single-error + all-adjacent-transposition guarantee), and the zero diagonal gives the "valid ⟺ final interim is 0" property. An implementation MUST NOT "fix" the table to be fully anti-symmetric — that changes the table and is a major-version event (see root `CLAUDE.md` load-bearing registry).
+
+### 4.2 Frozen quasigroup table (normative)
+
+`DAMM32_TABLE[interim][symbol]` — the outer index is the running interim digit (row), the inner index is the input symbol's Crockford index (column); both range over 0–31. This block is machine-generated (`emit_damm32_table_for_paste`); do not edit it by hand.
+
+<!-- BEGIN GENERATED damm32-table (emit_damm32_table_for_paste) — do not edit by hand -->
+```text
+  i\j │  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  ────┼────────────────────────────────────────────────────────────────────────────────────────────────
+    0 │  0  2  4  6  8 10 12 14 16 18 20 22 24 26 28 30  5  7  1  3 13 15  9 11 21 23 17 19 29 31 25 27
+    1 │  2  0  6  4 10  8 14 12 18 16 22 20 26 24 30 28  7  5  3  1 15 13 11  9 23 21 19 17 31 29 27 25
+    2 │  4  6  0  2 12 14  8 10 20 22 16 18 28 30 24 26  1  3  5  7  9 11 13 15 17 19 21 23 25 27 29 31
+    3 │  6  4  2  0 14 12 10  8 22 20 18 16 30 28 26 24  3  1  7  5 11  9 15 13 19 17 23 21 27 25 31 29
+    4 │  8 10 12 14  0  2  4  6 24 26 28 30 16 18 20 22 13 15  9 11  5  7  1  3 29 31 25 27 21 23 17 19
+    5 │ 10  8 14 12  2  0  6  4 26 24 30 28 18 16 22 20 15 13 11  9  7  5  3  1 31 29 27 25 23 21 19 17
+    6 │ 12 14  8 10  4  6  0  2 28 30 24 26 20 22 16 18  9 11 13 15  1  3  5  7 25 27 29 31 17 19 21 23
+    7 │ 14 12 10  8  6  4  2  0 30 28 26 24 22 20 18 16 11  9 15 13  3  1  7  5 27 25 31 29 19 17 23 21
+    8 │ 16 18 20 22 24 26 28 30  0  2  4  6  8 10 12 14 21 23 17 19 29 31 25 27  5  7  1  3 13 15  9 11
+    9 │ 18 16 22 20 26 24 30 28  2  0  6  4 10  8 14 12 23 21 19 17 31 29 27 25  7  5  3  1 15 13 11  9
+   10 │ 20 22 16 18 28 30 24 26  4  6  0  2 12 14  8 10 17 19 21 23 25 27 29 31  1  3  5  7  9 11 13 15
+   11 │ 22 20 18 16 30 28 26 24  6  4  2  0 14 12 10  8 19 17 23 21 27 25 31 29  3  1  7  5 11  9 15 13
+   12 │ 24 26 28 30 16 18 20 22  8 10 12 14  0  2  4  6 29 31 25 27 21 23 17 19 13 15  9 11  5  7  1  3
+   13 │ 26 24 30 28 18 16 22 20 10  8 14 12  2  0  6  4 31 29 27 25 23 21 19 17 15 13 11  9  7  5  3  1
+   14 │ 28 30 24 26 20 22 16 18 12 14  8 10  4  6  0  2 25 27 29 31 17 19 21 23  9 11 13 15  1  3  5  7
+   15 │ 30 28 26 24 22 20 18 16 14 12 10  8  6  4  2  0 27 25 31 29 19 17 23 21 11  9 15 13  3  1  7  5
+   16 │  5  7  1  3 13 15  9 11 21 23 17 19 29 31 25 27  0  2  4  6  8 10 12 14 16 18 20 22 24 26 28 30
+   17 │  7  5  3  1 15 13 11  9 23 21 19 17 31 29 27 25  2  0  6  4 10  8 14 12 18 16 22 20 26 24 30 28
+   18 │  1  3  5  7  9 11 13 15 17 19 21 23 25 27 29 31  4  6  0  2 12 14  8 10 20 22 16 18 28 30 24 26
+   19 │  3  1  7  5 11  9 15 13 19 17 23 21 27 25 31 29  6  4  2  0 14 12 10  8 22 20 18 16 30 28 26 24
+   20 │ 13 15  9 11  5  7  1  3 29 31 25 27 21 23 17 19  8 10 12 14  0  2  4  6 24 26 28 30 16 18 20 22
+   21 │ 15 13 11  9  7  5  3  1 31 29 27 25 23 21 19 17 10  8 14 12  2  0  6  4 26 24 30 28 18 16 22 20
+   22 │  9 11 13 15  1  3  5  7 25 27 29 31 17 19 21 23 12 14  8 10  4  6  0  2 28 30 24 26 20 22 16 18
+   23 │ 11  9 15 13  3  1  7  5 27 25 31 29 19 17 23 21 14 12 10  8  6  4  2  0 30 28 26 24 22 20 18 16
+   24 │ 21 23 17 19 29 31 25 27  5  7  1  3 13 15  9 11 16 18 20 22 24 26 28 30  0  2  4  6  8 10 12 14
+   25 │ 23 21 19 17 31 29 27 25  7  5  3  1 15 13 11  9 18 16 22 20 26 24 30 28  2  0  6  4 10  8 14 12
+   26 │ 17 19 21 23 25 27 29 31  1  3  5  7  9 11 13 15 20 22 16 18 28 30 24 26  4  6  0  2 12 14  8 10
+   27 │ 19 17 23 21 27 25 31 29  3  1  7  5 11  9 15 13 22 20 18 16 30 28 26 24  6  4  2  0 14 12 10  8
+   28 │ 29 31 25 27 21 23 17 19 13 15  9 11  5  7  1  3 24 26 28 30 16 18 20 22  8 10 12 14  0  2  4  6
+   29 │ 31 29 27 25 23 21 19 17 15 13 11  9  7  5  3  1 26 24 30 28 18 16 22 20 10  8 14 12  2  0  6  4
+   30 │ 25 27 29 31 17 19 21 23  9 11 13 15  1  3  5  7 28 30 24 26 20 22 16 18 12 14  8 10  4  6  0  2
+   31 │ 27 25 31 29 19 17 23 21 11  9 15 13  3  1  7  5 30 28 26 24 22 20 18 16 14 12 10  8  6  4  2  0
+```
+<!-- END GENERATED damm32-table -->
+
+**Worked example (pins orientation).** Entropy `0123456789ABCDEFGHJ` (indices 0,1,…,18). Start `interim = 0`. First symbol index `0` → `DAMM32_TABLE[0][0] = 0`; next index `1` → `DAMM32_TABLE[0][1] = 2`; next index `2` → `DAMM32_TABLE[2][2] = 0`; …continuing left-to-right over all 19 indices yields final `interim = 26`, which maps to Crockford `T`. The canonical account number is `0123456789ABCDEFGHJT`; validating all 20 characters returns `interim = 0`. (Because the row index is the *running interim* — not the position — a transposed pair changes the running state and is detected.)
+
+### 4.3 Provenance
+
+- **Construction method:** H. Michael Damm, *Total anti-symmetrische Quasigruppen* (PhD dissertation, Philipps-Universität Marburg, 2004) — <https://archiv.ub.uni-marburg.de/diss/z2004/0516>.
+- **Irreducible polynomial:** G. Seroussi, *Table of Low-Weight Binary Irreducible Polynomials*, HP Labs HPL-98-135 (1998) — degree-5 entry `x⁵ + x² + 1`.
+- **Reference implementation:** `srobo/damm32` (MIT) — <https://github.com/srobo/damm32>. The operative core is the same `α·(x⊕y)` step; that crate uses the RFC 4648 alphabet, so its check *characters* differ — the construction is alphabet-independent and Myne indexes via Crockford (§2).
+- The literal table is locked to the construction by a golden test in `protocol/src/account_number.rs` and pinned as a 1024-byte cross-implementation hex vector in `myne-test-vectors`.
 
 ## 5. Parsing and normalization
 
@@ -124,6 +190,5 @@ The 16-byte hash is stored in `vault.meta` (§9.3 of the protocol spec) and bind
 
 ## 9. Open issues
 
-- **Damm-32 quasigroup table selection** — pick a published source, inline the table, freeze.
 - **Display redaction policy** — UI behavior when re-displaying a previously-known account number (full vs partial). Out of scope for the protocol; UX decision.
 - **Recovery if account number is lost** — losing the account number is not equivalent to losing the password. The hash is in `vault.meta`, but reverse-deriving the number from the hash is infeasible. Practical recovery: the user MUST also store the account number alongside the recovery phrase.
