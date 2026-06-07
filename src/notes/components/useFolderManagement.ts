@@ -26,12 +26,19 @@ import { usePrefs } from "../../hooks/usePrefs";
 import {
   setDeliberateFolders,
   setFavorites as persistFavorites,
+  setFolderIcons as persistFolderIcons,
+  setItemColors as persistItemColors,
   setItemOrder as persistItemOrder,
 } from "../../lib/prefs";
 import { deleteFolder, renameFolder } from "../folderActions";
 import { moveNote } from "../moveNote";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
+import {
+  pruneFolderPrefix,
+  pruneStaleNoteColors,
+  rewriteFolderPrefix,
+} from "../decorationRewrite";
 import {
   buildItemRankMap,
   orderContainerChildren,
@@ -112,6 +119,95 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   useEffect(() => {
     setFavorites(prefs.favorites);
   }, [prefs.favorites]);
+
+  // Decoration maps (MYND-184 color labels / MYND-185 folder icons), synced
+  // from the mount-time prefs read and mutated optimistically by the picker
+  // setters below. `itemColors` is keyed by note UUID OR canonical folder path
+  // (`/`-discriminated, like `item_order`); `folderIcons` by folder path.
+  const [itemColors, setItemColorsState] = useState<Record<string, string>>({});
+  const [folderIcons, setFolderIconsState] = useState<Record<string, string>>(
+    {},
+  );
+  useEffect(() => {
+    setItemColorsState(prefs.item_colors);
+  }, [prefs.item_colors]);
+  useEffect(() => {
+    setFolderIconsState(prefs.folder_icons);
+  }, [prefs.folder_icons]);
+
+  // ---- decorations: color labels + folder icons (MYND-184 / 185) ----------
+  // Optimistic whole-map prefs write with revert-on-reject, mirroring the
+  // favorites/reorder discipline. The picker mutates one entry; we persist the
+  // full map (the established prefs-setter shape — set_item_colors /
+  // set_folder_icons take the whole desired map). Defined early so the folder
+  // rename/delete handlers below can re-root / prune the maps through it.
+  const writeItemColors = useCallback(
+    async (next: Record<string, string>) => {
+      // Lazy GC: drop note-keyed entries whose note no longer lives (the
+      // favorites pattern); folder keys are kept (rename/delete handle those).
+      const pruned = pruneStaleNoteColors(next, ctx.cache);
+      const prev = itemColors;
+      setItemColorsState(pruned);
+      try {
+        await persistItemColors(pruned);
+      } catch {
+        setItemColorsState(prev);
+      }
+    },
+    [ctx.cache, itemColors],
+  );
+  // Assign (`slot`) or clear (`null`) the color of one item — a note UUID or a
+  // canonical folder path. Clearing removes the key so the map omits-when-empty.
+  const setItemColor = useCallback(
+    (key: string, slot: string | null) => {
+      const next = { ...itemColors };
+      if (slot === null) delete next[key];
+      else next[key] = slot;
+      void writeItemColors(next);
+    },
+    [itemColors, writeItemColors],
+  );
+
+  const writeFolderIcons = useCallback(
+    async (next: Record<string, string>) => {
+      const prev = folderIcons;
+      setFolderIconsState(next);
+      try {
+        await persistFolderIcons(next);
+      } catch {
+        setFolderIconsState(prev);
+      }
+    },
+    [folderIcons],
+  );
+  // Assign (`icon`) or reset (`null`) a folder's custom icon, keyed by path.
+  const setFolderIcon = useCallback(
+    (path: string, icon: string | null) => {
+      const next = { ...folderIcons };
+      if (icon === null) delete next[path];
+      else next[path] = icon;
+      void writeFolderIcons(next);
+    },
+    [folderIcons, writeFolderIcons],
+  );
+
+  // Apply a folder-prefix transform (rewrite on rename / prune on delete) to
+  // BOTH decoration maps, persisting each only when it changed — the open-risk
+  // the durability task closes (MYND-184/185). A rename re-roots a whole
+  // subtree, so the folded-prefix walk catches descendants too.
+  const applyDecorationRemap = useCallback(
+    (
+      remap: (
+        map: Record<string, string>,
+      ) => { next: Record<string, string>; changed: boolean },
+    ) => {
+      const ic = remap(itemColors);
+      if (ic.changed) void writeItemColors(ic.next);
+      const fi = remap(folderIcons);
+      if (fi.changed) void writeFolderIcons(fi.next);
+    },
+    [itemColors, folderIcons, writeItemColors, writeFolderIcons],
+  );
 
   // The latest derived tree, kept in a ref so handlers stay referentially
   // stable while still reading current subtree state (delete-emptiness etc.).
@@ -283,9 +379,15 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         deliberate,
       );
       setDeliberate(result.nextDeliberate);
+      // Re-root the folder's color + icon onto the new path (and any descendant
+      // folder's, since the rename re-roots the whole subtree) so a rename
+      // never silently strips a decoration (MYND-184/185 durability).
+      if (!result.invalid) {
+        applyDecorationRemap((m) => rewriteFolderPrefix(m, node.path, newPath));
+      }
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
     },
-    [ctx, deliberate, notesForOps],
+    [ctx, deliberate, notesForOps, applyDecorationRemap],
   );
 
   // ---- delete folder -------------------------------------------------------
@@ -298,8 +400,11 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         return;
       }
       setDeliberate(plan.nextDeliberate);
+      // Prune the deleted folder's (and its deliberate descendants') color +
+      // icon (MYND-184/185 durability).
+      applyDecorationRemap((m) => pruneFolderPrefix(m, node.path));
     },
-    [deliberate],
+    [deliberate, applyDecorationRemap],
   );
   const dismissBlock = useCallback(() => setBlockNotice(null), []);
   // Auto-dismiss the block notice.
@@ -659,6 +764,11 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     onFolderReorder,
     onFolderDragStart,
     onDragEndCleanup,
+    // decorations (MYND-184 color labels / MYND-185 folder icons)
+    itemColors,
+    setItemColor,
+    folderIcons,
+    setFolderIcon,
   };
 }
 

@@ -14,6 +14,8 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { FolderNode } from "../folderTree";
+import { ColorDot } from "./ColorDot";
+import { FolderGlyph } from "./FolderGlyph";
 import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
 
 const INDENT_PER_LEVEL = 18;
@@ -147,6 +149,12 @@ export type FolderRowProps = {
   /** Commit an inline rename to `newName` (last-segment name). */
   onCommitRename?: (node: FolderNode, newName: string) => void;
   onCancelRename?: () => void;
+  /** Color-label slot (MYND-184) — renders a small dot after the folder icon.
+   *  Undefined when the folder has no color. */
+  colorSlot?: string;
+  /** Custom folder-icon glyph name (MYND-185) — replaces the default folder
+   *  icon. Undefined when the folder uses the default glyph. */
+  iconName?: string;
 };
 
 export function FolderRow({
@@ -169,6 +177,8 @@ export function FolderRow({
   onDragEnd,
   onCommitRename,
   onCancelRename,
+  colorSlot,
+  iconName,
 }: FolderRowProps) {
   const [hovering, setHovering] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -272,7 +282,12 @@ export function FolderRow({
       ) : (
         <Chevron collapsed={collapsed} />
       )}
-      <FolderIcon open={expanded} />
+      {iconName ? (
+        <FolderGlyph name={iconName} style={{ color: "var(--fg-3)" }} />
+      ) : (
+        <FolderIcon open={expanded} />
+      )}
+      <ColorDot slot={colorSlot} style={{ marginRight: 1 }} />
       {renaming ? (
         <input
           ref={inputRef}

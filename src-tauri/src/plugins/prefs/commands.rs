@@ -729,6 +729,105 @@ pub(crate) async fn set_theme_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `item_colors` map (MYND-184) — the
+/// per-item color labels keyed by note UUID OR canonical trailing-slash folder
+/// path (notes + folders both take a color). Read-modify-write under the
+/// per-plugin write mutex; **no native side-effect** (same shape as
+/// `set_deliberate_folders`). The caller passes the full desired map; v0.1
+/// single-device writes it verbatim. Clearing a color = omit its key from the
+/// map (an empty map omits the whole field on disk). Stale-key pruning
+/// (deleted note/folder) is the caller's job — the codec performs no GC.
+#[tauri::command]
+pub async fn set_item_colors<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    colors: std::collections::BTreeMap<String, String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_item_colors_with_dir(&dir, state.inner(), colors).await
+}
+
+/// Testable core of [`set_item_colors`].
+pub(crate) async fn set_item_colors_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    colors: std::collections::BTreeMap<String, String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = colors.len();
+    prefs.item_colors = colors;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Entry COUNT only — never the keys (note IDs / folder paths are AS3
+    // correlation tags; see ../../CLAUDE.md "Secret-handling logging discipline").
+    tracing::info!(event = "prefs_written", field = "item_colors", count,);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `folder_icons` map (MYND-185) — the
+/// per-folder custom sidebar icons keyed by canonical trailing-slash folder
+/// path. Same read-modify-write, no-native-side-effect contract as
+/// [`set_item_colors`]. The caller passes the full desired map; resetting a
+/// folder to its default glyph = omit its key (an empty map omits the field on
+/// disk). Stale-key pruning (deleted/renamed folder) is the caller's job.
+#[tauri::command]
+pub async fn set_folder_icons<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    icons: std::collections::BTreeMap<String, String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    set_folder_icons_with_dir(&dir, state.inner(), icons).await
+}
+
+/// Testable core of [`set_folder_icons`].
+pub(crate) async fn set_folder_icons_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    icons: std::collections::BTreeMap<String, String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = icons.len();
+    prefs.folder_icons = icons;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Entry COUNT only — never the keys (folder paths are AS3 correlation tags).
+    tracing::info!(event = "prefs_written", field = "folder_icons", count,);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -847,6 +946,8 @@ mod tests {
                 &account_hash,
                 &PrefsView {
                     screen_capture_protection: false,
+                    folder_icons: Default::default(),
+                    item_colors: Default::default(),
                     theme: None,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
@@ -1080,6 +1181,70 @@ mod tests {
                 .await
                 .expect("read after clear");
             assert!(cleared.deliberate_folders.is_empty());
+        });
+    }
+
+    // ---- decoration maps: item_colors / folder_icons (MYND-184/185) --
+
+    #[test]
+    fn item_colors_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            let colors = std::collections::BTreeMap::from([
+                (
+                    String::from("0190a000-0000-7000-8000-000000000001"),
+                    String::from("moss"),
+                ),
+                (String::from("Projects/Myne/"), String::from("slate")),
+            ]);
+            set_item_colors_with_dir(tmp.path(), &state, colors.clone())
+                .await
+                .expect("write must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after write");
+            assert_eq!(view.item_colors, colors);
+            // screen_capture_protection untouched (defaults on).
+            assert!(view.screen_capture_protection);
+
+            // Empty map round-trips (re-encodes byte-identical to a pre-feature blob).
+            set_item_colors_with_dir(tmp.path(), &state, std::collections::BTreeMap::new())
+                .await
+                .expect("clear must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert!(cleared.item_colors.is_empty());
+        });
+    }
+
+    #[test]
+    fn folder_icons_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            let icons = std::collections::BTreeMap::from([
+                (String::from("Archive/2025/"), String::from("archive")),
+                (String::from("Projects/Myne/"), String::from("book")),
+            ]);
+            set_folder_icons_with_dir(tmp.path(), &state, icons.clone())
+                .await
+                .expect("write must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after write");
+            assert_eq!(view.folder_icons, icons);
+
+            set_folder_icons_with_dir(tmp.path(), &state, std::collections::BTreeMap::new())
+                .await
+                .expect("clear must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert!(cleared.folder_icons.is_empty());
         });
     }
 

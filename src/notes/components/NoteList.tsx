@@ -29,6 +29,7 @@ import {
 import { TrashPanel } from "./TrashPanel";
 import { deriveFolderTree } from "../folderTree";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
@@ -620,6 +621,17 @@ function PopulatedList({
     setBgMenu({ x: e.clientX, y: e.clientY });
   }, []);
   const closeBgMenu = useCallback(() => setBgMenu(null), []);
+  // Decoration picker (MYND-184 color labels / MYND-185 folder icons) — an
+  // anchored popover opened from a flat "Color…" / "Customize…" context-menu
+  // item (so ContextMenu itself stays lean). `folderPath` is set for a folder
+  // (the icon section keys on it, MYND-185), null for a note (color only).
+  const [decoPopover, setDecoPopover] = useState<{
+    x: number;
+    y: number;
+    key: string;
+    folderPath: string | null;
+  } | null>(null);
+  const closeDecoPopover = useCallback(() => setDecoPopover(null), []);
 
   const handleContextMenu = useCallback(
     (id: NoteId, pos: { x: number; y: number }) => {
@@ -657,9 +669,10 @@ function PopulatedList({
         onCancelRename={ctx.cancelRename}
         favorited={favorited}
         onToggleFavorite={fm.toggleFavorite}
+        colorSlot={fm.itemColors[id]}
       />
     ),
-    [ctx, handleContextMenu, fm.toggleFavorite],
+    [ctx, handleContextMenu, fm.toggleFavorite, fm.itemColors],
   );
 
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -728,6 +741,17 @@ function PopulatedList({
         onSelect: () => fm.toggleFavorite(menu.id),
       },
       {
+        id: "color",
+        label: "Color…",
+        onSelect: () =>
+          setDecoPopover({
+            x: menu.x,
+            y: menu.y,
+            key: menu.id,
+            folderPath: null,
+          }),
+      },
+      {
         id: "delete",
         label: "Delete",
         destructive: true,
@@ -738,8 +762,9 @@ function PopulatedList({
 
   // Folder context-menu items (right-click a folder row).
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {
-    const node = fm.menu?.node;
-    if (node === undefined) return [];
+    const menuPos = fm.menu;
+    const node = menuPos?.node;
+    if (node === undefined || menuPos === null) return [];
     return [
       { id: "rename", label: "Rename", onSelect: () => fm.startRenameFolder(node) },
       {
@@ -751,6 +776,17 @@ function PopulatedList({
         id: "new-subfolder",
         label: "New subfolder",
         onSelect: () => fm.startNewFolder(node.path),
+      },
+      {
+        id: "color",
+        label: "Customize…",
+        onSelect: () =>
+          setDecoPopover({
+            x: menuPos.x,
+            y: menuPos.y,
+            key: node.path,
+            folderPath: node.path,
+          }),
       },
       {
         id: "delete",
@@ -947,6 +983,8 @@ function PopulatedList({
                   }
                   onToggle={onToggleFolder}
                   onContextMenu={fm.openMenu}
+                  colorSlot={fm.itemColors[row.node.path]}
+                  iconName={fm.folderIcons[row.node.path]}
                   onDragTarget={fm.setDropTargetKey}
                   onDropNote={(folderPath) => void fm.onFolderDropNote(folderPath)}
                   onDragStartFolder={fm.onFolderDragStart}
@@ -1061,6 +1099,24 @@ function PopulatedList({
           y={bgMenu.y}
           items={bgMenuItems}
           onClose={closeBgMenu}
+        />
+      )}
+      {decoPopover !== null && (
+        <DecorationPopover
+          x={decoPopover.x}
+          y={decoPopover.y}
+          color={fm.itemColors[decoPopover.key] ?? null}
+          onSelectColor={(slot) => fm.setItemColor(decoPopover.key, slot)}
+          icon={
+            decoPopover.folderPath !== null
+              ? {
+                  value: fm.folderIcons[decoPopover.folderPath] ?? null,
+                  onSelect: (name) =>
+                    fm.setFolderIcon(decoPopover.folderPath as string, name),
+                }
+              : undefined
+          }
+          onClose={closeDecoPopover}
         />
       )}
       <Toast
