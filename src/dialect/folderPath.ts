@@ -136,3 +136,28 @@ export function validateFolderNameInput(
   if (!isLegalPathLength(fullPath)) return "too-long";
   return null;
 }
+
+/**
+ * Case-fold + NFC identity key for a folder path (root / `null` → `""`). The
+ * canonical folder-identity shared by the daily-note resolver, folder-tree
+ * derivation, and the Obsidian importer (SYNC-5) so `Projects/` ≡ `projects/`.
+ */
+export function folderKey(folder: string | null): string {
+  const norm = normalizeFolderPath(folder);
+  return norm === null ? "" : foldSegment(norm);
+}
+
+/**
+ * Every ancestor folder of a canonical trailing-slash path, inclusive:
+ * `"A/B/C/"` → `["A/", "A/B/", "A/B/C/"]`. Root / empty → `[]`.
+ */
+export function ancestorPaths(canonical: string): string[] {
+  const segments = canonical.split("/").filter((s) => s.length > 0);
+  const out: string[] = [];
+  let acc = "";
+  for (const s of segments) {
+    acc += s + "/";
+    out.push(acc);
+  }
+  return out;
+}

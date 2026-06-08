@@ -1,0 +1,29 @@
+# Permissions for the in-app `importer` read-seam Tauri plugin (MYND-53, SYNC-1).
+# Picked up under the `importer:` ACL namespace only because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as
+# `importer:default` (or `importer:allow-<cmd>`).
+#
+# These two commands are the ONLY path by which the WebView reads an external
+# (Obsidian vault) directory. No `fs:allow-read-text-file` / `fs:read-dir` /
+# read `fs:scope` is granted — the narrow, path-validating seam replaces it
+# (least-privilege, TB6). Adding a command here without a matching `build.rs`
+# `InlinedPlugin::commands` entry is a security regression.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the importer read-seam plugin."
+permissions = [
+    "allow-import-read-dir",
+    "allow-import-read-file",
+]
+
+[[permission]]
+identifier = "allow-import-read-dir"
+description = "Allow invoking importer:import_read_dir (list a directory's entries — name + is_dir, no content — within the user-picked import root; the path is validated to live inside the canonical root before any I/O)."
+commands.allow = ["import_read_dir"]
+
+[[permission]]
+identifier = "allow-import-read-file"
+description = "Allow invoking importer:import_read_file (read the UTF-8 source bytes of a file within the user-picked import root; path validated within-root; plaintext wrapped in Zeroizing and dropped per the Plaintext-IPC pattern, never written to disk)."
+commands.allow = ["import_read_file"]
