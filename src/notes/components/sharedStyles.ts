@@ -18,3 +18,22 @@ export const SECTION_HEADING_STYLE: CSSProperties = {
   letterSpacing: "0.08em",
   fontWeight: 600,
 };
+
+/**
+ * The right-sidebar reader-surface card chrome shared by the Backlinks rows
+ * (`<RightSidebar>`) and the Unlinked-mentions rows
+ * (`<UnlinkedMentionsSection>`): `--bg-1` fill, `--line-1` hairline, 6px radius,
+ * 10/11px padding. Spread this and override per-row (e.g. `display`/`cursor`).
+ */
+export const SIDEBAR_CARD_STYLE: CSSProperties = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-1)",
+  borderRadius: 6,
+  padding: "10px 11px",
+  margin: 0,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};

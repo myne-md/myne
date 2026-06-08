@@ -23,6 +23,16 @@ import { definitionListDecorations } from "./definition-list";
 import { fencedCodeDecorations } from "./fenced-code";
 import { footnoteDecorations } from "./footnote";
 
+// SYNC-17 GUARD (MYND-200 / knowledge-graph-ux; `decisions.md` 2026-06-08
+// "Interactive tags ship as ONE unit"): there is intentionally NO inline-`#tag`
+// decoration here. Tags are recognized + indexed (`markdown-dialect.md` §3.7;
+// `tagTree()`/`byTag()`) but rendered as PLAIN TEXT — the coherent invisible-
+// but-indexed state. Decorating `#tag` makes it LOOK clickable; doing that
+// without a browse/click target manufactures a dead affordance. So tag
+// decoration may ONLY land together with the tag-browse surface (the interactive
+// -tag unit). Do NOT add a `tagDecorations()` entry in an editor-polish PR — it
+// must arrive in the same change as the browse surface. `tests/editor/
+// tagDecorationGuard.test.ts` fails if a tag decoration is registered here.
 export function myneDecorations(): readonly Extension[] {
   return [
     headingDecorations(),

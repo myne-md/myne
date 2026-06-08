@@ -152,6 +152,8 @@ fn main() {
                     "vault_indices_apply",
                     "vault_indices_remove",
                     "vault_indices_forward",
+                    "vault_indices_all_edges",
+                    "vault_indices_orphans",
                     "vault_indices_backlink_candidates",
                     "vault_indices_by_tag",
                     "vault_indices_tag_tree",

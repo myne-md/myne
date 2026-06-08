@@ -46,6 +46,7 @@ import { IconButton } from "../components/primitives/IconButton";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
+import { GraphView } from "../notes/components/GraphView";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast } from "../components/Toast";
@@ -60,8 +61,22 @@ import {
 } from "../notes";
 import { prefsRead } from "../lib/prefs";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
-import { SECTION_HEADING_STYLE } from "../notes/components/sharedStyles";
+import {
+  SECTION_HEADING_STYLE,
+  SIDEBAR_CARD_STYLE,
+} from "../notes/components/sharedStyles";
 import { noteRead } from "../notes/readNote";
+import {
+  backlinkRows,
+  backlinkRowsEqual,
+  type BacklinkRow,
+} from "../notes/backlinkRows";
+import { useIndexNonce } from "../notes/indexNonce";
+import { useResolverNotes } from "../notes/resolverNotes";
+import { backlinks } from "../notes/vaultIndices";
+import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
+import { linkMention } from "../notes/linkMention";
+import type { UnlinkedMention } from "../notes/unlinkedMentions";
 import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
 import {
   SidebarStateProvider,
@@ -271,6 +286,24 @@ function EditorChrome({
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
+  const [graphOpen, setGraphOpen] = useState<boolean>(false);
+
+  // Cmd/Ctrl+Shift+G toggles the whole-vault graph (MYND-198, SYNC-7) — the
+  // third entry point alongside the command-palette action + BottomBar button.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        (e.key === "G" || e.key === "g")
+      ) {
+        e.preventDefault();
+        setGraphOpen((g) => !g);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   const [wordCount, setWordCount] = useState<number>(0);
 
@@ -559,6 +592,7 @@ function EditorChrome({
       </div>
       <BottomBar
         onOpenSettings={() => setSettingsOpen(true)}
+        onShowGraph={() => setGraphOpen(true)}
         onLockFlushed={handleLockFlushed}
         saveStatus={autosave.status}
         onRetry={autosave.retry}
@@ -610,6 +644,7 @@ function EditorChrome({
             });
         }}
       />
+      <GraphView open={graphOpen} onClose={() => setGraphOpen(false)} />
       <CommandPaletteHost
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
@@ -628,6 +663,10 @@ function EditorChrome({
         onOpenSnapshots={() => {
           setPaletteOpen(false);
           setSnapshotsOpen(true);
+        }}
+        onShowGraph={() => {
+          setPaletteOpen(false);
+          setGraphOpen(true);
         }}
         onLockFlushed={async () => {
           setPaletteOpen(false);
@@ -653,6 +692,7 @@ type CommandPaletteHostProps = {
   onManageTemplates: () => void;
   onNewNoteFromTemplate: () => void;
   onOpenSnapshots: () => void;
+  onShowGraph: () => void;
   onLockFlushed: () => Promise<void>;
 };
 
@@ -663,6 +703,7 @@ function CommandPaletteHost({
   onManageTemplates,
   onNewNoteFromTemplate,
   onOpenSnapshots,
+  onShowGraph,
   onLockFlushed,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
@@ -715,6 +756,7 @@ function CommandPaletteHost({
       onNewNoteFromTemplate,
       onOpenTodayNote,
       onOpenSnapshots,
+      onShowGraph,
       onSelectNote: async (id) => {
         await ctx.open(id).catch(() => {
           /* selection failure surfaces via sidebar UX */
@@ -730,6 +772,7 @@ function CommandPaletteHost({
       onNewNoteFromTemplate,
       onOpenTodayNote,
       onOpenSnapshots,
+      onShowGraph,
     ],
   );
   return (
@@ -965,7 +1008,72 @@ function CenterPaneLoading() {
   );
 }
 
+/**
+ * The open note's backlinks pane (knowledge-graph-ux #1 / MYND-195). Wires the
+ * placeholder RightSidebar to the live `backlinks()` query: which notes link
+ * here, as count-only clickable source cards (no body snippet — grill Q1),
+ * alphabetical, self-link hidden, `ctx.open` navigation. No bespoke locked
+ * state — the Editor unmounts on lock and its mount-time fail-closed guard
+ * covers the race. Stays live via the vault-wide index-changed nonce (SYNC-5):
+ * any note's save/rename/move re-queries; the reference-equal bail guards renders.
+ */
 function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
+  const ctx = useSelectedNote();
+  const notes = useResolverNotes();
+  const indexNonce = useIndexNonce();
+  const [rows, setRows] = useState<BacklinkRow[]>([]);
+
+  const selectedId = ctx.selectedId;
+  const openTitle = useMemo(
+    () =>
+      selectedId === null
+        ? null
+        : (notes.find((n) => n.noteUuid === selectedId)?.title ?? null),
+    [selectedId, notes],
+  );
+  // Insert `[[openTitle]]` into the mentioning note. The target is always a
+  // DIFFERENT note (self is excluded from the candidates), so the SYNC-15 guard
+  // resolves to a plain disk write — `openNoteDirty: false` is correct in the
+  // single-pane v1.1 editor (no live buffer for a non-open note to clobber).
+  const handleLinkMention = useCallback(
+    async (mention: UnlinkedMention): Promise<boolean> => {
+      if (selectedId === null || openTitle === null) return false;
+      return linkMention(mention.noteId, openTitle, {
+        openNoteId: selectedId,
+        openNoteDirty: false,
+      });
+    },
+    [selectedId, openTitle],
+  );
+
+  useEffect(() => {
+    const noteId = ctx.selectedId;
+    if (noteId === null) {
+      setRows((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    let cancelled = false;
+    void backlinks(noteId, notes).then(
+      (groups) => {
+        if (cancelled) return;
+        const next = backlinkRows(groups, noteId);
+        // SYNC-5 condition 2: keep the previous reference when the result is
+        // unchanged, so a no-op re-query (e.g. a vault-wide reindex burst)
+        // bails the React render.
+        setRows((prev) => (backlinkRowsEqual(prev, next) ? prev : next));
+      },
+      () => {
+        // Best-effort — a transient query failure shows the empty state.
+        if (!cancelled) setRows((prev) => (prev.length === 0 ? prev : []));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+    // `indexNonce` re-runs the cheap (decrypt-free) re-query on every vault
+    // index mutation (SYNC-5); the reference-equal bail above guards renders.
+  }, [ctx.selectedId, notes, indexNonce]);
+
   return (
     <aside
       style={{
@@ -986,7 +1094,7 @@ function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
           justifyContent: "space-between",
         }}
       >
-        <div style={SECTION_HEADING_STYLE}>Backlinks</div>
+        <div style={SECTION_HEADING_STYLE}>Linked from {rows.length}</div>
         {onCollapse && (
           <IconButton
             icon="panel-right-close"
@@ -995,10 +1103,42 @@ function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
           />
         )}
       </div>
-      <div style={{ fontSize: 12, color: "var(--fg-3)" }}>Linked from 0</div>
-      <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
-        No backlinks yet.
-      </div>
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
+          No backlinks yet.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {rows.map((row) => (
+            <button
+              key={row.sourceUuid}
+              type="button"
+              onClick={() => void ctx.open(row.sourceUuid)}
+              style={SIDEBAR_CARD_STYLE}
+            >
+              <span
+                style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}
+              >
+                {row.sourceTitle ?? "Untitled"}
+              </span>
+              {row.count > 1 && (
+                <span
+                  style={{ fontSize: 12, color: "var(--fg-3)", marginLeft: 6 }}
+                >
+                  ({row.count})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+      <UnlinkedMentionsSection
+        openNoteId={selectedId}
+        openTitle={openTitle}
+        notes={notes}
+        onNavigate={(noteId) => void ctx.open(noteId)}
+        onLinkMention={handleLinkMention}
+      />
     </aside>
   );
 }
@@ -1119,6 +1259,9 @@ interface BottomBarProps {
    *  `lockVault()` and the parent's onLock — wired by `EditorChrome`. */
   onLockFlushed: () => Promise<void>;
   onOpenSettings?: () => void;
+  /** Open the whole-vault graph (the persistent wedge-first-class affordance,
+   *  SYNC-7) — parallel to the settings gear. */
+  onShowGraph?: () => void;
   saveStatus: SaveStatusValue;
   onRetry: () => void;
   /** Hide the save-status badge entirely when no note is selected
@@ -1134,6 +1277,7 @@ interface BottomBarProps {
 function BottomBar({
   onLockFlushed,
   onOpenSettings,
+  onShowGraph,
   saveStatus,
   onRetry,
   hideSaveStatus = false,
@@ -1161,6 +1305,27 @@ function BottomBar({
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {!hideSaveStatus && <SaveStatusBadge status={saveStatus} onRetry={onRetry} />}
+        {onShowGraph && (
+          <button
+            type="button"
+            onClick={onShowGraph}
+            aria-label="Show graph view"
+            title="Graph (⌘⇧G)"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="share-2" size={14} />
+          </button>
+        )}
         <button
           type="button"
           onClick={onOpenSettings}

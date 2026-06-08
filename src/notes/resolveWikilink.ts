@@ -22,6 +22,16 @@ export interface ResolverNote {
   folder: string | null;
 }
 
+/**
+ * The id set of a live resolver note-set — the ONE place this is built (SYNC-3
+ * trash exclusion). The resolver note-set is already the live (non-trashed,
+ * non-template) set; this projects it to ids for membership filtering against a
+ * trash-blind Rust index (backlinks T3, `byTag`, the graph tag filter). Pure.
+ */
+export function liveIdSet(notes: ReadonlyArray<ResolverNote>): Set<string> {
+  return new Set(notes.map((n) => n.noteUuid));
+}
+
 export type WikilinkResolution =
   | {
       status: "resolved";

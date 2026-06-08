@@ -74,6 +74,7 @@ fn build(n: usize) -> VaultIndicesState {
             NoteRecord {
                 title: Some(synthetic_title(i)),
                 folder: None,
+                title_key: Some(synthetic_title(i).to_lowercase()),
                 edges,
                 tags,
             },
