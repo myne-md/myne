@@ -43,6 +43,8 @@ export type CommandContext = {
   onNewNoteFromTemplate: () => void;
   /** Open (or idempotently create) today's daily note (MYND-191). */
   onOpenTodayNote: () => void;
+  /** Open the snapshots / file-recovery panel for the selected note (MYND-97). */
+  onOpenSnapshots: () => void;
   /** Switch active selection to the given note id (mirrors sidebar click). */
   onSelectNote: (id: NoteId) => Promise<void>;
   /** Drive Stage transitions for force-relock paths. */

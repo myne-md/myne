@@ -424,6 +424,29 @@ mod tests {
         assert!(!tmp.path().exists(), "Remove must delete the root dir");
     }
 
+    #[test]
+    fn sweep_remove_also_clears_snapshots_dir() {
+        // MYND-96 SYNC-7: the generic recursive walk covers `snapshots/` too, so
+        // a whole-vault delete leaves no orphan snapshot ciphertext on disk.
+        let tmp = ScopedTempDir::new("vs-snapshots").unwrap();
+        std::fs::write(tmp.path().join("vault.meta"), b"meta").unwrap();
+        let snapshots = tmp.path().join("snapshots");
+        std::fs::create_dir_all(&snapshots).unwrap();
+        std::fs::write(snapshots.join("n__s.myn"), b"snap").unwrap();
+
+        let o = sweep(tmp.path(), RootDisposal::Remove);
+        assert!(
+            o.is_complete(),
+            "tree with snapshots/ should sweep fully: {o:?}"
+        );
+        // vault.meta + n__s.myn + snapshots/ + vault_dir = 4 entries removed.
+        assert_eq!(o.removed, 4);
+        assert!(
+            !tmp.path().exists(),
+            "Remove must delete the root incl. snapshots/"
+        );
+    }
+
     // ---- sweep: RootDisposal::KeepRoot ----------------------------------
 
     #[test]

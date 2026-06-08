@@ -121,6 +121,20 @@ fn main() {
                     "note_delete",
                     "note_list",
                     "note_search",
+                    "note_snapshot_flush",
+                ]),
+            )
+            .plugin(
+                "snapshots",
+                // MYND-96 (encrypted per-note snapshots) read/management
+                // surface. The InlinedPlugin mirror is load-bearing per the
+                // `vault-creation` note above; keep it lock-stepped with
+                // `permissions/snapshots/default.toml`.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "snapshot_list",
+                    "snapshot_preview",
+                    "snapshot_restore",
+                    "snapshot_prune",
                 ]),
             )
             .plugin(

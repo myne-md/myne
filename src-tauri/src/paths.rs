@@ -78,6 +78,28 @@ pub(crate) fn notes_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
     Ok(dir)
 }
 
+/// Resolve `<vault-root>/snapshots/` and ensure it exists (MYND-96 encrypted
+/// per-note version history; `spec/protocol.md` §9.1). Mirrors [`notes_dir`] —
+/// the flat snapshots directory is a sibling of `notes/`, never nested inside
+/// it (the flat-notes invariant, MYND-144). Returns [`std::io::Result`] so the
+/// notes write-path hook can map IO failure kinds without losing signal.
+pub fn snapshots_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| std::io::Error::other("app_data_dir resolution failed"))?;
+    snapshots_dir_under(&base.join("vault"))
+}
+
+/// Pure helper — joins `parent` with `"snapshots"` and `create_dir_all`s the
+/// result. Used by [`snapshots_dir`] (Tauri-aware caller) and tests (which pass
+/// a `ScopedTempDir` path to exercise behavior without a Tauri runtime).
+pub(crate) fn snapshots_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
+    let dir = parent.join("snapshots");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
