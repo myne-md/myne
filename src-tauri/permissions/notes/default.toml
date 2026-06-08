@@ -20,6 +20,7 @@ permissions = [
     "allow-note-list",
     "allow-note-titles-batch",
     "allow-note-search",
+    "allow-note-snapshot-flush",
 ]
 
 [[permission]]
@@ -56,3 +57,8 @@ commands.allow = ["note_titles_batch"]
 identifier = "allow-note-search"
 description = "Allow invoking notes:note_search (Slot::Unlocked-gated full-text search over the live in-RAM index — MYND-29; returns BM25-ranked {note_id, title, score}, or empty when not unlocked; no decryption, no secret material logged)."
 commands.allow = ["note_search"]
+
+[[permission]]
+identifier = "allow-note-snapshot-flush"
+description = "Allow invoking notes:note_snapshot_flush (MYND-96 — force-capture an encrypted snapshot of the open note's current .myn on editor-close / before vault-lock, bypassing the coalescing window; verbatim copy, no decryption; best-effort, emits a non-blocking snapshot://write-failed event on failure)."
+commands.allow = ["note_snapshot_flush"]

@@ -6,6 +6,8 @@ mod plugins;
 mod protocol_error_kind;
 mod screen_capture;
 mod search;
+mod snapshot_policy;
+mod snapshot_store;
 #[cfg(test)]
 mod test_support;
 mod vault_meta_hash;
@@ -43,6 +45,7 @@ pub fn run() {
         .plugin(plugins::vault_repair::init())
         .plugin(plugins::prefs::init())
         .plugin(plugins::notes::init())
+        .plugin(plugins::snapshots::init())
         .plugin(plugins::vault_indices::init())
         .setup(|app| {
             use tauri::Manager;

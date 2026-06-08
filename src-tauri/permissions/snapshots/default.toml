@@ -1,0 +1,35 @@
+# Permissions for the in-app `snapshots` Tauri plugin (MYND-96).
+# Picked up under the `snapshots:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these
+# as `snapshots:default` (or `snapshots:allow-<cmd>`).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the snapshots plugin."
+permissions = [
+    "allow-snapshot-list",
+    "allow-snapshot-preview",
+    "allow-snapshot-restore",
+    "allow-snapshot-prune",
+]
+
+[[permission]]
+identifier = "allow-snapshot-list"
+description = "Allow invoking snapshots:snapshot_list (Slot::Unlocked-gated, decrypt-free enumeration of a note's encrypted snapshots — newest-first {snapshot_uuid, captured_at_ms, size_bytes} derived from filenames + stat; no decryption)."
+commands.allow = ["snapshot_list"]
+
+[[permission]]
+identifier = "allow-snapshot-preview"
+description = "Allow invoking snapshots:snapshot_preview (read + AEAD-decrypt a selected snapshot blob in memory after unlock; returns the UTF-8 plaintext; never writes plaintext to disk; non-distinguishing CannotDecrypt on tamper)."
+commands.allow = ["snapshot_preview"]
+
+[[permission]]
+identifier = "allow-snapshot-restore"
+description = "Allow invoking snapshots:snapshot_restore (atomically force-snapshot the current note as the undo point, then overwrite the live note with a selected snapshot's content via the note-update path; guaranteed undoable, no double snapshot)."
+commands.allow = ["snapshot_restore"]
+
+[[permission]]
+identifier = "allow-snapshot-prune"
+description = "Allow invoking snapshots:snapshot_prune (apply the canonical retention policy to a note's snapshots now — the same single-sourced policy the eager write-path prune uses; returns the count removed)."
+commands.allow = ["snapshot_prune"]

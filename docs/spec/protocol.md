@@ -589,6 +589,9 @@ A Myne vault is a directory on the user's filesystem containing:
 │   ├── 0184a2b3-...myn   ← one encrypted note per file
 │   ├── 0184a2b4-...myn
 │   └── ...
+├── snapshots/            ← encrypted per-note version history (MYND-96)
+│   ├── 0184a2b3-...__0184c1d2-...myn
+│   └── ...
 └── attachments/          ← reserved; out of scope for v0.1 (§11)
 ```
 
@@ -596,6 +599,7 @@ A Myne vault is a directory on the user's filesystem containing:
 - File extension `.meta` for vault-level metadata (the wrapped `itemsKey`, the random Argon2id salt, the protocol version, and the account number).
 - File names are the note's UUIDv7 string. UUIDs are not encrypted; they are random and reveal only "this is a note" plus a coarse creation-time bucket. (UUIDv7 chosen for natural sort order; the time component leaks a creation-time millisecond, which is accepted in v0.1; v005 may switch to UUIDv4 if even coarse leakage is unacceptable.)
 - **Folders are virtual (MYND-144).** The `notes/` directory is **always flat** — folder hierarchy is **not** reflected on disk. A note's folder is a path string in its encrypted frontmatter (`folder:`, see [`markdown-dialect.md`](markdown-dialect.md) §3.6.1); the sidebar tree is reconstructed client-side after decryption. This keeps folder structure inside the AEAD-encrypted blob (`threat-model.md` **AS3**, Sensitive) — a filesystem adversary (A4/A7) sees only flat `<uuid>.myn` blobs, never folder names. Deliberately-created (empty) folders are carried in `vault.prefs` (§9.5.2 `deliberate_folders`), also encrypted. No on-disk-format change.
+- **Encrypted snapshots (MYND-96).** The `snapshots/` directory holds per-note version history. Each snapshot is a frozen `.myn`-format blob — the prior note plaintext re-sealed under the note's own `item_key` in the `MY01` envelope of §9.2 — so there is **no new magic byte and no §10.3 registry entry**. Files are flat (no per-note subdirectories, mirroring the `notes/` privacy posture) and named `<note-uuid>__<snapshot-uuidv7>.myn`; the snapshot's capture time is the trailing UUIDv7's time component and snapshots sort naturally. Capture is time-coalesced (≈ one per note per 5 min of active editing, plus on editor-close / vault-lock); retention is a bounded window (default ~7 days) with a safety backstop, pruned eagerly. Permanently deleting a note purges its snapshots, preserving cryptographic erase (a reused-`item_key` snapshot would otherwise be undecryptable orphan ciphertext). The metadata-leak posture is recorded in `threat-model.md` §7 and the decision in `decisions.md` 2026-06-08. No on-disk-format change to `.myn`, `vault.meta`, `vault.prefs`, or `vault.search`.
 
 ### 9.2 Per-note blob (`.myn`) binary format
 

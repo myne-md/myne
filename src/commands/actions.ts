@@ -96,12 +96,28 @@ const convertWikilinksAction: CommandAction = {
   },
 };
 
+const openSnapshotsAction: CommandAction = {
+  id: "snapshots.open",
+  label: "Snapshots…",
+  category: "Editor",
+  // Editor-only and per-note: the panel is scoped to the selected note, so it is
+  // hidden when nothing is selected (MYND-97).
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null
+      ? "show"
+      : "hidden",
+  run: (ctx) => {
+    ctx.onOpenSnapshots();
+  },
+};
+
 export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
   newNoteFromTemplateAction,
   openTodayNoteAction,
   manageTemplatesAction,
+  openSnapshotsAction,
   importObsidianAction,
   convertWikilinksAction,
 ]);

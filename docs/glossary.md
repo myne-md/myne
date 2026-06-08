@@ -921,6 +921,12 @@ The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the 
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **snapshot** &nbsp; 📦 *Product*
+
+An encrypted previous version of a note, captured automatically as the note is edited so an accidental overwrite or bad edit can be recovered (the MYND-96 file-recovery feature — Myne's answer to Obsidian File Recovery). A snapshot is a **frozen [`.myn`](#myn-file) revision**: the prior note plaintext re-sealed under the note's own `item_key` in the `MY01` envelope (`spec/protocol.md` §9.2) — **no new magic byte, no new subkey role**. Snapshots live in a flat `<vault-root>/snapshots/` directory (§9.1), captured **time-coalesced** (≈ one per note per 5 min of active editing, plus on editor-close / vault-lock), retained for a **bounded window** (default ~7 days) with a safety backstop, and pruned eagerly. On **permanent** delete a note's snapshots are purged, preserving cryptographic erase; soft-[Trash](#trash) (an ordinary update, the note still exists) keeps snapshotting. Distinct from the unrelated `vault.prefs` *replay* sense ("restore prior valid `vault.prefs` snapshots") in `threat-model.md` §7. See also [`.myn` file](#myn-file), [Trash](#trash).
+
+Used in: `spec/protocol.md` §9.1; `threat-model.md` §7; `decisions.md` 2026-06-08
+
 ### **state-level actor** &nbsp; ⚠️ *Threat*
 
 Adversary class A10. Nation-state-class adversary with zero-day capabilities, supply-chain access, hardware-implant capability, and the legal power to compel operator cooperation. Myne's status against A10 is Best-effort: boring, well-vetted primitives plus a published spec, with no claim of defense against zero-days or hardware implants beyond what A2 covers.

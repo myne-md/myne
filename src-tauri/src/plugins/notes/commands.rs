@@ -35,7 +35,7 @@ use crate::search::{MatchedIn, SearchIndexState};
 use protocol::{decode_note, encode_new_note, encode_update, DecryptError, ProtocolError};
 use std::path::PathBuf;
 use std::time::Instant;
-use tauri::{AppHandle, Runtime, State};
+use tauri::{AppHandle, Emitter, Runtime, State};
 use zeroize::Zeroizing;
 
 use super::error::{
@@ -544,11 +544,37 @@ pub async fn note_update<R: Runtime>(
         (*plaintext).clone(),
     )
     .await;
-    if result.is_ok() {
-        let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-        search.upsert(&note_id, &title, &plaintext);
+    match result {
+        Ok(outcome) => {
+            // MYND-29: re-index the edited note after a successful write.
+            let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
+            search.upsert(&note_id, &title, &plaintext);
+            // SYNC-8: a best-effort snapshot failure is surfaced non-blockingly
+            // (the note itself saved fine). The frontend shows it on the
+            // save-status channel; the IPC return stays `Ok(())`.
+            if outcome.snapshot_warning {
+                let _ = app.emit(SNAPSHOT_WRITE_FAILED_EVENT, &note_id);
+            }
+            Ok(())
+        }
+        Err(e) => Err(e),
     }
-    result
+}
+
+/// Tauri event emitted (non-blocking) when a note saved successfully but its
+/// best-effort pre-overwrite snapshot could not be written (SYNC-8). Payload is
+/// the note id. The frontend surfaces this on the save-status channel; it never
+/// blocks editing and never implies the live note was lost.
+pub(crate) const SNAPSHOT_WRITE_FAILED_EVENT: &str = "snapshot://write-failed";
+
+/// Internal outcome of [`note_update_with_dir`] — carries a non-blocking
+/// snapshot-failure signal out to the `note_update` wrapper without changing the
+/// IPC contract (which stays `Result<(), NoteUpdateError>`).
+#[derive(Debug, Default)]
+pub(crate) struct NoteUpdateOutcome {
+    /// True if the best-effort pre-overwrite snapshot could not be written. The
+    /// note itself saved correctly.
+    pub(crate) snapshot_warning: bool,
 }
 
 /// Inner — pure-and-testable helper. Mirror of
@@ -558,7 +584,7 @@ pub(crate) async fn note_update_with_dir(
     state: &VaultRuntimeState,
     note_id: String,
     plaintext: String,
-) -> Result<(), NoteUpdateError> {
+) -> Result<NoteUpdateOutcome, NoteUpdateError> {
     // First non-doc statement: bound the lifetime of plaintext bytes
     // to a `Zeroizing<String>` wrapper. Same Plaintext-IPC discipline
     // as `note_create_with_dir` (see `src-tauri/CLAUDE.md`).
@@ -594,13 +620,24 @@ pub(crate) async fn note_update_with_dir(
     let note_uuid_bytes = *note_id.as_uuid().as_bytes();
     let path_for_read = path.clone();
 
+    // MYND-96 snapshot creation hook inputs (moved into the closure below).
+    // `vault_root` is the parent of `notes/`; the flat `snapshots/` dir is its
+    // sibling. `now_ms` is the single clock read, fed to the pure
+    // `should_snapshot` gate. The snapshot of the OLD content is written inside
+    // the closure (before this fn's post-closure `atomic_write` overwrites the
+    // live note), so a failed snapshot can never corrupt the note. Best-effort
+    // (SYNC-8): snapshot failure never fails the update.
+    let note_uuid_str = note_id.as_uuid().to_string();
+    let vault_root = notes_dir.parent().map(|p| p.to_path_buf());
+    let now_ms = crate::snapshot_store::now_unix_ms();
+
     // spawn_blocking pipeline: read .myn → decode_note → encode_update.
     // `encode_update` consumes the `DecryptedNote` handle (typestate
     // "one decode, one update"); fresh `content_nonce` generated
     // internally; bytes 0..47+N byte-identical per §6.3.
     let started = Instant::now();
     let join_result =
-        tokio::task::spawn_blocking(move || -> Result<Vec<u8>, NoteUpdateError> {
+        tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, bool), NoteUpdateError> {
             let blob = match std::fs::read(&path_for_read) {
                 Ok(bytes) => bytes,
                 Err(e) => {
@@ -637,7 +674,25 @@ pub(crate) async fn note_update_with_dir(
             // `encode_update` consumes `decrypted` and pulls a fresh
             // 24-byte `content_nonce` from `getrandom` internally.
             match encode_update(decrypted, plaintext.as_bytes()) {
-                Ok(new_blob) => Ok(new_blob),
+                Ok(new_blob) => {
+                    // MYND-96: capture a snapshot of the OLD content (`blob`,
+                    // the verbatim pre-overwrite `.myn`) before returning the
+                    // new blob to the post-closure overwrite. Gated by the
+                    // coalescing window; best-effort. The returned bool (snapshot
+                    // failed → surface a non-blocking warning) rides out with the
+                    // new blob, so the live note save is never affected.
+                    let snapshot_warning = match vault_root.as_deref() {
+                        Some(root) => capture_snapshot_best_effort(
+                            root,
+                            &note_uuid_str,
+                            &blob,
+                            now_ms,
+                            /* force = */ false,
+                        ),
+                        None => false,
+                    };
+                    Ok((new_blob, snapshot_warning))
+                }
                 Err(ProtocolError::PlaintextTooLarge) => {
                     tracing::debug!(
                         stage = "encode_update",
@@ -666,7 +721,7 @@ pub(crate) async fn note_update_with_dir(
         .await;
     let duration_ms = started.elapsed().as_millis() as u64;
 
-    let new_blob = match join_result {
+    let (new_blob, snapshot_warning) = match join_result {
         Err(_join_err) => {
             tracing::error!(
                 stage = "spawn_blocking_join",
@@ -676,7 +731,7 @@ pub(crate) async fn note_update_with_dir(
             return Err(NoteUpdateError::JoinFailure);
         }
         Ok(Err(e)) => return Err(e),
-        Ok(Ok(blob)) => blob,
+        Ok(Ok(pair)) => pair,
     };
     tracing::debug!(
         stage = "encode_update",
@@ -708,6 +763,168 @@ pub(crate) async fn note_update_with_dir(
     drop(slot);
 
     tracing::debug!(stage = "success", event = "note_updated");
+    Ok(NoteUpdateOutcome { snapshot_warning })
+}
+
+/// Best-effort: capture a snapshot of a note's pre-overwrite `.myn` blob
+/// (MYND-96), gated by the coalescing window. A snapshot is a recovery
+/// convenience, not part of the note write's integrity contract — so this
+/// **never** fails the caller's update (SYNC-8); every failure is logged and
+/// swallowed. `old_blob` is the verbatim `.myn` bytes about to be replaced;
+/// `vault_root` is the parent of `notes/` (the flat `snapshots/` dir is its
+/// sibling). Runs inside the caller's `spawn_blocking` + held slot read-guard,
+/// before the live note is overwritten — so a failed snapshot cannot corrupt
+/// the note. `force` bypasses the coalescing gate (on-close/lock flush, restore
+/// undo point).
+///
+/// **Returns `true` if the snapshot could not be written** (dir-create or write
+/// failure) — a non-blocking warning the caller surfaces to the frontend
+/// (SYNC-8). Returns `false` on success or a coalesced skip. A prune failure is
+/// NOT a warning (the snapshot itself already succeeded).
+fn capture_snapshot_best_effort(
+    vault_root: &std::path::Path,
+    note_uuid: &str,
+    old_blob: &[u8],
+    now_ms: u64,
+    force: bool,
+) -> bool {
+    let sdir = match crate::paths::snapshots_dir_under(vault_root) {
+        Ok(d) => d,
+        Err(e) => {
+            tracing::warn!(
+                stage = "snapshot_mkdir",
+                io_failure_kind = ?from_io_error_kind(e.kind()),
+                "snapshot dir create failed (best-effort; note save unaffected)"
+            );
+            return true;
+        }
+    };
+    let existing = crate::snapshot_store::list_note_snapshots(&sdir, note_uuid).unwrap_or_default();
+    let last = existing.first().map(|s| s.captured_at_ms);
+    if !crate::snapshot_policy::should_snapshot(last, now_ms, force) {
+        tracing::debug!(
+            stage = "snapshot_coalesced",
+            "snapshot skipped: within window"
+        );
+        return false;
+    }
+    let snap_uuid = crate::snapshot_store::new_snapshot_uuid().to_string();
+    if let Err(e) =
+        crate::snapshot_store::write_snapshot_blob(&sdir, note_uuid, &snap_uuid, old_blob)
+    {
+        tracing::warn!(
+            stage = "snapshot_write",
+            io_failure_kind = ?from_io_error_kind(e.kind()),
+            "snapshot write failed (best-effort; note save unaffected)"
+        );
+        return true;
+    }
+    tracing::debug!(
+        stage = "snapshot_created",
+        "pre-overwrite snapshot captured"
+    );
+
+    // Eager prune (SYNC-2): enforce retention at the single write-path source of
+    // truth, right after creating the snapshot. Best-effort; a prune failure is
+    // not surfaced as a warning (the snapshot already landed).
+    if let Err(e) = crate::snapshot_store::prune_note_snapshots(
+        &sdir,
+        note_uuid,
+        now_ms,
+        &crate::snapshot_policy::RetentionPolicy::default(),
+    ) {
+        tracing::warn!(
+            stage = "snapshot_prune",
+            io_failure_kind = ?from_io_error_kind(e.kind()),
+            "snapshot prune scan failed (best-effort; snapshot already written)"
+        );
+    }
+    false
+}
+
+/// Force-capture a snapshot of a note's CURRENT on-disk `.myn` (MYND-96
+/// on-close / vault-lock flush, SYNC-3). Unlike the `note_update` hook (which
+/// snapshots the OLD pre-overwrite content, gated by the window), this is the
+/// **force** entry point: it bypasses the coalescing gate so the last active
+/// state is recorded when an editor closes or the vault locks. Best-effort —
+/// returns the snapshot-failed warning bool. A missing `.myn` is a no-op
+/// (returns `false`). Reuses `capture_snapshot_best_effort`, so it shares the
+/// same atomic-write + durability + eager-prune path.
+fn flush_snapshot_for_note(notes_dir: &std::path::Path, note_uuid: &str, now_ms: u64) -> bool {
+    let path = notes_dir.join(format!("{note_uuid}.myn"));
+    let blob = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(_) => return false, // nothing on disk to flush
+    };
+    match notes_dir.parent() {
+        Some(vault_root) => {
+            capture_snapshot_best_effort(
+                vault_root, note_uuid, &blob, now_ms, /* force = */ true,
+            )
+        }
+        None => true,
+    }
+}
+
+/// Inner, testable core of [`note_snapshot_flush`]. Returns the snapshot-failed
+/// warning bool (the #[command] wrapper turns it into a non-blocking event).
+pub(crate) async fn note_snapshot_flush_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    note_id: String,
+) -> Result<bool, NoteUpdateError> {
+    let note_id = NoteId::parse(&note_id).map_err(|cause| {
+        tracing::debug!(stage = ?cause, "note_snapshot_flush note_id strict-parse failed");
+        NoteUpdateError::InvalidNoteId
+    })?;
+
+    // Slot read guard held across spawn_blocking — same fair-queue discipline as
+    // note_update. Flush copies the sealed `.myn` verbatim, so it needs no
+    // `items_key` clone (no decryption).
+    let slot = state.slot_read().await;
+    match &*slot {
+        Slot::Unlocked(_) => {}
+        Slot::Empty | Slot::Recovering { .. } => {
+            return Err(NoteUpdateError::VaultNotUnlocked);
+        }
+    }
+
+    let note_uuid_str = note_id.as_uuid().to_string();
+    let now_ms = crate::snapshot_store::now_unix_ms();
+    let warning = tokio::task::spawn_blocking(move || {
+        flush_snapshot_for_note(&notes_dir, &note_uuid_str, now_ms)
+    })
+    .await
+    .map_err(|_| NoteUpdateError::JoinFailure)?;
+
+    drop(slot);
+    Ok(warning)
+}
+
+/// `note_snapshot_flush` — force-capture a snapshot of the open note's current
+/// state on editor-close / before vault-lock (MYND-96, SYNC-3). The frontend
+/// calls this from its close/lock flush path (paired with the autosave
+/// flush-on-blur/close already in place). Best-effort: a snapshot failure
+/// surfaces the non-blocking `snapshot://write-failed` event; the IPC return
+/// stays `Result<(), NoteUpdateError>`.
+#[tauri::command]
+pub async fn note_snapshot_flush<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+) -> Result<(), NoteUpdateError> {
+    let notes_dir = paths::notes_dir(&app).map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+            NoteUpdateError::NotesDirNotADirectory
+        }
+        other => NoteUpdateError::Io {
+            io_error_kind: from_io_error_kind(other),
+        },
+    })?;
+    let warning = note_snapshot_flush_with_dir(notes_dir, state.inner(), note_id.clone()).await?;
+    if warning {
+        let _ = app.emit(SNAPSHOT_WRITE_FAILED_EVENT, &note_id);
+    }
     Ok(())
 }
 
@@ -851,6 +1068,8 @@ pub(crate) async fn note_delete_with_dir(
     tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
 
     let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    // MYND-96: the note's UUID string, used to purge its snapshots (SYNC-1).
+    let note_uuid_str = note_id.as_uuid().to_string();
 
     let started = Instant::now();
     let join_result = tokio::task::spawn_blocking(move || -> Result<(), NoteDeleteError> {
@@ -865,6 +1084,34 @@ pub(crate) async fn note_delete_with_dir(
                 "note_delete notes_dir is not a directory"
             );
             return Err(NoteDeleteError::NotesDirNotADirectory);
+        }
+        // MYND-96 SYNC-1: purge this note's snapshots BEFORE removing the live
+        // `.myn`, so cryptographic erase holds. A snapshot is a verbatim `.myn`
+        // copy carrying its own wrapped `enc_item_key`, so it stays decryptable
+        // under `itemsKey` even after the live note is gone — the purge IS the
+        // erase of the note's history. Purge-first ordering means a crash
+        // mid-delete leaves the live note intact (recoverable) rather than
+        // orphan decryptable snapshots. Best-effort; a failure is logged, not
+        // fatal to the delete (the live note removal is the user-facing action).
+        if let Some(vault_root) = notes_dir.parent() {
+            let sdir = vault_root.join("snapshots");
+            match crate::snapshot_store::remove_all_note_snapshots(&sdir, &note_uuid_str) {
+                Ok(n) if n > 0 => {
+                    tracing::debug!(
+                        stage = "snapshot_purge",
+                        removed = n,
+                        "purged note snapshots on delete"
+                    );
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        stage = "snapshot_purge",
+                        io_failure_kind = ?from_io_error_kind(e.kind()),
+                        "snapshot purge on delete failed (best-effort)"
+                    );
+                }
+            }
         }
         match std::fs::remove_file(&path) {
             Ok(()) => {}
@@ -1571,6 +1818,280 @@ mod tests {
             .expect("on-disk blob must decrypt under fixture keys");
 
             assert_eq!(decrypted.plaintext(), plaintext.as_bytes());
+        });
+    }
+
+    // ---- MYND-96 snapshot creation hook (note_update) -------------------
+
+    #[test]
+    fn note_update_captures_snapshot_of_old_content() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-snapshot").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let v1 = "# v1\noriginal body";
+            let id = note_create_with_dir(notes_dir.clone(), &state, v1.to_string())
+                .await
+                .unwrap();
+            let v2 = "# v2\nedited body";
+            let outcome =
+                note_update_with_dir(notes_dir.clone(), &state, id.clone(), v2.to_string())
+                    .await
+                    .unwrap();
+            assert!(
+                !outcome.snapshot_warning,
+                "a successful snapshot must not raise the warning signal"
+            );
+
+            let note_id = NoteId::parse(&id).unwrap();
+            let items_key = [FIXTURE_ITEMS_BYTE; 32];
+            let items_key_id = [FIXTURE_ITEMS_ID_BYTE; 16];
+
+            // Live note is v2.
+            let live = std::fs::read(notes_dir.join(format!("{}.myn", note_id.as_uuid()))).unwrap();
+            let live_dec = protocol::decode_note(
+                &live,
+                note_id.as_uuid().as_bytes(),
+                &items_key,
+                &items_key_id,
+            )
+            .unwrap();
+            assert_eq!(live_dec.plaintext(), v2.as_bytes());
+
+            // Exactly one snapshot, decrypting to v1 (the pre-edit content).
+            let sdir = scratch.path().join("snapshots");
+            let snaps =
+                crate::snapshot_store::list_note_snapshots(&sdir, &note_id.as_uuid().to_string())
+                    .unwrap();
+            assert_eq!(snaps.len(), 1, "first update must capture one snapshot");
+            let snap_blob = std::fs::read(&snaps[0].path).unwrap();
+            let snap_dec = protocol::decode_note(
+                &snap_blob,
+                note_id.as_uuid().as_bytes(),
+                &items_key,
+                &items_key_id,
+            )
+            .unwrap();
+            assert_eq!(
+                snap_dec.plaintext(),
+                v1.as_bytes(),
+                "snapshot must hold the pre-edit content"
+            );
+        });
+    }
+
+    #[test]
+    fn note_update_within_window_is_coalesced() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-coalesce").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
+                .await
+                .unwrap();
+            note_update_with_dir(notes_dir.clone(), &state, id.clone(), "v2".to_string())
+                .await
+                .unwrap();
+            // Second update lands within the ~5-min coalescing window → no new snapshot.
+            note_update_with_dir(notes_dir.clone(), &state, id.clone(), "v3".to_string())
+                .await
+                .unwrap();
+
+            let note_id = NoteId::parse(&id).unwrap();
+            let sdir = scratch.path().join("snapshots");
+            let snaps =
+                crate::snapshot_store::list_note_snapshots(&sdir, &note_id.as_uuid().to_string())
+                    .unwrap();
+            assert_eq!(
+                snaps.len(),
+                1,
+                "an update within the coalescing window must not add a snapshot"
+            );
+        });
+    }
+
+    #[test]
+    fn note_update_succeeds_even_if_snapshot_write_fails() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-snapshot-fail").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            // Sabotage: a regular file where `snapshots/` would go → create_dir_all
+            // fails → best-effort snapshot is skipped, update must still succeed.
+            std::fs::write(scratch.path().join("snapshots"), b"not a dir").unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
+                .await
+                .unwrap();
+            let outcome =
+                note_update_with_dir(notes_dir.clone(), &state, id.clone(), "v2".to_string())
+                    .await
+                    .expect("update must succeed despite a failing snapshot");
+            assert!(
+                outcome.snapshot_warning,
+                "a failed snapshot must surface the non-blocking warning signal (SYNC-8)"
+            );
+
+            let note_id = NoteId::parse(&id).unwrap();
+            let items_key = [FIXTURE_ITEMS_BYTE; 32];
+            let items_key_id = [FIXTURE_ITEMS_ID_BYTE; 16];
+            let live = std::fs::read(notes_dir.join(format!("{}.myn", note_id.as_uuid()))).unwrap();
+            let dec = protocol::decode_note(
+                &live,
+                note_id.as_uuid().as_bytes(),
+                &items_key,
+                &items_key_id,
+            )
+            .unwrap();
+            assert_eq!(dec.plaintext(), b"v2");
+        });
+    }
+
+    // ---- MYND-96 force-flush (on-close / vault-lock) --------------------
+
+    #[test]
+    fn flush_force_captures_even_within_window() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-flush").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
+                .await
+                .unwrap();
+            // First update captures one snapshot (of v1); we're now inside the window.
+            note_update_with_dir(notes_dir.clone(), &state, id.clone(), "v2".to_string())
+                .await
+                .unwrap();
+            // Flush force-captures the CURRENT state (v2) despite the window.
+            let warn = note_snapshot_flush_with_dir(notes_dir.clone(), &state, id.clone())
+                .await
+                .unwrap();
+            assert!(!warn);
+
+            let note_id = NoteId::parse(&id).unwrap();
+            let sdir = scratch.path().join("snapshots");
+            let snaps =
+                crate::snapshot_store::list_note_snapshots(&sdir, &note_id.as_uuid().to_string())
+                    .unwrap();
+            assert_eq!(
+                snaps.len(),
+                2,
+                "flush must force a snapshot even within the coalescing window"
+            );
+        });
+    }
+
+    #[test]
+    fn flush_missing_note_is_noop() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-flush-missing").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+            let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
+            let warn = note_snapshot_flush_with_dir(notes_dir, &state, phantom)
+                .await
+                .unwrap();
+            assert!(!warn, "flushing a missing note is a no-op, not a warning");
+        });
+    }
+
+    #[test]
+    fn flush_rejects_when_locked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-flush-locked").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default(); // Slot::Empty
+            let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
+            let r = note_snapshot_flush_with_dir(notes_dir, &state, phantom).await;
+            assert!(matches!(r, Err(NoteUpdateError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn delete_purges_note_snapshots() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-delete-purge").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
+                .await
+                .unwrap();
+            note_update_with_dir(notes_dir.clone(), &state, id.clone(), "v2".to_string())
+                .await
+                .unwrap();
+
+            let note_id = NoteId::parse(&id).unwrap();
+            let uuid = note_id.as_uuid().to_string();
+            let sdir = scratch.path().join("snapshots");
+            assert_eq!(
+                crate::snapshot_store::list_note_snapshots(&sdir, &uuid)
+                    .unwrap()
+                    .len(),
+                1,
+                "precondition: one snapshot exists before delete"
+            );
+
+            // Permanent delete must purge the note's snapshots (cryptographic erase).
+            note_delete_with_dir(notes_dir.clone(), &state, id.clone())
+                .await
+                .unwrap();
+
+            assert!(
+                !notes_dir.join(format!("{uuid}.myn")).exists(),
+                "the live note must be gone"
+            );
+            assert!(
+                crate::snapshot_store::list_note_snapshots(&sdir, &uuid)
+                    .unwrap()
+                    .is_empty(),
+                "delete must purge the note's snapshots (no orphan decryptable ciphertext)"
+            );
         });
     }
 
@@ -2469,7 +2990,7 @@ mod tests {
             //   - `Err(VaultNotUnlocked)`         → lock ran first; update
             //                                       observed `Slot::Empty`.
             match update_result {
-                Ok(()) => {}
+                Ok(_) => {}
                 Err(NoteUpdateError::VaultNotUnlocked) => {}
                 Err(other) => panic!("unexpected update outcome: {other:?}"),
             }

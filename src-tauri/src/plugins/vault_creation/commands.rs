@@ -288,13 +288,18 @@ pub(crate) async fn commit_with_permit(
 /// `notes/` (e.g., permission denied); the `From<io::Error> for
 /// AppError` impl maps this to [`AppError::Io`] at the call site.
 ///
-/// Future per-vault artefact families (A14 encrypted per-note
-/// snapshots, Phase 1.5 FTS index, attachments) extend this helper by
-/// adding a check in the same PR that introduces the artefact —
-/// concrete maintenance discipline preserved by the dual taxonomy
-/// with `vault_delete`'s recursive unlink (decisions.md 2026-05-26
-/// entry "vault_create defensive guard extension", T1a + T2b sub-
-/// decisions). The check intentionally does NOT recognize arbitrary
+/// `snapshots/` directory contains at least one `*.myn` file (MYND-96:
+/// orphan encrypted per-note snapshot blobs from a partial-fail
+/// `vault_delete` — sealed under a prior `root_key`/`itemsKey` lineage,
+/// same gate rationale as orphan `notes/*.myn`).
+///
+/// Future per-vault artefact families (Phase 1.5 FTS index, attachments)
+/// extend this helper by adding a check in the same PR that introduces
+/// the artefact — concrete maintenance discipline preserved by the dual
+/// taxonomy with `vault_delete`'s recursive unlink (decisions.md
+/// 2026-05-26 entry "vault_create defensive guard extension", T1a + T2b
+/// sub-decisions; MYND-96 added the `snapshots/` check). The check
+/// intentionally does NOT recognize arbitrary
 /// files under `vault_dir` (e.g., `.DS_Store`, `Thumbs.db`,
 /// OS-injected artefacts) — those are not vault state and must not
 /// gate `vault_create`.
@@ -325,6 +330,18 @@ pub(crate) fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool>
     let notes = vault_dir.join("notes");
     if notes.is_dir() {
         for entry in std::fs::read_dir(&notes)? {
+            let entry = entry?;
+            if entry.path().extension().is_some_and(|e| e == "myn") {
+                return Ok(true);
+            }
+        }
+    }
+    // MYND-96: orphan snapshot blobs under `snapshots/` gate a fresh create the
+    // same way orphan `notes/*.myn` do (a partial-fail `vault_delete` leftover
+    // sealed under a prior key lineage).
+    let snapshots = vault_dir.join("snapshots");
+    if snapshots.is_dir() {
+        for entry in std::fs::read_dir(&snapshots)? {
             let entry = entry?;
             if entry.path().extension().is_some_and(|e| e == "myn") {
                 return Ok(true);
@@ -1020,6 +1037,26 @@ mod tests {
         assert!(
             vault_artifacts_present(tmp.path()).expect("scan ok"),
             "orphan .myn from partial-fail vault_delete is a recognized artefact"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_snapshots_contains_myn_blob() {
+        // MYND-96: an orphan snapshot blob gates a fresh create just like an
+        // orphan note blob.
+        let tmp = crate::test_support::ScopedTempDir::new("vap-snap").expect("scoped tempdir");
+        let snapshots = tmp.path().join("snapshots");
+        std::fs::create_dir_all(&snapshots).expect("mkdir snapshots/");
+        std::fs::write(
+            snapshots.join(
+                "0193e8d3-1234-7890-abcd-ef0123456789__0193e8d4-5678-7000-8000-000000000000.myn",
+            ),
+            b"orphan snapshot bytes",
+        )
+        .expect("seed orphan snapshot .myn");
+        assert!(
+            vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "orphan snapshot .myn from partial-fail vault_delete is a recognized artefact"
         );
     }
 

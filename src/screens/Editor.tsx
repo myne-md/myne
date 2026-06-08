@@ -45,6 +45,8 @@ import { Icon } from "../components/primitives/Icon";
 import { IconButton } from "../components/primitives/IconButton";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
+import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
+import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast } from "../components/Toast";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
@@ -268,6 +270,7 @@ function EditorChrome({
   const [bodyLoading, setBodyLoading] = useState<boolean>(false);
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
+  const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   const [wordCount, setWordCount] = useState<number>(0);
 
@@ -578,6 +581,18 @@ function EditorChrome({
           });
         }}
       />
+      <SnapshotsPanel
+        open={snapshotsOpen}
+        onClose={() => setSnapshotsOpen(false)}
+        noteId={ctx.selectedId}
+        noteTitle={
+          ctx.selectedId === null
+            ? null
+            : ctx.cache.get(ctx.selectedId)?.title ?? null
+        }
+        onRestored={() => ctx.reloadOpenNote()}
+      />
+      <SnapshotFailedIndicator />
       <NewNoteFromTemplateModal
         open={newFromTemplateOpen}
         onClose={() => setNewFromTemplateOpen(false)}
@@ -610,6 +625,10 @@ function EditorChrome({
           setPaletteOpen(false);
           setNewFromTemplateOpen(true);
         }}
+        onOpenSnapshots={() => {
+          setPaletteOpen(false);
+          setSnapshotsOpen(true);
+        }}
         onLockFlushed={async () => {
           setPaletteOpen(false);
           await handleLockFlushed();
@@ -633,6 +652,7 @@ type CommandPaletteHostProps = {
   onOpenSettings: () => void;
   onManageTemplates: () => void;
   onNewNoteFromTemplate: () => void;
+  onOpenSnapshots: () => void;
   onLockFlushed: () => Promise<void>;
 };
 
@@ -642,6 +662,7 @@ function CommandPaletteHost({
   onOpenSettings,
   onManageTemplates,
   onNewNoteFromTemplate,
+  onOpenSnapshots,
   onLockFlushed,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
@@ -693,6 +714,7 @@ function CommandPaletteHost({
       onManageTemplates,
       onNewNoteFromTemplate,
       onOpenTodayNote,
+      onOpenSnapshots,
       onSelectNote: async (id) => {
         await ctx.open(id).catch(() => {
           /* selection failure surfaces via sidebar UX */
@@ -707,6 +729,7 @@ function CommandPaletteHost({
       onManageTemplates,
       onNewNoteFromTemplate,
       onOpenTodayNote,
+      onOpenSnapshots,
     ],
   );
   return (

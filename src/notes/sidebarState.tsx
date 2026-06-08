@@ -397,6 +397,13 @@ export type UseSelectedNoteReturn = {
   cache: ReadonlyMap<NoteId, TitleRecord>;
   /** Re-sync signal for the open note's body — see [`SidebarState.contentReloadNonce`]. */
   contentReloadNonce: number;
+  /**
+   * Force the currently-open note's editor body to re-read from disk by bumping
+   * `contentReloadNonce`. Used when an action mutates the open note's `.myn`
+   * out-of-band of the editor's own autosave — e.g. snapshot restore (MYND-97),
+   * the same re-sync `commitRename` performs. No-op when nothing is selected.
+   */
+  reloadOpenNote: () => void;
   /** Update selection. Does NOT load editor content; caller orchestrates. */
   select: (id: NoteId | null) => void;
   /** Select + emit a load-body intent (caller wires the editor). */
@@ -619,12 +626,24 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // MYND-97: re-read the open note's body after an out-of-band mutation
+  // (snapshot restore overwrites the `.myn` via the backend, not the editor's
+  // autosave). Mirrors the re-sync `commitRename` performs after a rename.
+  const reloadOpenNote = useCallback(() => {
+    setState((prev) =>
+      prev.selectedId === null
+        ? prev
+        : { ...prev, contentReloadNonce: prev.contentReloadNonce + 1 },
+    );
+  }, []);
+
   const value = useMemo<UseSelectedNoteReturn>(
     () => ({
       selectedId: state.selectedId,
       renamingId: state.renamingId,
       cache: state.cache,
       contentReloadNonce: state.contentReloadNonce,
+      reloadOpenNote,
       select,
       open,
       startRename,
@@ -640,6 +659,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      reloadOpenNote,
       select,
       open,
       startRename,
