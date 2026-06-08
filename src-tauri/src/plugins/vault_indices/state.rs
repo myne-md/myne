@@ -156,6 +156,12 @@ pub struct NoteRecord {
     pub title: Option<String>,
     /// The note's virtual `folder:` (frontmatter), if any.
     pub folder: Option<String>,
+    /// The note's own folded title-key (`§3.7.8` fold, computed TS-side like
+    /// the edge title-keys), or `None` when untitled. The in-degree half of
+    /// the orphan query (MYND-197): a note is "referenced" iff some edge's
+    /// folded target title-key equals this. Folding stays TS-side (no Turkish
+    /// divergence), so Rust receives it pre-folded.
+    pub title_key: Option<String>,
     /// Per-occurrence outbound wikilink edges (Task 2).
     pub edges: Vec<WikilinkEdge>,
     /// The note's tags — inline `#tags` ∪ frontmatter `tags:`, deduped by
@@ -171,6 +177,9 @@ impl NoteRecord {
         }
         if let Some(f) = self.folder.as_mut() {
             f.zeroize();
+        }
+        if let Some(k) = self.title_key.as_mut() {
+            k.zeroize();
         }
         for edge in self.edges.iter_mut() {
             edge.zeroize_in_place();
@@ -276,6 +285,65 @@ impl VaultIndicesState {
             .ok()
             .and_then(|idx| idx.notes.get(note_id).map(|r| r.edges.clone()))
             .unwrap_or_default()
+    }
+
+    /// Bulk dump of every note's raw outbound edges — `(note_id, edges)` per
+    /// note (MYND-197). One IPC call replaces N per-note `forward()` round
+    /// trips for the whole-vault graph build; resolution stays TS-side. The
+    /// caller routes by `note_count()` BEFORE calling this (a `> cap` vault
+    /// takes the per-note BFS subgraph path instead), so the whole-vault dump
+    /// only runs at ≤ cap. `max_edges` is a DEFENSIVE ceiling against a
+    /// pathological payload — accumulation stops once the total edge count
+    /// would exceed it (truncated; the normal route-by-count path never trips
+    /// it). Empty on a poisoned lock.
+    pub fn all_edges(&self, max_edges: usize) -> Vec<(String, Vec<WikilinkEdge>)> {
+        let Ok(idx) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let mut out = Vec::with_capacity(idx.notes.len());
+        let mut total = 0usize;
+        for (id, record) in idx.notes.iter() {
+            if total >= max_edges {
+                break; // defensive ceiling — never serialize an unbounded payload
+            }
+            let take = record.edges.len().min(max_edges - total);
+            total += take;
+            out.push((id.clone(), record.edges[..take].to_vec()));
+        }
+        out
+    }
+
+    /// Structurally-isolated ("orphan") note ids — zero outbound edges AND not
+    /// referenced as the folded title-key target of any edge (MYND-197 /
+    /// SYNC-13). A degree-0 INDEX query: needs no edge dump and works at any
+    /// vault size, so the orphans-only graph view bypasses the `> cap`
+    /// route-by-count tension. Untitled notes (no `title_key`) can't be
+    /// referenced by title, so they are orphans iff they have no outbound
+    /// edges. Raw structural definition: a note whose only edges are BROKEN is
+    /// NOT flagged here — that resolved-orphan refinement needs TS resolution
+    /// and is deferred. Empty on a poisoned lock.
+    pub fn orphans(&self) -> Vec<String> {
+        let Ok(idx) = self.inner.lock() else {
+            return Vec::new();
+        };
+        // Every folded target title-key any edge points at (the in-degree side).
+        let mut referenced: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for record in idx.notes.values() {
+            for edge in &record.edges {
+                referenced.insert(edge.title_key.as_str());
+            }
+        }
+        idx.notes
+            .iter()
+            .filter(|(_, record)| {
+                record.edges.is_empty()
+                    && match record.title_key.as_deref() {
+                        Some(key) => !referenced.contains(key),
+                        None => true, // untitled → unreferenceable by title
+                    }
+            })
+            .map(|(id, _)| id.clone())
+            .collect()
     }
 
     /// All candidate backlink edges naming `title_key` — every source
@@ -461,6 +529,57 @@ mod tests {
         assert!(!edges[0].embed);
         assert_eq!(edges[1].target, "Gamma");
         assert!(edges[1].embed);
+    }
+
+    #[test]
+    fn all_edges_dumps_every_note_with_its_edges() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.edges = vec![edge("Beta", false)];
+        let mut b = rec("Beta", None);
+        b.edges = vec![edge("Alpha", false), edge("Gamma", false)];
+        state.apply("a", a);
+        state.apply("b", b);
+        state.apply("c", rec("Gamma", None)); // linkless note still appears
+        let dump = state.all_edges(1_000);
+        assert_eq!(dump.len(), 3);
+        let total: usize = dump.iter().map(|(_, e)| e.len()).sum();
+        assert_eq!(total, 3); // 1 + 2 + 0
+    }
+
+    #[test]
+    fn all_edges_truncates_at_the_defensive_ceiling() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.edges = vec![edge("X", false), edge("Y", false), edge("Z", false)];
+        state.apply("a", a);
+        let dump = state.all_edges(2); // ceiling below the 3 edges
+        let total: usize = dump.iter().map(|(_, e)| e.len()).sum();
+        assert!(total <= 2, "the ceiling caps the total edge count");
+    }
+
+    #[test]
+    fn orphans_are_notes_with_zero_in_and_out_edges() {
+        let state = VaultIndicesState::default();
+        // hub: titled, referenced by `linker`, no out-edges → NOT orphan (in-edge).
+        let mut hub = rec("Hub", None);
+        hub.title_key = Some("hub".to_string());
+        // linker: has an out-edge → NOT orphan.
+        let mut linker = rec("Linker", None);
+        linker.title_key = Some("linker".to_string());
+        linker.edges = vec![edge("Hub", false)]; // edge.title_key == "hub"
+                                                 // lonely: titled, unreferenced, no out-edges → ORPHAN.
+        let mut lonely = rec("Lonely", None);
+        lonely.title_key = Some("lonely".to_string());
+        // untitled: no title_key, no out-edges → ORPHAN (unreferenceable by title).
+        let untitled = NoteRecord::default();
+        state.apply("hub", hub);
+        state.apply("linker", linker);
+        state.apply("lonely", lonely);
+        state.apply("untitled", untitled);
+        let mut orphans = state.orphans();
+        orphans.sort();
+        assert_eq!(orphans, vec!["lonely".to_string(), "untitled".to_string()]);
     }
 
     #[test]

@@ -150,7 +150,7 @@ Used in: `spec/protocol.md` §3.4
 
 *(Aliases: backlinks, wikilinks.)*
 
-Links between notes that are queryable from both endpoints — opening a note shows which other notes link to it. Myne supports the `[[wikilink]]` syntax in v0.1 with a backlinks pane; the graph view (Cytoscape-based) is also part of v1.0 scope (`vision.md` Phase 1 Scope).
+Links between notes that are queryable from both endpoints — opening a note shows which other notes link to it. Myne supports the `[[wikilink]]` syntax in v0.1 with a backlinks pane; the graph view (d3-force + hand-rolled render) is also part of v1.0 scope (`vision.md` Phase 1 Scope).
 
 Used in: `vision.md` Phase 1 Scope
 
@@ -277,7 +277,11 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07
 
 ### **Cytoscape.js** &nbsp; 🛠️ *Tooling*
 
-The graph-visualization library used for Myne's minimal graph view in Phase 1. Lazy-loaded into a separate panel rather than rendered in the editor surface.
+Originally selected for Myne's minimal graph view, but **superseded 2026-06-08 by [d3-force](#d3-force) + a hand-rolled canvas renderer** (see `decisions.md` 2026-06-08). The leaner decomposition — a dep only for the force-simulation, with render/interaction hand-rolled — cleared `dependency-policy.md` "The bar" Q1 where the full framework did not. Retained here for historical reference.
+
+### **d3-force** &nbsp; 🛠️ *Tooling*
+
+The force-directed-layout simulation library (`d3-force`, ISC) used for Myne's minimal graph view in Phase 1. It computes node positions only; the canvas render, pan/zoom/hit-test, and interaction are hand-rolled (no graph framework). Lazy-loaded into a separate panel rather than rendered in the editor surface. Chosen over [Cytoscape.js](#cytoscapejs) per `decisions.md` 2026-06-08 — the Envelope-A scale target (smooth to low-thousands of nodes, controlled degradation above) shrinks the dependency question to "force-simulation only", which `dependency-policy.md` Q1 then resolves to the hand-roll-plus-leaf-dep form.
 
 ### **decoration layer** &nbsp; 📦 *Product*
 
@@ -426,7 +430,7 @@ Used in: `decisions.md` 2026-05-07 (pattern), 2026-05-15 (concrete timings); MYN
 
 ### **graph view** &nbsp; 📦 *Product*
 
-The visualization of `[[wikilink]]` relationships between notes as a force-directed graph. Myne Phase 1 includes a minimal Cytoscape.js-based graph view in a separate, lazy-loaded panel (`vision.md` Phase 1 Scope).
+The visualization of `[[wikilink]]` relationships between notes as a force-directed graph. Myne Phase 1 includes a minimal graph view — [d3-force](#d3-force) layout + a hand-rolled canvas renderer — in a separate, lazy-loaded panel (`vision.md` Phase 1 Scope). Nodes are notes only (tags/folders are a filter dimension, not nodes); edges are resolved cross-note references.
 
 Used in: `vision.md` Phase 1 Scope
 
@@ -478,6 +482,14 @@ Used in: `spec/markdown-dialect.md` §3.7, §6 C1
 Adversary class A11: a Myne team member acting maliciously. The architecture grants the team no privileged read access — keys never leave the client. The single privileged asset is the code-signing key (TB8); compromise reduces to A9 (compromised distribution).
 
 Used in: `threat-model.md` §1 (A11)
+
+### **isolated note** &nbsp; 📦 *Product*
+
+*(Alias: orphan note.)*
+
+A note with **zero resolved cross-note wikilink edges** in the graph view — nothing links to it and it links to nothing (MYND-198 / SYNC-13). Graph-STRUCTURAL, not "no authored links": a note whose only outbound link is broken (`[[Typo]]`) is still isolated (a broken link is not an edge), and a note connected only by a shared tag is still isolated (the graph is notes-only — tags are a filter, not nodes). Embed / anchor / block-ref references (`![[Note]]`, `[[Note#h]]`, `[[Note^b]]`) DO count as edges, so a note reached only by an embed is not isolated. Surfaced by the graph view's "Isolated" filter (a degree-0 index query that works at any vault size).
+
+Used in: `vision.md` Phase 1 Scope (graph view); `decisions.md` 2026-06-08 (graph visualization)
 
 ### **item order** &nbsp; 📦 *Product*
 
@@ -585,6 +597,12 @@ Used in: `decisions.md` (Tauri stack realignment)
 A `[label]: url` line (CommonMark "link reference definition") that supplies the destination for a [reference link](#reference-link) (`[text][label]`) or a reference-style image (`![alt][label]`) elsewhere in the same note. Labels match by CommonMark rules — case-folded with internal whitespace collapsed — and the first definition of a given label wins. In the Myne editor a shared collector scans all such definition lines into a `label → { target, range }` map; a definition referenced by a resolved reference link is hidden off-cursor (it reads as body noise otherwise) and revealed when the cursor enters its line. The definition bytes are preserved (§6 C1) and the form is never emitted by an authoring affordance. See also [reference link](#reference-link).
 
 Used in: `spec/markdown-dialect.md` §3.2; `decisions.md` 2026-05-30
+
+### **local graph** &nbsp; 📦 *Product*
+
+The open note's neighborhood (1-2 hop) subgraph in the [graph view](#graph-view) — the note plus the notes it links to and that link to it, expanded one or two hops (MYND-199). It is a MODE of the graph modal (a note-relative entry centered on the open note), NOT a separate sidebar pane — a deliberate choice to keep the persistent UI calm (a persistent animated graph beside the editor would be the loudest element against the no-decorative-motion canon; deferred behind a dogfood trip-wire as a v1.x canon amendment). A single click pivots (re-centers on the clicked node, no navigation); a double-click opens the note. "Zoom out" returns to the whole-vault graph.
+
+Used in: `vision.md` Phase 1 Scope (graph view)
 
 ### **magic bytes** &nbsp; 📋 *Protocol*
 
@@ -782,7 +800,7 @@ Used in: `spec/protocol.md` §1.3, §10
 
 ### **React** &nbsp; 🛠️ *Tooling*
 
-The UI library used for the Phase 1 desktop client UI inside the Tauri WebView, and the planned UI library for the Phase 3 web and mobile clients (the latter via React Native). React 19 with TypeScript per the scaffold. Chosen for the maturity of its CodeMirror 6 (`@uiw/react-codemirror`) and Cytoscape.js (`react-cytoscapejs`) integrations — the two largest UI dependencies in the Phase 1 scope. Shared React components are anticipated to live in a future `packages/ui/` workspace member when Phase 3 web work begins, decoupling the desktop UI bundler from the web bundler.
+The UI library used for the Phase 1 desktop client UI inside the Tauri WebView, and the planned UI library for the Phase 3 web and mobile clients (the latter via React Native). React 19 with TypeScript per the scaffold. Chosen for the maturity of its CodeMirror 6 (`@uiw/react-codemirror`) integration — the largest UI dependency in the Phase 1 scope. (The graph view uses [d3-force](#d3-force) for layout with a hand-rolled canvas renderer rather than a React graph wrapper, so it adds no React-specific UI dependency — superseding the earlier `react-cytoscapejs` plan, `decisions.md` 2026-06-08.) Shared React components are anticipated to live in a future `packages/ui/` workspace member when Phase 3 web work begins, decoupling the desktop UI bundler from the web bundler.
 
 Used in: `decisions.md`; `threat-model.md` §7
 Reference: https://react.dev
@@ -1087,6 +1105,12 @@ The build tool and dev server used by the Phase 1 desktop client to bundle the R
 
 Used in: `decisions.md`; `threat-model.md` §7
 Reference: https://vite.dev
+
+### **unlinked mention** &nbsp; 📦 *Product*
+
+A note whose prose mentions the open note's **title** as a whole-word, fold-identity phrase **without** `[[wikilink]]`-ing it — surfaced as a collapsed-by-default second section of the **backlinks** pane with a one-click "link" action (Obsidian-parity discovery/cleanup aid; MYND-196, build-phase v1.1). Distinct from a backlink, which is an explicit link. Candidate recall rides the existing encrypted `vault.search` body index as a *filter only*; identity is verified by a `foldSegment` word-boundary match on the decrypted candidate body (`vault.search`'s language-detecting tokenizer is never the identity authority). A corpus-relative phrase document-frequency floor (df > ~0.15 → suppress) plus a ≤2-folded-char guard suppress common/short titles; the 0.15 threshold is a **tunable code constant, not spec** (deliberate contrast with the frozen Damm-32 table). Adds **no new at-rest artefact** — the guarantee surface does not move. Clicking "link" inserts `[[Title]]` through the canonical `saveNote` write path and never clobbers an open+dirty note (SYNC-15 guard).
+
+Used in: `agent-tooling/features/unlinked-mentions/prd.md`, `spec/wikilink.md`, `vision.md` Phase 1 Scope
 
 ### **wikilink** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 

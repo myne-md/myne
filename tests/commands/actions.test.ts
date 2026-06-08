@@ -37,10 +37,12 @@ function find(id: string): CommandAction {
 }
 
 describe("Command palette action registry", () => {
-  it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190)", () => {
+  it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190; snapshots.open MYND-97; graph.show MYND-198)", () => {
     expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
       "app.open-settings",
       "daily.open-today",
+      "graph.show",
+      "snapshots.open",
       "templates.manage",
       "templates.new-note",
       "vault.import-obsidian",

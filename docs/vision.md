@@ -67,7 +67,7 @@ The list of explicit non-goals is longer than usual because privacy products die
 - CodeMirror 6 editor with live markdown and `[[wikilinks]]`
 - Full-text search across decrypted notes
 - Backlinks pane ("which notes link here")
-- Minimal graph view (Cytoscape.js, separate panel, lazy-loaded)
+- Minimal graph view (d3-force layout + hand-rolled canvas render, separate panel, lazy-loaded)
 - Obsidian vault importer (`.md` files, YAML frontmatter, `[[wikilinks]]`)
 
 **Definition of done.** v1.0 ships when a real user can install the desktop app, generate a recovery phrase, write notes for 30 days, deliberately lose their password, recover the vault from the phrase, and at no point have plaintext touched the disk outside the in-memory editor session.
@@ -88,7 +88,7 @@ A record of the choices made while drafting this document, captured for the next
 - **Wedge is portability + open source full stack** (alternatives `b` + `c`) rather than competitor takedown or trust-only framing.
 - **Success criteria tiered (Minimum / Modest / Stretch)** with both numerical and qualitative outcomes. Numbers anchored on the audience-sizing analysis (5k–30k global power users) and the Notesnook benchmark (~14k stars in ~2 years OSS).
 - **Anti-features include nine commitments**, deliberately longer than typical because the team treats scope creep as the primary failure mode for privacy products.
-- **Phase 1 includes a minimal graph view** (lazy-loaded Cytoscape panel) — the wedge sentence promises graph as first-class, and v1 has to credibly back that.
+- **Phase 1 includes a minimal graph view** (lazy-loaded d3-force panel) — the wedge sentence promises graph as first-class, and v1 has to credibly back that.
 - **Definition of done is the recovery flow drill**: lose the password, recover from the phrase, plaintext never on disk. Recovery is the highest-risk piece of the project; the DoD reflects that.
 
 **Deliberately deferred**

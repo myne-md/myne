@@ -45,6 +45,8 @@ export type CommandContext = {
   onOpenTodayNote: () => void;
   /** Open the snapshots / file-recovery panel for the selected note (MYND-97). */
   onOpenSnapshots: () => void;
+  /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
+  onShowGraph: () => void;
   /** Switch active selection to the given note id (mirrors sidebar click). */
   onSelectNote: (id: NoteId) => Promise<void>;
   /** Drive Stage transitions for force-relock paths. */

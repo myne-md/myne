@@ -111,6 +111,20 @@ const openSnapshotsAction: CommandAction = {
   },
 };
 
+const showGraphAction: CommandAction = {
+  id: "graph.show",
+  label: "Show graph view…",
+  category: "Editor",
+  kbd: "⌘⇧G",
+  // Editor-only, like the other modal carve-outs. The whole-vault graph is a
+  // wedge-first-class surface, so it ALSO has a persistent BottomBar affordance
+  // (SYNC-7) — the palette action is one of two entry points, not the only one.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowGraph();
+  },
+};
+
 export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
@@ -118,6 +132,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   openTodayNoteAction,
   manageTemplatesAction,
   openSnapshotsAction,
+  showGraphAction,
   importObsidianAction,
   convertWikilinksAction,
 ]);

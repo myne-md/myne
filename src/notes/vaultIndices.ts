@@ -15,8 +15,10 @@ import type {
   WikilinkRef,
   WikilinkTargetKind,
 } from "../dialect/types";
+import { bumpIndexNonce } from "./indexNonce";
 import { noteRead } from "./readNote";
 import {
+  liveIdSet,
   parseTarget,
   resolveWikilink,
   type ResolverNote,
@@ -166,15 +168,47 @@ export async function vaultIndicesApply(
     noteId,
     title,
     folder,
+    // The note's own folded title-key (§3.7.8 fold, TS-side like the edge
+    // title-keys) — the in-degree side of the orphan query (MYND-197).
+    titleKey: title === null ? null : foldSegment(title),
     wikilinks,
     tags,
   });
+  // SYNC-5: bump the index-changed nonce AFTER the slice updated (single
+  // post-mutation chokepoint) so reader surfaces re-query.
+  bumpIndexNonce();
+}
+
+/**
+ * Whole-vault edge dump (MYND-197): `[noteId, edges][]` for every indexed
+ * note, resolved once TS-side by the graph adapter. The CLIENT must route by
+ * note count BEFORE calling this — a vault over the render cap takes the
+ * per-note BFS subgraph path instead (the Rust side applies only a defensive
+ * edge-ceiling, not the render cap).
+ */
+export async function vaultIndicesAllEdges(): Promise<
+  Array<[string, WikilinkEdge[]]>
+> {
+  return await invoke<Array<[string, WikilinkEdge[]]>>(
+    "plugin:vault-indices|vault_indices_all_edges",
+  );
+}
+
+/**
+ * Structurally-isolated ("orphan") note ids (MYND-197 / SYNC-13) — zero raw
+ * in+out edges. A degree-0 index query, so the orphans-only graph view works
+ * at any vault size without the edge dump. (Notes whose only links are broken
+ * are not flagged here — that resolved-orphan refinement is TS-side, deferred.)
+ */
+export async function vaultIndicesOrphans(): Promise<string[]> {
+  return await invoke<string[]>("plugin:vault-indices|vault_indices_orphans");
 }
 
 /** Remove a hard-deleted note from the index. Trash does NOT route here —
  *  a trashed note stays indexed and is filtered TS-side via `isTrashed`. */
 export async function vaultIndicesRemove(noteId: string): Promise<void> {
   await invoke<void>("plugin:vault-indices|vault_indices_remove", { noteId });
+  bumpIndexNonce(); // SYNC-5: chokepoint bump, after the slice updated.
 }
 
 /** Derive `{title, folder}` from a parsed note's frontmatter — the same
@@ -277,6 +311,19 @@ export async function forward(
     "plugin:vault-indices|vault_indices_forward",
     { noteId },
   );
+  return resolveEdges(edges, notes);
+}
+
+/**
+ * Resolve a batch of raw edges against the resident note-set via the SINGLE
+ * resolver (the render-time path) — the shared core of `forward()` and the
+ * graph adapter's whole-vault build (so the bulk dump resolves identically to
+ * the per-note query; no second resolver). Pure (no IPC).
+ */
+export function resolveEdges(
+  edges: ReadonlyArray<WikilinkEdge>,
+  notes: ReadonlyArray<ResolverNote>,
+): ForwardLink[] {
   return edges.map((edge) => ({
     edge,
     resolution: resolveWikilink(edgeToRef(edge), notes),
@@ -316,7 +363,7 @@ export async function backlinks(
   // (a) a candidate from a trashed source is dropped here, and (b) resolving
   // against `notes` means a link to a trashed note never resolves (it reads
   // broken). The Rust index stays trash-blind; exclusion is entirely here.
-  const liveIds = new Set(notes.map((n) => n.noteUuid));
+  const liveIds = liveIdSet(notes);
   const groups = new Map<string, BacklinkGroup>();
   for (const candidate of candidates) {
     if (!liveIds.has(candidate.source)) continue; // trashed source

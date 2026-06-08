@@ -203,6 +203,8 @@ The inline-tag tokenizer **only recognizes** tag occurrences. It MUST NOT rewrit
 
 A user who wants to programmatically rewrite tags (e.g., a "rename tag across vault" affordance) must invoke an explicit, transparent conversion command — the parser does not perform implicit rewrites on save or on load. (Spec discipline derived from §6 C1.)
 
+**No editor decoration in v0.1/v1 (SYNC-17).** "Recognize-only" also means the editor renders inline tags as **plain text** — there is no `#tag` chip/highlight decoration. This is deliberate, not an omission: a decorated `#tag` *looks* interactive, and a clickable-looking tag with nowhere to go is a dead affordance. Per `decisions.md` 2026-06-08 "Interactive tags ship as ONE unit" (MYND-200), tag editor-decoration may land ONLY together with the tag-browse/tag-click surface (the interactive-tag unit) — never as a standalone editor-polish change. Until then the coherent state is invisible-but-indexed: tags drive search / backlinks / `tagTree()` but carry no editor glyph.
+
 #### 3.7.8 Case identity
 
 The inline-tag tokenizer surfaces tag bytes verbatim — un-normalized, un-folded. Tag identity (whether `#Tag` and `#TAG` collide for index purposes) is determined by the consuming layer. In Myne v0.1, the tag index applies Unicode case-fold and NFC normalization at index-write time, matching Obsidian's globally case-insensitive behavior.

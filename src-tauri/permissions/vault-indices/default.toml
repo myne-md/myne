@@ -19,10 +19,22 @@ permissions = [
   "allow-vault-indices-apply",
   "allow-vault-indices-remove",
   "allow-vault-indices-forward",
+  "allow-vault-indices-all-edges",
+  "allow-vault-indices-orphans",
   "allow-vault-indices-backlink-candidates",
   "allow-vault-indices-by-tag",
   "allow-vault-indices-tag-tree",
 ]
+
+[[permission]]
+identifier = "allow-vault-indices-all-edges"
+description = "Allow invoking vault-indices:vault_indices_all_edges (Slot::Unlocked-gated whole-vault edge dump — [(noteId, edges)] for every indexed note, for the graph view's whole-vault build at ≤ cap; defensive edge-ceiling). Returns vault-wide link-structure (AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["vault_indices_all_edges"]
+
+[[permission]]
+identifier = "allow-vault-indices-orphans"
+description = "Allow invoking vault-indices:vault_indices_orphans (Slot::Unlocked-gated degree-0 query — note ids with zero in+out raw edges, for the orphans-only graph view at any vault size). Vault-wide (AS4-Sensitive) → main-window-only, same invariant as the prefs setters."
+commands.allow = ["vault_indices_orphans"]
 
 [[permission]]
 identifier = "allow-vault-indices-apply"
