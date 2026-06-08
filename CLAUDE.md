@@ -42,7 +42,7 @@ Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fa
 
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.
 
-No JS test runner wired up yet (no Vitest/Jest); `tsc` via `pnpm build` is the only TypeScript "test". Add Vitest if needed; for Rust use `cargo test`.
+JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vite.config.ts`/`vitest.config.ts`, specs under `tests/**/*.test.ts`). `tsc` via `pnpm build` is the typecheck; for Rust use `cargo test`. (Note: `tests/` is outside `tsc`'s `include: ["src"]`, so Vitest is the only check that exercises test files.)
 
 ## What lives where
 

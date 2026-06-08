@@ -48,6 +48,7 @@ pub fn run() {
         .plugin(plugins::snapshots::init())
         .plugin(plugins::vault_indices::init())
         .plugin(plugins::attachments::init())
+        .plugin(plugins::importer::init())
         // MYND-169: the `attachment://<id>` async custom-URI-scheme
         // handler — decrypts a `MYA1` blob in memory, re-sniffs the
         // content-type from the decrypted bytes, and serves ONLY an

@@ -177,6 +177,19 @@ fn main() {
                     "catalog_list",
                     "attachment_delete",
                 ]),
+            )
+            .plugin(
+                "importer",
+                // MYND-53 (importer engine read-seam, SYNC-1). `import_read_dir`
+                // + `import_read_file` are the ONLY external-dir read path — no
+                // `fs:allow-read-text-file` / `read-dir` / read-scope is granted
+                // to the WebView (least-privilege, TB6). Lock-step with
+                // `permissions/importer/default.toml`; adding a command here
+                // without a matching `commands.allow` entry is a security
+                // regression (the InlinedPlugin mirror is load-bearing per the
+                // `vault-creation` note above).
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["import_read_dir", "import_read_file"]),
             ),
     )
     .unwrap();

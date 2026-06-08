@@ -143,6 +143,17 @@ A `folder:` value is a slash-delimited path of **segments**. A folder segment an
 
 **Importer coordination (MYND-51).** The Obsidian importer writes folder structure to this same canonical `folder:` field; the field name and the trailing-slash form defined here are the contract the importer consumes / produces. (Whether the importer also persists *empty* source directories to `deliberate_folders` is an importer-side fidelity decision, out of scope here.)
 
+#### 3.6.3 Importer ignore-set
+
+The Obsidian importer (MYND-54) decides which directory entries become notes by **two rules**, applied to each entry the import walk encounters, in order:
+
+1. **Dot-prefix rule (wins).** Any entry whose name begins with `.` — file *or* directory, at any depth — is skipped and surfaced only as a low-profile transparency count ("N config/hidden items ignored", shown when non-zero). The single rule subsumes `.obsidian/`, `.git/`, `.trash/`, `.DS_Store`, `.obsidian.vimrc`, and every other dotfile; there is no per-name ignore list.
+2. **Extension rule** (non-dot entries only). Exactly one extension is imported as a note: `.md`. `.markdown` and `.mdx` are **not** importable (`.mdx` is JSX, not plain markdown — importing it would risk the parser and the §6 C1 round-trip contract); both fall to *non-markdown skipped*. `.canvas` files are skipped and reported on their **own** dedicated summary line — Obsidian Canvas is a whiteboard, a standing `vision.md` anti-feature, so skip-and-report upholds it rather than importing it. Every other non-`.md` extension is counted under *non-markdown skipped*. Extension matching is case-insensitive.
+
+**Latent edge.** Because the dot-prefix rule is evaluated first, a note literally named `.foo.md` is treated as hidden and silently dropped. This is accepted as a low-probability edge and is recorded in the MYND-90 round-trip-fixture edge-case list.
+
+Skipping an entry writes nothing, so the importer's C1 sanctioned-diff allowlist (§6) is unchanged by this rule. No glossary, protocol, or cryptographically load-bearing identifier is affected.
+
 ### 3.7 Inline-tag extension
 
 Notes may contain inline tags — `#`-prefixed identifiers in body text that consumers (search, backlink, sidebar UI) treat as structured metadata distinct from the YAML frontmatter `tags:` list. The grammar below mirrors Obsidian's runtime behavior so an Obsidian-imported vault produces the same tag set in Myne as it does in Obsidian. Each rule is verified against observed Obsidian behavior in `agent-tooling/researches/2026-05-09-obsidian-inline-tag-behavior.md` (the Q-numbered findings cited per rule).
@@ -258,6 +269,13 @@ When Myne authors new content (slash command, selection toolbar, keyboard shortc
 
 **Implication for migration.** Lazy migration on edit (rewriting all non-canonical syntax in a touched file on save) is **explicitly forbidden** by C1. A user who wants to migrate an imported note's syntax to Myne canonical forms must invoke an explicit, transparent conversion command (the wikilink-specific R2 command is the only such command in v0.1; see [`wikilink.md`](wikilink.md) §7).
 
+**Sanctioned importer transforms (the C1 allowlist).** Exactly two import-time mutations are explicit, *documented* exceptions to the "never silently rewrites" rule above — sanctioned transforms, not the silent rewrites C1 forbids — and together they are the **only** changes the Obsidian importer makes to imported content:
+
+1. **`folder:` frontmatter injection (MYND-51).** The importer writes the directory-derived folder into the Myne-managed `folder:` field (§3.6.2) via the same frontmatter surgery as note create/move; the body is untouched. A pre-existing user-authored `folder:` is **preserved, never overwritten**.
+2. **Import-time media-ref rewrite (MYND-52).** A *resolvable* + *allowlisted* (raster/SVG/PDF) + *in-cap* (≤ 64 MiB) local media ref (`![[image.png]]` / `![](assets/img.png)`) is ingested into the encrypted attachment store and the ref rewritten in place to form C `![[att:<id>|filename]]` — the same form + byte-surgery the post-import **import-&-convert** command produces. Non-ingestable refs (remote URL — never fetched; missing; audio/video; oversize) are replaced with a placeholder comment and counted by type, never rewritten on a name-match guess. This is documented import behavior (`decisions.md` 2026-06-08, superseding the 2026-04-27 placeholder-only clause), so it does **not** violate C1; every byte outside the rewritten ref spans is preserved.
+
+Everything else in an imported note is byte-for-byte preserved per the list above. (Skipping a non-note entry — §3.6.3 — writes nothing, so it is not a transform at all.)
+
 ## 7. Out of scope for v0.1
 
 The following syntax is **not** parsed or rendered in v0.1. Authoring affordances do not produce them; imported content containing them is preserved byte-for-byte and rendered as plain text:
@@ -265,10 +283,10 @@ The following syntax is **not** parsed or rendered in v0.1. Authoring affordance
 - **Math.** `$inline$` and `$$display$$` LaTeX-style math. Deferred to v0.1.x ("second step"); KaTeX integration is the implementation path.
 - **Attribute syntax.** `{#id .class key=value}` Pandoc-style attributes. Not native to GFM; not in v0.1.
 - **Callouts / admonitions.** `> [!NOTE]` GitHub/Obsidian convention. Recognized at parse for round-trip; the v0.1 baseline editor renders the callout block as a normal block quote (the `[!NOTE]` marker stays as plain text inside the quote). Full callout decoration is deferred to v0.1.x.
-- **Iframes / embeds.** Raw `<iframe>` HTML. Recognized as raw HTML; rendered as plain monospace; sandboxing is out of scope until the attachment-encryption pipeline lands.
+- **Iframes / embeds.** Raw `<iframe>` HTML. Recognized as raw HTML; rendered as plain monospace; sandboxing is out of scope in v0.1 (a separate concern from the now-shipped attachment pipeline).
 - **Custom container blocks.** `:::` div containers (Pandoc / Djot syntax). Not in v0.1.
 - **Mermaid / PlantUML diagrams.** Recognized as fenced code blocks with `mermaid` / `plantuml` language label; rendered as monospace code; diagram rendering is deferred.
-- **Inline images.** `![alt](path)` and `![[image.png]]` are parsed and round-trip-stable, but inline image rendering is gated on the attachment-encryption pipeline that is not part of v0.1. **Reference-style images** (`![alt][ref]`) resolve against the same link reference definition table as reference links (§3.2) — but their v0.1 rider (hiding a definition line referenced only by an image, even though no `<img>` is drawn) is **deferred to MYND-164**, tracked alongside the attachment-encryption pipeline. Until then, a definition referenced only by an image stays visible.
+- **Inline images.** `![alt](path)` and `![[image.png]]` are parsed and round-trip-stable. The attachment-encryption pipeline **ships in v0.1** (`protocol.md` §11.2; PR #53), so **attachment-form** refs (`![[att:<id>|filename]]`) render inline (raster/SVG via `attachment://`, PDF via pdf.js). **Raw-path** refs (`![[image.png]]` / `![alt](path)`) are still not rendered as images: the Obsidian importer (MYND-52) rewrites the ingestable ones to attachment form and leaves the residual as placeholder comments; a raw-path ref that survives in a note shows as a chip/text, not an `<img>`. **Reference-style images** (`![alt][ref]`) resolve against the same link reference definition table as reference links (§3.2); the rider that hides a definition line referenced only by an image **landed with MYND-164**.
 
 ## 8. Parser configuration (informative)
 

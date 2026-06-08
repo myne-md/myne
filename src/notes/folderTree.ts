@@ -9,7 +9,11 @@
 // Same shape as markdown-dialect §3.7.4 (parent-chain derivation lives in the
 // consuming layer, not the parser).
 
-import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
+import {
+  ancestorPaths,
+  foldSegment,
+  normalizeFolderPath,
+} from "../dialect/folderPath";
 
 /** A folder node in the derived sidebar tree. */
 export interface FolderNode {
@@ -48,18 +52,6 @@ interface Builder {
   deliberateDisplay: string | null;
   deliberate: boolean;
   noteIds: string[];
-}
-
-// "Projects/Myne/Sub/" → ["Projects/", "Projects/Myne/", "Projects/Myne/Sub/"].
-function ancestorPaths(canonical: string): string[] {
-  const segs = canonical.split("/").filter((s) => s.length > 0);
-  const out: string[] = [];
-  let acc = "";
-  for (const s of segs) {
-    acc += s + "/";
-    out.push(acc);
-  }
-  return out;
 }
 
 function lastSegment(canonical: string): string {

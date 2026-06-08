@@ -18,7 +18,7 @@
 // Daily-notes is a bounded plain-markdown skeleton + date navigation over
 // ordinary notes — NOT a calendar/date-object model (anti-Notion, vision.md:59).
 
-import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
+import { foldSegment, folderKey, normalizeFolderPath } from "../dialect/folderPath";
 import type { TitleRecord } from "./loadNoteBatch";
 import type { NoteId } from "./sidebarState";
 
@@ -47,12 +47,6 @@ export function formatDailyDate(now: Date, format: string): string {
 export type DailyResolution =
   | { kind: "open"; id: NoteId; dateTitle: string }
   | { kind: "create"; dateTitle: string; folder: string | null };
-
-/** Case-fold + NFC identity key for a folder path (root → `""`). */
-function folderKey(folder: string | null): string {
-  const norm = normalizeFolderPath(folder);
-  return norm == null ? "" : foldSegment(norm);
-}
 
 /**
  * Resolve today's note (idempotent open-or-create). Pure: all clock input is the
