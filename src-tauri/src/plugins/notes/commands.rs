@@ -2873,6 +2873,195 @@ mod tests {
         });
     }
 
+    // ---- durability: never plaintext on disk; failed write keeps old ----
+    //
+    // The "no plaintext temp files" + "interrupted write keeps a valid
+    // blob" acceptance gate (MYND-88). The atomic_write mechanism itself is
+    // fault-injected in `atomic_write.rs::tests`; these exercise the same
+    // contract end-to-end through the note commands.
+
+    /// True if `haystack` contains `needle` as a contiguous byte run.
+    fn bytes_contain_run(haystack: &[u8], needle: &[u8]) -> bool {
+        !needle.is_empty()
+            && needle.len() <= haystack.len()
+            && haystack.windows(needle.len()).any(|w| w == needle)
+    }
+
+    /// Assert no file under `dir` contains `marker`; return how many files
+    /// were scanned (so callers can sanity-check the scan was non-empty).
+    fn assert_no_file_under_contains(dir: &std::path::Path, marker: &[u8]) -> usize {
+        let mut scanned = 0;
+        for entry in std::fs::read_dir(dir).unwrap().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_file() {
+                scanned += 1;
+                let bytes = std::fs::read(&path).unwrap();
+                assert!(
+                    !bytes_contain_run(&bytes, marker),
+                    "plaintext marker leaked into on-disk file {:?}",
+                    path.file_name()
+                );
+            }
+        }
+        scanned
+    }
+
+    const PLAINTEXT_CANARY: &str = "ZZ_PLAINTEXT_LEAK_CANARY_8675309";
+
+    #[test]
+    fn create_persists_only_ciphertext_no_plaintext_on_disk() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-no-plaintext").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let plaintext = format!("# leak check\n{PLAINTEXT_CANARY} body");
+            note_create_with_dir(notes_dir.clone(), &state, plaintext)
+                .await
+                .expect("create must succeed");
+
+            // Every file persisted under notes/ (the .myn blob plus any
+            // leftover temp) must be ciphertext — the plaintext canary may
+            // appear in none.
+            let scanned = assert_no_file_under_contains(&notes_dir, PLAINTEXT_CANARY.as_bytes());
+            assert!(scanned >= 1, "expected at least the .myn blob on disk");
+        });
+    }
+
+    #[test]
+    fn update_persists_only_ciphertext_no_plaintext_on_disk() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-no-plaintext").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let note_id_str =
+                note_create_with_dir(notes_dir.clone(), &state, "# v1\nfirst body".to_string())
+                    .await
+                    .unwrap();
+            let updated = format!("# v2\n{PLAINTEXT_CANARY} rewritten");
+            note_update_with_dir(notes_dir.clone(), &state, note_id_str, updated)
+                .await
+                .expect("update must succeed");
+
+            let scanned = assert_no_file_under_contains(&notes_dir, PLAINTEXT_CANARY.as_bytes());
+            assert!(scanned >= 1, "expected at least the .myn blob on disk");
+        });
+    }
+
+    /// A real OS write failure (read-only notes dir) on update returns a
+    /// closed typed `Io` error AND leaves the committed note intact — the
+    /// "old or new, never partial" recovery invariant, end to end.
+    #[cfg(unix)]
+    #[test]
+    fn update_in_readonly_dir_returns_io_error_and_keeps_old_note() {
+        use crate::io_failure_kind::IoFailureKind;
+        use std::os::unix::fs::PermissionsExt;
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-update-readonly").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            let original = "# original\ndurable body";
+            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, original.to_string())
+                .await
+                .unwrap();
+
+            // r-x only: creating the atomic_write temp inside now fails
+            // with PermissionDenied. Read perms remain, so the pre-write
+            // decode of the existing blob still succeeds.
+            std::fs::set_permissions(&notes_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+            let result = note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                note_id_str.clone(),
+                "rewrite that cannot land".to_string(),
+            )
+            .await;
+            // Restore write perms BEFORE asserting so a failing assert can
+            // not skip the ScopedTempDir cleanup.
+            std::fs::set_permissions(&notes_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+            assert!(
+                matches!(
+                    &result,
+                    Err(NoteUpdateError::Io {
+                        io_error_kind: IoFailureKind::PermissionDenied
+                    })
+                ),
+                "expected Io PermissionDenied, got {result:?}"
+            );
+
+            // The committed note is byte-for-byte the original — a failed
+            // update never corrupts or partially overwrites it.
+            let recovered = note_read_with_dir(notes_dir, &state, note_id_str)
+                .await
+                .expect("note must still be readable after a failed update");
+            assert_eq!(recovered, original);
+        });
+    }
+
+    /// A read-only notes dir on create returns a closed typed `Io` error
+    /// and writes nothing — no `.myn`, no leftover `.tmp`.
+    #[cfg(unix)]
+    #[test]
+    fn create_in_readonly_dir_returns_io_error_and_writes_nothing() {
+        use std::os::unix::fs::PermissionsExt;
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-readonly").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ))
+                .await;
+
+            std::fs::set_permissions(&notes_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+            let result =
+                note_create_with_dir(notes_dir.clone(), &state, "# never lands".to_string()).await;
+            // Snapshot the dir contents while still read-only, then restore.
+            let entries: Vec<_> = std::fs::read_dir(&notes_dir)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name())
+                .collect();
+            std::fs::set_permissions(&notes_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+            assert!(
+                matches!(&result, Err(NoteCreateError::Io { .. })),
+                "expected Io error, got {result:?}"
+            );
+            assert!(
+                entries.is_empty(),
+                "a failed create must leave no .myn / .tmp behind, got {entries:?}"
+            );
+        });
+    }
+
     // ---- 16 MiB boundary -----------------------------------------------
 
     #[test]

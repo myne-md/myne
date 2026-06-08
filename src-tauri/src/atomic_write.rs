@@ -14,6 +14,27 @@
 //! `replace=false` and the destination was missing) — never a half-
 //! written one.
 //!
+//! ## Failure-path cleanup
+//!
+//! A *returned error* (temp open/write/`sync_all` failure, or a
+//! `finalize_atomic` rename failure) drops the partial `<path>.tmp` on
+//! the way out (best-effort; the original error is the one surfaced), so
+//! a failed write never leaves a stray temp sibling. The one deliberate
+//! exception is the `StopBeforeRename` crash *simulation* (test-only,
+//! below), which leaves the temp on disk exactly as a real power loss
+//! would. Note the temp always holds **ciphertext** — callers hand
+//! `atomic_write` already-encoded blobs — so even a leftover temp never
+//! exposes plaintext.
+//!
+//! ## Interrupted-write recovery test seam (MYND-88)
+//!
+//! The durability + recovery contract is exercised by a `#[cfg(test)]`
+//! fault-injection seam ([`Fault`]): the production [`atomic_write`]
+//! wrapper passes [`Fault::None`], so in non-test builds the seam
+//! collapses to the straight-line path with byte-identical behavior and
+//! zero runtime cost. See `design-notes.md` 2026-06-08 "Interrupted-
+//! write recovery test gate + atomic_write failure-path `.tmp` cleanup".
+//!
 //! ## `replace` parameter
 //!
 //! - `replace=true` — vault.meta rewrite (post-recovery commit, future
@@ -57,25 +78,94 @@ use std::path::Path;
 ///   — Slot is singleton, OS-level locking enforces single-process per
 ///   vault).
 pub fn atomic_write(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
+    atomic_write_inner(path, bytes, replace, Fault::None)
+}
+
+/// Test-only fault-injection points for the [`atomic_write`] durability +
+/// interrupted-write recovery contract (MYND-88).
+///
+/// In non-test builds the enum has only the [`Fault::None`] variant, so
+/// the matches in [`atomic_write_inner`] / [`write_temp`] are compiled out
+/// and the production write path is byte-identical to a seam-free
+/// implementation (zero runtime cost).
+#[derive(Clone, Copy)]
+enum Fault {
+    /// Production path: no injected failure.
+    None,
+    /// Open the temp, write only the first half of `bytes`, best-effort
+    /// `sync_all`, then return this error kind — simulates a short write
+    /// / disk-full partway through the write.
+    #[cfg(test)]
+    FailDuringWrite(std::io::ErrorKind),
+    /// Fully write + `sync_all` the temp, then return `Interrupted`
+    /// **before** the rename without removing the temp — simulates a
+    /// power-loss crash after the temp is durable but before the atomic
+    /// commit. The destination must be left untouched.
+    #[cfg(test)]
+    StopBeforeRename,
+}
+
+fn atomic_write_inner(
+    path: &Path,
+    bytes: &[u8],
+    replace: bool,
+    fault: Fault,
+) -> std::io::Result<()> {
     if !replace && path.exists() {
         return Err(std::io::ErrorKind::AlreadyExists.into());
     }
 
     let tmp = tmp_path(path);
 
-    {
-        let mut f = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&tmp)?;
-        f.write_all(bytes)?;
-        f.sync_all()?;
-        // f drops here, releasing the file handle so rename can proceed
-        // on Windows.
+    // On any returned error, drop the partial temp so a failed write never
+    // leaves a stray `<path>.tmp` sibling (best-effort; the original error
+    // is the one surfaced). The single deliberate exception is the
+    // `StopBeforeRename` crash simulation below.
+    if let Err(e) = write_temp(&tmp, bytes, fault) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
     }
 
-    finalize_atomic(&tmp, path, replace)
+    #[cfg(test)]
+    if let Fault::StopBeforeRename = fault {
+        // Model a crash before the rename commit: leave the temp on disk
+        // exactly as a power loss would. The destination stays untouched.
+        return Err(std::io::ErrorKind::Interrupted.into());
+    }
+
+    if let Err(e) = finalize_atomic(&tmp, path, replace) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+
+    Ok(())
+}
+
+/// Open `<tmp>`, write `bytes`, and `sync_all` so the bytes are durable
+/// before the caller commits the rename. `fault` is read only under
+/// `#[cfg(test)]`; in production it is always [`Fault::None`].
+#[cfg_attr(not(test), allow(unused_variables))]
+fn write_temp(tmp: &Path, bytes: &[u8], fault: Fault) -> std::io::Result<()> {
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(tmp)?;
+
+    #[cfg(test)]
+    if let Fault::FailDuringWrite(kind) = fault {
+        // Partial prefix on disk, then fail — exercises the caller's
+        // failure-path temp cleanup and the destination-intact invariant.
+        let half = bytes.len() / 2;
+        f.write_all(&bytes[..half])?;
+        let _ = f.sync_all();
+        return Err(kind.into());
+    }
+
+    f.write_all(bytes)?;
+    f.sync_all()
+    // f drops here, releasing the file handle so the rename can proceed
+    // on Windows.
 }
 
 /// Commit the temp file to its destination atomically + durably.
@@ -246,6 +336,114 @@ mod tests {
         // Only the original; no `.tmp` sibling.
         assert_eq!(entries.len(), 1, "entries: {entries:?}");
         assert_eq!(entries[0], "file.bin");
+    }
+
+    // ---- fault injection: interrupted-write recovery (MYND-88) ----------
+
+    #[test]
+    fn write_failure_removes_temp_and_returns_error() {
+        let dir = ScopedTempDir::new("aw-write-fail-clean").unwrap();
+        let target = dir.path().join("file.bin");
+
+        let err = atomic_write_inner(
+            &target,
+            b"abcdefgh",
+            true,
+            Fault::FailDuringWrite(std::io::ErrorKind::StorageFull),
+        )
+        .expect_err("injected write failure must surface as Err");
+        assert_eq!(err.kind(), std::io::ErrorKind::StorageFull);
+
+        // Neither the destination nor a `.tmp` sibling survives a failed
+        // write — the failure-path cleanup removed the partial temp.
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name())
+            .collect();
+        assert!(entries.is_empty(), "expected empty dir, got {entries:?}");
+    }
+
+    #[test]
+    fn write_failure_leaves_existing_destination_intact() {
+        let dir = ScopedTempDir::new("aw-write-fail-keep-old").unwrap();
+        let target = dir.path().join("file.bin");
+        atomic_write(&target, b"OLD-VALID", true).unwrap();
+
+        let err = atomic_write_inner(
+            &target,
+            b"NEW-PARTIAL-BYTES",
+            true,
+            Fault::FailDuringWrite(std::io::ErrorKind::WriteZero),
+        )
+        .expect_err("injected write failure must surface as Err");
+        assert_eq!(err.kind(), std::io::ErrorKind::WriteZero);
+
+        // The committed destination is the old, fully-valid content; the
+        // failed write left no `.tmp` sibling.
+        assert_eq!(read_file(&target), b"OLD-VALID");
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name())
+            .collect();
+        assert_eq!(entries.len(), 1, "entries: {entries:?}");
+        assert_eq!(entries[0], "file.bin");
+    }
+
+    #[test]
+    fn interrupted_before_rename_leaves_destination_intact() {
+        let dir = ScopedTempDir::new("aw-interrupt-keep-old").unwrap();
+        let target = dir.path().join("file.bin");
+        atomic_write(&target, b"OLD-VALID", true).unwrap();
+
+        let err = atomic_write_inner(&target, b"NEW-VALID", true, Fault::StopBeforeRename)
+            .expect_err("crash-before-rename simulation must surface as Err");
+        assert_eq!(err.kind(), std::io::ErrorKind::Interrupted);
+
+        // The committed file is still the old, fully-valid content — an
+        // interrupt before the atomic rename never replaces it. This is
+        // the "old or new, never partial" recovery invariant.
+        assert_eq!(read_file(&target), b"OLD-VALID");
+    }
+
+    #[test]
+    fn interrupted_before_rename_temp_holds_exactly_written_bytes() {
+        let dir = ScopedTempDir::new("aw-interrupt-temp-bytes").unwrap();
+        let target = dir.path().join("file.bin");
+
+        atomic_write_inner(&target, b"NEW-VALID", false, Fault::StopBeforeRename)
+            .expect_err("crash-before-rename simulation must surface as Err");
+
+        // The leftover temp (the crash artifact a real power loss would
+        // leave) holds exactly the bytes we asked to write — no truncation,
+        // no invented content; callers only ever pass ciphertext blobs.
+        let tmp = tmp_path(&target);
+        assert_eq!(read_file(&tmp), b"NEW-VALID");
+        // The destination was never created (create-only, dest missing).
+        assert!(!target.exists(), "destination must not exist pre-commit");
+    }
+
+    /// Force the rename step to fail (destination is a non-empty
+    /// directory; POSIX `rename(file, dir)` → `EISDIR`) and assert the
+    /// temp is cleaned up. Unix-only: the failure shape is POSIX-specific.
+    #[cfg(unix)]
+    #[test]
+    fn finalize_failure_removes_temp() {
+        let dir = ScopedTempDir::new("aw-finalize-fail-clean").unwrap();
+        let target = dir.path().join("dest");
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("inner"), b"x").unwrap();
+
+        atomic_write(&target, b"payload", true)
+            .expect_err("rename of a file onto a directory must fail");
+
+        let tmp = tmp_path(&target);
+        assert!(
+            !tmp.exists(),
+            "temp must be cleaned up after finalize failure"
+        );
+        assert!(target.is_dir(), "destination directory must be untouched");
     }
 
     // ---- durability: parent-dir fsync (Unix smoke) -----------------------
