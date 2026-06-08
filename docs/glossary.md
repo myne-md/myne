@@ -128,6 +128,22 @@ A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleto
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **attachment** &nbsp; 📋 *Protocol*
+
+An arbitrary file (image, SVG, or PDF in v0.1) stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). No remote URL is ever fetched; decrypted bytes never touch disk. See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
+
+### **attachment-id** &nbsp; 📋 *Protocol*
+
+The 32-byte content-addressed identifier of an [attachment](#attachment): `HMAC-SHA-256(DeriveSubkey(root_key, "attachments-id-hmac"), file_bytes)` (`spec/protocol.md` §9.9). Used as the on-disk filename (hex) and the dedup key — identical content yields one blob within a vault. Because it is keyed under `root_key`, a disk observer without the key cannot test whether the vault holds a specific known file (no confirmation oracle) nor link equal content across vaults (`threat-model.md` AS7/AS8). Notes reference it via the editor form-C embed `![[att:<id>|filename]]`. Dedup is an id-existence check, not convergent encryption. (MYND-164)
+
+### **attachment://** &nbsp; 📋 *Protocol*
+
+The custom WebView protocol scheme that serves a decrypted [attachment](#attachment) to the editor/library. The Rust handler resolves `attachment://<id>`, decrypts the blob in memory, **re-sniffs** the content-type from the bytes and emits only an allowlisted type (`image/*` or `application/pdf`), and returns a full response — no plaintext ever written to disk, no `Range`/206 in v0.1. Unlock-gated and main-window-scoped (TB6); the WebView CSP blocks outbound network so a hostile note cannot exfiltrate a blob. (MYND-164)
+
+### **attachment_import** &nbsp; 📋 *Protocol*
+
+The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap and the raster/SVG/PDF allowlist at the door with a locked reject taxonomy (oversize / unsupported / locked). Unlock-gated, main-window-scoped. (MYND-164)
+
 ### **auto-lock on idle** &nbsp; 📦 *Product*
 
 A security control that locks the vault after a period of device inactivity, bounding the exposure window of an unattended unlocked Myne (`threat-model.md` A6). A backend-authoritative, fail-closed idle timer fires at a configurable timeout; the lock has two legs — (1) unconditional in-memory key zeroize ("no further notes decryptable"), and (2) best-effort teardown of the decrypted open note (a synchronous OS-level window hide plus a WebView reload). **"Idle" means machine-level** device idle (no input to the whole machine, not merely the Myne window), read per-platform (`GetLastInputInfo` / `CGEventSourceSecondsSinceLastEventType` / `XScreenSaverQueryInfo`); on Wayland, where no portable OS-idle API exists, it falls back to window-level idle as a fail-secure (more-eager) degradation. The timeout preference lives in the encrypted `vault.prefs` blob (`auto_lock_seconds`); the protection itself is always on (see **AUTO_LOCK_CEILING**). Moves A6 from ❌ Out-of-scope to 🔒 Mitigated — deliberately not a 🛡️ Strong guarantee, since freed-page RAM, swap, and hibernation are not scrubbed (A7/A10).
@@ -313,6 +329,10 @@ An ordinary `.myn` note representing one calendar day, identified by **folder + 
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07 (MYND-182 / MYND-191)
 
+### **deleted-attachment tombstone** &nbsp; 📦 *Product*
+
+The styleable placeholder an editor embed renders when its [attachment-id](#attachment-id) no longer resolves. Note bodies are **never** rewritten on deletion — the `![[att:<id>|filename]]` reference dangles intentionally and the resolver renders a tombstone, distinguishing a *deleted attachment* (id once existed, removed from the library) from a *broken reference* (id never existed). One shared component across the editor and the attachments library. Consistent with the no-auto-GC, explicit-delete-only attachment lifecycle. (MYND-164)
+
 ### **deliberate folder** &nbsp; 📦 *Product*
 
 A folder the user explicitly created that persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). The set is *cold* — written only on explicit folder create / delete, never on note move — and merges as a union (add-wins) under Phase 2 sync. A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2). See also [folder](#folder), [item order](#item-order).
@@ -482,6 +502,10 @@ Used in: `spec/markdown-dialect.md` §3.7, §6 C1
 Adversary class A11: a Myne team member acting maliciously. The architecture grants the team no privileged read access — keys never leave the client. The single privileged asset is the code-signing key (TB8); compromise reduces to A9 (compromised distribution).
 
 Used in: `threat-model.md` §1 (A11)
+
+### **import-&-convert** &nbsp; 📦 *Product*
+
+The explicit, byte-change-visible command that turns an imported filename-only image reference (`![[image.png]]`, `![alt](path)`) into a real vault [attachment](#attachment): it resolves the source file (auto-resolve, picker fallback), imports it via [attachment_import](#attachment_import), mints the [attachment-id](#attachment-id), and rewrites the reference to the form-C embed `![[att:<id>|filename]]` — with a mandatory diff-preview before commit (parallel to the wikilink R2 conversion command, `spec/wikilink.md` §189). No silent name-match; without invoking it, imported references stay an unrendered chip (byte-preservation, `spec/markdown-dialect.md` C1). (MYND-164)
 
 ### **isolated note** &nbsp; 📦 *Product*
 
@@ -680,6 +704,14 @@ Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-05-07 "User-mea
 The literal string `"myne.v0.1 "` (with trailing space) used as the prefix for HKDF context strings in §3.2 of the protocol. Distinct from the AAD prefix `"myne.v0.1|"` (with trailing pipe, no space) used in AAD construction in §5.2. The two prefixes are deliberately non-identical because they live in different cryptographic call sites — context strings feed `info` to HKDF-Expand, while AAD bytes feed Poly1305 MAC and the CTX outer hash. Mistakenly using one for the other is a protocol violation. v005 strings will use `"myne.v005 "` and `"myne.v005|"` respectively.
 
 Used in: `spec/protocol.md` §3.2, §5.2, §10.3
+
+### **MYA1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying a v0.1 [attachment](#attachment) blob (`spec/protocol.md` §9.9). Part of the v0.1 magic family; registered in §10.3's magic-allocation table with its v005-reserved sibling `MYA5`. An `MYA1` blob reuses the `.myn` three-level wrap (per-attachment key under `itemsKey`), single-shot AEAD, 64 MiB cap. Implementations MUST reject any candidate attachment blob whose first four bytes are not `MYA1`.
+
+### **MYC1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying the v0.1 [`vault.attachments`](#vaultattachments) catalog blob (`spec/protocol.md` §9.10), the authoritative per-attachment metadata store. A `MYP1`-style 34-byte envelope over canonical JSON; KEK `DeriveSubkey(root_key, "attachments-catalog-key")`. Registered in §10.3 with its v005-reserved sibling `MYC5`. The "C" is for *catalog* — chosen after the initial `MYI1` proposal collided with the already-reserved VaultIndices magic (`decisions.md` 2026-06-07).
 
 ### **MYP1** &nbsp; 📋 *Protocol*
 
@@ -1068,6 +1100,10 @@ Used in: `spec/protocol.md` §9.3
 Vault-level singleton encrypted blob holding user-configurable preferences (Phase 1: the screen-capture-protection toggle from MYND-55/MYND-160). Magic bytes `MYP1` for v0.1. Lives at `<app_data_dir>/vault/vault.prefs` next to `vault.meta`. Outer envelope is a 34-byte fixed-offset header followed by AEAD-wrapped canonical JSON plaintext under `prefs_key`; layout + AAD construction + canonical encoding rules + size cap + migration-less semantic in `spec/protocol.md` §9.5. Written eagerly at `vault_create` (closed invariant: post-MYND-160 vaults always have `vault.prefs` on disk) and lazily re-read by every `prefs_read` IPC call (disk is canonical; not cached in `Slot::Unlocked`). Read failure (absent / truncated / AEAD-fail / parse-fail) returns `PrefsView::default()` per the §9.5.5 non-distinguishing semantic.
 
 Used in: `spec/protocol.md` §9.5; `decisions.md` 2026-05-27 "Vault preferences blob"
+
+### **vault.attachments** &nbsp; 📦 *Product*
+
+The vault-level singleton catalog ([`MYC1`](#myc1) blob, `spec/protocol.md` §9.10) holding **authoritative** per-[attachment](#attachment) metadata — `id → {content_type, created_at, filename, size}` — so the attachments library can display an attachment even when no note references it (the filename survives note deletion; the in-note alias is a cosmetic copy). AEAD-encrypted under a `root_key`-derived KEK (`"myne.v0.1 attachments-catalog-key"`); canonical-JSON inner; fall-back-to-empty on absent/tampered; eager-written at vault creation. The note→attachment reference graph ("used in N notes") is **not** stored here — it is derived from note bodies at runtime via the `content_nonce` reconcile (the [search index](#search-index) MYND-29 pattern), kept in RAM and rebuilt on demand. (MYND-164)
 
 ### **vault.search** &nbsp; 📦 *Product*
 

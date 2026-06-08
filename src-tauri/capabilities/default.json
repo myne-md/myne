@@ -23,10 +23,12 @@
     "notes:default",
     "snapshots:default",
     "vault-indices:default",
+    "attachments:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-clear",
     "dialog:allow-save",
+    "dialog:allow-open",
     "dialog:allow-confirm",
     {
       "identifier": "fs:allow-write-text-file",

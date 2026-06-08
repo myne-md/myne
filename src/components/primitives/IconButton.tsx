@@ -16,6 +16,8 @@ interface IconButtonProps {
   onClick: () => void;
   /** Icon glyph size (px). Default 16. */
   iconSize?: number;
+  /** Dim + disable the button (no hover, no click). Default false. */
+  disabled?: boolean;
 }
 
 const ICON_BUTTON_STYLE: CSSProperties = {
@@ -32,16 +34,26 @@ const ICON_BUTTON_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
-export function IconButton({ icon, label, onClick, iconSize = 16 }: IconButtonProps) {
+export function IconButton({
+  icon,
+  label,
+  onClick,
+  iconSize = 16,
+  disabled = false,
+}: IconButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      style={ICON_BUTTON_STYLE}
+      disabled={disabled}
+      style={{
+        ...ICON_BUTTON_STYLE,
+        ...(disabled ? { cursor: "not-allowed", opacity: 0.4 } : null),
+      }}
       aria-label={label}
       title={label}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--paper-3)";
+        if (!disabled) e.currentTarget.style.background = "var(--paper-3)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";

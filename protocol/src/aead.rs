@@ -85,11 +85,15 @@ const POLY1305_TAG_LEN: usize = 16;
 
 /// AAD prefix bound into every Myne v0.1 AEAD tag
 /// (`docs/spec/protocol.md` § 5.2). 10 ASCII bytes ending in pipe `|`.
-const AAD_PREFIX_V0_1: &[u8] = b"myne.v0.1|";
+/// `pub(crate)` so the attachment blob + catalog AAD builders bind the SAME
+/// load-bearing prefix (a major-version constant) from one definition site
+/// rather than re-declaring it.
+pub(crate) const AAD_PREFIX_V0_1: &[u8] = b"myne.v0.1|";
 
 /// `protocol_version` byte bound into every wrap AAD
-/// (spec § 9.3 offset 4 = `0x01` for v0.1).
-const PROTOCOL_VERSION_V0_1: u8 = 0x01;
+/// (spec § 9.3 offset 4 = `0x01` for v0.1). `pub(crate)` for the same
+/// single-source reason as [`AAD_PREFIX_V0_1`].
+pub(crate) const PROTOCOL_VERSION_V0_1: u8 = 0x01;
 
 /// Registered role string for the password-derived wrap AAD
 /// (spec § 3.1).

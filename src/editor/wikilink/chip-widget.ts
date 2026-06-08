@@ -35,6 +35,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
+import { parseAttachmentTarget } from "../../notes/attachmentRef";
 
 export type WikilinkParts = {
   isEmbed: boolean;
@@ -72,6 +73,23 @@ export function parseWikilinkParts(
     },
   });
   return result;
+}
+
+/**
+ * True iff a parsed wikilink is a form-C ATTACHMENT embed (`![[att:<id>|…]]`).
+ * Those are rendered by `decorations/attachment-embed.ts` as an inline image /
+ * PDF / tombstone, NOT by the text-chip widget here — so every walk in this
+ * module skips them to avoid a double decoration on the same range. A malformed
+ * `att:` target (not a valid id) is NOT an attachment embed; it falls through to
+ * the ordinary embed chip (plain `Embed: att:…` text), which is the intended
+ * broken-reference degradation.
+ */
+function isAttachmentEmbed(parts: WikilinkParts): boolean {
+  return (
+    parts.isEmbed &&
+    parts.target !== null &&
+    parseAttachmentTarget(parts.target) !== null
+  );
 }
 
 export function chipDisplayText(parts: WikilinkParts): string {
@@ -120,6 +138,8 @@ function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<
       enter: (node) => {
         if (node.name !== "Wikilink") return undefined;
         const parts = parseWikilinkParts(state, node.from, node.to);
+        // Form-C attachment embeds are rendered by attachment-embed.ts.
+        if (isAttachmentEmbed(parts)) return false;
         const display = chipDisplayText(parts);
         decorations.push(
           Decoration.replace({
@@ -155,7 +175,10 @@ function cachedWikilinkAtomicRanges(view: EditorView) {
     to: view.state.doc.length,
     enter: (node) => {
       if (node.name === "Wikilink") {
-        ranges.push(Decoration.replace({}).range(node.from, node.to));
+        // Attachment embeds register their own atomic range in attachment-embed.ts.
+        if (!isAttachmentEmbed(parseWikilinkParts(view.state, node.from, node.to))) {
+          ranges.push(Decoration.replace({}).range(node.from, node.to));
+        }
         return false;
       }
       return undefined;
@@ -207,7 +230,9 @@ export function wikilinkAtomicRanges(state: EditorState): RangeSet<Decoration> {
     to: state.doc.length,
     enter: (node) => {
       if (node.name === "Wikilink") {
-        ranges.push(Decoration.replace({}).range(node.from, node.to));
+        if (!isAttachmentEmbed(parseWikilinkParts(state, node.from, node.to))) {
+          ranges.push(Decoration.replace({}).range(node.from, node.to));
+        }
         return false;
       }
       return undefined;

@@ -47,6 +47,8 @@ import {
   useFolderManagement,
   type FolderManagement,
 } from "./useFolderManagement";
+import { Icon } from "../../components/primitives/Icon";
+import { useCenterView } from "../../screens/centerView";
 
 /**
  * Compute the adjacent note to select after deleting `victimId` from
@@ -288,9 +290,15 @@ const SIDEBAR_OUTER_STYLE: CSSProperties = {
   minHeight: 0,
 };
 
-// Trash entry — sidebar footer, pinned to the bottom (MYND-133).
-const TRASH_ENTRY_STYLE: CSSProperties = {
+// Sidebar footer wrapper — pins the nav entries (Attachments + Trash) to
+// the bottom of the sidebar (MYND-133 / MYND-170).
+const FOOTER_WRAP_STYLE: CSSProperties = {
   marginTop: "auto",
+  flexShrink: 0,
+};
+
+// Footer nav entry — full-width row with a leading icon (MYND-133 / MYND-170).
+const FOOTER_ENTRY_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
@@ -385,6 +393,17 @@ interface NoteListProps {
 
 export function NoteList({ onCollapse, onNewFromTemplate }: NoteListProps = {}) {
   const ctx = useSelectedNote();
+  // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
+  // pane to the editor — covers the Enter-on-already-selected edge the
+  // `selectedId` effect can't see. No-op outside the Editor provider.
+  const { setView } = useCenterView();
+  const openNote = useCallback(
+    (id: NoteId): Promise<unknown> => {
+      setView("editor");
+      return ctx.open(id);
+    },
+    [ctx, setView],
+  );
   // Folder-management state + handlers (deliberate_folders set, context menu,
   // create / rename / delete / drag-drop). Owns the deliberate set.
   const fm = useFolderManagement(ctx);
@@ -471,11 +490,11 @@ export function NoteList({ onCollapse, onNewFromTemplate }: NoteListProps = {}) 
       selectedId: ctx.selectedId,
       renamingId: ctx.renamingId,
       select: ctx.select,
-      open: ctx.open,
+      open: openNote,
     });
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [navIds, ctx]);
+  }, [navIds, ctx, openNote]);
 
   const handleCreate = useCallback(() => {
     void ctx.createAndStartRename().catch((err) => {
@@ -510,17 +529,21 @@ export function NoteList({ onCollapse, onNewFromTemplate }: NoteListProps = {}) 
           onNewFromTemplate={onNewFromTemplate}
         />
       )}
-      <button
-        type="button"
-        style={TRASH_ENTRY_STYLE}
-        onClick={() => setTrashOpen(true)}
-        title="Open the trash"
-      >
-        <span>Trash</span>
-        {trashCount > 0 && (
-          <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
-        )}
-      </button>
+      <div style={FOOTER_WRAP_STYLE}>
+        <AttachmentsNavEntry />
+        <button
+          type="button"
+          style={FOOTER_ENTRY_STYLE}
+          onClick={() => setTrashOpen(true)}
+          title="Open the trash"
+        >
+          <Icon name="trash-2" size={15} />
+          <span>Trash</span>
+          {trashCount > 0 && (
+            <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
+          )}
+        </button>
+      </div>
       <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
     </aside>
   );
@@ -605,6 +628,27 @@ function PopulatedList({
   onNewFromTemplate?: () => void;
 }) {
   const ctx = useSelectedNote();
+  // SYNC-9 exclusive active-state (MYND-164): opening a note from the sidebar
+  // returns the center pane to the editor. The `selectedId`-keyed effect in
+  // Editor.tsx covers note-to-note switches; this explicit reset also handles
+  // re-clicking the ALREADY-selected note while the Attachments view is open
+  // (no `selectedId` change → that effect wouldn't fire). No-op fallback
+  // outside the Editor provider, so isolated NoteList renders stay inert.
+  const { view, setView } = useCenterView();
+  const openNote = useCallback(
+    (id: NoteId) => {
+      setView("editor");
+      return ctx.open(id);
+    },
+    [ctx, setView],
+  );
+  // SYNC-9 exclusive active-state (MYND-164 Fix 1): while the Attachments view
+  // owns the center pane, NO sidebar note row renders its selected highlight —
+  // the Attachments footer entry is the sole active surface. The selection is
+  // preserved in `ctx.selectedId` (so returning to the editor restores it); it
+  // just isn't *shown* as active here. Exactly one of {a note, Attachments} is
+  // highlighted at any time.
+  const noteHighlightActive = view !== "attachments";
   const [menu, setMenu] = useState<ContextMenuState>(null);
   // Undo-toast target: the id of the note just moved to the trash. "Undo"
   // restores it (MYND-133). Replaced when another note is trashed.
@@ -654,10 +698,10 @@ function PopulatedList({
     (record: TitleRecord, id: NoteId, favorited: boolean) => (
       <NoteRow
         record={record}
-        selected={ctx.selectedId === id}
+        selected={noteHighlightActive && ctx.selectedId === id}
         renaming={ctx.renamingId === id}
         onSelect={(noteId) => {
-          void ctx.open(noteId).catch(() => {
+          void openNote(noteId).catch(() => {
             /* T30 wires editor body load; ignore here */
           });
         }}
@@ -672,7 +716,7 @@ function PopulatedList({
         colorSlot={fm.itemColors[id]}
       />
     ),
-    [ctx, handleContextMenu, fm.toggleFavorite, fm.itemColors],
+    [ctx, openNote, handleContextMenu, fm.toggleFavorite, noteHighlightActive, fm.itemColors],
   );
 
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -1127,6 +1171,35 @@ function PopulatedList({
       />
       <Toast message={trashError} onDone={() => setTrashError(null)} />
     </div>
+  );
+}
+
+/**
+ * Sidebar footer nav entry that opens the attachments library (MYND-170,
+ * SYNC-9). The library is a full-pane center-pane view, not a Stage; this
+ * entry highlights when that view is active. `useCenterView` returns a
+ * no-op fallback outside the Editor's provider, so this row is inert in any
+ * isolated NoteList render (tests) rather than crashing.
+ */
+function AttachmentsNavEntry() {
+  const { view, setView } = useCenterView();
+  const active = view === "attachments";
+  return (
+    <button
+      type="button"
+      style={{
+        ...FOOTER_ENTRY_STYLE,
+        color: active ? "var(--fg-1)" : "var(--fg-2)",
+        background: active ? "var(--paper-3)" : "transparent",
+        fontWeight: active ? 600 : 400,
+      }}
+      onClick={() => setView("attachments")}
+      title="Open attachments"
+      aria-current={active ? "page" : undefined}
+    >
+      <Icon name="paperclip" size={15} />
+      <span>Attachments</span>
+    </button>
   );
 }
 

@@ -43,8 +43,8 @@ Each asset is classified by sensitivity and by where it is visible (client only,
 | AS4 | Wikilinks / backlinks graph | Sensitive | Inside encrypted blob | Not visible. Graph is reconstructed client-side after decryption. |
 | AS5 | Tag list | Sensitive | Inside encrypted blob | Not visible. |
 | AS6 | User-meaningful timestamps (created_at, updated_at) | Sensitive | Inside encrypted blob | **Not visible.** Server uses an opaque per-note version counter that increments on each push — this is sync-internal state, not a user timestamp, and reveals only that *something* changed, not when. |
-| AS7 | Attachment content (images, PDFs) | Critical | Encrypted blob, separate from note | Ciphertext blob only |
-| AS8 | Attachment filename | Sensitive | Inside note's encrypted blob (referenced by attachment-id) | Not visible. Attachment blob size is visible (cannot avoid). |
+| AS7 | Attachment content (images, SVG, PDFs) | Critical | Encrypted attachment blob (`MYA1`, `protocol.md` §9.9), separate from notes; per-attachment key wrapped by `itemsKey` | Ciphertext blob only |
+| AS8 | Attachment filename | Sensitive | Authoritatively in the encrypted attachments catalog (`vault.attachments`, `MYC1`, `protocol.md` §9.10), referenced from notes by a `root_key`-keyed content-addressed attachment-id; the in-note alias is a cosmetic copy | Not visible. Attachment blob size is visible (cannot avoid) — v0.1 does not pad; size-indistinguishability is deferred (A13). |
 | AS9 | Account number (Mullvad-style identifier) | Pseudonymous | Server stores a hash; raw number is the user's bearer token | Hash only — raw value never persisted server-side after registration check |
 | AS10 | Master password | Critical secret | User's memory only | Never. Used only as Argon2id input on the client. |
 | AS11 | Recovery phrase (BIP39) | Critical secret | User's offline storage only (paper, password manager) | Never. Server has no representation of the phrase. |

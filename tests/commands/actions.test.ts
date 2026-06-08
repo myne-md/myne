@@ -25,6 +25,7 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onManageTemplates: vi.fn(),
     onNewNoteFromTemplate: vi.fn(),
     onOpenTodayNote: vi.fn(),
+    onOpenAttachments: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -40,6 +41,7 @@ describe("Command palette action registry", () => {
   it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190; snapshots.open MYND-97; graph.show MYND-198)", () => {
     expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
       "app.open-settings",
+      "attachments.open",
       "daily.open-today",
       "graph.show",
       "snapshots.open",
@@ -134,6 +136,17 @@ describe("Command palette action run() side effects", () => {
     const result = find("app.open-settings").run(ctx);
     expect(result).toBeUndefined();
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Open attachments…\" is SHOWN in editor + HIDDEN elsewhere, and calls onOpenAttachments", () => {
+    const onOpenAttachments = vi.fn();
+    const action = find("attachments.open");
+    expect(action.visibility(makeContext({ stageName: "editor" }))).toBe("show");
+    expect(action.visibility(makeContext({ stageName: "welcome" }))).toBe(
+      "hidden",
+    );
+    action.run(makeContext({ onOpenAttachments }));
+    expect(onOpenAttachments).toHaveBeenCalledTimes(1);
   });
 
   it("Disabled stubs are no-ops when run directly (defensive — palette UI guards them)", async () => {

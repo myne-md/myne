@@ -17,6 +17,7 @@ import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
 import { toggleWrap } from "../wrap-toggle";
 import { isSelectionInCode } from "../code-context";
+import { rangeOverlapsAttachmentEmbed } from "../decorations/attachment-embed";
 
 type Mode = "toolbar" | "url-overlay";
 
@@ -88,8 +89,13 @@ class ToolbarView implements PluginValue {
   private refresh(): void {
     const range = this.view.state.selection.main;
     // Suppress inside code (MYND-154): formatting a code selection would inject
-    // literal markdown markers into the source.
-    if ((range.empty || isSelectionInCode(this.view.state)) && !this.urlOverlayOpen) {
+    // literal markdown markers into the source. Also suppress when the
+    // selection touches an attachment embed — an image/PDF atom is not
+    // text-formattable, so the inline-mark toolbar must not appear over it.
+    const formattingNotApplicable =
+      isSelectionInCode(this.view.state) ||
+      rangeOverlapsAttachmentEmbed(this.view.state, range.from, range.to);
+    if ((range.empty || formattingNotApplicable) && !this.urlOverlayOpen) {
       this.dismiss();
       return;
     }

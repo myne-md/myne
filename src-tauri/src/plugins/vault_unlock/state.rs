@@ -383,6 +383,52 @@ impl VaultRuntimeState {
         }
     }
 
+    /// Read-lock peek that returns a CLONE of just the `root_key` from
+    /// [`Slot::Unlocked`], or `None` if the slot is `Empty` or
+    /// `Recovering`. The cloned `Zeroizing<[u8; 32]>` wipes on drop; the
+    /// slot's original copy stays in place.
+    ///
+    /// Used by the `attachments` plugin's read/delete paths (MYND-169) —
+    /// they need only `root_key` to derive the catalog KEK
+    /// (`AttachmentsCatalogKey`) + the id-HMAC subkey, not the
+    /// `items_key` or the CAS anchor. A narrower peek than
+    /// [`Self::peek_unlocked_root_key_and_hash_clone`] keeps the
+    /// borrowed surface minimal at each call site.
+    pub async fn peek_unlocked_root_key_clone(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
+        match &*self.slot.read().await {
+            Slot::Unlocked(uv) => Some(Zeroizing::new(*uv.root_key)),
+            Slot::Empty | Slot::Recovering { .. } => None,
+        }
+    }
+
+    /// Read-lock peek that returns CLONES of `(items_key, items_key_id,
+    /// root_key)` from [`Slot::Unlocked`], or `None` if the slot is
+    /// `Empty` or `Recovering`. The two `Zeroizing<[u8; 32]>` clones wipe
+    /// on drop; `items_key_id` is non-secret (the singleton UUIDv7).
+    ///
+    /// Used by `attachments::attachment_import` (MYND-169) — the import
+    /// path needs `items_key` to wrap the per-attachment key,
+    /// `items_key_id` for the blob header + AAD, and `root_key` for the
+    /// content-addressed id (`compute_attachment_id`) + the catalog KEK
+    /// (`AttachmentsCatalogKey`). One peek hands back all three so the
+    /// slot read-lock is acquired exactly once per import.
+    pub async fn peek_unlocked_attachment_material(
+        &self,
+    ) -> Option<(
+        Zeroizing<[u8; AEAD_KEY_LEN]>,
+        [u8; 16],
+        Zeroizing<[u8; AEAD_KEY_LEN]>,
+    )> {
+        match &*self.slot.read().await {
+            Slot::Unlocked(uv) => Some((
+                uv.items_key.clone(),
+                uv.items_key_id,
+                Zeroizing::new(*uv.root_key),
+            )),
+            Slot::Empty | Slot::Recovering { .. } => None,
+        }
+    }
+
     /// Atomically commit a `vault.meta` rewrite while holding the
     /// slot's write lock end-to-end: verify the slot is still
     /// [`Slot::Unlocked`] with `expected_hash`, run the `rewrite`

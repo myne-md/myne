@@ -150,6 +150,10 @@ pub async fn vault_delete<R: Runtime>(
         // MYND-31: wipe the plaintext-derived VaultIndices on the same
         // delete-proceeded path so it does not outlive the deleted vault.
         crate::plugins::vault_indices::zeroize_vault_indices(&app);
+        // MYND-169: wipe the plaintext-derived attachment reference graph
+        // on the same delete-proceeded path so it does not outlive the
+        // deleted vault.
+        crate::plugins::attachments::zeroize_attachment_refs(&app);
     }
     result
 }
@@ -966,6 +970,51 @@ mod tests {
             assert!(
                 !tmp.path().exists(),
                 "vault_dir must be removed recursively (full MYND-160 artefact set + dir itself)"
+            );
+        });
+    }
+
+    /// MYND-169: `vault_delete` removes `vault.attachments` + the
+    /// `attachments/` blob directory alongside the existing artefact set.
+    /// The recursive `vault_sweep::sweep` walker is artefact-agnostic by
+    /// design — this test pins the behaviour so a future refactor that
+    /// introduces a hard-coded artefact allow-list cannot silently orphan
+    /// the catalog or the blobs (the partner of the
+    /// `vault_artifacts_present_returns_true_when_vault_attachments_present`
+    /// guard test in the vault_creation suite).
+    #[test]
+    fn vault_delete_unlocked_removes_vault_attachments_and_blobs() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-attach").unwrap();
+            std::fs::write(tmp.path().join("vault.meta"), b"meta bytes").unwrap();
+            std::fs::write(tmp.path().join("vault.attachments"), b"catalog bytes").unwrap();
+            let attach = tmp.path().join("attachments");
+            std::fs::create_dir_all(&attach).unwrap();
+            std::fs::write(attach.join("deadbeefcafef00d"), b"blob bytes").unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(11, 22, 1),
+                )
+                .await;
+
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            assert!(
+                result.is_ok(),
+                "vault_delete must succeed with the MYND-169 artefact set; got {result:?}"
+            );
+            assert!(
+                !tmp.path().join("vault.attachments").exists(),
+                "vault.attachments must be removed by vault_delete"
+            );
+            assert!(
+                !attach.exists(),
+                "attachments/ dir + its blobs must be removed by vault_delete"
+            );
+            assert!(
+                !tmp.path().exists(),
+                "vault_dir must be removed recursively (full MYND-169 artefact set)"
             );
         });
     }

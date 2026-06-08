@@ -82,6 +82,18 @@ const openTodayNoteAction: CommandAction = {
   },
 };
 
+const openAttachmentsAction: CommandAction = {
+  id: "attachments.open",
+  label: "Open attachments…",
+  category: "Editor",
+  // Editor-only, like Open settings — the library is a full-pane center-pane
+  // view inside the Editor (SYNC-9), not a Stage. Free + local.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onOpenAttachments();
+  },
+};
+
 const convertWikilinksAction: CommandAction = {
   id: "wikilinks.convert-in-this-note",
   label: "Convert wikilinks in this note…",
@@ -131,6 +143,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   newNoteFromTemplateAction,
   openTodayNoteAction,
   manageTemplatesAction,
+  openAttachmentsAction,
   openSnapshotsAction,
   showGraphAction,
   importObsidianAction,

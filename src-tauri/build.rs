@@ -158,6 +158,25 @@ fn main() {
                     "vault_indices_by_tag",
                     "vault_indices_tag_tree",
                 ]),
+            )
+            .plugin(
+                "attachments",
+                // MYND-169 (attachments-crypto-pipeline) ships
+                // `attachment_import` (bytes/path import + dedup + 64 MiB
+                // cap + allowlist + Slot::Unlocked gate), `catalog_list`
+                // (library metadata read), and `attachment_delete`
+                // (explicit blob + catalog-entry removal). The
+                // `attachment://` URI scheme is NOT a command — it is
+                // registered on the Builder in `lib.rs`. Adding a command
+                // here without a matching `commands.allow` entry in
+                // `permissions/attachments/default.toml` is a security
+                // regression (the InlinedPlugin mirror is load-bearing per
+                // the `vault-creation` note above).
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "attachment_import",
+                    "catalog_list",
+                    "attachment_delete",
+                ]),
             ),
     )
     .unwrap();

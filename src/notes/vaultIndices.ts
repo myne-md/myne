@@ -18,6 +18,10 @@ import type {
 import { bumpIndexNonce } from "./indexNonce";
 import { noteRead } from "./readNote";
 import {
+  applyNoteAttachmentRefs,
+  removeNoteAttachmentRefs,
+} from "./attachmentRefs";
+import {
   liveIdSet,
   parseTarget,
   resolveWikilink,
@@ -207,6 +211,11 @@ export async function vaultIndicesOrphans(): Promise<string[]> {
 /** Remove a hard-deleted note from the index. Trash does NOT route here —
  *  a trashed note stays indexed and is filtered TS-side via `isTrashed`. */
 export async function vaultIndicesRemove(noteId: string): Promise<void> {
+  // MYND-169 SYNC-6: drop the note from the attachment reference graph in
+  // lockstep with the VaultIndices removal (hard-delete / empty-trash).
+  // Best-effort + independent (its own try/catch) so a reconcile hiccup
+  // never blocks the VaultIndices removal.
+  void removeNoteAttachmentRefs(noteId);
   await invoke<void>("plugin:vault-indices|vault_indices_remove", { noteId });
   bumpIndexNonce(); // SYNC-5: chokepoint bump, after the slice updated.
 }
@@ -252,6 +261,13 @@ export async function reindexNoteFromBody(
   } catch {
     // Best-effort — self-healed by a later apply / the next reconcile.
   }
+  // MYND-169 SYNC-6: in lockstep with the VaultIndices reindex above, push
+  // the note's attachment references (form-C `![[att:<id>|…]]` embeds) to the
+  // attachment reference graph. Independent best-effort — its own
+  // try/catch lives in `applyNoteAttachmentRefs`, so a reconcile hiccup
+  // never affects the VaultIndices apply (or vice-versa). Self-heals on the
+  // next rebuild-on-unlock sweep.
+  void applyNoteAttachmentRefs(noteId, body);
 }
 
 /** Re-index a single note by reading + parsing its body (for lifecycle

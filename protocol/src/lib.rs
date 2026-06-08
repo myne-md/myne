@@ -41,6 +41,8 @@ pub const MAX_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 
 pub mod account_number;
 pub mod aead;
+pub mod attachment_blob;
+pub mod attachments_catalog;
 pub mod blob;
 pub mod error;
 pub mod kdf;
@@ -61,6 +63,18 @@ pub use aead::{
     aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
     aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap, aead_open_ctx,
     aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+};
+pub use attachment_blob::{
+    aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id, decode_attachment_blob,
+    encode_attachment_blob, encode_attachment_blob_raw, AttachmentBlobError, ATTACHMENT_BLOB_MAGIC,
+    ATTACHMENT_BLOB_PROTOCOL_VERSION, ATTACHMENT_BLOB_RESERVED, ATTACHMENT_ID_LEN,
+    MAX_ATTACHMENT_LEN,
+};
+pub use attachments_catalog::{
+    aad_attachments_catalog, decode_attachments_catalog, encode_attachments_catalog,
+    encode_attachments_catalog_raw, read_or_empty, AttachmentMeta, AttachmentsCatalog,
+    CatalogBlobError, CATALOG_BLOB_ACCOUNT_HASH_LEN, CATALOG_BLOB_HEADER_LEN, CATALOG_BLOB_MAGIC,
+    CATALOG_BLOB_PROTOCOL_VERSION, CATALOG_BLOB_RESERVED, MAX_CATALOG_PLAINTEXT_LEN,
 };
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,

@@ -327,11 +327,36 @@ pub(crate) fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool>
     if vault_dir.join("vault.prefs.tmp").is_file() {
         return Ok(true);
     }
+    // MYND-169: `vault.attachments` (spec § 9.10, MYC1) is the v0.1
+    // attachments-catalog blob. Recognized the same way `vault.prefs` is —
+    // a stale catalog left by a partial-fail `vault_delete` was encrypted
+    // under a prior `root_key` and would AEAD-fail (silently fall back to
+    // empty) under a fresh vault's catalog KEK, defeating the
+    // closed-invariant intent of the eager-write at vault_create.
+    if vault_dir.join("vault.attachments").is_file() {
+        return Ok(true);
+    }
+    if vault_dir.join("vault.attachments.tmp").is_file() {
+        return Ok(true);
+    }
     let notes = vault_dir.join("notes");
     if notes.is_dir() {
         for entry in std::fs::read_dir(&notes)? {
             let entry = entry?;
             if entry.path().extension().is_some_and(|e| e == "myn") {
+                return Ok(true);
+            }
+        }
+    }
+    // MYND-169: orphan attachment blobs under `attachments/` (any regular
+    // file) — partial-fail `vault_delete` leftovers, same class as orphan
+    // `notes/*.myn`. The blobs are content-addressed hex filenames (no
+    // extension), so recognize ANY regular file in the directory.
+    let attachments = vault_dir.join("attachments");
+    if attachments.is_dir() {
+        for entry in std::fs::read_dir(&attachments)? {
+            let entry = entry?;
+            if entry.path().is_file() {
                 return Ok(true);
             }
         }
@@ -483,6 +508,51 @@ pub(crate) async fn commit_with_vault_path(
                         Err(_e) => tracing::warn!(
                             event = "vault_prefs_eager_encode_failed",
                             "vault.prefs encode failed during eager-write; vault remains usable via spec § 9.5.5 absence-fallback",
+                        ),
+                    }
+
+                    // MYND-169: eager-write the empty MYC1 attachments
+                    // catalog so every fresh vault carries the closed
+                    // invariant "vault.attachments exists immediately after
+                    // vault_create completes" — mirrors the vault.prefs
+                    // eager-write above. The catalog KEK derives from
+                    // root_key (`AttachmentsCatalogKey`), bound to the
+                    // account_number_hash AAD. Same partial-fail posture as
+                    // vault.prefs: if this write fails the next catalog read
+                    // falls back to empty per spec § 9.10.4 (read_or_empty),
+                    // so the vault stays usable — no rollback of vault.meta.
+                    let catalog_key = protocol::derive_subkey(
+                        &session.root_key,
+                        protocol::SubkeyRole::AttachmentsCatalogKey,
+                    );
+                    let catalog_path = vault_path
+                        .parent()
+                        .expect("vault_path has a parent (vault dir)")
+                        .join("vault.attachments");
+                    match protocol::encode_attachments_catalog(
+                        &catalog_key,
+                        &session.account.hash,
+                        &protocol::AttachmentsCatalog::empty(),
+                    ) {
+                        Ok(catalog_bytes) => match crate::atomic_write::atomic_write(
+                            &catalog_path,
+                            &catalog_bytes,
+                            false,
+                        ) {
+                            Ok(()) => tracing::info!(
+                                event = "vault_attachments_eager_written",
+                                "vault.attachments eager-write succeeded with empty catalog"
+                            ),
+                            Err(e) => tracing::warn!(
+                                event = "vault_attachments_eager_write_failed",
+                                io_failure_kind =
+                                    ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                                "vault.meta written but vault.attachments eager-write failed; vault remains usable via spec § 9.10.4 absence-fallback",
+                            ),
+                        },
+                        Err(_e) => tracing::warn!(
+                            event = "vault_attachments_eager_encode_failed",
+                            "vault.attachments encode failed during eager-write; vault remains usable via spec § 9.10.4 absence-fallback",
                         ),
                     }
                     Ok(())
@@ -1101,7 +1171,95 @@ mod tests {
                 scratch.dir.join("vault.prefs").exists(),
                 "vault.prefs must exist after commit happy-path (MYND-160 eager-write)"
             );
+            // MYND-169 closed invariant: vault.attachments is on disk too.
+            assert!(
+                scratch.dir.join("vault.attachments").exists(),
+                "vault.attachments must exist after commit happy-path (MYND-169 eager-write)"
+            );
         });
+    }
+
+    /// MYND-169: the eager-written `vault.attachments` decrypts under the
+    /// vault's own `root_key`-derived catalog KEK and the plaintext is the
+    /// empty catalog (the documented base case for a fresh vault).
+    #[test]
+    fn commit_eager_written_vault_attachments_decrypts_to_empty() {
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let state = VaultCreationState::default();
+            let token = Uuid::new_v4();
+            let session = build_session("commit-test-pw", FAST_TEST_KDF).expect("build_session");
+            let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
+            let original_account_hash = session.account.hash;
+            state
+                .try_insert(token, session)
+                .expect("scratch state has room");
+
+            commit_with_vault_path(token, scratch.path().to_path_buf(), &state)
+                .await
+                .expect("commit happy-path");
+
+            let catalog_bytes = std::fs::read(scratch.dir.join("vault.attachments"))
+                .expect("vault.attachments must exist after eager-write");
+            let catalog_key = protocol::derive_subkey(
+                &original_root_key,
+                protocol::SubkeyRole::AttachmentsCatalogKey,
+            );
+            let catalog = protocol::decode_attachments_catalog(
+                &catalog_key,
+                &original_account_hash,
+                &catalog_bytes,
+            )
+            .expect("eager-written vault.attachments must decrypt under the vault's own root_key");
+            assert_eq!(
+                catalog,
+                protocol::AttachmentsCatalog::empty(),
+                "eager-written catalog must equal the empty catalog"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_vault_attachments_present() {
+        // MYND-169 extension: `vault.attachments` (spec § 9.10) is a v0.1
+        // vault artefact. A stale catalog left by a prior partial-fail
+        // `vault_delete` must gate a fresh `vault_create` the same way
+        // `vault.meta` / `vault.prefs` do.
+        let tmp = crate::test_support::ScopedTempDir::new("vap-attach").expect("scoped tempdir");
+        std::fs::write(tmp.path().join("vault.attachments"), b"stale catalog bytes")
+            .expect("seed vault.attachments");
+        assert!(
+            vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "vault.attachments is a recognized v0.1 vault artefact (spec § 9.10)"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_true_when_orphan_attachment_blob_present() {
+        // MYND-169: an orphan attachment blob under attachments/ (a
+        // content-addressed hex filename, no extension) from a partial-fail
+        // vault_delete must gate a fresh vault_create — same class as an
+        // orphan notes/*.myn.
+        let tmp =
+            crate::test_support::ScopedTempDir::new("vap-attach-blob").expect("scoped tempdir");
+        let attach = tmp.path().join("attachments");
+        std::fs::create_dir_all(&attach).expect("mkdir attachments/");
+        std::fs::write(attach.join("aabbccdd"), b"orphan blob bytes").expect("seed orphan blob");
+        assert!(
+            vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "an orphan attachment blob is a recognized artefact"
+        );
+    }
+
+    #[test]
+    fn vault_artifacts_present_returns_false_when_attachments_dir_empty() {
+        let tmp =
+            crate::test_support::ScopedTempDir::new("vap-attach-empty").expect("scoped tempdir");
+        std::fs::create_dir_all(tmp.path().join("attachments")).expect("mkdir attachments/");
+        assert!(
+            !vault_artifacts_present(tmp.path()).expect("scan ok"),
+            "an empty attachments/ dir is not a recognized artefact"
+        );
     }
 
     /// MYND-160 Task 12: the eager-written `vault.prefs` decrypts under
