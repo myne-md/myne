@@ -49,6 +49,7 @@ import {
 } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { cachedLocateFrontmatter } from "./frontmatter-cache";
+import { rangeOverlapsAttachmentEmbed } from "./decorations/attachment-embed";
 
 const BOLD_MARKER = "**";
 
@@ -173,6 +174,10 @@ export function toggleWrap(open: string, close: string): StateCommand {
       if (isPositionInsideNode(tree, r.from, "FencedCode")) return true;
       if (isPositionInsideNode(tree, r.from, "CodeBlock")) return true;
       if (selectionPartiallyOverlapsNode(tree, r.from, r.to, "URL")) return true;
+      // Attachment embeds are atomic widgets (image / PDF) — you cannot apply
+      // inline emphasis to one. Wrapping the raw `![[att:…]]` source in `**`/`*`
+      // is meaningless, so refuse the toggle when the selection touches an embed.
+      if (rangeOverlapsAttachmentEmbed(state, r.from, r.to)) return true;
       if (
         fmRange !== null &&
         r.from >= fmRange.bodyStart &&

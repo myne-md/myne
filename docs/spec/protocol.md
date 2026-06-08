@@ -218,6 +218,8 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 backup-key"` | Local-encrypted backup file derivation root | Active when user exports a backup. |
 | `"myne.v0.1 prefs-key"` | KEK for `vault.prefs` blob (§9.5) | Active when `vault.prefs` is written. |
 | `"myne.v0.1 search-index-key"` | KEK for `vault.search` blob (§9.6) | Active when `vault.search` is written (MYND-29). |
+| `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
+| `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
 | (future v005 contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
@@ -345,6 +347,15 @@ AAD_encrypt_content =
 
 AAD_prefs_blob =
   AAD_prefix || protocol_version (1 B) || "prefs-blob" || account_number_hash (16 B)
+
+AAD_wrap_attachment_key =
+  AAD_prefix || protocol_version (1 B) || items_key_id (16 B) || attachment_id (32 B)
+
+AAD_encrypt_attachment =
+  AAD_prefix || protocol_version (1 B) || items_key_id (16 B) || attachment_id (32 B) || content_type
+
+AAD_attachments_catalog =
+  AAD_prefix || protocol_version (1 B) || "attachments-catalog" || account_number_hash (16 B)
 ```
 
 `AAD_wrap_items_key` is the AAD bound into the AEAD wrap of the singleton v0.1 `itemsKey` (`vault.meta` §9.3 offset 281). It is distinct from `AAD_wrap_item_key`, which binds the per-note `item_key` wrap and additionally carries the per-note UUID. The singleton `itemsKey` has no per-note UUID, so the AAD reduces accordingly.
@@ -352,6 +363,10 @@ AAD_prefs_blob =
 `AAD_prefs_blob` is the AAD bound into the AEAD wrap of `vault.prefs` (§9.5). The `"prefs-blob"` role string is length-prefixed UTF-8 (2-B big-endian length + 10 ASCII bytes); `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6) and binds the prefs blob to its specific vault. `items_key_id` is **not** bound — `vault.prefs` is independent of the `itemsKey` lineage because its KEK derives directly from `root_key` via `"myne.v0.1 prefs-key"` (§3.4), which preserves prefs portability across the v005 epoch-rotation `itemsKey` evolution.
 
 `AAD_search_index_blob` is the AAD bound into the AEAD wrap of `vault.search` (§9.6), the encrypted search-index blob. It mirrors `AAD_prefs_blob` exactly, with the role string `"search-index-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the index blob to its specific vault. As with prefs, `items_key_id` is **not** bound: the search-index KEK derives directly from `root_key` via `"myne.v0.1 search-index-key"` (§3.4), independent of the `itemsKey` lineage.
+
+`AAD_wrap_attachment_key` and `AAD_encrypt_attachment` are the two AADs of an attachment blob (`MYA1`, §9.9). They follow the `.myn` lineage pattern exactly: the attachment blob is wrapped under the vault `itemsKey`, so — unlike the `root_key`-derived prefs/search/catalog blobs — its AADs bind `items_key_id` (not `account_number_hash`), with the 32-byte `attachment_id` taking the structural place of `note_uuid` in `AAD_wrap_item_key` / `AAD_encrypt_content`. Binding `attachment_id` prevents substituting one attachment's blob for another within the same vault; `content_type` (the attachment's actual MIME, length-prefixed UTF-8) is bound into `AAD_encrypt_attachment` so a blob cannot be reinterpreted as a different content type at the AEAD layer.
+
+`AAD_attachments_catalog` is the AAD bound into the AEAD wrap of `vault.attachments` (`MYC1`, §9.10). It mirrors `AAD_prefs_blob`, with the role string `"attachments-catalog"` (length-prefixed UTF-8: 2-B big-endian length + 19 ASCII bytes) and the 16-byte `account_number_hash` binding the catalog to its vault. As with prefs and search, `items_key_id` is **not** bound: the catalog KEK derives directly from `root_key` via `"myne.v0.1 attachments-catalog-key"` (§3.4), independent of the `itemsKey` lineage.
 
 **Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
 
@@ -592,7 +607,8 @@ A Myne vault is a directory on the user's filesystem containing:
 ├── snapshots/            ← encrypted per-note version history (MYND-96)
 │   ├── 0184a2b3-...__0184c1d2-...myn
 │   └── ...
-└── attachments/          ← reserved; out of scope for v0.1 (§11)
+└── attachments/          ← encrypted attachment blobs (MYA1, §9.9), one per
+                             <attachment-id-hex>; catalog is vault.attachments (MYC1, §9.10)
 ```
 
 - File extension `.myn` (Myne Note) for per-note ciphertext blobs.
@@ -639,7 +655,7 @@ Offset  Size       Field                Description
 
 The two AEAD operations (wrapping `item_key`, encrypting note content) use independent random nonces drawn from the OS CSPRNG. XChaCha20-Poly1305's 192-bit nonce makes random-nonce collisions negligible across any realistic usage.
 
-Implementations SHOULD reject `ciphertext_len > 16 MiB + 32`. Larger payloads belong to the Phase 1.5+ attachment subsystem (§11). The cap exists to bound the parser's pre-AEAD allocation footprint — `ciphertext_len` is read and acted upon before any tag verification can run, so a hostile blob with a 4 GiB advertised length would otherwise force an unrecoverable allocation attempt before authenticity is established. See `design-notes.md` 2026-05-06 entry for the full rationale.
+Implementations SHOULD reject `ciphertext_len > 16 MiB + 32`. This is the **per-note** cap; arbitrary files (images, SVG, PDF) are not stored in `.myn` blobs but in the attachment subsystem (§9.9, 64 MiB per-blob cap), which **ships in v0.1**. The cap exists to bound the parser's pre-AEAD allocation footprint — `ciphertext_len` is read and acted upon before any tag verification can run, so a hostile blob with a 4 GiB advertised length would otherwise force an unrecoverable allocation attempt before authenticity is established. See `design-notes.md` 2026-05-06 entry for the full rationale.
 
 ### 9.3 Vault metadata (`vault.meta`)
 
@@ -888,6 +904,107 @@ AAD_search_index_blob =
 
 **At-rest leakage.** The blob's size leaks a coarse signal about indexed vocabulary / total volume, analogous to the `.myn`-count leak — accepted for v0.1 ([`../threat-model.md`](../threat-model.md) A5 / §7).
 
+### 9.9 Attachment blob (`MYA1`)
+
+An attachment blob holds one arbitrary file (image, SVG, PDF) as encrypted bytes, stored under `<vault-root>/attachments/<attachment-id-hex>` (§9.1). Attachments ship in v0.1 (this supersedes the earlier Phase-1.5 deferral; `decisions.md`). The blob reuses the `.myn` three-level wrapping pattern (§9.2): a per-attachment random `attachment_key` is wrapped under the vault `itemsKey`, and the file bytes are encrypted under `attachment_key`. Because the key lineage is `itemsKey → attachment_key`, an attachment blob is **independent of any single note** — a deduplicated attachment referenced by many notes has exactly one blob and one key.
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                  Description
+------  ---------  ---------------------  ---------------------------------------
+0       4 bytes    magic                  ASCII "MYA1"
+4       1 byte     protocol_version       0x01 for this specification
+5       1 byte     reserved               MUST be 0x00; non-zero rejects parse
+6       16 bytes   items_key_id           Identifier of the itemsKey under which
+                                          enc_attachment_key is wrapped (UUIDv7,
+                                          recorded in vault.meta; v005 epoch id).
+22      24 bytes   attachment_key_nonce   192-bit random nonce wrapping
+                                          attachment_key under itemsKey.
+46      2 bytes    enc_attachment_key_len Length N of the wrapped attachment_key
+                                          (XChaCha20-Poly1305 ciphertext +
+                                          CTX commitment tag, N = 32 + 32 = 64).
+48      N bytes    enc_attachment_key     attachment_key (32 B), AEAD-encrypted
+                                          under itemsKey with attachment_key_nonce,
+                                          followed by the 32-byte CTX tag T' (§5.1).
+48+N    24 bytes   content_nonce          192-bit random nonce encrypting the file
+                                          bytes under attachment_key.
+72+N    4 bytes    ciphertext_len         Length M = filebytes_len + 32 of the
+                                          file ciphertext followed by the 32-byte
+                                          CTX commitment tag T'.
+76+N    M bytes    ciphertext             File bytes, AEAD-encrypted under
+                                          attachment_key with content_nonce,
+                                          followed by the 32-byte CTX tag T'.
+                                          The AAD binding is defined in §5.2.
+```
+
+The structure is byte-shaped identically to §9.2 (`.myn`) with `MYA1` in place of `MY01`; the two AEAD operations (wrapping `attachment_key`, encrypting file bytes) use independent random nonces from the OS CSPRNG. The `AAD_attachment_blob` (§5.2) additionally binds the `attachment-id` so a blob cannot be substituted across attachments within a vault.
+
+**Size cap.** Implementations MUST reject `ciphertext_len > 67108864 + 32` (64 MiB + 32). This is the v0.1 attachment subsystem's per-blob ceiling — larger payloads (streamed/chunked AEAD, Merkle manifests) remain out of scope (§11) and would require a new magic + migration, not an extension of `MYA1`. The cap exists to bound the parser's pre-AEAD allocation footprint, parallel to §9.2's rationale.
+
+**Attachment-id.** The `attachment-id` is `HMAC-SHA-256(DeriveSubkey(root_key, "attachments-id-hmac"), file_plaintext_bytes)`, a deterministic 32-byte value used as the on-disk filename (hex) and the dedup key (§9.10). It is keyed under `root_key` so it is stable within a vault but reveals nothing to a disk observer who lacks `root_key` (no known-file confirmation oracle, no cross-vault equality — `threat-model.md` AS7/AS8). Encryption stays randomized (fresh `attachment_key` + nonces per blob); dedup is an id-existence check, **not** convergent encryption.
+
+### 9.10 Attachments catalog (`vault.attachments`, `MYC1`)
+
+`vault.attachments` is a vault-level singleton artifact carrying the **authoritative per-attachment metadata** and is the backing store for the attachments library. It lives next to `vault.meta` at `<vault-root>/vault.attachments` and is AEAD-encrypted under a `root_key`-derived KEK. Like `vault.prefs` (§9.5) and `vault.search` (§9.6), the outer envelope follows the fixed-offset binary discipline; the inner plaintext is canonical JSON.
+
+The catalog holds metadata that must **survive note deletion** (filename, content type, size, creation time) so the library can display an attachment even when no note references it. The note→attachment reference graph ("used in N notes") is **not** stored here — it is derived from note bodies at runtime via the §9.6-style `content_nonce` reconcile (MYND-29), kept in RAM, and rebuilt on demand.
+
+#### 9.10.1 Outer envelope layout
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                Description
+------  ---------  -------------------  ---------------------------------------
+0       4 bytes    magic                ASCII "MYC1"
+4       1 byte     protocol_version     0x01 for this specification
+5       1 byte     reserved             MUST be 0x00; non-zero rejects parse
+6       24 bytes   catalog_nonce        192-bit random nonce used to encrypt the
+                                        inner plaintext under attachments_catalog_key.
+30      4 bytes    ciphertext_len       Length M = plaintext_len + 32 of the
+                                        inner ciphertext followed by the
+                                        32-byte CTX commitment tag T'.
+34      M bytes    ciphertext           Inner plaintext (§9.10.2),
+                                        AEAD-encrypted under
+                                        attachments_catalog_key with
+                                        catalog_nonce, followed by the 32-byte
+                                        CTX commitment tag T' (§5.1). The AAD
+                                        binding is defined in §5.2 / §9.10.3.
+```
+
+The header is 34 bytes, identical in shape to `vault.prefs` (§9.5.1). The KEK is `attachments_catalog_key = DeriveSubkey(root_key, "attachments-catalog-key")` per §3.2 + §3.4 — derived deterministically from `root_key`, so no public key-id field appears. Note that the catalog KEK and the attachment-id HMAC key are **distinct** subkeys (§3.4): the former encrypts this blob, the latter derives content-addressed ids.
+
+#### 9.10.2 Inner plaintext schema
+
+The inner plaintext is canonical JSON per the §9.5.2 discipline (object keys lexicographically sorted by NFC bytes, no insignificant whitespace, UTF-8 NFC strings, integers as bare decimals with no leading zeros or trailing `.0`, floating-point FORBIDDEN). The top-level object maps each lowercase-hex `attachment-id` to a metadata object:
+
+```json
+{
+  "<attachment-id-hex>": {
+    "content_type": "image/png",
+    "created_at": 1730000000,
+    "filename": "diagram.png",
+    "size": 20480
+  }
+}
+```
+
+- `content_type` — the import-time MIME of the file (a hint; the `attachment://` handler re-sniffs at serve time and is the authority for the served content-type).
+- `created_at` — Unix epoch seconds (integer).
+- `filename` — the display filename (NFC). Free-form: duplicates across attachments are permitted (the id is the key).
+- `size` — plaintext byte length (integer).
+
+Per-key the four metadata fields are themselves emitted in canonical (lexicographic) order: `content_type`, `created_at`, `filename`, `size`. An empty catalog is the canonical JSON object `{}`. Schema evolution within v0.1 is additive optional fields (`#[serde(default)]`), per the §9.5.2 / §10.6 discipline — no inner version field.
+
+#### 9.10.3 AAD construction
+
+The AAD is `AAD_attachments_catalog` (§5.2), binding `account_number_hash` so the catalog is non-portable across vaults at the AEAD-verification layer, mirroring `AAD_prefs_blob`. `items_key_id` is **not** bound (the KEK derives directly from `root_key`, preserving portability across the v005 epoch-rotation `itemsKey` evolution).
+
+#### 9.10.4 Size cap and read semantics
+
+Implementations SHOULD reject `ciphertext_len` exceeding an implementation-defined catalog ceiling sized to the vault's attachment count (the catalog is bounded by ~120 bytes of metadata per attachment, dominated by the `.myn`/blob count already exposed at rest). The reference implementation pins this ceiling at **16 MiB** (~140k entries). Read semantic is **fall-back-to-empty** on any failure (file absent / truncated / magic-mismatch / AEAD-fail / inner-parse-fail collapse to the empty catalog `{}`), matching the §9.5.5 / §6.4 non-distinguishing-error discipline. Recommended practice is eager-write of the empty catalog at vault creation so the closed invariant "`vault.attachments` exists for every post-attachments vault" holds; the fall-back-to-empty semantic remains canonical for legacy vaults and recovery.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -906,10 +1023,25 @@ This commitment is normative. Implementations MUST refuse to parse blobs that do
 
 This registry is normative. Implementations MUST reject any magic byte / AAD prefix / context prefix that is not in the registry and is not declared by a published successor specification.
 
-| Major version | Per-note magic | Vault-meta magic | Vault-prefs magic | Vault-search magic | AAD prefix          | Context prefix         | Status |
-|---|---|---|---|---|---|---|---|
-| v0.1 | `MY01` | `MYV1` | `MYP1` | `MYS1` | `"myne.v0.1|"`  | `"myne.v0.1 …"`    | This document. Active. |
-| v005 | `NT05` | `NTV5` | `MYP5` | `MYS5` | `"myne.v005|"` | `"myne.v005 …"`   | Reserved. See `protocol-v005-roadmap.md` (TBD). |
+| Major version | AAD prefix | Context prefix | Status |
+|---|---|---|---|
+| v0.1 | `"myne.v0.1|"` | `"myne.v0.1 …"` | This document. Active. |
+| v005 | `"myne.v005|"` | `"myne.v005 …"` | Reserved. See `protocol-v005-roadmap.md` (TBD). |
+
+**Magic-byte allocation (normative).** Each blob family has a distinct 4-byte magic. Implementations MUST reject any magic not in this table. This table is the single source of truth for magic-byte allocation — a new blob family MUST claim a free magic here before it is implemented (this discipline exists because the attachments index initially mis-claimed the already-reserved `MYI1`; see `decisions.md` 2026-06-07).
+
+| Blob / file | v0.1 magic | v005 (reserved) | Section | Owner |
+|---|---|---|---|---|
+| Per-note (`.myn`) | `MY01` | `NT05` | §9.2 | core |
+| Vault metadata (`vault.meta`) | `MYV1` | `NTV5` | §9.3 | core |
+| Vault prefs (`vault.prefs`) | `MYP1` | `MYP5` | §9.5 | MYND-160 |
+| Search index (`vault.search`) | `MYS1` | `MYS5` | §9.6 | MYND-29 |
+| Workspace state (`vault.workspace`) | `MYW1` (in-flight) | `MYW5` | §9.7 (reserved) | multi-tab/split-pane (spec not yet landed) |
+| Vault indices (`vault.indices`) | `MYI1` (reserved) | `MYI5` | §9.8 (reserved) | MYND-31 (deferred persistence) |
+| Attachment blob | `MYA1` | `MYA5` | §9.9 | MYND-164 |
+| Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
+
+Section numbers §9.7 (workspace) and §9.8 (vault indices) are **reserved** for in-flight features whose blob specs land separately; attachments occupy §9.9/§9.10 to avoid the collision. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments) use the `MY?5` v005 convention.
 
 ### 10.4 Migration procedure (cross-major)
 
@@ -1002,7 +1134,8 @@ Items deliberately not addressed by this specification. Each entry names where i
 | OHTTP relay/gateway transport, traffic-analysis defense | `appname-v005` |
 | Anonymous credentials (KVAC, Privacy Pass) for sync entitlement | `appname-v005` |
 | Plugin sandboxing, capability-scoped plugin API | Possibly never; `../vision.md` §what-myne-is-not |
-| Attachment encryption, chunked AEAD, Merkle manifests | Phase 1.5 or later; future spec extension |
+| Single-shot attachment encryption (images/SVG/PDF, ≤64 MiB) | **Ships in v0.1** — `MYA1` blob (§9.9) + `MYC1` catalog (§9.10) |
+| Chunked/streamed attachment AEAD, Merkle manifests, large media (video/audio) | Phase 1.5 or later; future spec extension (new magic + migration, not a `MYA1` extension) |
 | Encrypted search index format (FTS5 inside encrypted SQLite) | Phase 1.5 or later; client-internal, not in this spec |
 | Bidirectional links, graph view rendering | Out of scope for the cryptographic protocol; client UI concern |
 | Mobile / WASM Argon2id parameter profile | Phase 3; this spec ships desktop-only |

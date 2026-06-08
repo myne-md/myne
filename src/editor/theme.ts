@@ -499,6 +499,191 @@ export const myneTheme = EditorView.theme({
     borderBottom: "none",
   },
 
+  // Attachment embeds (MYND-164 / 147 / 149) — decorations/attachment-embed.ts,
+  // decorations/image-url.ts, attachments/widgets.ts. The design pass uses raw
+  // hex (not tokens) for the chip palette; matched exactly here.
+  //
+  // Inline image / PDF frame: 1px hairline, radius 6, neutral placeholder fill,
+  // muted filename caption.
+  ".cm-attachment-frame": {
+    display: "inline-flex",
+    flexDirection: "column",
+    gap: "4px",
+    maxWidth: "320px",
+    verticalAlign: "top",
+    // No frame: the image renders directly on the editor surface — no white
+    // border / background / padding (dogfooding feedback). The `<img>` itself
+    // keeps a subtle radius (.cm-attachment-img).
+    // Vertical breathing room so two attachments rendered back-to-back are
+    // visually separated. Token-based block spacing, `--space-3` rhythm.
+    margin: "var(--space-3, 10px) 0",
+  },
+  ".cm-attachment-img": {
+    display: "block",
+    maxWidth: "100%",
+    height: "auto",
+    borderRadius: "4px",
+  },
+  // (Filename caption removed in the editor embed — dogfooding fix #2. The
+  // media renders alone; the library keeps filenames, out of scope here.)
+  // Inline scrollable multi-page reader: bounded box, the pages stack inside and
+  // scroll. No white frame (consistent with the inline image rendering directly
+  // on the surface). The scroller IS the IntersectionObserver root.
+  ".cm-attachment-pdf-scroller": {
+    display: "block",
+    maxWidth: "320px",
+    width: "320px",
+    maxHeight: "min(70vh, 520px)",
+    overflowY: "auto",
+    borderRadius: "4px",
+  },
+  // One stacked page. A subtle gap between pages; each page's canvas fills the
+  // page width. Placeholder background is the neutral paper tone until the lazy
+  // render swaps in the canvas.
+  // Small "Loading…" chip shown inside the (always-visible) scroller until the
+  // document loads + the first page paints. Quiet, centered, no spinner.
+  ".cm-attachment-pdf-loading": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "120px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    color: "var(--fg-3, #6b6a64)",
+    letterSpacing: "0.01em",
+  },
+  // One stacked page. An UNRENDERED placeholder reads as a muted "pending page"
+  // outline on the dark surface — a subtle dashed/translucent frame, NOT a solid
+  // white block, so a not-yet-painted page reads as pending rather than broken.
+  ".cm-attachment-pdf-page": {
+    display: "block",
+    marginBottom: "var(--space-2, 8px)",
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    border: "1px dashed var(--line-1, #e3e2dd)",
+    borderRadius: "4px",
+    overflow: "hidden",
+  },
+  // Once the real canvas swaps in, drop the pending outline (the canvas is the
+  // page now) and seat it on the neutral paper tone.
+  ".cm-attachment-pdf-page-rendered": {
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    border: "1px solid transparent",
+  },
+  ".cm-attachment-pdf-page:last-child": {
+    marginBottom: "0",
+  },
+  ".cm-attachment-pdf-page-canvas": {
+    display: "block",
+    maxWidth: "100%",
+  },
+
+  // Clean in-flight progress chip (dogfooding fix #4) — replaces the struck /
+  // tombstone-borrowing loading style. A quiet label + an indeterminate
+  // hairline; reads as "in progress", visually distinct from the deleted/broken
+  // tombstone. NO spinner, NO struck text, NO danger styling.
+  ".cm-attachment-progress": {
+    display: "inline-flex",
+    flexDirection: "column",
+    gap: "5px",
+    alignItems: "stretch",
+    minWidth: "104px",
+    padding: "2px",
+  },
+  ".cm-attachment-progress-label": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    color: "var(--fg-3, #6b6a64)",
+    letterSpacing: "0.01em",
+  },
+  ".cm-attachment-progress-bar": {
+    position: "relative",
+    display: "block",
+    height: "2px",
+    borderRadius: "1px",
+    overflow: "hidden",
+    backgroundColor: "var(--line-1, #e3e2dd)",
+  },
+  // Indeterminate moving segment — a subtle accent hairline sweeping across the
+  // track. Pure CSS keyframes (defined globally below); no spinner glyph.
+  ".cm-attachment-progress-bar::after": {
+    content: '""',
+    position: "absolute",
+    top: "0",
+    left: "0",
+    height: "100%",
+    width: "40%",
+    borderRadius: "1px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+    animation: "cm-attachment-progress-indeterminate 1.1s ease-in-out infinite",
+  },
+  ".cm-attachment-pdf-fallback": {
+    display: "inline-flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "6px",
+    color: "#6b6a64",
+  },
+  ".cm-attachment-pdf-fallback-label": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "11px",
+    letterSpacing: "0.06em",
+    color: "#6b6a64",
+  },
+
+  // Non-fetching `![](url)` / `![][ref]` chip — NEUTRAL family (per the design
+  // pass: not accent). radius 6, padding 3/8, flex row gap 6, 1px inner stroke.
+  ".cm-attachment-url-chip": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "3px 8px",
+    borderRadius: "6px",
+    backgroundColor: "#f4f4f2",
+    border: "1px solid #e3e2dd",
+    color: "#1a1a17",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    fontWeight: "500",
+    verticalAlign: "baseline",
+    cursor: "default",
+  },
+  ".cm-attachment-url-chip-label": {
+    whiteSpace: "nowrap",
+  },
+
+  // Tombstone — deleted (muted image-off + struck filename) vs broken (danger
+  // tint, like cm-footnote-ref-orphan). Shared visual family with the library.
+  ".cm-attachment-tombstone": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "3px 8px",
+    borderRadius: "6px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    fontWeight: "500",
+    verticalAlign: "baseline",
+    cursor: "default",
+  },
+  ".cm-attachment-tombstone-deleted": {
+    backgroundColor: "#f4f4f2",
+    border: "1px solid #e3e2dd",
+    color: "#6b6a64",
+  },
+  ".cm-attachment-tombstone-deleted .cm-attachment-tombstone-label": {
+    textDecoration: "line-through",
+    textDecorationColor: "var(--line-2, #c8c7c1)",
+  },
+  ".cm-attachment-tombstone-broken": {
+    // danger muted tint, mirroring the footnote orphan treatment.
+    backgroundColor: "color-mix(in srgb, var(--danger, #8a2a23) 8%, #f4f4f2)",
+    border: "1px solid color-mix(in srgb, var(--danger, #8a2a23) 22%, #e3e2dd)",
+    color: "var(--danger, #8a2a23)",
+  },
+  ".cm-attachment-tombstone-label": {
+    whiteSpace: "nowrap",
+  },
+
   // Floating UI (slash menu / selection toolbar / URL overlay) styles
   // live in `floating-styles.ts` as global CSS — they mount to
   // document.body to escape ancestor containing-block context, so CM6's

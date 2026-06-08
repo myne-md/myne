@@ -4,6 +4,7 @@
 // alongside the autocomplete picker.
 
 import type { EditorView } from "@codemirror/view";
+import { pickAndInsert } from "../attachments/picker";
 
 export type SlashCommand = {
   id: string;
@@ -124,6 +125,23 @@ export function slashCommands(): readonly SlashCommand[] {
       label: "To-do list",
       icon: "☐",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "- [ ] "),
+    },
+    {
+      // `/attach` (MYND-164): a single command (not type-split) — opens the
+      // allowlist-filtered file picker, imports each chosen file, and inserts
+      // form-C embed(s) at the trigger position. The trigger text (`/attach…`)
+      // is removed first so the embed lands cleanly.
+      id: "attach",
+      label: "Attach file",
+      icon: "▣",
+      apply: (v, f, t) => {
+        v.dispatch({
+          changes: { from: f, to: t, insert: "" },
+          selection: { anchor: f },
+          userEvent: "slash.apply",
+        });
+        void pickAndInsert(v, f);
+      },
     },
   ];
 }

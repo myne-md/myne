@@ -28,7 +28,6 @@ import {
   type Extension,
   type Range,
   RangeSetBuilder,
-  StateField,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -37,31 +36,16 @@ import {
 } from "@codemirror/view";
 import { collapseLineRange, isInsideRange, linesRevealed } from "./cursor-aware";
 import {
-  collectLinkReferences,
   type LinkReferenceEntry,
   type LinkReferenceMap,
+  linkReferencesField,
   resolveReference,
 } from "./link-reference-collector";
+import { imageReferencedDefinitions } from "./image-url";
 import {
   makeCursorAwareDecorationPlugin,
   makeCursorAwareStateField,
 } from "./plugin-factory";
-
-// One whole-document scan of `[ref]: url` definitions, shared by the usage marks
-// (ViewPlugin) and the definition-line hiding (StateField) so the collector
-// runs ONCE per doc/parse change instead of once per consumer per update — and
-// is NOT rebuilt on selection/focus-only changes (the map can't have changed).
-const linkReferencesField = StateField.define<LinkReferenceMap>({
-  create(state) {
-    return collectLinkReferences(state);
-  },
-  update(value, tr) {
-    if (!tr.docChanged && syntaxTree(tr.startState) === syntaxTree(tr.state)) {
-      return value;
-    }
-    return collectLinkReferences(tr.state);
-  },
-});
 
 /** Reference-style `Link` shape extracted from the parse tree. `null` when the
  *  node is an inline `[text](url)` link (has a `URL` child — `link.ts` owns it)
@@ -168,28 +152,36 @@ function buildReferenceLinkUsages(view: EditorView): DecorationSet {
 // --- 2. Definition-line hiding (StateField) ------------------------------
 
 /** Collect the definition ranges referenced by at least one RESOLVED reference
- *  usage. A definition referenced only by an image stays visible until the
- *  reference-image rider lands (MYND-149 → deferred to MYND-164). */
+ *  usage — link OR image (MYND-164 §264 rider). A `[ref]: url` referenced ONLY
+ *  by an image `![alt][ref]` is now also hidden off-cursor, since the image
+ *  decorator (`image-url.ts`) renders that reference as a non-fetching chip, so
+ *  the bare definition line should fold away just like a link's would. The
+ *  image-referenced entries come from `imageReferencedDefinitions`, deduped here
+ *  against the link-referenced ones. */
 function referencedDefinitions(
   state: EditorState,
   map: LinkReferenceMap,
 ): LinkReferenceEntry[] {
   const seen = new Set<number>();
   const out: LinkReferenceEntry[] = [];
+  const push = (entry: LinkReferenceEntry): void => {
+    if (!seen.has(entry.definitionRange.from)) {
+      seen.add(entry.definitionRange.from);
+      out.push(entry);
+    }
+  };
   syntaxTree(state).iterate({
     enter: (node) => {
       if (node.name !== "Link") return undefined;
       const shape = readRefLink(state, node.node);
       if (shape === null) return undefined;
       const entry = resolveReference(map, shape.label);
-      if (entry === undefined) return undefined;
-      if (!seen.has(entry.definitionRange.from)) {
-        seen.add(entry.definitionRange.from);
-        out.push(entry);
-      }
+      if (entry !== undefined) push(entry);
       return undefined;
     },
   });
+  // §264 rider: definitions referenced by a reference IMAGE.
+  for (const entry of imageReferencedDefinitions(state, map)) push(entry);
   return out;
 }
 

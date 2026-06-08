@@ -46,6 +46,7 @@ function buildCtx(over: Partial<CommandContext> = {}): CommandContext {
     onManageTemplates: vi.fn(),
     onNewNoteFromTemplate: vi.fn(),
     onOpenTodayNote: vi.fn(),
+    onOpenAttachments: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };

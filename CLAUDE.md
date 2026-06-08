@@ -95,11 +95,13 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Vault metadata magic | `MYV1` (file `vault.meta`) |
 | Vault prefs blob magic | `MYP1` (file `vault.prefs`; §9.5) |
 | Search-index blob magic | `MYS1` (file `vault.search`; §9.6) |
+| Attachment blob magic | `MYA1` (files `attachments/<attachment-id-hex>`; §9.9) |
+| Attachments catalog magic | `MYC1` (file `vault.attachments`; §9.10) |
 | Protocol identifier string | `myne-protocol-v0.1` |
 | Account-number display prefix | `MY-XXXX-XXXX-XXXX-XXXX-X` (display-only) |
 | Damm-32 quasigroup table | frozen literal, `account-number.md` §4.2 — determines which 20-char strings are valid and which check char generation emits; changing it rejects already-distributed account numbers and breaks cross-impl validity agreement |
 
-v005 reservations: `NT05`/`NTV5` (per-note / vault-meta) + `MYP5`/`MYS5` (prefs / search) magic, `"myne.v005|"` AAD prefix, `"myne.v005 "` HKDF context prefix — see the normative registry in `docs/spec/protocol.md` §10.3. v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.
+v005 reservations: `NT05`/`NTV5` (per-note / vault-meta) + `MYP5`/`MYS5`/`MYA5`/`MYC5` (prefs / search / attachment / attachments-catalog) magic, `"myne.v005|"` AAD prefix, `"myne.v005 "` HKDF context prefix — see the normative magic-allocation table in `docs/spec/protocol.md` §10.3 (which is the single source of truth for magic allocation, incl. the reserved `MYI1` VaultIndices magic). v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.
 
 ## Crypto primitives baseline (summary)
 

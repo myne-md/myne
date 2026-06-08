@@ -12,6 +12,8 @@ import { setextHeadingDecorations } from "./setext-heading";
 import { emphasisDecorations } from "./emphasis";
 import { linkDecorations } from "./link";
 import { referenceLinkDecorations } from "./reference-link";
+import { imageUrlDecorations } from "./image-url";
+import { attachmentEmbedDecorations } from "./attachment-embed";
 import { autolinkDecorations } from "./autolink";
 import { inlineCodeDecorations } from "./inline-code";
 import { taskListDecorations } from "./task-list";
@@ -40,6 +42,13 @@ export function myneDecorations(): readonly Extension[] {
     emphasisDecorations(),
     linkDecorations(),
     referenceLinkDecorations(),
+    // Non-fetching `![](url)` / `![][ref]` chips (MYND-147/149). After
+    // referenceLinkDecorations so the shared `linkReferencesField` is installed.
+    imageUrlDecorations(),
+    // Form-C attachment embeds `![[att:<id>|filename]]` → atomic inline image /
+    // PDF / tombstone (MYND-164). Needs the catalog extension (added in
+    // extensions.ts) for id resolution.
+    ...attachmentEmbedDecorations(),
     ...autolinkDecorations(),
     inlineCodeDecorations(),
     taskListDecorations(),

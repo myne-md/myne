@@ -65,6 +65,21 @@ const ROLE_STR_PREFS_KEY: &[u8] = b"prefs-key";
 /// `protocol.md` § 9.6). Load-bearing: drift silently changes the KEK.
 const ROLE_STR_SEARCH_INDEX_KEY: &[u8] = b"search-index-key";
 
+/// Registered role string for the v0.1 attachments-catalog blob KEK
+/// (`vault.attachments`, `MYC1` — `attachments_catalog.rs`,
+/// `protocol.md` § 9.10 + § 3.4). Load-bearing: drift silently changes
+/// the KEK.
+const ROLE_STR_ATTACHMENTS_CATALOG_KEY: &[u8] = b"attachments-catalog-key";
+
+/// Registered role string for the v0.1 content-addressed attachment-id
+/// HMAC key (`protocol.md` § 9.9 + § 3.4). Keys
+/// `HMAC-SHA-256(key, file_plaintext)` to derive the deterministic
+/// per-vault attachment-id; NOT a blob KEK. DISTINCT from
+/// `attachments-catalog-key` (§ 9.10.1 note) — the two are separate
+/// subkeys so the catalog encryption and the id derivation are
+/// domain-separated.
+const ROLE_STR_ATTACHMENTS_ID_HMAC: &[u8] = b"attachments-id-hmac";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -87,6 +102,16 @@ pub enum SubkeyRole {
     /// (CTX commitment outer). Distinct from `PrefsKey` so the two blobs
     /// are domain-separated.
     SearchIndexKey,
+    /// KEK for the v0.1 attachments-catalog blob (`vault.attachments`,
+    /// `MYC1`, spec § 9.10). Encrypts the canonical-JSON inner plaintext
+    /// of the catalog under XChaCha20-Poly1305 + CTX commitment.
+    AttachmentsCatalogKey,
+    /// HMAC key for the v0.1 content-addressed attachment-id (spec
+    /// § 9.9). Keys `HMAC-SHA-256(key, file_plaintext)` to derive the
+    /// deterministic per-vault attachment-id. NOT a blob KEK — distinct
+    /// from `AttachmentsCatalogKey` so id derivation and catalog
+    /// encryption are domain-separated.
+    AttachmentsIdHmac,
 }
 
 impl SubkeyRole {
@@ -98,6 +123,8 @@ impl SubkeyRole {
             SubkeyRole::ItemsKeyWrap => ROLE_STR_ITEMS_KEY_WRAP,
             SubkeyRole::PrefsKey => ROLE_STR_PREFS_KEY,
             SubkeyRole::SearchIndexKey => ROLE_STR_SEARCH_INDEX_KEY,
+            SubkeyRole::AttachmentsCatalogKey => ROLE_STR_ATTACHMENTS_CATALOG_KEY,
+            SubkeyRole::AttachmentsIdHmac => ROLE_STR_ATTACHMENTS_ID_HMAC,
         }
     }
 }
@@ -173,6 +200,37 @@ mod tests {
         // MYND-29 registry entry "myne.v0.1 search-index-key" (§ 9.6).
         // Frozen + load-bearing: drift silently changes the search-blob KEK.
         assert_eq!(SubkeyRole::SearchIndexKey.role_str(), b"search-index-key");
+    }
+
+    #[test]
+    fn attachments_catalog_key_role_string_matches_spec_registry() {
+        // Spec § 3.4 registry entry "myne.v0.1 attachments-catalog-key"
+        // (§ 9.10 MYC1 KEK). Load-bearing: drift silently changes the KEK.
+        assert_eq!(
+            SubkeyRole::AttachmentsCatalogKey.role_str(),
+            b"attachments-catalog-key"
+        );
+    }
+
+    #[test]
+    fn attachments_id_hmac_role_string_matches_spec_registry() {
+        // Spec § 3.4 registry entry "myne.v0.1 attachments-id-hmac"
+        // (§ 9.9 content-addressed attachment-id HMAC key). DISTINCT
+        // from attachments-catalog-key.
+        assert_eq!(
+            SubkeyRole::AttachmentsIdHmac.role_str(),
+            b"attachments-id-hmac"
+        );
+    }
+
+    #[test]
+    fn attachment_roles_are_distinct_subkeys() {
+        // The catalog KEK and the id-HMAC key MUST be different subkeys
+        // (spec § 9.10.1 note: "distinct subkeys").
+        let root = [0u8; 32];
+        let catalog = derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey);
+        let id_hmac = derive_subkey(&root, SubkeyRole::AttachmentsIdHmac);
+        assert_ne!(*catalog, *id_hmac);
     }
 
     #[test]
@@ -341,6 +399,8 @@ mod tests {
                 SubkeyRole::ItemsKeyWrap => "itemsKey-wrap",
                 SubkeyRole::PrefsKey => "prefs-key",
                 SubkeyRole::SearchIndexKey => "search-index-key",
+                SubkeyRole::AttachmentsCatalogKey => "attachments-catalog-key",
+                SubkeyRole::AttachmentsIdHmac => "attachments-id-hmac",
             }
         }
 

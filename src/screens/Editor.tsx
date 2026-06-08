@@ -90,6 +90,8 @@ import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { useEditorLayout } from "./editorLayout";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
+import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
+import { CenterViewProvider, type CenterView } from "./centerView";
 
 
 const STATUS_TEXT_STYLE: CSSProperties = {
@@ -306,6 +308,9 @@ function EditorChrome({
   }, []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   const [wordCount, setWordCount] = useState<number>(0);
+  // MYND-170 (SYNC-9): which surface the center pane shows. The shell +
+  // sidebars persist; only this region swaps.
+  const [centerView, setCenterView] = useState<CenterView>("editor");
 
   // Resizable/collapsible sidebar layout (MYND-137). Widths + collapse
   // flags are persisted to vault.prefs and clamped on load; `rowRef`
@@ -313,6 +318,25 @@ function EditorChrome({
   // minimum.
   const layout = useEditorLayout();
   const rowRef = useRef<HTMLDivElement | null>(null);
+
+  // MYND-170 (SYNC-9) exclusive active-state: selecting a note in the sidebar
+  // (from ANY source — row click, keyboard nav, command palette, favorites,
+  // jump-from-attachment) closes the Attachments view and returns the center
+  // pane to that note's editor. Keying on `selectedId` makes the swap general:
+  // opening Attachments does NOT change `selectedId`, so this never fires when
+  // the user enters the library; it fires only when the selection genuinely
+  // changes. The sidebar's Attachments entry and a note row are therefore
+  // mutually exclusive in the active highlight — opening one deactivates the
+  // other. Skips the initial mount so a fresh editor doesn't redundantly
+  // re-assert "editor" (it already starts there).
+  const selectionInitRef = useRef(true);
+  useEffect(() => {
+    if (selectionInitRef.current) {
+      selectionInitRef.current = false;
+      return;
+    }
+    setCenterView("editor");
+  }, [ctx.selectedId]);
 
   // Status-bar word counter — recompute on a short debounce so the parse
   // doesn't run on every keystroke. Frontmatter is excluded by
@@ -522,7 +546,13 @@ function EditorChrome({
     onLock?.();
   }, [autosave, onLock]);
 
+  const centerViewValue = useMemo(
+    () => ({ view: centerView, setView: setCenterView }),
+    [centerView],
+  );
+
   return (
+    <CenterViewProvider value={centerViewValue}>
     <div
       style={{
         display: "flex",
@@ -560,6 +590,9 @@ function EditorChrome({
             onNewFromTemplate={() => setNewFromTemplateOpen(true)}
           />
         </SidebarPane>
+        {centerView === "attachments" ? (
+          <AttachmentsLibrary onClose={() => setCenterView("editor")} />
+        ) : (
         <CenterPane
           content={content}
           onChange={setContent}
@@ -575,6 +608,7 @@ function EditorChrome({
             void ctx.createAndStartRename().catch(() => {});
           }}
         />
+        )}
         <SidebarPane
           side="right"
           width={layout.rightWidth}
@@ -648,6 +682,10 @@ function EditorChrome({
       <CommandPaletteHost
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
+        onOpenAttachments={() => {
+          setPaletteOpen(false);
+          setCenterView("attachments");
+        }}
         onOpenSettings={() => {
           setPaletteOpen(false);
           setSettingsOpen(true);
@@ -676,6 +714,7 @@ function EditorChrome({
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
       <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
     </div>
+    </CenterViewProvider>
   );
 }
 
@@ -689,6 +728,7 @@ type CommandPaletteHostProps = {
   open: boolean;
   onClose: () => void;
   onOpenSettings: () => void;
+  onOpenAttachments: () => void;
   onManageTemplates: () => void;
   onNewNoteFromTemplate: () => void;
   onOpenSnapshots: () => void;
@@ -700,6 +740,7 @@ function CommandPaletteHost({
   open,
   onClose,
   onOpenSettings,
+  onOpenAttachments,
   onManageTemplates,
   onNewNoteFromTemplate,
   onOpenSnapshots,
@@ -755,6 +796,7 @@ function CommandPaletteHost({
       onManageTemplates,
       onNewNoteFromTemplate,
       onOpenTodayNote,
+      onOpenAttachments,
       onOpenSnapshots,
       onShowGraph,
       onSelectNote: async (id) => {
@@ -771,6 +813,7 @@ function CommandPaletteHost({
       onManageTemplates,
       onNewNoteFromTemplate,
       onOpenTodayNote,
+      onOpenAttachments,
       onOpenSnapshots,
       onShowGraph,
     ],

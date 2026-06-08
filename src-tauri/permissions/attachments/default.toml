@@ -1,0 +1,63 @@
+# Permissions for the in-app `attachments` Tauri plugin (MYND-169).
+# Picked up under the `attachments:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `attachments:default` (or
+# `attachments:allow-attachment-import` /
+# `attachments:allow-catalog-list` /
+# `attachments:allow-attachment-delete`).
+#
+# Main-window-only invariant: import + delete write vault state and the
+# catalog read decrypts vault metadata, so all three are privileged. v0.2
+# multi-window MUST NOT grant any of these to a non-main window. The
+# `attachment://` URI scheme is NOT a command — it is registered on the
+# Builder in `lib.rs` and gated inside its own handler (unlock + main-
+# window-label), so it has no ACL entry here.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + reconcile (apply / remove / referencing)."
+permissions = [
+  "allow-attachment-import",
+  "allow-catalog-list",
+  "allow-attachment-delete",
+  "allow-attachment-rename",
+  "allow-attachment-refs-apply",
+  "allow-attachment-refs-remove",
+  "allow-attachment-refs-referencing",
+]
+
+[[permission]]
+identifier = "allow-attachment-import"
+description = "Allow invoking attachments:attachment_import (Slot::Unlocked-gated import of inline bytes or a path; sniffs + validates the type against the PNG/JPEG/GIF/WebP/SVG/PDF allowlist, enforces the 64 MiB cap, computes the content-addressed attachment-id, dedups on id-existence, else encrypts the MYA1 blob + upserts the MYC1 catalog; returns the id + metadata)."
+commands.allow = ["attachment_import"]
+
+[[permission]]
+identifier = "allow-catalog-list"
+description = "Allow invoking attachments:catalog_list (Slot::Unlocked-gated read of the full vault.attachments catalog metadata for the library UI; fall-back-to-empty on absence / AEAD-fail / parse-fail per protocol.md § 9.10.4)."
+commands.allow = ["catalog_list"]
+
+[[permission]]
+identifier = "allow-attachment-delete"
+description = "Allow invoking attachments:attachment_delete (Slot::Unlocked-gated explicit removal of one attachment — unlinks the blob + removes the catalog entry; idempotent on an absent id; NO auto-GC, the reference graph is the UI's concern)."
+commands.allow = ["attachment_delete"]
+
+[[permission]]
+identifier = "allow-attachment-rename"
+description = "Allow invoking attachments:attachment_rename (Slot::Unlocked-gated free-form rename of one attachment's catalog display filename; duplicates allowed since the content-addressed id is the key; only the MYC1 catalog entry's filename changes — the blob + id + on-disk filename are untouched)."
+commands.allow = ["attachment_rename"]
+
+[[permission]]
+identifier = "allow-attachment-refs-apply"
+description = "Allow invoking attachments:attachment_refs_apply (Slot::Unlocked-gated replace-on-apply of a note's referenced attachment-ids; ids arrive already extracted TS-side via the shared extractAttachmentIds tokenizer — never parses markdown; SYNC-6 reconcile)."
+commands.allow = ["attachment_refs_apply"]
+
+[[permission]]
+identifier = "allow-attachment-refs-remove"
+description = "Allow invoking attachments:attachment_refs_remove (Slot::Unlocked-gated removal of a hard-deleted note from the reference graph; trash does NOT route here — trashed notes stay in the graph, filtered TS-side via the live id-set)."
+commands.allow = ["attachment_refs_remove"]
+
+[[permission]]
+identifier = "allow-attachment-refs-referencing"
+description = "Allow invoking attachments:attachment_refs_referencing (Slot::Unlocked-gated query of the note-ids referencing one attachment-id — the library's 'used in N notes' count + the delete-warning's note list; SYNC-6 amended exposes ids, not just a count)."
+commands.allow = ["attachment_refs_referencing"]

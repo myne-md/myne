@@ -14,7 +14,7 @@
 // the user rather than taken here.
 
 import { syntaxTree } from "@codemirror/language";
-import type { EditorState } from "@codemirror/state";
+import { type EditorState, StateField } from "@codemirror/state";
 
 /** A `[ref]: url` definition resolved from a `LinkReference` node. */
 export interface LinkReferenceEntry {
@@ -91,3 +91,25 @@ export function resolveReference(
 ): LinkReferenceEntry | undefined {
   return map.get(foldLabel(rawLabel));
 }
+
+/**
+ * One whole-document scan of `[ref]: url` definitions, shared by the reference
+ * LINK decorator (`reference-link.ts`) AND the reference IMAGE decorator
+ * (`image-url.ts`, MYND-149). Lifted here from `reference-link.ts` so both
+ * consumers read ONE collected map per doc/parse change — the §264 rider needs
+ * the link decorator and the image decorator to agree on which definitions are
+ * referenced. Rebuilt only on doc/parse change (a selection/focus tick can't
+ * change the definition table). The field dedups by identity when both
+ * decorators install it.
+ */
+export const linkReferencesField = StateField.define<LinkReferenceMap>({
+  create(state) {
+    return collectLinkReferences(state);
+  },
+  update(value, tr) {
+    if (!tr.docChanged && syntaxTree(tr.startState) === syntaxTree(tr.state)) {
+      return value;
+    }
+    return collectLinkReferences(tr.state);
+  },
+});

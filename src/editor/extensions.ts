@@ -37,6 +37,9 @@ import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { myneDecorations } from "./decorations";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
+import { attachmentCatalogExtension } from "./attachments/catalog";
+import { attachmentPasteDropExtension } from "./attachments/paste-drop";
+import { attachmentInsertPlaceholderExtension } from "./attachments/insert-placeholder";
 import { slashMenuExtension } from "./slash/plugin";
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
@@ -62,6 +65,19 @@ export function myneExtensions(): readonly Extension[] {
       ],
     }),
     codeSyntaxHighlighting,
+    // Attachment catalog (MYND-164): loads `catalog_list` once on mount into a
+    // StateField the form-C embed decorator resolves ids against. Composed
+    // before the decorations so the field exists when they first build.
+    ...attachmentCatalogExtension(),
+    // Attachment INSERT (MYND-164): paste an image / drop image-SVG-PDF files
+    // into the editor → bytes → `attachment_import` → form-C embed at the
+    // cursor. WebView HTML5 DnD only (`dragDropEnabled` stays false, SYNC-10);
+    // returns un-consumed for plain text paste/drop so they keep working.
+    attachmentPasteDropExtension(),
+    // Optimistic in-editor "Importing…" progress chip at the cursor while an
+    // import is in flight (MYND-164 polish). Decoration-only — never writes to
+    // the doc, so the placeholder can't be persisted.
+    attachmentInsertPlaceholderExtension(),
     ...myneDecorations(),
     ...wikilinkChipExtensions(),
     slashMenuExtension(),

@@ -43,6 +43,8 @@ export type CommandContext = {
   onNewNoteFromTemplate: () => void;
   /** Open (or idempotently create) today's daily note (MYND-191). */
   onOpenTodayNote: () => void;
+  /** Open the attachments library (full-pane center-pane view, MYND-170). */
+  onOpenAttachments: () => void;
   /** Open the snapshots / file-recovery panel for the selected note (MYND-97). */
   onOpenSnapshots: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */

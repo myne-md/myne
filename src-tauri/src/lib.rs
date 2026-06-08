@@ -47,6 +47,18 @@ pub fn run() {
         .plugin(plugins::notes::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::vault_indices::init())
+        .plugin(plugins::attachments::init())
+        // MYND-169: the `attachment://<id>` async custom-URI-scheme
+        // handler — decrypts a `MYA1` blob in memory, re-sniffs the
+        // content-type from the decrypted bytes, and serves ONLY an
+        // allowlisted type (never text/html). Unlock-gated +
+        // main-window-scoped inside the handler. Registered on the
+        // Builder (not as a plugin invoke handler — custom protocols are
+        // a builder-level concern). See `plugins::attachments::scheme`.
+        .register_asynchronous_uri_scheme_protocol(
+            plugins::attachments::scheme::SCHEME,
+            plugins::attachments::scheme::handle,
+        )
         .setup(|app| {
             use tauri::Manager;
             // Apply screen-capture protection before `window.show()` so
@@ -66,6 +78,13 @@ pub fn run() {
             // TS-orchestrated sweep and wiped on lock alongside the search
             // index. Twin of SearchIndexState above.
             app.manage(plugins::vault_indices::VaultIndicesState::default());
+            // MYND-169: app-level live in-RAM attachment reference graph
+            // (note → attachment-ids), the structural twin of
+            // VaultIndicesState above. Rebuilt on unlock by the
+            // TS-orchestrated note sweep (TODO(attachments reconcile) — see
+            // `plugins::attachments::reconcile`) and wiped on lock alongside
+            // the search index + VaultIndices.
+            app.manage(plugins::attachments::AttachmentRefsState::default());
             // MYND-29 Task 7: periodic best-effort flush of the search index
             // to its encrypted `vault.search` blob while a vault is Unlocked
             // (no-op while locked). Bounds how much a hard quit / crash loses

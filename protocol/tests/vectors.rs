@@ -2009,6 +2009,380 @@ fn vault_search_vectors() {
 }
 
 #[test]
+fn attachment_blob_vectors() {
+    use protocol::{
+        aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id,
+        decode_attachment_blob, encode_attachment_blob_raw, AttachmentBlobError,
+    };
+
+    let path = companion_vectors_root()
+        .join("attachment-blob")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] attachment-blob: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "attachment-blob");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "attachment-blob must have at least one case"
+    );
+    assert_unique_vector_ids("attachment-blob", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let items_key: [u8; 32] = hex_decode_array(field(case, id, "input_items_key_hex"));
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+                let attachment_id: [u8; 32] =
+                    hex_decode_array(field(case, id, "input_attachment_id_hex"));
+                let content_type = hex_decode(field(case, id, "input_content_type_utf8_hex"));
+                let attachment_key: [u8; 32] =
+                    hex_decode_array(field(case, id, "input_attachment_key_hex"));
+                let attachment_key_nonce: [u8; 24] =
+                    hex_decode_array(field(case, id, "input_attachment_key_nonce_hex"));
+                let content_nonce: [u8; 24] =
+                    hex_decode_array(field(case, id, "input_content_nonce_hex"));
+                let file = hex_decode(field(case, id, "input_file_plaintext_hex"));
+                let expected = hex_decode(field(case, id, "expected_attachment_blob_hex"));
+
+                let actual = encode_attachment_blob_raw(
+                    &items_key,
+                    &items_key_id,
+                    &attachment_id,
+                    &content_type,
+                    &attachment_key,
+                    &attachment_key_nonce,
+                    &content_nonce,
+                    &file,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode_attachment_blob_raw failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] attachment-blob encrypt mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(field(case, id, "input_attachment_blob_hex"));
+                let attachment_id: [u8; 32] =
+                    hex_decode_array(field(case, id, "input_attachment_id_hex"));
+                let content_type = hex_decode(field(case, id, "input_content_type_utf8_hex"));
+                let items_key: [u8; 32] = hex_decode_array(field(case, id, "input_items_key_hex"));
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+                let expected = hex_decode(field(case, id, "expected_file_plaintext_hex"));
+
+                let actual = decode_attachment_blob(
+                    &blob,
+                    &attachment_id,
+                    &content_type,
+                    &items_key,
+                    &items_key_id,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] decode_attachment_blob failed: {e:?}"));
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] attachment-blob decrypt_ok mismatch"
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(field(case, id, "input_attachment_blob_hex"));
+                let attachment_id: [u8; 32] =
+                    hex_decode_array(field(case, id, "input_attachment_id_hex"));
+                let content_type = hex_decode(field(case, id, "input_content_type_utf8_hex"));
+                let items_key: [u8; 32] = hex_decode_array(field(case, id, "input_items_key_hex"));
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+
+                match decode_attachment_blob(&blob, &attachment_id, &content_type, &items_key, &items_key_id)
+                {
+                    Err(AttachmentBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected AttachmentBlobError::CannotDecrypt (non-distinguishing AEAD failure §6.4), got {other:?}"
+                    ),
+                    Ok(pt) => panic!(
+                        "[{id}] expected AEAD failure, decode returned Ok ({} bytes)",
+                        pt.len()
+                    ),
+                }
+            }
+            "aad_construction" => {
+                let builder = field(case, id, "input_aad_builder");
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+                let attachment_id: [u8; 32] =
+                    hex_decode_array(field(case, id, "input_attachment_id_hex"));
+                let expected = hex_decode(field(case, id, "expected_aad_hex"));
+
+                let actual = match builder {
+                    "aad_wrap_attachment_key" => {
+                        aad_wrap_attachment_key(&items_key_id, &attachment_id)
+                    }
+                    "aad_encrypt_attachment" => {
+                        let content_type =
+                            hex_decode(field(case, id, "input_content_type_utf8_hex"));
+                        aad_encrypt_attachment(&items_key_id, &attachment_id, &content_type)
+                    }
+                    other => panic!("[{id}] unknown aad builder '{other}'"),
+                };
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] {builder} AAD mismatch"
+                );
+            }
+            "id_determinism" => {
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let file = hex_decode(field(case, id, "input_file_plaintext_hex"));
+                let expected: [u8; 32] =
+                    hex_decode_array(field(case, id, "expected_attachment_id_hex"));
+
+                let actual = compute_attachment_id(&root_key, &file);
+                assert_eq!(actual, expected, "[{id}] compute_attachment_id mismatch");
+                // Determinism: a second call must match.
+                assert_eq!(
+                    compute_attachment_id(&root_key, &file),
+                    actual,
+                    "[{id}] compute_attachment_id is not deterministic"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    for kind in [
+        "encrypt",
+        "decrypt_ok",
+        "decrypt_aead_fail",
+        "aad_construction",
+        "id_determinism",
+    ] {
+        assert!(
+            seen_kinds.contains(kind),
+            "attachment-blob missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+}
+
+#[test]
+fn attachments_catalog_vectors() {
+    use protocol::{
+        aad_attachments_catalog, decode_attachments_catalog, derive_subkey,
+        encode_attachments_catalog_raw, CatalogBlobError, SubkeyRole,
+    };
+
+    let path = companion_vectors_root()
+        .join("attachments-catalog")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] attachments-catalog: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "attachments-catalog");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "attachments-catalog must have at least one case"
+    );
+    assert_unique_vector_ids("attachments-catalog", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let plaintext = hex_decode(field(case, id, "input_plaintext_canonical_utf8_hex"));
+                let nonce: [u8; 24] = hex_decode_array(field(case, id, "input_catalog_nonce_hex"));
+                let expected = hex_decode(field(case, id, "expected_catalog_blob_hex"));
+
+                // The encoder takes a structured catalog, not raw plaintext;
+                // round-trip the canonical bytes through decode to obtain the
+                // catalog, then re-encode and assert byte equality (this also
+                // pins that decode(plaintext) is the inverse of the encoder's
+                // canonical_json_encode).
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+                // Build a throwaway blob from the pinned plaintext to recover
+                // the structured catalog via the public decode path.
+                let probe_blob = build_catalog_blob_from_plaintext(
+                    &catalog_key,
+                    &account_hash,
+                    &plaintext,
+                    &nonce,
+                );
+                let catalog = decode_attachments_catalog(&catalog_key, &account_hash, &probe_blob)
+                    .unwrap_or_else(|e| panic!("[{id}] probe decode failed: {e:?}"));
+
+                let actual =
+                    encode_attachments_catalog_raw(&catalog_key, &account_hash, &catalog, &nonce)
+                        .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] attachments-catalog encrypt mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let expected_pt =
+                    hex_decode(field(case, id, "expected_plaintext_canonical_utf8_hex"));
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+                let catalog = decode_attachments_catalog(&catalog_key, &account_hash, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+                // Verify the decoded catalog equals the catalog the pinned
+                // canonical plaintext parses to: build a blob from the
+                // expected plaintext bytes and decode it through the same
+                // public path, then compare the two structured catalogs.
+                let nonce = [0u8; 24];
+                let pt_blob = build_catalog_blob_from_plaintext(
+                    &catalog_key,
+                    &account_hash,
+                    &expected_pt,
+                    &nonce,
+                );
+                let catalog_from_pt =
+                    decode_attachments_catalog(&catalog_key, &account_hash, &pt_blob)
+                        .unwrap_or_else(|e| {
+                            panic!("[{id}] expected_plaintext did not decode: {e:?}")
+                        });
+                assert_eq!(
+                    catalog, catalog_from_pt,
+                    "[{id}] decoded catalog disagrees with expected canonical plaintext"
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+                match decode_attachments_catalog(&catalog_key, &account_hash, &blob) {
+                    Err(CatalogBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected CatalogBlobError::CannotDecrypt (non-distinguishing AEAD failure §6.4), got {other:?}"
+                    ),
+                    Ok(view) => panic!("[{id}] expected AEAD failure, decode returned Ok({view:?})"),
+                }
+            }
+            "aad_construction" => {
+                let account_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let expected = hex_decode(field(case, id, "expected_aad_hex"));
+                let actual = aad_attachments_catalog(&account_hash);
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] aad_attachments_catalog mismatch"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    for kind in [
+        "encrypt",
+        "decrypt_ok",
+        "decrypt_aead_fail",
+        "aad_construction",
+    ] {
+        assert!(
+            seen_kinds.contains(kind),
+            "attachments-catalog missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+}
+
+/// Helper: build a MYC1 blob directly from a canonical-JSON plaintext,
+/// so the runner can recover the structured catalog from a pinned
+/// plaintext via the public decode path. Mirrors the encoder's
+/// envelope assembly (34-byte header + AEAD-sealed plaintext).
+fn build_catalog_blob_from_plaintext(
+    catalog_key: &[u8; 32],
+    account_hash: &[u8; 16],
+    plaintext: &[u8],
+    nonce: &[u8; 24],
+) -> Vec<u8> {
+    use protocol::{aad_attachments_catalog, aead_seal_ctx, CATALOG_BLOB_MAGIC};
+    let aad = aad_attachments_catalog(account_hash);
+    let sealed = aead_seal_ctx(catalog_key, nonce, plaintext, &aad).expect("seal");
+    let mut blob = Vec::with_capacity(34 + sealed.len());
+    blob.extend_from_slice(&CATALOG_BLOB_MAGIC);
+    blob.push(0x01);
+    blob.push(0x00);
+    blob.extend_from_slice(nonce);
+    blob.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+    blob.extend_from_slice(&sealed);
+    blob
+}
+
+/// Helper: fetch a required string field, panicking with the vector id
+/// on absence. Trims the repetitive `unwrap_or_else` boilerplate the
+/// older runners spell out inline.
+fn field<'a>(case: &'a serde_json::Value, id: &str, key: &str) -> &'a str {
+    case[key]
+        .as_str()
+        .unwrap_or_else(|| panic!("[{id}] missing {key}"))
+}
+
+#[test]
 fn damm32_table_vectors() {
     use protocol::damm32_table;
 

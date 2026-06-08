@@ -593,6 +593,14 @@ pub async fn lock<R: Runtime>(
     // so nothing survives the manual lock. Rebuilt on the next unlock.
     crate::plugins::vault_indices::zeroize_vault_indices(&app);
 
+    // ---- MYND-169: wipe the plaintext-derived attachment reference graph -
+    //
+    // Same lock path as the search-index + VaultIndices wipes — the
+    // reference graph's note-ids / attachment-ids are plaintext-derived
+    // correlation tags (AS3), wiped here so nothing survives the manual
+    // lock. Rebuilt on the next unlock.
+    crate::plugins::attachments::zeroize_attachment_refs(&app);
+
     // ---- MYND-160 Task 11: post-zeroize native default-ON ---------------
     //
     // Per `decisions.md` 2026-05-27 entry "Lock-on-default-ON: vault_lock
