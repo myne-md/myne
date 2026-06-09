@@ -58,7 +58,13 @@ const BACKUP_BUTTON_ROW_STYLE: CSSProperties = {
   gap: "var(--space-2)",
 };
 
-export function StoragePanel() {
+interface StoragePanelProps {
+  /** Open the Obsidian vault import flow (MYND-53). Absent → the control is
+   *  disabled (e.g. if Settings is ever shown outside the Editor). */
+  onImportObsidian?: () => void;
+}
+
+export function StoragePanel({ onImportObsidian }: StoragePanelProps = {}) {
   const [vaultPath, setVaultPath] = useState<string>("…");
 
   useEffect(() => {
@@ -95,6 +101,22 @@ export function StoragePanel() {
               disabled={vaultPath === "…" || vaultPath === "Path unavailable"}
             >
               Open in Files
+            </Button>
+          </div>
+        }
+      />
+
+      <ControlBlock
+        label="Import"
+        helper="Bring an existing Obsidian vault into Myne. Every Markdown note is imported and encrypted on the spot; your original files are left untouched."
+        control={
+          <div style={BACKUP_BUTTON_ROW_STYLE}>
+            <Button
+              variant="secondary"
+              onClick={onImportObsidian}
+              disabled={onImportObsidian === undefined}
+            >
+              Import Obsidian vault…
             </Button>
           </div>
         }

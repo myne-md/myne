@@ -49,6 +49,8 @@ export type CommandContext = {
   onOpenSnapshots: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
   onShowGraph: () => void;
+  /** Open the Obsidian vault import flow (folder picker → progress → summary) (MYND-53). */
+  onImportObsidian: () => void;
   /** Switch active selection to the given note id (mirrors sidebar click). */
   onSelectNote: (id: NoteId) => Promise<void>;
   /** Drive Stage transitions for force-relock paths. */

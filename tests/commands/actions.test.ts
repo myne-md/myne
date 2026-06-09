@@ -26,6 +26,7 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onNewNoteFromTemplate: vi.fn(),
     onOpenTodayNote: vi.fn(),
     onOpenAttachments: vi.fn(),
+    onImportObsidian: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -114,10 +115,16 @@ describe("Command palette action visibility per Stage", () => {
     );
   });
 
-  it("\"Import Obsidian vault…\" is always DISABLED in v1.0 (stub for Phase 1.x)", () => {
-    for (const stage of [...editorStages, ...nonEditorStages]) {
-      const ctx = makeContext({ stageName: stage });
-      expect(find("vault.import-obsidian").visibility(ctx)).toBe("disabled");
+  it("\"Import Obsidian vault…\" is SHOWN in editor + HIDDEN elsewhere (MYND-53 backend + UI landed)", () => {
+    for (const stage of editorStages) {
+      expect(find("vault.import-obsidian").visibility(makeContext({ stageName: stage }))).toBe(
+        "show",
+      );
+    }
+    for (const stage of nonEditorStages) {
+      expect(find("vault.import-obsidian").visibility(makeContext({ stageName: stage }))).toBe(
+        "hidden",
+      );
     }
   });
 });
@@ -149,14 +156,18 @@ describe("Command palette action run() side effects", () => {
     expect(onOpenAttachments).toHaveBeenCalledTimes(1);
   });
 
+  it("\"Import Obsidian vault…\" calls onImportObsidian (MYND-53)", () => {
+    const onImportObsidian = vi.fn();
+    find("vault.import-obsidian").run(makeContext({ onImportObsidian }));
+    expect(onImportObsidian).toHaveBeenCalledTimes(1);
+  });
+
   it("Disabled stubs are no-ops when run directly (defensive — palette UI guards them)", async () => {
     const ctx = makeContext({
       stageName: "editor",
       selectedNoteId: "note-1",
     });
-    const importAction = find("vault.import-obsidian");
     const convertAction = find("wikilinks.convert-in-this-note");
-    expect(await importAction.run(ctx)).toBeUndefined();
     expect(await convertAction.run(ctx)).toBeUndefined();
   });
 });

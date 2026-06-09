@@ -37,10 +37,13 @@ const importObsidianAction: CommandAction = {
   id: "vault.import-obsidian",
   label: "Import Obsidian vault…",
   category: "Vault",
-  disabledHint: "Ships in Phase 1.x",
-  visibility: () => "disabled",
-  run: () => {
-    // No-op while disabled.
+  // Enabled on the PR that lands the importer backend + UI (MYND-53), per the
+  // established disabled-control discipline. Editor-stage guarded: import
+  // requires an unlocked vault (note_create is Slot::Unlocked-gated), and the
+  // editor is the only stage that satisfies that.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onImportObsidian();
   },
 };
 
