@@ -50,6 +50,9 @@ import { GraphView } from "../notes/components/GraphView";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast } from "../components/Toast";
+import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
+import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
+import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 import {
@@ -98,6 +101,17 @@ const STATUS_TEXT_STYLE: CSSProperties = {
   fontSize: 12,
   color: "var(--fg-3)",
 };
+
+/**
+ * Device-local dismissal flag for the Obsidian-import onboarding offer (MYND-53,
+ * story 1). The offer shows whenever an unlocked editor mounts AND this flag is
+ * unset; picking "Choose folder…" or "Not now" sets it, so it appears until the
+ * user dismisses it once and then never again (the migration wedge). A
+ * non-sensitive UI boolean — a per-vault `vault.prefs` flag is a possible future
+ * hardening (it would survive a localStorage clear + scope per-vault), but
+ * device-local is sufficient for v0.1.
+ */
+const IMPORTER_OFFER_KEY = "myne.importer.onboarding-offer-dismissed";
 
 /**
  * Word count of a note body, frontmatter excluded. `extractFullText`
@@ -289,6 +303,46 @@ function EditorChrome({
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
   const [graphOpen, setGraphOpen] = useState<boolean>(false);
+  // MYND-53 — Obsidian importer: the active-import modal + the onboarding offer
+  // (shown on editor mount until dismissed once; IMPORTER_OFFER_KEY).
+  const [importerOpen, setImporterOpen] = useState<boolean>(false);
+  const [offerOpen, setOfferOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(IMPORTER_OFFER_KEY) !== "1") {
+        setOfferOpen(true);
+      }
+    } catch {
+      // localStorage unavailable (private mode / blocked) → just skip the offer.
+    }
+  }, []);
+
+  const dismissImporterOffer = useCallback(() => {
+    setOfferOpen(false);
+    try {
+      window.localStorage.setItem(IMPORTER_OFFER_KEY, "1");
+    } catch {
+      // Best-effort — if persistence fails the worst case is the offer reappears.
+    }
+  }, []);
+
+  const handleImported = useCallback(
+    (result: ImportResult) => {
+      const skipped =
+        result.skippedExisting > 0 ? ` · ${result.skippedExisting} skipped` : "";
+      setToastMessage(
+        `Imported ${result.imported} ${result.imported === 1 ? "note" : "notes"}${skipped}`,
+      );
+      // Repopulate the sidebar so the imported notes appear immediately.
+      void noteList()
+        .then((ids) => ctx.refreshAll(ids))
+        .catch(() => {
+          /* sidebar stays as-is until the next refresh — non-fatal */
+        });
+    },
+    [ctx, setToastMessage],
+  );
 
   // Cmd/Ctrl+Shift+G toggles the whole-vault graph (MYND-198, SYNC-7) — the
   // third entry point alongside the command-palette action + BottomBar button.
@@ -639,6 +693,10 @@ function EditorChrome({
         onShowToast={setToastMessage}
         onForceRelock={onForceRelock}
         onDeleteVaultSuccess={onDeleteVaultSuccess}
+        onImportObsidian={() => {
+          setSettingsOpen(false);
+          setImporterOpen(true);
+        }}
       />
       <TemplatesManager
         open={templatesOpen}
@@ -679,9 +737,26 @@ function EditorChrome({
         }}
       />
       <GraphView open={graphOpen} onClose={() => setGraphOpen(false)} />
+      <ObsidianImportModal
+        open={importerOpen}
+        onClose={() => setImporterOpen(false)}
+        onImported={handleImported}
+      />
+      <ImporterOnboardingOffer
+        open={offerOpen}
+        onChoose={() => {
+          dismissImporterOffer();
+          setImporterOpen(true);
+        }}
+        onDismiss={dismissImporterOffer}
+      />
       <CommandPaletteHost
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
+        onImportObsidian={() => {
+          setPaletteOpen(false);
+          setImporterOpen(true);
+        }}
         onOpenAttachments={() => {
           setPaletteOpen(false);
           setCenterView("attachments");
@@ -733,6 +808,7 @@ type CommandPaletteHostProps = {
   onNewNoteFromTemplate: () => void;
   onOpenSnapshots: () => void;
   onShowGraph: () => void;
+  onImportObsidian: () => void;
   onLockFlushed: () => Promise<void>;
 };
 
@@ -745,6 +821,7 @@ function CommandPaletteHost({
   onNewNoteFromTemplate,
   onOpenSnapshots,
   onShowGraph,
+  onImportObsidian,
   onLockFlushed,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
@@ -799,6 +876,7 @@ function CommandPaletteHost({
       onOpenAttachments,
       onOpenSnapshots,
       onShowGraph,
+      onImportObsidian,
       onSelectNote: async (id) => {
         await ctx.open(id).catch(() => {
           /* selection failure surfaces via sidebar UX */
@@ -816,6 +894,7 @@ function CommandPaletteHost({
       onOpenAttachments,
       onOpenSnapshots,
       onShowGraph,
+      onImportObsidian,
     ],
   );
   return (

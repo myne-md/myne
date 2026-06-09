@@ -76,6 +76,12 @@ interface SettingsModalProps {
    * `onClose()` call needed here — the unmount cascade closes us.
    */
   onDeleteVaultSuccess: () => void;
+  /**
+   * Open the Obsidian vault import flow (MYND-53). Threaded from Editor →
+   * StoragePanel's "Import Obsidian vault…" control; the handler closes Settings
+   * and opens the importer modal at the Editor level.
+   */
+  onImportObsidian?: () => void;
 }
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -191,6 +197,7 @@ export function SettingsModal({
   onShowToast,
   onForceRelock,
   onDeleteVaultSuccess,
+  onImportObsidian,
 }: SettingsModalProps) {
   const [selected, setSelected] = useState<PanelId>("account");
   const [childInFlight, setChildInFlight] = useState(false);
@@ -265,7 +272,7 @@ export function SettingsModal({
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     appearance: <AppearancePanel />,
-    storage: <StoragePanel />,
+    storage: <StoragePanel onImportObsidian={onImportObsidian} />,
     about: <AboutPanel />,
   };
 
