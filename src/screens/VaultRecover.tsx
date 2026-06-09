@@ -42,6 +42,7 @@ import { FailClosedError } from "../components/FailClosedError";
 import { closeApp } from "../lib/app-window";
 import { ioBanner } from "../lib/io-banner";
 import type { RecoverSubStep } from "../lib/stage";
+import { listVaults } from "../lib/vault-list";
 import { recoverWithPhrase } from "../lib/vault-recover";
 import {
   deleteVault,
@@ -52,6 +53,7 @@ import type { VaultRecoveryError } from "../types/vault-recovery-error";
 import {
   vaultRecoverReducer,
   initialState,
+  RecoverySelectStep,
   PhraseEntryStep,
   DecryptingStep,
   PasswordResetStep,
@@ -160,6 +162,41 @@ export function VaultRecover({
     };
   }, []);
 
+  // MYND-206 multi-vault recovery gate. On a COLD-START mount (the orchestrator
+  // entered via `unlock.start-recovery` → `initialSubStep === "phrase-entry"`),
+  // probe how many vaults exist on disk. ≥2 → require a selection first
+  // (dispatch `enter-select` → the `select` sub-step renders the picker +
+  // optional account-number). ≤1 → stay in phrase-entry with `vaultId = null`
+  // (single-vault parity, story 7: no picker, no account-number step; the IPC
+  // layer falls back to the sole vault). Runs once; gated on `initialSubStep`
+  // so a RESUMED recovery (`password-reset` entry from `unlock.resume-recovery`
+  // / boot probe) never re-enters selection — that flow already has a
+  // server-side `Slot::Recovering` for a specific vault.
+  const gatedRef = useRef(false);
+  useEffect(() => {
+    if (gatedRef.current) return;
+    if (initialSubStep !== "phrase-entry") {
+      gatedRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const result = await listVaults();
+      if (cancelled) return;
+      gatedRef.current = true;
+      // Only ≥2 well-formed-or-not vaults trigger the selection stage. A
+      // failed list read (exotic — recovery is reached with a vault on disk)
+      // leaves the single-vault phrase-entry path, the safe default.
+      if ("ok" in result && result.ok.length >= 2) {
+        dispatch({ type: "enter-select" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `initialSubStep` is the mount-time hint; `dispatch` is stable.
+  }, [initialSubStep]);
+
   // A8d firing effect: when the sub-step transitions to `decrypting`,
   // read the stashed phrase and invoke the IPC. Resolves/rejects map
   // to `phrase-result` outcomes; ref is wiped on either path.
@@ -170,7 +207,9 @@ export function VaultRecover({
     let cancelled = false;
     void (async () => {
       try {
-        await recoverWithPhrase(phrase);
+        // MYND-206: thread the chosen VaultId (null → sole-vault fallback) so
+        // A8d reads exactly the selected vault's vault.meta (SYNC-6 targeting).
+        await recoverWithPhrase(phrase, state.vaultId ?? undefined);
         if (cancelled) return;
         phraseRef.current = null;
         dispatch({ type: "phrase-result", outcome: { kind: "success" } });
@@ -196,6 +235,20 @@ export function VaultRecover({
   }
 
   switch (state.subStep) {
+    case "select":
+      // MYND-206 multi-vault recovery selection (≥2 vaults). Picker rows +
+      // optional account-number affordance; either resolves a VaultId which
+      // advances to phrase-entry against that vault. Cancel routes the whole
+      // recovery flow back to unlock (same `recover.cancel` route as
+      // phrase-entry's Cancel; slot is Empty — no `vault_lock` needed).
+      return (
+        <RecoverySelectStep
+          onVaultSelected={(vaultId) =>
+            dispatch({ type: "vault-selected", vaultId })
+          }
+          onCancel={onCancel}
+        />
+      );
     case "phrase-entry":
       return (
         <PhraseEntryStep

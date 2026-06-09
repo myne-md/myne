@@ -42,6 +42,17 @@ export type FailClosedReason = "corrupted-vault" | "invalid-state";
 /** Sub-step state machine state. */
 export interface VaultRecoverState {
   subStep: RecoverSubStep;
+  /**
+   * MYND-206: the chosen target `VaultId` (canonical string) once the
+   * multi-vault recovery selection stage resolves one — either by a picker row
+   * click or a successful account-number match. `null` for the single-vault
+   * flow (no selection was made; the IPC layer falls back to the sole vault).
+   * Threaded into BOTH `recover_with_phrase` (A8d) and `complete_recovery`
+   * (A8f) so the whole pipeline reads the SAME chosen vault's `vault.meta`
+   * (SYNC-6 targeting). Set once at `vault-selected`; never cleared, so an A8f
+   * IO-failure bounce back to `phrase-entry` retries against the same vault.
+   */
+  vaultId: string | null;
   /** 24-cell phrase grid. Reads as immutable; all reducer writes
    *  produce a fresh array. Length is fixed at 24. */
   cells: readonly string[];
@@ -86,6 +97,18 @@ export type PasswordOutcome =
   | { kind: "fail-closed"; reason: FailClosedReason };
 
 export type Action =
+  /** MYND-206: the mount-time multi-vault gate found ≥2 vaults on disk, so
+   *  recovery must pick one BEFORE phrase entry. Moves `phrase-entry → select`.
+   *  Fired once by the orchestrator's gate effect on a cold-start mount; a
+   *  no-op outside `phrase-entry` (so it can't disturb a resumed
+   *  `password-reset` or an in-progress grid). The single-vault flow never
+   *  dispatches it (≤1 vault stays in phrase-entry, sole-vault fallback). */
+  | { type: "enter-select" }
+  /** MYND-206: the multi-vault recovery selection stage resolved a target
+   *  `VaultId` (a picker row click OR a successful account-number match).
+   *  Stores the id and advances `select → phrase-entry`. No-op outside the
+   *  `select` sub-step. */
+  | { type: "vault-selected"; vaultId: string }
   /** User typed into a single phrase cell. Whitespace is filtered
    *  (Q5 P5: typed spaces rejected). */
   | { type: "set-cell"; index: number; value: string }
@@ -146,6 +169,7 @@ export const EMPTY_CELLS: readonly string[] = Array.from(
 export function initialState(initialSubStep: RecoverSubStep): VaultRecoverState {
   return {
     subStep: initialSubStep,
+    vaultId: null,
     cells: EMPTY_CELLS,
     password: "",
     banner: null,
@@ -177,6 +201,22 @@ export function vaultRecoverReducer(
   if (state.failClosed) return state;
 
   switch (action.type) {
+    case "enter-select": {
+      // MYND-206: the mount-time gate found ≥2 vaults. Move into the selection
+      // sub-step. Guarded to `phrase-entry` so a resumed `password-reset` or an
+      // already-progressing flow is never yanked back. Cells/banner reset
+      // defensively (the gate fires before any typing on a cold start).
+      if (state.subStep !== "phrase-entry") return state;
+      return { ...state, subStep: "select", cells: EMPTY_CELLS, banner: null };
+    }
+    case "vault-selected": {
+      // MYND-206: only reachable from the multi-vault `select` sub-step. Store
+      // the chosen VaultId and advance to phrase-entry against that vault. The
+      // single-vault flow never reaches `select` (it mounts straight in
+      // phrase-entry with `vaultId = null`).
+      if (state.subStep !== "select") return state;
+      return { ...state, subStep: "phrase-entry", vaultId: action.vaultId };
+    }
     case "set-cell": {
       if (state.subStep !== "phrase-entry") return state;
       if (action.index < 0 || action.index >= PHRASE_CELL_COUNT) return state;

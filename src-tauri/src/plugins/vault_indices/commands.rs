@@ -42,7 +42,7 @@ pub async fn vault_indices_apply(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<(), VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     indices.apply(
@@ -74,7 +74,7 @@ pub async fn vault_indices_all_edges(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<(String, Vec<WikilinkEdge>)>, VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.all_edges(MAX_GRAPH_EDGES))
@@ -89,7 +89,7 @@ pub async fn vault_indices_orphans(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<String>, VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.orphans())
@@ -106,7 +106,7 @@ pub async fn vault_indices_forward(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<WikilinkEdge>, VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.forward(&note_id))
@@ -124,7 +124,7 @@ pub async fn vault_indices_backlink_candidates(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<CandidateEdge>, VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.backlink_candidates(&title_key))
@@ -140,7 +140,7 @@ pub async fn vault_indices_by_tag(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<String>, VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.by_tag(&folded_tag))
@@ -155,7 +155,7 @@ pub async fn vault_indices_tag_tree(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<TagTreeNode>, VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.tag_tree())
@@ -173,7 +173,7 @@ pub async fn vault_indices_remove(
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<(), VaultIndicesError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     indices.remove(&note_id);

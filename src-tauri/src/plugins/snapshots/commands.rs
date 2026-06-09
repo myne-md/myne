@@ -73,7 +73,7 @@ pub(crate) async fn snapshot_list_in(
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
     let note_id = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
 
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
         Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
@@ -107,7 +107,7 @@ pub async fn snapshot_list<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     note_id: String,
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
-    let snapshots_dir = resolve_snapshots_dir(&app)?;
+    let snapshots_dir = resolve_snapshots_dir(&app, state.active_vault_id().await)?;
     snapshot_list_in(snapshots_dir, state.inner(), note_id)
         .await
         .inspect_err(|e| {
@@ -134,7 +134,7 @@ pub(crate) async fn snapshot_preview_in(
         return Err(SnapshotError::InvalidSnapshotId);
     }
 
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
         Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
@@ -180,7 +180,7 @@ pub async fn snapshot_preview<R: Runtime>(
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<String, SnapshotError> {
-    let snapshots_dir = resolve_snapshots_dir(&app)?;
+    let snapshots_dir = resolve_snapshots_dir(&app, state.active_vault_id().await)?;
     snapshot_preview_in(snapshots_dir, state.inner(), note_id, snapshot_uuid)
         .await
         .inspect_err(|e| {
@@ -217,7 +217,7 @@ pub(crate) async fn snapshot_restore_in(
 
     // Step 1: decode the snapshot → plaintext (in-memory; Zeroizing-bounded).
     let plaintext: Zeroizing<String> = {
-        let slot = state.slot_read().await;
+        let slot = state.slot_read_active().await;
         let (items_key, items_key_id) = match &*slot {
             Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
             Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
@@ -282,7 +282,7 @@ pub async fn snapshot_restore<R: Runtime>(
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<(), SnapshotError> {
-    let notes_dir = resolve_notes_dir(&app)?;
+    let notes_dir = resolve_notes_dir(&app, state.active_vault_id().await)?;
     snapshot_restore_in(
         notes_dir,
         state.inner(),
@@ -312,7 +312,7 @@ pub(crate) async fn snapshot_prune_in(
 ) -> Result<u32, SnapshotError> {
     let note_id = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
 
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
         Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
@@ -346,7 +346,7 @@ pub async fn snapshot_prune<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     note_id: String,
 ) -> Result<u32, SnapshotError> {
-    let snapshots_dir = resolve_snapshots_dir(&app)?;
+    let snapshots_dir = resolve_snapshots_dir(&app, state.active_vault_id().await)?;
     snapshot_prune_in(snapshots_dir, state.inner(), note_id)
         .await
         .inspect_err(|e| {
@@ -360,8 +360,11 @@ pub async fn snapshot_prune<R: Runtime>(
 
 // ---- path resolution ----------------------------------------------------
 
-fn resolve_snapshots_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, SnapshotError> {
-    paths::snapshots_dir(app).map_err(|e| match e.kind() {
+fn resolve_snapshots_dir<R: Runtime>(
+    app: &AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> Result<PathBuf, SnapshotError> {
+    paths::snapshots_dir_for(app, active_id).map_err(|e| match e.kind() {
         std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
             SnapshotError::NotesDirNotADirectory
         }
@@ -371,8 +374,11 @@ fn resolve_snapshots_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, Snap
     })
 }
 
-fn resolve_notes_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, SnapshotError> {
-    paths::notes_dir(app).map_err(|e| match e.kind() {
+fn resolve_notes_dir<R: Runtime>(
+    app: &AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> Result<PathBuf, SnapshotError> {
+    paths::notes_dir_for(app, active_id).map_err(|e| match e.kind() {
         std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
             SnapshotError::NotesDirNotADirectory
         }
@@ -387,7 +393,7 @@ mod tests {
     use super::*;
     use crate::paths::{notes_dir_under, snapshots_dir_under};
     use crate::plugins::notes::commands::{note_create_with_dir, note_update_with_dir};
-    use crate::plugins::vault_unlock::state::fixture_unlocked_with_keys;
+    use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
     use crate::test_support::ScopedTempDir;
 
     const FIXTURE_ROOT_BYTE: u8 = 0x07;
@@ -405,11 +411,14 @@ mod tests {
     async fn unlocked() -> VaultRuntimeState {
         let state = VaultRuntimeState::default();
         state
-            .set_unlocked(fixture_unlocked_with_keys(
-                FIXTURE_ROOT_BYTE,
-                FIXTURE_ITEMS_BYTE,
-                FIXTURE_ITEMS_ID_BYTE,
-            ))
+            .set_unlocked(
+                test_vault_id(),
+                fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ),
+            )
             .await;
         state
     }

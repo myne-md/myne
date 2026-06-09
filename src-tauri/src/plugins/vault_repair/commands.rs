@@ -109,7 +109,7 @@ pub(crate) async fn vault_repair_with_dir(
 
     // (2) Slot must be Empty — a non-Empty slot is an active session,
     //     i.e. a live vault (vault_delete's gated territory).
-    if state.slot_kind().await != SlotKind::Empty {
+    if state.slot_kind_active().await != SlotKind::Empty {
         tracing::debug!(
             stage = "slot_check",
             error_kind = "VaultPresent",
@@ -206,6 +206,7 @@ pub(crate) async fn vault_repair_with_dir(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plugins::vault_unlock::state::test_vault_id;
     use crate::test_support::ScopedTempDir;
 
     #[test]
@@ -284,6 +285,7 @@ mod tests {
             let state = VaultRuntimeState::default();
             state
                 .set_unlocked(
+                    test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
                 )
                 .await;

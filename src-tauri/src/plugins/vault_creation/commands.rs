@@ -7,6 +7,7 @@
 use super::error::AppError;
 use super::state::{SessionLookup, VaultCreationSession, VaultCreationState};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
+use crate::vault_id::VaultId;
 use protocol::{
     KdfParams, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, DEFAULT_V0_1_KDF_PARAMS,
     VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
@@ -55,10 +56,21 @@ pub struct BeginResult {
 ///
 /// On failure (Argon2id error, JoinFailure, panic): the
 /// [`SlotReservation`]'s `Drop` releases the slot.
+///
+/// SYNC-6 create targeting: `begin` mints a fresh, collision-free
+/// [`VaultId`] (`vault_registry::mint_unique_vault_id`, scanned against the
+/// live `vaults/` dir) and stores it on the session, so `commit` writes the
+/// new vault to `vaults/<minted-id>/`. This makes the first vault (fresh
+/// install) AND every "create another" vault land in a freshly-minted
+/// `vaults/<id>/` — there is no longer a transitional fall-back to the legacy
+/// `vault/` directory for a newly-created vault. The `AppHandle` is needed
+/// only to resolve `<app_data_dir>` for the collision scan; minting is cheap
+/// and runs before the slot reservation + Argon2id work.
 #[tauri::command]
-pub async fn begin(
+pub async fn begin<R: Runtime>(
     password: String,
     state: State<'_, VaultCreationState>,
+    app: tauri::AppHandle<R>,
 ) -> Result<BeginResult, AppError> {
     // Wrap immediately so any early-return path (slot-cap rejection,
     // spawn_blocking join failure, build_session error) drops the
@@ -88,6 +100,16 @@ pub async fn begin(
         return Err(AppError::WeakNewPassword);
     }
 
+    // Mint the fresh `VaultId` for this creation BEFORE reserving a slot or
+    // kicking off Argon2id — it is a cheap UUIDv7 + a read-only `vaults/`
+    // collision scan, and resolving `<app_data_dir>` here keeps the
+    // `AppHandle` out of the `spawn_blocking` closure. `commit` resolves the
+    // write destination to `vaults/<minted-id>/` from the session by default
+    // (SYNC-6). An `app_data_dir` lookup failure fails fast without
+    // consuming a session slot.
+    let base = crate::paths::app_data_dir(&app)?;
+    let vault_id = crate::vault_registry::mint_unique_vault_id(&base);
+
     // Reserve a slot atomically before kicking off ~2 seconds of
     // Argon2id work. If the cap is already saturated, fail fast
     // without consuming any memory.
@@ -98,11 +120,13 @@ pub async fn begin(
     // bytes wipe when the closure ends — success or failure. If
     // anything in here fails, the `?` early-exit drops `reservation`
     // (releasing the slot via SlotReservation::drop) and the closure-
-    // captured wrapper drops in spawn_blocking's task pool.
-    let session =
-        tokio::task::spawn_blocking(move || build_session(&password, DEFAULT_V0_1_KDF_PARAMS))
-            .await
-            .map_err(|_| AppError::JoinFailure)??;
+    // captured wrapper drops in spawn_blocking's task pool. The minted
+    // `vault_id` (Copy) moves into the closure and is stored on the session.
+    let session = tokio::task::spawn_blocking(move || {
+        build_session(vault_id, &password, DEFAULT_V0_1_KDF_PARAMS)
+    })
+    .await
+    .map_err(|_| AppError::JoinFailure)??;
 
     // Take the visible parts out before moving the session into the
     // map. `phrase.words()` returns `&[String; 24]` from inside
@@ -126,7 +150,14 @@ pub async fn begin(
 }
 
 /// Pure-function helper — no Tauri runtime, no async — that builds a
-/// fresh [`VaultCreationSession`] from a password.
+/// fresh [`VaultCreationSession`] from a password and a pre-minted
+/// [`VaultId`].
+///
+/// `vault_id` is the fresh, collision-free id minted by the caller
+/// (`begin` mints it via `vault_registry::mint_unique_vault_id` against
+/// the live `vaults/` dir; tests pass a bare `VaultId::mint()`). It is
+/// stored on the session so `commit` resolves the write destination to
+/// `vaults/<vault_id>/` by default (SYNC-6 create targeting).
 ///
 /// Tests instantiate this directly with fast Argon2id parameters
 /// (`m_kib=8, t=1, p=1`) so they don't need a Tauri runtime and don't
@@ -135,6 +166,7 @@ pub async fn begin(
 /// are stored on the returned session so `commit` rebuilds the AADs
 /// and `vault.meta` under the same set.
 pub(crate) fn build_session(
+    vault_id: VaultId,
     password: &str,
     kdf_params: KdfParams,
 ) -> Result<VaultCreationSession, AppError> {
@@ -151,6 +183,7 @@ pub(crate) fn build_session(
         protocol::derive_recovery_wrap_key(&phrase, &salt_recovery, &account.hash, &kdf_params)?;
 
     Ok(VaultCreationSession {
+        vault_id,
         account,
         phrase,
         kdf_params,
@@ -196,19 +229,43 @@ pub(crate) fn build_session(
 ///       On worker failure: re-insert the session under the same
 ///       token so the next `commit` invocation with that token can
 ///       retry.
+/// Returns the canonical string form of the `VaultId` the new vault was
+/// written to (`Some` for the normal `vaults/<id>/` path; `None` only on the
+/// legacy sole-vault fallback). The frontend threads this id straight into the
+/// chained `vault_unlock` so the auto-unlock targets the just-created vault
+/// rather than the ambiguous sole-vault fallback — which, once a second vault
+/// exists, resolves to a non-existent legacy path (`VaultNotFound`).
 #[tauri::command]
 pub async fn commit<R: Runtime>(
+    vault_id: Option<String>,
     session_token: String,
     state: State<'_, VaultCreationState>,
     runtime_state: State<'_, VaultRuntimeState>,
     app: tauri::AppHandle<R>,
-) -> Result<(), AppError> {
+) -> Result<Option<String>, AppError> {
     let token = Uuid::parse_str(&session_token).map_err(|_| AppError::SessionNotFound)?;
+    // SYNC-6 create targeting. Resolution precedence for the write
+    // destination, all without consuming the session yet:
+    //   1. an explicit, well-formed `vault_id` IPC param overrides (kept as an
+    //      escape hatch; the create flow does NOT pass one);
+    //   2. otherwise the session's own freshly-minted `VaultId` (minted at
+    //      `begin`) — the default path BOTH the first vault and every "create
+    //      another" vault take, so a new vault always lands at a fresh
+    //      `vaults/<id>/` rather than the legacy `vault/` fallback;
+    //   3. only if neither is available (no param AND the session is
+    //      absent/expired) do we fall through to the sole-vault `vault_dir`
+    //      fallback — and in that case the `state.take` inside
+    //      `commit_with_vault_path` immediately surfaces the precise
+    //      SessionNotFound / SessionExpired, so the path is never written.
+    // The session is peeked (not taken) so a path-resolution failure leaves it
+    // intact in the live map for a future retry (mirrors the prior ordering).
+    let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref())
+        .or_else(|| state.peek_vault_id(token));
     // Resolve the path before consuming the session — if app_data_dir
     // lookup or create_dir_all on the vault subfolder fails, there's
     // nothing to restore yet (the session is still in the live map for
     // a future retry once the underlying condition is fixed).
-    let vault_dir = crate::paths::vault_dir(&app)?;
+    let vault_dir = crate::paths::vault_dir_for_id(&app, target)?;
     let vault_path = vault_dir.join("vault.meta");
     commit_with_permit(
         token,
@@ -216,7 +273,10 @@ pub async fn commit<R: Runtime>(
         state.inner(),
         runtime_state.auth_permits(),
     )
-    .await
+    .await?;
+    // Surface the written-to vault id so the frontend's chained auto-unlock can
+    // target it explicitly (`target` is `Copy`, untouched by the path resolve).
+    Ok(target.map(|id| id.to_string()))
 }
 
 /// `auth_permits`-gated wrapper around [`commit_with_vault_path`].
@@ -306,6 +366,18 @@ pub(crate) async fn commit_with_permit(
 ///
 /// `pub(crate)` so the future `vault_repair` (v0.2, Plane MYND-159)
 /// can re-use the same predicate without duplication.
+///
+/// **Per-vault-directory scoping (SYNC-9, MYND-202).** This predicate is a
+/// pure function of the passed `vault_dir`: every probe is a
+/// `vault_dir.join(...)`, and there is no hidden resolution of a global
+/// `vault/` (or `vaults/`) location. Under the multi-vault `vaults/<id>/`
+/// layout the create path mints a fresh empty `vaults/<new-id>/` and passes
+/// *that* directory in, so the guard fires only on a genuine same-dir
+/// overwrite — a fully-populated sibling `vaults/<other-id>/` elsewhere never
+/// trips it. "Creating a vault never overwrites an existing `vault.meta`"
+/// therefore holds **per-vault-dir**. SYNC-9 keeps the predicate verbatim;
+/// the per-dir guarantee is a property of the call site (the freshly-minted
+/// dir) plus this purity, not a code change to the guard.
 pub(crate) fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool> {
     if !vault_dir.exists() {
         return Ok(false);
@@ -689,8 +761,12 @@ mod tests {
 
     #[test]
     fn build_session_populates_every_field() {
-        let session =
-            build_session("correct horse battery staple", FAST_TEST_KDF).expect("fast params");
+        let session = build_session(
+            VaultId::mint(),
+            "correct horse battery staple",
+            FAST_TEST_KDF,
+        )
+        .expect("fast params");
 
         assert!(session.account.display.starts_with("MY-"));
         assert_eq!(session.account.canonical.len(), 20);
@@ -705,15 +781,28 @@ mod tests {
     }
 
     #[test]
+    fn build_session_stores_the_passed_vault_id() {
+        // SYNC-6: the id `build_session` is handed (minted by `begin` in
+        // production) is stored verbatim on the session — `commit` resolves
+        // the write destination to `vaults/<vault_id>/` from it.
+        let id = VaultId::mint();
+        let session = build_session(id, "any password", FAST_TEST_KDF).unwrap();
+        assert_eq!(
+            session.vault_id, id,
+            "session must carry the minted VaultId"
+        );
+    }
+
+    #[test]
     fn build_session_password_and_recovery_wrap_keys_differ() {
-        let session = build_session("any password", FAST_TEST_KDF).unwrap();
+        let session = build_session(VaultId::mint(), "any password", FAST_TEST_KDF).unwrap();
         assert_ne!(*session.password_wrap_key, *session.recovery_wrap_key);
     }
 
     #[test]
     fn build_session_is_non_deterministic() {
-        let a = build_session("same password", FAST_TEST_KDF).unwrap();
-        let b = build_session("same password", FAST_TEST_KDF).unwrap();
+        let a = build_session(VaultId::mint(), "same password", FAST_TEST_KDF).unwrap();
+        let b = build_session(VaultId::mint(), "same password", FAST_TEST_KDF).unwrap();
         assert_ne!(a.account.canonical, b.account.canonical);
         assert_ne!(a.phrase.words(), b.phrase.words());
         assert_ne!(*a.root_key, *b.root_key);
@@ -739,7 +828,7 @@ mod tests {
         // the session by value, so a failed atomic_write could not be
         // retried with the same session. The borrow signature lets
         // commit re-insert the session under its token on failure.
-        let session = build_session("any password", FAST_TEST_KDF).unwrap();
+        let session = build_session(VaultId::mint(), "any password", FAST_TEST_KDF).unwrap();
         let bytes_a = build_and_serialize_vault_meta(&session).expect("first call");
         let bytes_b = build_and_serialize_vault_meta(&session).expect("second call");
         assert_eq!(bytes_a.len(), bytes_b.len());
@@ -824,7 +913,8 @@ mod tests {
     /// the exact path commit's retry-on-failure uses.
     fn seed_session_into_state(state: &VaultCreationState) -> Uuid {
         let token = Uuid::new_v4();
-        let session = build_session("commit-test-pw", FAST_TEST_KDF).expect("build_session");
+        let session =
+            build_session(VaultId::mint(), "commit-test-pw", FAST_TEST_KDF).expect("build_session");
         state
             .try_insert(token, session)
             .expect("scratch state has room");
@@ -1141,6 +1231,56 @@ mod tests {
         );
     }
 
+    /// SYNC-9 / MYND-202 (sub-feature 5): per-vault-directory guard scoping
+    /// under the multi-vault `vaults/<id>/` layout. A fully-populated SIBLING
+    /// vault (`vaults/<other-id>/` carrying `vault.meta`, `vault.prefs`, a
+    /// `notes/*.myn` blob, etc.) present *elsewhere* must NOT trip the guard
+    /// when it is evaluated against a freshly-minted, empty `vaults/<new-id>/`.
+    /// This is the load-bearing property that lets the create path (sub-feature
+    /// 3) operate on a fresh dir while other vaults coexist: because
+    /// `vault_artifacts_present` is a pure function of its `vault_dir` arg
+    /// (no global `vault/`/`vaults/` resolution), the sibling's artefacts are
+    /// invisible to a scan of the fresh dir.
+    #[test]
+    fn vault_artifacts_present_ignores_populated_sibling_vault() {
+        let tmp = crate::test_support::ScopedTempDir::new("vap-sibling").expect("scoped tempdir");
+        // Realistic multi-vault disk shape: `<base>/vaults/<id>/`.
+        let vaults = tmp.path().join("vaults");
+
+        // A fully-populated SIBLING vault under its own `vaults/<other-id>/`.
+        let other_id = crate::vault_id::VaultId::mint();
+        let sibling = vaults.join(other_id.to_string());
+        std::fs::create_dir_all(sibling.join("notes")).expect("mkdir sibling notes/");
+        std::fs::write(sibling.join("vault.meta"), b"sibling vault.meta bytes")
+            .expect("seed sibling vault.meta");
+        std::fs::write(sibling.join("vault.prefs"), b"sibling vault.prefs bytes")
+            .expect("seed sibling vault.prefs");
+        std::fs::write(
+            sibling
+                .join("notes")
+                .join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+            b"sibling note blob",
+        )
+        .expect("seed sibling .myn");
+        // Sanity: the sibling dir itself trips the guard (it is a real vault).
+        assert!(
+            vault_artifacts_present(&sibling).expect("scan sibling ok"),
+            "a fully-populated vault dir must trip the guard when scanned directly"
+        );
+
+        // The FRESH, empty create target under a distinct `vaults/<new-id>/`.
+        let new_id = crate::vault_id::VaultId::mint();
+        let fresh = vaults.join(new_id.to_string());
+        std::fs::create_dir_all(&fresh).expect("mkdir fresh vaults/<new-id>/");
+
+        // The guard, evaluated against the fresh dir, must NOT see the
+        // sibling's artefacts — per-vault-directory scoping (SYNC-9).
+        assert!(
+            !vault_artifacts_present(&fresh).expect("scan fresh ok"),
+            "a populated sibling vaults/<other-id>/ must NOT trip the guard on a fresh empty vaults/<new-id>/"
+        );
+    }
+
     /// MYND-160 Task 12: a successful `commit_with_vault_path` produces
     /// BOTH `vault.meta` AND `vault.prefs` on disk. Closed invariant
     /// from `decisions.md` 2026-05-27 "Vault preferences blob" entry.
@@ -1179,6 +1319,108 @@ mod tests {
         });
     }
 
+    /// SYNC-6 create targeting (task 4): a commit aimed at a `vaults/<id>/`
+    /// path (the shape `vault_dir_for_id(Some(id))` produces) writes the new
+    /// `vault.meta` under exactly that directory — proving the inner
+    /// `commit_with_vault_path` seam honors the threaded explicit-id path. The
+    /// `commit` Tauri wrapper resolves `Some(id)` → this path; here we build it
+    /// directly via the same `vault_root_for_id_from_base` resolver to avoid an
+    /// `AppHandle` in the test.
+    #[test]
+    fn commit_targeting_an_explicit_vault_id_writes_under_that_vaults_child() {
+        rt().block_on(async {
+            let base = crate::test_support::ScopedTempDir::new("commit-target").unwrap();
+            let id = crate::vault_id::VaultId::mint();
+            // The explicit-id resolver's path (mirrors vault_dir_for_id(Some)).
+            let vault_root = crate::paths::vault_root_for_id_from_base(base.path(), id);
+            std::fs::create_dir_all(&vault_root).expect("create vaults/<id>/");
+            let vault_path = vault_root.join("vault.meta");
+
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            commit_with_vault_path(token, vault_path.clone(), &state)
+                .await
+                .expect("commit to the explicit vaults/<id>/ path must succeed");
+
+            // vault.meta landed under exactly `vaults/<id>/`.
+            assert!(
+                vault_path.exists(),
+                "vault.meta must be written under the targeted vaults/<id>/ directory"
+            );
+            // The targeted root names back to the explicit id (round-trip).
+            assert_eq!(
+                crate::paths::vault_id_from_root(&vault_root),
+                id,
+                "the targeted root must name back to the explicit VaultId"
+            );
+        });
+    }
+
+    /// SYNC-6 + SYNC-9 (this task — create the Nth vault): a `commit` aimed at
+    /// a freshly-minted, empty `vaults/<new-id>/` SUCCEEDS even when a
+    /// fully-populated SIBLING vault exists under another `vaults/<other-id>/`.
+    /// This is the end-to-end create-flow property (the session-minted id of
+    /// `begin` → `vaults/<id>/` write destination): the `VaultArtifactsPresent`
+    /// guard is per-vault-dir, so a sibling's artefacts never gate creation of
+    /// a distinct vault. Pairs with the pure-predicate
+    /// `vault_artifacts_present_ignores_populated_sibling_vault` above — this one
+    /// drives the actual write pipeline (guard → AEAD-wrap → atomic_write) to
+    /// the fresh dir and asserts both that the new `vault.meta` lands AND that
+    /// the sibling's `vault.meta` is left byte-for-byte untouched.
+    #[test]
+    fn commit_to_fresh_vaults_child_succeeds_with_populated_sibling_present() {
+        rt().block_on(async {
+            let base = crate::test_support::ScopedTempDir::new("commit-nth").unwrap();
+
+            // A fully-populated SIBLING vault under `vaults/<other-id>/`.
+            let other_id = crate::vault_id::VaultId::mint();
+            let sibling_root = crate::paths::vault_root_for_id_from_base(base.path(), other_id);
+            std::fs::create_dir_all(sibling_root.join("notes")).expect("mkdir sibling notes/");
+            let sibling_meta = sibling_root.join("vault.meta");
+            let sibling_meta_bytes = b"sibling vault.meta - MUST NOT be touched";
+            std::fs::write(&sibling_meta, sibling_meta_bytes).expect("seed sibling vault.meta");
+            std::fs::write(sibling_root.join("vault.prefs"), b"sibling prefs")
+                .expect("seed sibling vault.prefs");
+            std::fs::write(
+                sibling_root
+                    .join("notes")
+                    .join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+                b"sibling note blob",
+            )
+            .expect("seed sibling .myn");
+
+            // The fresh, empty create target under a DISTINCT `vaults/<new-id>/`
+            // (the shape `vault_dir_for_id(Some(session.vault_id))` resolves to).
+            let new_id = crate::vault_id::VaultId::mint();
+            let fresh_root = crate::paths::vault_root_for_id_from_base(base.path(), new_id);
+            std::fs::create_dir_all(&fresh_root).expect("mkdir fresh vaults/<new-id>/");
+            let fresh_meta = fresh_root.join("vault.meta");
+
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            // The guard must NOT fire (the sibling lives in a different dir),
+            // and the full write pipeline must complete.
+            commit_with_vault_path(token, fresh_meta.clone(), &state)
+                .await
+                .expect("creating the Nth vault with a populated sibling present must succeed");
+
+            // The new vault landed under its own `vaults/<new-id>/`.
+            assert!(
+                fresh_meta.exists(),
+                "the Nth vault's vault.meta must be written under its fresh vaults/<new-id>/"
+            );
+            // The sibling's vault.meta is byte-for-byte untouched — the guard's
+            // per-vault-dir scoping means the create never reached the sibling.
+            assert_eq!(
+                std::fs::read(&sibling_meta).expect("sibling vault.meta still readable"),
+                sibling_meta_bytes,
+                "the populated sibling vault.meta must be left untouched"
+            );
+        });
+    }
+
     /// MYND-169: the eager-written `vault.attachments` decrypts under the
     /// vault's own `root_key`-derived catalog KEK and the plaintext is the
     /// empty catalog (the documented base case for a fresh vault).
@@ -1188,7 +1430,8 @@ mod tests {
             let scratch = ScratchVault::new();
             let state = VaultCreationState::default();
             let token = Uuid::new_v4();
-            let session = build_session("commit-test-pw", FAST_TEST_KDF).expect("build_session");
+            let session = build_session(VaultId::mint(), "commit-test-pw", FAST_TEST_KDF)
+                .expect("build_session");
             let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
             let original_account_hash = session.account.hash;
             state
@@ -1279,7 +1522,8 @@ mod tests {
             // the post-commit decryption assertion. (`seed_session_into_state`
             // moves the session into state.)
             let token = Uuid::new_v4();
-            let session = build_session("commit-test-pw", FAST_TEST_KDF).expect("build_session");
+            let session = build_session(VaultId::mint(), "commit-test-pw", FAST_TEST_KDF)
+                .expect("build_session");
             let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
             let original_account_hash = session.account.hash;
             state

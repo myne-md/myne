@@ -139,9 +139,11 @@ async fn serve<R: Runtime>(
         }
     };
 
-    // (4) Resolve the vault dir + read the catalog (for the content_type
-    //     AAD hint) + the blob, decode + re-sniff, build the response.
-    let vault_dir = match vault_dir(app) {
+    // (4) Resolve the ACTIVE vault dir + read the catalog (for the content_type
+    //     AAD hint) + the blob, decode + re-sniff, build the response. Resolve
+    //     the active id from the `state` obtained above (SYNC-6) so the served
+    //     bytes come from the unlocked vault, not the sole-vault disk heuristic.
+    let vault_dir = match vault_dir(app, state.active_vault_id().await) {
         Ok(d) => d,
         Err(_) => return server_error(),
     };
@@ -330,13 +332,17 @@ fn hex_val(b: u8) -> Option<u8> {
     }
 }
 
-/// Resolve `<app_data_dir>/vault/`.
-fn vault_dir<R: Runtime>(app: &tauri::AppHandle<R>) -> std::io::Result<PathBuf> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| std::io::Error::other("app_data_dir resolution failed"))?;
-    Ok(base.join("vault"))
+/// Resolve the ACTIVE vault root. `active_id` is read from the runtime state by
+/// [`serve`] (`state.active_vault_id().await`) after it obtains the managed
+/// `VaultRuntimeState` — the only place with `.await` access to the slot map.
+/// SYNC-6: the `attachment://` handler serves the unlocked vault's blobs, so
+/// resolving via the active id (not the transitional sole-vault disk heuristic)
+/// keeps the served bytes targeting the correct vault once two or more exist.
+fn vault_dir<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> std::io::Result<PathBuf> {
+    crate::paths::active_vault_root_io(app, active_id)
 }
 
 /// Read `vault.meta`'s account_number_hash; `None` on IO / parse failure.

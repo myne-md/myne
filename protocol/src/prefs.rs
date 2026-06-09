@@ -328,6 +328,23 @@ pub struct PrefsView {
     /// Canonical key 'i' — sorts after `folder_icons`, before `item_order`.
     #[serde(default)]
     pub item_colors: BTreeMap<String, String>,
+
+    /// Human-readable per-vault label (MYND-205) — the name the in-app vault
+    /// switcher shows for this vault. `None` ≡ no label set → the switcher
+    /// shows a neutral fallback (`Vault N`). A **non-load-bearing** cosmetic
+    /// preference (AS-low) — a tampered/replayed `vault.prefs` can at worst
+    /// surface the wrong display name — so no protective-envelope clamp. The
+    /// label lives **encrypted-only** inside `vault.prefs` (SYNC-3): it never
+    /// touches disk or crosses IPC in plaintext except as the user's own input
+    /// to `vault_set_label`, and decrypts into a per-session RAM cache on
+    /// unlock. NFC-normalized + **omitted entirely when `None`**, so a vault
+    /// that never set a label is byte-identical to a pre-MYND-205 `vault.prefs`
+    /// (existing golden vectors unaffected, no outer-envelope / magic change —
+    /// this rides the existing `MYP1` format as a migration-less additive
+    /// field, exactly like `auto_lock_seconds`). Canonical key 'l' — sorts
+    /// after `item_order`, before `screen_capture_protection`.
+    #[serde(default)]
+    pub label: Option<String>,
 }
 
 impl Default for PrefsView {
@@ -351,6 +368,7 @@ impl Default for PrefsView {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         }
     }
 }
@@ -593,6 +611,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // label (canonical key 'l' — after 'item_order' [i < l], before
+    // 'screen_capture_protection' [l < s]). The per-vault display name (MYND-205);
+    // omitted entirely when None so a vault that never set a label is
+    // byte-identical to a pre-MYND-205 vault.prefs (existing KAT vectors
+    // unaffected). NFC-normalized like the other string fields.
+    if let Some(ref label) = prefs.label {
+        out.extend_from_slice(b"\"label\":");
+        push_json_string(&mut out, &label.nfc().collect::<String>());
+        out.push(b',');
+    }
+
     out.extend_from_slice(b"\"screen_capture_protection\":");
     out.extend_from_slice(if prefs.screen_capture_protection {
         b"true"
@@ -819,6 +848,11 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let folder_icons = parse_optional_string_map_field(rest, &mut cursor, b"\"folder_icons\":")?;
     let item_colors = parse_optional_string_map_field(rest, &mut cursor, b"\"item_colors\":")?;
     let item_order = parse_optional_array_field(rest, &mut cursor, b"\"item_order\":")?;
+    // label (key 'l') — the per-vault display name (MYND-205), sitting between
+    // item_order (i) and screen_capture_protection (s) in canonical order.
+    // Parsed from the same monotonic cursor so a later field's key marker is
+    // never matched inside a prior field's content.
+    let label = parse_optional_string_field(rest, &mut cursor, b"\"label\":")?;
 
     // ---- screen_capture_protection (required) ----
     let region = &rest[cursor..];
@@ -861,6 +895,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         item_order,
         editor_layout,
         theme,
+        label,
     })
 }
 
@@ -1351,6 +1386,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -1371,6 +1407,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1511,6 +1548,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                label: None,
             }
         );
     }
@@ -1533,6 +1571,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                label: None,
             }
         );
     }
@@ -1617,6 +1656,65 @@ mod tests {
         );
     }
 
+    // ---- label field (MYND-205) --------------------------------------
+
+    #[test]
+    fn encode_omits_label_when_none_byte_identical_to_pre_label() {
+        // A vault that never set a label encodes byte-identically to the
+        // single-field pre-MYND-205 form (migration-less additive field).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#,);
+    }
+
+    #[test]
+    fn encode_places_label_between_item_order_and_screen_capture() {
+        // Canonical key order: item_order (i) < label (l) < screen_capture (s).
+        let encoded = canonical_json_encode(&PrefsView {
+            item_order: alloc::vec![alloc::string::String::from("n1")],
+            label: Some(alloc::string::String::from("Work")),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"item_order":["n1"],"label":"Work","screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn label_round_trips_through_decode() {
+        let original = PrefsView {
+            label: Some(alloc::string::String::from("Personal")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.label, Some(alloc::string::String::from("Personal")));
+        // The rest of the view round-trips to defaults.
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn label_is_nfc_normalized_on_encode() {
+        // "é" as NFD (e + combining acute) normalizes to NFC single codepoint.
+        let nfd = alloc::string::String::from("Cafe\u{0301}");
+        let encoded = canonical_json_encode(&PrefsView {
+            label: Some(nfd),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            "{\"label\":\"Café\",\"screen_capture_protection\":true}".as_bytes(),
+        );
+    }
+
+    #[test]
+    fn decode_absent_label_is_none() {
+        // A pre-MYND-205 single-field blob decodes with label == None.
+        let parsed =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert_eq!(parsed.label, None);
+    }
+
     #[test]
     fn encode_emits_theme_last_dark_with_scp_false() {
         let encoded = canonical_json_encode(&PrefsView {
@@ -1653,6 +1751,7 @@ mod tests {
                 right_collapsed: true,
             }),
             theme: Some(ThemeChoice::Dark),
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1758,6 +1857,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1785,6 +1885,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1810,6 +1911,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1834,6 +1936,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1921,6 +2024,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -1973,6 +2077,7 @@ mod tests {
                 alloc::string::String::from("n2"),
             ],
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2004,6 +2109,7 @@ mod tests {
                 alloc::string::String::from("zzz"),
             ],
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2067,6 +2173,7 @@ mod tests {
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
             ],
             editor_layout: None,
+            label: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2105,6 +2212,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2129,6 +2237,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2155,6 +2264,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2249,6 +2359,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2317,6 +2428,7 @@ mod tests {
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             editor_layout: Some(sample_layout()),
+            label: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2575,6 +2687,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2603,6 +2716,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            label: None,
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -2892,6 +3006,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                label: None,
             },
             &nonce_default,
         )
@@ -2913,6 +3028,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                label: None,
             },
             &nonce_toggled,
         )
@@ -2951,6 +3067,7 @@ mod tests {
                 left_collapsed: false,
                 right_collapsed: true,
             }),
+            label: None,
         };
         let nonce_populated: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
         let canonical_populated = canonical_json_encode(&prefs_populated);

@@ -11,6 +11,9 @@
 # `vault-recovery-from-phrase` adds `allow-vault-slot-kind` (read-only
 # three-state SlotKind probe — Empty | Recovering | Unlocked, used by
 # frontend boot-time + post-WebView-reload routing in the recovery flow).
+# Task 3 of `vault-registry-and-disk-layout` (multi-vault, MYND-202) adds
+# `allow-vault-list` (read-only multi-vault enumeration: one VaultSummary per
+# discovered `vaults/<id>/`, the SYNC-4 generalization of `vault_status`).
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -20,6 +23,7 @@ permissions = [
     "allow-unlock",
     "allow-lock",
     "allow-vault-status",
+    "allow-vault-list",
     "allow-vault-is-unlocked",
     "allow-vault-slot-kind",
     "allow-report-user-activity",
@@ -39,6 +43,11 @@ commands.allow = ["lock"]
 identifier = "allow-vault-status"
 description = "Allow invoking vault_unlock:vault_status (read-only probe of vault.meta — Exists | Missing | Corrupted)."
 commands.allow = ["vault_status"]
+
+[[permission]]
+identifier = "allow-vault-list"
+description = "Allow invoking vault_unlock:vault_list (read-only multi-vault enumeration: one VaultSummary { id, status: Exists|Corrupted, label, last_unlock } per discovered vaults/<id>/ directory; no account_number_hash bytes or filesystem paths cross IPC)."
+commands.allow = ["vault_list"]
 
 [[permission]]
 identifier = "allow-vault-is-unlocked"

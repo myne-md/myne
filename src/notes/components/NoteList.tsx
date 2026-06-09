@@ -50,6 +50,8 @@ import {
 } from "./useFolderManagement";
 import { Icon } from "../../components/primitives/Icon";
 import { useCenterView } from "../../screens/centerView";
+import { VaultSwitcher } from "../../components/VaultSwitcher";
+import type { VaultId } from "../../lib/stage";
 
 /**
  * Compute the adjacent note to select after deleting `victimId` from
@@ -291,6 +293,17 @@ const SIDEBAR_OUTER_STYLE: CSSProperties = {
   minHeight: 0,
 };
 
+// Sticky sidebar header holding the account-chip vault switcher (MYND-205).
+// Per `docs/design/README.md` "the sidebar header (account chip + new-note
+// button) is sticky" — this is the canonical account-chip location (the brand's
+// signature element), so the switcher mounts here above the "Notes" eyebrow.
+// Hidden for single-vault users (the switcher self-suppresses below two
+// vaults), so the strip collapses to nothing then.
+const HEADER_CHIP_ROW_STYLE: CSSProperties = {
+  flexShrink: 0,
+  padding: "10px 12px 4px",
+};
+
 // Sidebar footer wrapper — pins the nav entries (Attachments + Trash) to
 // the bottom of the sidebar (MYND-133 / MYND-170).
 const FOOTER_WRAP_STYLE: CSSProperties = {
@@ -386,13 +399,29 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
 /** Optional props. `onCollapse` wires the header chevron that hides the
  *  sidebar (MYND-137); omitted when the list is hosted outside the
  *  resizable editor seam. `onNewFromTemplate` wires the new-note caret that
- *  opens the template flow (MYND-190); omitted → the caret is not rendered. */
+ *  opens the template flow (MYND-190); omitted → the caret is not rendered.
+ *
+ *  `onSwitchVault` / `onCreateAnother` / `switching` (MYND-205) thread the
+ *  account-chip vault switcher's wiring from App.tsx → Editor.tsx → here (the
+ *  canonical sticky-sidebar-header location). All three are required together
+ *  for the chip to mount; omitting them (single-vault hosting / isolated test
+ *  renders) leaves the header strip empty — same hidden-when-<2-vaults
+ *  behaviour the switcher itself enforces. */
 interface NoteListProps {
   onCollapse?: () => void;
   onNewFromTemplate?: () => void;
+  onSwitchVault?: (targetVaultId: VaultId) => void;
+  onCreateAnother?: () => void;
+  switching?: boolean;
 }
 
-export function NoteList({ onCollapse, onNewFromTemplate }: NoteListProps = {}) {
+export function NoteList({
+  onCollapse,
+  onNewFromTemplate,
+  onSwitchVault,
+  onCreateAnother,
+  switching = false,
+}: NoteListProps = {}) {
   const ctx = useSelectedNote();
   // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
   // pane to the editor — covers the Enter-on-already-selected edge the
@@ -511,6 +540,15 @@ export function NoteList({ onCollapse, onNewFromTemplate }: NoteListProps = {}) 
 
   return (
     <aside style={SIDEBAR_OUTER_STYLE}>
+      {onSwitchVault && onCreateAnother && (
+        <div style={HEADER_CHIP_ROW_STYLE}>
+          <VaultSwitcher
+            onSwitchVault={onSwitchVault}
+            onCreateAnother={onCreateAnother}
+            switching={switching}
+          />
+        </div>
+      )}
       {isEmpty ? (
         <EmptyState
           onCreate={handleCreate}

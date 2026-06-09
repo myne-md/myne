@@ -33,10 +33,20 @@ import type { SlotKind } from "../types/slot-kind";
  * and fall back to `"Empty"` — the disk-based routing path then takes
  * over via `initialStageFromProbe`, so the user still reaches a usable
  * screen instead of getting stuck on the loading shim.
+ *
+ * ## `vaultId` targeting (multi-vault sub-feature 2 task 4 — SYNC-6)
+ *
+ * `vaultId` is an optional TARGETING argument:
+ * - omitted / `undefined` → probe the active/sole vault (the App.tsx boot
+ *   probe — no vault chosen yet). This is the current single-vault behavior.
+ * - a canonical `VaultId` string → probe exactly that vault; an unknown id
+ *   reports `"Empty"`. The picker (sub-feature 3) will pass the chosen id.
  */
-export async function probeSlotKind(): Promise<SlotKind> {
+export async function probeSlotKind(vaultId?: string): Promise<SlotKind> {
   try {
-    return await invoke<SlotKind>("plugin:vault-unlock|vault_slot_kind");
+    return await invoke<SlotKind>("plugin:vault-unlock|vault_slot_kind", {
+      vaultId,
+    });
   } catch (raw) {
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console

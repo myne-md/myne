@@ -50,14 +50,51 @@ struct DerivedKeys {
 /// if the vault directory does not exist, the subsequent `fs::read`
 /// will return `NotFound`, which the caller maps to
 /// [`VaultUnlockError::VaultNotFound`].
-fn vault_meta_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, VaultUnlockError> {
+/// Resolve the `vault.meta` path for an OPTIONAL explicit [`VaultId`].
+///
+/// - `Some(id)` → `<app_data_dir>/vaults/<id>/vault.meta` — the EXPLICIT target
+///   the picker (sub-feature 3) passes (SYNC-6 targeting).
+/// - `None` → the sole-vault fallback (`current_vault_root_from_base`), which
+///   preserves the current single-vault boot (callers that have no chosen id
+///   yet pass `None`).
+fn vault_meta_path<R: Runtime>(
+    app: &AppHandle<R>,
+    vault_id: Option<crate::vault_id::VaultId>,
+) -> Result<PathBuf, VaultUnlockError> {
     let base = app
         .path()
         .app_data_dir()
         .map_err(|_| VaultUnlockError::IoError {
             io_error_kind: IoFailureKind::Other,
         })?;
-    Ok(base.join("vault").join("vault.meta"))
+    let root = match vault_id {
+        Some(id) => crate::paths::vault_root_for_id_from_base(&base, id),
+        // sole-vault fallback until picker (sub-feature 3): the transitional
+        // single-on-disk-vault resolution from task 1.
+        None => crate::paths::current_vault_root_from_base(&base),
+    };
+    Ok(root.join("vault.meta"))
+}
+
+/// Whether an unlock of `target_id` is a vault SWITCH — i.e. a DIFFERENT vault
+/// was already `Unlocked` (`active_before`) when the unlock began.
+///
+/// Drives the GLOBAL derived-index teardown on the lock-then-unlock path
+/// (sub-feature 2 task 2): a switch must wipe the search index / VaultIndices /
+/// attachment-ref graph the prior vault hydrated, BEFORE the new vault
+/// re-hydrates them, so a vault A term / wikilink / attachment correlation tag
+/// cannot bleed into vault B. Returns:
+/// - `false` when no vault was unlocked (`None`) — a first unlock carries no
+///   stale global index.
+/// - `false` when the SAME vault was already active — a re-unlock is rejected
+///   upstream by the `VaultAlreadyUnlocked` guard anyway, and a same-id unlock
+///   from `Empty` shares the vault's own (still-valid) indices.
+/// - `true` only when a different vault was active — the switch case.
+fn is_vault_switch(
+    active_before: Option<crate::vault_id::VaultId>,
+    target_id: crate::vault_id::VaultId,
+) -> bool {
+    active_before.is_some_and(|prior| prior != target_id)
 }
 
 /// Open an existing vault with the user's master password.
@@ -100,12 +137,69 @@ fn vault_meta_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, VaultUnloc
 ///    when the function returns.
 #[tauri::command]
 pub async fn unlock<R: Runtime>(
+    vault_id: Option<String>,
     password: String,
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<(), VaultUnlockError> {
-    let vault_path = vault_meta_path(&app)?;
-    unlock_with_path(password, &vault_path, state.inner()).await?;
+    // SYNC-6 targeting: `Some(id)` → unlock exactly `vaults/<id>/` (the picker
+    // of sub-feature 3 passes the chosen id); `None`/malformed → the sole-vault
+    // fallback. The parsed id keys BOTH the path resolution and the slot map so
+    // they cannot diverge.
+    let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
+    let vault_path = vault_meta_path(&app, target)?;
+
+    // Lock-then-unlock teardown (sub-feature 2 task 2): capture the currently-
+    // active vault BEFORE the unlock so we can tell whether this unlock is a
+    // SWITCH (a different vault was unlocked) and so wipe the GLOBAL derived
+    // indices before the new vault hydrates them — no cross-vault index bleed.
+    // `auth_permits` (capacity 1) means no concurrent unlock can change the
+    // active vault between this read and `unlock_with_path`'s slot mutation, so
+    // the pre-read is a reliable switch predictor. The target vault id is the
+    // explicit `target` when present, else derived from the resolved root.
+    let active_before = state.active_vault_id().await;
+    let target_id = target.unwrap_or_else(|| {
+        crate::paths::vault_id_from_root(vault_path.parent().unwrap_or(&vault_path))
+    });
+
+    unlock_with_path(password, target, &vault_path, state.inner()).await?;
+
+    // A SWITCH occurred when a DIFFERENT vault was unlocked beforehand.
+    // `set_unlocked_locking_others` (inside `unlock_with_path`) already dropped
+    // + zeroized that vault's keys; here we complete the four-surface teardown
+    // by wiping the GLOBAL plaintext-derived indices (search index /
+    // VaultIndices / attachment-ref graph) so the prior vault's terms / wikilink
+    // graph / attachment correlation tags cannot bleed into the freshly-unlocked
+    // vault's about-to-hydrate indices. Re-unlocking the SAME vault is not a
+    // switch (the guards reject a re-unlock of an already-`Unlocked` vault, and
+    // a same-id re-unlock from `Empty` carries no stale global index). Reuses
+    // the EXACT existing teardown calls from the lock path — not a second wipe
+    // path.
+    if is_vault_switch(active_before, target_id) {
+        crate::plugins::notes::search_sync::zeroize_search_index(&app);
+        crate::plugins::vault_indices::zeroize_vault_indices(&app);
+        crate::plugins::attachments::zeroize_attachment_refs(&app);
+        // MYND-205: the prior vault is now locked (its keys were zeroized by
+        // `set_unlocked_locking_others`), so drop its cached label too — a
+        // switch must stop surfacing the prior vault's real name (SYNC-3).
+        if let Some(prior) = active_before {
+            state.evict_cached_label(prior).await;
+        }
+    }
+
+    // Stamp this vault's last-unlock time into the best-effort registry so the
+    // picker's recency ordering and the switcher's active-vault inference (both
+    // read `last_unlock`) reflect the just-opened vault — otherwise every entry
+    // stays `None` and those surfaces fall back to a creation-order tie-break.
+    // Best-effort: a failed `app_data_dir` lookup or persist degrades to stale
+    // ordering, never blocks the unlock. `target_id` is the vault just opened.
+    if let Ok(base) = app.path().app_data_dir() {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        crate::vault_registry::record_unlock(&base, &target_id, now_ms);
+    }
 
     // ---- MYND-160 pipeline steps 4-6 (post-`set_unlocked` orchestration) ----
     //
@@ -167,7 +261,14 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     app: &AppHandle<R>,
     state: &VaultRuntimeState,
 ) {
-    let Ok(vault_dir) = resolve_vault_dir(app) else {
+    // SYNC-6: resolve the ACTIVE vault root via the just-unlocked slot's id
+    // (`unlock_with_path` set the slot to `Unlocked` before this runs, so
+    // `active_vault_id` is the vault we just opened — the correct target once
+    // two or more vaults exist, where the old sole-vault disk heuristic
+    // mis-resolved). `None` (a concurrent lock raced — Phase 2 only) falls back
+    // to the sole-vault path, harmless since prefs_read then fails the slot gate.
+    let Ok(vault_dir) = crate::paths::active_vault_root_io(app, state.active_vault_id().await)
+    else {
         // app_data_dir lookup failure is structurally rare; if it
         // happens, fall back to the safer state (protection ON).
         tracing::warn!(
@@ -208,6 +309,17 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     state.set_auto_lock_timeout_secs(crate::auto_lock::effective_auto_lock_secs(
         prefs.auto_lock_seconds,
     ));
+
+    // MYND-205: decrypt the per-vault label into the RAM cache (SYNC-3/4). The
+    // label rode inside the same `vault.prefs` blob just read above; cache it
+    // under the active vault's id so `vault_list` projects
+    // `VaultSummary.label = Some(..)` for this this-session-unlocked vault.
+    // `None` (no label set, or a prefs-read fall-back-to-defaults) clears any
+    // stale entry. The plaintext label exists ONLY in this RAM cache at
+    // runtime — never persisted, never logged.
+    if let Some(active) = state.active_vault_id().await {
+        state.set_cached_label(active, prefs.label).await;
+    }
 }
 
 /// Closed-enum mapping for `PrefsReadError` variants emitted from the
@@ -224,18 +336,6 @@ fn prefs_read_error_kind(e: &crate::plugins::prefs::PrefsReadError) -> &'static 
     }
 }
 
-/// Local helper: resolve `<app_data_dir>/vault/`. Shaped identically
-/// to the prefs plugin's `vault_dir` helper but kept local to avoid
-/// a cross-plugin pub re-export; both are ~5-line wrappers around
-/// `tauri::path::PathResolver::app_data_dir()`.
-fn resolve_vault_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| std::io::Error::other("app_data_dir resolution failed"))?;
-    Ok(base.join("vault"))
-}
-
 /// Testable core of [`unlock`]. The Tauri-command wrapper resolves
 /// the platform-specific `vault.meta` path and delegates here so
 /// tests do not need an [`AppHandle`].
@@ -243,6 +343,7 @@ fn resolve_vault_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf>
 /// All decisions documented on [`unlock`] apply identically.
 pub(crate) async fn unlock_with_path(
     password: String,
+    vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
     state: &VaultRuntimeState,
 ) -> Result<(), VaultUnlockError> {
@@ -253,13 +354,24 @@ pub(crate) async fn unlock_with_path(
 
     let started = Instant::now();
 
+    // Slot-map key resolution (sub-feature 2 task 4 — explicit vault_id
+    // targeting): `Some(id)` is the EXPLICIT target the IPC layer threaded (it
+    // also resolved `vault_path` to `vaults/<id>/vault.meta`, so the two
+    // agree).
+    // sole-vault fallback until picker (sub-feature 3): `None` derives the key
+    // from the resolved vault ROOT (`vault_path` is `<vault-root>/vault.meta`;
+    // its parent is the root) — the transitional single-on-disk-vault key.
+    let vault_id = vault_id.unwrap_or_else(|| {
+        crate::paths::vault_id_from_root(vault_path.parent().unwrap_or(vault_path))
+    });
+
     // (1) Slot peek precedes permit acquire so the cheap occupied-slot
     //     guard never blocks on the semaphore (grilling Q5). The two
     //     non-Empty variants surface as distinct guard variants so the
     //     frontend can route correctly: `Unlocked` → editor, `Recovering`
     //     → password-reset form (per `recovery-flow.md` §4.1's
     //     non-dismissible chained step).
-    match state.slot_kind().await {
+    match state.slot_kind(vault_id).await {
         SlotKind::Empty => {}
         SlotKind::Unlocked => {
             tracing::error!(
@@ -382,15 +494,39 @@ pub(crate) async fn unlock_with_path(
     };
 
     let now = Instant::now();
-    state
-        .set_unlocked(UnlockedVault {
-            root_key,
-            items_key,
-            items_key_id,
-            unlocked_at: now,
-            vault_meta_bytes_hash,
-        })
+    // Lock-then-unlock seam (sub-feature 2 task 2): enforce the ≤1-`Unlocked`
+    // invariant. If a DIFFERENT vault is already unlocked,
+    // `set_unlocked_locking_others` locks it first (drops + zeroizes its keys)
+    // under one write lock before populating this vault's `Unlocked` entry, so
+    // the slot map is never observable with two `Unlocked` entries (SYNC-1).
+    // The slot-level four-surface teardown (key zeroize) happens here; the
+    // GLOBAL derived-index wipe (search / VaultIndices / attachment-refs) needs
+    // an `AppHandle` and runs in the Tauri-command wrapper [`unlock`] on a
+    // detected switch BEFORE hydration — no cross-vault index bleed.
+    let switched_from = state
+        .set_unlocked_locking_others(
+            vault_id,
+            UnlockedVault {
+                root_key,
+                items_key,
+                items_key_id,
+                unlocked_at: now,
+                vault_meta_bytes_hash,
+            },
+        )
         .await;
+    if matches!(switched_from, Slot::Unlocked(_)) {
+        // A previously-active vault was locked by the switch; its keys already
+        // wiped (the returned `Slot::Unlocked` dropped at the helper's scope
+        // end). Audit the lock-on-switch with the same `vault_locked` event the
+        // manual / idle lock paths emit.
+        tracing::info!(
+            event = "vault_locked",
+            from_slot_kind = "unlocked",
+            reason = "vault_switch",
+            "lock-then-unlock locked the prior active vault before unlocking the new one"
+        );
+    }
 
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
@@ -647,20 +783,59 @@ pub async fn lock<R: Runtime>(
 ///
 /// `Err` arm is structurally unreachable; the `Result` return is for
 /// IPC-contract uniformity with the rest of the plugin.
+///
+/// ## `vault_id` targeting (sub-feature 2 task 4 — SYNC-6)
+///
+/// The optional `vault_id` is a canonical hyphenated [`VaultId`] string. It is
+/// a TARGETING param (the picker of sub-feature 3 passes the chosen id):
+/// - `Some(id)` → report exactly that vault's variant; an UNKNOWN id (no map
+///   entry) reports [`SlotKind::Empty`] (a missing entry IS empty).
+/// - `None` → report the active/sole vault's variant — the existing App.tsx
+///   boot probe (no vault chosen yet) gets the same answer it does today.
+///
+/// A malformed (non-parseable) `vault_id` string is treated as `None` (fall
+/// back to the active-vault probe) rather than surfacing a hard error — the
+/// boot/routing probe must always yield a usable [`SlotKind`].
 #[tauri::command]
 pub async fn vault_slot_kind(
+    vault_id: Option<String>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<SlotKind, VaultUnlockError> {
-    vault_slot_kind_inner(state.inner()).await
+    vault_slot_kind_inner(
+        crate::vault_id::VaultId::parse_optional(vault_id.as_deref()),
+        state.inner(),
+    )
+    .await
 }
 
 /// Testable core of [`vault_slot_kind`]. The Tauri-command wrapper
 /// resolves the [`State`] borrow and delegates here so tests do not
 /// need a [`AppHandle`].
+///
+/// `vault_id` targeting (sub-feature 2 task 4): `Some(id)` reports that exact
+/// vault's variant (unknown id → [`SlotKind::Empty`]); `None` falls back to the
+/// active/sole vault probe below.
 pub(crate) async fn vault_slot_kind_inner(
+    vault_id: Option<crate::vault_id::VaultId>,
     state: &VaultRuntimeState,
 ) -> Result<SlotKind, VaultUnlockError> {
-    Ok(state.slot_kind().await)
+    // Explicit target: report exactly that vault's variant. A `VaultId` with
+    // no map entry IS empty → `SlotKind::Empty` (the picker can show it as a
+    // lockable/lockable-elsewhere vault).
+    if let Some(id) = vault_id {
+        return Ok(state.slot_kind(id).await);
+    }
+    // sole-vault fallback until picker (sub-feature 3): report the active
+    // vault's slot kind. With the ≤1-`Unlocked` invariant (task 2) there is at
+    // most one unlocked vault; an in-flight `Recovering` entry is surfaced when
+    // no vault is unlocked. When no entry is `Unlocked` or `Recovering`, the
+    // map is empty for routing purposes → `SlotKind::Empty` (the same boot
+    // routing the singleton produced). The picker (sub-feature 3) passes an
+    // explicit id; current App.tsx boot passes `None`.
+    let Some(id) = state.active_vault_or_recovering_for_probe().await else {
+        return Ok(SlotKind::Empty);
+    };
+    Ok(state.slot_kind(id).await)
 }
 
 /// Testable core of [`lock`]. The Tauri-command wrapper resolves
@@ -673,7 +848,23 @@ pub(crate) async fn vault_slot_kind_inner(
 /// function; whichever variant it held has its `Zeroizing` fields
 /// wiped in the process.
 pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), VaultUnlockError> {
-    let prior = state.take().await;
+    // TRANSITIONAL (sub-feature 2): param-less `vault_lock` drops the ACTIVE
+    // entry (the `Unlocked` vault, else the in-flight `Recovering` one). When
+    // no vault is unlocked or recovering, this is an idempotent no-op
+    // (`take` on a missing key returns `Slot::Empty`). Param-less is preserved
+    // (SYNC-8); task 4 adds explicit-vault_id targeting on top.
+    let prior = match state.active_vault_or_recovering_for_probe().await {
+        Some(id) => {
+            // MYND-205: drop this vault's cached label on the SAME lock path as
+            // the slot teardown — a locked vault must stop surfacing its real
+            // name in the switcher (SYNC-3: real labels only for this-session-
+            // unlocked vaults; a never-this-session-unlocked vault shows the
+            // neutral fallback).
+            state.evict_cached_label(id).await;
+            state.take(id).await
+        }
+        None => Slot::Empty,
+    };
     let from_slot_kind: &'static str = match &prior {
         Slot::Empty => "empty",
         Slot::Recovering { .. } => "recovering",
@@ -750,7 +941,9 @@ pub enum VaultStatus {
 ///    only surfaces IO-class failures).
 #[tauri::command]
 pub async fn vault_status<R: Runtime>(app: AppHandle<R>) -> Result<VaultStatus, VaultStatusError> {
-    let vault_path = vault_meta_path(&app).map_err(|_| VaultStatusError::IoError {
+    // sole-vault fallback until picker (sub-feature 3): `vault_status` is the
+    // boot-time probe of the sole on-disk vault — no explicit id to target.
+    let vault_path = vault_meta_path(&app, None).map_err(|_| VaultStatusError::IoError {
         io_error_kind: IoFailureKind::Other,
     })?;
     vault_status_with_path(&vault_path).await
@@ -854,7 +1047,158 @@ pub async fn vault_is_unlocked(
 pub(crate) async fn vault_is_unlocked_with_state(
     state: &VaultRuntimeState,
 ) -> Result<bool, VaultStatusError> {
-    Ok(matches!(state.slot_kind().await, SlotKind::Unlocked))
+    // TRANSITIONAL (sub-feature 2): true iff SOME vault is unlocked (the
+    // active vault). Task 4 routes by an explicit vault_id.
+    Ok(state.active_vault_id().await.is_some())
+}
+
+// ---- Multi-vault enumeration: `vault_list` (SYNC-4) -------------------
+//
+// `vault_list` is the multi-vault generalization of [`vault_status`]: where
+// `vault_status` probes the single `vault.meta` of the sole legacy vault,
+// `vault_list` enumerates every `vaults/<id>/` directory the disk-scan finds
+// and projects each into a DENY-list-clean [`VaultSummary`].
+//
+// Design context: `agent-tooling/features/vault-registry-and-disk-layout/`
+// (sub-feature 1 of the multi-vault epic, MYND-202) + SYNC-4 in
+// `agent-tooling/epics/multi-vault/sync-ledger.md`.
+
+/// Coarse on-disk health of a discovered vault directory — the IPC-facing
+/// twin of [`crate::vault_registry::DiscoveredVault::well_formed`].
+///
+/// Two-state minimal enum (SYNC-4):
+/// - `Exists`: the `vaults/<id>/` directory carries a readable `vault.meta`
+///   (the canonical, fully-formed case). Maps from `well_formed = true`.
+/// - `Corrupted`: the directory parses as a [`crate::vault_id::VaultId`] but
+///   its `vault.meta` is missing or unreadable. Maps from `well_formed =
+///   false`. Such a vault is **surfaced** in the list (so a downstream picker
+///   can show it distinctly), never dropped or panicked-on.
+///
+/// There is deliberately no `Missing` arm (unlike [`VaultStatus`]): a vault
+/// absent from disk is simply not in the returned `Vec`.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind")]
+pub enum VaultSummaryStatus {
+    Exists,
+    Corrupted,
+}
+
+/// One entry in the [`vault_list`] result — the DENY-list-clean IPC
+/// projection of a discovered vault (SYNC-4).
+///
+/// ## IPC discipline (what crosses, what does NOT)
+///
+/// - `id`: the [`crate::vault_id::VaultId`] rendered as its canonical
+///   36-char lowercase-hyphenated string (the `Display` form). A random
+///   UUIDv7 is safe to emit — it is decoupled from `account_number_hash`
+///   (SYNC-2), so it carries no account-correlation fingerprint.
+/// - `status`: [`VaultSummaryStatus`] — coarse `Exists | Corrupted`.
+/// - `label`: `Some` ONLY when a human label has been decrypted from this
+///   vault's `vault.prefs` during a this-session unlock and cached in RAM.
+///   The RAM label cache is built in sub-feature 4 — until then this is
+///   **always `None`** (the field is wired so the IPC contract is stable for
+///   the picker, but no label source exists yet). A locked vault not unlocked
+///   this session shows a neutral fallback in the picker, NOT its real name
+///   (SYNC-3: the label lives encrypted-only, never at rest in the registry).
+/// - `last_unlock`: Unix-epoch milliseconds of the last successful unlock,
+///   from the best-effort registry cache; `None` for a vault never unlocked
+///   (or whose cache entry was just rebuilt).
+///
+/// **Never emitted** (DENY-list, `src-tauri/CLAUDE.md`): the vault's
+/// `account_number_hash` bytes and its full filesystem path. The path lives
+/// on [`crate::vault_registry::DiscoveredVault::root`] and is dropped here.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct VaultSummary {
+    /// Canonical hyphenated `VaultId` string (the `vaults/<id>/` dir name).
+    pub id: String,
+    /// Coarse on-disk health — `Exists` for a well-formed dir, `Corrupted`
+    /// for one with a missing/unreadable `vault.meta`.
+    pub status: VaultSummaryStatus,
+    /// Decrypted human label — `Some` only for a this-session-unlocked vault
+    /// (always `None` until the RAM label cache lands in sub-feature 4).
+    pub label: Option<String>,
+    /// Last successful unlock (epoch ms) from the registry cache, if any.
+    pub last_unlock: Option<u64>,
+}
+
+/// Enumerate every discovered vault under `<app_data_dir>/vaults/` and
+/// project each into a [`VaultSummary`] (SYNC-4).
+///
+/// Read-only: does not hold the unlock permit, does not call into Argon2id,
+/// does not populate or peek [`VaultRuntimeState`]. The multi-vault
+/// generalization of [`vault_status`] — a downstream picker consumes the
+/// returned list (plus the runtime slot map, sub-feature 2) to route boot.
+///
+/// A corrupted vault (missing/unreadable `vault.meta`) is surfaced with
+/// `status: Corrupted`, never dropped. An empty / absent `vaults/` directory
+/// yields an empty `Vec`. The command is infallible by construction (the
+/// disk-scan never fails — a missing root simply yields nothing; the registry
+/// is best-effort and self-rebuilding), but returns `Result` for IPC-contract
+/// uniformity with the other probe commands and to surface the lone
+/// `app_data_dir`-resolution failure.
+#[tauri::command]
+pub async fn vault_list<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<VaultSummary>, VaultStatusError> {
+    let base = app.path().app_data_dir().map_err(|_| {
+        tracing::error!(
+            stage = "vault_list",
+            error_kind = "IoError",
+            io_failure_kind = ?IoFailureKind::Other,
+            "app_data_dir resolution failed during vault_list"
+        );
+        VaultStatusError::IoError {
+            io_error_kind: IoFailureKind::Other,
+        }
+    })?;
+    Ok(vault_list_from_base(&base, state.inner()).await)
+}
+
+/// Testable core of [`vault_list`]. The Tauri-command wrapper resolves
+/// `<app_data_dir>` and delegates here so tests do not need an
+/// [`AppHandle`].
+///
+/// Joins the disk-scan (the discovery authority, SYNC-10) against the
+/// best-effort registry cache for each vault's `last_unlock` and the
+/// per-session RAM label cache (MYND-205, SYNC-3/4) for each vault's `label`.
+/// `label` is `Some` iff the cache holds a decrypted label for that `VaultId`
+/// (i.e. the vault was unlocked this session and carries a label); `None`
+/// otherwise so a never-this-session-unlocked vault surfaces the neutral
+/// fallback in the switcher. Ordering follows the disk-scan's deterministic
+/// `VaultId` sort.
+pub(crate) async fn vault_list_from_base(
+    base: &Path,
+    state: &VaultRuntimeState,
+) -> Vec<VaultSummary> {
+    // Single disk-scan, fed into BOTH consumers: the registry reconcile (for
+    // `last_unlock`) and the summary projection (for the `well_formed` →
+    // status mapping the registry intentionally does not carry — SYNC-3).
+    // `load_or_rebuild_registry_with` takes the already-computed scan so we
+    // do not pay a second `vaults/` scan + re-stat per call.
+    let discovered = crate::vault_registry::discover_vaults(base);
+    let registry = crate::vault_registry::load_or_rebuild_registry_with(base, &discovered);
+    let mut summaries = Vec::with_capacity(discovered.len());
+    for discovered in discovered {
+        let status = if discovered.well_formed {
+            VaultSummaryStatus::Exists
+        } else {
+            VaultSummaryStatus::Corrupted
+        };
+        let last_unlock = registry.last_unlock_ms(&discovered.id);
+        // MYND-205: project the per-session decrypted label — `Some` only for
+        // a this-session-cached vault (SYNC-3/4), `None` otherwise.
+        let label = state.cached_label(discovered.id).await;
+        summaries.push(VaultSummary {
+            // `Display` → canonical hyphenated string; the `root` PathBuf
+            // (DENY-listed) is dropped on the move into this map.
+            id: discovered.id.to_string(),
+            status,
+            label,
+            last_unlock,
+        });
+    }
+    summaries
 }
 
 /// Record user activity for the auto-lock-on-idle timer (MYND-121).
@@ -875,6 +1219,7 @@ pub fn report_user_activity(state: State<'_, VaultRuntimeState>) {
 mod tests {
     use super::*;
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
+    use crate::plugins::vault_unlock::state::test_vault_id;
     use crate::test_support::{ScratchVault, FAST_TEST_KDF};
 
     fn rt() -> tokio::runtime::Runtime {
@@ -888,11 +1233,110 @@ mod tests {
         ScratchVault::new("unlock_test")
     }
 
+    // ---- lock-then-unlock: switch gate + global-index bleed (task 2) ----
+
+    use crate::vault_id::VaultId;
+
+    fn vault_id_a() -> VaultId {
+        crate::paths::legacy_vault_id()
+    }
+    fn vault_id_b() -> VaultId {
+        VaultId::parse("33333333-3333-7333-8333-333333333333").expect("valid test UUIDv7")
+    }
+
+    #[test]
+    fn is_vault_switch_true_only_when_a_different_vault_was_active() {
+        let a = vault_id_a();
+        let b = vault_id_b();
+        // No vault was unlocked → first unlock, not a switch.
+        assert!(!is_vault_switch(None, b));
+        // The SAME vault was active → re-unlock, not a switch.
+        assert!(!is_vault_switch(Some(b), b));
+        // A DIFFERENT vault was active → switch (must wipe global indices).
+        assert!(is_vault_switch(Some(a), b));
+    }
+
+    /// Index-bleed guard (task 2): on a vault switch the four-surface lock
+    /// teardown wipes the GLOBAL plaintext-derived indices — search index,
+    /// VaultIndices, attachment-ref graph — BEFORE the next vault hydrates
+    /// them, so vault A's terms / wikilink records / attachment correlation
+    /// tags cannot bleed into vault B. This pins the wipe MECHANISM: the
+    /// `zeroize_*`/`clear()` calls the switch triggers actually empty
+    /// previously-populated indices. (Driving the full Tauri `unlock` wrapper
+    /// end-to-end needs a `tauri::test::mock_app` harness + the `tauri/test`
+    /// feature, which would bump `Cargo.lock` — TB9 audit-anchor discipline;
+    /// the switch-decision half is covered by `is_vault_switch_*` above and
+    /// the slot-level lock-then-unlock by the `state` module's acceptance
+    /// test.)
+    #[test]
+    fn switch_teardown_wipes_every_global_derived_index() {
+        use crate::plugins::attachments::AttachmentRefsState;
+        use crate::plugins::vault_indices::state::NoteRecord;
+        use crate::plugins::vault_indices::VaultIndicesState;
+        use crate::search::SearchIndexState;
+
+        // Simulate vault A having hydrated all three global indices.
+        let search = SearchIndexState::default();
+        search.upsert("note-a", "Alpha Title", "alpha body text");
+        assert!(
+            !search.query("alpha").is_empty(),
+            "precondition: vault A search index populated"
+        );
+
+        let indices = VaultIndicesState::default();
+        indices.apply(
+            "note-a",
+            NoteRecord {
+                title: Some("Alpha Title".to_string()),
+                folder: None,
+                title_key: None,
+                edges: Vec::new(),
+                tags: Vec::new(),
+            },
+        );
+        assert_eq!(
+            indices.note_count(),
+            1,
+            "precondition: vault A VaultIndices populated"
+        );
+
+        let refs = AttachmentRefsState::default();
+        refs.apply("note-a", ["att-a".to_string()]);
+        assert_eq!(
+            refs.note_count(),
+            1,
+            "precondition: vault A attachment-ref graph populated"
+        );
+
+        // The switch teardown wipes each global index (the same `clear()` the
+        // `zeroize_*` wrappers call). After it, NONE of vault A's data
+        // survives into the next vault's about-to-hydrate indices.
+        search.clear();
+        indices.clear();
+        refs.clear();
+
+        assert!(
+            search.query("alpha").is_empty(),
+            "search index must be wiped on switch (no vault-A term bleed)"
+        );
+        assert_eq!(
+            indices.note_count(),
+            0,
+            "VaultIndices must be wiped on switch (no vault-A wikilink bleed)"
+        );
+        assert_eq!(
+            refs.note_count(),
+            0,
+            "attachment-ref graph must be wiped on switch (no vault-A correlation-tag bleed)"
+        );
+    }
+
     /// Seed a real `vault.meta` via `vault_creation::build_session`
     /// plus `build_and_serialize_vault_meta`. Returns the bytes and
     /// the original session-side `root_key` for post-unlock assertions.
     fn seed_vault_meta(password: &str) -> ([u8; protocol::VAULT_META_LEN], [u8; AEAD_KEY_LEN]) {
-        let session = build_session(password, FAST_TEST_KDF).expect("build_session");
+        let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
+            .expect("build_session");
         let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
         let bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
         (bytes, original_root_key)
@@ -913,13 +1357,14 @@ mod tests {
             let state = VaultRuntimeState::default();
             unlock_with_path(
                 "correct horse battery staple".to_string(),
+                None,
                 scratch.path(),
                 &state,
             )
             .await
             .expect("unlock with correct password");
 
-            let unlocked = state.take().await.unwrap_unlocked();
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
             let expected_hash = crate::vault_meta_hash::vault_meta_sha256(meta_bytes.as_slice());
             assert_eq!(
                 unlocked.vault_meta_bytes_hash, expected_hash,
@@ -977,6 +1422,7 @@ mod tests {
                     favorites: Vec::new(),
                     item_order: Vec::new(),
                     editor_layout: None,
+                    label: None,
                 },
             )
             .expect("encode prefs blob");
@@ -985,6 +1431,7 @@ mod tests {
             let state = VaultRuntimeState::default();
             unlock_with_path(
                 "correct horse battery staple".to_string(),
+                None,
                 scratch.path(),
                 &state,
             )
@@ -1023,6 +1470,7 @@ mod tests {
             let state = VaultRuntimeState::default();
             unlock_with_path(
                 "correct horse battery staple".to_string(),
+                None,
                 scratch.path(),
                 &state,
             )
@@ -1079,6 +1527,7 @@ mod tests {
                 favorites: Vec::new(),
                 item_order: Vec::new(),
                 editor_layout: None,
+                label: None,
             },
         )
         .expect("encode");
@@ -1106,6 +1555,7 @@ mod tests {
             let state = VaultRuntimeState::default();
             unlock_with_path(
                 "correct horse battery staple".to_string(),
+                None,
                 scratch.path(),
                 &state,
             )
@@ -1113,8 +1563,44 @@ mod tests {
             .expect("unlock with correct password");
 
             // Slot is occupied with the original root_key bytes.
-            let unlocked = state.take().await.unwrap_unlocked();
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
             assert_eq!(*unlocked.root_key, original_root_key);
+        });
+    }
+
+    #[test]
+    fn unlock_with_explicit_vault_id_keys_the_slot_under_that_id() {
+        // SYNC-6 targeting (task 4): an EXPLICIT `Some(id)` keys the slot map
+        // under exactly that id — NOT the path-derived legacy sentinel the
+        // sole-vault `None` fallback would use. (`scratch`'s temp dir name is
+        // not a UUIDv7, so the `None` derivation yields `legacy_vault_id()` =
+        // `test_vault_id()`; an explicit non-legacy id must override it.)
+        rt().block_on(async {
+            use super::super::state::test_vault_id_b;
+            let scratch = scratch_vault();
+            let (meta_bytes, original_root_key) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let explicit = test_vault_id_b();
+            assert_ne!(explicit, test_vault_id(), "explicit id must be non-legacy");
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path("pw".to_string(), Some(explicit), scratch.path(), &state)
+                .await
+                .expect("unlock with explicit vault_id");
+
+            // The slot is keyed under the EXPLICIT id.
+            assert_eq!(state.slot_kind(explicit).await, SlotKind::Unlocked);
+            let unlocked = state.take(explicit).await.unwrap_unlocked();
+            assert_eq!(*unlocked.root_key, original_root_key);
+
+            // The path-derived legacy key has NO entry — the explicit id
+            // overrode the fallback derivation.
+            assert_eq!(
+                state.slot_kind(test_vault_id()).await,
+                SlotKind::Empty,
+                "explicit-id targeting must NOT key the path-derived legacy sentinel"
+            );
         });
     }
 
@@ -1126,15 +1612,20 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            let result =
-                unlock_with_path("the wrong password".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "the wrong password".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await;
 
             assert!(matches!(
                 result,
                 Err(VaultUnlockError::InvalidCredentialOrVault)
             ));
             // Failed unlock leaves slot empty.
-            assert!(state.slot_kind().await == SlotKind::Empty);
+            assert!(state.slot_kind(test_vault_id()).await == SlotKind::Empty);
         });
     }
 
@@ -1146,10 +1637,11 @@ mod tests {
             assert!(!scratch.path().exists());
 
             let state = VaultRuntimeState::default();
-            let result = unlock_with_path("anything".to_string(), scratch.path(), &state).await;
+            let result =
+                unlock_with_path("anything".to_string(), None, scratch.path(), &state).await;
 
             assert!(matches!(result, Err(VaultUnlockError::VaultNotFound)));
-            assert!(state.slot_kind().await == SlotKind::Empty);
+            assert!(state.slot_kind(test_vault_id()).await == SlotKind::Empty);
         });
     }
 
@@ -1184,11 +1676,11 @@ mod tests {
             .expect("independent items_key unwrap");
 
             let state = VaultRuntimeState::default();
-            unlock_with_path("pw".to_string(), scratch.path(), &state)
+            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
                 .await
                 .expect("unlock");
 
-            let unlocked = state.take().await.unwrap_unlocked();
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
             assert_eq!(unlocked.items_key_id, parsed.items_key_id);
             assert_eq!(
                 unlocked.items_key.as_slice(),
@@ -1216,7 +1708,7 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
 
             match result {
                 Err(VaultUnlockError::InvalidVaultMeta) => {} // expected
@@ -1234,7 +1726,7 @@ mod tests {
             // inside spawn_blocking, then dropped on the items_key
             // failure early-return. No half-state.
             assert!(
-                state.slot_kind().await == SlotKind::Empty,
+                state.slot_kind(test_vault_id()).await == SlotKind::Empty,
                 "items_key failure must leave slot empty (no half-state)"
             );
         });
@@ -1258,7 +1750,7 @@ mod tests {
         scratch.write_meta(tampered_bytes);
 
         let state = VaultRuntimeState::default();
-        let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+        let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
 
         match result {
             Err(VaultUnlockError::InvalidVaultMeta) => {} // expected
@@ -1272,7 +1764,7 @@ mod tests {
             other => panic!("expected InvalidVaultMeta, got {other:?}"),
         }
         assert!(
-            state.slot_kind().await == SlotKind::Empty,
+            state.slot_kind(test_vault_id()).await == SlotKind::Empty,
             "parse failure must leave slot empty"
         );
     }
@@ -1381,7 +1873,7 @@ mod tests {
             std::fs::set_permissions(scratch.path(), perms).expect("chmod 000");
 
             let state = VaultRuntimeState::default();
-            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
 
             // Restore readability for cleanup BEFORE asserting (so a
             // panicking assert still leaves the dir cleanable).
@@ -1407,7 +1899,7 @@ mod tests {
                 other => panic!("expected IoError(PermissionDenied), got {other:?}"),
             }
             assert!(
-                state.slot_kind().await == SlotKind::Empty,
+                state.slot_kind(test_vault_id()).await == SlotKind::Empty,
                 "IO failure must leave slot empty"
             );
         });
@@ -1435,10 +1927,13 @@ mod tests {
             // directly with a fixture distinguishable by byte pattern
             // (so we can assert the existing slot is unchanged).
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x42, 0x13, 0x99))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x42, 0x13, 0x99),
+                )
                 .await;
 
-            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
 
             assert!(matches!(
                 result,
@@ -1448,7 +1943,7 @@ mod tests {
             // Existing slot is untouched: the same fixture bytes
             // come back from take(). The unlock attempt did NOT
             // overwrite or perturb it.
-            let existing = state.take().await.unwrap_unlocked();
+            let existing = state.take(test_vault_id()).await.unwrap_unlocked();
             assert_eq!(*existing.root_key, [0x42u8; AEAD_KEY_LEN]);
             assert_eq!(*existing.items_key, [0x13u8; AEAD_KEY_LEN]);
             assert_eq!(existing.items_key_id, [0x99u8; 16]);
@@ -1469,7 +1964,10 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x55, 0x66, 0x77))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x55, 0x66, 0x77),
+                )
                 .await;
 
             // Manually hold the unlock permit. If unlock_with_path
@@ -1481,7 +1979,7 @@ mod tests {
                 .expect("first acquire on fresh state");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
 
             // Peek catches it before try_acquire runs.
             assert!(matches!(
@@ -1515,10 +2013,13 @@ mod tests {
             // recovering material is NOT perturbed by the rejected
             // unlock attempt.
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
-            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
 
             assert!(matches!(
                 result,
@@ -1526,7 +2027,7 @@ mod tests {
             ));
 
             // Existing slot is untouched — slot_kind still Recovering.
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -1543,7 +2044,10 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0x55, 0x66, 0x77))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0x55, 0x66, 0x77),
+                )
                 .await;
 
             // Manually hold the auth permit. If unlock_with_path tried
@@ -1555,7 +2059,7 @@ mod tests {
                 .expect("first acquire on fresh state");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
 
             // Peek catches it before try_acquire runs.
             assert!(matches!(
@@ -1580,7 +2084,7 @@ mod tests {
             scratch.write_meta(&bytes);
 
             let state = VaultRuntimeState::default();
-            assert!(state.slot_kind().await == SlotKind::Empty);
+            assert!(state.slot_kind(test_vault_id()).await == SlotKind::Empty);
 
             // Simulate "in-flight unlock" by holding the permit.
             let held_permit = state
@@ -1590,10 +2094,10 @@ mod tests {
             assert_eq!(state.auth_permits().available_permits(), 0);
 
             // While held, a fresh unlock attempt rejects cleanly.
-            let result = unlock_with_path("pw".to_string(), scratch.path(), &state).await;
+            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
             assert!(matches!(result, Err(VaultUnlockError::UnlockInProgress)));
             // The slot stayed empty — no half-state.
-            assert!(state.slot_kind().await == SlotKind::Empty);
+            assert!(state.slot_kind(test_vault_id()).await == SlotKind::Empty);
 
             // Release the held permit; subsequent unlock succeeds
             // (proving the guard is purely structural, not stateful
@@ -1601,11 +2105,70 @@ mod tests {
             drop(held_permit);
             assert_eq!(state.auth_permits().available_permits(), 1);
 
-            unlock_with_path("pw".to_string(), scratch.path(), &state)
+            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
                 .await
                 .expect("retry after permit released succeeds");
 
             // Permit released after successful unlock too.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+        });
+    }
+
+    #[test]
+    fn distinct_vault_unlock_cannot_co_hold_the_single_global_permit() {
+        // Task 6: the `auth_permits` semaphore is a SINGLE GLOBAL capacity-1
+        // permit on `VaultRuntimeState` — NOT per-vault. Two unlock attempts
+        // for DISTINCT vaults therefore cannot both hold it: the second is
+        // rejected with `UnlockInProgress` (the per-plugin in-progress guard),
+        // NOT queued. Deterministic substitute for "two concurrent distinct
+        // unlocks": hold the permit (modeling an in-flight unlock of vault A at
+        // any post-acquire stage — e.g. mid-Argon2id), then attempt an unlock
+        // of a DIFFERENT vault B (distinct `VaultId` keyed via the explicit
+        // `Some(id)` param, distinct on-disk scratch). If the permit were
+        // per-vault, B would acquire its own and proceed; because it is global
+        // cap-1, B rejects without running Argon2id and without queueing.
+        rt().block_on(async {
+            // Two on-disk vaults, distinct directories.
+            let scratch_b = ScratchVault::new("unlock_distinct_b");
+            let (bytes_b, _) = seed_vault_meta("pw");
+            scratch_b.write_meta(&bytes_b);
+
+            let id_a = test_vault_id();
+            let id_b = vault_id_b();
+            assert_ne!(id_a, id_b);
+
+            let state = VaultRuntimeState::default();
+            // B's slot is Empty — so the slot peek inside `unlock_with_path`
+            // PASSES and the rejection can only come from the (global) permit.
+            assert_eq!(state.slot_kind(id_b).await, SlotKind::Empty);
+
+            // Model an in-flight unlock of vault A by holding the SINGLE permit.
+            let held_for_a = state
+                .auth_permits()
+                .try_acquire()
+                .expect("first acquire on fresh state (vault A's in-flight unlock)");
+            assert_eq!(state.auth_permits().available_permits(), 0);
+
+            // A DISTINCT vault B unlock attempt must reject with the in-progress
+            // guard — proving the permit is global, not per-vault. Argon2id is
+            // never reached (try_acquire fails before spawn_blocking).
+            let result =
+                unlock_with_path("pw".to_string(), Some(id_b), scratch_b.path(), &state).await;
+            assert!(
+                matches!(result, Err(VaultUnlockError::UnlockInProgress)),
+                "distinct-vault unlock must reject with UnlockInProgress while the single global permit is held, got {result:?}"
+            );
+            // No queueing / no half-state: B's slot stayed Empty.
+            assert_eq!(state.slot_kind(id_b).await, SlotKind::Empty);
+
+            // Release A's permit; B's unlock then succeeds (the guard was purely
+            // structural — global permit availability, not per-vault state).
+            drop(held_for_a);
+            assert_eq!(state.auth_permits().available_permits(), 1);
+            unlock_with_path("pw".to_string(), Some(id_b), scratch_b.path(), &state)
+                .await
+                .expect("B unlocks once the single global permit is free");
+            assert_eq!(state.slot_kind(id_b).await, SlotKind::Unlocked);
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }
@@ -1627,7 +2190,7 @@ mod tests {
             // succeeds) → Argon2id runs → AEAD-open fails →
             // InvalidCredentialOrVault → permit released by RAII
             // drop on function return.
-            let r1 = unlock_with_path("wrong pw".to_string(), scratch.path(), &state).await;
+            let r1 = unlock_with_path("wrong pw".to_string(), None, scratch.path(), &state).await;
             assert!(matches!(
                 r1,
                 Err(VaultUnlockError::InvalidCredentialOrVault)
@@ -1640,7 +2203,7 @@ mod tests {
 
             // Retry with the right password — must succeed (would
             // hit UnlockInProgress if the permit had leaked).
-            unlock_with_path("right pw".to_string(), scratch.path(), &state)
+            unlock_with_path("right pw".to_string(), None, scratch.path(), &state)
                 .await
                 .expect("retry after wrong-password failure works");
 
@@ -1666,16 +2229,19 @@ mod tests {
             let state = VaultRuntimeState::default();
             // Populate the slot directly with a fixture.
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x77, 0x88, 0x99))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x77, 0x88, 0x99),
+                )
                 .await;
-            assert!(state.slot_kind().await == SlotKind::Unlocked);
+            assert!(state.slot_kind(test_vault_id()).await == SlotKind::Unlocked);
 
             lock_with_state(&state)
                 .await
                 .expect("lock on populated slot returns Ok");
 
             assert!(
-                state.slot_kind().await == SlotKind::Empty,
+                state.slot_kind(test_vault_id()).await == SlotKind::Empty,
                 "lock must drop the slot — Zeroizing fields wipe on the taken UnlockedVault's drop"
             );
         });
@@ -1701,7 +2267,7 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             assert_eq!(
-                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
                 SlotKind::Empty
             );
         });
@@ -1714,16 +2280,19 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
             assert_eq!(
-                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
                 SlotKind::Recovering
             );
 
             // Read-only: state was not perturbed by the probe.
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -1740,12 +2309,12 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            unlock_with_path("pw".to_string(), scratch.path(), &state)
+            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
                 .await
                 .expect("unlock seeded vault");
 
             assert_eq!(
-                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
                 SlotKind::Unlocked
             );
         });
@@ -1760,19 +2329,129 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
                 .await;
             assert_eq!(
-                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
                 SlotKind::Unlocked
             );
 
             lock_with_state(&state).await.expect("lock");
             assert_eq!(
-                unwrap_slot_kind(vault_slot_kind_inner(&state).await),
+                unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
                 SlotKind::Empty
             );
         });
+    }
+
+    // ---- vault_slot_kind explicit `vault_id` targeting (task 4) ----------
+    //
+    // `Some(id)` reports exactly that vault's variant; an UNKNOWN id reports
+    // Empty; `None` keeps the active/sole-vault probe (App.tsx boot).
+
+    #[test]
+    fn vault_slot_kind_some_reports_the_named_vaults_variant() {
+        // Two distinct entries — Unlocked under A, Recovering under B. A
+        // targeted probe by id reports each entry's OWN variant, independent
+        // of which one the active-vault resolver would pick.
+        rt().block_on(async {
+            use super::super::state::test_vault_id_b;
+            let state = VaultRuntimeState::default();
+            let id_a = test_vault_id();
+            let id_b = test_vault_id_b();
+
+            state
+                .set_unlocked(id_a, fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+            state
+                .set_recovering(id_b, fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .await;
+
+            // Some(A) → Unlocked; Some(B) → Recovering — each names its own.
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(Some(id_a), &state).await),
+                SlotKind::Unlocked,
+                "Some(A) must report A's Unlocked variant"
+            );
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(Some(id_b), &state).await),
+                SlotKind::Recovering,
+                "Some(B) must report B's Recovering variant"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_slot_kind_some_unknown_id_reports_empty() {
+        // A `Some(id)` for a vault with NO map entry reports Empty (a missing
+        // entry IS empty) — even while a DIFFERENT vault is unlocked.
+        rt().block_on(async {
+            use super::super::state::test_vault_id_b;
+            let state = VaultRuntimeState::default();
+            // Only A is unlocked.
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
+                .await;
+
+            // Probing the OTHER (unknown) id → Empty, not A's Unlocked.
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(Some(test_vault_id_b()), &state).await),
+                SlotKind::Empty,
+                "an unknown vault_id must report Empty, not bleed the active vault's variant"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_slot_kind_none_falls_back_to_active_vault() {
+        // `None` (the App.tsx boot probe) reports the active/sole vault's
+        // variant — unchanged from the pre-task-4 single-arg behavior.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            // No explicit id, nothing unlocked → Empty.
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
+                SlotKind::Empty
+            );
+            // Unlock the sole vault; None now resolves it as the active vault.
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
+                .await;
+            assert_eq!(
+                unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
+                SlotKind::Unlocked,
+                "None must resolve to the sole Unlocked vault (App.tsx boot probe)"
+            );
+        });
+    }
+
+    #[test]
+    fn parse_optional_vault_id_some_invalid_and_none_collapse_to_none() {
+        // The IPC string parser: a valid id round-trips; `None` and a
+        // malformed string both collapse to `None` (active-vault fallback)
+        // so a picker bug / omitted field never hard-fails routing.
+        use crate::vault_id::VaultId;
+        let id = test_vault_id();
+        assert_eq!(
+            VaultId::parse_optional(Some(&id.to_string())),
+            Some(id),
+            "a canonical VaultId string parses to Some(id)"
+        );
+        assert_eq!(VaultId::parse_optional(None), None, "None stays None");
+        assert_eq!(
+            VaultId::parse_optional(Some("not-a-vault-id")),
+            None,
+            "a malformed id collapses to None (sole-vault fallback)"
+        );
     }
 
     #[test]
@@ -1787,16 +2466,16 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(test_vault_id(), fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
                 .await;
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
 
             lock_with_state(&state)
                 .await
                 .expect("lock on Recovering slot returns Ok");
 
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 SlotKind::Empty,
                 "lock must drop the Recovering slot — Zeroizing fields wipe on the taken material's drop"
             );
@@ -1810,13 +2489,13 @@ mod tests {
         // the audit need without surfacing a user-facing error.
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             lock_with_state(&state)
                 .await
                 .expect("lock on Empty slot returns Ok (idempotent)");
 
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -1831,14 +2510,17 @@ mod tests {
             // (a) Starting from Unlocked.
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x01, 0x02, 0x03))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x01, 0x02, 0x03),
+                )
                 .await;
             for i in 0..10 {
                 lock_with_state(&state)
                     .await
                     .unwrap_or_else(|_| panic!("lock #{i} from Unlocked must succeed"));
                 assert_eq!(
-                    state.slot_kind().await,
+                    state.slot_kind(test_vault_id()).await,
                     SlotKind::Empty,
                     "slot must be Empty after lock #{i} (from Unlocked)"
                 );
@@ -1847,14 +2529,17 @@ mod tests {
             // (b) Starting from Recovering.
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0x10, 0x20, 0x30))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0x10, 0x20, 0x30),
+                )
                 .await;
             for i in 0..10 {
                 lock_with_state(&state)
                     .await
                     .unwrap_or_else(|_| panic!("lock #{i} from Recovering must succeed"));
                 assert_eq!(
-                    state.slot_kind().await,
+                    state.slot_kind(test_vault_id()).await,
                     SlotKind::Empty,
                     "slot must be Empty after lock #{i} (from Recovering)"
                 );
@@ -1867,7 +2552,7 @@ mod tests {
                     .await
                     .unwrap_or_else(|_| panic!("lock #{i} from Empty must succeed"));
                 assert_eq!(
-                    state.slot_kind().await,
+                    state.slot_kind(test_vault_id()).await,
                     SlotKind::Empty,
                     "slot must be Empty after lock #{i} (from Empty)"
                 );
@@ -1893,22 +2578,25 @@ mod tests {
             // bytes (0x11) so we can prove the next unlock
             // overwrites them with the real derived root_key.
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x11, 0x12, 0x13))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x11, 0x12, 0x13),
+                )
                 .await;
 
             // Lock — drops the fixture; slot empties.
             lock_with_state(&state).await.expect("lock");
-            assert!(state.slot_kind().await == SlotKind::Empty);
+            assert!(state.slot_kind(test_vault_id()).await == SlotKind::Empty);
 
             // Real unlock from the seeded vault.meta. Pays the
             // full Argon2id (FAST_TEST_KDF) + AEAD-open pipeline.
-            unlock_with_path("pw".to_string(), scratch.path(), &state)
+            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
                 .await
                 .expect("unlock after lock succeeds");
 
             // The slot now carries the FRESH root_key from
             // vault.meta, NOT the prior fixture's 0x11 bytes.
-            let unlocked = state.take().await.unwrap_unlocked();
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
             assert_eq!(*unlocked.root_key, original_root_key);
             assert_ne!(
                 *unlocked.root_key, [0x11u8; AEAD_KEY_LEN],
@@ -2102,7 +2790,10 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(status_fixture_unlocked_with_keys(0x42, 0x13, 0x99))
+                .set_unlocked(
+                    test_vault_id(),
+                    status_fixture_unlocked_with_keys(0x42, 0x13, 0x99),
+                )
                 .await;
             let result = vault_is_unlocked_with_state(&state).await;
             assert_eq!(result, Ok(true));
@@ -2116,12 +2807,239 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(status_fixture_unlocked_with_keys(0x77, 0x88, 0x99))
+                .set_unlocked(
+                    test_vault_id(),
+                    status_fixture_unlocked_with_keys(0x77, 0x88, 0x99),
+                )
                 .await;
             assert_eq!(vault_is_unlocked_with_state(&state).await, Ok(true));
 
-            let _ = state.take().await; // simulate vault_lock
+            let _ = state.take(test_vault_id()).await; // simulate vault_lock
             assert_eq!(vault_is_unlocked_with_state(&state).await, Ok(false));
         });
+    }
+
+    // ---- vault_list multi-vault enumeration (SYNC-4) -------------------
+    //
+    // Exercises `vault_list_from_base` (the AppHandle-free core of the
+    // `vault_list` command) over a `ScopedTempDir` standing in for
+    // `<app_data_dir>`. Covers the three acceptance shapes — Exists,
+    // Corrupted-surfaced-not-dropped, empty-list — plus the IPC discipline
+    // (no path/hash crosses the boundary; label always None for now).
+
+    use crate::test_support::ScopedTempDir;
+
+    const VAULTS_DIR: &str = "vaults";
+
+    /// Create `<base>/vaults/<minted-id>/` and return the canonical id
+    /// string. `well_formed` controls whether a `vault.meta` marker is
+    /// seeded (its presence is what separates Exists from Corrupted).
+    fn seed_disk_vault(base: &Path, well_formed: bool) -> String {
+        let id = crate::vault_id::VaultId::mint();
+        let dir = base.join(VAULTS_DIR).join(id.to_string());
+        std::fs::create_dir_all(&dir).expect("create vault dir");
+        if well_formed {
+            std::fs::write(dir.join("vault.meta"), b"any vault.meta bytes")
+                .expect("seed vault.meta");
+        }
+        id.to_string()
+    }
+
+    #[test]
+    fn vault_list_empty_when_no_vaults() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vlist-empty").unwrap();
+            let state = VaultRuntimeState::default();
+            let summaries = vault_list_from_base(tmp.path(), &state).await;
+            assert!(
+                summaries.is_empty(),
+                "no vaults/ dir → empty vault_list (not an error, not a panic)"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_list_reports_exists_for_well_formed_dir() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vlist-exists").unwrap();
+            let id = seed_disk_vault(tmp.path(), true);
+
+            let state = VaultRuntimeState::default();
+            let summaries = vault_list_from_base(tmp.path(), &state).await;
+            assert_eq!(summaries.len(), 1, "one summary per discovered vault");
+            let s = &summaries[0];
+            assert_eq!(s.id, id, "id is the canonical hyphenated VaultId string");
+            assert_eq!(s.status, VaultSummaryStatus::Exists);
+            assert_eq!(
+                s.label, None,
+                "label is None when nothing is cached this session (MYND-205)"
+            );
+        });
+    }
+
+    /// MYND-205: a vault whose decrypted label is in the per-session RAM cache
+    /// projects `label: Some(..)`, while a discovered-but-not-cached vault
+    /// projects `label: None` (the neutral-fallback signal). Pins the
+    /// SYNC-3/4 wiring of `cached_label` → `VaultSummary.label`.
+    #[test]
+    fn vault_list_projects_cached_label_only_for_cached_vault() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vlist-label").unwrap();
+            let cached = seed_disk_vault(tmp.path(), true);
+            let uncached = seed_disk_vault(tmp.path(), true);
+
+            let state = VaultRuntimeState::default();
+            // Cache a label for exactly one of the two discovered vaults.
+            let cached_id = crate::vault_id::VaultId::parse(&cached).unwrap();
+            state
+                .set_cached_label(cached_id, Some(String::from("Work")))
+                .await;
+
+            let summaries = vault_list_from_base(tmp.path(), &state).await;
+            let cached_s = summaries.iter().find(|s| s.id == cached).expect("cached");
+            let uncached_s = summaries
+                .iter()
+                .find(|s| s.id == uncached)
+                .expect("uncached");
+            assert_eq!(
+                cached_s.label,
+                Some(String::from("Work")),
+                "the this-session-cached vault projects its real label"
+            );
+            assert_eq!(
+                uncached_s.label, None,
+                "a never-this-session-unlocked vault projects None (neutral fallback)"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_list_surfaces_corrupted_dir_not_dropped() {
+        rt().block_on(async {
+            // A `vaults/<id>/` directory with no `vault.meta` is discovered but
+            // flagged not-well-formed → Corrupted. It MUST appear in the list
+            // (so a downstream picker can show it distinctly), never be dropped
+            // or panicked-on (user story 5).
+            let tmp = ScopedTempDir::new("vlist-corrupt").unwrap();
+            let good = seed_disk_vault(tmp.path(), true);
+            let bad = seed_disk_vault(tmp.path(), false);
+
+            let state = VaultRuntimeState::default();
+            let summaries = vault_list_from_base(tmp.path(), &state).await;
+            assert_eq!(
+                summaries.len(),
+                2,
+                "corrupted vault is surfaced, not dropped"
+            );
+
+            let good_s = summaries
+                .iter()
+                .find(|s| s.id == good)
+                .expect("good present");
+            let bad_s = summaries.iter().find(|s| s.id == bad).expect("bad present");
+            assert_eq!(good_s.status, VaultSummaryStatus::Exists);
+            assert_eq!(
+                bad_s.status,
+                VaultSummaryStatus::Corrupted,
+                "dir without vault.meta → Corrupted"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_list_populates_last_unlock_from_registry() {
+        rt().block_on(async {
+            // last_unlock is read from the best-effort registry cache. Seed a
+            // registry entry with a known epoch-ms and assert it round-trips
+            // through `vault_list`.
+            let tmp = ScopedTempDir::new("vlist-last-unlock").unwrap();
+            let id = seed_disk_vault(tmp.path(), true);
+
+            // Hand-write a registry carrying a last-unlock time for `id`.
+            let registry_json = serde_json::json!({
+                "version": 1,
+                "vaults": [ { "id": id, "last_unlock": 1_700_000_000_000u64 } ],
+            });
+            std::fs::write(
+                tmp.path().join(VAULTS_DIR).join("registry.json"),
+                serde_json::to_vec(&registry_json).unwrap(),
+            )
+            .unwrap();
+
+            let state = VaultRuntimeState::default();
+            let summaries = vault_list_from_base(tmp.path(), &state).await;
+            assert_eq!(summaries.len(), 1);
+            assert_eq!(
+                summaries[0].last_unlock,
+                Some(1_700_000_000_000),
+                "last_unlock is populated from the registry cache"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_list_last_unlock_none_for_never_unlocked_vault() {
+        rt().block_on(async {
+            // A freshly-seeded vault with no registry last-unlock entry reports
+            // `last_unlock: None` (the registry is rebuilt with no time).
+            let tmp = ScopedTempDir::new("vlist-no-unlock").unwrap();
+            seed_disk_vault(tmp.path(), true);
+
+            let state = VaultRuntimeState::default();
+            let summaries = vault_list_from_base(tmp.path(), &state).await;
+            assert_eq!(summaries.len(), 1);
+            assert_eq!(summaries[0].last_unlock, None);
+        });
+    }
+
+    #[test]
+    fn vault_list_ipc_projection_carries_no_path_or_hash() {
+        rt().block_on(async {
+            // IPC discipline (SYNC-4 / DENY-list): the serialized VaultSummary
+            // must NOT carry a filesystem path or any account-hash bytes. The
+            // `DiscoveredVault.root` PathBuf is dropped in the projection. We
+            // assert structurally (no `root`/`path` field) AND by serialized
+            // content (the temp base path string never appears in the JSON).
+            let tmp = ScopedTempDir::new("vlist-deny").unwrap();
+            seed_disk_vault(tmp.path(), true);
+
+            let state = VaultRuntimeState::default();
+            let summaries = vault_list_from_base(tmp.path(), &state).await;
+            let json = serde_json::to_string(&summaries).expect("VaultSummary serializes");
+
+            // Only the four contract fields are present.
+            assert!(json.contains("\"id\""));
+            assert!(json.contains("\"status\""));
+            assert!(json.contains("\"label\""));
+            assert!(json.contains("\"last_unlock\""));
+            // No path/hash leakage.
+            for forbidden in ["root", "\"path\"", "account", "hash", "vaults/"] {
+                assert!(
+                    !json.contains(forbidden),
+                    "serialized VaultSummary must not contain `{forbidden}` (DENY-list)"
+                );
+            }
+            // The absolute temp base path (a full filesystem path) must not leak.
+            let base_str = tmp.path().to_string_lossy();
+            assert!(
+                !json.contains(base_str.as_ref()),
+                "the filesystem base path must never cross the IPC boundary"
+            );
+        });
+    }
+
+    #[test]
+    fn vault_list_status_serializes_with_kind_tag() {
+        // Wire-shape pin: VaultSummaryStatus serializes `#[serde(tag = "kind")]`
+        // (mirrors VaultStatus), so the TS mirror is `{ kind: "Exists" } |
+        // { kind: "Corrupted" }`.
+        assert_eq!(
+            serde_json::to_string(&VaultSummaryStatus::Exists).unwrap(),
+            r#"{"kind":"Exists"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&VaultSummaryStatus::Corrupted).unwrap(),
+            r#"{"kind":"Corrupted"}"#
+        );
     }
 }

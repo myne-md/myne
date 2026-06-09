@@ -6,6 +6,7 @@
 //! "session never existed" (Task 15 TTL).
 
 use super::error::AppError;
+use crate::vault_id::VaultId;
 use protocol::{AccountNumber, KdfParams, RecoveryPhrase, AEAD_KEY_LEN, ARGON2_SALT_LEN};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -235,6 +236,25 @@ impl VaultCreationState {
         }
     }
 
+    /// Non-consuming peek of a live session's minted [`VaultId`].
+    ///
+    /// `commit` resolves the write destination to `vaults/<vault_id>/` from
+    /// the session BEFORE it consumes the session via [`Self::take`] — the
+    /// `app_data_dir`/`create_dir_all` step must run while the session is
+    /// still in the map so a path-resolution failure leaves the session
+    /// intact for a future retry (mirrors the existing "resolve before take"
+    /// ordering). Returns `None` for an absent / TTL-evicted token (the
+    /// subsequent `take` inside `commit_with_vault_path` then surfaces the
+    /// precise `SessionNotFound` / `SessionExpired`). Does NOT touch the
+    /// `in_flight` counter — it neither inserts nor removes.
+    pub fn peek_vault_id(&self, token: Uuid) -> Option<VaultId> {
+        self.sessions
+            .lock()
+            .expect("session map poisoned")
+            .get(&token)
+            .map(|s| s.vault_id)
+    }
+
     /// Same as [`Self::take`] but treats `Expired` and `NotFound`
     /// identically — both yield `None`. Used by `cancel` (idempotent).
     pub fn take_ignore_status(&self, token: Uuid) -> Option<VaultCreationSession> {
@@ -299,6 +319,16 @@ impl VaultCreationState {
 /// dropping it, or TTL eviction — every Zeroizing field's bytes are
 /// wiped.
 pub struct VaultCreationSession {
+    /// The fresh, collision-free [`VaultId`] minted at `begin` time
+    /// (`vault_registry::mint_unique_vault_id`). `commit` resolves the
+    /// write destination to `vaults/<vault_id>/` from this field by default
+    /// (SYNC-6 create targeting), so BOTH the first vault (fresh install)
+    /// and every "create another" vault land in a freshly-minted
+    /// `vaults/<id>/` — eliminating the transitional "new vault falls back
+    /// to legacy `vault/`" path. Not secret-bearing (an opaque random
+    /// directory name, deliberately decoupled from `account_number_hash` —
+    /// SYNC-2), so no `Zeroizing`.
+    pub vault_id: VaultId,
     /// User identifier; not secret-bearing in the cryptographic sense
     /// (bearer-token semantics) so no `Zeroizing`.
     pub account: AccountNumber,
@@ -335,6 +365,7 @@ mod tests {
         let account = protocol::generate_account_number().expect("getrandom works");
         let phrase = protocol::generate_recovery_phrase().expect("getrandom works");
         VaultCreationSession {
+            vault_id: VaultId::mint(),
             account,
             phrase,
             kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
@@ -351,6 +382,40 @@ mod tests {
         let mut s = fixture_session();
         s.created_at = created_at;
         s
+    }
+
+    fn fixture_session_with_id(vault_id: VaultId) -> VaultCreationSession {
+        let mut s = fixture_session();
+        s.vault_id = vault_id;
+        s
+    }
+
+    #[test]
+    fn peek_vault_id_returns_the_minted_id_without_consuming_the_session() {
+        // `commit` peeks the session's minted id to resolve `vaults/<id>/`
+        // BEFORE consuming the session, so a path-resolution failure leaves
+        // the session in the map for retry. Peek must NOT remove the session
+        // and must NOT disturb the in-flight counter.
+        let state = VaultCreationState::default();
+        let token = Uuid::new_v4();
+        let id = VaultId::mint();
+        state
+            .try_insert(token, fixture_session_with_id(id))
+            .unwrap();
+        assert_eq!(state.in_flight_count(), 1);
+
+        assert_eq!(state.peek_vault_id(token), Some(id));
+        // Idempotent + non-consuming: a second peek still returns the id and
+        // the session is still takeable.
+        assert_eq!(state.peek_vault_id(token), Some(id));
+        assert_eq!(state.in_flight_count(), 1, "peek must not touch in_flight");
+        assert!(matches!(state.take(token), SessionLookup::Found(_)));
+    }
+
+    #[test]
+    fn peek_vault_id_returns_none_for_unknown_token() {
+        let state = VaultCreationState::default();
+        assert!(state.peek_vault_id(Uuid::new_v4()).is_none());
     }
 
     #[test]

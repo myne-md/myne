@@ -194,6 +194,12 @@ export function mapDeleteVaultError(
  *     backend paths but retained in the wire format for forward
  *     compatibility.
  */
-export async function deleteVault(): Promise<void> {
-  await invoke<void>("plugin:vault-delete|vault_delete");
+export async function deleteVault(vaultId?: string): Promise<void> {
+  // SYNC-6 explicit-id targeting (MYND-205): pass the chosen vault's
+  // canonical hyphenated `VaultId` string to erase exactly `vaults/<id>/`,
+  // leaving any sibling vault untouched. Omitting the id (or passing a
+  // malformed one) falls back to the active (sole `Unlocked`) vault — the
+  // SYNC-1 vault the in-vault danger-zone delete is driven from — which keeps
+  // the pre-multi-vault single-vault callers working unchanged.
+  await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

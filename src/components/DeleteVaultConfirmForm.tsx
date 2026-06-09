@@ -174,7 +174,7 @@ export function DeleteVaultConfirmForm({
         <>
           <div style={EYEBROW_STYLE}>IRREVERSIBLE</div>
           <p style={COPY_PRIMARY_STYLE}>
-            This permanently deletes the vault and every note inside
+            This permanently deletes this vault and every note inside
             it. The action cannot be undone, and your recovery phrase
             will not restore the data.
           </p>

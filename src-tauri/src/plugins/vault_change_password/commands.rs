@@ -20,17 +20,25 @@ use std::time::Instant;
 use tauri::{AppHandle, Manager, Runtime, State};
 use zeroize::Zeroizing;
 
-/// Resolve `<app_data_dir>/vault/vault.meta`. Local rather than imported
-/// from sibling plugins because the return type is
-/// `VaultChangePasswordError`.
-fn vault_meta_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, VaultChangePasswordError> {
+/// Resolve `<active-vault-root>/vault.meta`. Local rather than imported from
+/// sibling plugins because the return type is `VaultChangePasswordError`.
+/// `active_id` is read from the runtime state by [`change_password`]
+/// (`state.active_vault_id().await`) — the only place with `.await` access to
+/// the slot map. SYNC-6: a password change always rotates the unlocked vault's
+/// wrap, so resolving via the active id (not the transitional sole-vault disk
+/// heuristic) keeps the rewrite targeting the correct `vault.meta` once two or
+/// more exist.
+fn vault_meta_path<R: Runtime>(
+    app: &AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> Result<PathBuf, VaultChangePasswordError> {
     let base = app
         .path()
         .app_data_dir()
         .map_err(|_| VaultChangePasswordError::IoError {
             io_error_kind: IoFailureKind::Other,
         })?;
-    Ok(base.join("vault").join("vault.meta"))
+    Ok(crate::paths::active_vault_root_from_base(&base, active_id).join("vault.meta"))
 }
 
 /// Tauri command name `change_password` (NOT `commit`) — chosen to
@@ -45,7 +53,7 @@ pub async fn change_password<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<(), VaultChangePasswordError> {
-    let vault_path = vault_meta_path(&app)?;
+    let vault_path = vault_meta_path(&app, state.active_vault_id().await)?;
     let result =
         change_password_with_path(current_password, new_password, &vault_path, state.inner()).await;
 
@@ -376,7 +384,10 @@ pub(crate) async fn change_password_with_path(
         Ok(Err(VaultChangePasswordError::InvalidVaultMeta)) => {
             // Force-relock per MYND-22 grilling Q6(b) +
             // `decisions.md` 2026-05-06 entry "InvalidVaultMeta posture".
-            let _prior = state.take().await;
+            // TRANSITIONAL (sub-feature 2): drop the active vault entry.
+            if let Some(id) = state.active_vault_or_recovering_for_probe().await {
+                let _prior = state.take(id).await;
+            }
             tracing::warn!(
                 stage = "force_relock_on_invalid_vault_meta",
                 error_kind = "InvalidVaultMeta",
@@ -387,7 +398,10 @@ pub(crate) async fn change_password_with_path(
         Ok(Err(VaultChangePasswordError::VaultMetaChangedExternally)) => {
             // Force-relock per MYND-22 grilling Q3 + `decisions.md`
             // 2026-05-06 entry "CAS mismatch posture: force-relock".
-            let _prior = state.take().await;
+            // TRANSITIONAL (sub-feature 2): drop the active vault entry.
+            if let Some(id) = state.active_vault_or_recovering_for_probe().await {
+                let _prior = state.take(id).await;
+            }
             tracing::warn!(
                 stage = "force_relock_on_cas_mismatch",
                 error_kind = "VaultMetaChangedExternally",
@@ -493,7 +507,7 @@ mod tests {
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
     use crate::plugins::vault_recover::commands::recover_with_phrase_with_path;
     use crate::plugins::vault_unlock::commands::unlock_with_path;
-    use crate::plugins::vault_unlock::state::SlotKind;
+    use crate::plugins::vault_unlock::state::{test_vault_id, SlotKind};
     use crate::test_support::{ScratchVault, FAST_TEST_KDF};
 
     /// Same per-test runtime pattern as the sibling plugins. Builds a
@@ -528,16 +542,17 @@ mod tests {
         [u8; protocol::VAULT_META_LEN],
     ) {
         let scratch = scratch_vault();
-        let session = build_session(password, FAST_TEST_KDF).expect("build_session");
+        let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
+            .expect("build_session");
         let phrase_string: String = (*session.phrase.join_normalized()).to_string();
         let meta_bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
         scratch.write_meta(&meta_bytes);
 
         let state = VaultRuntimeState::default();
-        unlock_with_path(password.to_string(), scratch.path(), &state)
+        unlock_with_path(password.to_string(), None, scratch.path(), &state)
             .await
             .expect("seed: vault_unlock must succeed against the seeded vault");
-        assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+        assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
         (
             state,
@@ -578,7 +593,7 @@ mod tests {
 
             // Slot stays Unlocked (root_key NOT rotated; only the wrap
             // is rotated). Verify by re-peeking.
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
             let post_hash = state
                 .peek_unlocked_root_key_and_hash_clone()
                 .await
@@ -598,12 +613,13 @@ mod tests {
             );
 
             // Lock and re-unlock with old + new passwords.
-            let _ = state.take().await; // simulate vault_lock
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            let _ = state.take(test_vault_id()).await; // simulate vault_lock
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             // Old password no longer unlocks.
             let result_old = unlock_with_path(
                 "orig-password-12".to_string(),
+                None,
                 scratch.path(),
                 &state,
             )
@@ -617,7 +633,7 @@ mod tests {
             );
 
             // New password unlocks.
-            unlock_with_path("new-password-12".to_string(), scratch.path(), &state)
+            unlock_with_path("new-password-12".to_string(), None, scratch.path(), &state)
                 .await
                 .expect("new password must unlock the rewritten vault");
         });
@@ -642,11 +658,11 @@ mod tests {
             .expect("change_password");
 
             // Lock and recover via phrase.
-            let _ = state.take().await;
-            recover_with_phrase_with_path(phrase, scratch.path(), &state)
+            let _ = state.take(test_vault_id()).await;
+            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
                 .await
                 .expect("recovery phrase must still work after change_password");
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -743,7 +759,7 @@ mod tests {
 
             // Slot still Unlocked (Task 8 scope; Task 11 introduces
             // force-relock on CAS mismatch — different failure class).
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
             // Permit released.
             assert_eq!(state.auth_permits().available_permits(), 1);
@@ -757,7 +773,7 @@ mod tests {
             let scratch = scratch_vault();
             let state = VaultRuntimeState::default();
             // No unlock call — slot is Empty.
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             let result = change_password_with_path(
                 "orig-password-12".to_string(),
@@ -784,9 +800,12 @@ mod tests {
             let scratch = scratch_vault();
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
 
             let result = change_password_with_path(
                 "orig-password-12".to_string(),
@@ -800,7 +819,7 @@ mod tests {
                 "expected VaultNotUnlocked, got {result:?}"
             );
             // Slot still Recovering (rejection is non-mutative).
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -837,7 +856,7 @@ mod tests {
             );
 
             // Slot still Unlocked — gate fires before slot-mutating paths.
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
             // Permit released — gate fires before permit acquire.
             assert_eq!(state.auth_permits().available_permits(), 1);
@@ -889,7 +908,7 @@ mod tests {
             );
 
             // Slot still Unlocked.
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
             // Permit released.
             assert_eq!(state.auth_permits().available_permits(), 1);
@@ -949,7 +968,7 @@ mod tests {
             );
 
             // Force-relock: slot dropped to Empty.
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
             assert_eq!(state.auth_permits().available_permits(), 1);
 
             // Disk untouched (atomic_write never fired).
@@ -995,7 +1014,7 @@ mod tests {
                 Err(VaultChangePasswordError::InvalidCredentialOrVault)
             ));
 
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
             assert_eq!(after_bytes[260], corrupted_bytes[260]);
@@ -1018,8 +1037,12 @@ mod tests {
             // its bytes (and SHA-256) differ from the slot's snapshot.
             // This simulates a parallel app instance committing a
             // competing rewrite while our session was idle.
-            let other_session =
-                build_session("different-password", FAST_TEST_KDF).expect("build_session");
+            let other_session = build_session(
+                crate::vault_id::VaultId::mint(),
+                "different-password",
+                FAST_TEST_KDF,
+            )
+            .expect("build_session");
             let other_bytes =
                 build_and_serialize_vault_meta(&other_session).expect("serialize alt vault.meta");
             std::fs::write(scratch.path(), other_bytes).expect("overwrite vault.meta");
@@ -1041,7 +1064,7 @@ mod tests {
             );
 
             // Force-relock per Q3.
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             // Permit released.
             assert_eq!(state.auth_permits().available_permits(), 1);
@@ -1081,7 +1104,7 @@ mod tests {
             // Slot must still be Unlocked with a freshly-pinned hash
             // (no force-relock; Task 8's update_unlocked_meta_hash
             // ran successfully).
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
             // Second change: B → C, in the SAME session. CAS must
             // pass because the slot's hash was updated to match the
@@ -1095,14 +1118,19 @@ mod tests {
             .await
             .expect("second change_password (B→C) must succeed via propagated CAS anchor");
 
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
             // Verify the final disk state by locking + unlocking with
             // the final password.
-            let _ = state.take().await;
-            unlock_with_path("final-password-12".to_string(), scratch.path(), &state)
-                .await
-                .expect("final password must unlock the post-B→C rewritten vault");
+            let _ = state.take(test_vault_id()).await;
+            unlock_with_path(
+                "final-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("final password must unlock the post-B→C rewritten vault");
         });
     }
 
@@ -1151,7 +1179,10 @@ mod tests {
             {
                 let state = VaultRuntimeState::default();
                 state
-                    .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                    .set_recovering(
+                        test_vault_id(),
+                        fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                    )
                     .await;
                 let calls = Arc::new(AtomicUsize::new(0));
                 let calls_c = calls.clone();
@@ -1165,7 +1196,7 @@ mod tests {
                 assert_eq!(calls.load(Ordering::SeqCst), 0, "closure must NOT run");
                 // Slot still Recovering — helper does not touch a
                 // non-Unlocked slot on SlotDropped.
-                assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+                assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
             }
 
             // Case 3: Slot::Unlocked + MISMATCHED hash → HashMismatch,
@@ -1174,7 +1205,7 @@ mod tests {
                 let state = VaultRuntimeState::default();
                 let mut uv = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
                 uv.vault_meta_bytes_hash = [0xAB; 32]; // != snapshot_hash
-                state.set_unlocked(uv).await;
+                state.set_unlocked(test_vault_id(), uv).await;
                 let calls = Arc::new(AtomicUsize::new(0));
                 let calls_c = calls.clone();
                 let result: Result<(), CommitRewriteError<()>> = state
@@ -1186,7 +1217,7 @@ mod tests {
                 assert!(matches!(result, Err(CommitRewriteError::HashMismatch)));
                 assert_eq!(calls.load(Ordering::SeqCst), 0, "closure must NOT run");
                 // Slot dropped to Empty (force-relock).
-                assert_eq!(state.slot_kind().await, SlotKind::Empty);
+                assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
             }
 
             // Case 4: Slot::Unlocked + MATCHING hash → closure runs,
@@ -1196,7 +1227,7 @@ mod tests {
                 let state = VaultRuntimeState::default();
                 let mut uv = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
                 uv.vault_meta_bytes_hash = snapshot_hash;
-                state.set_unlocked(uv).await;
+                state.set_unlocked(test_vault_id(), uv).await;
                 let calls = Arc::new(AtomicUsize::new(0));
                 let calls_c = calls.clone();
                 let new_hash = [0xCD; 32];
@@ -1259,7 +1290,7 @@ mod tests {
 
             // Slot stays Unlocked (rejection is non-mutative — fires
             // before any state-changing code runs).
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
             // Held permit still held (the test's own _held).
             assert_eq!(state.auth_permits().available_permits(), 0);
@@ -1451,7 +1482,10 @@ mod tests {
             //         path in production code.
             use crate::plugins::vault_unlock::state::fixture_recovering_with_keys;
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
             assert!(
                 state
@@ -1460,27 +1494,27 @@ mod tests {
                     .is_none(),
                 "Recovering slot must return None (would route to VaultLockedDuringChange)"
             );
-            let _ = state.take().await; // reset
+            let _ = state.take(test_vault_id()).await; // reset
 
             // Case 3: Slot::Unlocked with MATCHING hash → Some(_,
             //         matching) → proceed path.
             use crate::plugins::vault_unlock::state::fixture_unlocked_with_keys;
             let mut uv = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
             uv.vault_meta_bytes_hash = snapshot_hash;
-            state.set_unlocked(uv).await;
+            state.set_unlocked(test_vault_id(), uv).await;
             let peek = state.peek_unlocked_root_key_and_hash_clone().await;
             assert!(
                 matches!(peek, Some((_, h)) if h == snapshot_hash),
                 "Unlocked + matching hash must return Some with snapshot_hash"
             );
-            let _ = state.take().await; // reset
+            let _ = state.take(test_vault_id()).await; // reset
 
             // Case 4: Slot::Unlocked with DIFFERENT hash → Some(_,
             //         different) → VaultMetaChangedExternally path
             //         (defensive; unreachable under auth_permits).
             let mut uv2 = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
             uv2.vault_meta_bytes_hash = [0xAB; 32]; // != snapshot_hash
-            state.set_unlocked(uv2).await;
+            state.set_unlocked(test_vault_id(), uv2).await;
             let peek2 = state.peek_unlocked_root_key_and_hash_clone().await;
             assert!(
                 matches!(peek2, Some((_, h)) if h != snapshot_hash),

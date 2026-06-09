@@ -55,7 +55,7 @@ import { Spinner } from "../components/Spinner";
 import { SuspicionBanner } from "../components/SuspicionBanner";
 import { closeApp } from "../lib/app-window";
 import { ioBanner } from "../lib/io-banner";
-import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
+import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
   deleteVault,
   mapDeleteVaultError,
@@ -66,6 +66,17 @@ import type { VaultUnlockError } from "../types/vault-unlock-error";
 
 interface UnlockProps {
   initialStatus: StageVaultStatus;
+  /**
+   * Optional vault-targeting id (MYND-204, multi-vault sub-feature 3, task 8).
+   * Carried on the `unlock` Stage when the screen was reached by an explicit
+   * vault choice (`picker.select-vault`, or the single-vault boot arm). Threaded
+   * into the vault-addressed `unlock` IPC (SYNC-6): `Some(id)` opens exactly
+   * `vaults/<id>/vault.meta`; `undefined` falls through to the param-less /
+   * `None` sole-vault unlock (unchanged single-vault behavior). The backend
+   * evicts any prior `Unlocked` vault on a switch (SYNC-1 lock-then-unlock), so
+   * picking a vault opens THAT vault with no other vault concurrently unlocked.
+   */
+  vaultId?: VaultId;
   onUnlocked: () => void;
   /** Cold-start recovery entry. Dispatched by the "Recovery phrase ile
    *  aç" link in idle mode. App.tsx sends `unlock.start-recovery` →
@@ -306,6 +317,7 @@ function ctaStyle(disabled: boolean): CSSProperties {
 
 export function Unlock({
   initialStatus,
+  vaultId,
   onUnlocked,
   onStartRecovery,
   onResumeRecovery,
@@ -457,7 +469,13 @@ export function Unlock({
     dispatch({ type: "submit" });
     void (async () => {
       try {
-        await invoke<void>("plugin:vault-unlock|unlock", { password });
+        // SYNC-6 vault-addressed unlock: `vaultId` opens exactly that vault's
+        // `vaults/<id>/vault.meta`; `undefined` (the Tauri arg is then omitted)
+        // falls through to the backend's sole-vault `None` path. Tauri maps the
+        // `vaultId` camelCase key to the command's `vault_id: Option<String>`
+        // param. On a switch the backend locks the prior `Unlocked` vault first
+        // (SYNC-1), so no other vault stays unlocked.
+        await invoke<void>("plugin:vault-unlock|unlock", { vaultId, password });
         dispatch({ type: "success" });
         onUnlocked();
       } catch (raw) {

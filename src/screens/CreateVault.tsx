@@ -55,9 +55,12 @@ interface CreateVaultProps {
    * chained `vault_unlock` call rejected (rare, almost certainly a
    * transient backend failure since the same password just succeeded
    * inside `commit`). Route to `unlock(Exists)` so the user can
-   * retype manually.
+   * retype manually. `vaultId` is the just-created vault's id (from
+   * `commit`) so the manual unlock targets it explicitly — without it
+   * the retry hits the sole-vault fallback, which resolves to a
+   * non-existent legacy path once a second vault exists (`VaultNotFound`).
    */
-  onAutoUnlockFailed: () => void;
+  onAutoUnlockFailed: (vaultId: string | null) => void;
 }
 
 export function CreateVault({
@@ -69,6 +72,10 @@ export function CreateVault({
   const [autoUnlocking, setAutoUnlocking] = useState(false);
 
   const sessionTokenRef = useRef<string | null>(null);
+  // The id of the vault `commit` just wrote to (`vaults/<id>/`), captured from
+  // the commit IPC so the chained auto-unlock — and the manual-unlock fallback
+  // — can target it explicitly. `null` only on the legacy sole-vault path.
+  const committedVaultIdRef = useRef<string | null>(null);
   const stepRef = useRef<Step>(state.step);
   useEffect(() => {
     sessionTokenRef.current = state.sessionToken;
@@ -234,18 +241,23 @@ export function CreateVault({
     if (!password || !HAS_TAURI) {
       // Defensive (web dev or test-step path with no real password).
       passwordRef.current = null;
-      onAutoUnlockFailed();
+      onAutoUnlockFailed(committedVaultIdRef.current);
       return;
     }
     setAutoUnlocking(true);
     try {
-      await invoke("plugin:vault-unlock|unlock", { password });
+      // Target the just-created vault explicitly (SYNC-6). Passing `null`
+      // (legacy sole-vault path) reproduces the prior implicit behaviour.
+      await invoke("plugin:vault-unlock|unlock", {
+        password,
+        vaultId: committedVaultIdRef.current,
+      });
       passwordRef.current = null;
       onAutoUnlockSuccess();
     } catch (e) {
       passwordRef.current = null;
       logErrorKind(e, "auto-unlock-failed");
-      onAutoUnlockFailed();
+      onAutoUnlockFailed(committedVaultIdRef.current);
     } finally {
       setAutoUnlocking(false);
     }
@@ -302,8 +314,14 @@ export function CreateVault({
     let cancelled = false;
     (async () => {
       try {
-        await invoke("plugin:vault-creation|commit", { sessionToken: token });
+        const newVaultId = await invoke<string | null>(
+          "plugin:vault-creation|commit",
+          { sessionToken: token },
+        );
         if (cancelled) return;
+        // Capture the written-to vault id for the chained auto-unlock so it
+        // targets `vaults/<newVaultId>/` rather than the sole-vault fallback.
+        committedVaultIdRef.current = newVaultId;
         sessionTokenRef.current = null;
         dispatch({ type: "COMMIT_OK" });
       } catch (e) {

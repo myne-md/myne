@@ -35,16 +35,31 @@ struct DerivedKeys {
     items_key_id: [u8; 16],
 }
 
-/// Resolve `<app_data_dir>/vault/vault.meta`. Local rather than imported
-/// from `vault_unlock` because the return type is `VaultRecoveryError`.
-fn vault_meta_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, VaultRecoveryError> {
+/// Resolve the `vault.meta` path for an OPTIONAL explicit [`VaultId`]. Local
+/// rather than imported from `vault_unlock` because the return type is
+/// `VaultRecoveryError`.
+///
+/// - `Some(id)` → `<app_data_dir>/vaults/<id>/vault.meta` — the EXPLICIT target
+///   the picker (sub-feature 3) passes (SYNC-6 targeting).
+/// - `None` → the sole-vault fallback (`current_vault_root_from_base`), which
+///   preserves the current single-vault recovery flow.
+fn vault_meta_path<R: Runtime>(
+    app: &AppHandle<R>,
+    vault_id: Option<crate::vault_id::VaultId>,
+) -> Result<PathBuf, VaultRecoveryError> {
     let base = app
         .path()
         .app_data_dir()
         .map_err(|_| VaultRecoveryError::IoError {
             io_error_kind: IoFailureKind::Other,
         })?;
-    Ok(base.join("vault").join("vault.meta"))
+    let root = match vault_id {
+        Some(id) => crate::paths::vault_root_for_id_from_base(&base, id),
+        // sole-vault fallback until picker (sub-feature 3): the transitional
+        // single-on-disk-vault resolution from task 1.
+        None => crate::paths::current_vault_root_from_base(&base),
+    };
+    Ok(root.join("vault.meta"))
 }
 
 /// Recover an existing vault with the user's BIP-39 recovery phrase.
@@ -67,12 +82,17 @@ fn vault_meta_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, VaultRecov
 /// failure → `InvalidVaultMeta` (recovery wrap-key already verified).
 #[tauri::command]
 pub async fn recover_with_phrase<R: Runtime>(
+    vault_id: Option<String>,
     phrase: String,
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<(), VaultRecoveryError> {
-    let vault_path = vault_meta_path(&app)?;
-    recover_with_phrase_with_path(phrase, &vault_path, state.inner()).await
+    // SYNC-6 targeting: `Some(id)` recovers exactly `vaults/<id>/`; `None`/
+    // malformed → the sole-vault fallback. The parsed id keys BOTH the path
+    // resolution and the slot map so they cannot diverge.
+    let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
+    let vault_path = vault_meta_path(&app, target)?;
+    recover_with_phrase_with_path(phrase, target, &vault_path, state.inner()).await
 }
 
 /// Testable core of [`recover_with_phrase`]. The Tauri-command wrapper
@@ -82,6 +102,7 @@ pub async fn recover_with_phrase<R: Runtime>(
 /// All decisions documented on [`recover_with_phrase`] apply identically.
 pub(crate) async fn recover_with_phrase_with_path(
     phrase: String,
+    vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
     state: &VaultRuntimeState,
 ) -> Result<(), VaultRecoveryError> {
@@ -93,13 +114,22 @@ pub(crate) async fn recover_with_phrase_with_path(
 
     let started = Instant::now();
 
+    // Slot-map key resolution (sub-feature 2 task 4 — explicit vault_id
+    // targeting): `Some(id)` is the EXPLICIT target the IPC layer threaded.
+    // sole-vault fallback until picker (sub-feature 3): `None` derives the key
+    // from the resolved vault ROOT (`vault_path` is `<vault-root>/vault.meta`;
+    // its parent is the root).
+    let vault_id = vault_id.unwrap_or_else(|| {
+        crate::paths::vault_id_from_root(vault_path.parent().unwrap_or(vault_path))
+    });
+
     // (1) Slot peek precedes permit acquire so the cheap occupied-slot
     //     guards never block on the semaphore. The two non-Empty
     //     variants surface as distinct guard variants so the frontend
     //     can route correctly: `Unlocked` → editor, `Recovering` →
     //     password-reset form (per `recovery-flow.md` §4.1's
     //     non-dismissible chained step).
-    match state.slot_kind().await {
+    match state.slot_kind(vault_id).await {
         SlotKind::Empty => {}
         SlotKind::Unlocked => {
             tracing::error!(
@@ -215,12 +245,15 @@ pub(crate) async fn recover_with_phrase_with_path(
 
     let now = Instant::now();
     state
-        .set_recovering(RecoveringMaterial {
-            root_key,
-            items_key,
-            items_key_id,
-            recovered_at: now,
-        })
+        .set_recovering(
+            vault_id,
+            RecoveringMaterial {
+                root_key,
+                items_key,
+                items_key_id,
+                recovered_at: now,
+            },
+        )
         .await;
 
     // Success event. Coarse `duration_ms` only — no account
@@ -267,12 +300,17 @@ pub(crate) async fn recover_with_phrase_with_path(
 /// `vault_status` is for boot + post-WebView-reload routing only.
 #[tauri::command]
 pub async fn complete_recovery<R: Runtime>(
+    vault_id: Option<String>,
     new_password: String,
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<(), VaultRecoveryError> {
-    let vault_path = vault_meta_path(&app)?;
-    complete_recovery_with_path(new_password, &vault_path, state.inner()).await?;
+    // SYNC-6 targeting: `Some(id)` commits against exactly `vaults/<id>/`;
+    // `None`/malformed → the sole-vault fallback. The parsed id keys BOTH the
+    // path resolution and the slot map so they cannot diverge.
+    let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
+    let vault_path = vault_meta_path(&app, target)?;
+    complete_recovery_with_path(new_password, target, &vault_path, state.inner()).await?;
 
     // MYND-160 fix: post-recovery slot transition to Unlocked must
     // re-apply persisted prefs (user story 11). Same pattern as
@@ -297,6 +335,7 @@ pub async fn complete_recovery<R: Runtime>(
 /// All decisions documented on [`complete_recovery`] apply identically.
 pub(crate) async fn complete_recovery_with_path(
     new_password: String,
+    vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
     state: &VaultRuntimeState,
 ) -> Result<(), VaultRecoveryError> {
@@ -322,8 +361,17 @@ pub(crate) async fn complete_recovery_with_path(
         return Err(VaultRecoveryError::WeakNewPassword);
     }
 
+    // Slot-map key resolution (sub-feature 2 task 4 — explicit vault_id
+    // targeting): `Some(id)` is the EXPLICIT target the IPC layer threaded.
+    // sole-vault fallback until picker (sub-feature 3): `None` derives the key
+    // from the resolved vault ROOT (`vault_path` is `<vault-root>/vault.meta`;
+    // its parent is the root).
+    let vault_id = vault_id.unwrap_or_else(|| {
+        crate::paths::vault_id_from_root(vault_path.parent().unwrap_or(vault_path))
+    });
+
     // (1) Slot peek — must be Recovering.
-    match state.slot_kind().await {
+    match state.slot_kind(vault_id).await {
         SlotKind::Recovering => {}
         SlotKind::Empty | SlotKind::Unlocked => {
             tracing::error!(
@@ -502,7 +550,7 @@ pub(crate) async fn complete_recovery_with_path(
     //     material now — if it is gone, `vault_lock` (or another
     //     slot-dropping action) fired during the derivation window;
     //     bail without disk write.
-    let recovering = match state.take_recovering().await {
+    let recovering = match state.take_recovering(vault_id).await {
         Some(m) => m,
         None => {
             tracing::warn!(
@@ -569,13 +617,16 @@ pub(crate) async fn complete_recovery_with_path(
     // (7) Promote Slot::Recovering material → Slot::Unlocked.
     let now = Instant::now();
     state
-        .set_unlocked(UnlockedVault {
-            root_key: recovering.root_key,
-            items_key: recovering.items_key,
-            items_key_id: recovering.items_key_id,
-            unlocked_at: now,
-            vault_meta_bytes_hash,
-        })
+        .set_unlocked(
+            vault_id,
+            UnlockedVault {
+                root_key: recovering.root_key,
+                items_key: recovering.items_key,
+                items_key_id: recovering.items_key_id,
+                unlocked_at: now,
+                vault_meta_bytes_hash,
+            },
+        )
         .await;
 
     // Success event. Coarse `duration_ms` only — no account
@@ -593,6 +644,45 @@ pub(crate) async fn complete_recovery_with_path(
     );
 
     Ok(())
+}
+
+/// Resolve a user-supplied account-number to the [`VaultId`] of the on-disk
+/// vault whose `vault.meta` header `account_number_hash` matches — the
+/// OPTIONAL multi-vault recovery selector (SYNC-12).
+///
+/// Returns `Some(<canonical VaultId string>)` for the first matching vault,
+/// `None` for EVERY failure mode (malformed account-number OR no on-disk
+/// match) — the single non-distinguishing result per `account-number.md` §5.
+/// The caller (recovery selection stage) treats `Some` as "advance to phrase
+/// entry against this vault" and `None` as a single generic "invalid account
+/// number" — it cannot tell a typo from a no-match.
+///
+/// **Selection only — NO cryptographic change.** This reads only the plaintext
+/// `account_number_hash` header field (`protocol.md` §9.3 offset 6): NO
+/// decrypt, NO unlock, NO Argon2id, and it acquires NO `auth_permits` (it is
+/// not an Argon2id path). `account_number_hash` already binds both Argon2id
+/// salts (`protocol.md` §3.1); picking a vault by it just chooses WHICH
+/// `vault.meta` the unchanged recovery pipeline subsequently reads.
+///
+/// **Logging discipline.** `account_number_hash` bytes are DENY-listed
+/// (`src-tauri/CLAUDE.md`). This command emits NONE of them — nor the parsed
+/// account-number, nor any per-vault hash, nor the resolved `VaultId`, nor a
+/// path — via `tracing`/IPC/format. It returns a bare `Option<String>`.
+#[tauri::command]
+pub async fn resolve_vault_by_account_number<R: Runtime>(
+    account_number: String,
+    app: AppHandle<R>,
+) -> Result<Option<String>, VaultRecoveryError> {
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| VaultRecoveryError::IoError {
+            io_error_kind: IoFailureKind::Other,
+        })?;
+    Ok(
+        super::account_number_select::resolve_vault_by_account_number(&base, &account_number)
+            .map(|id| id.to_string()),
+    )
 }
 
 /// Step (a)+(b) of the spawn_blocking pipeline: NFKD-normalize the
@@ -728,7 +818,7 @@ mod tests {
     use super::*;
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
     use crate::plugins::vault_unlock::state::{
-        fixture_recovering_with_keys, fixture_unlocked_with_keys, Slot,
+        fixture_recovering_with_keys, fixture_unlocked_with_keys, test_vault_id, Slot,
     };
     use crate::test_support::{ScratchVault, FAST_TEST_KDF};
 
@@ -750,7 +840,8 @@ mod tests {
     fn seed_vault_meta(
         password: &str,
     ) -> ([u8; protocol::VAULT_META_LEN], [u8; AEAD_KEY_LEN], String) {
-        let session = build_session(password, FAST_TEST_KDF).expect("build_session");
+        let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
+            .expect("build_session");
         let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
         let phrase_string: String = (*session.phrase.join_normalized()).to_string();
         let bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
@@ -765,12 +856,12 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            recover_with_phrase_with_path(phrase, scratch.path(), &state)
+            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
                 .await
                 .expect("recover with correct phrase");
 
             // Slot is now Recovering; both keys derived eagerly.
-            let taken = state.take().await;
+            let taken = state.take(test_vault_id()).await;
             match taken {
                 Slot::Recovering {
                     root_key,
@@ -782,6 +873,145 @@ mod tests {
                 }
                 _ => panic!("expected Slot::Recovering after recover_with_phrase success"),
             }
+        });
+    }
+
+    #[test]
+    fn recover_with_explicit_vault_id_keys_the_recovering_slot_under_that_id() {
+        // SYNC-6 targeting (task 4): an EXPLICIT `Some(id)` keys the Recovering
+        // slot under exactly that id, NOT the path-derived legacy sentinel the
+        // `None` fallback would use.
+        use crate::plugins::vault_unlock::state::test_vault_id_b;
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, original_root_key, phrase) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let explicit = test_vault_id_b();
+            assert_ne!(explicit, test_vault_id(), "explicit id must be non-legacy");
+
+            let state = VaultRuntimeState::default();
+            recover_with_phrase_with_path(phrase, Some(explicit), scratch.path(), &state)
+                .await
+                .expect("recover with explicit vault_id");
+
+            // The Recovering entry is keyed under the EXPLICIT id.
+            assert_eq!(state.slot_kind(explicit).await, SlotKind::Recovering);
+            match state.take(explicit).await {
+                Slot::Recovering { root_key, .. } => assert_eq!(*root_key, original_root_key),
+                _ => panic!("expected Slot::Recovering under the explicit id"),
+            }
+            // The path-derived legacy key has NO entry.
+            assert_eq!(
+                state.slot_kind(test_vault_id()).await,
+                SlotKind::Empty,
+                "explicit-id targeting must NOT key the path-derived legacy sentinel"
+            );
+        });
+    }
+
+    // ---- multi-vault recovery routing (MYND-206) -----------------------
+    //
+    // Two DISTINCT vaults on disk, each with its own vault.meta + recovery
+    // phrase. The recovery selection stage hands the chosen VaultId to the
+    // targeting layer (`Some(id)`); these tests prove the chosen vault's
+    // vault.meta drives the pipeline, the wrong-vault phrase is
+    // non-distinguishing, and exactly one Argon2id permit is held per attempt.
+
+    #[test]
+    fn vault_b_selection_feeds_vault_bs_meta_not_vault_as() {
+        // Selecting vault B (passing B's id + B's path) recovers B's root_key
+        // and keys the Recovering slot under B's id. Vault A's slot stays
+        // Empty — no cross-vault bleed.
+        use crate::plugins::vault_unlock::state::test_vault_id_b;
+        rt().block_on(async {
+            let scratch_a = ScratchVault::new("recover_route_a");
+            let scratch_b = ScratchVault::new("recover_route_b");
+            let (meta_a, root_key_a, _phrase_a) = seed_vault_meta("pw-a");
+            let (meta_b, root_key_b, phrase_b) = seed_vault_meta("pw-b");
+            scratch_a.write_meta(&meta_a);
+            scratch_b.write_meta(&meta_b);
+            // Two independently-generated vaults must have distinct root keys.
+            assert_ne!(root_key_a, root_key_b, "fixtures must be distinct vaults");
+
+            let id_a = test_vault_id();
+            let id_b = test_vault_id_b();
+
+            let state = VaultRuntimeState::default();
+            // Recover with B's phrase against B's id + B's path.
+            recover_with_phrase_with_path(phrase_b, Some(id_b), scratch_b.path(), &state)
+                .await
+                .expect("B's phrase recovers B's vault.meta");
+
+            // B's slot holds B's root_key; A's slot is untouched.
+            assert_eq!(state.slot_kind(id_b).await, SlotKind::Recovering);
+            match state.take(id_b).await {
+                Slot::Recovering { root_key, .. } => assert_eq!(*root_key, root_key_b),
+                _ => panic!("expected Slot::Recovering under vault B's id"),
+            }
+            assert_eq!(
+                state.slot_kind(id_a).await,
+                SlotKind::Empty,
+                "selecting vault B must not populate vault A's slot"
+            );
+        });
+    }
+
+    #[test]
+    fn wrong_vault_phrase_is_non_distinguishing() {
+        // Vault A's phrase entered against vault B (B's id + B's path) fails
+        // the AEAD tag on B's recovery wrap-key → the SAME
+        // `InvalidCredentialOrVault` a typo produces (spec §3.4
+        // non-distinguishing). No slot populated, no counter, permit released.
+        use crate::plugins::vault_unlock::state::test_vault_id_b;
+        rt().block_on(async {
+            let scratch_b = ScratchVault::new("recover_wrong_b");
+            // A's phrase, B's vault.meta on disk.
+            let (_meta_a, _root_a, phrase_a) = seed_vault_meta("pw-a");
+            let (meta_b, _root_b, _phrase_b) = seed_vault_meta("pw-b");
+            scratch_b.write_meta(&meta_b);
+
+            let id_b = test_vault_id_b();
+            let state = VaultRuntimeState::default();
+
+            let result =
+                recover_with_phrase_with_path(phrase_a, Some(id_b), scratch_b.path(), &state).await;
+            assert!(
+                matches!(result, Err(VaultRecoveryError::InvalidCredentialOrVault)),
+                "wrong-vault phrase must map to the same non-distinguishing variant as a typo; got {result:?}"
+            );
+            // No slot populated for either vault.
+            assert_eq!(state.slot_kind(id_b).await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+            // Permit released by RAII drop — exactly one Argon2id ran, no leak.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+        });
+    }
+
+    #[test]
+    fn single_vault_recovery_uses_sole_vault_fallback() {
+        // 1-vault parity (story 7): the recovery flow skips the picker +
+        // account-number step and recovers against the sole vault via the
+        // `None` (sole-vault fallback) targeting — exactly the pre-multi-vault
+        // single-vault behavior. The slot keys under the path-derived id.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, original_root_key, phrase) = seed_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            // `None` = sole-vault fallback — no VaultId selection was made.
+            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
+                .await
+                .expect("single-vault recovery via sole-vault fallback");
+
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
+            match state.take(test_vault_id()).await {
+                Slot::Recovering { root_key, .. } => assert_eq!(*root_key, original_root_key),
+                _ => panic!("expected Slot::Recovering under the sole-vault id"),
+            }
+            // One Argon2id permit, released after.
+            assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }
 
@@ -800,14 +1030,18 @@ mod tests {
                                 abandon abandon abandon abandon abandon abandon \
                                 abandon abandon abandon abandon abandon abandon \
                                 abandon abandon abandon abandon abandon art";
-            let result =
-                recover_with_phrase_with_path(wrong_phrase.to_string(), scratch.path(), &state)
-                    .await;
+            let result = recover_with_phrase_with_path(
+                wrong_phrase.to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::InvalidCredentialOrVault)
             ));
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -831,11 +1065,11 @@ mod tests {
             assert_ne!(mutated, phrase, "must actually contain U+00A0 now");
 
             let state = VaultRuntimeState::default();
-            recover_with_phrase_with_path(mutated, scratch.path(), &state)
+            recover_with_phrase_with_path(mutated, None, scratch.path(), &state)
                 .await
                 .expect("NFKD-normalized phrase must recover successfully");
 
-            let taken = state.take().await;
+            let taken = state.take(test_vault_id()).await;
             match taken {
                 Slot::Recovering { root_key, .. } => {
                     assert_eq!(*root_key, original_root_key);
@@ -855,12 +1089,13 @@ mod tests {
             let state = VaultRuntimeState::default();
             let result = recover_with_phrase_with_path(
                 "anything anything anything".to_string(),
+                None,
                 scratch.path(),
                 &state,
             )
             .await;
             assert!(matches!(result, Err(VaultRecoveryError::VaultNotFound)));
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -879,7 +1114,7 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            let result = recover_with_phrase_with_path(phrase, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
             match result {
                 Err(VaultRecoveryError::InvalidVaultMeta) => {}
                 Err(VaultRecoveryError::InvalidCredentialOrVault) => {
@@ -890,7 +1125,7 @@ mod tests {
                 }
                 other => panic!("expected InvalidVaultMeta, got {other:?}"),
             }
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -903,9 +1138,9 @@ mod tests {
             scratch.write_meta(&bytes);
 
             let state = VaultRuntimeState::default();
-            let result = recover_with_phrase_with_path(phrase, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
             assert!(matches!(result, Err(VaultRecoveryError::InvalidVaultMeta)));
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -918,9 +1153,9 @@ mod tests {
             scratch.write_meta(&bytes[..protocol::VAULT_META_LEN - 1]);
 
             let state = VaultRuntimeState::default();
-            let result = recover_with_phrase_with_path(phrase, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
             assert!(matches!(result, Err(VaultRecoveryError::InvalidVaultMeta)));
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -936,17 +1171,20 @@ mod tests {
             // pattern; recovery must reject without perturbing the
             // existing slot.
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x42, 0x13, 0x99))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x42, 0x13, 0x99),
+                )
                 .await;
 
-            let result = recover_with_phrase_with_path(phrase, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::VaultAlreadyUnlocked)
             ));
 
             // Existing Unlocked slot is untouched.
-            let taken = state.take().await;
+            let taken = state.take(test_vault_id()).await;
             match taken {
                 Slot::Unlocked(uv) => {
                     assert_eq!(*uv.root_key, [0x42u8; AEAD_KEY_LEN]);
@@ -968,17 +1206,20 @@ mod tests {
             // pattern; recovery must reject without perturbing the
             // existing recovery state.
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
-            let result = recover_with_phrase_with_path(phrase, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::RecoveryAlreadyInProgress)
             ));
 
             // Existing Recovering slot is untouched.
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -992,7 +1233,7 @@ mod tests {
             scratch.write_meta(&bytes);
 
             let state = VaultRuntimeState::default();
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             let held_permit = state
                 .auth_permits()
@@ -1001,20 +1242,20 @@ mod tests {
             assert_eq!(state.auth_permits().available_permits(), 0);
 
             let result =
-                recover_with_phrase_with_path(phrase.clone(), scratch.path(), &state).await;
+                recover_with_phrase_with_path(phrase.clone(), None, scratch.path(), &state).await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::RecoveryInProgress)
             ));
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             drop(held_permit);
             assert_eq!(state.auth_permits().available_permits(), 1);
 
-            recover_with_phrase_with_path(phrase, scratch.path(), &state)
+            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
                 .await
                 .expect("retry after permit released succeeds");
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }
@@ -1031,7 +1272,10 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x42, 0x13, 0x99))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x42, 0x13, 0x99),
+                )
                 .await;
 
             let _held_permit = state
@@ -1040,7 +1284,7 @@ mod tests {
                 .expect("first acquire on fresh state");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result = recover_with_phrase_with_path(phrase, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
             // Peek catches it before try_acquire runs.
             assert!(matches!(
                 result,
@@ -1070,9 +1314,13 @@ mod tests {
                                 abandon abandon abandon abandon abandon abandon \
                                 abandon abandon abandon abandon abandon abandon \
                                 abandon abandon abandon abandon abandon art";
-            let r1 =
-                recover_with_phrase_with_path(wrong_phrase.to_string(), scratch.path(), &state)
-                    .await;
+            let r1 = recover_with_phrase_with_path(
+                wrong_phrase.to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await;
             assert!(matches!(
                 r1,
                 Err(VaultRecoveryError::InvalidCredentialOrVault)
@@ -1084,10 +1332,10 @@ mod tests {
             );
 
             // Retry with correct phrase — must succeed.
-            recover_with_phrase_with_path(correct_phrase, scratch.path(), &state)
+            recover_with_phrase_with_path(correct_phrase, None, scratch.path(), &state)
                 .await
                 .expect("retry after wrong-phrase failure works");
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }
@@ -1122,10 +1370,10 @@ mod tests {
         scratch.write_meta(&meta_bytes);
 
         let state = VaultRuntimeState::default();
-        recover_with_phrase_with_path(phrase.clone(), scratch.path(), &state)
+        recover_with_phrase_with_path(phrase.clone(), None, scratch.path(), &state)
             .await
             .expect("seed: A8d must succeed against the seeded vault");
-        assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+        assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
 
         (state, scratch, password.to_string(), phrase, meta_bytes)
     }
@@ -1144,7 +1392,7 @@ mod tests {
             // 11 chars — below MIN_PASSWORD_LEN of 12.
             let weak_pw = "a".repeat(11);
             let started = std::time::Instant::now();
-            let result = complete_recovery_with_path(weak_pw, scratch.path(), &state).await;
+            let result = complete_recovery_with_path(weak_pw, None, scratch.path(), &state).await;
             let elapsed = started.elapsed();
 
             assert!(
@@ -1163,7 +1411,7 @@ mod tests {
             // Slot stays Recovering — gate fired before slot peek's
             // potential mutations and before take_recovering. User can
             // retry with a stronger password.
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
 
             // Permit released — gate fires before permit acquire.
             assert_eq!(state.auth_permits().available_permits(), 1);
@@ -1184,11 +1432,16 @@ mod tests {
             let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                .await
-                .expect("A8f must succeed when slot is Recovering");
+            complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("A8f must succeed when slot is Recovering");
 
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
             // Permit released after success.
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
@@ -1207,14 +1460,19 @@ mod tests {
             let (state, scratch, _orig_pw, _phrase, orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                .await
-                .expect("A8f");
+            complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("A8f");
 
             let new_disk_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
             let expected_hash = crate::vault_meta_hash::vault_meta_sha256(&new_disk_bytes);
 
-            let unlocked = state.take().await.unwrap_unlocked();
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
             assert_eq!(
                 unlocked.vault_meta_bytes_hash, expected_hash,
                 "slot.vault_meta_bytes_hash must equal SHA-256 of the rewritten vault.meta bytes"
@@ -1239,9 +1497,14 @@ mod tests {
             let (state, scratch, _orig_pw, _phrase, orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                .await
-                .expect("A8f");
+            complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("A8f");
 
             let new_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
             assert_eq!(
@@ -1287,18 +1550,23 @@ mod tests {
             let (state, scratch, orig_pw, _phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                .await
-                .expect("A8f");
+            complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("A8f");
 
             // Lock to clear Slot::Unlocked; otherwise unlock_with_path
             // rejects with VaultAlreadyUnlocked before reaching the
             // password-verification stage.
-            let _ = state.take().await;
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            let _ = state.take(test_vault_id()).await;
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             // Try the original password — must fail.
-            let result = unlock_with_path(orig_pw, scratch.path(), &state).await;
+            let result = unlock_with_path(orig_pw, None, scratch.path(), &state).await;
             assert!(
                 matches!(result, Err(VaultUnlockError::InvalidCredentialOrVault)),
                 "original password must no longer unlock after A8f; got {result:?}"
@@ -1316,15 +1584,20 @@ mod tests {
             let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                .await
-                .expect("A8f");
+            complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("A8f");
 
-            let _ = state.take().await;
-            unlock_with_path("new-password-12".to_string(), scratch.path(), &state)
+            let _ = state.take(test_vault_id()).await;
+            unlock_with_path("new-password-12".to_string(), None, scratch.path(), &state)
                 .await
                 .expect("new password must unlock the rewritten vault.meta");
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 
@@ -1338,17 +1611,22 @@ mod tests {
             let (state, scratch, _orig_pw, phrase, _orig_bytes) =
                 seed_recovering_state_via_full_a8d("orig-pw").await;
 
-            complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                .await
-                .expect("A8f");
+            complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("A8f");
 
             // Lock to clear Slot::Unlocked, then re-recover with the
             // original phrase.
-            let _ = state.take().await;
-            recover_with_phrase_with_path(phrase, scratch.path(), &state)
+            let _ = state.take(test_vault_id()).await;
+            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
                 .await
                 .expect("phrase must still recover after A8f");
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -1360,11 +1638,15 @@ mod tests {
             scratch.write_meta(&bytes);
 
             let state = VaultRuntimeState::default();
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
-            let result =
-                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                    .await;
+            let result = complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::VaultRecoveryRequiresActiveSession)
@@ -1389,19 +1671,26 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(0xAB, 0xCD, 0xEF))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0xAB, 0xCD, 0xEF),
+                )
                 .await;
 
-            let result =
-                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                    .await;
+            let result = complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::VaultRecoveryRequiresActiveSession)
             ));
 
             // Existing Unlocked slot is untouched.
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
             // vault.meta unchanged on disk.
             let on_disk = std::fs::read(scratch.path()).expect("vault.meta exists");
             assert_eq!(on_disk, &bytes[..]);
@@ -1422,16 +1711,20 @@ mod tests {
                 .expect("permit available pre-hold");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result =
-                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state)
-                    .await;
+            let result = complete_recovery_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::RecoveryInProgress)
             ));
             // Slot is still Recovering (not consumed by the rejected
             // attempt).
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -1465,7 +1758,7 @@ mod tests {
             std::fs::remove_dir_all(&scratch.dir).expect("remove parent dir");
 
             let result =
-                complete_recovery_with_path("new-password-12".to_string(), scratch.path(), &state).await;
+                complete_recovery_with_path("new-password-12".to_string(), None, scratch.path(), &state).await;
             // Either IoError (read_meta / atomic_write failed) or
             // VaultNotFound (vault.meta was removed alongside the dir).
             assert!(
@@ -1479,7 +1772,7 @@ mod tests {
             // Slot must be coherent with the failure-stage rule above:
             // pre-Argon2id failure → Recovering (retryable);
             // post-Argon2id failure → Empty (must restart from A8d).
-            let slot_kind_after = state.slot_kind().await;
+            let slot_kind_after = state.slot_kind(test_vault_id()).await;
             assert!(
                 matches!(slot_kind_after, SlotKind::Recovering | SlotKind::Empty),
                 "slot must be Recovering (pre-Argon2id failure) or Empty (post-Argon2id failure), got {slot_kind_after:?}"
