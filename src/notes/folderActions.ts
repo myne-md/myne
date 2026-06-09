@@ -1,21 +1,29 @@
-// Folder-management actions (MYND-144 Task 8): folder delete.
+// Folder-management actions (MYND-144 Task 8): folder delete + rename.
 //
-// Grill 2026-05-29 Q8: v0.1 has no soft-trash, so a folder-delete must NEVER
-// touch a note. Deleting a folder whose subtree holds any note is **blocked**
-// ("move or delete the notes first"); deleting a note-empty folder (necessarily
-// a deliberate folder and/or its derived ancestors) cascade-removes the matching
-// deliberate_folders entries — a cold prefs-set write, no re-encrypt. Ancestors
-// that were only ancestor-derived vanish naturally from the next tree
-// derivation (they were never in the set).
+// Folder delete soft-trashes its subtree (2026-06-09 — supersedes the
+// 2026-05-29 "non-empty-folder-delete is blocked (no v0.1 trash)" pin). Now that
+// vault-internal soft-trash exists (MYND-133, 2026-06-03), deleting a non-empty
+// folder is no longer blocked: `planFolderDelete` collects every note in the
+// target subtree so the caller can soft-trash them (recoverable from the Trash
+// panel) and cascade-removes the matching deliberate_folders entries — a cold
+// prefs-set write, no re-encrypt. Ancestors that were only ancestor-derived
+// vanish naturally from the next tree derivation (they were never in the set).
+// Deleting a note-empty folder yields an empty `noteIds`, so the caller skips
+// the trash step and only trims the deliberate set — the pre-2026-06-09 path.
 
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { setDeliberateFolders } from "../lib/prefs";
 import { moveNote } from "./moveNote";
 import type { FolderNode, FolderTree } from "./folderTree";
 
-export type FolderDeletePlan =
-  | { blocked: true; reason: "non-empty"; noteCount: number }
-  | { blocked: false; nextDeliberate: string[]; removed: string[] };
+export type FolderDeletePlan = {
+  /** Every note in the target subtree (itself + descendants) — to soft-trash. */
+  noteIds: string[];
+  /** The deliberate_folders set after dropping the target + deliberate descendants. */
+  nextDeliberate: string[];
+  /** The deliberate entries dropped (target + deliberate descendants). */
+  removed: string[];
+};
 
 function findNode(nodes: readonly FolderNode[], key: string): FolderNode | null {
   for (const n of nodes) {
@@ -26,19 +34,19 @@ function findNode(nodes: readonly FolderNode[], key: string): FolderNode | null 
   return null;
 }
 
-/** Total notes in `node`'s subtree (itself + all descendants). */
-function countSubtreeNotes(node: FolderNode): number {
-  let total = node.noteIds.length;
-  for (const child of node.children) total += countSubtreeNotes(child);
-  return total;
+/** Every note in `node`'s subtree (itself + all descendants), pre-order. */
+function collectSubtreeNoteIds(node: FolderNode): string[] {
+  const ids = [...node.noteIds];
+  for (const child of node.children) ids.push(...collectSubtreeNoteIds(child));
+  return ids;
 }
 
 /**
- * Decide whether `targetPath` can be deleted and, if so, compute the next
- * deliberate_folders set. Pure — no IPC. The target subtree's note count gates
- * the decision; the deliberate set is filtered by folded-path prefix so the
- * target and every deliberate descendant are removed in one pass, while
- * siblings and deliberate ancestors are preserved.
+ * Compute a folder delete. Pure — no IPC. Collects the target subtree's notes
+ * (the caller soft-trashes them; an empty list = a note-empty folder) and
+ * filters the deliberate set by folded-path prefix so the target and every
+ * deliberate descendant drop in one pass, while siblings and deliberate
+ * ancestors are preserved. Root (absent) is a no-op.
  */
 export function planFolderDelete(
   targetPath: string,
@@ -48,15 +56,12 @@ export function planFolderDelete(
   const normalized = normalizeFolderPath(targetPath);
   // Root (absent) is not a deletable folder — no-op, nothing removed.
   if (normalized === null) {
-    return { blocked: false, nextDeliberate: [...deliberateFolders], removed: [] };
+    return { noteIds: [], nextDeliberate: [...deliberateFolders], removed: [] };
   }
   const targetKey = foldSegment(normalized); // trailing-slash folded form
 
   const node = findNode(tree.roots, targetKey);
-  const noteCount = node ? countSubtreeNotes(node) : 0;
-  if (noteCount > 0) {
-    return { blocked: true, reason: "non-empty", noteCount };
-  }
+  const noteIds = node ? collectSubtreeNoteIds(node) : [];
 
   // targetKey ends with "/", so `startsWith` matches the target itself and any
   // descendant but never a name-prefix sibling (`projectsx/` ⊀ `projects/`).
@@ -68,24 +73,19 @@ export function planFolderDelete(
     if (key.startsWith(targetKey)) removed.push(f);
     else nextDeliberate.push(f);
   }
-  return { blocked: false, nextDeliberate, removed };
+  return { noteIds, nextDeliberate, removed };
 }
 
 /**
- * Delete `targetPath`. Returns the plan; persists the trimmed deliberate set
- * via {@link setDeliberateFolders} only when the delete is not blocked. Never
- * touches a note blob. Rejects with whatever `setDeliberateFolders` propagates.
+ * Persist the trimmed deliberate set for a planned folder delete. Note-trashing
+ * + cache-sync is the caller's job (it needs the sidebar cache); this helper
+ * only writes the cold deliberate_folders set. Rejects with whatever
+ * {@link setDeliberateFolders} propagates.
  */
-export async function deleteFolder(
-  targetPath: string,
-  tree: FolderTree,
-  deliberateFolders: readonly string[],
-): Promise<FolderDeletePlan> {
-  const plan = planFolderDelete(targetPath, tree, deliberateFolders);
-  if (!plan.blocked) {
-    await setDeliberateFolders(plan.nextDeliberate);
-  }
-  return plan;
+export async function persistFolderDelete(
+  plan: FolderDeletePlan,
+): Promise<void> {
+  await setDeliberateFolders(plan.nextDeliberate);
 }
 
 // ---- folder rename ----------------------------------------------------

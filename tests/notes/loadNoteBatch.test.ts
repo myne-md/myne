@@ -110,18 +110,44 @@ describe("loadNoteBatch — title derivation (frontmatter `title:` only)", () =>
     expect(rec.title).toBe("2026-06-07");
   });
 
-  it("an UNquoted date-shaped title is mis-typed to null (the bug the quoting fix prevents)", async () => {
+  // An unquoted date-shaped title makes js-yaml hand back a Date, not a string.
+  // The value-strict raw-read fallback heals it back to the typed date string
+  // (so older / imported / hand-edited notes show their title, not "Untitled").
+  it("heals an UNquoted date-shaped title via the raw-read fallback", async () => {
     invokeMock.mockResolvedValueOnce([
       {
         Ok: {
-          note_uuid: "daily-bad",
+          note_uuid: "daily-legacy",
           frontmatter_bytes: "title: 2026-06-07\n",
           first_h1_line: null,
         },
       },
     ]);
-    const [rec] = await loadNoteBatch(["daily-bad"]);
-    expect(rec.title).toBeNull();
+    const [rec] = await loadNoteBatch(["daily-legacy"]);
+    expect(rec.title).toBe("2026-06-07");
+  });
+
+  // Same healing for int- / bool-shaped unquoted titles js-yaml re-types.
+  it("heals UNquoted number- and bool-shaped titles via the raw-read fallback", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "num",
+          frontmatter_bytes: "title: 42\n",
+          first_h1_line: null,
+        },
+      },
+      {
+        Ok: {
+          note_uuid: "bool",
+          frontmatter_bytes: "title: true\n",
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const out = await loadNoteBatch(["num", "bool"]);
+    expect(out[0]?.title).toBe("42");
+    expect(out[1]?.title).toBe("true");
   });
 
   it("yields null when frontmatter has no title field (no H1 fallback)", async () => {

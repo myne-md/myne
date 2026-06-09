@@ -47,3 +47,33 @@ export async function restoreNote(noteId: string): Promise<void> {
   const restored = patchTrashedField(encoder.encode(current), null);
   await noteUpdate(noteId, decoder.decode(restored));
 }
+
+/** Outcome of a {@link bulkTrashNotes} call — trashed IDs + per-note failures. */
+export interface BulkTrashResult {
+  /** Note IDs that were soft-trashed successfully. */
+  trashed: string[];
+  /** Note IDs that failed, with the propagated IPC error. */
+  failed: Array<{ noteId: string; error: unknown }>;
+}
+
+/**
+ * Soft-trash many notes at once (e.g. every note under a deleted folder). Each
+ * note is an independent {@link trashNote} fired via `Promise.allSettled` —
+ * trashing is not correctness-critical (mirrors `bulkMoveNotes`, grill
+ * 2026-05-29 Q8), so a partial failure is benign: successful trashes stand,
+ * failures are reported for a retry. Never rejects; surfaces results via
+ * {@link BulkTrashResult}.
+ */
+export async function bulkTrashNotes(
+  noteIds: string[],
+): Promise<BulkTrashResult> {
+  const settled = await Promise.allSettled(noteIds.map((id) => trashNote(id)));
+  const trashed: string[] = [];
+  const failed: Array<{ noteId: string; error: unknown }> = [];
+  settled.forEach((outcome, i) => {
+    const noteId = noteIds[i] ?? "";
+    if (outcome.status === "fulfilled") trashed.push(noteId);
+    else failed.push({ noteId, error: outcome.reason });
+  });
+  return { trashed, failed };
+}

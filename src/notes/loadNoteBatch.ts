@@ -25,7 +25,11 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { load as parseYaml } from "js-yaml";
-import { readTemplateFromFmBody, readTrashedFromFmBody } from "../dialect";
+import {
+  readTemplateFromFmBody,
+  readTitleFromFmBody,
+  readTrashedFromFmBody,
+} from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import type {
   NoteTitleError,
@@ -145,8 +149,18 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // Title comes from the frontmatter `title:` key only — no first-H1
   // fallback. A note without an explicit `title:` renders as "Untitled"
   // until the user names it (sidebar rename / Properties title field).
+  // js-yaml re-types an unquoted date-/int-/bool-shaped title to a non-string
+  // (a daily note titled `2026-06-07` parses to a Date); fall back to the
+  // value-strict raw read so the typed title still shows instead of "Untitled"
+  // — heals notes written before the state-B title-quoting fix, plus imported
+  // / hand-edited files. New Myne writes quote such titles (see surgery.ts).
+  const titleRaw = parsed["title"];
   const titleFromFm =
-    typeof parsed["title"] === "string" ? (parsed["title"] as string) : null;
+    typeof titleRaw === "string"
+      ? titleRaw
+      : titleRaw === undefined || titleRaw === null
+        ? null
+        : readTitleFromFmBody(slice.frontmatter_bytes ?? "");
   // `folder:` → canonical trailing-slash path (or null = root/unfiled). Parse
   // is tolerant + non-mutating: imported / malformed paths are normalized
   // structurally only (no segment validation here).

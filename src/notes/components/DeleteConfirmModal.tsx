@@ -107,6 +107,12 @@ export type DeleteConfirmModalProps = {
   title?: string;
   /** Body line override (shown above the warning). Default: the quoted note title. */
   body?: string;
+  /**
+   * Warning line override (shown below the body, muted). Default:
+   * "This cannot be undone." Pass a softer line for recoverable actions (e.g.
+   * a folder delete that only soft-trashes its notes).
+   */
+  warning?: string;
   /** Confirm-button label override. Default: "Delete". */
   confirmLabel?: string;
   onCancel: () => void;
@@ -114,7 +120,8 @@ export type DeleteConfirmModalProps = {
 };
 
 export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
-  const { noteTitle, title, body, confirmLabel, onCancel, onConfirm } = props;
+  const { noteTitle, title, body, warning, confirmLabel, onCancel, onConfirm } =
+    props;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
 
   // Default-focus on Cancel (safer destructive UX).
@@ -162,7 +169,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
         <p id="delete-confirm-body" style={BODY_TITLE_STYLE}>
           {bodyLine}
         </p>
-        <p style={BODY_WARNING_STYLE}>This cannot be undone.</p>
+        <p style={BODY_WARNING_STYLE}>{warning ?? "This cannot be undone."}</p>
         <div style={BUTTON_ROW_STYLE}>
           <button
             ref={cancelRef}

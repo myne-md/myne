@@ -10,7 +10,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
 }));
 
-import { trashNote, restoreNote } from "../../src/notes/trashNote";
+import {
+  trashNote,
+  restoreNote,
+  bulkTrashNotes,
+} from "../../src/notes/trashNote";
 
 beforeEach(() => invokeMock.mockReset());
 afterEach(() => invokeMock.mockReset());
@@ -130,5 +134,35 @@ describe("restoreNote", () => {
       return Promise.reject({ kind: "Io" });
     });
     await expect(restoreNote("id-y")).rejects.toMatchObject({ kind: "Io" });
+  });
+});
+
+describe("bulkTrashNotes — N independent best-effort trashes", () => {
+  it("trashes all notes and reports them as trashed", async () => {
+    routeReadThenUpdate("body\n");
+    const result = await bulkTrashNotes(["a", "b", "c"]);
+    expect(result.trashed.sort()).toEqual(["a", "b", "c"]);
+    expect(result.failed).toEqual([]);
+  });
+
+  it("reports per-note failures without aborting the rest", async () => {
+    invokeMock.mockImplementation((cmd: string, args: unknown) => {
+      const id = (args as { noteId?: string }).noteId;
+      if (cmd === "plugin:notes|note_read") {
+        if (id === "bad") return Promise.reject({ kind: "CannotDecrypt" });
+        return Promise.resolve("body\n");
+      }
+      return Promise.resolve(undefined);
+    });
+    const result = await bulkTrashNotes(["ok1", "bad", "ok2"]);
+    expect(result.trashed.sort()).toEqual(["ok1", "ok2"]);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0]?.noteId).toBe("bad");
+  });
+
+  it("returns an empty result for an empty input", async () => {
+    const result = await bulkTrashNotes([]);
+    expect(result).toEqual({ trashed: [], failed: [] });
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 });

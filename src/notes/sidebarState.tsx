@@ -25,7 +25,12 @@ import {
 import { createNote } from "./createNote";
 import { deleteNote } from "./deleteNote";
 import { emptyTrash, type EmptyTrashResult } from "./emptyTrash";
-import { restoreNote, trashNote } from "./trashNote";
+import {
+  bulkTrashNotes,
+  restoreNote,
+  trashNote,
+  type BulkTrashResult,
+} from "./trashNote";
 import {
   loadNoteBatch,
   type TitleRecord,
@@ -428,6 +433,8 @@ export type UseSelectedNoteReturn = {
   restoreWithRollback: (id: NoteId) => Promise<void>;
   /** Permanently delete every id (empty trash); drops purged ids from the cache. */
   emptyTrashWithSync: (ids: readonly NoteId[]) => Promise<EmptyTrashResult>;
+  /** Soft-trash every id at once (e.g. a non-empty folder delete); optimistic + rollback. */
+  bulkTrashWithSync: (ids: readonly NoteId[]) => Promise<BulkTrashResult>;
   /** Surgical refresh: re-fetch a single note's title slice. */
   refreshOne: (id: NoteId) => Promise<void>;
   /** Initial-boot full refresh: load `note_list` + chunked title batch. */
@@ -626,6 +633,46 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // Soft-trash every id in `ids` (a non-empty folder delete). Optimistically
+  // marks all rows trashed (they leave the live tree at once), trashes them
+  // best-effort via `bulkTrashNotes`, refreshes the survivors to their canonical
+  // on-disk timestamps, and rolls back any that failed. Batched twin of
+  // `trashWithRollback` with `emptyTrashWithSync`'s cache-sync posture.
+  const bulkTrashWithSync = useCallback(
+    async (ids: readonly NoteId[]): Promise<BulkTrashResult> => {
+      if (ids.length === 0) return { trashed: [], failed: [] };
+      const iso = new Date().toISOString();
+      const snapshots = new Map<NoteId, TrashedFlagSnapshot>();
+      setState((prev) => {
+        let next = prev;
+        for (const id of ids) {
+          const result = applyOptimisticTrashedFlag(next, id, iso);
+          snapshots.set(id, result.snapshot);
+          next = result.next;
+        }
+        return next;
+      });
+      const result = await bulkTrashNotes([...ids]);
+      // Roll back the failures to their prior marker (the optimistic flag was
+      // wrong for those); the successes get refreshed to the canonical stamp.
+      if (result.failed.length > 0) {
+        setState((prev) => {
+          let next = prev;
+          for (const { noteId } of result.failed) {
+            const snap = snapshots.get(noteId);
+            if (snap !== undefined) {
+              next = rollbackOptimisticTrashedFlag(next, noteId, snap);
+            }
+          }
+          return next;
+        });
+      }
+      await Promise.allSettled(result.trashed.map((id) => refreshOne(id)));
+      return result;
+    },
+    [refreshOne],
+  );
+
   // MYND-97: re-read the open note's body after an out-of-band mutation
   // (snapshot restore overwrites the `.myn` via the backend, not the editor's
   // autosave). Mirrors the re-sync `commitRename` performs after a rename.
@@ -654,6 +701,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       trashWithRollback,
       restoreWithRollback,
       emptyTrashWithSync,
+      bulkTrashWithSync,
       refreshOne,
       refreshAll,
     }),
@@ -670,6 +718,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       trashWithRollback,
       restoreWithRollback,
       emptyTrashWithSync,
+      bulkTrashWithSync,
       refreshOne,
       refreshAll,
     ],
