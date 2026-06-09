@@ -27,6 +27,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::unlock,
             commands::lock,
             commands::vault_status,
+            commands::vault_list,
             commands::vault_is_unlocked,
             commands::vault_slot_kind,
             commands::report_user_activity,

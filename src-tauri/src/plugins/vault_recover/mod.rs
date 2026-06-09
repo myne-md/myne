@@ -9,6 +9,7 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
+pub mod account_number_select;
 pub mod commands;
 pub mod error;
 
@@ -24,7 +25,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("vault-recover")
         .invoke_handler(tauri::generate_handler![
             commands::recover_with_phrase,
-            commands::complete_recovery
+            commands::complete_recovery,
+            commands::resolve_vault_by_account_number
         ])
         .build()
 }

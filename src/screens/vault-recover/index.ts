@@ -20,6 +20,7 @@ export type {
 } from "./reducer";
 
 export { StepShell } from "./step-shell";
+export { RecoverySelectStep } from "./RecoverySelectStep";
 export { PhraseEntryStep } from "./PhraseEntryStep";
 export { DecryptingStep } from "./DecryptingStep";
 export { PasswordResetStep } from "./PasswordResetStep";

@@ -46,7 +46,7 @@ pub async fn attachment_refs_apply(
     runtime: State<'_, VaultRuntimeState>,
     refs: State<'_, AttachmentRefsState>,
 ) -> Result<(), AttachmentRefsError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(AttachmentRefsError::SlotNotUnlocked);
     }
     refs.apply(&note_id, attachment_ids);
@@ -66,7 +66,7 @@ pub async fn attachment_refs_remove(
     runtime: State<'_, VaultRuntimeState>,
     refs: State<'_, AttachmentRefsState>,
 ) -> Result<(), AttachmentRefsError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(AttachmentRefsError::SlotNotUnlocked);
     }
     refs.remove(&note_id);
@@ -86,7 +86,7 @@ pub async fn attachment_refs_referencing(
     runtime: State<'_, VaultRuntimeState>,
     refs: State<'_, AttachmentRefsState>,
 ) -> Result<Vec<String>, AttachmentRefsError> {
-    if runtime.slot_kind().await != SlotKind::Unlocked {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(AttachmentRefsError::SlotNotUnlocked);
     }
     Ok(refs.referencing_notes(&attachment_id))

@@ -38,12 +38,18 @@ fn main() {
                 "vault-recover",
                 // Task 4 of `vault-recovery-from-phrase` ships
                 // `recover_with_phrase`. Task 6 adds
-                // `complete_recovery` (the A8f bundle). Adding a
-                // command here without a matching `commands.allow`
-                // entry in `permissions/vault-recover/default.toml`
-                // is a security regression.
-                tauri_build::InlinedPlugin::new()
-                    .commands(&["recover_with_phrase", "complete_recovery"]),
+                // `complete_recovery` (the A8f bundle). MYND-206 adds
+                // `resolve_vault_by_account_number` (the optional
+                // multi-vault recovery selector — header-only, no
+                // decrypt). Adding a command here without a matching
+                // `commands.allow` entry in
+                // `permissions/vault-recover/default.toml` is a
+                // security regression.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "recover_with_phrase",
+                    "complete_recovery",
+                    "resolve_vault_by_account_number",
+                ]),
             )
             .plugin(
                 "vault-delete",
@@ -101,6 +107,7 @@ fn main() {
                     "prefs_read",
                     "set_screen_capture_protection",
                     "set_deliberate_folders",
+                    "vault_set_label",
                 ]),
             )
             .plugin(

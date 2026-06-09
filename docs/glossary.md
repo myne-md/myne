@@ -58,7 +58,7 @@ Used in: `spec/protocol.md` §5.2
 
 ### **account_number** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-Myne's user identifier. A 20-character canonical value composed of 19 random Crockford base32 characters (95 bits of entropy) plus 1 Damm-32 check character, displayed as `MY-XXXX-XXXX-XXXX-XXXX-X`. The account number replaces email at signup; it is bearer-token semantics in Phase 2+ (anyone in possession of it can authenticate sync requests for that account, like a Mullvad VPN account) but it is **not** a key — it does not encrypt anything, and possession alone does not unlock a vault. The cryptographic role is via `account_number_hash`, which binds Argon2id salts to this account and prevents pre-computation attacks across accounts.
+Myne's user identifier. A 20-character canonical value composed of 19 random Crockford base32 characters (95 bits of entropy) plus 1 Damm-32 check character, displayed as `MY-XXXX-XXXX-XXXX-XXXX-X`. The account number replaces email at signup; it is bearer-token semantics in Phase 2+ (anyone in possession of it can authenticate sync requests for that account, like a Mullvad VPN account) but it is **not** a key — it does not encrypt anything, and possession alone does not unlock a vault. The cryptographic role is via `account_number_hash`, which binds Argon2id salts to this account and prevents pre-computation attacks across accounts. In **multi-vault recovery** the account number gains an *optional selector* role: a user **may** type it so the host matches `account_number_hash` against on-disk `vault.meta` headers and jumps to that vault — **never required** (the picker is the primary path; the 24-word phrase stays the sole recovery secret; `decisions.md` 2026-06-09 "Multi-vault recovery").
 
 Used in: `spec/account-number.md`, `spec/protocol.md` §8
 
@@ -66,7 +66,7 @@ Used in: `spec/account-number.md`, `spec/protocol.md` §8
 
 *(Aliases: account hash. Myne-divergent: yes — two different truncation lengths in different roles.)*
 
-A SHA-256 hash of the canonical account number. **Truncation differs by use site**: for Argon2id salt construction (§3.1 of the protocol spec) it is 16 bytes — `SHA-256(canonical_account_number)[:16]` — and stored in `vault.meta`. For Phase 2+ server-side identification (`spec/account-number.md` §7) it is 32 bytes — `SHA-256(canonical)[:32]` — stored in the sync server registration table. The two lengths are deliberate to avoid identifier reuse across uses; readers must check which length applies in context.
+A SHA-256 hash of the canonical account number. **Truncation differs by use site**: for Argon2id salt construction (§3.1 of the protocol spec) it is 16 bytes — `SHA-256(canonical_account_number)[:16]` — and stored in `vault.meta`. For Phase 2+ server-side identification (`spec/account-number.md` §7) it is 32 bytes — `SHA-256(canonical)[:32]` — stored in the sync server registration table. The two lengths are deliberate to avoid identifier reuse across uses; readers must check which length applies in context. In **multi-vault recovery** the 16-byte `vault.meta` value doubles as an *optional* vault selector: when a user types their account number, the host recomputes `SHA-256(canonical)[:16]` and byte-matches it against each discovered vault's plaintext header field to jump to that vault (header-read only — no decrypt, no `auth_permits`; `decisions.md` 2026-06-09 "Multi-vault recovery").
 
 Used in: `spec/protocol.md` §3.1, §8.3; `spec/account-number.md` §6, §7
 
@@ -961,9 +961,9 @@ Used in: `decisions.md` 2026-05-15; MYND-82
 
 ### **Slot** &nbsp; 📦 *Product*
 
-The three-state enum that holds the current vault auth state inside `VaultRuntimeState`'s `RwLock<Slot>` (Rust-side singleton, one instance per app process). Variants: `Slot::Empty` (no vault open; the default at process start and the post-`vault_lock` state), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access). Editor commands match only `Slot::Unlocked(uv) => ...`; the `Slot::Recovering` and `Slot::Empty` variants are structurally rejected at compile time. The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Phase 2 multi-vault is a mechanical type swap (`HashMap<VaultId, Slot>`); the lifecycle reasoning carries forward unchanged.
+The three-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access). Editor commands match only `Slot::Unlocked(uv) => ...`; the `Slot::Recovering` and `Slot::Empty` variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
 
-Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization", 2026-06-09 "Runtime multi-slot core"
 
 ### **SlotKind** &nbsp; 📋 *Protocol*
 
@@ -1069,6 +1069,12 @@ The aspirational long-term protocol specification, drawn from the founder's rese
 
 Used in: `decisions.md` (Doc strategy = Option C)
 
+### **VaultId** &nbsp; 🗝️ *Key/identifier*
+
+A random **UUIDv7** that names a vault: it is both the `vaults/<id>/` on-disk directory name and the runtime `HashMap<VaultId, Slot>` key. Opaque and **decoupled from `account_number_hash`** — the directory name leaks no account-correlation tag to a disk observer (a deliberate rejection of an `account_hash_short`-derived name). Minted via `VaultId::mint()` (a directory collision triggers mint-and-retry); rendered/parsed as its 36-char hyphenated form. Not a secret and not a key — it encrypts nothing. Introduced for multi-vault.
+
+Used in: `decisions.md` 2026-06-09 "Vault disk layout: vaults/<id>/ + eager boot migration"
+
 ### **vault** &nbsp; 📦 *Product*
 
 A user's encrypted note collection — the unit of Myne's data model. Concretely: a directory containing `vault.meta`, a `notes/` subdirectory of `.myn` files, and (reserved for v0.1) an `attachments/` subdirectory.
@@ -1081,6 +1087,24 @@ The backend-resident state held between the `begin` and `commit` IPC calls of th
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
 
+### **vault label** &nbsp; 📦 *Product*
+
+A per-vault human-readable name shown in the [vault picker](#vault-picker) and [vault switcher](#vault-switcher). Stored **encrypted-only** inside that vault's [vault.prefs](#vaultprefs) (a non-breaking field on the §9.5 extensible prefs JSON — no new magic, the `MYP1` envelope is unchanged), decrypted into a RAM cache on unlock. Set via the `vault_set_label` IPC, **unlock-gated by construction** (only the active/sole-`Unlocked` vault is writable — a locked vault cannot be renamed). Never written in plaintext at rest and never crosses IPC except as the user's own input; a vault not unlocked this session shows a neutral "Vault N" fallback instead (SYNC-3). Introduced for multi-vault.
+
+Used in: `decisions.md` 2026-06-09 "Multi-vault in-app switcher + label management"
+
+### **vault picker** &nbsp; 📦 *Product*
+
+The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly) — a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Pre-unlock it surfaces only the vault **count + last-unlock timing** (an accepted leak, `threat-model.md` §7) — never names, content, or account identity. The recovery picker reuses the same view-model.
+
+Used in: `decisions.md` 2026-06-09 "Multi-vault onboarding + vault picker"
+
+### **vault registry** &nbsp; 📦 *Product*
+
+A best-effort, **rebuildable** on-disk cache (`<app_data_dir>/vaults/registry.json`) holding only each vault's opaque [VaultId](#vaultid) + last-unlock timestamp — **no human label** at rest (labels live encrypted in [vault.prefs](#vaultprefs)). It is **not authoritative**: the discovery authority is the disk-scan of `vaults/<id>/` directories, so a missing or corrupt registry is transparently rebuilt from disk and discovery never fails when the cache is gone. Serves the pre-unlock picker's stable ordering. Introduced for multi-vault.
+
+Used in: `decisions.md` 2026-06-09 "Vault disk layout: vaults/<id>/ + eager boot migration"
+
 ### **vault root** &nbsp; 📦 *Product* *(retired 2026-06-02)*
 
 *Retired as a named sidebar section by MYND-183 (`decisions.md` 2026-06-02): folderless notes are no longer bucketed under a separate "Vault root" header but render at the root level of the unified [item-order](#item-order) tree, alongside top-level folders. The **logical root position** it described — a note whose `folder:` frontmatter is **absent** — remains first-class and unchanged (`spec/markdown-dialect.md` §3.6 still uses "root / unfiled" for that state); only the dedicated sidebar section is gone. Unrelated: "vault root" in `spec/wikilink.md` means the on-disk vault directory (the folder holding `vault.meta`), a different sense untouched here. Preserved for audit trail.*
@@ -1088,6 +1112,12 @@ Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation sessio
 The top of the virtual folder tree — the home of *unfiled* notes. A note is at the vault root when its `folder:` frontmatter field is **absent** (`folder: ""` is read as root and normalized to absent; `folder: "/"` is rejected). Distinct from the *vault directory* on the filesystem: the vault root is a logical position in the sidebar tree, not a path on disk (the on-disk layout is always flat `notes/<uuid>.myn`). A new note created with no folder selected, and a note moved out of every folder, both land at the vault root. See also [folder](#folder).
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2; `decisions.md` 2026-05-29
+
+### **vault switcher** &nbsp; 📦 *Product*
+
+The in-app surface for changing the active vault while running — the sidebar-header account chip opens a dropdown listing the discovered vaults (the [vault picker](#vault-picker) view-model: real [label](#vault-label) for a this-session-unlocked vault, neutral "Vault N" fallback otherwise, last-unlock ordering, active vault marked). Selecting a non-active vault **switches** to it via **lock-then-unlock** (NOT a pointer-flip): the param-less `vault_lock()` runs the four-surface teardown (keys + search index + VaultIndices + attachment-refs) + `flushIfDirty`, then the target is unlocked (vault-addressed) — so the prior vault's plaintext is fully torn down before the next opens (SYNC-1/8). A brief "saving…" state covers the chain; selecting the active vault is a no-op. Introduced for multi-vault.
+
+Used in: `decisions.md` 2026-06-09 "Multi-vault in-app switcher + label management"
 
 ### **vault.meta** &nbsp; 📦 *Product* (deep entry)
 

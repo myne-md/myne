@@ -75,6 +75,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_daily_template,
             commands::set_item_colors,
             commands::set_folder_icons,
+            commands::vault_set_label,
         ])
         .build()
 }

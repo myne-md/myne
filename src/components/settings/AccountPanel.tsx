@@ -38,6 +38,8 @@ import { Button } from "../primitives/Button";
 import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
 import { changePassword } from "../../lib/vault-change-password";
+import { prefsRead, setVaultLabel } from "../../lib/prefs";
+import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import {
   deleteVault,
   mapDeleteVaultError,
@@ -120,6 +122,68 @@ const HELPER_TEXT_MUTED_STYLE: CSSProperties = {
   ...HELPER_TEXT_STYLE,
   color: "var(--fg-3)",
 };
+
+// VAULT LABEL section (MYND-205 task 6). Pinned to the Penpot spec rather
+// than the panel's semantic-token helpers so the eyebrow / input / Save button
+// match the rename-control frame exactly (Inter 11/600 eyebrow, 36px controls).
+const LABEL_EYEBROW_STYLE: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "var(--tracking-caps)",
+  textTransform: "uppercase",
+  color: "var(--ink-3)",
+  margin: 0,
+};
+
+const LABEL_HELPER_STYLE: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 400,
+  lineHeight: "var(--leading-normal)",
+  color: "var(--ink-2)",
+  margin: 0,
+};
+
+const LABEL_INPUT_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+  alignSelf: "stretch",
+};
+
+function labelInputStyle(focused: boolean): CSSProperties {
+  return {
+    flex: 1,
+    minWidth: 0,
+    height: 36,
+    boxSizing: "border-box",
+    padding: "0 10px",
+    background: "var(--paper)",
+    border: `1px solid ${focused ? "var(--accent)" : "var(--line-2)"}`,
+    borderRadius: "var(--radius-1)",
+    fontFamily: "var(--font-sans)",
+    fontSize: 13,
+    color: "var(--ink-1)",
+    outline: "none",
+  };
+}
+
+function labelSaveButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    height: 36,
+    boxSizing: "border-box",
+    padding: "0 14px",
+    flexShrink: 0,
+    background: disabled ? "var(--paper-2)" : "var(--accent)",
+    border: `1px solid ${disabled ? "var(--line-1)" : "var(--accent)"}`,
+    borderRadius: "var(--radius-2)",
+    fontFamily: "var(--font-sans)",
+    fontSize: 13,
+    fontWeight: 500,
+    color: disabled ? "var(--line-3)" : "var(--accent-on)",
+    cursor: disabled ? "default" : "pointer",
+  };
+}
 
 const KV_ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -217,6 +281,24 @@ export function AccountPanel({
     useState<DeleteVaultPartialFailContext | null>(null);
   const mountedRef = useRef(true);
 
+  // VAULT LABEL rename control (MYND-205 task 6). `savedLabel` is the
+  // last-persisted label (read from vault.prefs on mount; `""` when unset),
+  // `labelDraft` is the live input. Unlock-gated by construction — Settings
+  // mounts only when the active vault is unlocked, so `prefs_read` /
+  // `vault_set_label` always have the slot's `prefs_key`.
+  const [savedLabel, setSavedLabel] = useState<string>("");
+  const [labelDraft, setLabelDraft] = useState<string>("");
+  const [labelInFlight, setLabelInFlight] = useState(false);
+  const [labelFocused, setLabelFocused] = useState(false);
+
+  // Active vault id (MYND-205 task 7). The Settings danger-zone delete targets
+  // the vault you currently have unlocked — under SYNC-1 that's the lone
+  // `Unlocked` slot, surfaced by `vault_list()` as the most-recent `last_unlock`
+  // entry. Resolved on mount and threaded into `deleteVault(activeVaultId)` so
+  // the erase is explicitly id-targeted (SYNC-6). `null` until resolved →
+  // `deleteVault` falls back to the active vault, identical end state.
+  const [activeVaultId, setActiveVaultId] = useState<string | null>(null);
+
   // Defensive guard against state updates after unmount (e.g., the
   // parent modal closes mid-flight via a path that bypasses our
   // in-flight gating). React would warn otherwise.
@@ -224,6 +306,46 @@ export function AccountPanel({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+    };
+  }, []);
+
+  // Load the active vault's current label once on mount. Failure (should not
+  // happen on the unlocked editor stage) leaves the draft empty.
+  useEffect(() => {
+    let cancelled = false;
+    void prefsRead()
+      .then((prefs) => {
+        if (cancelled) return;
+        const current = prefs.label ?? "";
+        setSavedLabel(current);
+        setLabelDraft(current);
+      })
+      .catch(() => {
+        /* unlocked-stage read should not reject; leave the draft empty */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Resolve the active vault id (most-recent `last_unlock`) for the id-targeted
+  // danger-zone delete (task 7). Best-effort — on failure `activeVaultId` stays
+  // null and `deleteVault` falls back to the active vault.
+  useEffect(() => {
+    let cancelled = false;
+    void listVaults()
+      .then((res) => {
+        if (cancelled || !("ok" in res) || res.ok.length === 0) return;
+        // The active vault is the most-recent last-unlock (SYNC-1/7) — the head
+        // of the shared canonical ordering the picker + switcher also use.
+        const active = orderByLastUnlock(res.ok)[0];
+        setActiveVaultId(active.id);
+      })
+      .catch(() => {
+        /* leave activeVaultId null → deleteVault active-vault fallback */
+      });
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -316,7 +438,9 @@ export function AccountPanel({
       setInFlight(true);
       void (async () => {
         try {
-          await deleteVault();
+          // Id-targeted erase of the active vault (SYNC-6); `?? undefined`
+          // falls back to the active-vault path if the id has not resolved yet.
+          await deleteVault(activeVaultId ?? undefined);
           if (!mountedRef.current) return;
           // Resolve = full success. Slot is Empty + vault dir gone.
           // Notify parent to dispatch `editor.delete-vault-success`;
@@ -373,6 +497,32 @@ export function AccountPanel({
     );
   }
 
+  // Persist the vault label. Empty draft ⇒ clear the label (`null`); a
+  // non-empty draft sets it. On success, update `savedLabel` so the Save
+  // button re-disables (no unsaved diff) AND re-fetch `listVaults()` so the
+  // RAM label cache the backend just refreshed is reflected for the switcher
+  // (best-effort — the switcher also re-probes on open).
+  const trimmedLabel = labelDraft.trim();
+  const labelChanged = trimmedLabel !== savedLabel;
+  const labelSaveDisabled = !labelChanged || labelInFlight;
+  const handleSaveLabel = () => {
+    if (labelSaveDisabled) return;
+    setLabelInFlight(true);
+    void (async () => {
+      try {
+        await setVaultLabel(trimmedLabel === "" ? null : trimmedLabel);
+        if (!mountedRef.current) return;
+        setSavedLabel(trimmedLabel);
+        // Re-fetch so the switcher's cache-backed name reflects the rename.
+        void listVaults().catch(() => {});
+      } catch {
+        /* unlocked-stage write should not reject; leave the draft as-is */
+      } finally {
+        if (mountedRef.current) setLabelInFlight(false);
+      }
+    })();
+  };
+
   return (
     <div style={ROOT_STYLE}>
       <section style={SECTION_STYLE}>
@@ -403,6 +553,45 @@ export function AccountPanel({
           <Button variant="primary" onClick={() => setView("change-password")}>
             Change password
           </Button>
+        </div>
+      </section>
+
+      <section style={SECTION_STYLE}>
+        <h3 style={LABEL_EYEBROW_STYLE}>VAULT LABEL</h3>
+        <p style={LABEL_HELPER_STYLE}>
+          A name for this vault shown in the in-app switcher. Stored encrypted
+          inside the vault; never leaves your device in plaintext.
+        </p>
+        <div style={LABEL_INPUT_ROW_STYLE}>
+          <input
+            className="vault-label-input"
+            type="text"
+            value={labelDraft}
+            placeholder="Add a label…"
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            disabled={labelInFlight}
+            onChange={(e) => setLabelDraft(e.target.value)}
+            onFocus={() => setLabelFocused(true)}
+            onBlur={() => setLabelFocused(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleSaveLabel();
+              }
+            }}
+            style={labelInputStyle(labelFocused)}
+          />
+          <button
+            type="button"
+            onClick={handleSaveLabel}
+            disabled={labelSaveDisabled}
+            style={labelSaveButtonStyle(labelSaveDisabled)}
+          >
+            Save
+          </button>
         </div>
       </section>
 

@@ -14,7 +14,7 @@ This document covers two halves of the same lifecycle:
 Out of scope:
 
 - The vault-unlock-with-password screen itself (B4a). This document only fixes the **entry point** at which recovery is reachable from that screen (§3.1).
-- Multi-vault and sync-aware account-number UX. Phase 1 is single-vault local-only (§5).
+- Multi-vault and sync-aware account-number UX. Phase 1 is single-vault local-only (§5). _(Forward pointer: multi-vault later activated the optional account-number selector role — see §5's forward pointer + `decisions.md` 2026-06-09 "Multi-vault recovery".)_
 - Cryptographic primitive selection — see `protocol.md` §2 + §7.
 
 ---
@@ -168,6 +168,8 @@ The reset writes only the **password-side credential**: new salt, new wrap key, 
 In Phase 1, the account number (`account-number.md`) is a Phase 2+ sync identifier with no role in recovery. The recovery flow operates on whichever `vault.meta` exists at `app_data_dir/vault/vault.meta`; the account-number stored in that file's plaintext header is not read, displayed, or required by any recovery surface.
 
 If Phase 2 multi-vault or sync introduces a meaningful UX role for the account number during recovery, a new `decisions.md` entry MUST supersede this section.
+
+> **Forward pointer — superseded for multi-vault (`decisions.md` 2026-06-09 "Multi-vault recovery: vault-selection = pick-from-list + optional account-number selector", supersedes 2026-05-01 — Recovery flow spec (S3)).** With multiple vaults present, recovery activates the account-number's *optional selector* role: the user **may** type their account number to match `account_number_hash` against on-disk `vault.meta` headers and jump straight to that vault — **never required** (the primary path is the vault picker reused from onboarding; the 24-word phrase remains the sole recovery secret). This selects *which* `vault.meta` the unchanged §3–§4 pipeline reads; it does **not** change the KDF, the AAD, or how `account_number_hash` binds the Argon2id salts. The single-vault statement above stays accurate; the supersession lives in `decisions.md` (audit trail).
 
 ---
 

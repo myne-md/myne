@@ -36,7 +36,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
@@ -55,13 +55,17 @@ fn catalog_write_mutex() -> &'static Mutex<()> {
     M.get_or_init(|| Mutex::new(()))
 }
 
-/// Resolve `<app_data_dir>/vault/` for the current Tauri app.
-fn vault_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| std::io::Error::other("app_data_dir resolution failed"))?;
-    Ok(base.join("vault"))
+/// Resolve the ACTIVE vault root for the current Tauri app. `active_id` is read
+/// from the runtime state by the calling command (`state.active_vault_id().await`)
+/// — the only place with `.await` access to the slot map. SYNC-6: attachment
+/// import/list/delete/rename all operate on the unlocked vault, so resolving via
+/// the active id (not the transitional sole-vault disk heuristic) keeps the blob
+/// + catalog targeting the correct vault once two or more exist.
+fn vault_dir<R: Runtime>(
+    app: &AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> std::io::Result<PathBuf> {
+    crate::paths::active_vault_root_io(app, active_id)
 }
 
 /// The `source` argument to [`attachment_import`].
@@ -212,7 +216,8 @@ pub async fn attachment_import<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
-    let dir = vault_dir(&app).map_err(AttachmentImportError::from)?;
+    let dir =
+        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentImportError::from)?;
     attachment_import_with_dir(&dir, state.inner(), source).await
 }
 
@@ -452,7 +457,7 @@ pub async fn catalog_list<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<CatalogEntry>, CatalogListError> {
-    let dir = vault_dir(&app).map_err(CatalogListError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(CatalogListError::from)?;
     catalog_list_with_dir(&dir, state.inner()).await
 }
 
@@ -507,7 +512,8 @@ pub async fn attachment_delete<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     id: String,
 ) -> Result<(), AttachmentDeleteError> {
-    let dir = vault_dir(&app).map_err(AttachmentDeleteError::from)?;
+    let dir =
+        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentDeleteError::from)?;
     attachment_delete_with_dir(&dir, state.inner(), id).await
 }
 
@@ -597,7 +603,8 @@ pub async fn attachment_rename<R: Runtime>(
     id: String,
     filename: String,
 ) -> Result<(), AttachmentRenameError> {
-    let dir = vault_dir(&app).map_err(AttachmentRenameError::from)?;
+    let dir =
+        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentRenameError::from)?;
     attachment_rename_with_dir(&dir, state.inner(), id, filename).await
 }
 
@@ -700,7 +707,9 @@ fn read_catalog_or_empty(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, VaultRuntimeState};
+    use crate::plugins::vault_unlock::state::{
+        fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
+    };
     use crate::test_support::ScopedTempDir;
     use protocol::{SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 
@@ -747,11 +756,10 @@ mod tests {
     async fn unlocked_state() -> VaultRuntimeState {
         let state = VaultRuntimeState::default();
         state
-            .set_unlocked(fixture_unlocked_with_keys(
-                SEED_ROOT,
-                SEED_ITEMS,
-                SEED_ITEMS_ID,
-            ))
+            .set_unlocked(
+                test_vault_id(),
+                fixture_unlocked_with_keys(SEED_ROOT, SEED_ITEMS, SEED_ITEMS_ID),
+            )
             .await;
         state
     }

@@ -17,8 +17,8 @@
 //!   variant retained in wire format for cross-version-skew forward
 //!   compat + defense-in-depth, but unreachable from current code
 //!   paths.
-//! - **Happy-path (Unlocked/Recovering):** [`VaultRuntimeState::take_and_run_blocking`]
-//!   takes the slot (zeroize via the moved-out variant's `Drop`)
+//! - **Happy-path (Unlocked/Recovering):** [`VaultRuntimeState::take_and_run_blocking_for_id`]
+//!   takes the slot for the targeted `VaultId` (zeroize via the moved-out variant's `Drop`)
 //!   BEFORE any I/O, then runs the per-file unlink walk inside
 //!   `spawn_blocking` with the slot write-lock held across the
 //!   await. Both `Slot::Unlocked` and `Slot::Recovering` arms
@@ -69,6 +69,7 @@
 
 use super::error::VaultDeleteError;
 use crate::plugins::vault_unlock::state::{SlotKind, TakeAndRunError, VaultRuntimeState};
+use crate::vault_id::VaultId;
 use std::path::PathBuf;
 use tauri::{AppHandle, Runtime, State};
 
@@ -130,11 +131,26 @@ use tauri::{AppHandle, Runtime, State};
 pub async fn vault_delete<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
+    vault_id: Option<String>,
 ) -> Result<(), VaultDeleteError> {
-    let vault_dir = crate::paths::vault_dir(&app).map_err(|_| VaultDeleteError::Io {
-        io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
-    })?;
-    let result = vault_delete_with_dir(vault_dir, state.inner()).await;
+    // SYNC-6 explicit-id targeting (mirrors `unlock` / `recover`): the IPC layer
+    // carries a canonical hyphenated `VaultId` string. `Some(id)` resolves to
+    // `vaults/<id>/` directly (NOT the sole-vault `paths::vault_dir()` scan), so
+    // the erase hits exactly the chosen vault and never a sibling. A malformed
+    // or absent id is treated as "no explicit target → the active vault", the
+    // SYNC-1 sole-`Unlocked` vault the danger-zone delete is driven from. The
+    // slot-map key is the same `VaultId` so the per-id slot peek + keyed
+    // `take_and_run_blocking_for_id` zeroize only the targeted slot.
+    let target = VaultId::parse_optional(vault_id.as_deref());
+    let vault_dir =
+        crate::paths::vault_dir_for_id(&app, target).map_err(|_| VaultDeleteError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        })?;
+    // Name the slot-map key: the explicit `target` when present, else the
+    // sole-vault id derived from the resolved root (same derivation as
+    // `unlock` / `recover` when no explicit id was threaded).
+    let vault_id = target.unwrap_or_else(|| crate::paths::vault_id_from_root(&vault_dir));
+    let result = vault_delete_with_dir(vault_dir, vault_id, state.inner()).await;
 
     // MYND-29 Task 8: the slot was dropped iff the delete actually proceeded
     // (full `Ok` or a `PartialDelete`) — wipe the plaintext-derived search
@@ -172,7 +188,7 @@ pub async fn vault_delete<R: Runtime>(
 ///    lost-credentials accept) or `VaultNotFound` rejection
 ///    (`vault.meta` absent → no silent no-op success).
 /// 4. `Slot::Unlocked` / `Slot::Recovering` arm: delegate to
-///    [`VaultRuntimeState::take_and_run_blocking`] which holds the
+///    [`VaultRuntimeState::take_and_run_blocking_for_id`] which holds the
 ///    slot write-lock across the spawn_blocking closure. The
 ///    closure runs the shared [`crate::vault_sweep::sweep`] pipeline
 ///    (post-order unlink walk + per-file DENY-list tracing + Unix
@@ -189,6 +205,7 @@ pub async fn vault_delete<R: Runtime>(
 ///    bug-canary rejection.
 pub(crate) async fn vault_delete_with_dir(
     vault_dir: PathBuf,
+    vault_id: VaultId,
     state: &VaultRuntimeState,
 ) -> Result<(), VaultDeleteError> {
     // (1) auth_permits gate — RAII guard; try_acquire, reject not queue.
@@ -214,7 +231,7 @@ pub(crate) async fn vault_delete_with_dir(
     //     `dispatch_empty_arm` which decides between the new
     //     no-keys accept path (MYND-108-bis) and `VaultNotFound`
     //     rejection.
-    match state.slot_kind().await {
+    match state.slot_kind(vault_id).await {
         SlotKind::Empty => dispatch_empty_arm(vault_dir).await,
         SlotKind::Recovering | SlotKind::Unlocked => {
             // Happy path: take_and_run_blocking takes the slot
@@ -235,7 +252,7 @@ pub(crate) async fn vault_delete_with_dir(
             // posture" + PRD §"Implementation Decisions".
             let vault_dir_for_blocking = vault_dir.clone();
             match state
-                .take_and_run_blocking(move || -> Result<(), VaultDeleteError> {
+                .take_and_run_blocking_for_id(vault_id, move || -> Result<(), VaultDeleteError> {
                     // Shared sweep pipeline (`crate::vault_sweep`): post-order
                     // unlink walk + DENY-list-clean per-file tracing +
                     // best-effort Unix journal commit. `RootDisposal::Remove`
@@ -457,7 +474,7 @@ pub(crate) fn vault_delete_error_kind(e: &VaultDeleteError) -> &'static str {
 mod tests {
     use super::*;
     use crate::io_failure_kind::IoFailureKind;
-    use crate::plugins::vault_unlock::state::VaultRuntimeState;
+    use crate::plugins::vault_unlock::state::{test_vault_id, VaultRuntimeState};
     use crate::test_support::ScopedTempDir;
 
     /// Same per-test runtime pattern as the sibling plugins. Builds a
@@ -488,7 +505,8 @@ mod tests {
             // Pre-acquire the single auth_permit; the guard's drop at
             // function end releases.
             let _held = state.auth_permits().acquire().await.unwrap();
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 matches!(result, Err(VaultDeleteError::VaultBusyAuth)),
                 "expected VaultBusyAuth, got {result:?}"
@@ -509,7 +527,8 @@ mod tests {
             let tmp = ScopedTempDir::new("vd-not-found").unwrap();
             // Empty tempdir — no vault.meta, no notes/, no artefacts.
             let state = VaultRuntimeState::default();
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 matches!(result, Err(VaultDeleteError::VaultNotFound)),
                 "expected VaultNotFound, got {result:?}"
@@ -549,7 +568,7 @@ mod tests {
             .expect("seed .myn");
             // Slot stays Empty — no set_unlocked / set_recovering call.
             let state = VaultRuntimeState::default();
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 result.is_ok(),
                 "MYND-108-bis: Empty + vault.meta-exists is the no-keys accept path; expected Ok, got {result:?}"
@@ -560,7 +579,7 @@ mod tests {
             );
             // Slot was Empty entering the call and stays Empty exiting.
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
                 "slot was Empty entering and stays Empty exiting (no state change)"
             );
@@ -581,7 +600,8 @@ mod tests {
             // VaultNotFound. But we also hold the permit, so
             // VaultBusyAuth must win.
             let _held = state.auth_permits().acquire().await.unwrap();
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 matches!(result, Err(VaultDeleteError::VaultBusyAuth)),
                 "auth_permits check must run before slot peek; got {result:?}"
@@ -608,19 +628,21 @@ mod tests {
             let state = VaultRuntimeState::default();
             state
                 .set_recovering(
+                    test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_recovering_with_keys(
                         0xAA, 0xBB, 0xCC,
                     ),
                 )
                 .await;
 
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 result.is_ok(),
                 "R3 happy-path Slot::Recovering must succeed; got {result:?}"
             );
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
                 "slot must be Empty after vault_delete (RecoveringMaterial zeroize fired)"
             );
@@ -666,12 +688,12 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(
+                .set_unlocked(test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
                 )
                 .await;
 
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
 
             // Restore notes/ permissions BEFORE assertions so the
             // tempdir teardown can succeed regardless of assertion
@@ -694,7 +716,7 @@ mod tests {
             // Slot zeroize fired before walk — slot must be Empty
             // despite the unlink cascade failure.
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
                 "key zeroize must precede unlink, regardless of unlink outcome"
             );
@@ -743,11 +765,13 @@ mod tests {
             let state = VaultRuntimeState::default();
             state
                 .set_unlocked(
+                    test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
                 )
                 .await;
 
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
 
             // POSIX semantic: vault is fully removed despite file chmod.
             assert!(
@@ -791,11 +815,13 @@ mod tests {
             let state = VaultRuntimeState::default();
             state
                 .set_unlocked(
+                    test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
                 )
                 .await;
 
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
 
             // Restore notes/ permissions so the test fixture's Drop
             // can clean up.
@@ -814,7 +840,7 @@ mod tests {
             }
             // Slot zeroize fired before the unlink — slot must be Empty.
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
                 "key zeroize must precede unlink failure"
             );
@@ -859,7 +885,8 @@ mod tests {
 
             // Slot stays Empty entering the call — MYND-108-bis path.
             let state = VaultRuntimeState::default();
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
 
             // Restore notes/ permissions for tempdir teardown.
             let mut restore = std::fs::metadata(&notes).unwrap().permissions();
@@ -900,10 +927,11 @@ mod tests {
             let state = VaultRuntimeState::default();
             state
                 .set_unlocked(
+                    test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(1, 2, 3),
                 )
                 .await;
-            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 logs_contain("event=\"vault_deleted\""),
                 "expected vault_deleted event in tracing on success"
@@ -949,11 +977,13 @@ mod tests {
             let state = VaultRuntimeState::default();
             state
                 .set_unlocked(
+                    test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(11, 22, 1),
                 )
                 .await;
 
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
 
             assert!(
                 result.is_ok(),
@@ -995,11 +1025,13 @@ mod tests {
             let state = VaultRuntimeState::default();
             state
                 .set_unlocked(
+                    test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(11, 22, 1),
                 )
                 .await;
 
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 result.is_ok(),
                 "vault_delete must succeed with the MYND-169 artefact set; got {result:?}"
@@ -1037,22 +1069,101 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(
+                .set_unlocked(test_vault_id(),
                     crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
                 )
                 .await;
 
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result = vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
 
             assert!(result.is_ok(), "happy-path Slot::Unlocked must succeed; got {result:?}");
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
                 "slot must be Empty after vault_delete (UnlockedVault zeroize-on-drop fired)"
             );
             assert!(
                 !tmp.path().exists(),
                 "vault_dir must be removed recursively (vault.meta + vault.meta.tmp + notes/*.myn + notes/ dir + vault_dir itself)"
+            );
+        });
+    }
+
+    // ---- MYND-205: VaultId-targeted erase leaves siblings untouched -------
+
+    /// SYNC-6 explicit-id targeting: `vault_delete_with_dir` erases EXACTLY the
+    /// resolved `vaults/<id>/` for the targeted `VaultId` and leaves any sibling
+    /// `vaults/<other>/` directory completely untouched. Models the multi-vault
+    /// danger-zone delete where vault A is the active (sole `Unlocked`) vault and
+    /// vault B is a never-opened-this-session sibling that must survive. Two
+    /// physically-separate vault roots under a shared `vaults/` parent stand in
+    /// for the on-disk layout; the per-`VaultId` slot peek + the keyed
+    /// `take_and_run_blocking_for_id` together guarantee only the targeted slot
+    /// is zeroized and only the targeted directory is unlinked.
+    #[test]
+    fn vault_delete_targets_named_vault_and_leaves_sibling_untouched() {
+        use crate::vault_id::VaultId;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-sibling-untouched").unwrap();
+            let vaults = tmp.path().join("vaults");
+
+            // Two well-formed vault roots side by side under `vaults/`.
+            let id_a = VaultId::mint();
+            let id_b = VaultId::mint();
+            let dir_a = vaults.join(id_a.to_string());
+            let dir_b = vaults.join(id_b.to_string());
+            for dir in [&dir_a, &dir_b] {
+                std::fs::create_dir_all(dir.join("notes")).unwrap();
+                std::fs::write(dir.join("vault.meta"), b"meta bytes").unwrap();
+                std::fs::write(
+                    dir.join("notes")
+                        .join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+                    b"ciphertext",
+                )
+                .unwrap();
+            }
+
+            // Vault A is the active (sole `Unlocked`) vault; vault B stays a
+            // sibling with no runtime slot (locked / never opened this session).
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id_a,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            // Delete A by its explicit id, resolving to A's own root.
+            let result = vault_delete_with_dir(dir_a.clone(), id_a, &state).await;
+            assert!(
+                result.is_ok(),
+                "targeted delete of the active vault must succeed; got {result:?}"
+            );
+
+            // A's directory is gone; A's slot zeroized to Empty.
+            assert!(
+                !dir_a.exists(),
+                "the targeted vaults/<id_a>/ must be removed"
+            );
+            assert_eq!(
+                state.slot_kind(id_a).await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+                "the targeted vault's slot must be Empty (keys zeroized)"
+            );
+
+            // The sibling B is COMPLETELY untouched — directory, vault.meta, blob.
+            assert!(dir_b.exists(), "the sibling vaults/<id_b>/ must remain");
+            assert!(
+                dir_b.join("vault.meta").is_file(),
+                "the sibling's vault.meta must remain"
+            );
+            assert!(
+                dir_b
+                    .join("notes")
+                    .join("0193e8d3-1234-7890-abcd-ef0123456789.myn")
+                    .is_file(),
+                "the sibling's note blob must remain"
             );
         });
     }
@@ -1071,7 +1182,7 @@ mod tests {
             let tmp = ScopedTempDir::new("vd-tr-busy").unwrap();
             let state = VaultRuntimeState::default();
             let _held = state.auth_permits().acquire().await.unwrap();
-            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 logs_contain("error_kind=\"VaultBusyAuth\""),
                 "expected VaultBusyAuth error_kind label in tracing"
@@ -1097,7 +1208,8 @@ mod tests {
             let tmp = ScopedTempDir::new("vd-empty-trace").unwrap();
             std::fs::write(tmp.path().join("vault.meta"), b"x").unwrap();
             let state = VaultRuntimeState::default();
-            let result = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let result =
+                vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 result.is_ok(),
                 "Empty + vault.meta-exists must succeed; got {result:?}"
@@ -1129,7 +1241,7 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("vd-tr-not-found").unwrap();
             let state = VaultRuntimeState::default();
-            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), &state).await;
+            let _ = vault_delete_with_dir(tmp.path().to_path_buf(), test_vault_id(), &state).await;
             assert!(
                 logs_contain("error_kind=\"VaultNotFound\""),
                 "expected VaultNotFound error_kind label in tracing"

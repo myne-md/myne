@@ -103,14 +103,22 @@ fn sync_error_kind(e: &SearchSyncError) -> &'static str {
     }
 }
 
-/// Resolve `<app_data_dir>/vault/` for the running app. Local mirror of the
+/// Resolve the ACTIVE vault root for the running app. Local mirror of the
 /// prefs / vault_unlock helpers — kept private to avoid a cross-plugin pub
-/// re-export of a 5-line wrapper.
-fn resolve_vault_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+/// re-export of a 5-line wrapper. `active_id` is read from the runtime state
+/// by the caller (`state.active_vault_id().await`) — the only place with
+/// `.await` access to the slot map. SYNC-6: hydrate/persist always operate on
+/// the unlocked vault, so resolving via the active id (not the transitional
+/// sole-vault disk heuristic) keeps the search blob targeting the correct
+/// vault once two or more exist.
+fn resolve_vault_dir<R: Runtime>(
+    app: &AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> Option<PathBuf> {
     app.path()
         .app_data_dir()
         .ok()
-        .map(|base| base.join("vault"))
+        .map(|base| crate::paths::active_vault_root_from_base(&base, active_id))
 }
 
 /// Resolve the `(vault_dir, app-managed SearchIndexState)` pair the best-effort
@@ -119,9 +127,10 @@ fn resolve_vault_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
 /// (best-effort: a search-IO miss never blocks unlock / lock / quit).
 fn resolve_search_io<'a, R: Runtime>(
     app: &'a AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
     skipped_event: &'static str,
 ) -> Option<(PathBuf, tauri::State<'a, SearchIndexState>)> {
-    let Some(vault_dir) = resolve_vault_dir(app) else {
+    let Some(vault_dir) = resolve_vault_dir(app, active_id) else {
         tracing::warn!(
             event = skipped_event,
             reason = "vault_dir_resolution_failed"
@@ -298,7 +307,10 @@ pub(crate) async fn persist_search_index_with_dir(
 /// measure (a background-hydrate refinement is a candidate then; the warm
 /// path is a header scan + decode + skip-all reconcile).
 pub async fn hydrate_search_index<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
-    let Some((vault_dir, search)) = resolve_search_io(app, "search_index_hydrate_skipped") else {
+    let active_id = state.active_vault_id().await;
+    let Some((vault_dir, search)) =
+        resolve_search_io(app, active_id, "search_index_hydrate_skipped")
+    else {
         return;
     };
     if let Err(e) = hydrate_search_index_with_dir(&vault_dir, state, search.inner()).await {
@@ -314,7 +326,10 @@ pub async fn hydrate_search_index<R: Runtime>(app: &AppHandle<R>, state: &VaultR
 /// failure is logged and swallowed. MUST be called while the slot is still
 /// `Unlocked` (the core peeks `root_key`).
 pub async fn persist_search_index<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
-    let Some((vault_dir, search)) = resolve_search_io(app, "search_index_persist_skipped") else {
+    let active_id = state.active_vault_id().await;
+    let Some((vault_dir, search)) =
+        resolve_search_io(app, active_id, "search_index_persist_skipped")
+    else {
         return;
     };
     if let Err(e) = persist_search_index_with_dir(&vault_dir, state, search.inner()).await {
@@ -356,7 +371,7 @@ pub fn spawn_periodic_flush_timer<R: Runtime>(app: AppHandle<R>) {
             let Some(state) = app.try_state::<VaultRuntimeState>() else {
                 continue;
             };
-            if matches!(state.slot_kind().await, SlotKind::Unlocked) {
+            if matches!(state.slot_kind_active().await, SlotKind::Unlocked) {
                 persist_search_index(&app, state.inner()).await;
             }
         }
@@ -367,7 +382,9 @@ pub fn spawn_periodic_flush_timer<R: Runtime>(app: AppHandle<R>) {
 mod tests {
     use super::*;
     use crate::plugins::notes::commands::{note_create_with_dir, note_update_with_dir};
-    use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, VaultRuntimeState};
+    use crate::plugins::vault_unlock::state::{
+        fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
+    };
     use crate::test_support::ScopedTempDir;
 
     // Fixture key bytes — `note_create_with_dir` encrypts under these, and
@@ -412,7 +429,10 @@ mod tests {
     async fn unlocked_state() -> VaultRuntimeState {
         let state = VaultRuntimeState::default();
         state
-            .set_unlocked(fixture_unlocked_with_keys(ROOT, ITEMS, ITEMS_ID))
+            .set_unlocked(
+                test_vault_id(),
+                fixture_unlocked_with_keys(ROOT, ITEMS, ITEMS_ID),
+            )
             .await;
         state
     }

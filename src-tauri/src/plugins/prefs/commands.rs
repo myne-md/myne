@@ -19,7 +19,7 @@ use protocol::{
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 
 /// Per-plugin write serialization. `OnceLock<Mutex<()>>` is lazily
@@ -36,14 +36,17 @@ fn write_mutex() -> &'static Mutex<()> {
     M.get_or_init(|| Mutex::new(()))
 }
 
-/// Resolve `<app_data_dir>/vault/` for the current Tauri app.
-fn vault_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| std::io::Error::other("app_data_dir resolution failed"))?;
-    let dir = base.join("vault");
-    Ok(dir)
+/// Resolve the ACTIVE (sole-`Unlocked`) vault's root. `active_id` is read from
+/// the runtime state by the calling command (`state.active_vault_id().await`) —
+/// the only place with `.await` access to the slot map. SYNC-6: prefs always
+/// operate on the unlocked vault, so resolving via the active id (not the
+/// transitional sole-vault disk heuristic) is what keeps `vault.prefs` reads +
+/// the label write targeting the correct vault once two or more exist.
+fn vault_dir<R: Runtime>(
+    app: &AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> std::io::Result<PathBuf> {
+    crate::paths::active_vault_root_io(app, active_id)
 }
 
 /// Read `vault.prefs` from disk and decode under `prefs_key` + AAD
@@ -156,7 +159,7 @@ pub async fn prefs_read<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<PrefsView, PrefsReadError> {
-    let dir = vault_dir(&app).map_err(PrefsReadError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsReadError::from)?;
     prefs_read_with_dir(&dir, state.inner()).await
 }
 
@@ -196,7 +199,7 @@ pub async fn set_screen_capture_protection<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     // Disk-side commit FIRST, under the mutex.
     set_screen_capture_protection_with_dir(&dir, state.inner(), enabled).await?;
     // Native side-effect SECOND, only on disk-side success.
@@ -259,7 +262,7 @@ pub async fn set_deliberate_folders<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_deliberate_folders_with_dir(&dir, state.inner(), folders).await
 }
 
@@ -311,7 +314,7 @@ pub async fn set_item_order<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_item_order_with_dir(&dir, state.inner(), order).await
 }
 
@@ -359,7 +362,7 @@ pub async fn set_daily_date_format<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     format: String,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_daily_date_format_with_dir(&dir, state.inner(), format).await
 }
 
@@ -404,7 +407,7 @@ pub async fn set_daily_folder<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     folder: String,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_daily_folder_with_dir(&dir, state.inner(), folder).await
 }
 
@@ -455,7 +458,7 @@ pub async fn set_daily_template<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     template_id: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_daily_template_with_dir(&dir, state.inner(), template_id).await
 }
 
@@ -503,7 +506,7 @@ pub async fn set_favorites<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_favorites_with_dir(&dir, state.inner(), order).await
 }
 
@@ -549,7 +552,7 @@ pub async fn set_auto_lock_timeout<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     seconds: u32,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_auto_lock_timeout_with_dir(&dir, state.inner(), seconds).await
 }
 
@@ -617,7 +620,7 @@ pub async fn set_editor_layout<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     layout: EditorLayout,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_editor_layout_with_dir(&dir, state.inner(), layout).await
 }
 
@@ -689,7 +692,7 @@ pub async fn set_theme<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     theme: Option<ThemeChoice>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_theme_with_dir(&dir, state.inner(), theme).await
 }
 
@@ -743,7 +746,7 @@ pub async fn set_item_colors<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     colors: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_item_colors_with_dir(&dir, state.inner(), colors).await
 }
 
@@ -792,7 +795,7 @@ pub async fn set_folder_icons<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     icons: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app).map_err(PrefsWriteError::from)?;
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_folder_icons_with_dir(&dir, state.inner(), icons).await
 }
 
@@ -828,10 +831,86 @@ pub(crate) async fn set_folder_icons_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the per-vault `label` field (MYND-205) — the
+/// human-readable name the in-app vault switcher shows for this vault. `Some`
+/// sets/changes it; `None` clears it (back to the neutral-fallback state).
+/// Read-modify-write under the per-plugin write mutex; **no native side-effect**
+/// (same disk-only shape as `set_theme`).
+///
+/// **Unlock-gated by construction** (SYNC-3): writing the label needs
+/// `prefs_key`, which only exists while the vault is unlocked — and under
+/// SYNC-1 the sole `Unlocked` slot is the active vault — so the user can only
+/// rename the vault they are currently inside. After the disk write commits,
+/// the decrypted label is refreshed in the per-session RAM cache so the
+/// switcher (`vault_list`) reflects the rename immediately. The plaintext label
+/// lives ONLY inside the AEAD-sealed `vault.prefs` at rest and in that RAM
+/// cache at runtime; it is never logged (DENY-list discipline — the value is
+/// the user's own input, treated as AS3-sensitive).
+#[tauri::command]
+pub async fn vault_set_label<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    label: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    vault_set_label_with_dir(&dir, state.inner(), label).await
+}
+
+/// Testable core of [`vault_set_label`]. Performs the disk-side commit
+/// (read-modify-write under the per-plugin write mutex) FIRST, then refreshes
+/// the active vault's entry in the per-session RAM label cache (the "effect";
+/// window-free, so it lives in the core rather than the wrapper — like
+/// `set_auto_lock_timeout`'s idle-timer cache refresh). The disk-FIRST-then-
+/// effect ordering holds: a disk-write failure returns before the cache update,
+/// so the switcher never reflects a label that did not persist.
+pub(crate) async fn vault_set_label_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    label: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (root_key, _vmh) = state
+        .peek_unlocked_root_key_and_hash_clone()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let cleared = label.is_none();
+    prefs.label = label.clone();
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    // Disk commit FIRST.
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Effect SECOND (only on disk success): refresh the active vault's entry in
+    // the per-session RAM label cache so `vault_list` reflects the rename
+    // immediately. SYNC-1: the sole `Unlocked` slot is the active vault we just
+    // wrote to. If a concurrent lock raced (Phase 2 only; impossible Phase 1
+    // single-window), `active_vault_id` returns None and the cache update is
+    // skipped — disk truth is canonical and the next unlock re-decrypts it.
+    if let Some(active) = state.active_vault_id().await {
+        state.set_cached_label(active, label).await;
+    }
+
+    // Field name + set/cleared only — NEVER the label value (it is the user's
+    // own input, treated as AS3-sensitive; see ../../CLAUDE.md "Secret-handling
+    // logging discipline").
+    tracing::info!(event = "prefs_written", field = "label", cleared);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::vault_unlock::state::fixture_unlocked_with_keys;
+    use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
     use crate::test_support::ScopedTempDir;
     use protocol::{encode_prefs_blob_raw, AEAD_NONCE_LEN};
 
@@ -856,7 +935,7 @@ mod tests {
         // seed byte). Match that here so test assertions can recompute
         // prefs_key off the same root_key.
         let unlocked = fixture_unlocked_with_keys(0x42, 0x99, 1);
-        state.set_unlocked(unlocked).await;
+        state.set_unlocked(test_vault_id(), unlocked).await;
         (tmp, state)
     }
 
@@ -957,6 +1036,7 @@ mod tests {
                     favorites: Vec::new(),
                     item_order: Vec::new(),
                     editor_layout: None,
+                    label: None,
                 },
                 &[0x77; AEAD_NONCE_LEN],
             )
@@ -1353,6 +1433,103 @@ mod tests {
         });
     }
 
+    // ---- vault_set_label setter (MYND-205) ----------------------------
+
+    /// Unlock-gating: with no vault unlocked, `vault_set_label` rejects with
+    /// `SlotNotUnlocked` — writing the label needs `prefs_key`, which only
+    /// exists for the active/sole-`Unlocked` vault (SYNC-3). This is the
+    /// structural unlock-gate the danger-zone/rename surface relies on.
+    #[test]
+    fn vault_set_label_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-label-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                vault_set_label_with_dir(tmp.path(), &state, Some(String::from("Work"))).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    /// The label round-trips through the encrypted `vault.prefs` (disk-first),
+    /// AND the per-session RAM cache is refreshed so `vault_list` reflects the
+    /// rename immediately. Clearing (`None`) round-trips back to no-label and
+    /// removes the cache entry.
+    #[test]
+    fn vault_set_label_round_trips_and_updates_cache() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            // Before any write, the cache holds no label for the active vault.
+            assert_eq!(state.cached_label(test_vault_id()).await, None);
+
+            // Set a label — persists on disk + caches in RAM.
+            vault_set_label_with_dir(tmp.path(), &state, Some(String::from("Work")))
+                .await
+                .expect("write label");
+            assert!(
+                tmp.path().join("vault.prefs").exists(),
+                "vault_set_label must create vault.prefs"
+            );
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after label write");
+            assert_eq!(view.label, Some(String::from("Work")));
+            // The pre-existing screen_capture default is untouched.
+            assert!(view.screen_capture_protection);
+            // RAM cache reflects the label immediately (the switcher source).
+            assert_eq!(
+                state.cached_label(test_vault_id()).await,
+                Some(String::from("Work"))
+            );
+
+            // Rename overwrites both disk + cache.
+            vault_set_label_with_dir(tmp.path(), &state, Some(String::from("Personal")))
+                .await
+                .expect("rename label");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after rename");
+            assert_eq!(view.label, Some(String::from("Personal")));
+            assert_eq!(
+                state.cached_label(test_vault_id()).await,
+                Some(String::from("Personal"))
+            );
+
+            // Clearing (None) removes the label on disk AND evicts the cache.
+            vault_set_label_with_dir(tmp.path(), &state, None)
+                .await
+                .expect("clear label");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert_eq!(view.label, None);
+            assert_eq!(state.cached_label(test_vault_id()).await, None);
+        });
+    }
+
+    /// DENY-list: the user-supplied label value must NEVER appear in any
+    /// tracing payload (it is AS3-sensitive input). The emitted
+    /// `prefs_written` event carries only the field name + `cleared` flag.
+    #[test]
+    #[tracing_test::traced_test]
+    fn vault_set_label_does_not_log_the_label_value() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let secret_label = "TopSecretProjectName";
+            vault_set_label_with_dir(tmp.path(), &state, Some(String::from(secret_label)))
+                .await
+                .expect("write label");
+            assert!(
+                logs_contain("field=\"label\""),
+                "expected the prefs_written event with field=label"
+            );
+            assert!(
+                !logs_contain(secret_label),
+                "the label value must NEVER cross the tracing boundary (DENY-list)"
+            );
+        });
+    }
+
     // ---- vault.meta IO failure surfaces ------------------------------
 
     #[test]
@@ -1362,7 +1539,7 @@ mod tests {
             let state = VaultRuntimeState::default();
             // Don't seed vault.meta — just set slot to unlocked.
             state
-                .set_unlocked(fixture_unlocked_with_keys(0x42, 0x99, 1))
+                .set_unlocked(test_vault_id(), fixture_unlocked_with_keys(0x42, 0x99, 1))
                 .await;
             let result = prefs_read_with_dir(tmp.path(), &state).await;
             // vault.meta absent → Io error (NOT collapsed to defaults

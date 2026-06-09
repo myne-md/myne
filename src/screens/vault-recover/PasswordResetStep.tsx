@@ -157,7 +157,10 @@ export function PasswordResetStep({
     setInFlight(true);
     void (async () => {
       try {
-        await completeRecovery(newPassword);
+        // MYND-206: commit against the SAME vault A8d targeted (null →
+        // sole-vault fallback) so the password reset rewrites exactly the
+        // chosen vault's vault.meta (SYNC-6 targeting).
+        await completeRecovery(newPassword, state.vaultId ?? undefined);
         // A8f Ok — slot is Unlocked server-side; App.tsx transitions
         // Stage to editor. Component unmounts shortly after; no
         // reducer dispatch needed.

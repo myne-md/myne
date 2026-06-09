@@ -29,6 +29,7 @@ permissions = [
   "allow-set-daily-template",
   "allow-set-item-colors",
   "allow-set-folder-icons",
+  "allow-vault-set-label",
 ]
 
 [[permission]]
@@ -120,3 +121,14 @@ commands.allow = ["set_item_colors"]
 identifier = "allow-set-folder-icons"
 description = "Allow invoking prefs:set_folder_icons (Slot::Unlocked-gated setter for the folder_icons map — per-folder custom sidebar icons keyed by canonical folder path; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_folder_icons"]
+
+# MYND-205 in-app vault switcher: a write setter for the per-vault label, so it
+# inherits the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
+# Unlock-gated by construction (writing the label needs prefs_key, which only
+# exists for the active/sole-Unlocked vault); atomic-writes vault.prefs with no
+# native side-effect, then refreshes the per-session RAM label cache.
+[[permission]]
+identifier = "allow-vault-set-label"
+description = "Allow invoking prefs:vault_set_label (Slot::Unlocked-gated setter for the per-vault label field — the in-app vault switcher's human-readable name; Option<String> where None clears it; atomic-writes vault.prefs with no native side-effect, then refreshes the per-session RAM label cache so vault_list reflects the rename immediately)."
+commands.allow = ["vault_set_label"]

@@ -239,11 +239,18 @@ async fn idle_lock_tick<R: Runtime>(app: &AppHandle<R>) {
     let Some(state) = app.try_state::<VaultRuntimeState>() else {
         return;
     };
-    // Peek the slot kind (cheap read-lock) and dispatch. Each path re-checks
-    // under the write-lock before the irreversible drop, so this peek is only
-    // a pre-dispatch — a slot change in the gap is handled by the under-lock
-    // re-read in the take_* method.
-    match state.slot_kind().await {
+    // Peek the active vault's slot kind (cheap read-lock) and dispatch. Each
+    // path re-checks under the write-lock before the irreversible drop, so this
+    // peek is only a pre-dispatch — a slot change in the gap is handled by the
+    // under-lock re-read in the take_* method.
+    //
+    // TRANSITIONAL (sub-feature 6 — multi-vault auto-lock): operate on the
+    // single active (`Unlocked`, else `Recovering`) entry (SYNC-1).
+    let active_kind = match state.active_vault_or_recovering_for_probe().await {
+        Some(id) => state.slot_kind(id).await,
+        None => SlotKind::Empty,
+    };
+    match active_kind {
         SlotKind::Unlocked => lock_unlocked_if_idle(app, state.inner()).await,
         SlotKind::Recovering => bail_recovering_if_expired(app, state.inner()).await,
         SlotKind::Empty => {}
@@ -481,6 +488,144 @@ mod tests {
         // On a real macOS GUI session this returns Some(small) right after
         // input. Best-effort FFI smoke — not asserted in CI (env-dependent).
         let _ = machine_idle();
+    }
+
+    // ---- multi-vault idle-lock bridge: sole `Unlocked` entry (MYND-207) ----
+    //
+    // Sub-feature 2 swapped the singleton `RwLock<Slot>` for
+    // `RwLock<HashMap<VaultId, Slot>>` and repointed the idle-lock tick to act
+    // on the SOLE `Unlocked` entry (resolved min-by-id) via the SAME
+    // `take_unlocked_if_idle` slot-take. These tests confirm the idle decision
+    // reads that one HashMap entry — keyed under a NON-legacy id, with a
+    // `Recovering` sibling present — using the cached SINGLETON
+    // `auto_lock_timeout_secs`, identical to the single-vault behaviour. They
+    // reproduce the lock-free pre-check + under-lock re-read of
+    // `lock_unlocked_if_idle` without an `AppHandle` (the teardown OS effects
+    // are runtime / manual-verify; the leg ORDER is covered separately above).
+
+    use crate::plugins::vault_unlock::state::{
+        fixture_recovering_with_keys, fixture_unlocked_with_keys, test_vault_id, test_vault_id_b,
+    };
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime build")
+    }
+
+    #[test]
+    fn idle_tick_locks_the_sole_unlocked_hashmap_entry_using_cached_timeout() {
+        // The idle decision acts on the SOLE `Unlocked` entry of the HashMap,
+        // using the cached singleton `auto_lock_timeout_secs` (= the active
+        // vault's value, set at its unlock). Unlock a vault under a NON-legacy
+        // id (so this is a real HashMap lookup, not a singleton), cache a
+        // timeout, then drive the SAME idle-decision the tick takes: idle >=
+        // cached timeout → the sole entry locks.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let active = test_vault_id_b(); // non-legacy id → genuine HashMap key
+
+            state
+                .set_unlocked(active, fixture_unlocked_with_keys(0x21, 0x22, 0x23))
+                .await;
+            // Cache the active vault's effective timeout (5s) — the singleton
+            // atom the idle timer reads lock-free each tick.
+            state.set_auto_lock_timeout_secs(5);
+            let timeout = Duration::from_secs(u64::from(state.auto_lock_timeout_secs()));
+            assert_eq!(timeout, Duration::from_secs(5));
+
+            // Reproduce `lock_unlocked_if_idle`'s under-lock take: idle (injected
+            // 10s) >= cached timeout (5s) → lock the sole Unlocked entry.
+            let locked = state
+                .take_unlocked_if_idle(timeout, || Duration::from_secs(10))
+                .await;
+            assert!(
+                matches!(locked, Some(Slot::Unlocked(_))),
+                "idle past the cached timeout must lock the sole Unlocked entry"
+            );
+            // That one entry is now Empty; no other vault was ever Unlocked.
+            assert_eq!(state.slot_kind(active).await, SlotKind::Empty);
+            assert_eq!(state.unlocked_entry_count().await, 0);
+        });
+    }
+
+    #[test]
+    fn idle_tick_does_not_lock_the_sole_unlocked_entry_within_cached_timeout() {
+        // Identical-to-single-vault: when idle < cached timeout the sole
+        // `Unlocked` HashMap entry stays Unlocked (the lock-free pre-check that
+        // `lock_unlocked_if_idle` does before any teardown).
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let active = test_vault_id_b();
+            state
+                .set_unlocked(active, fixture_unlocked_with_keys(0x21, 0x22, 0x23))
+                .await;
+            state.set_auto_lock_timeout_secs(300);
+            let timeout = Duration::from_secs(u64::from(state.auto_lock_timeout_secs()));
+
+            let locked = state
+                .take_unlocked_if_idle(timeout, || Duration::from_secs(1))
+                .await;
+            assert!(
+                locked.is_none(),
+                "idle below the cached timeout must NOT lock"
+            );
+            assert_eq!(state.slot_kind(active).await, SlotKind::Unlocked);
+        });
+    }
+
+    #[test]
+    fn idle_tick_resolution_picks_unlocked_then_recovering_then_empty() {
+        // The tick's dispatch (`active_vault_or_recovering_for_probe` →
+        // `slot_kind`): with an `Unlocked` entry it acts on that; with only a
+        // `Recovering` entry it bails THAT via the absolute TTL; an all-`Empty`
+        // map is skipped. Confirms a `Recovering` sibling never shadows the
+        // `Unlocked` entry, and the `RECOVERING_TTL` bail still applies per
+        // entry.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_unlocked = test_vault_id();
+            let id_recovering = test_vault_id_b();
+
+            // Unlocked beside Recovering → the probe resolves the Unlocked one.
+            state
+                .set_recovering(
+                    id_recovering,
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
+                .await;
+            state
+                .set_unlocked(id_unlocked, fixture_unlocked_with_keys(0x21, 0x22, 0x23))
+                .await;
+            assert_eq!(
+                state.active_vault_or_recovering_for_probe().await,
+                Some(id_unlocked),
+                "the idle tick acts on the Unlocked entry, not the Recovering sibling"
+            );
+
+            // Lock the Unlocked entry; now ONLY the Recovering entry remains →
+            // the probe resolves it, and the absolute-TTL bail applies to it
+            // (injected age >= RECOVERING_TTL).
+            let _ = state
+                .take_unlocked_if_idle(Duration::ZERO, || Duration::from_secs(10))
+                .await;
+            assert_eq!(
+                state.active_vault_or_recovering_for_probe().await,
+                Some(id_recovering),
+                "with no Unlocked entry the tick falls through to the Recovering one"
+            );
+            let bailed = state
+                .take_recovering_if_expired(RECOVERING_TTL, |_| RECOVERING_TTL)
+                .await;
+            assert!(
+                matches!(bailed, Some(Slot::Recovering { .. })),
+                "the per-entry RECOVERING_TTL absolute bail still fires"
+            );
+
+            // All-Empty map → the probe resolves None (tick skips, no panic).
+            assert_eq!(state.active_vault_or_recovering_for_probe().await, None);
+        });
     }
 
     // ---- teardown leg ordering (MYND-121 task 7) ----------------------

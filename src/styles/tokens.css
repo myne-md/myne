@@ -591,3 +591,7 @@ a:focus-visible,
   transition: border-color var(--duration-fast) var(--ease-standard);
 }
 .t-link:hover { border-bottom-color: currentColor; }
+
+/* VAULT LABEL rename input (MYND-205 task 6). Placeholder color cannot be set
+   via inline style, so the "Add a label…" hint color (--line-3) lives here. */
+.vault-label-input::placeholder { color: var(--line-3); opacity: 1; }

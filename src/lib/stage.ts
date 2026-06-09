@@ -56,6 +56,21 @@ export type StageVaultStatus =
  * success dispatched only from PasswordResetStep on A8f success).
  */
 export type RecoverSubStep =
+  /**
+   * Multi-vault recovery selection stage (MYND-206), entered BEFORE
+   * phrase-entry when ≥2 vaults exist on disk. The recover screen renders a
+   * vault picker (reusing sub-feature 3's row view-model — last-unlock /
+   * "Vault N") plus an OPTIONAL account-number affordance (Task 1's
+   * `resolve_vault_by_account_number` selector). Picking a row OR a successful
+   * account-number match resolves a `VaultId` and advances to `phrase-entry`
+   * against that vault. With exactly 1 vault the recover screen SKIPS this
+   * sub-step entirely (single-vault parity, story 7) and mounts directly in
+   * `phrase-entry`; the account-number is NEVER required (story 6). Reducer-
+   * only — `initialStageFromProbe` never produces it (boot routes ≥2 vaults to
+   * the unlock `picker`, not into recovery); it is reached only when the
+   * recover screen mounts and discovers ≥2 vaults.
+   */
+  | "select"
   | "phrase-entry"
   | "decrypting"
   | "password-reset"
@@ -105,17 +120,56 @@ export type SuspicionReason =
   | "vault-locked-during-change";
 
 /**
+ * Canonical vault identifier on the TS side — the `VaultId` rendered as
+ * its 36-char lowercase-hyphenated UUIDv7 string (SYNC-2). Mirrors the
+ * `id` field of `VaultSummary` (`src/types/vault-summary.ts`) and the
+ * optional `vaultId` targeting argument on `probeSlotKind` /
+ * vault-addressed IPC wrappers (SYNC-6). A plain `string` alias (not a
+ * branded type) — the Rust side owns minting + validation; the TS side
+ * only routes opaque ids through `transition` / `initialStageFromProbe`.
+ */
+export type VaultId = string;
+
+/**
  * Top-level app stage. Discriminator is `name`. `unlock` carries an
  * `initialStatus` payload + optional `suspicionReason` for change-password
- * force-relock signals; `recover` carries a `subStep` payload; the other
- * three stages are payload-free.
+ * force-relock signals; `recover` carries a `subStep` payload; `picker`
+ * and the other three stages are payload-free.
+ *
+ * `picker` (MYND-204, multi-vault sub-feature 3) is the ≥2-vault startup
+ * surface. It is payload-free: the vault list is fetched from `vault_list()`
+ * by the picker screen, not carried on the Stage. It is produced ONLY by
+ * `initialStageFromProbe` (boot routing) — there is no `transition` arm that
+ * *enters* `picker` (mirroring how the other initial stages are selected:
+ * boot has no prior Stage). It is *left* via `picker.select-vault` →
+ * `unlock` and `picker.create-vault` → `create-vault`.
  */
 export type Stage =
   | { name: "welcome" }
   | { name: "create-vault" }
-  | { name: "unlock"; initialStatus: StageVaultStatus; suspicionReason?: SuspicionReason }
+  | {
+      name: "unlock";
+      initialStatus: StageVaultStatus;
+      suspicionReason?: SuspicionReason;
+      /**
+       * Optional vault-targeting id (MYND-204, multi-vault sub-feature 3,
+       * task 8). Set ONLY when the unlock was reached by an explicit vault
+       * choice: the `picker.select-vault` transition copies the chosen
+       * `vaultId` here, and `initialStageFromProbe`'s single-vault arm sets
+       * it to that lone vault's id. `<Unlock>` reads it and threads it into
+       * the vault-addressed `unlock` IPC (SYNC-6 targeting). EVERY other
+       * path to `unlock` (editor lock, recovery cancel, create-vault commit
+       * fallback, change-password force-relock) leaves this `undefined` →
+       * `<Unlock>` calls the param-less / `None` sole-vault unlock, which is
+       * the unchanged single-vault behavior. Like `suspicionReason`, this is
+       * payload (not part of the `name` discriminator), so the `LEGAL`
+       * transition table is unaffected.
+       */
+      vaultId?: VaultId;
+    }
   | { name: "editor" }
-  | { name: "recover"; subStep: RecoverSubStep };
+  | { name: "recover"; subStep: RecoverSubStep }
+  | { name: "picker" };
 
 /**
  * Action type sent to `transition`. Each action corresponds to a
@@ -136,8 +190,14 @@ export type Action =
    * call rejected — the user lands on the unlock screen and retypes
    * the password manually. Defensive: should not trigger in normal
    * flow because the same password just succeeded inside `commit`.
+   *
+   * `vaultId` is the just-created vault's id (returned by `commit`); it
+   * rides onto the resulting `unlock` Stage so the manual retry targets
+   * that exact vault. Without it the retry hits the sole-vault fallback,
+   * which resolves to a non-existent legacy path once a second vault
+   * exists (`VaultNotFound`). `undefined` only on the legacy sole-vault path.
    */
-  | { type: "create-vault.commit-success" }
+  | { type: "create-vault.commit-success"; vaultId?: VaultId }
   /**
    * create-vault → editor. **Auto-unlock success path.** PRD Q4(a):
    * after `commit` resolves, CreateVault re-uses the just-typed
@@ -158,6 +218,39 @@ export type Action =
    * screen.
    */
   | { type: "editor.lock" }
+  /**
+   * editor → unlock(Exists, vaultId: target). **Multi-vault switch route**
+   * (MYND-205, multi-vault sub-feature 4). Dispatched by App.tsx's
+   * `switchVault` orchestration (the account-chip dropdown, sub-feature 4
+   * task 5) AFTER the param-less `vault_lock()` four-surface teardown has
+   * already torn down the prior vault (graceful `flushIfDirty` + keys +
+   * indices + attachment-refs, SYNC-8). The side effect (`vault_lock()`)
+   * runs in the dispatch handler, exactly like the editor Lock button fires
+   * `vault_lock` before transitioning to `unlock(Exists)` — the only delta
+   * is this arm carries the TARGET vault's `VaultId` on the resulting
+   * `unlock` Stage's payload so `<Unlock>` threads it into the
+   * vault-addressed `unlock` IPC (SYNC-6). The user lands on the target's
+   * unlock screen (same Stage shape `picker.select-vault` produces) and
+   * types the target's password; that unlock makes the target the sole
+   * `Unlocked` slot (no pointer-flip; SYNC-1). NOT a separate teardown —
+   * it reuses the existing `vault_lock()` primitive. See `decisions.md`
+   * 2026-06-09 "Multi-vault in-app switcher + label management".
+   */
+  | { type: "editor.switch-vault"; vaultId: VaultId }
+  /**
+   * editor → create-vault. **Create-another route from the in-app
+   * switcher** (MYND-205, multi-vault sub-feature 4 task 5). Dispatched by
+   * App.tsx when the user picks the account-chip dropdown's "Create another
+   * vault" footer. Routes into the existing vault-creation flow — the SAME
+   * target as the picker's `picker.create-vault` affordance, but from the
+   * editor stage rather than the picker. Under SYNC-1, committing the new
+   * vault locks the currently-unlocked one (the create → auto-unlock chain
+   * lands the user in the new vault's editor); the fresh `vaults/<new-id>/`
+   * minting + guard scoping (SYNC-9) live in the IPC layer, not here. The
+   * switcher's row-selection path uses `editor.switch-vault` instead — this
+   * arm is only the "make a brand-new vault" branch.
+   */
+  | { type: "editor.create-vault" }
   /**
    * editor → welcome. **Terminal-destructive transition.** Dispatched
    * by App.tsx on the `onDeleteVaultSuccess` callback chain from
@@ -239,7 +332,30 @@ export type Action =
    * inside `PasswordResetStep` — chained password reset stays
    * non-dismissible). Welcome lands as a fresh-vault entry point.
    */
-  | { type: "recover.delete-vault-success" };
+  | { type: "recover.delete-vault-success" }
+  /**
+   * picker → unlock(Exists). Dispatched by the vault picker screen when
+   * the user selects a vault row (MYND-204). Carries the chosen
+   * `VaultId` so the App-side handler can thread it through the
+   * vault-addressed `unlock` IPC (SYNC-6 targeting; the runtime evicts
+   * any prior `Unlocked` entry per SYNC-1 — lock-on-pick is enforced at
+   * the IPC layer, not via an extra Stage hop). `initialStatus` is
+   * `Exists` — the picker only lists discovered vaults, and a `Corrupted`
+   * row would surface its fail-closed UI on the unlock screen once
+   * selected (the picker does not pre-route corrupted vaults to a
+   * separate stage).
+   */
+  | { type: "picker.select-vault"; vaultId: VaultId }
+  /**
+   * picker → create-vault. Dispatched by the picker's "create another"
+   * affordance (MYND-204, story 6). Routes into the existing
+   * vault-creation flow; under SYNC-1 creating a new vault locks the
+   * current one (no-op at cold boot — nothing is unlocked) and the
+   * create → auto-unlock chain lands the user in the new vault's editor.
+   * The fresh `vaults/<new-id>/` minting + guard scoping (SYNC-9) live
+   * in the IPC layer (task 7), not here.
+   */
+  | { type: "picker.create-vault" };
 
 /**
  * Pure transition function. Returns the next Stage given the previous
@@ -268,8 +384,14 @@ export function transition(prev: Stage, action: Action): Stage {
         case "create-vault.commit-success":
           // Auto-unlock failure fallback (PRD Q4(a)): vault is
           // created but the chained vault_unlock IPC rejected; user
-          // retypes manually on the unlock screen.
-          return { name: "unlock", initialStatus: { kind: "Exists" } };
+          // retypes manually on the unlock screen. Carry the just-created
+          // vault's id so the manual retry targets it (SYNC-6) instead of
+          // the sole-vault fallback (which would 404 with >=2 vaults).
+          return {
+            name: "unlock",
+            initialStatus: { kind: "Exists" },
+            vaultId: action.vaultId,
+          };
         case "create-vault.auto-unlock-success":
           // Auto-unlock success path: vault_unlock resolved, slot is
           // populated, user lands in editor without retyping.
@@ -315,6 +437,28 @@ export function transition(prev: Stage, action: Action): Stage {
           // so initialStatus is `Exists`. No intermediate "locked"
           // screen — the user lands directly on the password form.
           return { name: "unlock", initialStatus: { kind: "Exists" } };
+        case "editor.switch-vault":
+          // Multi-vault switch route (MYND-205). The dispatch handler
+          // (`switchVault`) has already fired the param-less `vault_lock()`
+          // four-surface teardown (SYNC-8), so the prior vault is fully torn
+          // down — this arm only routes to the TARGET's unlock screen,
+          // carrying its `vaultId` on the resulting `unlock` Stage's payload
+          // so `<Unlock>` threads it into the vault-addressed `unlock` IPC
+          // (SYNC-6). Same Stage shape `picker.select-vault` produces;
+          // `initialStatus` is `Exists` (the switcher only lists discovered
+          // vaults — a corrupted target surfaces its fail-closed UI on the
+          // unlock screen). The target's unlock makes it the sole `Unlocked`
+          // slot (SYNC-1 — no pointer-flip).
+          return {
+            name: "unlock",
+            initialStatus: { kind: "Exists" },
+            vaultId: action.vaultId,
+          };
+        case "editor.create-vault":
+          // "Create another vault" footer in the account-chip switcher
+          // dropdown (MYND-205 task 5) → existing vault-creation flow. Same
+          // target as `picker.create-vault`, dispatched from the editor stage.
+          return { name: "create-vault" };
         case "editor.delete-vault-success":
           // Terminal-destructive transition (MYND-108). vault.meta is
           // gone (or partially gone in PartialDelete case); slot is
@@ -358,75 +502,147 @@ export function transition(prev: Stage, action: Action): Stage {
         default:
           return rejectIllegal(prev, action);
       }
+    case "picker":
+      switch (action.type) {
+        case "picker.select-vault":
+          // User selected a vault row. Route to the unlock screen for
+          // that vault; `initialStatus` is `Exists` (the picker lists
+          // discovered vaults — a corrupted one surfaces its fail-closed
+          // UI on the unlock screen, not via a separate stage). The chosen
+          // `vaultId` rides on the resulting `unlock` Stage's payload so
+          // `<Unlock>` threads it into the vault-addressed `unlock` IPC
+          // (SYNC-6 targeting); the runtime evicts any prior `Unlocked`
+          // entry at the IPC layer (SYNC-1 — lock-on-pick, no extra Stage
+          // hop). Carrying the id on the Stage (rather than App-side
+          // mutable state) keeps the targeting survivable across the React
+          // re-render between dispatch and the Unlock mount.
+          return {
+            name: "unlock",
+            initialStatus: { kind: "Exists" },
+            vaultId: action.vaultId,
+          };
+        case "picker.create-vault":
+          // "Create another" affordance → existing vault-creation flow.
+          return { name: "create-vault" };
+        default:
+          return rejectIllegal(prev, action);
+      }
     default:
       return assertNever(prev);
   }
 }
 
 /**
- * Map paired probe results (`vault_status` on disk +
- * `vault_slot_kind` on runtime) to the initial Stage at app boot.
+ * Per-vault runtime-slot view consumed by `initialStageFromProbe`
+ * (MYND-204, multi-vault sub-feature 3 — SYNC-4 boot-routing rework).
+ *
+ * Maps each discovered `VaultId` to its in-memory `Slot` kind
+ * (`vault_slot_kind` is per-vault under SYNC-6 — `probeSlotKind(vaultId)`).
+ * Under SYNC-1 (one vault unlocked at a time) AT MOST ONE entry is
+ * non-`Empty`. Missing keys are treated as `Empty` (a vault the runtime
+ * has never touched this session has no live slot). Modeled as a plain
+ * `Record` rather than a `Map` so it round-trips trivially over the
+ * App.tsx probe boundary and is cheap to scan.
+ */
+export type SlotMap = Record<VaultId, SlotKind>;
+
+/**
+ * Map the multi-vault boot probes (`vault_list` on disk +
+ * per-vault `vault_slot_kind` on runtime) to the initial Stage at app
+ * boot (MYND-204, SYNC-4 rework of the former
+ * `(vaultResult, slotKind)` single-vault signature).
  *
  * **Runtime slot trumps disk for non-Empty variants.** A live
- * `Recovering` or `Unlocked` slot means the Rust process is mid-flow
- * (typically post-WebView-reload — Tauri's host outlives the JS
- * runtime across Cmd+R / HMR). At cold boot the slot is always
- * `Empty` and disk-based routing applies as before.
+ * `Recovering` or `Unlocked` slot (in ANY `slotMap` entry) means the
+ * Rust process is mid-flow (typically post-WebView-reload — Tauri's
+ * host outlives the JS runtime across Cmd+R / HMR). Under SYNC-1 at
+ * most one slot is non-Empty. At cold boot every slot is `Empty` and
+ * list-based routing applies.
  *
- * Decision tree:
- * - Slot `Recovering`            → `recover` with `subStep = password-reset`
+ * Decision tree (slot-priority first, then vault-count):
+ * - any slot `Recovering`        → `recover` with `subStep = password-reset`
  *   (skip phrase-entry; A8d already produced the in-memory `root_key`
  *   in a prior session — `recovery-flow.md` §4.1's non-dismissible
  *   chained step continues from where the user left off).
- * - Slot `Unlocked`              → `editor` (auto-unlock parity;
+ * - any slot `Unlocked`          → `editor` (auto-unlock parity;
  *   the Editor mount guard's `vault_is_unlocked()` probe is the
- *   reality check if Rust state somehow disagrees).
- * - Slot `Empty` + `Ok(Missing)`     → `welcome`
- * - Slot `Empty` + `Ok(Exists)`      → `unlock` with `initialStatus = Exists`
- * - Slot `Empty` + `Ok(Corrupted)`   → `unlock` with `initialStatus = Corrupted`
- * - Slot `Empty` + `Err(IoError)`    → `unlock` with `initialStatus = IoError`
+ *   reality check if Rust state somehow disagrees). `Recovering` wins
+ *   over `Unlocked` if both somehow appear (defensive — SYNC-1 forbids
+ *   it; the non-dismissible recovery step takes precedence).
+ * - all slots Empty + `Err(IoError)`    → `unlock` with `initialStatus = IoError`
+ *   (list-level IO failure — fail-closed regardless of vault count).
+ * - all slots Empty + `Ok([])`          → `welcome` (0 vaults)
+ * - all slots Empty + `Ok([v])`         → `unlock` for that one vault,
+ *   mapping its `VaultSummary` status: `Exists` → `Exists`,
+ *   `Corrupted` → `Corrupted` (fail-closed corrupted-vault UI).
+ * - all slots Empty + `Ok([v0, v1, …])` → `picker` (≥2 vaults — SYNC-7a;
+ *   the picker screen renders the full list, the user chooses).
  *
  * The IO-error path lands in `unlock` (not a separate `error` stage)
  * per Q10 α=3 — Unlock component renders `<FailClosedError reason="io-error">`
  * in place of the password form when `initialStatus.kind === "IoError"`.
  *
- * **Exotic disagreements** (slot says Recovering/Unlocked but disk
- * is Missing/Corrupted/IoError) are routed by slot anyway; the
- * downstream A8f / editor mount surfaces the real failure (parse
- * fail → fail-closed corrupted-vault; missing file → A8f
- * VaultNotFound). Keeping the boot decision tree slot-priority
- * preserves the silent-recovery posture (Q4) at the boundary.
+ * **`VaultSummary` has no `Missing` / `IoError` per-vault status** (unlike
+ * the single-vault `VaultStatus`): a vault absent from disk is simply not
+ * in the list (0-count → welcome), and IO failure is a *list-level* error
+ * (`VaultListResult` err arm). So the three fail-closed mappings
+ * (Exists/Corrupted/IoError) are preserved: Exists/Corrupted come from the
+ * single-vault `status`, IoError from the list-level err arm.
+ *
+ * **Exotic disagreements** (a slot says Recovering/Unlocked but the list
+ * is empty / IoError) are routed by slot anyway; the downstream A8f /
+ * editor mount surfaces the real failure. Keeping the boot decision tree
+ * slot-priority preserves the silent-recovery posture (Q4) at the boundary.
  */
-export function initialStageFromProbe(
-  result: { ok: VaultStatus } | { err: VaultStatusError },
-  slotKind: SlotKind,
-): Stage {
+export function initialStageFromProbe(vaultList: VaultListResult, slotMap: SlotMap): Stage {
   // Slot-priority: a non-Empty runtime slot pins the boot stage
-  // regardless of disk state.
-  if (slotKind === "Recovering") {
+  // regardless of disk state / vault count. Under SYNC-1 at most one
+  // slot is non-Empty; we scan defensively and let `Recovering` win
+  // over `Unlocked` (the non-dismissible chained recovery step).
+  const slots = Object.values(slotMap);
+  if (slots.includes("Recovering")) {
     return { name: "recover", subStep: "password-reset" };
   }
-  if (slotKind === "Unlocked") {
+  if (slots.includes("Unlocked")) {
     return { name: "editor" };
   }
-  // Slot is Empty — fall through to disk-based routing.
-  if ("ok" in result) {
-    switch (result.ok.kind) {
-      case "Missing":
-        return { name: "welcome" };
+
+  // All slots Empty (or no live slots) — fall through to list-based
+  // routing. A list-level IO failure is fail-closed regardless of count.
+  if ("err" in vaultList) {
+    return {
+      name: "unlock",
+      initialStatus: { kind: "IoError", ioKind: vaultList.err.detail.io_error_kind },
+    };
+  }
+
+  const vaults = vaultList.ok;
+  if (vaults.length === 0) {
+    return { name: "welcome" };
+  }
+  if (vaults.length === 1) {
+    // Exactly one vault — unlock it directly (SYNC-7a: no picker for the
+    // single-vault user). Map its on-disk health to the unlock screen's
+    // fail-closed surfaces. Carry the lone vault's id as the unlock target
+    // (task 8) so the single-vault path also unlocks explicitly — parity
+    // with the picker path, and a clean migration to the vault-addressed
+    // `unlock` IPC even when there is only one vault on disk. (A `Corrupted`
+    // vault never reaches an unlock IPC — `<Unlock>` renders the fail-closed
+    // surface for the first frame — so its `vaultId` is moot, but set for
+    // uniformity.)
+    const vaultId = vaults[0].id;
+    const status = vaults[0].status;
+    switch (status.kind) {
       case "Exists":
-        return { name: "unlock", initialStatus: { kind: "Exists" } };
+        return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId };
       case "Corrupted":
-        return { name: "unlock", initialStatus: { kind: "Corrupted" } };
+        return { name: "unlock", initialStatus: { kind: "Corrupted" }, vaultId };
       default:
-        return assertNever(result.ok);
+        return assertNever(status);
     }
   }
-  // Err arm: IoError. Unlock component renders fail-closed UI.
-  return {
-    name: "unlock",
-    initialStatus: { kind: "IoError", ioKind: result.err.detail.io_error_kind },
-  };
+  // ≥2 vaults — show the picker (SYNC-7a).
+  return { name: "picker" };
 }
 
 function rejectIllegal(prev: Stage, action: Action): Stage {
@@ -443,8 +659,8 @@ function assertNever(x: never): never {
   throw new Error(`[stage] Unhandled stage variant: ${JSON.stringify(x)}`);
 }
 
-import type { VaultStatus, VaultStatusError } from "../types/vault-status";
 import type { SlotKind } from "../types/slot-kind";
+import type { VaultListResult, VaultSummary } from "../types/vault-summary";
 
 // ---- Dev-only runtime verification harness ----
 //
@@ -470,6 +686,8 @@ const LEGAL: Record<string, Stage["name"]> = {
   "create-vault|create-vault.auto-unlock-success": "editor",
   "unlock|unlock.success": "editor",
   "editor|editor.lock": "unlock",
+  "editor|editor.switch-vault": "unlock",
+  "editor|editor.create-vault": "create-vault",
   "editor|editor.delete-vault-success": "welcome",
   "unlock|unlock.delete-vault-success": "welcome",
   "unlock|unlock.start-recovery": "recover",
@@ -477,6 +695,8 @@ const LEGAL: Record<string, Stage["name"]> = {
   "recover|recover.cancel": "unlock",
   "recover|recover.complete-success": "editor",
   "recover|recover.delete-vault-success": "welcome",
+  "picker|picker.select-vault": "unlock",
+  "picker|picker.create-vault": "create-vault",
 };
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
@@ -488,11 +708,18 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   // this entry exercises every (Stage × Action) pair to confirm the
   // field's presence does not change transition outcomes.
   { name: "unlock", initialStatus: { kind: "Exists" }, suspicionReason: "vault-meta-changed-externally" },
+  // Coverage entry for the optional `vaultId` payload field (MYND-204
+  // task 8). Like `suspicionReason`, it is payload (not the `name`
+  // discriminator), so `transition` ignores it on every (Stage × Action)
+  // pair — this entry confirms its presence does not change outcomes.
+  { name: "unlock", initialStatus: { kind: "Exists" }, vaultId: "00000000-0000-7000-8000-00000000000a" },
   { name: "editor" },
+  { name: "recover", subStep: "select" },
   { name: "recover", subStep: "phrase-entry" },
   { name: "recover", subStep: "decrypting" },
   { name: "recover", subStep: "password-reset" },
   { name: "recover", subStep: "delete-confirm" },
+  { name: "picker" },
 ];
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
@@ -502,6 +729,12 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "create-vault.auto-unlock-success" },
   { type: "unlock.success" },
   { type: "editor.lock" },
+  // `editor.switch-vault` carries a `vaultId`; the verification walk only
+  // inspects the resulting `Stage["name"]`, so a placeholder id suffices
+  // (the legality table tracks `name` only, not payload — like
+  // `picker.select-vault`).
+  { type: "editor.switch-vault", vaultId: "00000000-0000-7000-8000-000000000000" },
+  { type: "editor.create-vault" },
   { type: "editor.delete-vault-success" },
   { type: "unlock.delete-vault-success" },
   { type: "unlock.start-recovery" },
@@ -509,6 +742,11 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "recover.cancel" },
   { type: "recover.complete-success" },
   { type: "recover.delete-vault-success" },
+  // `picker.select-vault` carries a `vaultId`; the verification walk
+  // only inspects the resulting `Stage["name"]`, so a placeholder id
+  // suffices (the legality table tracks `name` only, not payload).
+  { type: "picker.select-vault", vaultId: "00000000-0000-7000-8000-000000000000" },
+  { type: "picker.create-vault" },
 ];
 
 /**
@@ -559,91 +797,166 @@ function verifyTransitionTable(): void {
 }
 
 /**
- * Walk every (vault_status × slot_kind) probe outcome combination and
- * assert `initialStageFromProbe` produces the expected Stage. Catches
- * regressions where a refactor on either side (Rust enum drift, TS
- * mapping change) breaks the boot routing.
+ * Walk the `(vaultList × slotMap)` boot-probe cross-product and assert
+ * `initialStageFromProbe` produces the expected Stage (MYND-204 SYNC-4
+ * rework). Catches regressions where a refactor on either side (Rust enum
+ * drift, TS mapping change, picker-visibility threshold) breaks the boot
+ * routing — the load-bearing routing test that runs at `pnpm dev` boot and
+ * hard-fails on regression.
  *
- * Coverage:
- * - Slot `Empty` × four disk states (Missing / Exists / Corrupted /
- *   two IoError variants) — five disk-priority cases.
- * - Slot `Recovering` × Exists (the realistic post-reload case) —
- *   slot-priority routes to `recover(password-reset)`.
- * - Slot `Recovering` × Missing (exotic disagreement) — still routes
- *   to recover; downstream A8f surfaces VaultNotFound.
- * - Slot `Unlocked` × Exists — slot-priority routes to `editor`.
+ * Coverage (vault-count buckets {0, 1, ≥2} × slot-priority {all-Empty,
+ * one-Recovering, one-Unlocked} × per-vault status {Exists, Corrupted}
+ * where relevant + the list-level IoError fail-closed path):
+ * - all-Empty slots:
+ *   - 0 vaults                       → welcome
+ *   - 1 vault Exists                 → unlock(Exists)
+ *   - 1 vault Corrupted              → unlock(Corrupted)
+ *   - ≥2 vaults (Exists/Corrupted mix) → picker
+ *   - list-level Err(IoError, …)     → unlock(IoError) (count-independent)
+ * - one-Recovering slot (post-reload mid-recovery): slot-priority wins for
+ *   0 / 1 / ≥2 vault counts AND the exotic IoError-list disagreement →
+ *   recover(password-reset).
+ * - one-Unlocked slot (post-reload mid-edit): slot-priority wins for
+ *   0 / 1 / ≥2 vault counts → editor.
  */
 function verifyInitialStageFromProbe(): void {
+  // ---- Small fixture builders (keep the case table readable) ----
+  const VID_A = "00000000-0000-7000-8000-00000000000a";
+  const VID_B = "00000000-0000-7000-8000-00000000000b";
+  const existsVault = (id: VaultId): VaultSummary => ({
+    id,
+    status: { kind: "Exists" },
+    label: null,
+    last_unlock: null,
+  });
+  const corruptVault = (id: VaultId): VaultSummary => ({
+    id,
+    status: { kind: "Corrupted" },
+    label: null,
+    last_unlock: null,
+  });
+  const okList = (...vaults: VaultSummary[]): VaultListResult => ({ ok: vaults });
+  const errList = (ioKind: IoFailureKind): VaultListResult => ({
+    err: { kind: "IoError", detail: { io_error_kind: ioKind } },
+  });
+  const allEmpty: SlotMap = {};
+  const oneRecovering: SlotMap = { [VID_A]: "Recovering" };
+  const oneUnlocked: SlotMap = { [VID_A]: "Unlocked" };
+
   type Case = {
     label: string;
-    input: { ok: VaultStatus } | { err: VaultStatusError };
-    slotKind: SlotKind;
+    vaultList: VaultListResult;
+    slotMap: SlotMap;
     expectedName: Stage["name"];
     expectedInitialStatus?: { kind: "Exists" | "Corrupted" | "IoError"; ioKind?: IoFailureKind };
     expectedSubStep?: RecoverSubStep;
+    // Single-vault boot arm threads the lone vault's id as the unlock target
+    // (task 8). `undefined` here means "do not assert" (multi-vault picker
+    // route + list-level IoError carry no targeting id).
+    expectedVaultId?: VaultId;
   };
   const cases: Array<Case> = [
-    // ---- Slot Empty: disk-based routing (cold boot path) ----
+    // ---- All slots Empty: list-based routing (cold boot path) ----
     {
-      label: "Empty + Ok(Missing)",
-      input: { ok: { kind: "Missing" } },
-      slotKind: "Empty",
+      label: "AllEmpty + 0 vaults",
+      vaultList: okList(),
+      slotMap: allEmpty,
       expectedName: "welcome",
     },
     {
-      label: "Empty + Ok(Exists)",
-      input: { ok: { kind: "Exists" } },
-      slotKind: "Empty",
+      label: "AllEmpty + 1 vault Exists",
+      vaultList: okList(existsVault(VID_A)),
+      slotMap: allEmpty,
       expectedName: "unlock",
       expectedInitialStatus: { kind: "Exists" },
+      expectedVaultId: VID_A,
     },
     {
-      label: "Empty + Ok(Corrupted)",
-      input: { ok: { kind: "Corrupted" } },
-      slotKind: "Empty",
+      label: "AllEmpty + 1 vault Corrupted",
+      vaultList: okList(corruptVault(VID_A)),
+      slotMap: allEmpty,
       expectedName: "unlock",
       expectedInitialStatus: { kind: "Corrupted" },
+      expectedVaultId: VID_A,
     },
     {
-      label: "Empty + Err(IoError, PermissionDenied)",
-      input: { err: { kind: "IoError", detail: { io_error_kind: "PermissionDenied" } } },
-      slotKind: "Empty",
+      label: "AllEmpty + 2 vaults (Exists, Exists)",
+      vaultList: okList(existsVault(VID_A), existsVault(VID_B)),
+      slotMap: allEmpty,
+      expectedName: "picker",
+    },
+    {
+      label: "AllEmpty + 2 vaults (Exists, Corrupted) — picker still",
+      vaultList: okList(existsVault(VID_A), corruptVault(VID_B)),
+      slotMap: allEmpty,
+      expectedName: "picker",
+    },
+    {
+      label: "AllEmpty + Err(IoError, PermissionDenied) — list-level fail-closed",
+      vaultList: errList("PermissionDenied"),
+      slotMap: allEmpty,
       expectedName: "unlock",
       expectedInitialStatus: { kind: "IoError", ioKind: "PermissionDenied" },
     },
     {
-      label: "Empty + Err(IoError, Other)",
-      input: { err: { kind: "IoError", detail: { io_error_kind: "Other" } } },
-      slotKind: "Empty",
+      label: "AllEmpty + Err(IoError, Other) — list-level fail-closed",
+      vaultList: errList("Other"),
+      slotMap: allEmpty,
       expectedName: "unlock",
       expectedInitialStatus: { kind: "IoError", ioKind: "Other" },
     },
-    // ---- Slot Recovering: slot-priority (post-reload mid-recovery) ----
+    // ---- One Recovering slot: slot-priority wins over any count ----
     {
-      label: "Recovering + Ok(Exists)",
-      input: { ok: { kind: "Exists" } },
-      slotKind: "Recovering",
+      label: "Recovering + 1 vault Exists",
+      vaultList: okList(existsVault(VID_A)),
+      slotMap: oneRecovering,
       expectedName: "recover",
       expectedSubStep: "password-reset",
     },
     {
-      label: "Recovering + Ok(Missing) (exotic)",
-      input: { ok: { kind: "Missing" } },
-      slotKind: "Recovering",
+      label: "Recovering + 2 vaults — slot-priority over picker",
+      vaultList: okList(existsVault(VID_A), existsVault(VID_B)),
+      slotMap: oneRecovering,
       expectedName: "recover",
       expectedSubStep: "password-reset",
     },
-    // ---- Slot Unlocked: slot-priority (post-reload mid-edit) ----
     {
-      label: "Unlocked + Ok(Exists)",
-      input: { ok: { kind: "Exists" } },
-      slotKind: "Unlocked",
+      label: "Recovering + 0 vaults (exotic) — still recover",
+      vaultList: okList(),
+      slotMap: oneRecovering,
+      expectedName: "recover",
+      expectedSubStep: "password-reset",
+    },
+    {
+      label: "Recovering + Err(IoError) (exotic) — still recover",
+      vaultList: errList("Other"),
+      slotMap: oneRecovering,
+      expectedName: "recover",
+      expectedSubStep: "password-reset",
+    },
+    // ---- One Unlocked slot: slot-priority wins over any count ----
+    {
+      label: "Unlocked + 1 vault Exists",
+      vaultList: okList(existsVault(VID_A)),
+      slotMap: oneUnlocked,
+      expectedName: "editor",
+    },
+    {
+      label: "Unlocked + 2 vaults — slot-priority over picker",
+      vaultList: okList(existsVault(VID_A), existsVault(VID_B)),
+      slotMap: oneUnlocked,
+      expectedName: "editor",
+    },
+    {
+      label: "Unlocked + 0 vaults (exotic) — still editor",
+      vaultList: okList(),
+      slotMap: oneUnlocked,
       expectedName: "editor",
     },
   ];
 
   for (const c of cases) {
-    const actual = initialStageFromProbe(c.input, c.slotKind);
+    const actual = initialStageFromProbe(c.vaultList, c.slotMap);
     if (actual.name !== c.expectedName) {
       throw new Error(
         `[stage] regression: initialStageFromProbe(${c.label}) returned name=${actual.name}; expected ${c.expectedName}`,
@@ -668,6 +981,13 @@ function verifyInitialStageFromProbe(): void {
       if (actual.subStep !== c.expectedSubStep) {
         throw new Error(
           `[stage] regression: initialStageFromProbe(${c.label}) subStep=${actual.subStep}; expected ${c.expectedSubStep}`,
+        );
+      }
+    }
+    if (c.expectedVaultId !== undefined && actual.name === "unlock") {
+      if (actual.vaultId !== c.expectedVaultId) {
+        throw new Error(
+          `[stage] regression: initialStageFromProbe(${c.label}) vaultId=${actual.vaultId}; expected ${c.expectedVaultId}`,
         );
       }
     }

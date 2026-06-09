@@ -10,7 +10,19 @@ mod snapshot_policy;
 mod snapshot_store;
 #[cfg(test)]
 mod test_support;
+mod vault_id;
 mod vault_meta_hash;
+// SAFETY-CRITICAL eager boot migration `vault/` → `vaults/<id>/` (MYND-202
+// task 4). Runs once at boot, before any routing, from the `setup` hook
+// below — so every downstream probe/resolver sees only the post-migration
+// layout. Idempotent: a no-op when no legacy `vault/` is present.
+mod vault_migration;
+// Discovery + best-effort registry cache. `discover_vaults` +
+// `load_or_rebuild_registry` are now live via the `vault_list` IPC command
+// (`plugins::vault_unlock::commands::vault_list_from_base`). The remaining
+// not-yet-wired helper (`mint_unique_vault_id`, consumed by sub-feature 3's
+// create path) carries its own per-item `#[cfg_attr(not(test), allow(dead_code))]`.
+mod vault_registry;
 mod vault_sweep;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,6 +74,40 @@ pub fn run() {
         )
         .setup(|app| {
             use tauri::Manager;
+            // MYND-202: SAFETY-CRITICAL eager boot migration `vault/` →
+            // `vaults/<id>/`, run FIRST — before screen-capture init, before
+            // any timer/state setup, and (by virtue of `setup` running during
+            // `build()`) before the WebView/router is exposed or any vault
+            // command can be invoked. The rest of the app therefore only ever
+            // observes the post-migration layout (one on-disk invariant).
+            //
+            // Copy → fsync → verify-new → delete-old-LAST; the old `vault/` is
+            // the untouched source of truth until the final delete, so an
+            // interrupt at any step leaves it intact and the next boot
+            // re-runs. A migration failure is logged with a closed-enum
+            // reduction (paths + VaultId are DENY-listed) and is NON-FATAL:
+            // the old `vault/` is left intact for the next boot to retry, so
+            // the app still starts (the transitional resolver falls back to
+            // the legacy `vault/` until a later boot completes the move).
+            match app.path().app_data_dir() {
+                Ok(base) => match vault_migration::migrate_legacy_vault(&base) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        let kind = vault_migration::migration_failure_kind(&e);
+                        tracing::error!(
+                            stage = "vault_migration_failed",
+                            io_failure_kind = ?kind,
+                            "boot migration failed; old vault/ left intact for next-boot retry"
+                        );
+                    }
+                },
+                Err(_) => {
+                    tracing::error!(
+                        stage = "vault_migration_app_data_dir",
+                        "could not resolve app_data_dir for boot migration; skipping"
+                    );
+                }
+            }
             // Apply screen-capture protection before `window.show()` so
             // the first frame is protected on macOS + Windows 10 build
             // 19041+. The main window is declared `"visible": false` in

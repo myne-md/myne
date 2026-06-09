@@ -116,6 +116,15 @@ export interface PrefsView {
    * defaults it to `{}`. Serialized from Rust `BTreeMap<String, String>`.
    */
   item_colors: Record<string, string>;
+  /**
+   * Per-vault human-readable label (MYND-205) — the name the in-app vault
+   * switcher shows for this vault. `null` ≡ no label set → the switcher shows a
+   * neutral fallback (`Vault N`). Lives encrypted-only inside `vault.prefs`
+   * (SYNC-3); decrypted into a per-session RAM cache on unlock. Absent in vaults
+   * with no label → the Rust decoder defaults it to `null`. Serialized from Rust
+   * `Option<String>` (null | string).
+   */
+  label: string | null;
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -258,4 +267,19 @@ export async function setItemColors(colors: Record<string, string>): Promise<voi
  */
 export async function setFolderIcons(icons: Record<string, string>): Promise<void> {
   await invoke<void>("plugin:prefs|set_folder_icons", { icons });
+}
+
+/**
+ * Set (or clear) the active vault's human-readable label (MYND-205) — the name
+ * the in-app vault switcher shows. Pass a string to set/rename it, or `null` to
+ * clear it back to the neutral-fallback state. **Unlock-gated**: writing the
+ * label needs the active vault's `prefs_key`, so you can only rename the vault
+ * you currently have unlocked (a rejected promise with `SlotNotUnlocked` means
+ * no vault was unlocked). The backend atomic-writes `vault.prefs` disk-first
+ * with no native side-effect, then refreshes the per-session RAM label cache so
+ * the switcher reflects the rename immediately. The label lives encrypted-only
+ * at rest — it never touches disk in plaintext except as this input.
+ */
+export async function setVaultLabel(label: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|vault_set_label", { label });
 }

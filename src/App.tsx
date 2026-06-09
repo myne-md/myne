@@ -4,19 +4,33 @@ import { CreateVault } from "./screens/CreateVault";
 import { Unlock } from "./screens/Unlock";
 import { Editor } from "./screens/Editor";
 import { VaultRecover } from "./screens/VaultRecover";
+import { VaultPicker } from "./screens/VaultPicker";
 import {
   initialStageFromProbe,
   transition,
   type Action,
+  type SlotMap,
   type Stage,
   type StageVaultStatus,
   type SuspicionReason,
+  type VaultId,
 } from "./lib/stage";
-import { probeVaultStatus } from "./lib/vault-status";
+import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
+import { switchVault } from "./lib/vault-switch";
 import { openInNoteFind } from "./editor/find/find-session";
 import { prefsRead } from "./lib/prefs";
 import { applyTheme } from "./lib/theme";
+
+// Synthetic key for the single-entry boot `SlotMap` (MYND-204 SYNC-4).
+// `initialStageFromProbe` routes on the slot KIND only — it scans
+// `Object.values(slotMap)` and never reads a key — so this string is
+// purely structural and carries no meaning. Under SYNC-1 (one vault
+// unlocked at a time) at most one slot is non-`Empty`, and the Rust
+// runtime owns "which vault is active", so the boot probe maps the lone
+// active-slot kind under this fixed key rather than building a per-vault
+// map. A correctness-under-SYNC-1 constant, NOT a transitional sentinel.
+const ACTIVE_SLOT_KEY = "active-slot";
 
 function App() {
   // Initial stage is `null` until the boot probe resolves (loading
@@ -27,27 +41,62 @@ function App() {
   // VaultRuntimeState slot, defeating the editor mount guard).
   const [stage, setStage] = useState<Stage | null>(null);
 
-  // Boot-time probe pair: `vault_status` (disk) + `vault_slot_kind`
-  // (runtime slot). Issued in parallel via `Promise.all` — both are
-  // cheap (vault.meta is 345 bytes; slot peek is microseconds) and
-  // independent, so the boot blocking-time is bounded by the slower
-  // of the two. The `probed` ref guards against React 18 StrictMode
-  // double-effect in dev. Also re-fires when `reprobe()` resets
-  // `stage` to null (Editor mount guard's "Lock" CTA →
-  // fail-closed → re-route). Slot-priority routing applies: a
-  // `Recovering` or `Unlocked` runtime slot pins the boot stage to
-  // `recover(password-reset)` or `editor` regardless of disk state.
+  // Transient "saving…" flag for the multi-vault switch (MYND-205). True
+  // only while `switchVault`'s param-less `vault_lock()` IPC is in flight
+  // (the prior vault's `flushIfDirty` + four-surface teardown); cleared once
+  // the lock settles and the `editor.switch-vault` Stage action is
+  // dispatched. The switcher dropdown (sub-feature 4 task 5) renders the
+  // "saving…" affordance off this; App.tsx also shows a lightweight overlay
+  // so the state is visible even before the dropdown lands. No confirm-
+  // discard dialog — `vault_lock()`'s flush covers unsaved edits.
+  const [switching, setSwitching] = useState(false);
+
+  // Boot-time multi-vault probe pair (MYND-204 SYNC-4): `vault_list`
+  // (disk enumeration) + `vault_slot_kind(None)` (the active runtime
+  // slot). Issued in parallel via `Promise.all` — both are cheap (each
+  // vault.meta is 345 bytes; the slot peek is microseconds) and
+  // independent, so the boot blocking-time is bounded by the slower of
+  // the two. The `probed` ref guards against React 18 StrictMode
+  // double-effect in dev. Also re-fires when `reprobe()` resets `stage`
+  // to null (Editor mount guard's "Lock" CTA → fail-closed → re-route).
+  //
+  // Slot-priority routing applies: a `Recovering` or `Unlocked` runtime
+  // slot pins the boot stage to `recover(password-reset)` or `editor`
+  // regardless of disk state / vault count (`initialStageFromProbe`
+  // scans the slot map first). Post-WebView-reload (Cmd+R / HMR — the
+  // Tauri host outlives the JS runtime), the lone non-`Empty` slot is
+  // how we detect a mid-flow vault.
   const probed = useRef(false);
   useEffect(() => {
     if (stage !== null) return; // already-resolved probe
     if (probed.current) return; // StrictMode second invocation
     probed.current = true;
     void (async () => {
-      const [vaultResult, slotKind] = await Promise.all([
-        probeVaultStatus(),
+      // Build the `(vaultList, slotMap)` pair `initialStageFromProbe`
+      // consumes. `listVaults()` enumerates every `vaults/<id>/` on disk;
+      // `probeSlotKind()` (no `vaultId` → the active/sole vault) reports
+      // the one live slot.
+      //
+      // **Single-entry SlotMap is correct under SYNC-1, not a stopgap.**
+      // SYNC-1 guarantees AT MOST ONE vault holds a non-`Empty` slot, so
+      // a per-vault probe loop over every discovered vault would be
+      // wasted IPC for zero routing benefit — boot routing only needs
+      // "the active slot's kind", which the Rust runtime owns ("which
+      // vault is active" is resolved host-side). The `None`-arg
+      // `vault_slot_kind` path is **Recovering-aware**: it resolves via
+      // `active_vault_or_recovering_for_probe` (Unlocked first, else
+      // Recovering, else Empty — `src-tauri/.../commands.rs`
+      // `vault_slot_kind_inner` + `state.rs`
+      // `active_or_recovering_vault_id`), so a post-reload mid-recovery
+      // slot is detected and routes to `recover`. Routing keys only on
+      // the slot KIND, never the vault id (the runtime owns active-vault
+      // identity), so the synthetic key below is purely structural.
+      const [vaultList, activeSlotKind] = await Promise.all([
+        listVaults(),
         probeSlotKind(),
       ]);
-      setStage(initialStageFromProbe(vaultResult, slotKind));
+      const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
+      setStage(initialStageFromProbe(vaultList, slotMap));
     })();
   }, [stage]);
 
@@ -143,6 +192,17 @@ function App() {
 
   const dispatch = (action: Action) => setStage((prev) => (prev ? transition(prev, action) : prev));
 
+  // Multi-vault switch handler (MYND-205). Fires the param-less
+  // `vault_lock()` (four-surface teardown + `flushIfDirty`, SYNC-8) then
+  // dispatches `editor.switch-vault` → `unlock(Exists, vaultId: target)`, so
+  // the user lands on the TARGET's unlock screen and types its password
+  // (the vault-addressed unlock IPC runs there, SYNC-6). `switchVault` toggles
+  // the `switching` "saving…" flag around the lock IPC. Passed to the Editor
+  // for the account-chip dropdown (sub-feature 4 task 5) to invoke.
+  const onSwitchVault = (targetVaultId: VaultId) => {
+    void switchVault(targetVaultId, { onSavingChange: setSwitching, dispatch });
+  };
+
   const screen = (() => {
     switch (stage.name) {
       case "welcome":
@@ -154,8 +214,11 @@ function App() {
             onAutoUnlockSuccess={() =>
               dispatch({ type: "create-vault.auto-unlock-success" })
             }
-            onAutoUnlockFailed={() =>
-              dispatch({ type: "create-vault.commit-success" })
+            onAutoUnlockFailed={(vaultId) =>
+              dispatch({
+                type: "create-vault.commit-success",
+                vaultId: vaultId ?? undefined,
+              })
             }
           />
         );
@@ -163,6 +226,7 @@ function App() {
         return (
           <Unlock
             initialStatus={stage.initialStatus}
+            vaultId={stage.vaultId}
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
@@ -181,6 +245,9 @@ function App() {
             onDeleteVaultSuccess={() =>
               dispatch({ type: "editor.delete-vault-success" })
             }
+            onSwitchVault={onSwitchVault}
+            onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
+            switching={switching}
           />
         );
       case "recover":
@@ -194,6 +261,22 @@ function App() {
             onDeleteVaultSuccess={() =>
               dispatch({ type: "recover.delete-vault-success" })
             }
+          />
+        );
+      case "picker":
+        // ≥2-vault startup surface (MYND-204). The picker fetches its
+        // own vault list from `vault_list()` (the `picker` Stage is
+        // payload-free). Selecting a row threads the chosen `vaultId`
+        // into `picker.select-vault` → unlock(Exists) for that vault; the
+        // id rides on the resulting unlock Stage's payload and `<Unlock>`
+        // passes it to the vault-addressed `unlock` IPC (task 8, SYNC-6).
+        // Under SYNC-1 the backend evicts any prior `Unlocked` entry —
+        // lock-on-pick is enforced at the IPC layer, not via an extra
+        // Stage hop. "Create another" → `picker.create-vault` → create flow.
+        return (
+          <VaultPicker
+            onSelect={(vaultId) => dispatch({ type: "picker.select-vault", vaultId })}
+            onCreateAnother={() => dispatch({ type: "picker.create-vault" })}
           />
         );
     }

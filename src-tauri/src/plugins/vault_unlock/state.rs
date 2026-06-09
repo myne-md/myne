@@ -1,15 +1,34 @@
 //! Runtime state for the vault auth domain (vault-unlock + vault-recover).
 //!
-//! Holds a single [`Slot`] for the running process plus the `Semaphore`
-//! permit that gates concurrent Argon2id-bound auth operations to one in
-//! flight at a time, shared across the `vault_unlock` and `vault_recover`
-//! plugins.
+//! Holds a [`HashMap<VaultId, Slot>`] of per-vault [`Slot`]s for the running
+//! process plus the `Semaphore` permit that gates concurrent Argon2id-bound
+//! auth operations to one in flight at a time, shared across the
+//! `vault_unlock` and `vault_recover` plugins.
 //!
-//! Phase 1 is single-vault per OS user (`paths.rs` + `decisions.md`
-//! 2026-04-28 "Vault path: app_data_dir/vault/, single vault per OS user
-//! in Phase 1"). The slot is one [`Slot`] rather than a
-//! `HashMap<VaultId, Slot>` — Phase 2 multi-vault is a mechanical type
-//! swap, lifecycle reasoning unchanged.
+//! ## Per-vault slot map (multi-vault sub-feature 2, MYND-203)
+//!
+//! The runtime slot was a singleton `RwLock<Slot>`; it is now a
+//! `RwLock<HashMap<VaultId, Slot>>` keyed by [`crate::vault_id::VaultId`]
+//! (sub-feature 1). Each entry is an independent [`Slot`] state machine — two
+//! distinct `VaultId`s can hold one `Unlocked` and one `Recovering` slot side
+//! by side without aliasing. A keyed accessor on a MISSING entry behaves
+//! exactly as the singleton's `Slot::Empty` did (no panic, same guard/locked
+//! path); a keyed [`Self::take`] on a missing entry is an idempotent no-op
+//! that leaves every other entry intact.
+//!
+//! **Invariant (forthcoming — task 2):** at most ONE entry may be
+//! `Slot::Unlocked` at any time (SYNC-1 one-at-a-time). This task performs
+//! only the mechanical type-swap + keyed accessors; the ≤1-`Unlocked`
+//! invariant is NOT enforced here. [`Self::active_vault_id`] resolves the sole
+//! `Unlocked` key transitionally (deterministic min-by-id if >1 ever exist —
+//! which task 2 will make impossible); read sites resolve the active id
+//! through it, then call the keyed accessor.
+//!
+//! The two auto-lock activity atoms (`last_activity_millis`,
+//! `auto_lock_timeout_secs`) stay SINGLETONS: SYNC-1 (one vault unlocked at a
+//! time) → one active vault → one activity clock. Sub-feature 6 formalizes
+//! multi-vault auto-lock; until then the idle timer operates on the active
+//! entry.
 //!
 //! ## Slot state machine
 //!
@@ -31,8 +50,10 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
+use crate::vault_id::VaultId;
 use protocol::AEAD_KEY_LEN;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 use tokio::sync::{RwLock, Semaphore};
@@ -57,13 +78,18 @@ pub const AUTH_PERMITS: usize = 1;
 /// is borrowable from any command in either the `vault_unlock` or
 /// `vault_recover` plugin.
 pub struct VaultRuntimeState {
-    /// Three-state slot per the [`Slot`] enum. `Slot::Empty` is the
-    /// default; `Slot::Recovering { ... }` is populated by
-    /// `vault_recover_with_phrase` success (root_key + items_key derived,
-    /// awaiting password commit); `Slot::Unlocked(UnlockedVault)` is
-    /// populated by either `vault_unlock` success or
-    /// `vault_complete_recovery` success (Recovering → Unlocked promotion).
-    slot: RwLock<Slot>,
+    /// Per-vault [`Slot`] map keyed by [`VaultId`]. A MISSING key is the
+    /// `Slot::Empty` equivalent — there is no stored `Empty` entry; an
+    /// absent entry IS empty. Each present entry is one three-state slot:
+    /// `Slot::Recovering { ... }` is populated by `vault_recover_with_phrase`
+    /// success (root_key + items_key derived, awaiting password commit);
+    /// `Slot::Unlocked(UnlockedVault)` is populated by either `vault_unlock`
+    /// success or `vault_complete_recovery` success (Recovering → Unlocked
+    /// promotion). Distinct keys never alias.
+    ///
+    /// Invariant (task 2, not enforced here): at most one entry is
+    /// `Slot::Unlocked`.
+    slots: RwLock<HashMap<VaultId, Slot>>,
 
     /// Capacity-1 semaphore gating concurrent Argon2id-bound auth ops.
     /// Acquired via `try_acquire()` (reject) per grilling Q2 +
@@ -95,16 +121,32 @@ pub struct VaultRuntimeState {
     /// `Slot::Unlocked` — disk is canonical). Held outside the slot
     /// `RwLock`, same rationale as `last_activity_millis`.
     auto_lock_timeout_secs: AtomicU32,
+
+    /// Per-session decrypted vault-label cache (MYND-205, SYNC-3/4). Maps a
+    /// [`VaultId`] to the human label decrypted from that vault's
+    /// `vault.prefs` during a this-session unlock. The label lives
+    /// **encrypted-only** at rest; this cache is the ONLY place the
+    /// plaintext label exists outside the editing UI, and it never persists.
+    /// `vault_list` reads it to populate `VaultSummary.label` (`Some` iff the
+    /// cache holds one for that id) so a never-this-session-unlocked vault
+    /// shows a neutral fallback. Held in its own `RwLock` (not the slot map)
+    /// so a `vault_list` read does not serialise against the slot lock; an
+    /// absent key means "no cached label" (the switcher fallback). The entry
+    /// is dropped on lock / take / switch alongside the slot teardown so a
+    /// locked vault stops surfacing its real name (SYNC-3 — label only for
+    /// this-session-unlocked vaults).
+    label_cache: RwLock<HashMap<VaultId, String>>,
 }
 
 impl Default for VaultRuntimeState {
     fn default() -> Self {
         Self {
-            slot: RwLock::new(Slot::Empty),
+            slots: RwLock::new(HashMap::new()),
             auth_permits: Semaphore::new(AUTH_PERMITS),
             start_instant: Instant::now(),
             last_activity_millis: AtomicU64::new(0),
             auto_lock_timeout_secs: AtomicU32::new(crate::auto_lock::DEFAULT_AUTO_LOCK_SECS),
+            label_cache: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -114,6 +156,54 @@ impl VaultRuntimeState {
     /// this in their command's critical-section guard.
     pub fn auth_permits(&self) -> &Semaphore {
         &self.auth_permits
+    }
+
+    /// The `VaultId` of the sole `Slot::Unlocked` entry, or `None` if no
+    /// vault is unlocked.
+    ///
+    /// TRANSITIONAL active-vault resolver (sub-feature 2). Read sites that used
+    /// to peek the singleton slot resolve the active id through this, then call
+    /// the keyed accessor; when this returns `None` they hit the SAME
+    /// guard/locked path they hit today on an empty slot. Task 2 enforces the
+    /// ≤1-`Unlocked` invariant so at most one entry is ever `Unlocked`; until
+    /// then, if more than one were somehow `Unlocked`, this returns the
+    /// deterministic minimum by `VaultId` (`Ord`) so the choice is stable.
+    pub async fn active_vault_id(&self) -> Option<VaultId> {
+        let slots = self.slots.read().await;
+        slots
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Unlocked(_)))
+            .map(|(id, _)| *id)
+            .min()
+    }
+
+    /// The `VaultId` of the sole non-`Empty` entry the idle timer / lock path
+    /// should act on — the `Unlocked` key if one exists, else the `Recovering`
+    /// key. `None` when no entry is `Unlocked` or `Recovering`.
+    ///
+    /// TRANSITIONAL (sub-feature 2): `vault_lock` and the auto-lock idle timer
+    /// operate on "the active entry" while SYNC-1 guarantees one-at-a-time.
+    /// Deterministic min-by-id within each tier mirrors [`Self::active_vault_id`].
+    pub async fn active_vault_or_recovering_for_probe(&self) -> Option<VaultId> {
+        self.active_or_recovering_vault_id().await
+    }
+
+    /// Internal active-or-recovering resolver (see the public
+    /// [`Self::active_vault_or_recovering_for_probe`] wrapper).
+    async fn active_or_recovering_vault_id(&self) -> Option<VaultId> {
+        let slots = self.slots.read().await;
+        slots
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Unlocked(_)))
+            .map(|(id, _)| *id)
+            .min()
+            .or_else(|| {
+                slots
+                    .iter()
+                    .filter(|(_, slot)| matches!(slot, Slot::Recovering { .. }))
+                    .map(|(id, _)| *id)
+                    .min()
+            })
     }
 
     /// Record user activity — the lock-free heartbeat sink for auto-lock
@@ -162,6 +252,42 @@ impl VaultRuntimeState {
         self.auto_lock_timeout_secs.load(Ordering::Relaxed)
     }
 
+    /// Insert/replace the decrypted label for `id` in the per-session label
+    /// cache (MYND-205, SYNC-3). Called at unlock (label decrypted from
+    /// `vault.prefs`) and by `vault_set_label` after a successful disk write
+    /// so the switcher reflects a rename immediately. `Some(label)` caches it;
+    /// `None` removes the entry (the user cleared the label) so `vault_list`
+    /// reports the vault as unlabelled again. The plaintext label exists ONLY
+    /// here at runtime; it never persists outside the AEAD-sealed `vault.prefs`.
+    pub async fn set_cached_label(&self, id: VaultId, label: Option<String>) {
+        let mut cache = self.label_cache.write().await;
+        match label {
+            Some(l) => {
+                cache.insert(id, l);
+            }
+            None => {
+                cache.remove(&id);
+            }
+        }
+    }
+
+    /// The decrypted label cached for `id` this session, or `None` if no
+    /// label was cached (vault never unlocked this session, or it carries no
+    /// label). Read by `vault_list` to project `VaultSummary.label` (SYNC-4):
+    /// `Some` only for a this-session-cached vault, the neutral-fallback
+    /// signal otherwise.
+    pub async fn cached_label(&self, id: VaultId) -> Option<String> {
+        self.label_cache.read().await.get(&id).cloned()
+    }
+
+    /// Drop `id`'s cached label (MYND-205) — the label-cache half of a lock /
+    /// take / switch teardown so a locked vault stops surfacing its real name
+    /// in the switcher (SYNC-3 — real labels only for this-session-unlocked
+    /// vaults). Idempotent: a missing entry is a no-op.
+    pub async fn evict_cached_label(&self, id: VaultId) {
+        self.label_cache.write().await.remove(&id);
+    }
+
     /// TOCTOU-safe idle lock: acquire the slot write-lock and drop the
     /// `Slot::Unlocked` ONLY if (a) the slot is still `Unlocked` and (b) the
     /// idle — re-read UNDER the lock via `idle_under_lock` — is still
@@ -184,14 +310,21 @@ impl VaultRuntimeState {
     where
         F: FnOnce() -> core::time::Duration,
     {
-        let mut guard = self.slot.write().await;
-        if !matches!(&*guard, Slot::Unlocked(_)) {
-            return None;
-        }
+        // TRANSITIONAL (sub-feature 6 — multi-vault auto-lock): operate on the
+        // single active `Unlocked` entry (SYNC-1 one-at-a-time).
+        let mut guard = self.slots.write().await;
+        let id = guard
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Unlocked(_)))
+            .map(|(id, _)| *id)
+            .min()?;
         if idle_under_lock() < timeout {
             return None;
         }
-        Some(core::mem::replace(&mut *guard, Slot::Empty))
+        // Remove the active entry — a missing key IS empty, so removal is the
+        // map analogue of replacing the singleton with `Slot::Empty`. Other
+        // entries are untouched.
+        guard.remove(&id)
     }
 
     /// TTL bail for `Slot::Recovering` (MYND-121 story 8/9): acquire the slot
@@ -215,15 +348,21 @@ impl VaultRuntimeState {
     where
         F: FnOnce(Instant) -> core::time::Duration,
     {
-        let mut guard = self.slot.write().await;
-        let recovered_at = match &*guard {
-            Slot::Recovering { recovered_at, .. } => *recovered_at,
-            Slot::Empty | Slot::Unlocked(_) => return None,
-        };
+        // TRANSITIONAL (sub-feature 6 — multi-vault auto-lock): operate on the
+        // single active `Recovering` entry (SYNC-1 one-at-a-time).
+        let mut guard = self.slots.write().await;
+        let (id, recovered_at) = guard
+            .iter()
+            .filter_map(|(id, slot)| match slot {
+                Slot::Recovering { recovered_at, .. } => Some((*id, *recovered_at)),
+                _ => None,
+            })
+            .min_by_key(|(id, _)| *id)?;
         if age_of(recovered_at) < ttl {
             return None;
         }
-        Some(core::mem::replace(&mut *guard, Slot::Empty))
+        // Remove the active entry; a missing key IS empty. Other entries intact.
+        guard.remove(&id)
     }
 
     /// Acquire a read borrow of the [`Slot`].
@@ -239,8 +378,43 @@ impl VaultRuntimeState {
     /// The guard is `Send + Sync` because `Slot: Send + Sync` (every
     /// variant's fields are; `Zeroizing<[u8; 32]>` is `Send + Sync`).
     /// Holding it across `.await` keeps the outer future `Send`-clean.
-    pub async fn slot_read(&self) -> tokio::sync::RwLockReadGuard<'_, Slot> {
-        self.slot.read().await
+    /// TRANSITIONAL active-vault read helper (sub-feature 2): resolve the
+    /// active vault id, then [`Self::slot_read`] it. When no vault is unlocked
+    /// the guard `Deref`s to [`Slot::Empty`] (a missing entry IS empty) — the
+    /// SAME locked/guard path read sites hit today on an empty singleton slot.
+    /// Read sites (notes CRUD, snapshots, etc.) call this; task 4 replaces it
+    /// with an explicitly-threaded vault_id.
+    pub async fn slot_read_active(&self) -> SlotReadGuard<'_> {
+        // Resolve under the same map; a `None` active id keys an arbitrary
+        // absent entry (the legacy sentinel) so the guard yields `Empty`.
+        let id = self
+            .active_vault_id()
+            .await
+            .unwrap_or(crate::paths::legacy_vault_id());
+        self.slot_read(id).await
+    }
+
+    /// TRANSITIONAL active-vault read helper (sub-feature 2): the active
+    /// vault's [`SlotKind`], or [`SlotKind::Empty`] when no vault is unlocked
+    /// or recovering. The locked-path guard read sites use; task 4 replaces it
+    /// with an explicitly-threaded vault_id.
+    pub async fn slot_kind_active(&self) -> SlotKind {
+        match self.active_or_recovering_vault_id().await {
+            Some(id) => self.slot_kind(id).await,
+            None => SlotKind::Empty,
+        }
+    }
+
+    pub async fn slot_read(&self, id: VaultId) -> SlotReadGuard<'_> {
+        // Hold the WHOLE-map read guard (transitionally a coarse lock — a
+        // `vault_lock` write request on ANY entry waits behind it; sub-feature
+        // 3 narrows this to per-entry locking). The wrapper resolves `id`'s
+        // entry on each `Deref`, returning the shared `Slot::Empty` when the
+        // key is absent (a missing entry IS empty).
+        SlotReadGuard {
+            guard: self.slots.read().await,
+            id,
+        }
     }
 
     /// Cheap read-lock peek: which [`Slot`] variant is currently held?
@@ -250,11 +424,13 @@ impl VaultRuntimeState {
     /// `VaultRecoveryInProgress`, `RecoveryAlreadyInProgress`) before
     /// the permit acquire — fast-path observable so an already-occupied
     /// guard never blocks on a permit.
-    pub async fn slot_kind(&self) -> SlotKind {
-        match &*self.slot.read().await {
-            Slot::Empty => SlotKind::Empty,
-            Slot::Recovering { .. } => SlotKind::Recovering,
-            Slot::Unlocked(_) => SlotKind::Unlocked,
+    pub async fn slot_kind(&self, id: VaultId) -> SlotKind {
+        // A missing key IS the `Empty` case (matches the singleton's
+        // empty-slot behavior).
+        match self.slots.read().await.get(&id) {
+            None | Some(Slot::Empty) => SlotKind::Empty,
+            Some(Slot::Recovering { .. }) => SlotKind::Recovering,
+            Some(Slot::Unlocked(_)) => SlotKind::Unlocked,
         }
     }
 
@@ -263,11 +439,23 @@ impl VaultRuntimeState {
     /// fields wipe at a known program point) or pattern-match the
     /// variant to emit stage-tagged tracing.
     ///
-    /// Used by `vault_lock` — idempotent (returns `Slot::Empty` when
-    /// the slot was already empty); drops whichever occupied variant
-    /// was held.
-    pub async fn take(&self) -> Slot {
-        core::mem::replace(&mut *self.slot.write().await, Slot::Empty)
+    /// Used by `vault_lock` (via the active-id resolution) — idempotent: a
+    /// `take` on a MISSING entry returns `Slot::Empty` (matches the
+    /// singleton's already-empty behavior), and removing an entry leaves every
+    /// OTHER entry intact.
+    ///
+    /// ## The `VaultId`-keyed lock primitive (sub-feature 6)
+    ///
+    /// This keyed `take(id)` is the primitive sibling 6's lock-on-switch +
+    /// idle-lock will call to lock ONE specific vault by id (e.g. the switcher
+    /// locks the prior vault before unlocking the target; a per-vault idle
+    /// timer locks exactly the vault that went idle). It is `pub` (callable
+    /// from anywhere in the crate, where sibling 6 lives); no widening needed.
+    /// Param-less `vault_lock` stays the active-vault convenience (SYNC-8) and
+    /// resolves the sole active id, then funnels through this same primitive.
+    pub async fn take(&self, id: VaultId) -> Slot {
+        // Remove the entry; a missing key IS empty → `Slot::Empty`.
+        self.slots.write().await.remove(&id).unwrap_or(Slot::Empty)
     }
 
     /// Take just the [`Slot::Recovering`] material, leaving `Slot::Empty`.
@@ -278,26 +466,33 @@ impl VaultRuntimeState {
     /// repopulates the slot with `set_unlocked`; on failure the local
     /// [`RecoveringMaterial`] drops, the Zeroizing fields wipe, and the
     /// slot stays `Empty` (user must restart from A8d).
-    pub async fn take_recovering(&self) -> Option<RecoveringMaterial> {
-        let mut slot_guard = self.slot.write().await;
-        match core::mem::replace(&mut *slot_guard, Slot::Empty) {
-            Slot::Recovering {
+    pub async fn take_recovering(&self, id: VaultId) -> Option<RecoveringMaterial> {
+        let mut slots = self.slots.write().await;
+        // Only consume `id`'s entry if it is `Recovering`; a missing /
+        // `Empty` / `Unlocked` entry is left untouched (and other entries are
+        // never perturbed).
+        match slots.get(&id) {
+            Some(Slot::Recovering { .. }) => {}
+            _ => return None,
+        }
+        match slots.remove(&id) {
+            Some(Slot::Recovering {
                 root_key,
                 items_key,
                 items_key_id,
                 recovered_at,
-            } => Some(RecoveringMaterial {
+            }) => Some(RecoveringMaterial {
                 root_key,
                 items_key,
                 items_key_id,
                 recovered_at,
             }),
-            other => {
-                // Slot was Empty or Unlocked — restore the original
-                // variant so we do not perturb a non-Recovering slot.
-                *slot_guard = other;
+            // Unreachable given the guard above; restore defensively.
+            Some(other) => {
+                slots.insert(id, other);
                 None
             }
+            None => None,
         }
     }
 
@@ -309,7 +504,7 @@ impl VaultRuntimeState {
     /// should never hit a non-`Empty` return because the slot peek +
     /// permit acquire upstream of this call reject the attempt with the
     /// appropriate guard variant.
-    pub async fn set_recovering(&self, material: RecoveringMaterial) -> Slot {
+    pub async fn set_recovering(&self, id: VaultId, material: RecoveringMaterial) -> Slot {
         let RecoveringMaterial {
             root_key,
             items_key,
@@ -322,7 +517,13 @@ impl VaultRuntimeState {
             items_key_id,
             recovered_at,
         };
-        core::mem::replace(&mut *self.slot.write().await, new)
+        // Insert under `id`; the prior entry (or `Slot::Empty` if absent) is
+        // returned for diagnostics.
+        self.slots
+            .write()
+            .await
+            .insert(id, new)
+            .unwrap_or(Slot::Empty)
     }
 
     /// Populate [`Slot::Unlocked`].
@@ -331,13 +532,78 @@ impl VaultRuntimeState {
     /// success (the post-A8f promotion of `Slot::Recovering` →
     /// `Slot::Unlocked`). Returns the previously-held `Slot` for
     /// diagnostics.
-    pub async fn set_unlocked(&self, vault: UnlockedVault) -> Slot {
+    pub async fn set_unlocked(&self, id: VaultId, vault: UnlockedVault) -> Slot {
         // Fresh activity baseline for the new session so a stale pre-unlock
         // `last_activity_millis` cannot shorten the first idle window
-        // (auto-lock on idle, MYND-121).
+        // (auto-lock on idle, MYND-121). The activity clock stays a SINGLETON
+        // (SYNC-1: one vault unlocked at a time → one clock).
         self.last_activity_millis
             .store(self.monotonic_millis(), Ordering::Relaxed);
-        core::mem::replace(&mut *self.slot.write().await, Slot::Unlocked(vault))
+        // Insert under `id`; the prior entry (or `Slot::Empty` if absent) is
+        // returned for diagnostics.
+        self.slots
+            .write()
+            .await
+            .insert(id, Slot::Unlocked(vault))
+            .unwrap_or(Slot::Empty)
+    }
+
+    /// Populate [`Slot::Unlocked`] for `id`, FIRST locking (dropping +
+    /// zeroizing) any OTHER currently-`Unlocked` vault — the set-unlocked seam
+    /// that enforces the **≤1-`Unlocked` invariant** (SYNC-1 one-at-a-time).
+    ///
+    /// Lock-then-unlock: resolve the active vault; if a DIFFERENT vault is
+    /// `Unlocked`, remove its entry under the SAME write lock (its
+    /// `UnlockedVault`'s `Zeroizing` keys wipe when the returned `Slot` drops),
+    /// THEN insert `id`'s `Unlocked` entry. Holding ONE write lock across both
+    /// mutations guarantees the `slots` map is never observable with two
+    /// `Unlocked` entries.
+    ///
+    /// Only `Unlocked` is capped: a `Recovering` entry for another vault is
+    /// left untouched (recovery-flow.md §4 — a `Recovering` entry is not
+    /// `Unlocked`; its transient state is fine alongside the sole `Unlocked`).
+    /// Re-unlocking the SAME `id` is not a switch (the active vault equals the
+    /// target) — the prior same-id entry is simply replaced by `insert`.
+    ///
+    /// Returns the prior `Slot` so the caller can drive the rest of the
+    /// four-surface lock teardown at a known program point: the slot drop +
+    /// key zeroize is done here, but wiping the GLOBAL derived indices (search
+    /// index / VaultIndices / attachment-refs) needs an `AppHandle` and so
+    /// happens at the command-wrapper seam (`vault_unlock::commands::unlock`)
+    /// BEFORE the next unlock hydrates them — no cross-vault index bleed. When
+    /// a SWITCH occurred the returned variant is the locked prior vault's
+    /// `Slot::Unlocked`; when no other vault was unlocked (or this re-unlocks
+    /// the same id from `Empty`) it is `Slot::Empty`.
+    pub async fn set_unlocked_locking_others(&self, id: VaultId, vault: UnlockedVault) -> Slot {
+        // Fresh activity baseline for the new session (mirrors `set_unlocked`)
+        // so a stale pre-unlock `last_activity_millis` cannot shorten the first
+        // idle window. The activity clock stays a SINGLETON (SYNC-1).
+        self.last_activity_millis
+            .store(self.monotonic_millis(), Ordering::Relaxed);
+
+        let mut slots = self.slots.write().await;
+        // Resolve the currently-`Unlocked` vault (if any) under the held write
+        // lock — the same deterministic min-by-id resolution as
+        // `active_vault_id`, but inside this critical section so the
+        // lock-then-unlock is atomic w.r.t. any concurrent reader.
+        let active = slots
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Unlocked(_)))
+            .map(|(other, _)| *other)
+            .min();
+        // Lock the OTHER unlocked vault first (drop + zeroize its keys). A
+        // re-unlock of the same id is not a switch, so skip when `other == id`.
+        let locked_prior = match active {
+            Some(other) if other != id => slots.remove(&other),
+            _ => None,
+        };
+        // Populate the target. The prior same-id entry (or `Empty` if absent)
+        // is replaced; on a switch it is `Empty` for `id` so this insert is
+        // the first `Unlocked` entry after the teardown above.
+        let prior_same_id = slots.insert(id, Slot::Unlocked(vault));
+        // Prefer the locked-prior (switch) variant for the caller's teardown
+        // decision; otherwise hand back this id's own prior slot.
+        locked_prior.or(prior_same_id).unwrap_or(Slot::Empty)
     }
 
     /// Read-lock peek that returns a CLONE of the `root_key` from
@@ -355,10 +621,13 @@ impl VaultRuntimeState {
     /// See `decisions.md` 2026-05-06 entry "vault_complete_recovery
     /// post-Argon2id slot peek symmetric retrofit".
     pub async fn peek_recovering_root_key_clone(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
-        match &*self.slot.read().await {
+        // TRANSITIONAL (sub-feature 2): resolve the single active `Recovering`
+        // entry. Sub-feature 4 threads an explicit `vault_id` here.
+        let slots = self.slots.read().await;
+        slots.values().find_map(|slot| match slot {
             Slot::Recovering { root_key, .. } => Some(Zeroizing::new(**root_key)),
-            Slot::Empty | Slot::Unlocked(_) => None,
-        }
+            _ => None,
+        })
     }
 
     /// Read-lock peek that returns a CLONE of `(root_key, vault_meta_bytes_hash)`
@@ -377,10 +646,13 @@ impl VaultRuntimeState {
     pub async fn peek_unlocked_root_key_and_hash_clone(
         &self,
     ) -> Option<(Zeroizing<[u8; AEAD_KEY_LEN]>, [u8; 32])> {
-        match &*self.slot.read().await {
+        // TRANSITIONAL (sub-feature 2): resolve the single active `Unlocked`
+        // entry. Sub-feature 4 threads an explicit `vault_id` here.
+        let slots = self.slots.read().await;
+        slots.values().find_map(|slot| match slot {
             Slot::Unlocked(uv) => Some((Zeroizing::new(*uv.root_key), uv.vault_meta_bytes_hash)),
-            Slot::Empty | Slot::Recovering { .. } => None,
-        }
+            _ => None,
+        })
     }
 
     /// Read-lock peek that returns a CLONE of just the `root_key` from
@@ -395,10 +667,13 @@ impl VaultRuntimeState {
     /// [`Self::peek_unlocked_root_key_and_hash_clone`] keeps the
     /// borrowed surface minimal at each call site.
     pub async fn peek_unlocked_root_key_clone(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
-        match &*self.slot.read().await {
+        // TRANSITIONAL (sub-feature 2): resolve the single active `Unlocked`
+        // entry. Sub-feature 4 threads an explicit `vault_id` here.
+        let slots = self.slots.read().await;
+        slots.values().find_map(|slot| match slot {
             Slot::Unlocked(uv) => Some(Zeroizing::new(*uv.root_key)),
-            Slot::Empty | Slot::Recovering { .. } => None,
-        }
+            _ => None,
+        })
     }
 
     /// Read-lock peek that returns CLONES of `(items_key, items_key_id,
@@ -419,14 +694,17 @@ impl VaultRuntimeState {
         [u8; 16],
         Zeroizing<[u8; AEAD_KEY_LEN]>,
     )> {
-        match &*self.slot.read().await {
+        // TRANSITIONAL (sub-feature 2): resolve the single active `Unlocked`
+        // entry. Sub-feature 4 threads an explicit `vault_id` here.
+        let slots = self.slots.read().await;
+        slots.values().find_map(|slot| match slot {
             Slot::Unlocked(uv) => Some((
                 uv.items_key.clone(),
                 uv.items_key_id,
                 Zeroizing::new(*uv.root_key),
             )),
-            Slot::Empty | Slot::Recovering { .. } => None,
-        }
+            _ => None,
+        })
     }
 
     /// Atomically commit a `vault.meta` rewrite while holding the
@@ -465,21 +743,34 @@ impl VaultRuntimeState {
         F: FnOnce() -> Result<[u8; 32], E> + Send + 'static,
         E: Send + 'static,
     {
-        let mut slot_guard = self.slot.write().await;
-        match &*slot_guard {
-            Slot::Unlocked(uv) if uv.vault_meta_bytes_hash == expected_hash => {
+        // TRANSITIONAL (sub-feature 4): resolve the single active `Unlocked`
+        // entry under the write lock. Sub-feature 4 threads an explicit
+        // `vault_id` here. The whole-map write lock is held across the rewrite
+        // so any concurrent `vault_lock` (on any entry) queues behind it.
+        let mut slots = self.slots.write().await;
+        let id = slots
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Unlocked(_)))
+            .map(|(id, _)| *id)
+            .min();
+        match id.and_then(|id| slots.get(&id)) {
+            Some(Slot::Unlocked(uv)) if uv.vault_meta_bytes_hash == expected_hash => {
                 // Verified. Hold the lock through the rewrite below.
             }
-            Slot::Unlocked(_) => {
+            Some(Slot::Unlocked(_)) => {
                 // Hash drift — defensive (auth_permits hold makes
-                // this unreachable today). Force-relock.
-                *slot_guard = Slot::Empty;
+                // this unreachable today). Force-relock: drop the entry.
+                if let Some(id) = id {
+                    slots.remove(&id);
+                }
                 return Err(CommitRewriteError::HashMismatch);
             }
-            Slot::Empty | Slot::Recovering { .. } => {
+            _ => {
                 return Err(CommitRewriteError::SlotDropped);
             }
         }
+        // `id` is Some here (the `Some(Slot::Unlocked …)` arms above imply it).
+        let id = id.expect("active Unlocked entry resolved above");
 
         // Run the rewrite in spawn_blocking; the write lock is held
         // across the .await, blocking any concurrent `vault_lock`
@@ -490,9 +781,9 @@ impl VaultRuntimeState {
             Err(_) => return Err(CommitRewriteError::Join),
         };
 
-        // Slot is still Unlocked under the held write lock; update
+        // Entry is still Unlocked under the held write lock; update
         // the hash anchor in place. root_key + items_key untouched.
-        if let Slot::Unlocked(uv) = &mut *slot_guard {
+        if let Some(Slot::Unlocked(uv)) = slots.get_mut(&id) {
             uv.vault_meta_bytes_hash = new_hash;
         }
         Ok(())
@@ -529,21 +820,48 @@ impl VaultRuntimeState {
     /// "vault_delete partial-fail posture" (the rationale that
     /// partial-fail leaves only cryptographically-junk ciphertext
     /// because key zeroize happens BEFORE the unlink loop).
-    pub async fn take_and_run_blocking<F, E>(&self, unlink: F) -> Result<(), TakeAndRunError<E>>
+    /// Take the slot for **exactly `id`** (zeroizing the moved-out variant's
+    /// `Drop`-able fields), then run a `spawn_blocking` closure with the slot
+    /// write-lock held across the await (SYNC-6 explicit-id targeting). Every
+    /// OTHER entry is untouched — the unlink walk under the closure runs
+    /// against `vaults/<id>/` while a sibling vault's keys stay live in its own
+    /// slot.
+    ///
+    /// **Cryptographic-erase ordering:** the `remove` consumes `id`'s prior
+    /// slot and the explicit `drop` fires the `UnlockedVault` /
+    /// `RecoveringMaterial` `Drop` BEFORE the `spawn_blocking` await begins —
+    /// keys zeroize before any filesystem operation runs. Pinned by
+    /// `decisions.md` 2026-05-26 "vault_delete partial-fail posture".
+    ///
+    /// Returns [`TakeAndRunError::SlotEmpty`] (closure NOT run, disk untouched)
+    /// when `id`'s entry is absent / `Empty` at write-lock acquire. This
+    /// catches a race where the caller peeked `slot_kind(id)` observing
+    /// Unlocked/Recovering, then a concurrent `vault_lock` on `id` fired
+    /// between the peek and this write-lock acquire (`vault_lock` does NOT
+    /// consume an `auth_permit`, so the permit the caller holds does not block
+    /// it). Used by `vault_delete` (MYND-205) to erase a chosen `VaultId`.
+    pub async fn take_and_run_blocking_for_id<F, E>(
+        &self,
+        id: VaultId,
+        unlink: F,
+    ) -> Result<(), TakeAndRunError<E>>
     where
         F: FnOnce() -> Result<(), E> + Send + 'static,
         E: Send + 'static,
     {
-        let mut slot_guard = self.slot.write().await;
-        if matches!(&*slot_guard, Slot::Empty) {
-            return Err(TakeAndRunError::SlotEmpty);
+        let mut slots = self.slots.write().await;
+        // Only take `id` when it is non-`Empty`; an absent / `Empty` entry is
+        // the race case (closure must not run). Other entries stay intact.
+        match slots.get(&id) {
+            Some(Slot::Unlocked(_)) | Some(Slot::Recovering { .. }) => {}
+            _ => return Err(TakeAndRunError::SlotEmpty),
         }
-        let dropped = core::mem::replace(&mut *slot_guard, Slot::Empty);
+        // Remove exactly `id`'s entry; a missing key IS empty. Siblings intact.
+        let dropped = slots.remove(&id);
         // Explicit drop fires zeroize NOW — before any IO.
         drop(dropped);
-        // Lock still held across the spawn_blocking await; any
-        // concurrent slot-touching op (vault_lock, vault_unlock,
-        // note_*) queues on the RwLock.
+        // Lock still held across the spawn_blocking await; any concurrent
+        // slot-touching op queues on the RwLock.
         match tokio::task::spawn_blocking(unlink).await {
             Ok(Ok(())) => Ok(()),
             Ok(Err(e)) => Err(TakeAndRunError::Closure(e)),
@@ -552,7 +870,7 @@ impl VaultRuntimeState {
     }
 }
 
-/// Outcome of [`VaultRuntimeState::take_and_run_blocking`].
+/// Outcome of [`VaultRuntimeState::take_and_run_blocking_for_id`].
 ///
 /// Generic over the closure's error type so the caller (`vault_delete`)
 /// can route its own io-error variant back through its own
@@ -618,6 +936,32 @@ pub enum Slot {
     /// `Slot::Recovering → Slot::Unlocked` promotion inside
     /// `vault_complete_recovery`.
     Unlocked(UnlockedVault),
+}
+
+/// Shared `Slot::Empty` returned by [`SlotReadGuard`] when the keyed entry is
+/// absent — a missing map entry IS the empty slot. `const` so no allocation
+/// and a `'static` borrow is available for the `Deref`.
+const EMPTY_SLOT: Slot = Slot::Empty;
+
+/// Read guard returned by [`VaultRuntimeState::slot_read`]. Holds the
+/// whole-map read lock (transitionally coarse — sub-feature 3 narrows it) and
+/// `Deref`s to the [`Slot`] for the keyed [`VaultId`], or to the shared
+/// [`EMPTY_SLOT`] when that key is absent.
+///
+/// Callers keep the existing `let slot = state.slot_read(id).await; match
+/// &*slot { Slot::Unlocked(uv) => … }` shape unchanged — and HOLD the guard
+/// across `spawn_blocking` so a concurrent `vault_lock`'s write request waits
+/// behind it (the in-flight-op ordering of `decisions.md` 2026-05-07).
+pub struct SlotReadGuard<'a> {
+    guard: tokio::sync::RwLockReadGuard<'a, HashMap<VaultId, Slot>>,
+    id: VaultId,
+}
+
+impl core::ops::Deref for SlotReadGuard<'_> {
+    type Target = Slot;
+    fn deref(&self) -> &Slot {
+        self.guard.get(&self.id).unwrap_or(&EMPTY_SLOT)
+    }
 }
 
 /// Owned payload for the [`Slot::Recovering`] variant. Used by the
@@ -692,6 +1036,48 @@ impl Slot {
     }
 }
 
+/// Test-only invariant probe: how many entries in the `slots` map are
+/// `Slot::Unlocked`. The **A6 single-unlocked invariant** (SYNC-1
+/// one-at-a-time) requires this to be `<= 1` at every observable point —
+/// before, during, and after an idle-lock or a lock-on-switch. Tests assert
+/// against it directly so the invariant is checked, not merely implied by the
+/// `active_vault_id` min-by-id tie-break.
+#[cfg(test)]
+impl VaultRuntimeState {
+    pub(crate) async fn unlocked_entry_count(&self) -> usize {
+        self.slots
+            .read()
+            .await
+            .values()
+            .filter(|slot| matches!(slot, Slot::Unlocked(_)))
+            .count()
+    }
+}
+
+/// A fixed, deterministic test [`VaultId`] for the slot-map keyed accessors.
+///
+/// Most tests exercise a single vault, so they key every accessor
+/// (`set_unlocked` / `slot_kind` / `take` / …) with this one id. It is
+/// deliberately the LEGACY-vault sentinel id ([`crate::paths::legacy_vault_id`]):
+/// integration-style tests interleave a direct accessor call with a production
+/// command (`unlock_with_path` / `recover_with_phrase_with_path` / …) whose
+/// slot key is path-derived. Those tests drive a temp-dir `vault.meta` whose
+/// parent is NOT a `vaults/<uuid>/` directory, so the production path derives
+/// exactly this legacy sentinel — keeping the direct accessor and the
+/// production command on the SAME map entry. Tests that need two distinct
+/// entries pair this with [`test_vault_id_b`].
+#[cfg(test)]
+pub(crate) fn test_vault_id() -> VaultId {
+    crate::paths::legacy_vault_id()
+}
+
+/// A second fixed, deterministic test [`VaultId`], distinct from
+/// [`test_vault_id`], for tests that need two independent slot-map entries.
+#[cfg(test)]
+pub(crate) fn test_vault_id_b() -> VaultId {
+    VaultId::parse("22222222-2222-7222-8222-222222222222").expect("valid test UUIDv7")
+}
+
 /// Build a fixture `UnlockedVault` with byte-pattern arguments so tests
 /// can assert against distinguishable bytes. Shared across `state.rs`
 /// tests and `commands.rs` tests.
@@ -762,7 +1148,7 @@ mod tests {
     fn slot_kind_returns_empty_on_fresh_state() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -770,9 +1156,11 @@ mod tests {
     fn set_unlocked_then_slot_kind_returns_unlocked() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            let prior = state.set_unlocked(fixture_unlocked()).await;
+            let prior = state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
             assert!(matches!(prior, Slot::Empty));
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 
@@ -780,9 +1168,11 @@ mod tests {
     fn set_recovering_then_slot_kind_returns_recovering() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            let prior = state.set_recovering(fixture_recovering()).await;
+            let prior = state
+                .set_recovering(test_vault_id(), fixture_recovering())
+                .await;
             assert!(matches!(prior, Slot::Empty));
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -790,8 +1180,10 @@ mod tests {
     fn take_returns_unlocked_value() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
-            let taken = state.take().await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            let taken = state.take(test_vault_id()).await;
             match taken {
                 Slot::Unlocked(uv) => {
                     assert_eq!(*uv.root_key, [7u8; AEAD_KEY_LEN]);
@@ -837,7 +1229,7 @@ mod tests {
         // high-frequency heartbeat must never contend with crypto-state.
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            let _write_guard = state.slot.write().await;
+            let _write_guard = state.slots.write().await;
             state.report_activity();
             let _ = state.idle_millis();
             // Reaching here without deadlock proves no slot-lock acquisition.
@@ -849,7 +1241,9 @@ mod tests {
         // Unlock starts a fresh activity baseline → idle ~0 right after.
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
             assert!(state.idle_millis() < 1_000);
         });
     }
@@ -860,7 +1254,9 @@ mod tests {
     fn take_unlocked_if_idle_locks_when_idle_exceeds_timeout() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
             // idle (injected 10s) >= timeout (0) → locks; slot drops to Empty.
             let dropped = state
                 .take_unlocked_if_idle(core::time::Duration::ZERO, || {
@@ -868,7 +1264,7 @@ mod tests {
                 })
                 .await;
             assert!(matches!(dropped, Some(Slot::Unlocked(_))));
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -876,7 +1272,9 @@ mod tests {
     fn take_unlocked_if_idle_does_not_lock_when_not_yet_idle() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
             // idle (injected 0) < timeout (1h) → no lock; slot stays Unlocked.
             let dropped = state
                 .take_unlocked_if_idle(core::time::Duration::from_secs(3600), || {
@@ -884,7 +1282,7 @@ mod tests {
                 })
                 .await;
             assert!(dropped.is_none());
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 
@@ -898,7 +1296,7 @@ mod tests {
                 })
                 .await;
             assert!(dropped.is_none());
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -908,14 +1306,16 @@ mod tests {
         // a heartbeat landing in the check→lock gap → abort, slot stays Unlocked.
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
             let dropped = state
                 .take_unlocked_if_idle(core::time::Duration::from_secs(300), || {
                     core::time::Duration::from_millis(50)
                 })
                 .await;
             assert!(dropped.is_none());
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 
@@ -932,7 +1332,9 @@ mod tests {
     fn take_recovering_if_expired_bails_when_ttl_elapsed() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_recovering(fixture_recovering()).await;
+            state
+                .set_recovering(test_vault_id(), fixture_recovering())
+                .await;
             // injected age (9999s) >= ttl (600s) → bail; slot drops to Empty.
             let bailed = state
                 .take_recovering_if_expired(core::time::Duration::from_secs(600), |_| {
@@ -940,7 +1342,7 @@ mod tests {
                 })
                 .await;
             assert!(matches!(bailed, Some(Slot::Recovering { .. })));
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -948,7 +1350,9 @@ mod tests {
     fn take_recovering_if_expired_does_not_bail_within_ttl() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_recovering(fixture_recovering()).await;
+            state
+                .set_recovering(test_vault_id(), fixture_recovering())
+                .await;
             // injected age (0) < ttl (600s) → no bail; slot stays Recovering.
             let bailed = state
                 .take_recovering_if_expired(core::time::Duration::from_secs(600), |_| {
@@ -956,7 +1360,7 @@ mod tests {
                 })
                 .await;
             assert!(bailed.is_none());
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -964,7 +1368,9 @@ mod tests {
     fn take_recovering_if_expired_is_noop_when_unlocked() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
             // Even with an "expired" age, an Unlocked slot is untouched (this
             // path only bails Recovering; Unlocked is the idle-timer's job).
             let bailed = state
@@ -973,7 +1379,7 @@ mod tests {
                 })
                 .await;
             assert!(bailed.is_none());
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 
@@ -987,7 +1393,7 @@ mod tests {
                 })
                 .await;
             assert!(bailed.is_none());
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -995,8 +1401,10 @@ mod tests {
     fn take_returns_recovering_value() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_recovering(fixture_recovering()).await;
-            let taken = state.take().await;
+            state
+                .set_recovering(test_vault_id(), fixture_recovering())
+                .await;
+            let taken = state.take(test_vault_id()).await;
             match taken {
                 Slot::Recovering {
                     root_key,
@@ -1017,10 +1425,12 @@ mod tests {
     fn take_clears_slot_to_empty() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
-            let _ = state.take().await;
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+            let _ = state.take(test_vault_id()).await;
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -1028,9 +1438,11 @@ mod tests {
     fn take_after_take_returns_empty() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
-            let _first = state.take().await;
-            let second = state.take().await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            let _first = state.take(test_vault_id()).await;
+            let second = state.take(test_vault_id()).await;
             assert!(matches!(second, Slot::Empty));
         });
     }
@@ -1039,8 +1451,400 @@ mod tests {
     fn take_on_fresh_state_returns_empty() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            let taken = state.take().await;
+            let taken = state.take(test_vault_id()).await;
             assert!(matches!(taken, Slot::Empty));
+        });
+    }
+
+    // ---- multi-vault keyed map (sub-feature 2 task 1) ------------------
+
+    #[test]
+    fn two_distinct_vault_ids_hold_independent_slots_without_aliasing() {
+        // Acceptance: set two distinct VaultId entries (one Unlocked, one
+        // Recovering) and read each back independently by id; the two slots
+        // do not alias.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_unlocked = test_vault_id();
+            let id_recovering = test_vault_id_b();
+            assert_ne!(id_unlocked, id_recovering);
+
+            state
+                .set_unlocked(id_unlocked, fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+            state
+                .set_recovering(
+                    id_recovering,
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
+                .await;
+
+            // Each id reads back its OWN variant — no aliasing.
+            assert_eq!(state.slot_kind(id_unlocked).await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(id_recovering).await, SlotKind::Recovering);
+
+            // The Unlocked entry's key bytes are the ones we set (0x11), and
+            // the Recovering entry's are its own (0xAA) — independent storage.
+            let unlocked = state.slot_read(id_unlocked).await;
+            match &*unlocked {
+                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0x11u8; AEAD_KEY_LEN]),
+                other => panic!("expected Unlocked, got {:?}", slot_label(other)),
+            }
+            drop(unlocked);
+
+            let recovering = state.slot_read(id_recovering).await;
+            match &*recovering {
+                Slot::Recovering { root_key, .. } => {
+                    assert_eq!(**root_key, [0xAAu8; AEAD_KEY_LEN])
+                }
+                other => panic!("expected Recovering, got {:?}", slot_label(other)),
+            }
+            drop(recovering);
+
+            // The active (sole Unlocked) id resolves to the Unlocked entry.
+            assert_eq!(state.active_vault_id().await, Some(id_unlocked));
+        });
+    }
+
+    #[test]
+    fn take_on_missing_entry_is_empty_and_leaves_other_entries_intact() {
+        // Acceptance: take(id) on a VaultId with no entry returns the Empty
+        // equivalent (idempotent), leaving other entries intact.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let present = test_vault_id();
+            let missing = test_vault_id_b();
+
+            state
+                .set_unlocked(present, fixture_unlocked_with_keys(0x44, 0x55, 0x66))
+                .await;
+
+            // take on the MISSING id → Slot::Empty, no panic.
+            let taken_missing = state.take(missing).await;
+            assert!(matches!(taken_missing, Slot::Empty));
+
+            // The present entry is untouched.
+            assert_eq!(state.slot_kind(present).await, SlotKind::Unlocked);
+
+            // Idempotent: a second take on the missing id is still Empty.
+            assert!(matches!(state.take(missing).await, Slot::Empty));
+            assert_eq!(state.slot_kind(present).await, SlotKind::Unlocked);
+
+            // Taking the present id removes only that entry; the missing id
+            // stays empty.
+            assert!(matches!(state.take(present).await, Slot::Unlocked(_)));
+            assert_eq!(state.slot_kind(present).await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(missing).await, SlotKind::Empty);
+        });
+    }
+
+    // ---- ≤1-`Unlocked` invariant: lock-then-unlock seam (task 2) -------
+
+    #[test]
+    fn unlocking_b_while_a_unlocked_leaves_exactly_b_unlocked() {
+        // REQUIRED ACCEPTANCE TEST (task 2): unlock vault A, then unlock vault
+        // B through the set-unlocked seam → exactly one entry is `Unlocked`
+        // afterward and it is B; A's entry is no longer `Unlocked` (locked by
+        // the lock-then-unlock switch). `active_vault_id()` returns B.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_a = test_vault_id();
+            let id_b = test_vault_id_b();
+            assert_ne!(id_a, id_b);
+
+            // Unlock A first (no prior Unlocked → no lock teardown).
+            state
+                .set_unlocked_locking_others(id_a, fixture_unlocked_with_keys(0x11, 0x12, 0x13))
+                .await;
+            assert_eq!(state.active_vault_id().await, Some(id_a));
+
+            // Unlock B while A is unlocked → A must be locked first.
+            state
+                .set_unlocked_locking_others(id_b, fixture_unlocked_with_keys(0x21, 0x22, 0x23))
+                .await;
+
+            // Exactly one Unlocked entry, and it is B.
+            assert_eq!(state.slot_kind(id_b).await, SlotKind::Unlocked);
+            assert_eq!(
+                state.slot_kind(id_a).await,
+                SlotKind::Empty,
+                "A must no longer be Unlocked after the switch (locked by lock-then-unlock)"
+            );
+            // The helper resolves the active vault as B.
+            assert_eq!(state.active_vault_id().await, Some(id_b));
+
+            // And B's bytes are the ones we set (not A's — no aliasing).
+            let unlocked = state.slot_read(id_b).await;
+            match &*unlocked {
+                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0x21u8; AEAD_KEY_LEN]),
+                other => panic!("expected Unlocked, got {:?}", slot_label(other)),
+            }
+        });
+    }
+
+    #[test]
+    fn active_vault_id_is_none_when_no_vault_unlocked() {
+        // The active-vault helper returns `None` when no vault is unlocked —
+        // the other half of the acceptance criteria (returns B after the
+        // switch, None when nothing is unlocked).
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            assert_eq!(state.active_vault_id().await, None);
+
+            // Locking the sole unlocked vault returns to None.
+            state
+                .set_unlocked_locking_others(test_vault_id(), fixture_unlocked())
+                .await;
+            assert_eq!(state.active_vault_id().await, Some(test_vault_id()));
+            let _ = state.take(test_vault_id()).await;
+            assert_eq!(state.active_vault_id().await, None);
+        });
+    }
+
+    #[test]
+    fn set_unlocked_locking_others_returns_the_locked_prior_unlocked_for_teardown() {
+        // The switch returns the prior `Unlocked` slot (when a different vault
+        // was active) so the caller can drive the index teardown / drop the
+        // keys at a known program point. Re-unlocking the SAME id is not a
+        // switch and returns the same-id prior entry.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_a = test_vault_id();
+            let id_b = test_vault_id_b();
+
+            // No prior Unlocked → returns Empty (nothing locked).
+            let prior_first = state
+                .set_unlocked_locking_others(id_a, fixture_unlocked_with_keys(0xA1, 0xA2, 0xA3))
+                .await;
+            assert!(matches!(prior_first, Slot::Empty));
+
+            // Switching A → B locks A; the returned prior is A's Unlocked slot.
+            let prior_switch = state
+                .set_unlocked_locking_others(id_b, fixture_unlocked_with_keys(0xB1, 0xB2, 0xB3))
+                .await;
+            match prior_switch {
+                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0xA1u8; AEAD_KEY_LEN]),
+                other => panic!(
+                    "expected the locked prior A as Slot::Unlocked, got {:?}",
+                    slot_label(&other)
+                ),
+            }
+            // Only B is Unlocked now.
+            assert_eq!(state.active_vault_id().await, Some(id_b));
+            assert_eq!(state.slot_kind(id_a).await, SlotKind::Empty);
+        });
+    }
+
+    #[test]
+    fn set_unlocked_locking_others_does_not_lock_a_recovering_entry() {
+        // The ≤1-`Unlocked` cap is about `Unlocked` ONLY. A `Recovering` entry
+        // for a DIFFERENT vault is NOT torn down by the switch — recovery's
+        // transient `Recovering` is fine alongside the sole `Unlocked`
+        // (recovery-flow.md §4: a `Recovering` entry is not `Unlocked`).
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_unlocked = test_vault_id();
+            let id_recovering = test_vault_id_b();
+
+            state
+                .set_recovering(id_recovering, fixture_recovering())
+                .await;
+            // Unlock a different vault while one is Recovering.
+            state
+                .set_unlocked_locking_others(id_unlocked, fixture_unlocked())
+                .await;
+
+            // The Recovering entry survives the switch.
+            assert_eq!(
+                state.slot_kind(id_recovering).await,
+                SlotKind::Recovering,
+                "a Recovering entry must NOT be capped/locked by the switch (only Unlocked is capped)"
+            );
+            assert_eq!(state.slot_kind(id_unlocked).await, SlotKind::Unlocked);
+            assert_eq!(state.active_vault_id().await, Some(id_unlocked));
+        });
+    }
+
+    // ---- A6 ≤1-`Unlocked` invariant across idle-lock + switch (MYND-207) ----
+    //
+    // The A6 single-unlocked invariant (SYNC-1 one-at-a-time): the `slots` map
+    // never holds more than one `Slot::Unlocked` entry at any observable point.
+    // These tests assert it across BOTH multi-vault lifecycle paths that mutate
+    // the unlocked set — the lock-on-switch seam (`set_unlocked_locking_others`)
+    // and the idle-lock take (`take_unlocked_if_idle`) — using the direct
+    // `unlocked_entry_count` probe rather than the `active_vault_id` min-by-id
+    // tie-break (which would mask a second `Unlocked` entry).
+
+    #[test]
+    fn at_most_one_unlocked_entry_across_a_lock_on_switch() {
+        // Switching A → B must never transiently NOR finally leave two
+        // `Unlocked` entries: `set_unlocked_locking_others` locks A and inserts
+        // B under ONE write lock, so an external observer can only ever see
+        // <= 1 Unlocked. Assert the count is exactly 1 after each unlock and
+        // that it is B (A was locked) — the A6 invariant across the switch.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_a = test_vault_id();
+            let id_b = test_vault_id_b();
+            assert_ne!(id_a, id_b);
+
+            // Fresh map: zero unlocked.
+            assert_eq!(state.unlocked_entry_count().await, 0);
+
+            // Unlock A → exactly one unlocked.
+            state
+                .set_unlocked_locking_others(id_a, fixture_unlocked_with_keys(0x11, 0x12, 0x13))
+                .await;
+            assert_eq!(
+                state.unlocked_entry_count().await,
+                1,
+                "exactly one vault unlocked after the first unlock"
+            );
+
+            // Switch to B → STILL exactly one unlocked (A locked, B unlocked).
+            state
+                .set_unlocked_locking_others(id_b, fixture_unlocked_with_keys(0x21, 0x22, 0x23))
+                .await;
+            assert_eq!(
+                state.unlocked_entry_count().await,
+                1,
+                "the switch must leave EXACTLY one Unlocked entry — never two (A6)"
+            );
+            assert_eq!(state.slot_kind(id_a).await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(id_b).await, SlotKind::Unlocked);
+        });
+    }
+
+    #[test]
+    fn at_most_one_unlocked_entry_across_an_idle_lock() {
+        // The idle-lock take (`take_unlocked_if_idle`) removes the sole
+        // `Unlocked` entry — it must drive the unlocked count from 1 to 0,
+        // never leaving a second vault unlocked. With a `Recovering` entry for
+        // a DIFFERENT vault present alongside, the idle-lock still touches only
+        // the `Unlocked` one, and the count is <= 1 throughout (the Recovering
+        // entry is not Unlocked).
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_unlocked = test_vault_id();
+            let id_recovering = test_vault_id_b();
+
+            // A Recovering entry beside the Unlocked one — both present.
+            state
+                .set_recovering(id_recovering, fixture_recovering())
+                .await;
+            state.set_unlocked(id_unlocked, fixture_unlocked()).await;
+            assert_eq!(
+                state.unlocked_entry_count().await,
+                1,
+                "exactly one Unlocked entry even with a Recovering sibling present"
+            );
+
+            // Idle-lock the sole Unlocked entry (injected idle >= timeout).
+            let dropped = state
+                .take_unlocked_if_idle(core::time::Duration::ZERO, || {
+                    core::time::Duration::from_secs(10)
+                })
+                .await;
+            assert!(matches!(dropped, Some(Slot::Unlocked(_))));
+
+            // Now zero Unlocked entries — the A6 invariant held across the
+            // idle-lock (1 → 0), and the Recovering sibling is untouched.
+            assert_eq!(
+                state.unlocked_entry_count().await,
+                0,
+                "the idle-lock must drop the count to zero, never leave a second Unlocked"
+            );
+            assert_eq!(state.slot_kind(id_recovering).await, SlotKind::Recovering);
+        });
+    }
+
+    // ---- per-entry Recovering → no-editor-access guarantee (task 5) ----
+    //
+    // Editor/CRUD resolution funnels through `active_vault_id()`
+    // (`slot_read_active` / `vault_is_unlocked_with_state`), which filters
+    // `Slot::Unlocked` ONLY. A `Recovering` (or absent) entry is therefore
+    // never handed to the editor — the compile-time `Slot::Unlocked(uv)` match
+    // is preserved structurally across the keyed accessors (recovery-flow.md
+    // §4.1/§4.3 per entry). These tests pin the RESOLUTION half of that
+    // guarantee: a `Recovering` entry is not resolved as the active vault.
+
+    #[test]
+    fn active_resolution_does_not_reach_a_recovering_entry() {
+        // Acceptance (a): a vault's entry is `Slot::Recovering` — active-vault
+        // resolution does NOT reach it (it is not handed to the editor). With
+        // ONLY a `Recovering` entry present, `active_vault_id()` is `None`, so
+        // the editor read path (`slot_read_active`) keys an absent entry and
+        // `Deref`s to `Slot::Empty` — the editor never sees `Recovering` as
+        // active. Preserves recovery-flow.md §4.1/§4.3 per entry: a
+        // `Recovering` slot grants no editor access.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_recovering = test_vault_id_b();
+            state
+                .set_recovering(id_recovering, fixture_recovering())
+                .await;
+
+            // The recovering entry is NOT the active (editor-reachable) vault.
+            assert_eq!(
+                state.active_vault_id().await,
+                None,
+                "a sole Recovering entry must not resolve as the active vault"
+            );
+            // The editor read helper keys the (absent) active id → Empty,
+            // never the Recovering entry. The structural `Slot::Unlocked(uv)`
+            // editor match therefore cannot bind a Recovering slot.
+            let editor_view = state.slot_read_active().await;
+            assert!(
+                matches!(&*editor_view, Slot::Empty),
+                "editor read must see Empty, never the Recovering entry"
+            );
+            // The Recovering entry is untouched and still keyed under its id.
+            drop(editor_view);
+            assert_eq!(state.slot_kind(id_recovering).await, SlotKind::Recovering);
+        });
+    }
+
+    #[test]
+    fn active_resolution_picks_the_unlocked_alongside_a_recovering() {
+        // Acceptance (b): a second vault `Unlocked` alongside the `Recovering`
+        // one resolves correctly to the `Unlocked` one. `active_vault_id()`
+        // (the editor/CRUD resolver) yields the `Unlocked` key, NOT the
+        // `Recovering` key — so the editor binds the Unlocked vault's
+        // `UnlockedVault` and the Recovering entry is never reachable by it.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_unlocked = test_vault_id();
+            let id_recovering = test_vault_id_b();
+            assert_ne!(id_unlocked, id_recovering);
+
+            // One vault Recovering, a DIFFERENT vault Unlocked, side by side.
+            state
+                .set_recovering(id_recovering, fixture_recovering())
+                .await;
+            state
+                .set_unlocked(id_unlocked, fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+
+            // Active resolution picks the Unlocked one, never the Recovering.
+            assert_eq!(
+                state.active_vault_id().await,
+                Some(id_unlocked),
+                "resolution must pick the Unlocked vault, not the Recovering one"
+            );
+            // The editor read helper resolves to the Unlocked vault's slot and
+            // binds its `UnlockedVault` (bytes 0x11) — proving it is the
+            // Unlocked entry, not the Recovering one, that reaches the editor.
+            let editor_view = state.slot_read_active().await;
+            match &*editor_view {
+                Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [0x11u8; AEAD_KEY_LEN]),
+                other => panic!(
+                    "editor must see the Unlocked vault, got {:?}",
+                    slot_label(other)
+                ),
+            }
+            drop(editor_view);
+            // The Recovering entry survives — present but never editor-reachable.
+            assert_eq!(state.slot_kind(id_recovering).await, SlotKind::Recovering);
         });
     }
 
@@ -1048,16 +1852,18 @@ mod tests {
     fn take_recovering_returns_some_for_recovering_slot() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_recovering(fixture_recovering()).await;
+            state
+                .set_recovering(test_vault_id(), fixture_recovering())
+                .await;
             let taken = state
-                .take_recovering()
+                .take_recovering(test_vault_id())
                 .await
                 .expect("slot was just populated");
             assert_eq!(*taken.root_key, [0xAAu8; AEAD_KEY_LEN]);
             assert_eq!(*taken.items_key, [0xBBu8; AEAD_KEY_LEN]);
             assert_eq!(taken.items_key_id, [0xCCu8; 16]);
             // Slot becomes Empty after take_recovering succeeds.
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -1065,8 +1871,8 @@ mod tests {
     fn take_recovering_returns_none_for_empty_slot() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            assert!(state.take_recovering().await.is_none());
-            assert_eq!(state.slot_kind().await, SlotKind::Empty);
+            assert!(state.take_recovering(test_vault_id()).await.is_none());
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -1077,10 +1883,12 @@ mod tests {
         // method is targeted: only `Recovering` is taken.
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
-            assert!(state.take_recovering().await.is_none());
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            assert!(state.take_recovering(test_vault_id()).await.is_none());
             // Slot still Unlocked — was not perturbed.
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 
@@ -1098,8 +1906,11 @@ mod tests {
             let mut b = fixture_unlocked();
             b.root_key = Zeroizing::new([2u8; AEAD_KEY_LEN]);
 
-            assert!(matches!(state.set_unlocked(a).await, Slot::Empty));
-            let prior = state.set_unlocked(b).await;
+            assert!(matches!(
+                state.set_unlocked(test_vault_id(), a).await,
+                Slot::Empty
+            ));
+            let prior = state.set_unlocked(test_vault_id(), b).await;
             match prior {
                 Slot::Unlocked(uv) => assert_eq!(*uv.root_key, [1u8; AEAD_KEY_LEN]),
                 other => panic!(
@@ -1117,7 +1928,9 @@ mod tests {
         // the clone matches the slot's bytes; slot stays in Recovering.
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_recovering(fixture_recovering()).await;
+            state
+                .set_recovering(test_vault_id(), fixture_recovering())
+                .await;
 
             let cloned = state
                 .peek_recovering_root_key_clone()
@@ -1127,7 +1940,7 @@ mod tests {
             // (0xAA, 32 bytes).
             assert_eq!(*cloned, [0xAA; AEAD_KEY_LEN]);
             // Slot must STILL be Recovering (clone doesn't take).
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
 
@@ -1143,10 +1956,12 @@ mod tests {
     fn peek_recovering_root_key_clone_returns_none_when_unlocked() {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_unlocked(fixture_unlocked()).await;
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
             assert!(state.peek_recovering_root_key_clone().await.is_none());
             // Slot still Unlocked (peek does not mutate).
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 
@@ -1156,10 +1971,15 @@ mod tests {
         // promotes Recovering → Unlocked. Verify the transition.
         rt().block_on(async {
             let state = VaultRuntimeState::default();
-            state.set_recovering(fixture_recovering()).await;
-            assert_eq!(state.slot_kind().await, SlotKind::Recovering);
+            state
+                .set_recovering(test_vault_id(), fixture_recovering())
+                .await;
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
 
-            let recovering = state.take_recovering().await.expect("slot was Recovering");
+            let recovering = state
+                .take_recovering(test_vault_id())
+                .await
+                .expect("slot was Recovering");
             // Build an UnlockedVault from the recovering material (mimics
             // the A8f closure body's promotion step).
             let promoted = UnlockedVault {
@@ -1169,9 +1989,9 @@ mod tests {
                 unlocked_at: Instant::now(),
                 vault_meta_bytes_hash: [0xAA; 32],
             };
-            state.set_unlocked(promoted).await;
+            state.set_unlocked(test_vault_id(), promoted).await;
 
-            assert_eq!(state.slot_kind().await, SlotKind::Unlocked);
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
 

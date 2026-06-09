@@ -70,7 +70,7 @@ pub async fn note_create<R: Runtime>(
     // `NotADirectory` and `AlreadyExists` to the structural defensive
     // variant per the accept-list pinned in `paths::notes_dir_under`'s
     // tests.
-    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
         let kind = e.kind();
         match kind {
             std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
@@ -132,7 +132,7 @@ pub(crate) async fn note_create_with_dir(
     // `vault_lock` taking the slot mid-write (`decisions.md` 2026-05-07
     // "Note AEAD ops"). The guard drops at the function-exit `drop(slot)`
     // below — or any early-return on its way out.
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
         Slot::Empty | Slot::Recovering { .. } => {
@@ -283,7 +283,7 @@ pub async fn note_read<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     note_id: String,
 ) -> Result<String, NoteReadError> {
-    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
         let kind = e.kind();
         match kind {
             std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
@@ -330,7 +330,7 @@ pub(crate) async fn note_read_with_dir(
     // Slot guard. Held across spawn_blocking + file read so vault_lock
     // waits for in-flight decrypts via `tokio::sync::RwLock` fair
     // queueing — same load-bearing pattern as `note_create_with_dir`.
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
         Slot::Empty | Slot::Recovering { .. } => {
@@ -510,7 +510,7 @@ pub async fn note_update<R: Runtime>(
     // at function exit rather than lingering as a plain `String` across the
     // `.await`. The core takes a fresh plain clone and re-wraps it first-line.
     let plaintext = Zeroizing::new(plaintext);
-    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
         let kind = e.kind();
         match kind {
             std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
@@ -602,7 +602,7 @@ pub(crate) async fn note_update_with_dir(
     // wait-and-complete semantics — same uniform pattern as
     // `note_create_with_dir` / `note_read_with_dir` per
     // `decisions.md` 2026-05-07 "Note AEAD ops".
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
         Slot::Empty | Slot::Recovering { .. } => {
@@ -881,7 +881,7 @@ pub(crate) async fn note_snapshot_flush_with_dir(
     // Slot read guard held across spawn_blocking — same fair-queue discipline as
     // note_update. Flush copies the sealed `.myn` verbatim, so it needs no
     // `items_key` clone (no decryption).
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
         Slot::Empty | Slot::Recovering { .. } => {
@@ -913,14 +913,15 @@ pub async fn note_snapshot_flush<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     note_id: String,
 ) -> Result<(), NoteUpdateError> {
-    let notes_dir = paths::notes_dir(&app).map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-            NoteUpdateError::NotesDirNotADirectory
-        }
-        other => NoteUpdateError::Io {
-            io_error_kind: from_io_error_kind(other),
-        },
-    })?;
+    let notes_dir =
+        paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                NoteUpdateError::NotesDirNotADirectory
+            }
+            other => NoteUpdateError::Io {
+                io_error_kind: from_io_error_kind(other),
+            },
+        })?;
     let warning = note_snapshot_flush_with_dir(notes_dir, state.inner(), note_id.clone()).await?;
     if warning {
         let _ = app.emit(SNAPSHOT_WRITE_FAILED_EVENT, &note_id);
@@ -999,7 +1000,7 @@ pub async fn note_delete<R: Runtime>(
     search: State<'_, SearchIndexState>,
     note_id: String,
 ) -> Result<(), NoteDeleteError> {
-    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
         let kind = e.kind();
         match kind {
             std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
@@ -1053,7 +1054,7 @@ pub(crate) async fn note_delete_with_dir(
     // uniform pattern even though delete touches no AEAD. **No
     // `items_key` clone** — delete needs only the `Slot::Unlocked`
     // invariant, not the keys themselves.
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
         Slot::Empty | Slot::Recovering { .. } => {
@@ -1290,7 +1291,7 @@ pub async fn note_list<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<NoteId>, NoteListError> {
-    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
         let kind = e.kind();
         match kind {
             std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
@@ -1336,7 +1337,7 @@ pub(crate) async fn note_list_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
 ) -> Result<Vec<NoteId>, NoteListError> {
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
         Slot::Empty | Slot::Recovering { .. } => {
@@ -1486,7 +1487,7 @@ pub async fn note_titles_batch<R: Runtime>(
         return Err(err);
     }
 
-    let notes_dir = paths::notes_dir(&app).map_err(|e| {
+    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
         let kind = e.kind();
         match kind {
             std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
@@ -1529,7 +1530,7 @@ pub(crate) async fn note_titles_batch_with_dir(
         });
     }
 
-    let slot = state.slot_read().await;
+    let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
         Slot::Empty | Slot::Recovering { .. } => {
@@ -1740,7 +1741,7 @@ pub(crate) async fn note_search_core(
 ) -> Vec<SearchResult> {
     // Gate: search only while Unlocked. Recovering / Empty → empty result, so a
     // stale-but-not-yet-cleared index (pre-Task-8) cannot leak when locked.
-    if !matches!(state.slot_kind().await, SlotKind::Unlocked) {
+    if !matches!(state.slot_kind_active().await, SlotKind::Unlocked) {
         return Vec::new();
     }
     search
@@ -1761,7 +1762,8 @@ mod tests {
     use super::*;
     use crate::paths::notes_dir_under;
     use crate::plugins::vault_unlock::state::{
-        fixture_recovering_with_keys, fixture_unlocked_with_keys, VaultRuntimeState,
+        fixture_recovering_with_keys, fixture_unlocked_with_keys, test_vault_id, test_vault_id_b,
+        VaultRuntimeState,
     };
     use crate::test_support::ScopedTempDir;
     use std::path::Path;
@@ -1789,11 +1791,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let plaintext = "# happy path\nnote body";
@@ -1830,11 +1835,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let v1 = "# v1\noriginal body";
@@ -1895,11 +1903,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
@@ -1936,11 +1947,14 @@ mod tests {
             std::fs::write(scratch.path().join("snapshots"), b"not a dir").unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
@@ -1979,11 +1993,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
@@ -2019,11 +2036,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
             let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
             let warn = note_snapshot_flush_with_dir(notes_dir, &state, phantom)
@@ -2052,11 +2072,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
@@ -2116,7 +2139,10 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
             let result = note_create_with_dir(notes_dir, &state, "x".to_string()).await;
@@ -2133,11 +2159,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let plaintext = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN]).unwrap();
@@ -2156,11 +2185,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let plaintext = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN + 1]).unwrap();
@@ -2235,11 +2267,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = Arc::new(VaultRuntimeState::default());
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let create_state = Arc::clone(&state);
@@ -2251,7 +2286,7 @@ mod tests {
             tokio::task::yield_now().await;
 
             let lock_state = Arc::clone(&state);
-            let lock = tokio::spawn(async move { lock_state.take().await });
+            let lock = tokio::spawn(async move { lock_state.take(test_vault_id()).await });
 
             let create_result = create.await.expect("create task joins");
             let lock_taken = lock.await.expect("lock task joins");
@@ -2272,7 +2307,7 @@ mod tests {
             // After both tasks join, the slot is Empty (lock consumed
             // it; create never mutated the variant).
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
             );
 
@@ -2371,11 +2406,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let plaintext = "# round trip\nbody bytes";
@@ -2417,7 +2455,10 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
             let result = note_read_with_dir(
@@ -2439,11 +2480,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let result = note_read_with_dir(notes_dir, &state, "too-short".to_string()).await;
@@ -2461,11 +2505,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let result = note_read_with_dir(
@@ -2487,11 +2534,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let result = note_read_with_dir(
@@ -2513,11 +2563,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             // Mint a fresh v7 UUID; no corresponding file on disk.
@@ -2536,11 +2589,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             // Create a real note, then tamper one byte of the on-disk
@@ -2581,11 +2637,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let items_key = [FIXTURE_ITEMS_BYTE; 32];
@@ -2682,11 +2741,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let original = "# original\nfirst body";
@@ -2767,7 +2829,10 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
             let result = note_update_with_dir(
@@ -2794,11 +2859,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let result =
@@ -2817,11 +2885,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             // Mint a fresh v7 UUID; no corresponding file on disk.
@@ -2844,11 +2915,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             // Create a real note, then tamper one byte of the on-disk
@@ -2915,11 +2989,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let plaintext = format!("# leak check\n{PLAINTEXT_CANARY} body");
@@ -2942,11 +3019,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let note_id_str =
@@ -2976,11 +3056,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let original = "# original\ndurable body";
@@ -3033,11 +3116,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             std::fs::set_permissions(&notes_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
@@ -3071,11 +3157,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let note_id_str = note_create_with_dir(notes_dir.clone(), &state, "small".to_string())
@@ -3098,11 +3187,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let note_id_str = note_create_with_dir(notes_dir.clone(), &state, "small".to_string())
@@ -3133,11 +3225,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = Arc::new(VaultRuntimeState::default());
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let note_id_str =
@@ -3156,7 +3251,7 @@ mod tests {
             tokio::task::yield_now().await;
 
             let lock_state = Arc::clone(&state);
-            let lock_task = tokio::spawn(async move { lock_state.take().await });
+            let lock_task = tokio::spawn(async move { lock_state.take(test_vault_id()).await });
 
             let update_result = update_task.await.expect("update task joins");
             let lock_taken = lock_task.await.expect("lock task joins");
@@ -3169,7 +3264,7 @@ mod tests {
                 "lock must take the Unlocked variant"
             );
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
             );
 
@@ -3240,11 +3335,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let note_id_str =
@@ -3287,11 +3385,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let note_id_str =
@@ -3320,11 +3421,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let phantom = NoteId::new_v7();
@@ -3359,7 +3463,10 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
             let result = note_delete_with_dir(
@@ -3381,11 +3488,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let result = note_delete_with_dir(notes_dir, &state, "too-short".to_string()).await;
@@ -3409,11 +3519,14 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let phantom = NoteId::new_v7();
@@ -3440,11 +3553,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = Arc::new(VaultRuntimeState::default());
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let note_id_str =
@@ -3462,7 +3578,7 @@ mod tests {
             tokio::task::yield_now().await;
 
             let lock_state = Arc::clone(&state);
-            let lock_task = tokio::spawn(async move { lock_state.take().await });
+            let lock_task = tokio::spawn(async move { lock_state.take(test_vault_id()).await });
 
             let delete_result = delete_task.await.expect("delete task joins");
             let lock_taken = lock_task.await.expect("lock task joins");
@@ -3475,7 +3591,7 @@ mod tests {
                 "lock must take the Unlocked variant"
             );
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
             );
 
@@ -3796,11 +3912,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let result = note_list_with_dir(notes_dir, &state).await;
@@ -3815,11 +3934,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let stems_descending = [
@@ -3863,7 +3985,10 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
 
             let result = note_list_with_dir(notes_dir, &state).await;
@@ -3885,11 +4010,14 @@ mod tests {
             std::fs::write(&conflict, b"hostile").unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             let result = note_list_with_dir(conflict, &state).await;
@@ -3915,11 +4043,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = std::sync::Arc::new(VaultRuntimeState::default());
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
 
             // Pre-populate so the list does real work.
@@ -3938,7 +4069,7 @@ mod tests {
             tokio::task::yield_now().await;
 
             let lock_state = std::sync::Arc::clone(&state);
-            let lock_task = tokio::spawn(async move { lock_state.take().await });
+            let lock_task = tokio::spawn(async move { lock_state.take(test_vault_id()).await });
 
             let list_result = list_task.await.expect("list task joins");
             let lock_taken = lock_task.await.expect("lock task joins");
@@ -3951,7 +4082,7 @@ mod tests {
                 "lock must take the Unlocked variant"
             );
             assert_eq!(
-                state.slot_kind().await,
+                state.slot_kind(test_vault_id()).await,
                 crate::plugins::vault_unlock::state::SlotKind::Empty,
             );
 
@@ -3997,11 +4128,14 @@ mod tests {
         let notes_dir = notes_dir_under(scratch.path()).unwrap();
         let state = VaultRuntimeState::default();
         state
-            .set_unlocked(fixture_unlocked_with_keys(
-                FIXTURE_ROOT_BYTE,
-                FIXTURE_ITEMS_BYTE,
-                FIXTURE_ITEMS_ID_BYTE,
-            ))
+            .set_unlocked(
+                test_vault_id(),
+                fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ),
+            )
             .await;
         (scratch, notes_dir, state)
     }
@@ -4141,7 +4275,10 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
             let result = note_titles_batch_with_dir(notes_dir, &state, vec![]).await;
             assert!(matches!(result, Err(NoteTitleBatchError::VaultNotUnlocked)));
@@ -4254,11 +4391,14 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
             let search = SearchIndexState::default();
             search.upsert("note-a", "Rust Guide", "rust async runtime");
@@ -4288,7 +4428,10 @@ mod tests {
             // search gates it too.
             let state = VaultRuntimeState::default();
             state
-                .set_recovering(fixture_recovering_with_keys(0xAA, 0xBB, 0xCC))
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
                 .await;
             let search = SearchIndexState::default();
             search.upsert("note-a", "t", "rust");
@@ -4301,11 +4444,14 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
             let search = SearchIndexState::default();
             // More matching notes than the cap → the result set must be bounded.
@@ -4324,11 +4470,14 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             state
-                .set_unlocked(fixture_unlocked_with_keys(
-                    FIXTURE_ROOT_BYTE,
-                    FIXTURE_ITEMS_BYTE,
-                    FIXTURE_ITEMS_ID_BYTE,
-                ))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
                 .await;
             let search = SearchIndexState::default();
             search.upsert("title-hit", "rust guide", "lorem ipsum");
@@ -4344,6 +4493,74 @@ mod tests {
                 .expect("body-hit present");
             assert!(title_hit.matched_in.title && !title_hit.matched_in.body);
             assert!(body_hit.matched_in.body && !body_hit.matched_in.title);
+        });
+    }
+
+    // ---- multi-slot active-vault resolution (MYND-203 sub-feature 3) -----
+    //
+    // The note-CRUD commands carry NO `vault_id` IPC parameter; they resolve
+    // the active (sole `Unlocked`) vault internally via `slot_read_active()`.
+    // These two tests pin that seam at the CRUD layer: (a) a command with no
+    // vault_id operates on whichever vault is the sole `Unlocked` entry — even
+    // when that key is NOT the legacy sentinel `slot_read_active()` falls back
+    // to when nothing is unlocked — and (b) with no vault unlocked the command
+    // returns the clean `VaultNotUnlocked` guard error and does not panic.
+
+    #[test]
+    fn note_create_resolves_to_sole_unlocked_vault_without_vault_id() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-active-resolve").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            // Unlock under a NON-legacy id (`test_vault_id_b`, i.e. a
+            // `vaults/<uuid>/`-style key), deliberately different from the
+            // legacy sentinel `slot_read_active()` keys when no vault is
+            // unlocked. If the CRUD seam keyed a hardcoded id instead of
+            // resolving the active vault, this `note_create` would observe
+            // an EMPTY slot and reject — so a successful create + round-trip
+            // proves active-vault resolution.
+            state
+                .set_unlocked(
+                    test_vault_id_b(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+
+            let plaintext = "# active vault\nresolved with no vault_id param";
+            let id = note_create_with_dir(notes_dir.clone(), &state, plaintext.to_string())
+                .await
+                .expect("note_create must operate on the sole Unlocked vault");
+
+            // Round-trip read (also no vault_id param) returns the same body —
+            // confirming both the create and read seams resolved the active
+            // vault and used its `items_key`.
+            let read_back = note_read_with_dir(notes_dir, &state, id)
+                .await
+                .expect("note_read must operate on the sole Unlocked vault");
+            assert_eq!(read_back, plaintext);
+        });
+    }
+
+    #[test]
+    fn note_create_with_no_vault_unlocked_returns_clean_guard_no_panic() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-create-no-unlocked").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            // Empty slot map: NO vault unlocked or recovering. `active_vault_id`
+            // resolves `None`, `slot_read_active` keys an absent entry and the
+            // guard `Deref`s to `Slot::Empty`. The CRUD command must take the
+            // clean guard branch (`VaultNotUnlocked`) — never panic / unwrap.
+            let state = VaultRuntimeState::default();
+
+            let result = note_create_with_dir(notes_dir, &state, "x".to_string()).await;
+            assert!(
+                matches!(result, Err(NoteCreateError::VaultNotUnlocked)),
+                "no unlocked vault must yield the clean guard error, got {result:?}"
+            );
         });
     }
 }

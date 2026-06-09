@@ -45,6 +45,7 @@ import { Icon } from "../components/primitives/Icon";
 import { IconButton } from "../components/primitives/IconButton";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
+import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { GraphView } from "../notes/components/GraphView";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
@@ -54,7 +55,7 @@ import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
 import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
-import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
+import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
   noteList,
   loadNoteBatch,
@@ -170,6 +171,33 @@ interface EditorProps {
    * SettingsModal unmounts in cascade.
    */
   onDeleteVaultSuccess: () => void;
+  /**
+   * Multi-vault switch trigger (MYND-205, sub-feature 4). Invoked by the
+   * account-chip switcher dropdown (task 5) when the user picks a non-active
+   * vault. App.tsx's `switchVault` fires the param-less `vault_lock()`
+   * (four-surface teardown + `flushIfDirty`, SYNC-8) then routes to the
+   * target's unlock screen via `editor.switch-vault` → `unlock(Exists,
+   * vaultId: target)`. The target's password entry happens on the Unlock
+   * screen; selecting the active vault is a no-op the dropdown itself
+   * suppresses. Optional so the component renders without the switcher wired
+   * (single-vault users / pre-task-5 state).
+   */
+  onSwitchVault?: (targetVaultId: VaultId) => void;
+  /**
+   * Route to vault creation from the switcher dropdown's "Create another
+   * vault" footer (MYND-205 task 5). App.tsx dispatches `editor.create-vault`
+   * → the existing vault-creation flow (the same target as the picker's
+   * "Create another" affordance). Optional — omitted → the footer is hidden
+   * alongside the switcher (single-vault / pre-task-5 state).
+   */
+  onCreateAnother?: () => void;
+  /**
+   * True while a switch's `vault_lock()` IPC is in flight (the brief
+   * "switching…" window during which the prior vault flushes + tears down).
+   * The account-chip dropdown (task 5) reads it to disable the chip + show the
+   * per-row "switching…" caption.
+   */
+  switching?: boolean;
 }
 
 /**
@@ -185,6 +213,9 @@ export function Editor({
   onLock,
   onForceRelock,
   onDeleteVaultSuccess,
+  onSwitchVault,
+  onCreateAnother,
+  switching = false,
 }: EditorProps) {
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -262,6 +293,9 @@ export function Editor({
         onLock={onLock}
         onForceRelock={onForceRelock}
         onDeleteVaultSuccess={onDeleteVaultSuccess}
+        onSwitchVault={onSwitchVault}
+        onCreateAnother={onCreateAnother}
+        switching={switching}
         settingsOpen={settingsOpen}
         setSettingsOpen={setSettingsOpen}
         toastMessage={toastMessage}
@@ -281,6 +315,9 @@ type EditorChromeProps = {
   onLock?: () => void;
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
   onDeleteVaultSuccess: () => void;
+  onSwitchVault?: (targetVaultId: VaultId) => void;
+  onCreateAnother?: () => void;
+  switching: boolean;
   settingsOpen: boolean;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
   toastMessage: string | null;
@@ -291,6 +328,9 @@ function EditorChrome({
   onLock,
   onForceRelock,
   onDeleteVaultSuccess,
+  onSwitchVault,
+  onCreateAnother,
+  switching,
   settingsOpen,
   setSettingsOpen,
   toastMessage,
@@ -609,6 +649,7 @@ function EditorChrome({
     <CenterViewProvider value={centerViewValue}>
     <div
       style={{
+        position: "relative",
         display: "flex",
         flexDirection: "column",
         height: "100%",
@@ -617,6 +658,14 @@ function EditorChrome({
         minHeight: 0,
       }}
     >
+      {/* Transient "saving…" overlay during a multi-vault switch (MYND-205).
+          Shows while `switchVault`'s param-less `vault_lock()` flushes the
+          prior vault + tears it down, before the Stage routes to the target's
+          unlock screen. The styled account-chip dropdown (task 5) owns the
+          full switch UI; this overlay just makes the lock+flush window
+          visible until then. No confirm-discard dialog — the flush is
+          automatic. */}
+      {switching && <SwitchingOverlay />}
       <div
         ref={rowRef}
         style={{
@@ -642,6 +691,9 @@ function EditorChrome({
           <NotesSidebarList
             onCollapse={layout.toggleLeftCollapsed}
             onNewFromTemplate={() => setNewFromTemplateOpen(true)}
+            onSwitchVault={onSwitchVault}
+            onCreateAnother={onCreateAnother}
+            switching={switching}
           />
         </SidebarPane>
         {centerView === "attachments" ? (
@@ -1373,6 +1425,43 @@ function CollapsedRail({
     >
       <Icon name={side === "left" ? "chevron-right" : "chevron-left"} size={14} />
     </button>
+  );
+}
+
+/**
+ * Transient full-pane overlay shown while a multi-vault switch's
+ * `vault_lock()` IPC is in flight (MYND-205). The lock is microseconds-to-
+ * low-ms (it includes the graceful `flushIfDirty`), so this is a brief
+ * scrim with a spinner + "saving…" copy — it makes the lock+flush window
+ * visible and blocks stray interaction until the Stage routes to the
+ * target's unlock screen. Design-token-only styling; the styled switcher
+ * dropdown (task 5) may relocate the "saving…" affordance into the dropdown
+ * itself, but the semantics (saving during lock) stay the same.
+ */
+function SwitchingOverlay() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        background: "color-mix(in srgb, var(--bg-1) 70%, transparent)",
+        backdropFilter: "blur(1px)",
+        color: "var(--fg-2)",
+        fontFamily: "var(--font-sans)",
+        fontSize: 13,
+        fontWeight: 500,
+      }}
+    >
+      <Spinner size={16} style={{ borderWidth: 2 }} />
+      <span>Saving…</span>
+    </div>
   );
 }
 
