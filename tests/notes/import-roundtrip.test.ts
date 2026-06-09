@@ -3,8 +3,9 @@
 // The grill (D1) settled the achievable proof: import → the plaintext handed to
 // `note_create` (which IS what gets encrypted; decrypt is its inverse) must equal
 // the source bytes MODULO the sanctioned-diff allowlist (SYNC-9): only the
-// `folder:` frontmatter injection and the media `![[att:<id>]]` rewrite differ;
-// every other byte is identical. No exporter is built (the "export again" leg is
+// `folder:` + `title:` frontmatter injections and the media `![[att:<id>]]`
+// rewrite differ; every other byte is identical. No exporter is built (the
+// "export again" leg is
 // a separate feature). The engine's injected `ImportPorts` make an in-memory
 // vault the fixture — the real-fs read path is covered by the Rust read-seam's
 // own `cargo test`s; this asserts the parse+ingest preservation end-to-end.
@@ -92,13 +93,15 @@ const NON_CANONICAL_BODY =
   "- [X] uppercase task\n1) alt marker\n\nSetext\n======\n\n    indented code\n";
 
 describe("MYND-90 round-trip — C1 preservation (allowlist-modulo byte equality)", () => {
-  it("a no-media note: created plaintext == body + only the folder: injection", async () => {
+  it("a no-media note: created plaintext == body + only the folder: + title: injections", async () => {
     const h = harness({ Notes: { "raw.md": NON_CANONICAL_BODY } });
     await importVault("/v", h.ports, new Set(), "skip");
     expect(h.createdList).toHaveLength(1);
     const out = h.createdList[0]!;
-    // strip the single sanctioned folder: FM block → must be byte-identical to source.
-    expect(out.replace("---\nfolder: Notes/\n---\n\n", "")).toBe(NON_CANONICAL_BODY);
+    // strip the sanctioned folder: + title: FM block → must be byte-identical to source.
+    expect(out.replace("---\nfolder: Notes/\ntitle: raw\n---\n\n", "")).toBe(
+      NON_CANONICAL_BODY,
+    );
   });
 
   it("media: ingestable image → att: rewrite, residual audio → placeholder, rest preserved", async () => {
@@ -135,8 +138,10 @@ describe("MYND-90 round-trip — C1 preservation (allowlist-modulo byte equality
   });
 
   it("import-twice idempotency: second run skips all FM-titled notes (SYNC-5)", async () => {
-    // Both notes carry an FM `title:` so they have a persisted identity (an
-    // untitled note has none — the documented residual, owned by sub-feature 2).
+    // Both notes carry an FM `title:`, so the persisted title == identity key and a
+    // re-import skips them. (Since MYND-53 a filename-only note ALSO gets its
+    // `title:` injected, so it likewise dedups — see the next test; the old
+    // untitled-residual is gone.)
     const tree: Tree = {
       Notes: { "a.md": "---\ntitle: Alpha\n---\nbody\n" },
       "b.md": "---\ntitle: Bravo\n---\nB\n",
@@ -153,5 +158,22 @@ describe("MYND-90 round-trip — C1 preservation (allowlist-modulo byte equality
     expect(r2.imported).toBe(0);
     expect(r2.skippedExisting).toBe(2);
     expect(h2.createdList).toHaveLength(0);
+  });
+
+  it("import-twice idempotency now covers filename-only notes (MYND-53 title injection)", async () => {
+    // A note with NO FM `title:` now gets `title: <filename>` injected, so it has a
+    // persisted identity and a re-import skips it — the old untitled residual, fixed.
+    const tree: Tree = { Notes: { "Weekly Review.md": "just a body\n" } };
+    const h1 = harness(tree);
+    await importVault("/v", h1.ports, new Set(), "skip");
+    expect(h1.createdList[0]).toContain("title: Weekly Review");
+
+    const existing = buildExistingIdentitySet([
+      { folder: "Notes/", title: "Weekly Review", trashed: null, template: false },
+    ]);
+    const h2 = harness(tree);
+    const r2 = await importVault("/v", h2.ports, existing, "skip");
+    expect(r2.imported).toBe(0);
+    expect(r2.skippedExisting).toBe(1);
   });
 });

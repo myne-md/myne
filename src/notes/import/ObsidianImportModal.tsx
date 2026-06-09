@@ -125,31 +125,38 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
     setCancelling(false);
   }, [open]);
 
+  // `dismissable` gates the header ✕ + the explicit-close handler (everything but
+  // mid-import). `casualDismiss` gates backdrop-click + Esc, which fire ONLY in
+  // setup — the summary (with its interactive needs-attention rows) and the error
+  // report must be closed deliberately via ✕ / Done / Close, never lost to a
+  // stray backdrop click or keypress.
   const dismissable = phase !== "running";
+  const casualDismiss = phase === "setup";
 
   const handleClose = useCallback(() => {
     if (!dismissable) return;
     onClose();
   }, [dismissable, onClose]);
 
-  // Esc dismisses except mid-import (where Cancel is the only exit).
+  // Esc dismisses ONLY in setup (mid-import Cancel is the only exit; summary/error
+  // require an explicit button).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && dismissable) {
+      if (e.key === "Escape" && casualDismiss) {
         e.preventDefault();
         onClose();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, dismissable, onClose]);
+  }, [open, casualDismiss, onClose]);
 
   const handleBackdrop = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) handleClose();
+      if (e.target === e.currentTarget && casualDismiss) onClose();
     },
-    [handleClose],
+    [casualDismiss, onClose],
   );
 
   const chooseFolder = useCallback(async () => {

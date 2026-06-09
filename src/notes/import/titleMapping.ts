@@ -2,14 +2,15 @@
 //
 // Sub-feature 1 of the obsidian-importer epic (MYND-51), task 2.
 //
-// The filename (minus exactly one trailing `.md`) is the note's title as a
-// READ-TIME DEFAULT only; a frontmatter `title:` already present in the file
-// overrides it. The importer NEVER writes a `title:` field into the composed
-// plaintext — injecting one is a silent body rewrite (C1) and would resurrect
-// the dropped filename-as-title behavior (`decisions.md` 2026-05-28). A file
-// with no FM `title:` correctly reads as "Untitled" downstream until renamed.
-// The read-time title is used for the importer's identity key (conflict /
-// dedup, sub-feature 2) and the import summary — not for persistence.
+// The filename (minus exactly one trailing `.md`) is the note's title; a
+// frontmatter `title:` already present in the file overrides it. `mapping.ts`
+// INJECTS this value into the Myne-managed `title:` field when the file has none
+// — a SANCTIONED import transform (the SYNC-9 C1 allowlist, beside `folder:`
+// injection), NOT the dropped read-time filename-as-title fallback (`decisions.md`
+// 2026-05-28): it materializes Obsidian's filename-as-title into the canonical
+// frontmatter field so the note isn't "Untitled" in Myne's frontmatter-only-title
+// model. The derived title is also the importer's identity key (conflict / dedup,
+// sub-feature 2) and feeds the import summary.
 
 import { filenameToTitle } from "../../dialect/folderPath";
 
@@ -20,10 +21,10 @@ export function importBasename(relativePath: string): string {
 }
 
 /**
- * Read-time title for an imported file: a present frontmatter `title:` wins;
- * otherwise the filename minus exactly one trailing `.md` (so the `.md`
- * discriminator round-trips — `Foo.md.md` → "Foo.md", `report.md` → "report").
- * Never injected into the note's plaintext.
+ * Title for an imported file: a present frontmatter `title:` wins; otherwise the
+ * filename minus exactly one trailing `.md` (so the `.md` discriminator
+ * round-trips — `Foo.md.md` → "Foo.md", `report.md` → "report"). When the file
+ * has no FM `title:`, `mapping.ts` injects this value into the `title:` field.
  */
 export function deriveImportTitle(
   relativePath: string,

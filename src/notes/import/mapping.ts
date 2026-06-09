@@ -4,10 +4,14 @@
 //
 // One pure, non-throwing, non-blocking function turns a single imported file
 // into its Myne note plaintext + the metadata the engine (sub-feature 3) needs:
-//   - `plaintext`      : original body + the single injected `folder:` field
-//                        (C1 — every other byte preserved; SYNC-9)
-//   - `readTimeTitle`  : FM `title:` or filename-derived (NOT injected) — used
-//                        for the identity key (sub-feature 2) + summary
+//   - `plaintext`      : original body + the injected Myne-managed fields —
+//                        `folder:` (directory-derived) and, when the file has no
+//                        FM `title:`, `title:` (filename-derived). Every other
+//                        byte preserved (C1 — the SYNC-9 sanctioned-transform
+//                        allowlist).
+//   - `readTimeTitle`  : FM `title:` or filename-derived — the value injected
+//                        into `title:` (when absent) + the identity key
+//                        (sub-feature 2) + summary
 //   - `illegalFlags`   : segments illegal under the Myne grammar, PRESERVED
 //                        byte-for-byte and surfaced in the post-import
 //                        "needs attention" report (SYNC-3) — never sanitized,
@@ -29,8 +33,12 @@ import {
   utf8ByteLength,
   MAX_SEGMENT_BYTES,
 } from "../../dialect/folderPath";
+import { patchTitleField } from "../../dialect";
 import { deriveImportFolder, injectImportFolder } from "./folderMapping";
 import { deriveImportTitle } from "./titleMapping";
+
+const utf8Encoder = new TextEncoder();
+const utf8Decoder = new TextDecoder();
 
 export type IllegalSegmentReason =
   | "illegal-char"
@@ -86,9 +94,22 @@ export function mapImportedFile(
 
   // C1: never overwrite a `folder:` field the imported file authored itself.
   const hasPreexistingFolder = fm != null && "folder" in fm;
-  const plaintext = hasPreexistingFolder
+  let plaintext = hasPreexistingFolder
     ? rawText // preserve byte-for-byte
     : injectImportFolder(rawText, folder);
+
+  // Title injection (SYNC-9 sanctioned transform). Obsidian takes a note's title
+  // from its filename, but Myne is frontmatter-only-title — so a file with no FM
+  // `title:` would land "Untitled". Materialize the filename-derived title into
+  // the Myne-managed `title:` field (via the same surgery as create/rename),
+  // verbatim — even an illegal value is preserved + flagged below, never
+  // sanitized. A pre-existing FM `title:` wins and is left untouched. Composes
+  // with the `folder:` injection above (each patcher touches only its own line).
+  if (fmTitle === null) {
+    plaintext = utf8Decoder.decode(
+      patchTitleField(utf8Encoder.encode(plaintext), readTimeTitle),
+    );
+  }
   const preexistingFolder: PreexistingFolder | null = hasPreexistingFolder
     ? { existing: String((fm as Record<string, unknown>)["folder"]), derivedFromPath: folder }
     : null;

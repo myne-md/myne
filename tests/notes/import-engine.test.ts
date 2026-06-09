@@ -88,7 +88,12 @@ describe("importVault — walk, classify, serial ingest", () => {
     expect(r.total).toBe(2); // root.md + Projects/spec.md
     expect(r.imported).toBe(2);
     expect(h.created.some((p) => p.includes("folder: Projects/"))).toBe(true);
-    expect(h.created.some((p) => p === "# root\n")).toBe(true); // root → no folder:
+    // root file: filename title injected, body preserved, no folder field.
+    expect(
+      h.created.some(
+        (p) => p.includes("title: root") && p.includes("# root\n") && !p.includes("folder:"),
+      ),
+    ).toBe(true);
     expect(r.ignore.canvasSkipped).toBe(1);
     expect(r.ignore.nonMarkdownSkipped).toBe(1); // image.png
     expect(r.ignore.hiddenIgnored).toBe(2); // .obsidian dir + .DS_Store
