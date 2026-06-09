@@ -28,17 +28,19 @@ describe("deriveImportTitle — filename→title read-time default", () => {
 });
 
 describe("mapImportedFile — plaintext + readTimeTitle + flags", () => {
-  it("happy path: folder injected, filename title, no flags", () => {
+  it("happy path: folder + filename title injected, no flags", () => {
     const r = mapImportedFile("Projects/spec.md", "# Hi\n");
     expect(r.plaintext).toContain("folder: Projects/");
+    expect(r.plaintext).toContain("title: spec");
     expect(r.readTimeTitle).toBe("spec");
     expect(r.illegalFlags).toEqual([]);
   });
 
-  it("NEVER injects a title: field for a file with no FM title:", () => {
+  it("injects the filename-derived title: when the file has no FM title:", () => {
     const r = mapImportedFile("Projects/Weekly Review.md", "plain body\n");
-    expect(r.plaintext).not.toContain("title:");
-    expect(r.readTimeTitle).toBe("Weekly Review"); // read-time only
+    expect(r.plaintext).toContain("title: Weekly Review");
+    expect(r.plaintext).toContain("plain body"); // body preserved
+    expect(r.readTimeTitle).toBe("Weekly Review");
   });
 
   it("a present FM title: is preserved (not re-injected) and wins the read-time title", () => {
@@ -61,12 +63,12 @@ describe("mapImportedFile — plaintext + readTimeTitle + flags", () => {
     expect(r.plaintext).toContain("Bad#Folder");
   });
 
-  it("flags an illegal title segment (title never injected, only flagged)", () => {
+  it("injects an illegal filename title verbatim AND flags it (preserve, never sanitize)", () => {
     const r = mapImportedFile("p/Note]]End.md", "x\n");
     const titleFlag = r.illegalFlags.find((f) => f.kind === "title");
     expect(titleFlag?.segment).toBe("Note]]End");
     expect(titleFlag?.reason).toBe("illegal-char");
-    expect(r.plaintext).not.toContain("title:"); // still not injected
+    expect(r.plaintext).toContain("title: Note]]End"); // verbatim, flagged for the user
   });
 
   it("enforces the segment byte cap as a flag, not an error", () => {
@@ -79,10 +81,12 @@ describe("mapImportedFile — plaintext + readTimeTitle + flags", () => {
     expect(() => mapImportedFile("####/||.md", "x")).not.toThrow();
   });
 
-  it("root file: no folder, no flags, body byte-identical", () => {
+  it("root file: no folder, title: injected, body preserved", () => {
     const body = "# Root\n\n_kept_ verbatim\n";
     const r = mapImportedFile("root.md", body);
-    expect(r.plaintext).toBe(body);
+    expect(r.plaintext).toContain("title: root"); // filename title materialized
+    expect(r.plaintext).toContain(body); // body preserved verbatim after the FM block
+    expect(r.plaintext).not.toContain("folder:"); // root file → no folder field
     expect(r.readTimeTitle).toBe("root");
     expect(r.illegalFlags).toEqual([]);
     expect(r.preexistingFolder).toBeNull();
@@ -90,10 +94,13 @@ describe("mapImportedFile — plaintext + readTimeTitle + flags", () => {
 });
 
 describe("mapImportedFile — pre-existing folder: is preserved, never overwritten (C1)", () => {
-  it("preserves a user-authored folder: byte-for-byte and reports the discrepancy", () => {
+  it("preserves a user-authored folder: (never overwritten) and reports the discrepancy", () => {
     const body = "---\nfolder: My Own Category\ntags: [x]\n---\n\nbody\n";
     const r = mapImportedFile("Projects/Sub/note.md", body);
-    expect(r.plaintext).toBe(body); // byte-identical — no overwrite
+    expect(r.plaintext).toContain("folder: My Own Category"); // preserved — no overwrite
+    expect(r.plaintext).toContain("tags: [x]"); // other FM preserved
+    expect(r.plaintext).toContain("\n\nbody\n"); // body preserved
+    expect(r.plaintext).toContain("title: note"); // filename title still injected (file had none)
     expect(r.preexistingFolder).toEqual({
       existing: "My Own Category",
       derivedFromPath: "Projects/Sub/",
@@ -105,7 +112,8 @@ describe("mapImportedFile — pre-existing folder: is preserved, never overwritt
   it("does NOT collapse a block-scalar folder: value (the silent-rewrite case)", () => {
     const body = "---\nfolder: >\n  multi\n  line\ntags: [y]\n---\n\nbody\n";
     const r = mapImportedFile("X/note.md", body);
-    expect(r.plaintext).toBe(body); // preserved verbatim — nothing collapsed
+    expect(r.plaintext).toContain("folder: >\n  multi\n  line"); // block scalar preserved, not collapsed
+    expect(r.plaintext).toContain("title: note"); // filename title injected (file had no title:)
     expect(r.preexistingFolder).not.toBeNull();
   });
 
