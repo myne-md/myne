@@ -1,7 +1,9 @@
-// Tests for folder-delete semantics (MYND-144 Task 8): block a folder whose
-// subtree holds any note; otherwise cascade-remove the (note-empty) subtree
-// from the deliberate_folders set. Folder-delete NEVER touches a note blob.
-// Grill 2026-05-29 Q8 (non-empty-delete = block; v0.1 has no trash).
+// Tests for folder-delete semantics (MYND-144 Task 8; non-empty delete added
+// 2026-06-09). `planFolderDelete` collects the target subtree's notes (the
+// caller soft-trashes them — recoverable, MYND-133) and cascade-removes the
+// (note-empty) subtree from the deliberate_folders set. The pure plan never
+// touches a note blob; `persistFolderDelete` writes only the trimmed set.
+// Supersedes the pre-2026-06-09 "block when non-empty" behavior.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,7 +13,10 @@ vi.mock("../../src/lib/prefs", () => ({
 }));
 
 import { deriveFolderTree } from "../../src/notes/folderTree";
-import { planFolderDelete, deleteFolder } from "../../src/notes/folderActions";
+import {
+  planFolderDelete,
+  persistFolderDelete,
+} from "../../src/notes/folderActions";
 
 beforeEach(() => setDeliberateFoldersMock.mockReset());
 afterEach(() => setDeliberateFoldersMock.mockReset());
@@ -21,17 +26,42 @@ const tree = (
   deliberate: string[] = [],
 ) => deriveFolderTree(notes, deliberate);
 
-describe("planFolderDelete — block when subtree holds a note", () => {
-  it("blocks a folder with a direct note", () => {
+describe("planFolderDelete — collects the subtree's notes (no longer blocks)", () => {
+  it("collects a direct note", () => {
     const t = tree([{ noteUuid: "n1", folder: "Projects/" }]);
     const plan = planFolderDelete("Projects/", t, []);
-    expect(plan).toMatchObject({ blocked: true, reason: "non-empty", noteCount: 1 });
+    expect(plan.noteIds).toEqual(["n1"]);
   });
 
-  it("blocks a folder whose descendant holds a note", () => {
+  it("collects a descendant note", () => {
     const t = tree([{ noteUuid: "n1", folder: "Projects/Myne/" }]);
     const plan = planFolderDelete("Projects/", t, []);
-    expect(plan).toMatchObject({ blocked: true, noteCount: 1 });
+    expect(plan.noteIds).toEqual(["n1"]);
+  });
+
+  it("collects every note across the whole subtree, not its siblings", () => {
+    const t = tree([
+      { noteUuid: "a", folder: "Projects/" },
+      { noteUuid: "b", folder: "Projects/Myne/" },
+      { noteUuid: "c", folder: "Other/" },
+    ]);
+    const plan = planFolderDelete("Projects/", t, []);
+    expect(plan.noteIds.sort()).toEqual(["a", "b"]);
+  });
+
+  it("yields an empty noteIds for a note-empty folder", () => {
+    const t = tree([], ["Drafts/"]);
+    const plan = planFolderDelete("Drafts/", t, ["Drafts/"]);
+    expect(plan.noteIds).toEqual([]);
+  });
+
+  it("still trims the deliberate set when the subtree holds notes", () => {
+    const set = ["Busy/"];
+    const t = tree([{ noteUuid: "n1", folder: "Busy/" }], set);
+    const plan = planFolderDelete("Busy/", t, set);
+    expect(plan.noteIds).toEqual(["n1"]);
+    expect(plan.removed).toEqual(["Busy/"]);
+    expect(plan.nextDeliberate).toEqual([]);
   });
 });
 
@@ -39,14 +69,14 @@ describe("planFolderDelete — remove note-empty deliberate folders", () => {
   it("removes a single empty deliberate folder from the set", () => {
     const t = tree([], ["Drafts/"]);
     const plan = planFolderDelete("Drafts/", t, ["Drafts/"]);
-    expect(plan).toMatchObject({ blocked: false, removed: ["Drafts/"], nextDeliberate: [] });
+    expect(plan.removed).toEqual(["Drafts/"]);
+    expect(plan.nextDeliberate).toEqual([]);
   });
 
   it("cascade-removes a nested empty subtree in one action", () => {
     const set = ["Projects/", "Projects/Myne/", "Projects/Myne/Sub/"];
     const t = tree([], set);
     const plan = planFolderDelete("Projects/", t, set);
-    if (plan.blocked) throw new Error("should not block");
     expect(plan.removed.sort()).toEqual(
       ["Projects/", "Projects/Myne/", "Projects/Myne/Sub/"].sort(),
     );
@@ -57,7 +87,6 @@ describe("planFolderDelete — remove note-empty deliberate folders", () => {
     const set = ["Projects/", "Projects/Myne/"];
     const t = tree([], set);
     const plan = planFolderDelete("Projects/Myne/", t, set);
-    if (plan.blocked) throw new Error("should not block");
     expect(plan.removed).toEqual(["Projects/Myne/"]);
     expect(plan.nextDeliberate).toEqual(["Projects/"]);
   });
@@ -66,7 +95,6 @@ describe("planFolderDelete — remove note-empty deliberate folders", () => {
     const set = ["Projects/", "Archive/"];
     const t = tree([], set);
     const plan = planFolderDelete("Projects/", t, set);
-    if (plan.blocked) throw new Error("should not block");
     expect(plan.nextDeliberate).toEqual(["Archive/"]);
   });
 
@@ -74,33 +102,24 @@ describe("planFolderDelete — remove note-empty deliberate folders", () => {
     const set = ["Projects/", "Projectsx/"];
     const t = tree([], set);
     const plan = planFolderDelete("Projects/", t, set);
-    if (plan.blocked) throw new Error("should not block");
     expect(plan.nextDeliberate).toEqual(["Projectsx/"]);
   });
 
   it("matches case-insensitively (fold + NFC)", () => {
     const t = tree([], ["Projects/"]);
     const plan = planFolderDelete("projects/", t, ["Projects/"]);
-    if (plan.blocked) throw new Error("should not block");
     expect(plan.removed).toEqual(["Projects/"]);
   });
 });
 
-describe("deleteFolder — persists only when not blocked", () => {
-  it("calls setDeliberateFolders with the next set when not blocked", async () => {
+describe("persistFolderDelete — writes the trimmed deliberate set", () => {
+  it("calls setDeliberateFolders with the next set", async () => {
     setDeliberateFoldersMock.mockResolvedValueOnce(undefined);
     const set = ["Drafts/", "Keep/"];
     const t = tree([], set);
-    const plan = await deleteFolder("Drafts/", t, set);
-    expect(plan.blocked).toBe(false);
+    const plan = planFolderDelete("Drafts/", t, set);
+    await persistFolderDelete(plan);
     expect(setDeliberateFoldersMock).toHaveBeenCalledTimes(1);
     expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Keep/"]);
-  });
-
-  it("does NOT persist (or touch any note) when blocked", async () => {
-    const t = tree([{ noteUuid: "n1", folder: "Busy/" }], ["Busy/"]);
-    const plan = await deleteFolder("Busy/", t, ["Busy/"]);
-    expect(plan.blocked).toBe(true);
-    expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
   });
 });

@@ -32,6 +32,7 @@ export {
   patchTrashedField,
   patchUpdatedField,
   readTemplateFromFmBody,
+  readTitleFromFmBody,
   readTrashedFromFmBody,
   TEMPLATE_FLAG_VALUE,
 } from "./surgery";

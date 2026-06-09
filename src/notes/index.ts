@@ -54,7 +54,7 @@ export { moveNote, bulkMoveNotes } from "./moveNote";
 export type { BulkMoveResult } from "./moveNote";
 export {
   planFolderDelete,
-  deleteFolder,
+  persistFolderDelete,
   planFolderRename,
   renameFolder,
 } from "./folderActions";

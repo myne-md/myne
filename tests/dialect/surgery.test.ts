@@ -12,6 +12,7 @@ import {
   patchSourceRanges,
   patchTitleField,
   patchUpdatedField,
+  readTitleFromFmBody,
 } from "../../src/dialect/surgery";
 import { bytesEqual, dec, enc, fixtureDir } from "./_helpers";
 
@@ -170,6 +171,25 @@ describe("patchTitleField — invariants", () => {
     expect(plain).toContain("title: Meeting notes\n");
   });
 
+  it("quotes a re-typeable value when INSERTING into an existing FM block (state B)", () => {
+    // Regression: the common rename path — a note that already carries
+    // `updated:` (every autosaved note) or `folder:` but no `title:` line yet.
+    // Inserting a date-shaped title here must quote it exactly like state C,
+    // else it reads back as a Date → "Untitled". (State B previously used the
+    // non-title scalar formatter and emitted it bare.)
+    const updatedOnly = enc.encode(
+      "---\nupdated: 2026-05-10T12:00:00Z\n---\n\nbody",
+    );
+    const date = dec.decode(patchTitleField(updatedOnly, "2026-06-07"));
+    expect(date).toContain('title: "2026-06-07"');
+    const folderOnly = enc.encode("---\nfolder: Daily/\n---\n\nbody");
+    const num = dec.decode(patchTitleField(folderOnly, "42"));
+    expect(num).toContain('title: "42"');
+    // An ordinary title still inserts unquoted.
+    const plain = dec.decode(patchTitleField(updatedOnly, "Meeting notes"));
+    expect(plain).toContain("title: Meeting notes\n");
+  });
+
   it("escapes embedded double-quotes and backslashes when quoting is forced", () => {
     const input = enc.encode("---\ntitle: Plain\n---\n");
     // Leading `-` is a YAML-reserved start char → forces double-quoting,
@@ -202,6 +222,35 @@ describe("patchTitleField — invariants", () => {
     for (const input of inputs) {
       expect(() => patchTitleField(input, TEST_TITLE)).not.toThrow();
     }
+  });
+});
+
+describe("readTitleFromFmBody — value-strict title read", () => {
+  it("reads an unquoted date title as the typed string (the heal path)", () => {
+    expect(readTitleFromFmBody("title: 2026-06-07\n")).toBe("2026-06-07");
+  });
+
+  it("reads unquoted int / bool titles as their literal text", () => {
+    expect(readTitleFromFmBody("title: 42\n")).toBe("42");
+    expect(readTitleFromFmBody("title: true\n")).toBe("true");
+  });
+
+  it("unwraps double- and single-quoted scalars", () => {
+    expect(readTitleFromFmBody('title: "2026-06-07"\n')).toBe("2026-06-07");
+    expect(readTitleFromFmBody("title: 'Plain'\n")).toBe("Plain");
+  });
+
+  it("strips an unquoted trailing comment", () => {
+    expect(readTitleFromFmBody("title: 2026-06-07 # daily\n")).toBe(
+      "2026-06-07",
+    );
+  });
+
+  it("returns null for a missing, empty, or block-scalar title", () => {
+    expect(readTitleFromFmBody("folder: Daily/\n")).toBeNull();
+    expect(readTitleFromFmBody("title:\n")).toBeNull();
+    expect(readTitleFromFmBody("title: |\n  multi\n")).toBeNull();
+    expect(readTitleFromFmBody("")).toBeNull();
   });
 });
 

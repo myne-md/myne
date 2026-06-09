@@ -27,6 +27,7 @@ import {
   type UseSelectedNoteReturn,
 } from "../sidebarState";
 import { TrashPanel } from "./TrashPanel";
+import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deriveFolderTree } from "../folderTree";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { DecorationPopover } from "./DecorationPopover";
@@ -1120,6 +1121,18 @@ function PopulatedList({
             </button>
           </div>
         </div>
+      )}
+      {fm.confirmFolderDelete !== null && (
+        <DeleteConfirmModal
+          title="Delete this folder?"
+          body={`“${fm.confirmFolderDelete.node.name}” and its ${fm.confirmFolderDelete.noteCount} note${
+            fm.confirmFolderDelete.noteCount === 1 ? "" : "s"
+          }`}
+          warning="The notes move to Trash — you can restore them later."
+          confirmLabel="Delete folder"
+          onCancel={fm.cancelFolderDelete}
+          onConfirm={fm.confirmFolderDeleteAction}
+        />
       )}
       {menu !== null && (
         <ContextMenu

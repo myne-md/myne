@@ -1,11 +1,13 @@
 // `useFolderManagement` — sidebar folder-tree interaction state + handlers
 // (MYND-144 Task 10). Centralizes the deliberate_folders set, the transient UI
 // state (context menu / new-folder input / inline rename / block notice /
-// case-merge confirm / drag-drop target), and the handlers that wire the
-// already-built logic: createNote(folder) (T5), moveNote (T5), deleteFolder
-// (T8), renameFolder (T9), setDeliberateFolders (T4). After any mutation the
-// affected notes are surgically refreshed (`ctx.refreshOne`) so the derived
-// tree updates; the deliberate set is updated locally + persisted.
+// case-merge confirm / folder-delete confirm / drag-drop target), and the
+// handlers that wire the already-built logic: createNote(folder) (T5), moveNote
+// (T5), planFolderDelete + persistFolderDelete (T8; non-empty delete soft-
+// trashes the subtree via ctx.bulkTrashWithSync, 2026-06-09), renameFolder (T9),
+// setDeliberateFolders (T4). After any mutation the affected notes are
+// surgically refreshed (`ctx.refreshOne`) so the derived tree updates; the
+// deliberate set is updated locally + persisted.
 
 import {
   useCallback,
@@ -30,7 +32,12 @@ import {
   setItemColors as persistItemColors,
   setItemOrder as persistItemOrder,
 } from "../../lib/prefs";
-import { deleteFolder, renameFolder } from "../folderActions";
+import {
+  persistFolderDelete,
+  planFolderDelete,
+  renameFolder,
+  type FolderDeletePlan,
+} from "../folderActions";
 import { moveNote } from "../moveNote";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
@@ -69,6 +76,11 @@ export type FolderMenuState = { node: FolderNode; x: number; y: number } | null;
 /** `parentPath === ""` = a new top-level folder. */
 export type NewFolderState = { parentPath: string } | null;
 export type CaseMergeState = { path: string; existingDisplay: string } | null;
+/** Pending non-empty-folder delete awaiting confirmation (notes → Trash). */
+export type ConfirmFolderDeleteState = {
+  node: FolderNode;
+  noteCount: number;
+} | null;
 
 function folderParent(path: string): string {
   const segs = path.split("/").filter((s) => s.length > 0);
@@ -221,6 +233,8 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const [renamingFolderKey, setRenamingFolderKey] = useState<string | null>(null);
   const [blockNotice, setBlockNotice] = useState<string | null>(null);
   const [caseMerge, setCaseMerge] = useState<CaseMergeState>(null);
+  const [confirmFolderDelete, setConfirmFolderDelete] =
+    useState<ConfirmFolderDeleteState>(null);
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [rootDropActive, setRootDropActive] = useState(false);
   // Drop-target highlight when a note is dragged over the Favorites section
@@ -391,20 +405,56 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   );
 
   // ---- delete folder -------------------------------------------------------
-  const deleteFolderAction = useCallback(
-    async (node: FolderNode) => {
-      setMenu(null);
-      const plan = await deleteFolder(node.path, treeRef.current, deliberate);
-      if (plan.blocked) {
-        setBlockNotice("Folder isn't empty — move or delete its notes first.");
-        return;
+  // Execute a planned delete: soft-trash the subtree notes (recoverable from
+  // Trash, MYND-133), then trim the deliberate set + prune decorations. Shared
+  // by the empty-folder fast path (no notes, no confirm) and the confirmed
+  // non-empty path. Replaces the pre-2026-06-09 "block when non-empty" gate.
+  const performFolderDelete = useCallback(
+    async (node: FolderNode, plan: FolderDeletePlan) => {
+      if (plan.noteIds.length > 0) {
+        await ctx.bulkTrashWithSync(plan.noteIds);
+        // If the open/selected note just went to Trash, don't dwell on it.
+        if (ctx.selectedId !== null && plan.noteIds.includes(ctx.selectedId)) {
+          ctx.select(null);
+        }
       }
+      await persistFolderDelete(plan);
       setDeliberate(plan.nextDeliberate);
       // Prune the deleted folder's (and its deliberate descendants') color +
       // icon (MYND-184/185 durability).
       applyDecorationRemap((m) => pruneFolderPrefix(m, node.path));
     },
-    [deliberate, applyDecorationRemap],
+    [ctx, applyDecorationRemap],
+  );
+
+  const deleteFolderAction = useCallback(
+    (node: FolderNode) => {
+      setMenu(null);
+      const plan = planFolderDelete(node.path, treeRef.current, deliberate);
+      if (plan.noteIds.length === 0) {
+        // Note-empty folder → delete immediately (no confirmation, unchanged).
+        void performFolderDelete(node, plan).catch(() => {});
+        return;
+      }
+      // Non-empty → confirm first; the subtree notes move to Trash on confirm.
+      setConfirmFolderDelete({ node, noteCount: plan.noteIds.length });
+    },
+    [deliberate, performFolderDelete],
+  );
+
+  const confirmFolderDeleteAction = useCallback(() => {
+    const pending = confirmFolderDelete;
+    if (pending === null) return;
+    setConfirmFolderDelete(null);
+    // Recompute against the live tree at confirm time (notes may have moved
+    // while the dialog was open) — pure, cheap.
+    const plan = planFolderDelete(pending.node.path, treeRef.current, deliberate);
+    void performFolderDelete(pending.node, plan).catch(() => {});
+  }, [confirmFolderDelete, deliberate, performFolderDelete]);
+
+  const cancelFolderDelete = useCallback(
+    () => setConfirmFolderDelete(null),
+    [],
   );
   const dismissBlock = useCallback(() => setBlockNotice(null), []);
   // Auto-dismiss the block notice.
@@ -734,6 +784,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     cancelCaseMerge,
     newNoteHere,
     deleteFolderAction,
+    confirmFolderDelete,
+    confirmFolderDeleteAction,
+    cancelFolderDelete,
     dropTargetKey,
     setDropTargetKey,
     rootDropActive,

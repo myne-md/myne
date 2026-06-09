@@ -249,7 +249,13 @@ function applyStateBTitle(
   bodyEnd: number,
   value: string,
 ): string {
-  const insert = "title: " + formatYamlScalar(value) + NEWLINE;
+  // `formatYamlTitleScalar` (NOT `formatYamlScalar`) — inserting a fresh
+  // `title:` line into an existing FM block (the common case: a note that
+  // already carries `updated:` / `folder:` but no title yet) must quote a
+  // value YAML would re-type away from a string, exactly like states A and C.
+  // A date-shaped title (`2026-06-07`) inserted unquoted reads back as a Date
+  // → "Untitled" (and breaks daily-note title-keyed matching).
+  const insert = "title: " + formatYamlTitleScalar(value) + NEWLINE;
   return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
 }
 
@@ -322,6 +328,45 @@ export function patchTitleField(bytes: Uint8Array, value: string): Uint8Array {
   }
 
   return utf8Encoder.encode(applyStateBTitle(source, fm.bodyEnd, value));
+}
+
+// Extract the scalar value of a `title:` line into its logical string,
+// stripping surrounding quotes (single/double) and an unquoted trailing
+// `# comment`. Returns null for an empty value or a block-scalar form
+// (`title: |`). Shape-mirror of `extractTrashedScalar`.
+function extractTitleScalar(valuePortion: string): string | null {
+  const trimmed = valuePortion.trim();
+  if (trimmed === "") return null;
+  if (/^[|>]/.test(trimmed)) return null;
+
+  const quotedM = /^(["'])(.*?)\1[ \t]*(?:#.*)?$/.exec(trimmed);
+  if (quotedM !== null) return quotedM[2] ?? null;
+
+  const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+  const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
+  const result = raw.trim();
+  return result === "" ? null : result;
+}
+
+/**
+ * Read the FM `title:` scalar **value-strict** from a frontmatter **body** (the
+ * slice shape `loadNoteBatch` parses, identical to {@link readTrashedFromFmBody}).
+ * Returns the literal title text the user typed — preserving the exact string
+ * for a value YAML would otherwise re-type to a non-string (a date-shaped
+ * `2026-06-07`, an int, a bool). `loadNoteBatch` uses this as the fallback when
+ * js-yaml hands back a non-string for `title:`, so an unquoted date title (an
+ * older note written before the state-B title-quoting fix, or an imported /
+ * hand-edited file) still shows its title instead of "Untitled". Returns null
+ * when no `title:` line is present, the value is empty, or it is a block scalar.
+ */
+export function readTitleFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = TITLE_KEY_RE.exec(line);
+    if (m === null) continue;
+    return extractTitleScalar(m[2] ?? "");
+  }
+  return null;
 }
 
 // === patchFirstH1Line — Q7 (β mirror-existing) write target for body `# H1` ===
