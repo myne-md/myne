@@ -29,7 +29,7 @@ import {
  *  the rebuild on `docChanged` can run before the incremental parser re-covers
  *  the edited region, so e.g. a toggled task checkbox renders as raw text until
  *  the next interaction. (CM6 "Decorating Syntax" recipe.) */
-const treeChanged = (update: ViewUpdate): boolean =>
+export const treeChanged = (update: ViewUpdate): boolean =>
   syntaxTree(update.startState) !== syntaxTree(update.state);
 
 /** Default update trigger: doc / viewport / selection / focus / parse changes —

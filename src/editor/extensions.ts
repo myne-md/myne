@@ -27,11 +27,14 @@ import {
 } from "@codemirror/commands";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { Subscript, Superscript, Emoji } from "@lezer/markdown";
 import { type Extension } from "@codemirror/state";
 import { Wikilink } from "../dialect/lezer/wikilink";
 import { InlineTag } from "../dialect/lezer/inline-tag";
 import { DefinitionList } from "../dialect/lezer/definition-list";
 import { Footnote } from "../dialect/lezer/footnote";
+import { Highlight } from "../dialect/lezer/highlight";
+import { Math } from "../dialect/lezer/math";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { myneDecorations } from "./decorations";
@@ -43,6 +46,8 @@ import { attachmentInsertPlaceholderExtension } from "./attachments/insert-place
 import { slashMenuExtension } from "./slash/plugin";
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
+import { emojiCompletionExtension } from "./emoji-complete";
+import { clickCollapseExtension } from "./click-collapse";
 import { findExtension } from "./find/find-extension";
 import { myneKeyBindings } from "./keymap";
 import { myneTheme } from "./theme";
@@ -61,6 +66,14 @@ export function myneExtensions(): readonly Extension[] {
         InlineTag,
         DefinitionList,
         Footnote,
+        // Inline typography (MYND-156): `==highlight==`, `~sub~`, `^sup^`,
+        // emoji `:shortcode:`. Sub/Super/Emoji are pre-built @lezer/markdown
+        // configs; Highlight is hand-rolled. Must match parser.ts registration.
+        Subscript,
+        Superscript,
+        Emoji,
+        Highlight,
+        Math,
         codeNestMarkdownExtension,
       ],
     }),
@@ -85,6 +98,12 @@ export function myneExtensions(): readonly Extension[] {
     // (MYND-189). Sits alongside the slash menu; both are floating menus.
     templateTokenMenuExtension(),
     selectionToolbarExtension(),
+    // Emoji `:` autocomplete (MYND-156) — inserts the unicode glyph. Built on
+    // @codemirror/autocomplete; the source awaits the lazy emoji map.
+    emojiCompletionExtension(),
+    // Collapse the spurious tiny selection a plain click makes when the
+    // cursor-aware reveal reflows the clicked line (e.g. an H1 re-showing `# `).
+    clickCollapseExtension(),
     // In-note find (MYND-175): keeps the @codemirror/search engine, swaps the
     // stock panel for the Myne-styled docked bar. Cmd/Ctrl+F is owned by the
     // window-level listener in App.tsx, NOT bound in the keymap below.

@@ -473,6 +473,30 @@ A class of attack where an adversary captures encrypted traffic or storage today
 
 Used in: `threat-model.md` §1 (A10 discussion); `e2ee-notes-evaluation.md`
 
+### **embedded HTML rendering** &nbsp; 📦 *Product*
+
+The editor's rendering of a curated safe subset of note-authored raw HTML (MYND-209): inline `<kbd>`/`<mark>`/`<sub>`/`<sup>`/`<abbr title>` and block `<p>`/`<details>`/`<summary>`. The raw span is sanitized through DOMPurify (lazy-loaded) under an ultra-tight allowlist (8 tags, `title`-only) and rendered via `innerHTML` of the **sanitized output only** — the SYNC-5 trusted-input boundary. Off-allowlist tags (`<script>`/`<iframe>`/`<img>`) and HTML inside code are not rendered (stay plain text). `<details>` is natively interactive with open/closed in a WebView-only map (never the buffer, §6 C1). Supersedes the prior "raw HTML → plain monospace, no XSS surface" posture (`markdown-dialect.md` §8; `decisions.md` 2026-06-08).
+
+Used in: `spec/markdown-dialect.md` §3.1/§8, `threat-model.md` §6
+
+### **callout (admonition)** &nbsp; 📦 *Product*
+
+A `> [!TYPE]` blockquote rendered as a styled container with a colored tint, icon, and title (MYND-47) — the GitHub/Obsidian admonition convention. `src/editor/decorations/callout.ts` promotes the blockquote via a separate cursor-aware layer that composes with `blockquote.ts` (does not modify it); the Obsidian-full ~12-type set is case-insensitive and maps to the existing semantic color tokens + a local icon set. Custom title supported; unknown type → plain blockquote; `[!TYPE]` bytes preserved, revealed on-cursor (§6 C1). A `/callout` slash command emits `> [!note] ` (§5). The interactive fold (`+`/`-`) marker is recognized + round-trips but the collapse toggle is a follow-up.
+
+Used in: `spec/markdown-dialect.md` §5/§7
+
+### **emoji shortcode** &nbsp; 📦 *Product*
+
+A `:name:` token (e.g. `:rocket:`) the editor renders as the corresponding unicode emoji glyph (MYND-156). The `@lezer/markdown` Emoji config tags the token; a lazy-loaded name→glyph map (`src/dialect/emoji-shortcodes.ts`, code-split per SYNC-4) resolves mapped names, leaving unmapped ones as literal text. The `:` autocomplete inserts the unicode glyph directly (not the `:shortcode:`), so authoring emits a plain char. The source `:name:` is render-only — never rewritten in the buffer (§6 C1).
+
+Used in: `spec/markdown-dialect.md` §3.2
+
+### **highlight (markdown)** &nbsp; 📦 *Product*
+
+The `==text==` inline construct, rendered with a muted warm-amber `--highlight` wash (MYND-156). The one hand-rolled `MarkdownConfig` in Myne's dialect (`@lezer/markdown` ships sub/sup/emoji but no highlight). Cursor-aware: the `==` markers hide off-cursor and reveal on-cursor; bytes preserved (§6 C1). Has a canonical emit form via the highlight selection-toolbar button (§5). The `.cm-highlight` class is shared with the embedded-HTML `<mark>` element render (SYNC-6).
+
+Used in: `spec/markdown-dialect.md` §3.2, §5
+
 ### **hosted sync** &nbsp; 📦 *Product*
 
 The convenience-paid tier in Myne's freemium model. Myne-operated zero-knowledge sync server (Phase 2+); identical protocol-level guarantees to a self-hosted instance. Status in v0.1: not yet shipped.
@@ -1177,6 +1201,24 @@ Reference: https://vite.dev
 A note whose prose mentions the open note's **title** as a whole-word, fold-identity phrase **without** `[[wikilink]]`-ing it — surfaced as a collapsed-by-default second section of the **backlinks** pane with a one-click "link" action (Obsidian-parity discovery/cleanup aid; MYND-196, build-phase v1.1). Distinct from a backlink, which is an explicit link. Candidate recall rides the existing encrypted `vault.search` body index as a *filter only*; identity is verified by a `foldSegment` word-boundary match on the decrypted candidate body (`vault.search`'s language-detecting tokenizer is never the identity authority). A corpus-relative phrase document-frequency floor (df > ~0.15 → suppress) plus a ≤2-folded-char guard suppress common/short titles; the 0.15 threshold is a **tunable code constant, not spec** (deliberate contrast with the frozen Damm-32 table). Adds **no new at-rest artefact** — the guarantee surface does not move. Clicking "link" inserts `[[Title]]` through the canonical `saveNote` write path and never clobbers an open+dirty note (SYNC-15 guard).
 
 Used in: `agent-tooling/features/unlinked-mentions/prd.md`, `spec/wikilink.md`, `vision.md` Phase 1 Scope
+
+### **math (markdown)** &nbsp; 📦 *Product*
+
+LaTeX math rendered in the editor (MYND-48): inline `$…$` (a custom `InlineMath` Lezer node) and block `$$…$$` (a regex block decoration), typeset by lazy-loaded KaTeX, cursor-aware (raw LaTeX revealed on-cursor; invalid LaTeX → source + a subtle dotted-underline hint, never KaTeX's red node). The `$`-disambiguation keeps currency text (`$5`, `$ €`) from parsing as math (opening `$` not followed by whitespace/digit, closing `$` not preceded by whitespace, `$$` = block, single-line). `InlineMath` is a leaf → no `#tags`/emphasis inside; math doesn't parse in code. Render-only, never emitted (§6 C1). Supersedes the §7 math deferral (`decisions.md` 2026-06-08).
+
+Used in: `spec/markdown-dialect.md` §3.2/§7
+
+### **mermaid diagram** &nbsp; 📦 *Product*
+
+A ```mermaid fenced code block rendered as an SVG diagram in the editor (MYND-49) via lazy-loaded Mermaid (`securityLevel:'strict'`, `htmlLabels:false` — mermaid sanitizes its own SVG with its bundled DOMPurify). `fenced-code.ts` skips the `mermaid` info-string so the diagram widget renders it instead of a code card; parse-error / load-failure falls back to a monospace card. Cursor-aware whole-block reveal; render-only (§6 C1). Mermaid is the **heaviest dependency** in the project (≈+100 transitive packages), lazy-loaded so a diagram-free note pays zero bytes — shipped as a conscious decision (`decisions.md` 2026-06-08) over the auto-grill's defer recommendation. PlantUML is not rendered (stays a code card).
+
+Used in: `spec/markdown-dialect.md` §7; `dependency-policy.md`
+
+### **subscript / superscript (markdown)** &nbsp; 📦 *Product*
+
+The `~x~` (subscript) and `^x^` (superscript) inline constructs, rendered with reduced-size, vertically-shifted typography (MYND-156, `.cm-sub` / `.cm-sup`). Use the pre-built `@lezer/markdown` Subscript/Superscript configs; single-run and space-free (Pandoc-style), disjoint from GFM strikethrough `~~…~~` and footnote `[^id]`. Recognize-and-render-only — never emitted; bytes preserved (§6 C1).
+
+Used in: `spec/markdown-dialect.md` §3.2
 
 ### **wikilink** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 

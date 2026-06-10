@@ -72,6 +72,18 @@ export function CMEditor(props: CMEditorProps) {
     });
     viewRef.current = view;
 
+    // The self-hosted web fonts (Inter / JetBrains Mono) finish loading AFTER
+    // the editor's first paint; their metrics change line + block-widget heights,
+    // which can leave CM6's height map stale and drift the click→position mapping
+    // across the WHOLE document (the "clicks land one line lower, everywhere"
+    // symptom). Re-measure once fonts settle. Guarded so a torn-down view is a
+    // no-op (viewRef is nulled on destroy).
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (viewRef.current === view) view.requestMeasure();
+      });
+    }
+
     return () => {
       view.destroy();
       viewRef.current = null;

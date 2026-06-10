@@ -17,7 +17,24 @@ import {
   type Transaction,
 } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
 import { searchPanelOpen } from "@codemirror/search";
+
+/** Code-construct node names (fenced / indented / inline). */
+const CODE_NODE_RE = /Code|FencedCode|InlineCode|CodeBlock|CodeText/;
+
+/**
+ * True if `pos` sits inside a code construct (fenced / indented / inline).
+ * Shared by the embedded-HTML and math decorations: `<kbd>` / `$…$` inside a
+ * code span or fence are literal source, not constructs to render.
+ */
+export function isInCode(state: EditorState, pos: number): boolean {
+  let node = syntaxTree(state).resolveInner(pos, 1);
+  for (; node.parent !== null; node = node.parent) {
+    if (CODE_NODE_RE.test(node.name)) return true;
+  }
+  return CODE_NODE_RE.test(node.name);
+}
 
 /**
  * True if any selection head or anchor sits on a line in the inclusive range

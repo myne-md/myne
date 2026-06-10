@@ -122,6 +122,40 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 - **Bundle size:** the runtime is **lazy-loaded via dynamic `import()`** so it lands in its own chunks and never enters the main editor bundle — measured at build: `pdf-*.js` ≈ **427 KB raw / 127 KB gzip**, plus the parsing worker `pdf.worker.min-*.mjs` ≈ **1.25 MB raw** shipped as a separate hashed asset fetched only when a PDF attachment is actually rendered. A note with no PDF attachment pays **zero** bytes for it.
 - **Mandatory fallback (SYNC-5):** if pdf.js fails to load or parse for any reason, the render path rejects and the editor draws a generic PDF icon instead — pdf.js is never a hard dependency of the render surface.
 
+### Embedded-HTML sanitizer (MYND-209) — `package.json`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `dompurify` | 3.4.8 (exact-pinned) | Sanitize note-authored embedded HTML to an ultra-tight allowlist before render (`src/editor/html/sanitize.ts`); also reused for mermaid SVG (MYND-49) | One small transitive (`@types/trusted-types`), pure-JS | (MPL-2.0 OR Apache-2.0) | epic `markdown-render-conformance` SYNC-4/SYNC-5; grill 2026-06-08 `embedded-html-rendering`; `decisions.md` 2026-06-08 |
+
+- **Non-existence of alternative:** the createElement-per-tag allowlist path (the standing "no sanitizer" preference) was considered but does not cleanly handle `<details>`'s nested content; a correct HTML sanitizer is not safely hand-rollable (parser-differential / mutation-XSS classes). DOMPurify is the industry-standard, single-purpose, widely-audited choice. This is the **deliberate reversal** of the prior "no content sanitization layer" posture, scoped to the desktop editor.
+- **Maintained:** very active (cure53), huge install base; bus-factor low for a security-critical lib.
+- **Bundle size:** **lazy-loaded via dynamic `import()`** (code-split); a note with no embedded HTML pays zero bytes. ~ tens of KB.
+- **The control IS the config:** `ALLOWED_TAGS` = 8 elements, `ALLOWED_ATTR` = `[title]`, KEEP_CONTENT; strips all `on*`/`src`/`href`/`style`/`class`/`id`. Rendered via `innerHTML` of sanitized output ONLY. Tested in `tests/editor/sanitize-html.test.ts` + `embedded-html-security.test.ts`.
+
+### Math render (MYND-48) — `package.json`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `katex` | 0.17.0 (exact-pinned) | Render inline `$…$` + block `$$…$$` LaTeX to HTML in the editor (`src/editor/math/render-math.ts`) | Zero runtime deps; ships its own CSS + WOFF2 fonts | MIT | epic `markdown-render-conformance` SYNC-4; grill 2026-06-08 `math-katex`; `decisions.md` 2026-06-08 |
+
+- **Non-existence of alternative:** a LaTeX math typesetter is not hand-rollable; KaTeX is the renderer the dialect spec (§7) already named. The MathML-via-temml alternative was rejected (uneven WebView math support cross-platform).
+- **Maintained:** Khan Academy / community, very active; large install base.
+- **Bundle size:** **lazy-loaded via dynamic `import()`** (code-split, with its CSS); a math-free note pays zero bytes. Fonts self-hosted (Vite-bundled, no CDN — reproducible-build-safe).
+- **CSP / safety:** KaTeX needs no `eval`; runs `trust:false` so output carries no `\html`/`\href` injection — safe to `innerHTML` (vetted-output mode, SYNC-5). `throwOnError` caught → invalid LaTeX falls back to source + a subtle hint.
+
+### Mermaid diagram render (MYND-49) — `package.json` — ⚠️ HEAVIEST DEPENDENCY
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `mermaid` | 11.15.0 (exact-pinned) | Render ```mermaid fenced blocks to SVG (`src/editor/decorations/mermaid.ts`) | **≈ +100 packages** — the largest in the project. Direct: cytoscape (+cose-bilkent/fcose), d3 + d3-sankey, dagre-d3-es, roughjs, marked, dayjs, khroma, stylis, es-toolkit, @iconify/utils, @braintree/sanitize-url, its own dompurify + katex, @mermaid-js/parser, … | MIT | epic `markdown-render-conformance` SYNC-4; grill 2026-06-08 `mermaid-diagrams`; `decisions.md` 2026-06-08 |
+
+- **"The bar" Q1 (hand-roll?):** a general diagram-grammar + layout engine (flowchart/sequence/gantt/class/state/…) is not hand-rollable; the lighter-subset alternative (a hand-rolled `graph TD`/`sequenceDiagram`-only renderer) was considered and rejected by the user in favour of full Mermaid.
+- **"The bar" Q4 (transitive tree):** RED FLAG by the policy's own ≥50-transitive heuristic — this is the project's single biggest TB9 surface expansion. Accepted as a **conscious decision** (`decisions.md` 2026-06-08): the auto-grill *recommended deferring* mermaid; the user overrode to ship it.
+- **Bundle size:** **lazy-loaded via dynamic `import()`** (code-split) — a diagram-free note pays **zero** bytes; the heaviest dep never enters the cold bundle. (Owed at PR: a measured lazy-chunk KB figure + a byte-stable-across-builds check.)
+- **Security:** `securityLevel:'strict'` + `htmlLabels:false` → mermaid sanitizes its own SVG via its bundled DOMPurify (no click/script/`<foreignObject>`, no raw-HTML labels). No remote fetch. `threat-model.md` §6.
+- **Mandatory fallback:** parse-error / load-failure → monospace code card (mermaid is never a hard dependency of the render surface).
+
 ## Reference
 
 - `threat-model.md` §6 — compensating controls

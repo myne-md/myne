@@ -95,6 +95,185 @@ export const myneTheme = EditorView.theme({
     borderRadius: "var(--radius-1, 3px)",
   },
 
+  // Plain list rendering — list.ts (MYND-208). Off-cursor, the raw `-`/`1.`
+  // marker becomes a muted glyph/number; the line gets a hanging indent so
+  // wrapped lines align under the body, not the marker. Markers recede in
+  // `--fg-3` (Penpot "list rendering" frame); body stays `--fg-1`.
+  // CSS-drawn bullet (the widget carries no glyph): a filled disc top-level, a
+  // hollow ring when nested — both the same size + baseline, unlike the `•`/`◦`
+  // glyphs which rendered as a tiny high dot vs a big ring. The 1ch slot +
+  // `text-align: center` seats the dot; `margin-right` is the gap to the body.
+  // inline-flex at the line's height + center → the dot sits at the vertical
+  // middle of the line (where the text sits), deterministically — not at the
+  // baseline like an empty inline-block would.
+  ".cm-list-bullet": {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "1ch",
+    height: "1.7em",
+    marginRight: "0.4ch",
+    verticalAlign: "top",
+  },
+  ".cm-list-bullet::before": {
+    content: '""',
+    flex: "none",
+    width: "0.34em",
+    height: "0.34em",
+    borderRadius: "50%",
+    backgroundColor: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-list-bullet-ring::before": {
+    backgroundColor: "transparent",
+    border: "1.5px solid var(--fg-3, #6b6a64)",
+    boxSizing: "border-box",
+  },
+  ".cm-list-number": {
+    color: "var(--fg-3, #6b6a64)",
+  },
+  // Hanging indent. The `+ 6px` keeps the MARKER aligned with the body text
+  // column (CM's default `.cm-line` left padding is 6px) instead of hanging it at
+  // the line's hard left edge — at x≈0 the top-level •/* /+ markers fell 6px into
+  // the gutter and read as "no marker at all". Wrapped lines still hang to 1.5em.
+  ".cm-list-item-line": {
+    textIndent: "-1.5em",
+    paddingLeft: "calc(1.5em + 6px)",
+  },
+
+  // Inline typography — highlight / sub / sup from inline-typography.ts
+  // (MYND-156). `.cm-highlight` is the SYNC-6 shared class reused by
+  // embedded-html-rendering's `<mark>`. Sub/sup reuse the footnote-marker
+  // metrics (0.75em + line-height 0 so line spacing isn't disturbed). Penpot
+  // "inline typography" frame; `--highlight` is a muted warm-amber wash.
+  ".cm-highlight": {
+    backgroundColor: "var(--highlight, #f3e7c4)",
+    borderRadius: "var(--radius-1, 3px)",
+    padding: "1px 3px",
+    color: "var(--fg-1)",
+  },
+  ".cm-sub": {
+    fontSize: "0.75em",
+    lineHeight: "0",
+    verticalAlign: "sub",
+  },
+  ".cm-sup": {
+    fontSize: "0.75em",
+    lineHeight: "0",
+    verticalAlign: "super",
+  },
+
+  // Embedded HTML (MYND-209) — the sanitized element keeps its real tag; style
+  // <mark>/<kbd> to match the dialect. <sub>/<sup>/<abbr> use native rendering.
+  // DISCRIMINATOR (soft-tint option): render the output, marked ONLY by a faint
+  // background wash — no border, no label, no underline. The wash is a low-%
+  // accent mix over paper, so it reads as a set-apart "embed region", stays
+  // distinct from the warm hover/selection greys, and flips with the theme. If a
+  // WebView lacks `color-mix` the property is simply dropped (renders seamless).
+  ".cm-embedded-html": {
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 10%, var(--paper, #fbfbfa))",
+    borderRadius: "var(--radius-1, 3px)",
+    padding: "0 3px",
+  },
+  ".cm-embedded-html mark": {
+    backgroundColor: "var(--highlight, #f3e7c4)",
+    borderRadius: "var(--radius-1, 3px)",
+    padding: "1px 3px",
+    color: "var(--fg-1)",
+  },
+  ".cm-embedded-html kbd": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.85em",
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    borderRadius: "var(--radius-1, 3px)",
+    padding: "1px 4px",
+  },
+  // Block embed — same soft tint, as a tinted panel. `padding` not `margin`
+  // (measured-height fix, see math block); no border, no label.
+  ".cm-embedded-html-block": {
+    display: "block",
+    padding: "10px 14px",
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 10%, var(--paper, #fbfbfa))",
+    borderRadius: "var(--radius-2, 6px)",
+  },
+  ".cm-embedded-html-block summary": {
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+
+  // Math (MYND-48) — KaTeX output. Block math centers as a card-like row;
+  // invalid LaTeX shows source with a quiet dotted underline + hover message.
+  // Vertical breathing room is `padding`, NOT `margin`: a block-widget's outer
+  // margin is OUTSIDE the box CM6 measures, so it isn't counted in the height
+  // map — clicks below accumulate a "lands one line lower" drift. Padding lives
+  // inside the measured box, so the height map stays correct. (Same fix applied
+  // to every block widget below: mermaid, table, embedded-HTML, footnotes.)
+  ".cm-math-block": {
+    display: "block",
+    textAlign: "center",
+    padding: "8px 0",
+    overflowX: "auto",
+    cursor: "pointer",
+  },
+  ".cm-math-error": {
+    textDecoration: "underline dotted var(--fg-3, #6b6a64)",
+    textDecorationSkipInk: "none",
+    cursor: "pointer",
+  },
+  ".cm-math-inline": { cursor: "pointer" },
+
+  // Mermaid diagrams (MYND-49) — rendered SVG sits on its OWN fixed-light card so
+  // it reads in BOTH editor themes (Mermaid's palette assumes a light surface; on
+  // the dark editor its edge labels were unreadable). The outer `.cm-mermaid` is a
+  // transparent, measured spacer (padding, not margin — see note above); the inner
+  // `.cm-mermaid-card` carries the light surface.
+  ".cm-mermaid": {
+    display: "block",
+    textAlign: "center",
+    padding: "8px 0",
+  },
+  ".cm-mermaid-card": {
+    display: "inline-block",
+    maxWidth: "100%",
+    overflowX: "auto",
+    backgroundColor: "#fbfbfa",
+    border: "1px solid #e3e2dd",
+    borderRadius: "var(--radius-2, 6px)",
+    padding: "16px",
+    color: "#1a1a17",
+  },
+  ".cm-mermaid-fallback .cm-mermaid-card": {
+    display: "block",
+  },
+  ".cm-mermaid-fallback pre": {
+    margin: "0",
+    textAlign: "left",
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.9em",
+    color: "#1a1a17",
+    overflowX: "auto",
+  },
+
+  // Callouts (MYND-47) — a colored tint on each callout line (composes with
+  // blockquote's left bars) + an icon+title header. Colors reuse the semantic
+  // soft/solid tokens; `-bg-` tints the line, `-fg-` colors the title+icon.
+  ".cm-callout-bg-info": { backgroundColor: "var(--info-soft, #e8edf5)" },
+  ".cm-callout-bg-success": { backgroundColor: "var(--success-soft, #e3eee8)" },
+  ".cm-callout-bg-warning": { backgroundColor: "var(--warning-soft, #f5efde)" },
+  ".cm-callout-bg-danger": { backgroundColor: "var(--danger-soft, #f5e7e5)" },
+  ".cm-callout-bg-accent": { backgroundColor: "var(--accent-soft, #e8edf5)" },
+  ".cm-callout-title": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    fontWeight: "700",
+  },
+  ".cm-callout-fg-info": { color: "var(--info, #2c4a7a)" },
+  ".cm-callout-fg-success": { color: "var(--success, #2f6048)" },
+  ".cm-callout-fg-warning": { color: "var(--warning, #8a6a1f)" },
+  ".cm-callout-fg-danger": { color: "var(--danger, #8a2a23)" },
+  ".cm-callout-fg-accent": { color: "var(--accent, #2c4a7a)" },
+
   // Block decorations — line classes from blockquote.ts / frontmatter.ts.
   // Left bar(s) + indent are painted per-line by blockquote.ts as a
   // `--line-2` gradient background (one bar per nesting level, Penpot spec),
@@ -126,11 +305,13 @@ export const myneTheme = EditorView.theme({
   // raw pipe source is reached via cursor-aware whole-table reveal (Task 2).
   // `.cm-table-scroll` contains horizontal overflow so wide tables scroll in
   // their own box without breaking the editor's vertical layout.
+  // `padding` (not `margin`) for the same height-map reason as the math/mermaid
+  // block widgets above — an outer margin here drifts every click below the table.
   ".cm-table-scroll": {
     display: "block",
     overflowX: "auto",
     maxWidth: "100%",
-    margin: "10px 0",
+    padding: "10px 0",
   },
   ".cm-table": {
     borderCollapse: "collapse",
@@ -169,41 +350,58 @@ export const myneTheme = EditorView.theme({
     lineHeight: "1.5",
     padding: "0 16px",
   },
+  // Vertical padding matches the 16px sides so all four inner edges read equal
+  // (the top/bottom gap used to be 8px — half the sides). In the away state the
+  // top gap comes from the bar's bottom padding (above); in the editing state the
+  // first/last body lines (which show the raw fences) carry it via the rules below.
   // Editing-state line rounding (raw fence shown): top/bottom body lines round.
   ".cm-code-card-top": {
     borderTop: "1px solid var(--line-1)",
     borderTopLeftRadius: "var(--radius-2, 6px)",
     borderTopRightRadius: "var(--radius-2, 6px)",
-    paddingTop: "8px",
+    paddingTop: "16px",
   },
   ".cm-code-card-bottom": {
     borderBottom: "1px solid var(--line-1)",
     borderBottomLeftRadius: "var(--radius-2, 6px)",
     borderBottomRightRadius: "var(--radius-2, 6px)",
-    paddingBottom: "8px",
+    paddingBottom: "16px",
   },
   // Away-state card-top bar widget (replaces the opening fence line); carries
   // the language badge top-right. Side + top borders + top radius continue the
   // card around the body lines below.
+  // Away-state bar: a 0-height OVERLAY anchored on the (collapsed) opening-fence
+  // line. It contributes no vertical row, so the first code line — which is now
+  // the card's visual top (`cm-code-card-top`, 16px top padding) — keeps the same
+  // inset as the other three edges. The badge + copy float in the top-right corner
+  // via `.cm-code-bar-cluster`.
   ".cm-code-card-bar": {
-    display: "flex",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: "10px",
-    backgroundColor: "var(--paper-2)",
-    borderLeft: "1px solid var(--line-1)",
-    borderRight: "1px solid var(--line-1)",
-    borderTop: "1px solid var(--line-1)",
-    borderTopLeftRadius: "var(--radius-2, 6px)",
-    borderTopRightRadius: "var(--radius-2, 6px)",
-    minHeight: "26px",
-    padding: "4px 16px",
-    boxSizing: "border-box",
+    position: "relative",
+    height: "0",
+    overflow: "visible",
   },
+  // Empty block (```lang```): no body to overlay onto, so this variant stays a
+  // real, visible rounded bar holding the badge.
   ".cm-code-card-bar-full": {
-    borderBottom: "1px solid var(--line-1)",
-    borderBottomLeftRadius: "var(--radius-2, 6px)",
-    borderBottomRightRadius: "var(--radius-2, 6px)",
+    height: "auto",
+    minHeight: "34px",
+    backgroundColor: "var(--paper-2)",
+    border: "1px solid var(--line-1)",
+    borderRadius: "var(--radius-2, 6px)",
+  },
+  ".cm-code-bar-cluster": {
+    position: "absolute",
+    top: "7px",
+    right: "12px",
+    zIndex: "1",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    // Paper-2 backing so a long first code line passing under the cluster is
+    // cleanly occluded rather than peeking through the label.
+    backgroundColor: "var(--paper-2)",
+    paddingLeft: "8px",
+    borderRadius: "var(--radius-1, 3px)",
   },
   // Language badge inside the bar. Decorative, non-selectable.
   ".cm-code-badge": {
@@ -302,6 +500,9 @@ export const myneTheme = EditorView.theme({
     display: "inline-block",
     width: "16px",
     height: "16px",
+    // Gap to the label so a completed item's strikethrough never touches the box
+    // (the strike itself also starts past the leading space — see task-list.ts).
+    marginRight: "6px",
     border: "1.5px solid var(--line-2, #c8c7c1)",
     borderRadius: "var(--radius-1, 3px)",
     backgroundColor: "var(--paper, #faf8f3)",
@@ -399,7 +600,7 @@ export const myneTheme = EditorView.theme({
   // EOD "Footnotes" block widget — a derived read-only VIEW appended at document
   // end. The source definition lines stay byte-stable; this list never writes.
   ".cm-footnote-list": {
-    marginTop: "28px",
+    paddingTop: "28px",
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
     lineHeight: "1.6",
@@ -434,10 +635,16 @@ export const myneTheme = EditorView.theme({
   ".cm-footnote-item": {
     display: "contents",
   },
+  // The identifier (the "label": 1 / long-note / final-note) reads as a distinct
+  // anchor — monospace + accent — so it's unmistakably the footnote KEY, not part
+  // of the sans body prose next to it (which previously shared the muted grey).
   ".cm-footnote-item-marker": {
     textAlign: "right",
     whiteSpace: "nowrap",
-    color: "var(--fg-3, #6b6a64)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.85em",
+    fontWeight: "600",
+    color: "var(--accent, #2c4a7a)",
     fontVariantNumeric: "tabular-nums",
   },
   ".cm-footnote-item-body": {
@@ -682,6 +889,54 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-attachment-tombstone-label": {
     whiteSpace: "nowrap",
+  },
+
+  // Autocomplete tooltip (emoji `:shortcode`, MYND-156). CM6 mounts the
+  // completion tooltip inside the editor's tooltip layer, so its `.cm-tooltip*`
+  // classes ARE reachable by this theme (unlike the body-mounted slash menu).
+  // Bring it into the design system: paper surface, hairline + shadow, sans
+  // type, accent-soft active row. The glyph (`detail`) sits muted on the right.
+  ".cm-tooltip.cm-tooltip-autocomplete": {
+    backgroundColor: "var(--paper, #faf8f3)",
+    border: "1px solid var(--line-2, #c8c7c1)",
+    borderRadius: "var(--radius-2, 6px)",
+    boxShadow: "var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08))",
+    overflow: "hidden",
+  },
+  ".cm-tooltip-autocomplete > ul": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    maxHeight: "16em",
+  },
+  ".cm-tooltip-autocomplete > ul > li": {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "5px 10px",
+    color: "var(--fg-1)",
+    lineHeight: "1.3",
+  },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected]": {
+    backgroundColor: "var(--accent-soft, #e8edf5)",
+    color: "var(--fg-1)",
+  },
+  ".cm-tooltip-autocomplete .cm-completionLabel": {
+    flex: "1 1 auto",
+    fontFamily: "var(--font-mono)",
+  },
+  ".cm-tooltip-autocomplete .cm-completionMatchedText": {
+    textDecoration: "none",
+    fontWeight: "700",
+    color: "var(--accent, #2c4a7a)",
+  },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText": {
+    color: "var(--accent, #2c4a7a)",
+  },
+  ".cm-tooltip-autocomplete .cm-completionDetail": {
+    flex: "0 0 auto",
+    fontStyle: "normal",
+    fontSize: "15px",
+    color: "var(--fg-2)",
   },
 
   // Floating UI (slash menu / selection toolbar / URL overlay) styles

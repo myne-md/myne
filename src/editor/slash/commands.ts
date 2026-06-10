@@ -96,6 +96,15 @@ export function slashCommands(): readonly SlashCommand[] {
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "> "),
     },
     {
+      // MYND-47: inserts a note callout header; the user types the title and can
+      // change the type. (A type-picker sub-palette is a flagged refinement.)
+      // First blockquote-family construct the editor EMITS — §5 callout row.
+      id: "callout",
+      label: "Callout",
+      icon: "!",
+      apply: (v, f, t) => replaceLinePrefix(v, f, t, "> [!note] "),
+    },
+    {
       id: "divider",
       label: "Divider",
       icon: "—",

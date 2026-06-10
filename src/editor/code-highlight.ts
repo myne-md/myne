@@ -154,6 +154,14 @@ export const codeHighlightStyle = HighlightStyle.define([
     tag: [t.meta, t.annotation, t.documentMeta],
     color: "var(--syntax-meta)",
   },
+  // Diff blocks (```diff): the legacy diff stream-mode tags whole `+`/`-` lines
+  // as inserted/deleted (the `@@` hunk header is `meta`, handled above). Without
+  // these the +/- lines fell through to the default color and read as unstyled
+  // (the diff-not-styled bug). Reuse the semantic success/danger tokens (both
+  // themed, both AA on the code-card surface).
+  { tag: [t.inserted], color: "var(--success)" },
+  { tag: [t.deleted], color: "var(--danger)" },
+  { tag: [t.changed], color: "var(--syntax-number)" },
   { tag: [t.invalid], color: "var(--syntax-invalid)" },
 ]);
 

@@ -26,6 +26,9 @@ const TOOLBAR_BUTTONS = [
   { id: "italic", label: "I", weight: "600", italic: true, action: toggleAction("*", "*") },
   { id: "strike", label: "S", weight: "600", strike: true, action: toggleAction("~~", "~~") },
   { id: "code", label: "<>", weight: "600", mono: true, action: toggleAction("`", "`") },
+  // Highlight (MYND-156): wraps the selection in `==…==`. Rendered as a small
+  // highlight swatch so it reads distinctly from the heading "H▾" button.
+  { id: "highlight", label: "H", weight: "600", highlight: true, action: toggleAction("==", "==") },
 ] as const;
 
 function toggleAction(open: string, close: string) {
@@ -196,7 +199,17 @@ class ToolbarView implements PluginValue {
       const el = document.createElement("button");
       el.type = "button";
       el.className = "cm-toolbar-button";
-      el.textContent = btn.label;
+      if ("highlight" in btn && btn.highlight) {
+        const swatch = document.createElement("span");
+        swatch.textContent = btn.label;
+        swatch.style.backgroundColor = "var(--highlight, #f3e7c4)";
+        swatch.style.padding = "0 3px";
+        swatch.style.borderRadius = "2px";
+        swatch.style.color = "var(--fg-1)";
+        el.appendChild(swatch);
+      } else {
+        el.textContent = btn.label;
+      }
       el.style.fontWeight = btn.weight;
       if ("italic" in btn && btn.italic) el.style.fontStyle = "italic";
       if ("strike" in btn && btn.strike) el.style.textDecoration = "line-through";

@@ -37,10 +37,10 @@ The parser recognizes the union of CommonMark + GFM extensions + footnote extens
 - Indented code blocks (4-space indent) — recognized for round-trip but **never emitted**; new code blocks always use fenced form
 - Fenced code blocks (`` ``` `` or `~~~`) with optional language label (` ```ts `)
 - Block quotes (`> ` prefix)
-- Bullet lists (`- ` / `* ` / `+ `; canonical emit form for new writes is `- `)
-- Ordered lists (`1. ` / `1) `; canonical emit form is `1. `)
+- Bullet lists (`- ` / `* ` / `+ `; canonical emit form for new writes is `- `) — since MYND-208 **rendered** with a cursor-aware decoration: the marker becomes a muted bullet glyph (`•` top level, `◦` nested) with a hanging indent off-cursor, the raw marker revealed on-cursor. The alternate markers (`*`/`+`) and the source nesting whitespace are preserved; **never emitted**, bytes preserved per §6 C1. (Task-list items `- [ ]` keep their checkbox decoration, §3.3.)
+- Ordered lists (`1. ` / `1) `; canonical emit form is `1. `) — since MYND-208 the `n.` marker is **rendered** muted (cursor-aware) off-cursor, revealed on-cursor; non-canonical numbering and `1)` form preserved, never emitted.
 - Horizontal rules (`---` / `***` / `___`; canonical emit form is `---`)
-- HTML blocks (raw HTML — recognized at parse, rendered as plain monospace by default; full sanitized rendering is out of scope for v0.1)
+- HTML blocks (raw HTML — recognized at parse). Since MYND-209 a **curated safe subset** is **rendered**: block `<p>` and `<details>`/`<summary>` (the latter natively interactive, with WebView-only ephemeral open state) are sanitized through DOMPurify under an ultra-tight allowlist and rendered as block widgets, cursor-aware (raw HTML revealed on-cursor; bytes preserved per §6 C1). Everything off the allowlist (incl. `<script>`/`<iframe>`/`<img>`) is NOT rendered and stays plain text. See §8.
 - Definition lists (Pandoc-style `Term` then `: Definition`) — **recognized and rendered** since MYND-152 (scope reversal, `decisions.md` 2026-05-30; previously §7 out-of-scope). The pinned v0.1 subset is **tight only**: a single term line immediately followed (no blank line between) by one or more definition lines, each `:` + a space + the definition text (a bare `:` is an empty definition); multiple consecutive `:` lines attach as multiple definitions of that term. **Not** in the subset (preserved byte-stably as ordinary paragraphs, not parsed as definition lists): the blank-line-separated "loose" form, lazy continuation lines (a definition wrapping onto a non-`:` line), and multiple terms sharing one definition block. Rendered with a cursor-aware decoration (term styled, definitions indented, leading `:` hidden off-cursor); **never emitted** — no authoring affordance produces a definition list, and bytes are preserved per §6 C1. The custom parser node is informative in §8.
 
 ### 3.2 Inline elements (CommonMark base)
@@ -50,8 +50,13 @@ The parser recognizes the union of CommonMark + GFM extensions + footnote extens
 - Inline links: `[text](url)` and `[text](url "title")`
 - Reference links: `[text][ref]` (and collapsed `[text][]` / shortcut `[ref]`) + `[ref]: url` — recognized for round-trip and, since MYND-148, **rendered** with a cursor-aware decoration: a resolved usage shows its visible text as a link and the resolved `[ref]: url` definition line hides off-cursor; a dangling reference (no matching definition) stays plain text. Still **never emitted** — new links use inline form, bytes preserved per §6 C1. A `[ref]: url` definition is matched to its uses by CommonMark reference rules (case-folded, internal whitespace collapsed). See also the shared **link reference definition** collector consumed by reference images (§7, MYND-149/MYND-164).
 - Autolinks: `<https://example.com>` (CommonMark form) and bare `https://example.com` (GFM extension)
-- Hard line breaks: trailing two spaces or `\` at line end
+- Hard line breaks: trailing two spaces or `\` at line end — since MYND-208 the trailing marker is **hidden** off-cursor (render-only, no `↵` glyph, per PRODUCT.md), revealed on-cursor; bytes preserved per §6 C1.
+- Backslash escapes (`\*`, `` \` ``, `\\`, `\#`, …) — since MYND-208 the leading `\` is **hidden** off-cursor so the escaped character reads cleanly (e.g. `\*` renders `*`), revealed on-cursor; render-only, bytes preserved per §6 C1.
 - Raw inline HTML (recognized; rendered as plain text)
+- **Highlight** (Myne inline extension, MYND-156): `==text==` — **rendered** with a muted `--highlight` wash (cursor-aware: `==` markers hidden off-cursor, revealed on-cursor). The one hand-rolled inline config (the bundle has no highlight). Canonical emit `==text==` via the highlight toolbar button (§5).
+- **Subscript / superscript** (MYND-156): `~x~` / `^x^` — **rendered** (`.cm-sub` / `.cm-sup`, cursor-aware), reusing the `@lezer/markdown` Subscript/Superscript configs. Single-run, space-free (Pandoc-style); disjoint from GFM strikethrough `~~…~~` and footnote `[^id]`. Recognize-and-render-only — **never emitted**, bytes preserved per §6 C1.
+- **Emoji shortcodes** (MYND-156): `:name:` (via the `@lezer/markdown` Emoji config) — a mapped name **renders** as the unicode glyph (lazy-loaded name→glyph map); an unmapped `:name:` stays literal text. The `:` autocomplete inserts the unicode glyph directly (so authoring emits a plain glyph, not the `:shortcode:`). The `:name:` source is render-only — never rewritten in the buffer (§6 C1).
+- **Math** (MYND-48): inline `$…$` (a custom `InlineMath` Lezer node) and block `$$…$$` (a decoration, not a node) — **rendered** via lazy-loaded KaTeX, cursor-aware (raw LaTeX revealed on-cursor; invalid LaTeX shows source + a subtle hint, never KaTeX's red node). The inline **`$`-disambiguation** (Pandoc/Obsidian): the opening `$` must not be followed by whitespace or a digit (`$5` is currency), the closing `$` must not be preceded by whitespace, `$$` is block, and a `$…$` run does not cross a line break — so tests.md's `Currency: $ € £ …` stays text. Math does not parse inside code spans/fences. InlineMath is a leaf node, so `#tags`/emphasis do not parse inside it (§3.7.5). Render-only, never emitted; bytes preserved (§6 C1).
 
 ### 3.3 GFM extensions
 
@@ -200,7 +205,7 @@ The inline-tag tokenizer **does not** match within the following nested syntacti
 
 When the parser is built on a nested-node syntax tree (e.g., the `@lezer/markdown` reference implementation per §8), zones (1)–(6) are excluded structurally because the inline-tag tokenizer runs only at the outer-inline-text level and does not descend into nested nodes. (Research Q7, Q9.)
 
-**Future hook (v0.1.x).** When math (`$…$`, `$$…$$`) lands per §7's deferred items, the inline-tag tokenizer must additionally exclude math zones. v0.1 implementations may safely skip this case because math is not yet parsed.
+**Math zones (MYND-48, landed).** Math (`$…$`, `$$…$$`) now renders (§3.2). The exclusion is **structural**: `InlineMath` is a leaf node (no inline children parsed inside), and the inline-tag deny-list already excludes `$` (§3.7.2), so a `#tag` can neither contain a `$` nor extend into a math span — no separate tokenizer pass is needed.
 
 #### 3.7.6 Frontmatter scope
 
@@ -238,6 +243,7 @@ When Myne authors new content (slash command, selection toolbar, keyboard shortc
 | Italic | `*italic*` | GFM-default; tighter visually than `_italic_` |
 | Bold | `**bold**` | GFM-default; consistent with italic delimiter family |
 | Strikethrough | `~~text~~` | Only GFM form |
+| Highlight | `==text==` | Myne inline extension (MYND-156); the highlight toolbar button emits this. Subscript/superscript/emoji are render-only (no emit form). |
 | Heading | ATX (`# `, `## `, etc.) | Setext is recognized on parse but never emitted |
 | Bullet list | `- ` | GFM-default; Obsidian-default; visually quieter than `* ` |
 | Ordered list | `1. ` | Standard form |
@@ -245,6 +251,7 @@ When Myne authors new content (slash command, selection toolbar, keyboard shortc
 | Horizontal rule | `---` | Three dashes; matches frontmatter delimiter visually but unambiguous in context |
 | Inline link | `[text](url)` | Reference form is recognized for round-trip but never emitted |
 | Wikilink (new authoring) | `[[vault/relative/path.md\|Display]]` | See [`wikilink.md`](wikilink.md) §4 |
+| Callout | `> [!note] ` | MYND-47; the `/callout` slash command emits this. The first blockquote-family construct the editor emits — recognized callout types render (§3 / §7); other blockquotes are unaffected. |
 
 **The canonical emit form is what slash commands, the selection toolbar, and keyboard shortcuts produce.** A user who hand-writes `_italic_` or `1) ordered` is **never** silently rewritten — non-canonical forms recognized at parse are preserved byte-for-byte unless the user themselves edits them.
 
@@ -258,7 +265,7 @@ When Myne authors new content (slash command, selection toolbar, keyboard shortc
 - reference links (`[text][ref]` + later `[ref]: url`)
 - indented code blocks
 - task list `[X]` (uppercase) variants
-- callout / admonition syntax not yet rendered by Myne (`> [!NOTE]`)
+- callout / admonition syntax (`> [!NOTE]`) — rendered since MYND-47 (decoration-only; bytes preserved, never rewritten)
 - block ID markers (`^block-id`)
 - HTML embeds
 - inline `#tag` bytes (per §3.7 — recognizer-only; never rewritten)
@@ -281,12 +288,12 @@ Everything else in an imported note is byte-for-byte preserved per the list abov
 
 The following syntax is **not** parsed or rendered in v0.1. Authoring affordances do not produce them; imported content containing them is preserved byte-for-byte and rendered as plain text:
 
-- **Math.** `$inline$` and `$$display$$` LaTeX-style math. Deferred to v0.1.x ("second step"); KaTeX integration is the implementation path.
+- ~~**Math.**~~ **Now rendered since MYND-48** (`decisions.md` 2026-06-08) — `$inline$` + `$$display$$` LaTeX render via lazy-loaded KaTeX; the `$`-vs-currency disambiguation grammar is in §3.2. No longer out of scope.
 - **Attribute syntax.** `{#id .class key=value}` Pandoc-style attributes. Not native to GFM; not in v0.1.
-- **Callouts / admonitions.** `> [!NOTE]` GitHub/Obsidian convention. Recognized at parse for round-trip; the v0.1 baseline editor renders the callout block as a normal block quote (the `[!NOTE]` marker stays as plain text inside the quote). Full callout decoration is deferred to v0.1.x.
+- ~~**Callouts / admonitions.**~~ **Now rendered since MYND-47** (`decisions.md` 2026-06-08) — a `> [!TYPE]` blockquote promotes to a styled callout container (Obsidian-full ~12 types, case-insensitive, custom title; colored tint + icon + title), via a cursor-aware decoration that composes with the blockquote bars and does not modify `blockquote.ts`; the `[!TYPE]` bytes are preserved (§6 C1), revealed on-cursor. Unknown type → plain blockquote. The `/callout` slash command emits `> [!note] ` (§5). (Interactive fold `+`/`-` is recognized + round-trips; the collapse toggle is a follow-up.)
 - **Iframes / embeds.** Raw `<iframe>` HTML. Recognized as raw HTML; rendered as plain monospace; sandboxing is out of scope in v0.1 (a separate concern from the now-shipped attachment pipeline).
 - **Custom container blocks.** `:::` div containers (Pandoc / Djot syntax). Not in v0.1.
-- **Mermaid / PlantUML diagrams.** Recognized as fenced code blocks with `mermaid` / `plantuml` language label; rendered as monospace code; diagram rendering is deferred.
+- ~~**Mermaid diagrams.**~~ **Now rendered since MYND-49** (`decisions.md` 2026-06-08) — a ```mermaid fenced block renders as an SVG diagram via lazy-loaded Mermaid (`securityLevel:'strict'`, `htmlLabels:false`); parse-error / load-failure falls back to the monospace code card; cursor-aware whole-block reveal, bytes preserved (§6 C1). **PlantUML remains out of scope** (recognized as fenced code, rendered as a code card).
 - **Inline images.** `![alt](path)` and `![[image.png]]` are parsed and round-trip-stable. The attachment-encryption pipeline **ships in v0.1** (`protocol.md` §11.2; PR #53), so **attachment-form** refs (`![[att:<id>|filename]]`) render inline (raster/SVG via `attachment://`, PDF via pdf.js). **Raw-path** refs (`![[image.png]]` / `![alt](path)`) are still not rendered as images: the Obsidian importer (MYND-52) rewrites the ingestable ones to attachment form and leaves the residual as placeholder comments; a raw-path ref that survives in a note shows as a chip/text, not an `<img>`. **Reference-style images** (`![alt][ref]`) resolve against the same link reference definition table as reference links (§3.2); the rider that hides a definition line referenced only by an image **landed with MYND-164**.
 
 ## 8. Parser configuration (informative)
@@ -297,7 +304,7 @@ For the v0.1 reference implementation in the desktop client:
 - Definition lists (§3.1) use a custom `MarkdownConfig` extension (a `LeafBlockParser`, the same hook CommonMark uses for setext headings and link references) that emits a `DefinitionList` block node with `DefinitionTerm` / `DefinitionMarker` (`:`) / `DefinitionDesc` children for the pinned tight subset. GFM has no definition-list node, so this extension is the sole producer; it is registered both in the shared serialization parser and in the editor's `markdown({ extensions })` so the editor's `syntaxTree` carries the node for decoration. Setext headings and reference links require **no** parser extension — `markdownLanguage` already produces `SetextHeading1`/`SetextHeading2` and reference-style `Link` nodes; MYND-146/148 are decoration-only.
 - Footnotes (§3.4) use a custom `MarkdownConfig` extension (`src/dialect/lezer/footnote.ts`, MYND-153) because the `GFM` bundle (`[Table, TaskList, Strikethrough, Autolink]`) carries no footnote config and `@lezer/markdown` exports none. It emits an inline `FootnoteReference` node (registered `before: "Link"` so `[^…]` outranks standard link parsing) and a block `FootnoteDefinition` node (registered `before: "LinkReference"` so a `[^id]: text` line is claimed as a footnote rather than half-parsed as a CommonMark link reference definition), each exposing `FootnoteMark` (`[^`, `]` / `]:`) and `FootnoteLabel` (the identifier) children. The `FootnoteDefinition` is a **composite block**: its body parses as nested block content via a continuation rule (`NodeSpec.composite`), so multi-paragraph footnotes and fenced code / blockquotes *inside* a footnote render correctly. Like definition lists it is registered in both the shared serialization parser and the editor's `markdown({ extensions })`. The v0.1 subset: an identifier is a non-empty whitespace-free run with no `]`; a definition begins a block line (`[^id]:`, content optional — a bare `[^id]:` is an empty definition) and its body continues onto following lines that are blank or indented ≥4 columns (the Pandoc / GitHub continuation rule), ending at the first less-indented non-blank line; a footnote-definition line also interrupts an open paragraph (so consecutive `[^1]:`/`[^2]:` lines are distinct definitions). Recognizer-only — it emits nodes and never mutates bytes. The editor renders the reference as a superscript marker and collects definitions into a derived end-of-document list (a VIEW; in-source definition lines stay byte-stable in place); see `decisions.md` 2026-05-31.
 - The frontmatter recognizer is single-pass and does not parse the YAML body; it only delimits the block. YAML parsing happens in a separate pass (when the Properties UI lands; deferred).
-- HTML embedded inside markdown is recognized via `@codemirror/lang-html` (forced transitive of `lang-markdown`); v0.1 renders raw HTML as plain monospace, with no sanitization (because nothing is rendered beyond plain monospace, there is no XSS surface).
+- HTML embedded inside markdown is recognized via `@codemirror/lang-html` (forced transitive of `lang-markdown`). **Amended by MYND-209** (`decisions.md` 2026-06-08, supersedes the prior "no sanitization, no XSS surface" posture): a curated safe subset — inline `<kbd>`/`<mark>`/`<sub>`/`<sup>`/`<abbr title>` and block `<p>`/`<details>`/`<summary>` — is **rendered** by sanitizing the raw span through **DOMPurify** (lazy-loaded) under an ultra-tight allowlist (`ALLOWED_TAGS` = those 8; `ALLOWED_ATTR` = `[title]`; KEEP_CONTENT). Rendering is via `innerHTML` of the **sanitized output ONLY** — never raw note HTML — so the introduced XSS surface is bounded to DOMPurify's vetted output; CSP (`script-src 'self'`, no `'unsafe-inline'`) is defense-in-depth. Off-allowlist tags (`<script>`/`<iframe>`/`<img>`/etc.) and HTML inside code spans/fences are NOT rendered and stay plain text. This is the SYNC-5 trusted-input contract reused by mermaid (MYND-49) SVG sanitization.
 
 This section is informative — a future Myne client implementation may choose any parser that produces an AST conformant to §3 and emits per §5. The dialect, not the parser, is what binds clients.
 
