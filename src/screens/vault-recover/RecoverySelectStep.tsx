@@ -186,6 +186,8 @@ function VaultRow({
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
+      data-testid="recover.select-row"
+      data-vault-id={vault.id}
       style={rowStyle(hovered)}
     >
       <span style={ROW_LABEL_COL_STYLE}>
@@ -309,9 +311,10 @@ export function RecoverySelectStep({
           spellCheck={false}
           autoCapitalize="off"
           invalid={accountError != null}
+          data-testid="recover.select-account-input"
         />
         {accountError != null && (
-          <span role="alert" style={ERROR_STYLE}>
+          <span role="alert" style={ERROR_STYLE} data-testid="recover.select-account-error">
             {accountError}
           </span>
         )}
@@ -319,12 +322,18 @@ export function RecoverySelectStep({
           type="submit"
           variant="secondary"
           disabled={resolving || accountNumber.trim() === ""}
+          data-testid="recover.select-account-submit"
         >
           {resolving ? "Checking…" : "Use account number"}
         </Button>
       </form>
 
-      <Button type="button" variant="ghost" onClick={onCancel}>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={onCancel}
+        data-testid="recover.select-cancel"
+      >
         Cancel
       </Button>
     </StepShell>

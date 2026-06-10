@@ -42,6 +42,7 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
       <PasswordCreateForm
         submitLabel="Generate recovery phrase"
         onSubmit={onSubmit}
+        testIdPrefix="create"
         secondaryAction={{ label: "Back", onClick: onBack, icon: "arrow-left" }}
         errorBanner={
           error && error.displayMode === "inline" ? (

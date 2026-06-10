@@ -289,18 +289,24 @@ export function Editor({
 
   return (
     <SidebarStateProvider>
-      <EditorChrome
-        onLock={onLock}
-        onForceRelock={onForceRelock}
-        onDeleteVaultSuccess={onDeleteVaultSuccess}
-        onSwitchVault={onSwitchVault}
-        onCreateAnother={onCreateAnother}
-        switching={switching}
-        settingsOpen={settingsOpen}
-        setSettingsOpen={setSettingsOpen}
-        toastMessage={toastMessage}
-        setToastMessage={setToastMessage}
-      />
+      {/* display:contents marker — the E2E suites' "editor mounted"
+          signal (SYNC-8 testid pass). Renders after the mount-time
+          vault_is_unlocked guard has passed, so its presence implies
+          the Rust slot agreed with the React stage. */}
+      <div style={{ display: "contents" }} data-testid="editor.root">
+        <EditorChrome
+          onLock={onLock}
+          onForceRelock={onForceRelock}
+          onDeleteVaultSuccess={onDeleteVaultSuccess}
+          onSwitchVault={onSwitchVault}
+          onCreateAnother={onCreateAnother}
+          switching={switching}
+          settingsOpen={settingsOpen}
+          setSettingsOpen={setSettingsOpen}
+          toastMessage={toastMessage}
+          setToastMessage={setToastMessage}
+        />
+      </div>
     </SidebarStateProvider>
   );
 }
@@ -1443,6 +1449,7 @@ function SwitchingOverlay() {
     <div
       role="status"
       aria-live="polite"
+      data-testid="editor.switching-overlay"
       style={{
         position: "absolute",
         inset: 0,
@@ -1560,6 +1567,7 @@ function BottomBar({
           type="button"
           onClick={handleLockClick}
           aria-label="Vault'u kilitle"
+          data-testid="editor.lock-cta"
           style={{
             display: "flex",
             alignItems: "center",

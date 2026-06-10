@@ -38,7 +38,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 brew install lefthook && lefthook install   # one-time per clone; activates git hooks
 ```
 
-Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fast lint set (rustfmt-check, `tsc --noEmit`, whitespace, EOF newline, secret pattern guard, single-Cargo.lock check); `pre-push` runs the full battery (`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `pnpm build`). No CI yet — these hooks are the safety net. Bypass with `git commit --no-verify` only when you understand why.
+Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fast lint set (rustfmt-check, `tsc --noEmit`, whitespace, EOF newline, secret pattern guard, single-Cargo.lock check); `pre-push` runs the full battery (`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `pnpm build`). CI is self-hosted Woodpecker via the Forgejo mirror (`.woodpecker.yml`, Linux runner; `docs/decisions.md` 2026-05-01) — the hooks are the local pre-push net, CI is the remote gate, and the `e2e` step drives the production binary via tauri-driver (`docs/dev/e2e.md`). Bypass with `git commit --no-verify` only when you understand why.
 
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.
 
@@ -98,7 +98,7 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Attachment blob magic | `MYA1` (files `attachments/<attachment-id-hex>`; §9.9) |
 | Attachments catalog magic | `MYC1` (file `vault.attachments`; §9.10) |
 | Protocol identifier string | `myne-protocol-v0.1` |
-| Account-number display prefix | `MY-XXXX-XXXX-XXXX-XXXX-X` (display-only) |
+| Account-number display prefix | `MY-` + five dash-separated 4-char Crockford groups (27-char display form, `account-number.md` §3; the old `MY-XXXX-XXXX-XXXX-XXXX-X` sketch was illustrative shorthand — the last group is 4 chars, ending in the Damm-32 check char) |
 | Damm-32 quasigroup table | frozen literal, `account-number.md` §4.2 — determines which 20-char strings are valid and which check char generation emits; changing it rejects already-distributed account numbers and breaks cross-impl validity agreement |
 
 v005 reservations: `NT05`/`NTV5` (per-note / vault-meta) + `MYP5`/`MYS5`/`MYA5`/`MYC5` (prefs / search / attachment / attachments-catalog) magic, `"myne.v005|"` AAD prefix, `"myne.v005 "` HKDF context prefix — see the normative magic-allocation table in `docs/spec/protocol.md` §10.3 (which is the single source of truth for magic allocation, incl. the reserved `MYI1` VaultIndices magic). v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.

@@ -47,10 +47,10 @@ const COPY_FOR_REASON: Record<SuspicionReason, string> = {
 export function SuspicionBanner({ reason }: SuspicionBannerProps) {
   const message = COPY_FOR_REASON[reason];
   if (reason === "vault-meta-changed-externally") {
-    return <DestructiveBanner>{message}</DestructiveBanner>;
+    return <DestructiveBanner testId="suspicion.banner">{message}</DestructiveBanner>;
   }
   return (
-    <div role="alert" style={GRAY_STYLE}>
+    <div role="alert" data-testid="suspicion.banner" style={GRAY_STYLE}>
       {message}
     </div>
   );

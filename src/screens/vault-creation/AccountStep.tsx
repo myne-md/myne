@@ -96,7 +96,11 @@ export function AccountStep({
           textAlign: "center",
         }}
       >
-        <span className="t-account-number" style={{ fontSize: 24 }}>
+        <span
+          className="t-account-number"
+          style={{ fontSize: 24 }}
+          data-testid="create.account-number"
+        >
           {accountNumber}
         </span>
       </div>
@@ -137,6 +141,7 @@ export function AccountStep({
             dispatch({ type: "ACCOUNT_ACK_TOGGLED", checked: e.target.checked })
           }
           style={{ marginTop: 3, accentColor: "var(--accent)" }}
+          data-testid="create.account-ack"
         />
         <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg-1)" }}>
           I have saved my account number where I can find it later.
@@ -149,6 +154,7 @@ export function AccountStep({
           onClick={() => dispatch({ type: "ACCOUNT_BACK" })}
           icon="arrow-left"
           disabled={committing}
+          data-testid="create.account-back"
         >
           Back
         </Button>
@@ -157,6 +163,7 @@ export function AccountStep({
           variant="primary"
           onClick={() => dispatch({ type: "COMMIT_REQUESTED" })}
           disabled={!acknowledged || committing}
+          data-testid="create.account-commit"
         >
           {committing && (
             <Spinner

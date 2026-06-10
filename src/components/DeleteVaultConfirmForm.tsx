@@ -208,6 +208,7 @@ export function DeleteVaultConfirmForm({
               onChange={(e) => setTyped(e.target.value)}
               disabled={inFlight}
               autoFocus
+              data-testid="delete-vault.confirm-input"
             />
             <div style={INPUT_HINT_STYLE}>
               Case-sensitive. Type the word exactly to enable
@@ -220,6 +221,7 @@ export function DeleteVaultConfirmForm({
               variant="secondary"
               onClick={onCancel}
               disabled={inFlight}
+              data-testid="delete-vault.cancel"
             >
               Cancel
             </Button>
@@ -227,6 +229,7 @@ export function DeleteVaultConfirmForm({
               variant="danger"
               onClick={handleSubmit}
               disabled={!submitReady}
+              data-testid="delete-vault.submit"
             >
               {inFlight ? "Deleting vault…" : "Delete vault"}
             </Button>
@@ -260,7 +263,11 @@ export function DeleteVaultConfirmForm({
           </DestructiveBanner>
 
           <div style={BUTTON_ROW_STYLE}>
-            <Button variant="danger" onClick={onContinueAfterPartial}>
+            <Button
+              variant="danger"
+              onClick={onContinueAfterPartial}
+              data-testid="delete-vault.continue"
+            >
               Continue
             </Button>
           </div>

@@ -55,6 +55,7 @@ import { Spinner } from "../components/Spinner";
 import { SuspicionBanner } from "../components/SuspicionBanner";
 import { closeApp } from "../lib/app-window";
 import { ioBanner } from "../lib/io-banner";
+import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
   deleteVault,
@@ -202,9 +203,11 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "InvalidCredentialOrVault":
       // §7.3 LITERAL compound — UI does NOT collapse to "Wrong password"
       // alone (would silently weaken the non-distinguishing posture).
+      // Canonical literal lives in `lib/load-bearing-copy.ts` (E2E
+      // asserts it by full-string equality).
       return {
         kind: "banner",
-        text: "Wrong password or vault file is corrupted.",
+        text: UNLOCK_NON_DISTINGUISHING_BANNER,
       };
     case "InvalidVaultMeta":
       return { kind: "corrupted" };
@@ -448,10 +451,19 @@ export function Unlock({
         <p style={CARD_BODY_STYLE}>
           Set a new password first, then re-seal your vault.
         </p>
-        <div role="alert" style={INFO_BANNER_STYLE}>
+        <div
+          role="alert"
+          data-testid="unlock.recovery-in-progress-banner"
+          style={INFO_BANNER_STYLE}
+        >
           Recovery flow was interrupted. Set a new password first.
         </div>
-        <button type="button" onClick={onResumeRecovery} style={ctaStyle(false)}>
+        <button
+          type="button"
+          onClick={onResumeRecovery}
+          style={ctaStyle(false)}
+          data-testid="unlock.resume-cta"
+        >
           <span>Continue</span>
         </button>
       </CenteredCard>
@@ -496,7 +508,17 @@ export function Unlock({
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
       <h1 style={CARD_TITLE_STYLE}>Unlock your vault.</h1>
       <p style={CARD_BODY_STYLE}>Enter your password to continue.</p>
-      <form style={FORM_STYLE} onSubmit={onSubmit} noValidate>
+      {/* `data-vault-id` mirrors the picker-row idiom (SYNC-8): the
+          vault-addressed unlock target threaded from the Stage payload,
+          observable to the E2E suite (MYND-127 story 2). Absent when the
+          backend's sole-vault `None` path applies. */}
+      <form
+        style={FORM_STYLE}
+        onSubmit={onSubmit}
+        noValidate
+        data-testid="unlock.form"
+        data-vault-id={vaultId}
+      >
         <input
           type="password"
           placeholder="Password"
@@ -508,14 +530,27 @@ export function Unlock({
           style={INPUT_STYLE}
           aria-label="Password"
           aria-invalid={error != null ? true : undefined}
+          data-testid="unlock.password-input"
         />
-        {error != null && <DestructiveBanner>{error}</DestructiveBanner>}
-        <button type="submit" disabled={submitDisabled} style={ctaStyle(submitDisabled)}>
+        {error != null && (
+          <DestructiveBanner testId="unlock.error-banner">{error}</DestructiveBanner>
+        )}
+        <button
+          type="submit"
+          disabled={submitDisabled}
+          style={ctaStyle(submitDisabled)}
+          data-testid="unlock.submit"
+        >
           {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
           <span>{decrypting ? "Decrypting…" : "Unlock"}</span>
         </button>
         {!decrypting && (
-          <button type="button" onClick={onStartRecovery} style={RECOVER_LINK_STYLE}>
+          <button
+            type="button"
+            onClick={onStartRecovery}
+            style={RECOVER_LINK_STYLE}
+            data-testid="unlock.recovery-link"
+          >
             Forgot your password? Unlock with recovery phrase
           </button>
         )}
@@ -524,6 +559,7 @@ export function Unlock({
             type="button"
             onClick={() => dispatch({ type: "request-delete-vault" })}
             style={DELETE_VAULT_LINK_STYLE}
+            data-testid="unlock.delete-link"
           >
             Lost both password and recovery phrase? Delete vault and start over
           </button>

@@ -46,6 +46,7 @@ export function SessionLostStep({ error, dispatch }: SessionLostStepProps) {
         variant="primary"
         onClick={() => dispatch({ type: "RESET" })}
         style={{ marginTop: 12 }}
+        data-testid="create.session-lost-start-over"
       >
         Start over
       </Button>

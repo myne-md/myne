@@ -35,13 +35,23 @@ interface ReadyStepProps {
    * "Done" click.
    */
   pending?: boolean;
+  /**
+   * The vault `commit` just wrote (`vaults/<id>/`) — the "Show vault
+   * folder" target (MYND-219 / SYNC-16: the pre-multi-vault `vault/`
+   * path no longer exists). `null` only on the legacy sole-vault path,
+   * where the affordance falls back to the legacy dir.
+   */
+  vaultId?: string | null;
 }
 
-export function ReadyStep({ onDone, pending = false }: ReadyStepProps) {
+export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStepProps) {
   const handleShowVaultFolder = async () => {
     try {
       const base = await appDataDir();
-      const dir = await join(base, "vault");
+      const dir =
+        vaultId != null
+          ? await join(base, "vaults", vaultId)
+          : await join(base, "vault");
       await openPath(dir);
     } catch (e) {
       logErrorKind(e, "show-vault-folder-failed");
@@ -76,10 +86,16 @@ export function ReadyStep({ onDone, pending = false }: ReadyStepProps) {
           icon="folder"
           onClick={handleShowVaultFolder}
           disabled={pending}
+          data-testid="create.ready-show-folder"
         >
           Show vault folder
         </Button>
-        <Button variant="primary" onClick={onDone} disabled={pending}>
+        <Button
+          variant="primary"
+          onClick={onDone}
+          disabled={pending}
+          data-testid="create.ready-done"
+        >
           {pending ? "Decrypting…" : "Done"}
         </Button>
       </div>

@@ -65,7 +65,7 @@ pre-commit:
 
 pre-push:
   # Heavier checks — matches CLAUDE.md's "Common commands" baseline.
-  # No CI yet; this is the safety net before publishing a branch.
+  # Local pre-push net; Woodpecker CI (.woodpecker.yml) is the remote gate.
   parallel: false
   commands:
 

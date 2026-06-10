@@ -23,6 +23,7 @@ export function EncryptingStep() {
       heading="Encrypting your vault"
       caption="This takes a moment."
       footerHint="If this takes longer than 30 seconds, close the window and try again."
+      testId="create.encrypting"
     />
   );
 }

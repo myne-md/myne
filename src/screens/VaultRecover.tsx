@@ -65,12 +65,16 @@ interface VaultRecoverProps {
   /** Dispatched when the user clicks Cancel on phrase-entry. Routes
    *  Stage `recover → unlock(Exists)` via `recover.cancel`. Decrypting
    *  and password-reset sub-steps do NOT render Cancel affordances
-   *  (spec §3.3 + §4.1). */
-  onCancel: () => void;
+   *  (spec §3.3 + §4.1). Carries the recovery's selected target
+   *  vault id (MYND-219 / SYNC-17 — keeps the post-cancel unlock
+   *  vault-addressed at ≥2 vaults; `undefined` on the sole-vault path). */
+  onCancel: (vaultId?: string) => void;
   /** Dispatched when A8f returns Ok. Routes Stage
    *  `recover(password-reset) → editor` via
-   *  `recover.complete-success`. */
-  onCompleteSuccess: () => void;
+   *  `recover.complete-success`. Carries the recovered vault's id
+   *  (MYND-219 / SYNC-17) for the editor stage's vault-addressed
+   *  lock/relock exits. */
+  onCompleteSuccess: (vaultId?: string) => void;
   /**
    * MYND-108-bis: terminal-destructive transition from the lost-
    * credentials cul-de-sac. Dispatched when the user submits the
@@ -129,6 +133,20 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
         banner: "Unexpected error. Please try again.",
       };
     case "JoinFailure":
+      return {
+        kind: "banner-retry",
+        banner: "Unexpected error. Please try again.",
+      };
+    case "RecoveryAbortedByLock":
+      // Defensive — an A8f-side variant (lock raced complete_recovery);
+      // A8d cannot produce it. Informational copy mirrors the
+      // change-password lock-race banner class.
+      return {
+        kind: "banner-retry",
+        banner: "Recovery cancelled: vault was locked.",
+      };
+    case "WeakNewPassword":
+      // Defensive — A8f-side floor; A8d takes no password. Generic.
       return {
         kind: "banner-retry",
         banner: "Unexpected error. Please try again.",
@@ -246,7 +264,9 @@ export function VaultRecover({
           onVaultSelected={(vaultId) =>
             dispatch({ type: "vault-selected", vaultId })
           }
-          onCancel={onCancel}
+          // No vault chosen yet on the select step — the post-cancel
+          // unlock falls to the boot-shaped sole/None path.
+          onCancel={() => onCancel(undefined)}
         />
       );
     case "phrase-entry":
@@ -254,7 +274,9 @@ export function VaultRecover({
         <PhraseEntryStep
           state={state}
           dispatch={dispatch}
-          onCancel={onCancel}
+          // Thread the recovery's selected target (MYND-219 / SYNC-17)
+          // so the post-cancel unlock stays vault-addressed.
+          onCancel={() => onCancel(state.vaultId ?? undefined)}
           onSubmitNormalizedPhrase={(normalized) => {
             phraseRef.current = normalized;
           }}
@@ -267,7 +289,7 @@ export function VaultRecover({
         <PasswordResetStep
           state={state}
           dispatch={dispatch}
-          onCompleteSuccess={onCompleteSuccess}
+          onCompleteSuccess={() => onCompleteSuccess(state.vaultId ?? undefined)}
         />
       );
     case "delete-confirm": {

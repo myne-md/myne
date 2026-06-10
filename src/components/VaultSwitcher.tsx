@@ -332,6 +332,7 @@ export function VaultSwitcher({
         aria-label="Switch vault"
         aria-haspopup="menu"
         aria-expanded={open}
+        data-testid="switcher.chip"
         style={{
           ...chipStyle(open),
           opacity: switching ? 0.6 : 1,
@@ -371,6 +372,9 @@ export function VaultSwitcher({
                 type="button"
                 role="menuitemradio"
                 aria-checked={isActive}
+                data-testid="switcher.vault-row"
+                data-vault-id={v.id}
+                data-active={isActive}
                 onClick={() => {
                   if (isActive) {
                     // Selecting the active vault is a no-op; just dismiss.
@@ -432,6 +436,7 @@ export function VaultSwitcher({
               onCreateAnother();
             }}
             style={FOOTER_STYLE}
+            data-testid="switcher.create-cta"
           >
             <Icon name="plus" size={16} style={{ flexShrink: 0 }} />
             <span>Create another vault</span>

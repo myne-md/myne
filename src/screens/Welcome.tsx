@@ -9,6 +9,7 @@ interface WelcomeProps {
 export function Welcome({ onCreateVault }: WelcomeProps) {
   return (
     <div
+      data-testid="welcome.root"
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -80,7 +81,11 @@ export function Welcome({ onCreateVault }: WelcomeProps) {
             marginTop: 8,
           }}
         >
-          <Button variant="primary" onClick={onCreateVault}>
+          <Button
+            variant="primary"
+            onClick={onCreateVault}
+            data-testid="welcome.create-cta"
+          >
             Create new vault
           </Button>
         </div>

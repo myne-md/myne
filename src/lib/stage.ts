@@ -167,7 +167,24 @@ export type Stage =
        */
       vaultId?: VaultId;
     }
-  | { name: "editor" }
+  | {
+      name: "editor";
+      /**
+       * The ACTIVE (sole-Unlocked) vault's id, threaded onto the editor
+       * stage by every entry path that knows it (MYND-219 / SYNC-17):
+       * `unlock.success` copies the unlock stage's targeting id,
+       * `create-vault.auto-unlock-success` and `recover.complete-success`
+       * carry the just-created / just-recovered vault's id on the action.
+       * Read by the exits that re-enter `unlock` (`editor.lock`, the
+       * change-password force-relock via `setStageWithSuspicion`) so the
+       * resulting unlock stays vault-addressed at ≥2 vaults instead of
+       * falling to the sole-vault `None` path. `undefined` only on the
+       * boot-probe slot-priority entry (post-reload editor) — the runtime
+       * owns active-vault identity there and no WebView-side id exists
+       * without an extra IPC.
+       */
+      vaultId?: VaultId;
+    }
   | { name: "recover"; subStep: RecoverSubStep }
   | { name: "picker" };
 
@@ -182,8 +199,6 @@ export type Stage =
 export type Action =
   /** Welcome → create-vault. */
   | { type: "create-vault.start" }
-  /** create-vault → welcome (Back from any step). */
-  | { type: "create-vault.back" }
   /**
    * create-vault → unlock(Exists). **Auto-unlock failure path.** The
    * vault was created (commit ok) but the chained `vault_unlock`
@@ -205,10 +220,14 @@ export type Action =
    * and the user lands directly in editor without retyping. The
    * password itself does NOT travel via Stage payload — it's held
    * by the CreateVault reducer and passed directly to vault_unlock,
-   * then wiped on resolve.
+   * then wiped on resolve. `vaultId` is the just-created vault's id
+   * (MYND-219 / SYNC-17) — it rides onto the editor stage so the
+   * editor's lock/relock exits stay vault-addressed.
    */
-  | { type: "create-vault.auto-unlock-success" }
-  /** unlock(decrypting) → editor on `vault_unlock` IPC resolve. */
+  | { type: "create-vault.auto-unlock-success"; vaultId?: VaultId }
+  /** unlock(decrypting) → editor on `vault_unlock` IPC resolve. The
+   *  unlock stage's own targeting `vaultId` threads onto the editor
+   *  stage (MYND-219 / SYNC-17) — no action payload needed. */
   | { type: "unlock.success" }
   /**
    * editor → unlock(Exists) on user clicking the Lock affordance.
@@ -307,17 +326,23 @@ export type Action =
    * `phrase-entry` sub-step (the recover screen renders Cancel only
    * there per `recovery-flow.md` §3.3 + §4.1). Stage transition is
    * not sub-step-aware — the recover-screen component is the gate.
+   * `vaultId` is the recovery's selected target (the recover screen's
+   * reducer owns it — MYND-206 selection / sole-vault null), threaded
+   * so the post-cancel unlock stays vault-addressed at ≥2 vaults
+   * (MYND-219 / SYNC-17).
    */
-  | { type: "recover.cancel" }
+  | { type: "recover.cancel"; vaultId?: VaultId }
   /**
    * recover → editor. Dispatched by PasswordResetStep on A8f
    * success. Stage transition is not sub-step-aware — Stage's
    * `subStep` is a mount-time hint and may drift from the recover
    * screen's live reducer state across silent-recovery swaps; the
    * recover-screen component is the gate that ensures only
-   * `password-reset` dispatches this action.
+   * `password-reset` dispatches this action. `vaultId` is the
+   * just-recovered vault's id (MYND-219 / SYNC-17) — threads onto the
+   * editor stage for vault-addressed lock/relock exits.
    */
-  | { type: "recover.complete-success" }
+  | { type: "recover.complete-success"; vaultId?: VaultId }
   /**
    * recover → welcome. Terminal-destructive transition from the
    * Recovery phrase-entry sub-step's footer "Delete vault and start
@@ -379,8 +404,12 @@ export function transition(prev: Stage, action: Action): Stage {
       }
     case "create-vault":
       switch (action.type) {
-        case "create-vault.back":
-          return { name: "welcome" };
+        // NOTE: Back-from-create is NOT a transition arm. It has reprobe
+        // semantics (MYND-219 / SYNC-16): App.tsx's `reprobe()` re-runs
+        // boot routing so the user returns where they came from — welcome
+        // at 0 vaults, the lone vault's unlock at 1, the picker at ≥2.
+        // The former `create-vault.back` → welcome arm stranded picker/
+        // editor entrants on Welcome.
         case "create-vault.commit-success":
           // Auto-unlock failure fallback (PRD Q4(a)): vault is
           // created but the chained vault_unlock IPC rejected; user
@@ -394,15 +423,19 @@ export function transition(prev: Stage, action: Action): Stage {
           };
         case "create-vault.auto-unlock-success":
           // Auto-unlock success path: vault_unlock resolved, slot is
-          // populated, user lands in editor without retyping.
-          return { name: "editor" };
+          // populated, user lands in editor without retyping. The
+          // just-created vault's id rides onto the editor stage
+          // (MYND-219 / SYNC-17 vault-addressed exits).
+          return { name: "editor", vaultId: action.vaultId };
         default:
           return rejectIllegal(prev, action);
       }
     case "unlock":
       switch (action.type) {
         case "unlock.success":
-          return { name: "editor" };
+          // Thread the unlock's targeting id onto the editor stage so
+          // lock/relock exits stay vault-addressed (MYND-219 / SYNC-17).
+          return { name: "editor", vaultId: prev.vaultId };
         case "unlock.start-recovery":
           // Cold-start entry — user does not have a recovery in
           // flight yet (slot is Empty); recover screen mounts in
@@ -435,8 +468,11 @@ export function transition(prev: Stage, action: Action): Stage {
           // Post-explicit-lock entry: vault.meta is known good
           // (the user just locked from a successful editor session),
           // so initialStatus is `Exists`. No intermediate "locked"
-          // screen — the user lands directly on the password form.
-          return { name: "unlock", initialStatus: { kind: "Exists" } };
+          // screen — the user lands directly on the password form,
+          // re-targeted at the vault that was just locked (MYND-219 /
+          // SYNC-17: at ≥2 vaults the sole-vault `None` fallback would
+          // be ambiguous).
+          return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId: prev.vaultId };
         case "editor.switch-vault":
           // Multi-vault switch route (MYND-205). The dispatch handler
           // (`switchVault`) has already fired the param-less `vault_lock()`
@@ -481,13 +517,16 @@ export function transition(prev: Stage, action: Action): Stage {
           // back). The recover-screen component renders Cancel only
           // on its live phrase-entry sub-step, so dispatch-site
           // gating is sufficient; Stage transition trusts the
-          // component.
-          return { name: "unlock", initialStatus: { kind: "Exists" } };
+          // component. The action's `vaultId` (the recovery's selected
+          // target) keeps the post-cancel unlock vault-addressed
+          // (MYND-219 / SYNC-17).
+          return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId: action.vaultId };
         case "recover.complete-success":
           // PasswordResetStep dispatches this on A8f success. Same
           // reasoning as recover.cancel — Stage trusts the dispatch
-          // site.
-          return { name: "editor" };
+          // site. The recovered vault's id threads onto the editor
+          // stage (MYND-219 / SYNC-17).
+          return { name: "editor", vaultId: action.vaultId };
         case "recover.delete-vault-success":
           // Terminal-destructive transition (MYND-108-bis lost-
           // credentials cul-de-sac escape). Dispatched ONLY from
@@ -681,7 +720,8 @@ import type { VaultListResult, VaultSummary } from "../types/vault-summary";
  */
 const LEGAL: Record<string, Stage["name"]> = {
   "welcome|create-vault.start": "create-vault",
-  "create-vault|create-vault.back": "welcome",
+  // Back-from-create is reprobe-based (MYND-219 / SYNC-16) — no
+  // `create-vault.back` action exists; App.tsx calls `reprobe()`.
   "create-vault|create-vault.commit-success": "unlock",
   "create-vault|create-vault.auto-unlock-success": "editor",
   "unlock|unlock.success": "editor",
@@ -714,6 +754,10 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   // pair — this entry confirms its presence does not change outcomes.
   { name: "unlock", initialStatus: { kind: "Exists" }, vaultId: "00000000-0000-7000-8000-00000000000a" },
   { name: "editor" },
+  // Coverage entry for the editor stage's optional `vaultId` payload
+  // (MYND-219 / SYNC-17) — same payload-ignoring contract as the unlock
+  // entries above.
+  { name: "editor", vaultId: "00000000-0000-7000-8000-00000000000a" },
   { name: "recover", subStep: "select" },
   { name: "recover", subStep: "phrase-entry" },
   { name: "recover", subStep: "decrypting" },
@@ -724,7 +768,6 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "create-vault.start" },
-  { type: "create-vault.back" },
   { type: "create-vault.commit-success" },
   { type: "create-vault.auto-unlock-success" },
   { type: "unlock.success" },

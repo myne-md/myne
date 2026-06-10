@@ -94,9 +94,15 @@ export function ConfirmStep({
                 spellCheck={false}
                 mono
                 autoFocus={idx === 0}
+                data-testid="create.confirm-input"
+                data-index={pos}
               />
               {invalid && (
-                <div style={{ fontSize: 12, color: "var(--danger)" }}>
+                <div
+                  style={{ fontSize: 12, color: "var(--danger)" }}
+                  data-testid="create.confirm-error"
+                  data-index={pos}
+                >
                   Doesn't match word #{pos}.
                 </div>
               )}
@@ -110,6 +116,7 @@ export function ConfirmStep({
           variant="ghost"
           onClick={() => dispatch({ type: "CONFIRM_BACK" })}
           icon="arrow-left"
+          data-testid="create.confirm-back"
         >
           Back
         </Button>
@@ -118,6 +125,7 @@ export function ConfirmStep({
           variant="primary"
           onClick={() => dispatch({ type: "PHRASE_CONFIRMED" })}
           disabled={!allMatch}
+          data-testid="create.confirm-continue"
         >
           Continue
         </Button>

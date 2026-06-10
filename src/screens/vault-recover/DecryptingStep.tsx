@@ -19,6 +19,7 @@ export function DecryptingStep() {
       subCaption="Working… Argon2id m=256 MiB, t=3, p=2"
       caption="This takes a moment."
       footerHint="If this takes longer than 30 seconds, close the window and try again."
+      testId="recover.decrypting"
     />
   );
 }

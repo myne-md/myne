@@ -48,8 +48,11 @@ interface CreateVaultProps {
   /**
    * Auto-unlock success — `vault_unlock(password)` resolved after
    * `commit`, slot is populated, route directly to editor. PRD Q4(a).
+   * `vaultId` is the just-created vault's id (from `commit`) so the
+   * editor stage's lock/relock exits stay vault-addressed (MYND-219 /
+   * SYNC-17). `null` only on the legacy sole-vault path.
    */
-  onAutoUnlockSuccess: () => void;
+  onAutoUnlockSuccess: (vaultId: string | null) => void;
   /**
    * Auto-unlock failure (defansif) — `commit` succeeded but the
    * chained `vault_unlock` call rejected (rare, almost certainly a
@@ -253,7 +256,7 @@ export function CreateVault({
         vaultId: committedVaultIdRef.current,
       });
       passwordRef.current = null;
-      onAutoUnlockSuccess();
+      onAutoUnlockSuccess(committedVaultIdRef.current);
     } catch (e) {
       passwordRef.current = null;
       logErrorKind(e, "auto-unlock-failed");
@@ -391,7 +394,13 @@ export function CreateVault({
         />
       );
     case "ready":
-      return <ReadyStep onDone={handleAutoUnlock} pending={autoUnlocking} />;
+      return (
+        <ReadyStep
+          onDone={handleAutoUnlock}
+          pending={autoUnlocking}
+          vaultId={committedVaultIdRef.current}
+        />
+      );
     case "session-lost":
       // SESSION_LOST is the only path into this step and always carries
       // an error; the non-null assertion is type-safe per the reducer.

@@ -120,8 +120,8 @@ pub enum VaultRecoveryError {
     /// `decisions.md` 2026-05-06 entry "vault_complete_recovery
     /// post-Argon2id slot peek symmetric retrofit".
     ///
-    /// Frontend UX: informational banner, "Kurtarma iptal edildi:
-    /// kilit atıldı." — not a suspicion signal. User can restart
+    /// Frontend UX: informational banner, "Recovery cancelled: vault
+    /// was locked." — not a suspicion signal. User can restart
     /// recovery from the unlock screen.
     #[error("recovery aborted by lock")]
     RecoveryAbortedByLock,

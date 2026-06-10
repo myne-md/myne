@@ -47,6 +47,8 @@ interface BlockingProgressStepProps {
    *  this takes longer than 30 seconds, close the window and try
    *  again." */
   footerHint?: string;
+  /** Stable E2E selector rendered as `data-testid` on the root (SYNC-8). */
+  testId?: string;
 }
 
 const ROOT_STYLE: CSSProperties = {
@@ -116,6 +118,7 @@ export function BlockingProgressStep({
   subCaption,
   caption,
   footerHint,
+  testId,
 }: BlockingProgressStepProps) {
   // Auto-focus the heading on mount so screen readers announce the
   // new transient surface (parity with vault-creation's `StepHeading`
@@ -134,7 +137,7 @@ export function BlockingProgressStep({
   }, []);
 
   return (
-    <div style={ROOT_STYLE}>
+    <div style={ROOT_STYLE} data-testid={testId}>
       <div style={COLUMN_STYLE}>
         <Spinner size={36} />
         {eyebrow && <div style={EYEBROW_STYLE}>{eyebrow}</div>}
