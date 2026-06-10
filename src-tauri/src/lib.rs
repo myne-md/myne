@@ -61,6 +61,7 @@ pub fn run() {
         .plugin(plugins::vault_indices::init())
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
+        .plugin(plugins::workspace::init())
         // MYND-169: the `attachment://<id>` async custom-URI-scheme
         // handler — decrypts a `MYA1` blob in memory, re-sniffs the
         // content-type from the decrypted bytes, and serves ONLY an
@@ -158,6 +159,15 @@ pub fn run() {
                     tauri::async_runtime::block_on(async move {
                         plugins::notes::search_sync::persist_search_index(&app, state.inner())
                             .await;
+                        // MYND-166: flush the staged editor workspace descriptor
+                        // to vault.workspace. Cmd+Q / app-menu Quit fire only
+                        // ExitRequested (not the window's onCloseRequested), so
+                        // this is the layout's persist path on app quit.
+                        plugins::workspace::commands::persist_workspace_on_exit(
+                            &app,
+                            state.inner(),
+                        )
+                        .await;
                     });
                 }
             }

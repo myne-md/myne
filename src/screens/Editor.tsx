@@ -36,13 +36,10 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { CMEditor } from "../editor/CMEditor";
-import { extractFullText } from "../dialect";
 import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
 import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
-import { IconButton } from "../components/primitives/IconButton";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
 import { Spinner } from "../components/Spinner";
@@ -69,7 +66,6 @@ import {
   SECTION_HEADING_STYLE,
   SIDEBAR_CARD_STYLE,
 } from "../notes/components/sharedStyles";
-import { noteRead } from "../notes/readNote";
 import {
   backlinkRows,
   backlinkRowsEqual,
@@ -87,15 +83,29 @@ import {
   useSelectedNote,
   type NoteId,
 } from "../notes/sidebarState";
-import { useAutosave, type SaveStatus as SaveStatusValue } from "../notes/useAutosave";
+import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
+import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
+import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
 import { CenterViewProvider, type CenterView } from "./centerView";
+import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
+import { PaneTree } from "../notes/components/PaneTree";
+import { STRIP_HEIGHT } from "../notes/components/TabStrip";
+import type { PaneReadout } from "../notes/components/PaneView";
+import { findNotePane } from "../notes/workspaceState";
+import {
+  deserializeWorkspace,
+  serializeWorkspace,
+  workspaceRead,
+  workspaceStage,
+  workspaceWrite,
+} from "../lib/workspace-persist";
 
 
 const STATUS_TEXT_STYLE: CSSProperties = {
@@ -113,18 +123,6 @@ const STATUS_TEXT_STYLE: CSSProperties = {
  * device-local is sufficient for v0.1.
  */
 const IMPORTER_OFFER_KEY = "myne.importer.onboarding-offer-dismissed";
-
-/**
- * Word count of a note body, frontmatter excluded. `extractFullText`
- * strips the YAML frontmatter block + decoration syntax (code URLs,
- * wikilink targets behind aliases) and collapses whitespace to single
- * spaces, so a plain space-split yields the body word count. Empty body
- * → 0 (a bare split would otherwise return `[""]`, miscounting as 1).
- */
-function countBodyWords(content: string): number {
-  const text = extractFullText(content);
-  return text.length === 0 ? 0 : text.split(" ").length;
-}
 
 interface EditorProps {
   /**
@@ -294,6 +292,7 @@ export function Editor({
           vault_is_unlocked guard has passed, so its presence implies
           the Rust slot agreed with the React stage. */}
       <div style={{ display: "contents" }} data-testid="editor.root">
+      <WorkspaceProvider>
         <EditorChrome
           onLock={onLock}
           onForceRelock={onForceRelock}
@@ -306,6 +305,7 @@ export function Editor({
           toastMessage={toastMessage}
           setToastMessage={setToastMessage}
         />
+      </WorkspaceProvider>
       </div>
     </SidebarStateProvider>
   );
@@ -343,8 +343,7 @@ function EditorChrome({
   setToastMessage,
 }: EditorChromeProps) {
   const ctx = useSelectedNote();
-  const [content, setContent] = useState<string>("");
-  const [bodyLoading, setBodyLoading] = useState<boolean>(false);
+  const ws = useWorkspace();
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
@@ -407,7 +406,16 @@ function EditorChrome({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
-  const [wordCount, setWordCount] = useState<number>(0);
+  // Bottom-bar readout (save status + word count) — reported up by
+  // whichever PaneView is currently focused (MYND-166). Per-pane PaneViews
+  // own content load, autosave, word count, and the surgical sidebar
+  // refresh-after-save; the chrome just mirrors the focused pane's readout.
+  const [readout, setReadout] = useState<PaneReadout>({
+    status: { status: "clean" },
+    wordCount: null,
+    retry: () => {},
+  });
+  const onReadout = useCallback((r: PaneReadout) => setReadout(r), []);
   // MYND-170 (SYNC-9): which surface the center pane shows. The shell +
   // sidebars persist; only this region swaps.
   const [centerView, setCenterView] = useState<CenterView>("editor");
@@ -438,118 +446,111 @@ function EditorChrome({
     setCenterView("editor");
   }, [ctx.selectedId]);
 
-  // Status-bar word counter — recompute on a short debounce so the parse
-  // doesn't run on every keystroke. Frontmatter is excluded by
-  // `countBodyWords`. Note-switch flows through `content` too (the
-  // selection effect resets it), so the counter follows the active note.
+  // MYND-166 selection bridges — two one-way syncs that never loop
+  // (A only fires for a note open in NO pane; B only mirrors):
+  //  A) a selection arriving via a non-pane path (a freshly-created note,
+  //     the command palette, a backlink / template / today-note open, the
+  //     post-delete adjacent pick) is opened into the focused pane.
+  //  B) the focused pane's active note is mirrored back into `selectedId`
+  //     so the sidebar highlight / rename / F2 + the right-sidebar backlinks
+  //     keep tracking the focused pane.
+  const { openInFocused } = ws;
+  const selectedId = ctx.selectedId;
   useEffect(() => {
-    const handle = setTimeout(() => {
-      setWordCount(countBodyWords(content));
-    }, 200);
-    return () => clearTimeout(handle);
-  }, [content]);
-
-  // Selection-change → load body via `noteRead`. The ID is the
-  // canonical reload trigger; if it stays stable across renders we
-  // never re-fetch. Race protection: a pending fetch that resolves
-  // AFTER a newer selection is dropped via the `cancelled` flag.
-  useEffect(() => {
-    let cancelled = false;
-    const id = ctx.selectedId;
-    if (id === null) {
-      setContent("");
-      setBodyLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-    setBodyLoading(true);
-    void (async () => {
-      try {
-        const body = await noteRead(id);
-        if (!cancelled) {
-          setContent(body);
-          setBodyLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setContent("");
-          setBodyLoading(false);
-        }
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.warn("[Editor] noteRead failed:", err);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ctx.selectedId]);
-
-  // Re-sync the open note's body when a sidebar action mutates it on
-  // disk (today: rename of the currently-open note — MYND-140). Without
-  // this, the editor's local `content` stays stale after a rename and the
-  // next autosave writes the old title back, silently reverting the
-  // rename. Keyed on the nonce only (not `selectedId` — plain selection
-  // changes flow through the load effect above); skips the initial mount.
-  const reloadNonce = ctx.contentReloadNonce;
-  const reloadInitRef = useRef(true);
-  useEffect(() => {
-    if (reloadInitRef.current) {
-      reloadInitRef.current = false;
-      return;
-    }
-    const id = ctx.selectedId;
-    if (id === null) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const body = await noteRead(id);
-        if (!cancelled) setContent((prev) => (prev === body ? prev : body));
-      } catch (err) {
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.warn("[Editor] content re-sync after rename failed:", err);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // selectedId is read at fire time intentionally; nonce is the trigger.
+    if (selectedId === null) return;
+    const where = findNotePane(
+      { root: ws.root, focusedPaneId: ws.focusedPaneId },
+      selectedId,
+    );
+    if (where === null) openInFocused(selectedId);
+    // `ws.root` is read at fire time; the effect triggers only on a real
+    // selection change, never per-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadNonce]);
+  }, [selectedId, openInFocused]);
 
-  const autosave = useAutosave(ctx.selectedId, content, undefined, setContent);
+  const focusedActive = ws.focusedLeaf.activeTab;
+  const select = ctx.select;
+  useEffect(() => {
+    select(focusedActive);
+  }, [focusedActive, select]);
 
   // MYND-121 — report window-level activity to the backend auto-lock idle
   // timer. The Editor is mounted iff the vault is Unlocked, so the heartbeat
   // runs exactly while a lockable session is live.
   useActivityHeartbeat();
 
-  // After every successful save, refresh the sidebar entry for that
-  // note so a title/H1 edit in the editor body propagates to the row
-  // label (Q13 "action-driven surgical refresh after saveNote"). We
-  // track the `saved.at` timestamp identity so re-renders don't
-  // re-fire — `useAutosave` produces a new `saved` object only when
-  // an IPC actually completes successfully.
-  const lastRefreshedAtRef = useRef<number>(0);
-  useEffect(() => {
-    if (autosave.status.status !== "saved") return;
-    const at = autosave.status.at.getTime();
-    if (at === lastRefreshedAtRef.current) return;
-    lastRefreshedAtRef.current = at;
-    const id = ctx.selectedId;
-    if (id === null) return;
-    void ctx.refreshOne(id).catch(() => {
-      /* refresh failure is non-fatal — sidebar shows stale title until next refresh */
-    });
-  }, [autosave.status, ctx]);
+  // Close / lock / idle-lock flush EVERY pane's pending save via the
+  // workspace flush registry (each PaneView registers its `flushIfDirty`).
+  // Per-pane PaneViews own content load, autosave, the surgical sidebar
+  // refresh-after-save (title/H1 → row label), and the `contentReloadNonce`
+  // re-sync (rename / snapshot restore) — so the chrome only orchestrates
+  // the cross-pane flush.
+  const flushAll = ws.flushAll;
 
-  // T28 — Tauri close-intercept. Block window close until any pending
-  // save flushes. Uses the `tauri::api::webviewWindow` listener; safe
-  // to no-op when running outside Tauri (browser dev fallback).
+  // MYND-166 — restore the persisted workspace ONCE on mount (unlock).
+  // A missing / unreadable / malformed descriptor leaves the default
+  // single empty pane (spec § 9.7.4). Runs after the slot guard, so the
+  // backend read is Slot::Unlocked-gated.
+  const restore = ws.restore;
+  const restoredRef = useRef(false);
+  // Gates the staging effect: until the restore IO settles, staging would
+  // push the DEFAULT empty layout, so an immediate post-unlock quit could
+  // clobber the saved layout. Holding off means such a quit is a no-op that
+  // preserves whatever is on disk.
+  const [restoreSettled, setRestoreSettled] = useState(false);
+  useEffect(() => {
+    if (restoredRef.current) return; // StrictMode double-invoke guard
+    restoredRef.current = true;
+    void (async () => {
+      try {
+        const descriptor = await workspaceRead();
+        if (descriptor === null) return;
+        const state = deserializeWorkspace(descriptor);
+        if (state !== null) restore(state);
+      } catch {
+        // Read failure → keep the default workspace (best-effort restore).
+      } finally {
+        setRestoreSettled(true);
+      }
+    })();
+  }, [restore]);
+
+  // Latest serialized descriptor, refreshed every render so the
+  // graceful-exit hooks (which capture a stale closure) always persist the
+  // CURRENT layout. Serialization is cheap (a small JSON tree).
+  const descriptorRef = useRef("");
+  descriptorRef.current = serializeWorkspace({
+    root: ws.root,
+    focusedPaneId: ws.focusedPaneId,
+  });
+  // Persist the workspace descriptor (graceful-exit only — never per
+  // tab-switch, so the blob mtime stays a low-resolution lock/quit signal).
+  const persistWorkspace = useCallback(async () => {
+    try {
+      await workspaceWrite(descriptorRef.current);
+    } catch {
+      // Best-effort — a failed convenience write never blocks lock/close.
+    }
+  }, []);
+
+  // MYND-166 — mirror the current layout into the backend's in-RAM staging
+  // slot on every change (incl. the restored/default state on mount). The
+  // backend flushes it to vault.workspace on `ExitRequested`, so an app QUIT
+  // (Cmd+Q / app-menu Quit) persists the layout even though it never fires
+  // the window's `onCloseRequested`. Staging is RAM-only — it never writes
+  // the blob, so its mtime stays a low-resolution lock/quit signal.
+  useEffect(() => {
+    if (!restoreSettled) return; // don't stage the pre-restore default layout
+    void workspaceStage(
+      serializeWorkspace({ root: ws.root, focusedPaneId: ws.focusedPaneId }),
+    ).catch(() => {
+      // Best-effort; outside Tauri (browser dev shim) the invoke rejects.
+    });
+  }, [restoreSettled, ws.root, ws.focusedPaneId]);
+
+  // T28 — Tauri close-intercept. Block window close until pending saves
+  // flush (every pane), then persist the workspace descriptor. Safe to
+  // no-op when running outside Tauri (browser dev fallback).
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
@@ -560,17 +561,8 @@ function EditorChrome({
           if (cancelled) return;
           // Stop the default close; we'll close manually after flush.
           event.preventDefault();
-          try {
-            await autosave.flushIfDirty();
-          } catch (err) {
-            if (import.meta.env.DEV) {
-              // eslint-disable-next-line no-console
-              console.warn("[Editor] flushIfDirty on close failed:", err);
-            }
-            // Surface the failure to the user — but for v0.1 we close
-            // anyway since blocking forever is worse UX. T31 manual
-            // smoke can revisit the close-fail alert dialog.
-          }
+          await flushAll();
+          await persistWorkspace();
           await w.close();
         });
       } catch {
@@ -583,14 +575,14 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [autosave]);
+  }, [flushAll, persistWorkspace]);
 
-  // MYND-121 — flush on idle-lock imminent. The backend idle timer emits
-  // `vault-lock-imminent` before its grace window; flush any unsaved edit so
-  // the autosave delta persists before the keys zeroize. Best-effort — the
-  // backend proceeds when the grace elapses regardless. Mirrors the
-  // close-intercept's listen / unlisten + cancelled-guard shape; no-op outside
-  // Tauri (browser dev shim).
+  // MYND-121 — flush every pane on idle-lock imminent. The backend idle
+  // timer emits `vault-lock-imminent` before its grace window; flush any
+  // unsaved edit so the autosave deltas persist before the keys zeroize.
+  // Best-effort — the backend proceeds when the grace elapses regardless.
+  // Mirrors the close-intercept's listen / unlisten + cancelled-guard
+  // shape; no-op outside Tauri (browser dev shim).
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
@@ -598,9 +590,12 @@ function EditorChrome({
       try {
         const handle = await listen("vault-lock-imminent", () => {
           if (cancelled) return;
-          void autosave.flushIfDirty().catch(() => {
-            /* per-flush error already routed through saveStatus */
-          });
+          void (async () => {
+            // Content flush first (data integrity), workspace descriptor
+            // second (convenience — droppable if the grace window expires).
+            await flushAll();
+            await persistWorkspace();
+          })();
         });
         if (cancelled) {
           handle();
@@ -615,36 +610,18 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [autosave]);
-
-  // T29 — fire-on-blur. When the editor body loses focus (Tab away to
-  // sidebar / another app / Settings modal), trigger an immediate flush.
-  // Fire-and-forget; the autosave latest-wins gate handles in-flight
-  // overlap.
-  const handleEditorBlur = useCallback(() => {
-    void autosave.flushIfDirty().catch(() => {
-      /* per-flush error already routed through saveStatus */
-    });
-  }, [autosave]);
+  }, [flushAll, persistWorkspace]);
 
   // Lock button flush-then-lock — `decisions.md` 2026-05-07 canonical
-  // flush-on-lock. The BottomBar's existing onLock handler fires
-  // `lockVault()` then the parent's callback; we wrap with a flush
-  // pre-step.
+  // flush-on-lock, now across all panes; persist the workspace before lock.
   const handleLockFlushed = useCallback(async () => {
-    try {
-      await autosave.flushIfDirty();
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.warn("[Editor] flushIfDirty on lock failed:", err);
-      }
-    }
+    await flushAll();
+    await persistWorkspace();
     await lockVault().catch(() => {
       /* lock is best-effort, parent callback still fires */
     });
     onLock?.();
-  }, [autosave, onLock]);
+  }, [flushAll, persistWorkspace, onLock]);
 
   const centerViewValue = useMemo(
     () => ({ view: centerView, setView: setCenterView }),
@@ -672,9 +649,16 @@ function EditorChrome({
           visible until then. No confirm-discard dialog — the flush is
           automatic. */}
       {switching && <SwitchingOverlay />}
+      {/* No separate top bar (MYND-166): the editor content fills from the top
+          and each top pane's tab strip rises into the OS title-bar row,
+          Obsidian-style. The sidebar toggles float in the top corners below
+          (clear of the traffic lights); whatever top surface sits beneath each
+          reserves clearance for it (the left sidebar header when open, or the
+          corner pane's strip inset when not). */}
       <div
         ref={rowRef}
         style={{
+          position: "relative",
           display: "flex",
           flexDirection: "row",
           flex: 1,
@@ -682,68 +666,125 @@ function EditorChrome({
         }}
       >
         <SidebarBootstrap />
-        <SidebarPane
-          side="left"
-          width={layout.leftWidth}
-          collapsed={layout.leftCollapsed}
-          min={LEFT_BOUNDS.min}
-          max={LEFT_BOUNDS.max}
-          containerRef={rowRef}
-          onResize={layout.setLeftWidth}
-          onToggleCollapse={layout.toggleLeftCollapsed}
-          resizeLabel="Resize notes sidebar"
-          expandLabel="Expand notes sidebar"
-        >
-          <NotesSidebarList
-            onCollapse={layout.toggleLeftCollapsed}
-            onNewFromTemplate={() => setNewFromTemplateOpen(true)}
-            onSwitchVault={onSwitchVault}
-            onCreateAnother={onCreateAnother}
-            switching={switching}
-          />
-        </SidebarPane>
-        {centerView === "attachments" ? (
-          <AttachmentsLibrary onClose={() => setCenterView("editor")} />
-        ) : (
-        <CenterPane
-          content={content}
-          onChange={setContent}
-          onBlur={handleEditorBlur}
-          loading={bodyLoading}
-          hasSelection={ctx.selectedId !== null}
-          noteTitle={
-            ctx.selectedId === null
-              ? null
-              : ctx.cache.get(ctx.selectedId)?.title ?? null
-          }
-          onCreateNote={() => {
-            void ctx.createAndStartRename().catch(() => {});
-          }}
-        />
+        {!layout.leftCollapsed && (
+          <SidebarPane
+            side="left"
+            width={layout.leftWidth}
+            collapsed={false}
+            min={LEFT_BOUNDS.min}
+            max={LEFT_BOUNDS.max}
+            containerRef={rowRef}
+            onResize={layout.setLeftWidth}
+            onToggleCollapse={layout.toggleLeftCollapsed}
+            resizeLabel="Resize notes sidebar"
+          >
+            <div style={SIDEBAR_COLUMN_STYLE}>
+              {/* Traffic-light + left-toggle clearance row. The floated toggle
+                  and macOS traffic lights sit over this; the vault switcher
+                  and Notes list start below it. Draggable (title-bar row). */}
+              <div
+                data-tauri-drag-region
+                style={{
+                  height: STRIP_HEIGHT,
+                  flexShrink: 0,
+                  background: "var(--paper-2)",
+                  borderRight: "1px solid var(--line-1)",
+                }}
+              />
+              <SidebarVaultSwitcher
+                onSwitchVault={onSwitchVault}
+                onCreateAnother={onCreateAnother}
+                switching={switching}
+              />
+              <NotesSidebarList
+                onNewFromTemplate={() => setNewFromTemplateOpen(true)}
+              />
+            </div>
+          </SidebarPane>
         )}
-        <SidebarPane
-          side="right"
-          width={layout.rightWidth}
-          collapsed={layout.rightCollapsed}
-          min={RIGHT_BOUNDS.min}
-          max={RIGHT_BOUNDS.max}
-          containerRef={rowRef}
-          onResize={layout.setRightWidth}
-          onToggleCollapse={layout.toggleRightCollapsed}
-          resizeLabel="Resize backlinks sidebar"
-          expandLabel="Expand backlinks sidebar"
-        >
-          <RightSidebar onCollapse={layout.toggleRightCollapsed} />
-        </SidebarPane>
+        {centerView === "attachments" ? (
+          // Attachments is a full-center view with no tab strip; give it a
+          // matching drag-region clearance row so its toolbar clears the
+          // floated toggles + traffic lights.
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              data-tauri-drag-region
+              style={{
+                height: STRIP_HEIGHT,
+                flexShrink: 0,
+                background: "var(--paper-2)",
+                borderBottom: "1px solid var(--line-1)",
+              }}
+            />
+            <AttachmentsLibrary onClose={() => setCenterView("editor")} />
+          </div>
+        ) : (
+          <PaneTree
+            node={ws.root}
+            focusedPaneId={ws.focusedPaneId}
+            onReadout={onReadout}
+            leftInset={layout.leftCollapsed ? LEFT_CLEARANCE : 0}
+            rightInset={layout.rightCollapsed ? RIGHT_CLEARANCE : 0}
+          />
+        )}
+        {centerView !== "attachments" && !layout.rightCollapsed && (
+          <SidebarPane
+            side="right"
+            width={layout.rightWidth}
+            collapsed={false}
+            min={RIGHT_BOUNDS.min}
+            max={RIGHT_BOUNDS.max}
+            containerRef={rowRef}
+            onResize={layout.setRightWidth}
+            onToggleCollapse={layout.toggleRightCollapsed}
+            resizeLabel="Resize backlinks sidebar"
+          >
+            <RightSidebar />
+          </SidebarPane>
+        )}
       </div>
+      {/* Sidebar toggles, floated into the editor's top corners (the title-bar
+          row), level with the macOS traffic lights. */}
+      <div
+        style={{ position: "absolute", top: 6, left: LEFT_TOGGLE_X, zIndex: 30 }}
+      >
+        <TitleBarToggle
+          side="left"
+          collapsed={layout.leftCollapsed}
+          onToggle={layout.toggleLeftCollapsed}
+        />
+      </div>
+      {centerView !== "attachments" && (
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            right: RIGHT_TOGGLE_X,
+            zIndex: 30,
+          }}
+        >
+          <TitleBarToggle
+            side="right"
+            collapsed={layout.rightCollapsed}
+            onToggle={layout.toggleRightCollapsed}
+          />
+        </div>
+      )}
       <BottomBar
         onOpenSettings={() => setSettingsOpen(true)}
         onShowGraph={() => setGraphOpen(true)}
         onLockFlushed={handleLockFlushed}
-        saveStatus={autosave.status}
-        onRetry={autosave.retry}
-        hideSaveStatus={ctx.selectedId === null}
-        wordCount={ctx.selectedId === null ? null : wordCount}
+        saveStatus={readout.status}
+        onRetry={readout.retry}
+        hideSaveStatus={ws.focusedLeaf.activeTab === null}
+        wordCount={readout.wordCount}
       />
       <SettingsModal
         open={settingsOpen}
@@ -843,11 +884,130 @@ function EditorChrome({
           setPaletteOpen(false);
           await handleLockFlushed();
         }}
+        onToggleLeftSidebar={() => {
+          setPaletteOpen(false);
+          layout.toggleLeftCollapsed();
+        }}
+        onToggleRightSidebar={() => {
+          setPaletteOpen(false);
+          layout.toggleRightCollapsed();
+        }}
       />
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
+      <WorkspaceHotkeys />
       <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
     </div>
     </CenterViewProvider>
+  );
+}
+
+/** Column wrapper inside a `SidebarPane`: header band stacked above the
+ *  sidebar body, filling the pane width. */
+const SIDEBAR_COLUMN_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  flex: 1,
+  minWidth: 0,
+  minHeight: 0,
+};
+
+/** Fixed width of a `TitleBarToggle` button. */
+const TITLE_BAR_TOGGLE_WIDTH = 30;
+
+// Sidebar toggles float in the editor's top corners (the OS title-bar row),
+// Obsidian-style — there is no separate top bar; each top pane's tab strip
+// rises into that row. These constants place the toggles clear of the macOS
+// traffic lights and size the clearance the underlying top surface (sidebar
+// header or a corner pane's strip) must reserve so nothing collides.
+/** Left toggle's x offset — comfortably right of the traffic lights on macOS. */
+const LEFT_TOGGLE_X = IS_MAC ? TRAFFIC_LIGHT_GAP + 16 : 12;
+/** Right toggle's x offset from the right edge. */
+const RIGHT_TOGGLE_X = 8;
+/** Left clearance: the top-left surface must keep its content past this. */
+const LEFT_CLEARANCE = LEFT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
+/** Right clearance: the top-right surface must keep its content before this. */
+const RIGHT_CLEARANCE = RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
+
+/**
+ * The Notion-style workspace switcher row at the top of the left sidebar,
+ * above the Notes list (MYND-166). Full-width chip — mark + vault name +
+ * chevron — with a downward dropdown. Carries the sidebar's right + bottom
+ * hairlines so the edge is continuous and it separates from the Notes list.
+ * Hidden when there's no vault info to show (the switcher self-suppresses).
+ */
+function SidebarVaultSwitcher({
+  onSwitchVault,
+  onCreateAnother,
+  switching,
+}: {
+  onSwitchVault?: (targetVaultId: VaultId) => void;
+  onCreateAnother?: () => void;
+  switching: boolean;
+}) {
+  if (onSwitchVault === undefined || onCreateAnother === undefined) return null;
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        // Sits below the traffic-light clearance row, so normal padding — no
+        // bottom divider (it reads as a header above the Notes list directly).
+        padding: "8px 8px 6px",
+        background: "var(--paper-2)",
+        borderRight: "1px solid var(--line-1)",
+      }}
+    >
+      <VaultSwitcher
+        onSwitchVault={onSwitchVault}
+        onCreateAnother={onCreateAnother}
+        switching={switching}
+      />
+    </div>
+  );
+}
+
+function TitleBarToggle({
+  side,
+  collapsed,
+  onToggle,
+}: {
+  side: "left" | "right";
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const icon =
+    side === "left"
+      ? collapsed
+        ? "panel-left"
+        : "panel-left-close"
+      : collapsed
+        ? "panel-right"
+        : "panel-right-close";
+  const label = `${collapsed ? "Show" : "Hide"} ${
+    side === "left" ? "notes" : "backlinks"
+  } sidebar`;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={label}
+      title={label}
+      style={{
+        display: "flex",
+        alignSelf: "center",
+        alignItems: "center",
+        justifyContent: "center",
+        width: TITLE_BAR_TOGGLE_WIDTH,
+        height: 26,
+        flexShrink: 0,
+        border: 0,
+        borderRadius: "var(--radius-1)",
+        background: "transparent",
+        color: "var(--fg-3)",
+        cursor: "pointer",
+      }}
+    >
+      <Icon name={icon} size={16} />
+    </button>
   );
 }
 
@@ -868,6 +1028,8 @@ type CommandPaletteHostProps = {
   onShowGraph: () => void;
   onImportObsidian: () => void;
   onLockFlushed: () => Promise<void>;
+  onToggleLeftSidebar: () => void;
+  onToggleRightSidebar: () => void;
 };
 
 function CommandPaletteHost({
@@ -881,6 +1043,8 @@ function CommandPaletteHost({
   onShowGraph,
   onImportObsidian,
   onLockFlushed,
+  onToggleLeftSidebar,
+  onToggleRightSidebar,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
   // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
@@ -935,6 +1099,8 @@ function CommandPaletteHost({
       onOpenSnapshots,
       onShowGraph,
       onImportObsidian,
+      onToggleLeftSidebar,
+      onToggleRightSidebar,
       onSelectNote: async (id) => {
         await ctx.open(id).catch(() => {
           /* selection failure surfaces via sidebar UX */
@@ -953,6 +1119,8 @@ function CommandPaletteHost({
       onOpenSnapshots,
       onShowGraph,
       onImportObsidian,
+      onToggleLeftSidebar,
+      onToggleRightSidebar,
     ],
   );
   return (
@@ -1056,136 +1224,97 @@ function SidebarBootstrap() {
   return null;
 }
 
-interface CenterPaneProps {
-  content: string;
-  onChange: (next: string) => void;
-  onBlur: () => void;
-  loading: boolean;
-  hasSelection: boolean;
-  noteTitle: string | null;
-  onCreateNote: () => void;
-}
+/**
+ * Tab/pane keyboard shortcuts (MYND-166). Window-level so they fire
+ * regardless of which pane / sidebar has focus, and they act on the
+ * FOCUSED pane. Skipped while typing in a non-editor input (e.g. the
+ * sidebar rename field), but active inside the CM6 editor (`.cm-content`).
+ *
+ * Bindings (grill 2026-06-01, routed around the reserved `Cmd+K` palette):
+ *   Cmd/Ctrl+T              new note (opens in the focused pane)
+ *   Cmd/Ctrl+W              close the focused pane's active tab
+ *   Ctrl+Tab / +Shift       next / prev tab in the focused pane
+ *   Cmd/Ctrl+\ / +Shift     split the focused pane right / down
+ *   Cmd/Ctrl+Alt+Arrows     move focus to the next / prev pane
+ */
+function WorkspaceHotkeys() {
+  const ws = useWorkspace();
+  const ctx = useSelectedNote();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target !== null) {
+        const tag = target.tagName.toLowerCase();
+        if (
+          (tag === "input" || tag === "textarea") &&
+          !target.classList.contains("cm-content")
+        ) {
+          return;
+        }
+      }
+      const mod = e.metaKey || e.ctrlKey;
 
-function CenterPane({
-  content,
-  onChange,
-  onBlur,
-  loading,
-  hasSelection,
-  noteTitle,
-  onCreateNote,
-}: CenterPaneProps) {
-  const isTitleEmpty = noteTitle === null || noteTitle.trim() === "";
-  const headerLabel = !hasSelection ? "" : isTitleEmpty ? "Untitled" : noteTitle;
-  const headerIsItalic = hasSelection && isTitleEmpty;
-  return (
-    <main
-      style={{
-        flex: 1,
-        minWidth: 0,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div
-        style={{
-          height: 38,
-          padding: "0 16px",
-          display: "flex",
-          alignItems: "center",
-          borderBottom: "1px solid var(--line-1)",
-          fontSize: 12,
-          color: "var(--fg-2)",
-          fontStyle: headerIsItalic ? "italic" : "normal",
-        }}
-      >
-        {headerLabel}
-      </div>
+      // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused pane.
+      if (e.ctrlKey && e.key === "Tab") {
+        const tabs = ws.focusedLeaf.tabs;
+        if (tabs.length === 0) return;
+        e.preventDefault();
+        const cur = ws.focusedLeaf.activeTab;
+        const i = cur === null ? -1 : tabs.indexOf(cur);
+        const len = tabs.length;
+        const next = e.shiftKey
+          ? tabs[(i - 1 + len) % len]!
+          : tabs[(i + 1) % len]!;
+        ws.activateInPane(ws.focusedPaneId, next);
+        return;
+      }
 
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflow: "auto",
-          padding: "12px 24px 32px",
-        }}
-      >
-        {!hasSelection ? (
-          <CenterPaneEmpty onCreateNote={onCreateNote} />
-        ) : loading ? (
-          <CenterPaneLoading />
-        ) : (
-          <div style={{ maxWidth: 680, margin: "0 auto" }}>
-            <CMEditor
-              value={content}
-              onChange={onChange}
-              onBlur={onBlur}
-              style={{
-                width: "100%",
-                minHeight: 360,
-                color: "var(--fg-1)",
-                fontFamily: "var(--font-mono)",
-                fontSize: 14,
-                lineHeight: 1.7,
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
+      if (!mod) return;
 
-function CenterPaneEmpty({ onCreateNote }: { onCreateNote: () => void }) {
-  return (
-    <div
-      style={{
-        maxWidth: 680,
-        margin: "10vh auto 0",
-        textAlign: "center",
-        color: "var(--fg-3)",
-        fontFamily: "var(--font-sans)",
-      }}
-    >
-      <div style={{ fontSize: 14, marginBottom: 14 }}>
-        Select a note from the sidebar, or
-      </div>
-      <button
-        type="button"
-        onClick={onCreateNote}
-        style={{
-          fontFamily: "var(--font-sans)",
-          fontSize: 13,
-          fontWeight: 500,
-          color: "var(--accent-on)",
-          background: "var(--accent)",
-          border: 0,
-          padding: "10px 14px",
-          borderRadius: 6,
-          cursor: "pointer",
-        }}
-      >
-        + Create a new note
-      </button>
-    </div>
-  );
-}
+      // Cmd/Ctrl+Alt+Arrow — move focus between panes (tree order).
+      if (
+        e.altKey &&
+        (e.key === "ArrowLeft" ||
+          e.key === "ArrowRight" ||
+          e.key === "ArrowUp" ||
+          e.key === "ArrowDown")
+      ) {
+        const ids = ws.leaves.map((l) => l.id);
+        if (ids.length < 2) return;
+        e.preventDefault();
+        const i = ids.indexOf(ws.focusedPaneId);
+        const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
+        const next = ids[(i + (forward ? 1 : -1) + ids.length) % ids.length]!;
+        ws.focusPane(next);
+        return;
+      }
 
-function CenterPaneLoading() {
-  return (
-    <div
-      style={{
-        maxWidth: 680,
-        margin: "10vh auto 0",
-        textAlign: "center",
-        color: "var(--fg-3)",
-        fontSize: 13,
-        fontFamily: "var(--font-sans)",
-      }}
-    >
-      Loading…
-    </div>
-  );
+      switch (e.key) {
+        case "t":
+        case "T":
+          e.preventDefault();
+          void ctx.createAndStartRename().catch(() => {});
+          return;
+        case "w":
+        case "W": {
+          const a = ws.focusedLeaf.activeTab;
+          if (a === null) return;
+          e.preventDefault();
+          ws.closeTabInPane(ws.focusedPaneId, a);
+          return;
+        }
+        case "\\":
+          e.preventDefault();
+          ws.splitFocused(e.shiftKey ? "column" : "row");
+          return;
+        default:
+          return;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [ws, ctx]);
+  return null;
 }
 
 /**
@@ -1197,7 +1326,7 @@ function CenterPaneLoading() {
  * covers the race. Stays live via the vault-wide index-changed nonce (SYNC-5):
  * any note's save/rename/move re-queries; the reference-equal bail guards renders.
  */
-function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
+function RightSidebar() {
   const ctx = useSelectedNote();
   const notes = useResolverNotes();
   const indexNonce = useIndexNonce();
@@ -1258,7 +1387,11 @@ function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
     <aside
       style={{
         // Fills the layout-seam wrapper, which owns the resizable width.
+        // `flex: 1` fills the height below the ribbon header (MYND-166).
         width: "100%",
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
         background: "var(--paper-2)",
         borderLeft: "1px solid var(--line-1)",
         padding: "16px 18px",
@@ -1267,22 +1400,7 @@ function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
         gap: 8,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={SECTION_HEADING_STYLE}>Linked from {rows.length}</div>
-        {onCollapse && (
-          <IconButton
-            icon="panel-right-close"
-            label="Collapse backlinks sidebar"
-            onClick={onCollapse}
-          />
-        )}
-      </div>
+      <div style={SECTION_HEADING_STYLE}>Linked from {rows.length}</div>
       {rows.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
           No backlinks yet.
@@ -1324,11 +1442,13 @@ function RightSidebar({ onCollapse }: { onCollapse?: () => void }) {
 }
 
 /**
- * One resizable/collapsible sidebar slot (MYND-137). When collapsed, renders
- * the {@link CollapsedRail}; otherwise a width-driven `position: relative`
- * wrapper holding the sidebar `children` plus the inner-edge {@link ResizeHandle}
- * (the handle is absolutely positioned, so child order is irrelevant). Both the
- * left (notes) and right (backlinks) panes are this same component, mirrored by
+ * One resizable/collapsible sidebar slot (MYND-137). When collapsed it
+ * renders NOTHING — the pane is fully hidden (MYND-166 removed the thin
+ * re-expand rail; toggling is the top-bar buttons + command palette).
+ * Otherwise a width-driven `position: relative` wrapper holding the sidebar
+ * `children` plus the inner-edge {@link ResizeHandle} (the handle is
+ * absolutely positioned, so child order is irrelevant). Both the left
+ * (notes) and right (backlinks) panes are this same component, mirrored by
  * `side`.
  */
 function SidebarPane({
@@ -1341,7 +1461,6 @@ function SidebarPane({
   onResize,
   onToggleCollapse,
   resizeLabel,
-  expandLabel,
   children,
 }: {
   side: "left" | "right";
@@ -1353,14 +1472,9 @@ function SidebarPane({
   onResize: (rawWidth: number, containerWidth: number) => void;
   onToggleCollapse: () => void;
   resizeLabel: string;
-  expandLabel: string;
   children: ReactNode;
 }) {
-  if (collapsed) {
-    return (
-      <CollapsedRail side={side} label={expandLabel} onExpand={onToggleCollapse} />
-    );
-  }
+  if (collapsed) return null;
   return (
     <div
       style={{
@@ -1383,54 +1497,6 @@ function SidebarPane({
         label={resizeLabel}
       />
     </div>
-  );
-}
-
-/**
- * Thin re-expand rail shown in place of a collapsed sidebar (MYND-137) so a
- * fully-hidden pane stays recoverable. A 14px `--paper-2` strip with the
- * sidebar's hairline border and an inward-pointing chevron near the top;
- * clicking (or Enter/Space) re-expands the pane to its remembered width.
- */
-function CollapsedRail({
-  side,
-  label,
-  onExpand,
-}: {
-  side: "left" | "right";
-  label: string;
-  onExpand: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onExpand}
-      aria-label={label}
-      title={label}
-      style={{
-        width: 14,
-        flexShrink: 0,
-        background: "var(--paper-2)",
-        border: 0,
-        ...(side === "left"
-          ? { borderRight: "1px solid var(--line-1)" }
-          : { borderLeft: "1px solid var(--line-1)" }),
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        paddingTop: 16,
-        color: "var(--fg-3)",
-        cursor: "pointer",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--paper-3)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "var(--paper-2)";
-      }}
-    >
-      <Icon name={side === "left" ? "chevron-right" : "chevron-left"} size={14} />
-    </button>
   );
 }
 

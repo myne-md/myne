@@ -1,0 +1,31 @@
+# Permissions for the in-app `workspace` Tauri plugin (MYND-166).
+# Picked up under the `workspace:` ACL namespace because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these
+# as `workspace:default` (or `workspace:allow-workspace-read` /
+# `workspace:allow-workspace-write`).
+#
+# Both commands are write/read of the encrypted vault.workspace blob and
+# inherit the main-window-only invariant shared by the other vault plugins
+# — v0.2 multi-window MUST NOT grant `workspace:allow-workspace-write` to
+# any non-main window.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the workspace plugin — read + write + stage of the encrypted editor workspace descriptor."
+permissions = ["allow-workspace-read", "allow-workspace-write", "allow-workspace-stage"]
+
+[[permission]]
+identifier = "allow-workspace-read"
+description = "Allow invoking workspace:workspace_read (Slot::Unlocked-gated read of the vault.workspace blob; returns the descriptor string or None with fall-back-to-default per protocol.md § 9.7.4)."
+commands.allow = ["workspace_read"]
+
+[[permission]]
+identifier = "allow-workspace-write"
+description = "Allow invoking workspace:workspace_write (Slot::Unlocked-gated write of the editor workspace descriptor; atomic-writes vault.workspace, no native side-effect)."
+commands.allow = ["workspace_write"]
+
+[[permission]]
+identifier = "allow-workspace-stage"
+description = "Allow invoking workspace:workspace_stage (in-RAM hold of the latest descriptor; flushed to vault.workspace only on app exit — no file write, no native side-effect)."
+commands.allow = ["workspace_stage"]

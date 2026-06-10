@@ -197,6 +197,21 @@ fn main() {
                 // `vault-creation` note above).
                 tauri_build::InlinedPlugin::new()
                     .commands(&["import_read_dir", "import_read_file"]),
+            )
+            .plugin(
+                "workspace",
+                // MYND-166: the `workspace_read` + `workspace_write` +
+                // `workspace_stage` commands (encrypted vault.workspace
+                // persistence; stage = in-RAM hold flushed on app quit). Same
+                // InlinedPlugin discipline as the plugins above — each
+                // command needs a matching `commands.allow` entry in
+                // `permissions/workspace/default.toml` or the ACL resolver
+                // never authorizes the `plugin:workspace|<cmd>` invoke.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "workspace_read",
+                    "workspace_write",
+                    "workspace_stage",
+                ]),
             ),
     )
     .unwrap();

@@ -177,6 +177,9 @@ pub async fn unlock<R: Runtime>(
     // path.
     if is_vault_switch(active_before, target_id) {
         crate::plugins::notes::search_sync::zeroize_search_index(&app);
+        // MYND-166: drop the prior vault's staged editor-workspace descriptor
+        // so the switch can't flush vault A's layout into vault B.
+        crate::plugins::workspace::commands::clear_staged_descriptor();
         crate::plugins::vault_indices::zeroize_vault_indices(&app);
         crate::plugins::attachments::zeroize_attachment_refs(&app);
         // MYND-205: the prior vault is now locked (its keys were zeroized by
@@ -721,6 +724,9 @@ pub async fn lock<R: Runtime>(
     // survive the manual lock. The persist above already flushed it to the
     // `vault.search` blob (persist-then-wipe); the next unlock reloads it.
     crate::plugins::notes::search_sync::zeroize_search_index(&app);
+    // MYND-166: wipe the staged editor-workspace descriptor on the same lock
+    // path (AS3 note-ids + layout, as sensitive as the index).
+    crate::plugins::workspace::commands::clear_staged_descriptor();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //

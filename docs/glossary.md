@@ -749,6 +749,12 @@ The 4-byte ASCII magic identifying a v0.1 `vault.search` (search-index) blob. Pa
 
 Used in: `spec/protocol.md` §9.6, §10.3
 
+### **MYW1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying a v0.1 `vault.workspace` ([workspace-state blob](#workspace-state-blob)). Parallel to `MY01` (per-note), `MYV1` (vault metadata), `MYP1` (preferences), and `MYS1` (search) in the v0.1 magic-byte family. Registered in `spec/protocol.md` §10.3's major-version registry alongside its v005-reserved sibling `MYW5`. Implementations MUST reject any candidate `vault.workspace` whose first four bytes do not match `MYW1` — and fall back to the default (single empty pane) workspace rather than treating the rejection as data loss.
+
+Used in: `spec/protocol.md` §9.7, §10.3
+
 ### **`.myn` file** &nbsp; 📦 *Product*
 
 Myne Note: the binary encrypted blob holding a single note. File extension `.myn`, magic bytes `MY01` for v0.1. Layout in `spec/protocol.md` §9.2: header, items_key_id, item_key_nonce, length-prefixed `enc_item_key`, content_nonce, length-prefixed ciphertext + CTX tag.
@@ -927,6 +933,16 @@ Used in: `spec/protocol.md` §9.6; `decisions.md` 2026-05-31
 The 32-byte AEAD KEK encrypting `vault.search`. Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "search-index-key")` helper (`spec/protocol.md` §3.4 registry entry `"myne.v0.1 search-index-key"`). Never persisted; re-derived on each unlock (to load / reconcile the index) and on each persist (graceful lock / periodic flush). Independent from the `itemsKey` lineage by design — like `prefs_key` it derives straight from `root_key`, so it survives the v005 epoch-rotation `itemsKey` evolution. The AAD `AAD_search_index_blob` (role `"search-index-blob"`, `spec/protocol.md` §5.2) binds the blob to its vault via `account_number_hash`.
 
 Used in: `spec/protocol.md` §3.4, §5.2, §9.6
+
+### **session-state-key** &nbsp; 🗝️ *Key/identifier*
+
+The 32-byte AEAD KEK encrypting `vault.workspace` (the [workspace-state blob](#workspace-state-blob)). Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "session-state-key")` helper (`spec/protocol.md` §3.4 registry entry `"myne.v0.1 session-state-key"`). Never persisted; re-derived on each unlock (to restore the workspace) and on each graceful-exit persist. Independent from the `itemsKey` lineage by design — like `prefs_key` / `search-index-key` it derives straight from `root_key`, so it survives the v005 epoch-rotation `itemsKey` evolution. The AAD `AAD_workspace_blob` (role `"workspace-blob"`, `spec/protocol.md` §9.7.3) binds the blob to its vault via `account_number_hash`.
+
+Used in: `spec/protocol.md` §3.4, §9.7
+
+### **workspace-state blob** &nbsp; 📦 *Product*
+
+The encrypted `vault.workspace` artifact (`MYW1`, `spec/protocol.md` §9.7) carrying the editor's **workspace state** — the open-tab set per pane, the recursive pane-split layout, each pane's active tab, the focused pane, and per-tab cursor/scroll positions (MYND-166). AS3-Sensitive (note ids + structure): persisting *which notes are open* is activity metadata, so it rides inside the AEAD envelope under [session-state-key](#session-state-key) rather than as plaintext local state. Written **only on graceful exit** (manual lock / idle auto-lock grace / quit) — never per tab-switch — so the blob's mtime stays a low-resolution lock/quit signal and never becomes an editor-activity log (a filesystem adversary A4/A7 learns nothing about *which* notes are open or *when* they were switched). Best-effort, not crash-durable; a missing / tampered / malformed blob falls back to a single empty pane (§9.7.4). The inner descriptor is client-opaque to the protocol layer, like the [search index](#search-index).
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 

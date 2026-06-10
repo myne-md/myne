@@ -36,6 +36,7 @@ import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
+import { useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
 import {
   buildFavoriteRows,
@@ -50,8 +51,6 @@ import {
 } from "./useFolderManagement";
 import { Icon } from "../../components/primitives/Icon";
 import { useCenterView } from "../../screens/centerView";
-import { VaultSwitcher } from "../../components/VaultSwitcher";
-import type { VaultId } from "../../lib/stage";
 
 /**
  * Compute the adjacent note to select after deleting `victimId` from
@@ -285,23 +284,15 @@ const EMPTY_CTA_STYLE: CSSProperties = {
 
 const SIDEBAR_OUTER_STYLE: CSSProperties = {
   // Fills the layout-seam wrapper, which owns the resizable width (MYND-137).
+  // `flex: 1` lets it fill the height below the ribbon header in the
+  // sidebar column (MYND-166); harmless outside a flex parent.
   width: "100%",
+  flex: 1,
   background: "var(--paper-2)",
   borderRight: "1px solid var(--line-1)",
   display: "flex",
   flexDirection: "column",
   minHeight: 0,
-};
-
-// Sticky sidebar header holding the account-chip vault switcher (MYND-205).
-// Per `docs/design/README.md` "the sidebar header (account chip + new-note
-// button) is sticky" — this is the canonical account-chip location (the brand's
-// signature element), so the switcher mounts here above the "Notes" eyebrow.
-// Hidden for single-vault users (the switcher self-suppresses below two
-// vaults), so the strip collapses to nothing then.
-const HEADER_CHIP_ROW_STYLE: CSSProperties = {
-  flexShrink: 0,
-  padding: "10px 12px 4px",
 };
 
 // Sidebar footer wrapper — pins the nav entries (Attachments + Trash) to
@@ -396,32 +387,18 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
   marginTop: 8,
 };
 
-/** Optional props. `onCollapse` wires the header chevron that hides the
- *  sidebar (MYND-137); omitted when the list is hosted outside the
- *  resizable editor seam. `onNewFromTemplate` wires the new-note caret that
- *  opens the template flow (MYND-190); omitted → the caret is not rendered.
+/** Optional props. `onNewFromTemplate` wires the new-note caret that opens
+ *  the template flow (MYND-190); omitted → the caret is not rendered.
  *
- *  `onSwitchVault` / `onCreateAnother` / `switching` (MYND-205) thread the
- *  account-chip vault switcher's wiring from App.tsx → Editor.tsx → here (the
- *  canonical sticky-sidebar-header location). All three are required together
- *  for the chip to mount; omitting them (single-vault hosting / isolated test
- *  renders) leaves the header strip empty — same hidden-when-<2-vaults
- *  behaviour the switcher itself enforces. */
+ *  The sidebar collapse toggle moved to a floated `TitleBarToggle` in the
+ *  editor's top-left corner, and the vault switcher to the
+ *  `SidebarVaultSwitcher` header above this list (MYND-166); neither is
+ *  hosted here. */
 interface NoteListProps {
-  onCollapse?: () => void;
   onNewFromTemplate?: () => void;
-  onSwitchVault?: (targetVaultId: VaultId) => void;
-  onCreateAnother?: () => void;
-  switching?: boolean;
 }
 
-export function NoteList({
-  onCollapse,
-  onNewFromTemplate,
-  onSwitchVault,
-  onCreateAnother,
-  switching = false,
-}: NoteListProps = {}) {
+export function NoteList({ onNewFromTemplate }: NoteListProps = {}) {
   const ctx = useSelectedNote();
   // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
   // pane to the editor — covers the Enter-on-already-selected edge the
@@ -540,20 +517,10 @@ export function NoteList({
 
   return (
     <aside style={SIDEBAR_OUTER_STYLE}>
-      {onSwitchVault && onCreateAnother && (
-        <div style={HEADER_CHIP_ROW_STYLE}>
-          <VaultSwitcher
-            onSwitchVault={onSwitchVault}
-            onCreateAnother={onCreateAnother}
-            switching={switching}
-          />
-        </div>
-      )}
       {isEmpty ? (
         <EmptyState
           onCreate={handleCreate}
           fm={fm}
-          onCollapse={onCollapse}
           onNewFromTemplate={onNewFromTemplate}
         />
       ) : (
@@ -564,7 +531,6 @@ export function NoteList({
           onToggleFolder={toggleFolder}
           onCreate={handleCreate}
           fm={fm}
-          onCollapse={onCollapse}
           onNewFromTemplate={onNewFromTemplate}
         />
       )}
@@ -591,25 +557,16 @@ export function NoteList({
 function EmptyState({
   onCreate,
   fm,
-  onCollapse,
   onNewFromTemplate,
 }: {
   onCreate: () => void;
   fm: FolderManagement;
-  onCollapse?: () => void;
   onNewFromTemplate?: () => void;
 }) {
   return (
     <div style={LIST_OUTER_STYLE}>
       <div style={HEADER_ROW_STYLE}>
         <div style={HEADER_LEAD_STYLE}>
-          {onCollapse && (
-            <IconButton
-              icon="panel-left-close"
-              label="Collapse notes sidebar"
-              onClick={onCollapse}
-            />
-          )}
           <div style={SECTION_HEADING_STYLE}>Notes</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
@@ -654,7 +611,6 @@ function PopulatedList({
   onToggleFolder,
   onCreate,
   fm,
-  onCollapse,
   onNewFromTemplate,
 }: {
   rows: VisibleRow[];
@@ -663,7 +619,6 @@ function PopulatedList({
   onToggleFolder: (key: string) => void;
   onCreate: () => void;
   fm: FolderManagement;
-  onCollapse?: () => void;
   onNewFromTemplate?: () => void;
 }) {
   const ctx = useSelectedNote();
@@ -674,12 +629,25 @@ function PopulatedList({
   // (no `selectedId` change → that effect wouldn't fire). No-op fallback
   // outside the Editor provider, so isolated NoteList renders stay inert.
   const { view, setView } = useCenterView();
+  const ws = useWorkspace();
+  // Open a note from the sidebar into the workspace (MYND-166). Modifiers /
+  // context-menu choose the target: Alt → split to the side; Cmd/Ctrl or
+  // middle → new tab; plain → reuse the focused tab. `setView("editor")` also
+  // covers the re-click-the-already-selected-note-while-Attachments-open edge
+  // the `selectedId` effect can't see (no `selectedId` change → no fire). The
+  // editor mirrors the focused pane's active note back into `selectedId` for
+  // row highlight (Editor.tsx bridge B). No-op fallback outside the providers.
   const openNote = useCallback(
-    (id: NoteId) => {
+    (id: NoteId, opts?: { newTab?: boolean; toSide?: boolean }) => {
       setView("editor");
-      return ctx.open(id);
+      // Plain click → open in the focused pane's CURRENT active tab (reuse);
+      // Cmd/Ctrl-click (or middle) → a new tab; Alt-click → split to the
+      // side. Re-opening an already-open note reveals it (duplicate-forbid).
+      if (opts?.toSide) ws.openToSide(id);
+      else if (opts?.newTab) ws.openNewTabInFocused(id);
+      else ws.openInFocused(id);
     },
-    [ctx, setView],
+    [ws, setView],
   );
   // SYNC-9 exclusive active-state (MYND-164 Fix 1): while the Attachments view
   // owns the center pane, NO sidebar note row renders its selected highlight —
@@ -718,12 +686,16 @@ function PopulatedList({
 
   const handleContextMenu = useCallback(
     (id: NoteId, pos: { x: number; y: number }) => {
-      // Also select the right-clicked row so the visual state matches
-      // the context-menu target (mirrors Finder / Explorer behavior).
-      ctx.select(id);
+      // Do NOT select the right-clicked row. Under the MYND-166 workspace
+      // model a selection change drives Editor.tsx's bridge A, which OPENS
+      // the note in the focused pane — so a Finder-style "right-click also
+      // selects" would open the note on every right-click and, worse, leave
+      // it already-open so "Open in new tab" degrades to a reveal. Right-
+      // click only surfaces the menu; every menu item already acts on
+      // `menu.id`, not the selection.
       setMenu({ id, x: pos.x, y: pos.y });
     },
-    [ctx],
+    [],
   );
 
   // Favorite-membership lookup — one Set shared by the tree rows + the context
@@ -739,11 +711,7 @@ function PopulatedList({
         record={record}
         selected={noteHighlightActive && ctx.selectedId === id}
         renaming={ctx.renamingId === id}
-        onSelect={(noteId) => {
-          void openNote(noteId).catch(() => {
-            /* T30 wires editor body load; ignore here */
-          });
-        }}
+        onSelect={(noteId, opts) => openNote(noteId, opts)}
         onStartRename={ctx.startRename}
         onContextMenu={handleContextMenu}
         onCommitRename={async (noteId, newTitle) => {
@@ -812,6 +780,16 @@ function PopulatedList({
     if (menu === null) return [];
     return [
       {
+        id: "open-in-new-tab",
+        label: "Open in new tab",
+        onSelect: () => openNote(menu.id, { newTab: true }),
+      },
+      {
+        id: "open-to-side",
+        label: "Open to the side",
+        onSelect: () => openNote(menu.id, { toSide: true }),
+      },
+      {
         id: "rename",
         label: "Rename",
         onSelect: () => ctx.startRename(menu.id),
@@ -841,7 +819,7 @@ function PopulatedList({
         onSelect: () => void handleTrash(menu.id),
       },
     ];
-  }, [menu, ctx, handleTrash, fm, favSet]);
+  }, [menu, ctx, handleTrash, fm, favSet, openNote]);
 
   // Folder context-menu items (right-click a folder row).
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -983,13 +961,6 @@ function PopulatedList({
       )}
       <div style={HEADER_ROW_STYLE}>
         <div style={HEADER_LEAD_STYLE}>
-          {onCollapse && (
-            <IconButton
-              icon="panel-left-close"
-              label="Collapse notes sidebar"
-              onClick={onCollapse}
-            />
-          )}
           <div style={SECTION_HEADING_STYLE}>Notes</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>

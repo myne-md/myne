@@ -25,6 +25,7 @@
     "vault-indices:default",
     "attachments:default",
     "importer:default",
+    "workspace:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-clear",

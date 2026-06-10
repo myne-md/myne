@@ -51,6 +51,10 @@ export type CommandContext = {
   onShowGraph: () => void;
   /** Open the Obsidian vault import flow (folder picker → progress → summary) (MYND-53). */
   onImportObsidian: () => void;
+  /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
+  onToggleLeftSidebar: () => void;
+  /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */
+  onToggleRightSidebar: () => void;
   /** Switch active selection to the given note id (mirrors sidebar click). */
   onSelectNote: (id: NoteId) => Promise<void>;
   /** Drive Stage transitions for force-relock paths. */

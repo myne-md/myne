@@ -36,8 +36,10 @@ export type NoteRowProps = {
   record: TitleRecord;
   selected: boolean;
   renaming: boolean;
-  /** Click handler → caller dispatches selection + open. */
-  onSelect: (id: string) => void;
+  /** Click handler → caller dispatches selection + open. `opts.newTab`
+   *  is set on Cmd/Ctrl-click or middle-click (open in a new tab);
+   *  `opts.toSide` on Alt-click (split to the side) — MYND-166. */
+  onSelect: (id: string, opts?: { newTab?: boolean; toSide?: boolean }) => void;
   /** Double-click on title → enter inline-rename mode. */
   onStartRename: (id: string) => void;
   /** Right-click → caller surfaces context menu. */
@@ -228,9 +230,28 @@ export function NoteRow(props: NoteRowProps) {
 
   const subtitleText = effectiveDate !== null ? formatRelativeTime(effectiveDate) : "";
 
-  const handleClick = useCallback(() => {
-    onSelect(record.noteUuid);
-  }, [onSelect, record.noteUuid]);
+  const handleClick = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      // Alt-click → split to the side; Cmd/Ctrl-click → new tab; plain
+      // click → reuse the focused tab.
+      onSelect(record.noteUuid, {
+        newTab: e.metaKey || e.ctrlKey,
+        toSide: e.altKey,
+      });
+    },
+    [onSelect, record.noteUuid],
+  );
+
+  // Middle-click also opens in a new tab.
+  const handleAuxClick = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        onSelect(record.noteUuid, { newTab: true });
+      }
+    },
+    [onSelect, record.noteUuid],
+  );
 
   const handleDoubleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -258,6 +279,7 @@ export function NoteRow(props: NoteRowProps) {
     <div
       style={composedRowStyle}
       onClick={handleClick}
+      onAuxClick={handleAuxClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       onMouseEnter={() => setHovering(true)}
