@@ -82,6 +82,13 @@ const ROLE_STR_ATTACHMENTS_CATALOG_KEY: &[u8] = b"attachments-catalog-key";
 /// domain-separated.
 const ROLE_STR_ATTACHMENTS_ID_HMAC: &[u8] = b"attachments-id-hmac";
 
+/// Registered role string for the v0.1 editor workspace-state blob KEK
+/// (MYND-166; encrypts the `vault.workspace` blob — `workspace_blob.rs`,
+/// `protocol.md` § 9.7). Load-bearing: drift silently changes the KEK.
+/// `root_key`-derived (like prefs/search), so it is `itemsKey`-independent
+/// and survives a v005 epoch rotation.
+const ROLE_STR_SESSION_STATE_KEY: &[u8] = b"session-state-key";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -114,6 +121,11 @@ pub enum SubkeyRole {
     /// from `AttachmentsCatalogKey` so id derivation and catalog
     /// encryption are domain-separated.
     AttachmentsIdHmac,
+    /// KEK for the v0.1 editor workspace-state blob (`vault.workspace`,
+    /// MYND-166). Encrypts the serialized open-tab/pane-layout descriptor
+    /// under XChaCha20-Poly1305 (CTX commitment outer). Distinct from
+    /// `PrefsKey`/`SearchIndexKey` so the three blobs are domain-separated.
+    SessionStateKey,
 }
 
 impl SubkeyRole {
@@ -127,6 +139,7 @@ impl SubkeyRole {
             SubkeyRole::SearchIndexKey => ROLE_STR_SEARCH_INDEX_KEY,
             SubkeyRole::AttachmentsCatalogKey => ROLE_STR_ATTACHMENTS_CATALOG_KEY,
             SubkeyRole::AttachmentsIdHmac => ROLE_STR_ATTACHMENTS_ID_HMAC,
+            SubkeyRole::SessionStateKey => ROLE_STR_SESSION_STATE_KEY,
         }
     }
 }
@@ -408,6 +421,7 @@ mod tests {
                 SubkeyRole::SearchIndexKey => "search-index-key",
                 SubkeyRole::AttachmentsCatalogKey => "attachments-catalog-key",
                 SubkeyRole::AttachmentsIdHmac => "attachments-id-hmac",
+                SubkeyRole::SessionStateKey => "session-state-key",
             }
         }
 

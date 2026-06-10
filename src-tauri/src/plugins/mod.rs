@@ -19,3 +19,4 @@ pub mod vault_indices;
 pub mod vault_recover;
 pub mod vault_repair;
 pub mod vault_unlock;
+pub mod workspace;

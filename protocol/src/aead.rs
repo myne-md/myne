@@ -251,6 +251,37 @@ pub fn aad_search_index_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD encryption of the v0.1 editor
+/// workspace-state blob (`vault.workspace`, MYND-166). Same shape as
+/// [`aad_prefs_blob`] / [`aad_search_index_blob`] with a distinct role
+/// string `"workspace-blob"`, so the workspace blob is cryptographically
+/// domain-separated from prefs and search — a blob of one kind can never
+/// AEAD-verify under another's key/AAD.
+///
+/// Layout (43 bytes):
+///
+/// ```text
+/// "myne.v0.1|"                  10 bytes  (AAD prefix, § 5.2)
+/// 0x01                           1 byte   (protocol_version, § 9.3)
+/// u16_be(14) || "workspace-blob" 16 bytes (length-prefixed role)
+/// account_number_hash           16 bytes  (vault identity binding, § 9.3 offset 6)
+/// ```
+///
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// workspace blob lives outside the `items_key` lineage, same rationale as
+/// `aad_prefs_blob`.
+pub fn aad_workspace_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_WORKSPACE_BLOB: &[u8] = b"workspace-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_WORKSPACE_BLOB.len() + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_WORKSPACE_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///

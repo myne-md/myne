@@ -1,0 +1,350 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! `vault.workspace` 34-byte-header encrypted editor-workspace codec —
+//! see `docs/spec/protocol.md` § 9.7 (MYND-166).
+//!
+//! `vault.workspace` is a vault-level singleton artifact holding the
+//! editor's **workspace state**: the open-tab set per pane, the pane-split
+//! layout, the per-pane active tab, the focused pane, and per-tab
+//! cursor/scroll positions. It lives next to `vault.meta` at
+//! `<vault-root>/vault.workspace` and is AEAD-encrypted under
+//! `session_state_key = DeriveSubkey(root_key, SubkeyRole::SessionStateKey)`.
+//!
+//! Like `vault.search` (§ 9.6) and unlike `vault.prefs` (§ 9.5), the inner
+//! plaintext is **opaque to this layer** — the desktop client serializes
+//! the recursive pane tree (a variable, client-defined structure) and
+//! hands the codec raw bytes. The codec owns only the envelope: magic,
+//! versions, nonce, AEAD seal under `session_state_key`, and the
+//! `aad_workspace_blob` binding. This keeps the protocol crate agnostic to
+//! the (evolving) workspace schema, which the `workspace_format_version`
+//! byte at offset 5 carries for the client's own forward-compat.
+//!
+//! ## On-disk layout (spec § 9.7.1)
+//!
+//! ```text
+//! Offset  Size  Field                     Notes
+//! ------  ----  ------------------------  ----------------------------------
+//! 0       4     magic                     ASCII "MYW1"
+//! 4       1     protocol_version          0x01
+//! 5       1     workspace_format_version  0x01 = the v0.1 inner-plaintext
+//!                                         schema; bumping it lets a client
+//!                                         fall to default on an unknown form
+//! 6       24    nonce                     XChaCha20-Poly1305 nonce
+//! 30      4     ciphertext_len            big-endian uint32, plaintext_len + 32
+//! 34      M     ciphertext                AEAD ciphertext + 32-byte CTX tag T'
+//! ```
+//!
+//! ## Migration-less semantic (spec § 9.7.4)
+//!
+//! The caller-side `read_or_default` discipline (Tauri plugin layer)
+//! collapses absent-file / truncated / AEAD-fail / unsupported-format to
+//! "no restored workspace" (a single empty pane). This module emits
+//! **honest errors** per failure mode; the caller applies
+//! fall-back-to-defaults at the boundary (parity with `prefs.rs` /
+//! `search_blob.rs`).
+
+use crate::aead::{
+    aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
+    CTX_COMMITMENT_TAG_LEN,
+};
+use crate::error::ProtocolError;
+use alloc::vec::Vec;
+use getrandom::getrandom;
+use thiserror::Error;
+use zeroize::{Zeroize, Zeroizing};
+
+/// Magic bytes at offset 0 — ASCII `"MYW1"` (Myne Workspace v1).
+pub const WORKSPACE_BLOB_MAGIC: [u8; 4] = *b"MYW1";
+
+/// `protocol_version` byte at offset 4 — `0x01` for v0.1.
+pub const WORKSPACE_BLOB_PROTOCOL_VERSION: u8 = 0x01;
+
+/// `workspace_format_version` byte at offset 5 — the v0.1 inner-plaintext
+/// schema. Distinct from `protocol_version`: the pane-tree schema may grow
+/// fields within v0.1, and a client that does not understand a newer form
+/// falls back to the default workspace (§ 9.7.4) rather than mis-parsing.
+pub const WORKSPACE_BLOB_FORMAT_V1: u8 = 0x01;
+
+/// Length of the 16-byte `account_number_hash` bound into
+/// `AAD_workspace_blob` (spec § 9.7.3 + § 9.3 offset 6).
+pub const WORKSPACE_BLOB_ACCOUNT_HASH_LEN: usize = 16;
+
+/// Length of the outer envelope's fixed-offset header (offsets 0..34).
+pub const WORKSPACE_BLOB_HEADER_LEN: usize = 34;
+
+/// Maximum inner-plaintext length, inclusive (1 MiB).
+///
+/// The descriptor is tabs + a small pane tree + per-tab cursor offsets —
+/// kilobytes even for a heavy workspace. 1 MiB is generous headroom while
+/// still bounding the parser's pre-AEAD allocation (DoS-allocation defense,
+/// parallel to the §9.5.4 / §9.6 caps). See spec § 9.7.4.
+pub const MAX_WORKSPACE_PLAINTEXT_LEN: usize = 1024 * 1024;
+
+/// Closed-enum failure surface for `vault.workspace` encode / decode.
+/// Mirrors `SearchBlobError`; callers collapse all variants to the default
+/// (empty) workspace per spec § 9.7.4.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum WorkspaceBlobError {
+    /// Input shorter than [`WORKSPACE_BLOB_HEADER_LEN`] bytes.
+    #[error("vault.workspace blob too short to parse a header")]
+    HeaderTooShort,
+    /// First 4 bytes are not `MYW1`.
+    #[error("vault.workspace blob magic mismatch (expected MYW1)")]
+    MagicMismatch,
+    /// `protocol_version` byte at offset 4 is not `0x01`.
+    #[error("vault.workspace blob protocol_version mismatch (expected 0x01)")]
+    ProtocolVersionMismatch,
+    /// `workspace_format_version` is not understood by this client → the
+    /// caller falls back to the default workspace.
+    #[error("vault.workspace blob workspace_format_version unsupported")]
+    FormatUnsupported,
+    /// `ciphertext_len` exceeds [`MAX_WORKSPACE_PLAINTEXT_LEN`] + 32.
+    #[error("vault.workspace ciphertext_len exceeds 1 MiB + 32 cap")]
+    CiphertextLenOverflow,
+    /// Blob shorter than `WORKSPACE_BLOB_HEADER_LEN + ciphertext_len`.
+    #[error("vault.workspace blob truncated relative to advertised ciphertext_len")]
+    CiphertextTruncated,
+    /// AEAD verification failure — wrong key, wrong AAD (cross-vault),
+    /// tampered ciphertext, or tampered CTX commitment tag (§ 6.4
+    /// non-distinguishing rule).
+    #[error("vault.workspace AEAD verification failed")]
+    CannotDecrypt,
+    /// Plaintext to encode exceeds [`MAX_WORKSPACE_PLAINTEXT_LEN`].
+    #[error("vault.workspace plaintext exceeds 1 MiB cap")]
+    PlaintextTooLarge,
+    /// OS CSPRNG unavailable for nonce generation.
+    #[error("OS CSPRNG unavailable for vault.workspace nonce generation")]
+    RandomnessUnavailable,
+}
+
+impl From<ProtocolError> for WorkspaceBlobError {
+    fn from(_: ProtocolError) -> Self {
+        // Every AEAD-layer failure collapses to a single non-distinguishing
+        // decrypt error (boundary-policy §6.4, mirroring prefs/search).
+        WorkspaceBlobError::CannotDecrypt
+    }
+}
+
+/// Encode a `vault.workspace` blob from an opaque `plaintext` (the desktop
+/// layer's serialized pane-tree descriptor), sealing under
+/// `session_state_key` with `nonce`.
+///
+/// `_raw` callers source `nonce` from a CSPRNG-grade source — nonce reuse
+/// under the same `session_state_key` is catastrophic per the
+/// XChaCha20-Poly1305 contract. Production callers SHOULD use
+/// [`encode_workspace_blob`].
+pub fn encode_workspace_blob_raw(
+    session_state_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN],
+    plaintext: &[u8],
+    nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<Vec<u8>, WorkspaceBlobError> {
+    if plaintext.len() > MAX_WORKSPACE_PLAINTEXT_LEN {
+        return Err(WorkspaceBlobError::PlaintextTooLarge);
+    }
+
+    let aad = aad_workspace_blob(account_number_hash);
+    let sealed = aead_seal_ctx(session_state_key, nonce, plaintext, &aad)?;
+
+    let ciphertext_len = sealed.len();
+    debug_assert_eq!(
+        ciphertext_len,
+        plaintext.len() + CTX_COMMITMENT_TAG_LEN,
+        "aead_seal_ctx invariant: output is ciphertext || CTX tag",
+    );
+
+    let mut out = Vec::with_capacity(WORKSPACE_BLOB_HEADER_LEN + ciphertext_len);
+    out.extend_from_slice(&WORKSPACE_BLOB_MAGIC);
+    out.push(WORKSPACE_BLOB_PROTOCOL_VERSION);
+    out.push(WORKSPACE_BLOB_FORMAT_V1);
+    out.extend_from_slice(nonce);
+    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
+    out.extend_from_slice(&sealed);
+    Ok(out)
+}
+
+/// Encode a `vault.workspace` blob, pulling the 24-byte nonce from the OS
+/// CSPRNG. Production callers SHOULD use this rather than
+/// [`encode_workspace_blob_raw`].
+pub fn encode_workspace_blob(
+    session_state_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, WorkspaceBlobError> {
+    let mut nonce = [0u8; AEAD_NONCE_LEN];
+    getrandom(&mut nonce).map_err(|_| WorkspaceBlobError::RandomnessUnavailable)?;
+    let result =
+        encode_workspace_blob_raw(session_state_key, account_number_hash, plaintext, &nonce);
+    nonce.zeroize();
+    result
+}
+
+/// Decode a `vault.workspace` blob into its opaque inner plaintext (the
+/// serialized pane-tree descriptor, for the desktop layer to deserialize).
+/// Magic / protocol_version / workspace_format_version are all checked
+/// BEFORE any decryption; AEAD failure collapses to
+/// [`WorkspaceBlobError::CannotDecrypt`].
+pub fn decode_workspace_blob(
+    session_state_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN],
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, WorkspaceBlobError> {
+    if blob.len() < WORKSPACE_BLOB_HEADER_LEN {
+        return Err(WorkspaceBlobError::HeaderTooShort);
+    }
+    if blob[0..4] != WORKSPACE_BLOB_MAGIC {
+        return Err(WorkspaceBlobError::MagicMismatch);
+    }
+    if blob[4] != WORKSPACE_BLOB_PROTOCOL_VERSION {
+        return Err(WorkspaceBlobError::ProtocolVersionMismatch);
+    }
+    if blob[5] != WORKSPACE_BLOB_FORMAT_V1 {
+        return Err(WorkspaceBlobError::FormatUnsupported);
+    }
+
+    let mut nonce = [0u8; AEAD_NONCE_LEN];
+    nonce.copy_from_slice(&blob[6..30]);
+
+    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
+
+    // Reject oversize BEFORE indexing so a hostile ciphertext_len cannot
+    // panic on the slice.
+    if ciphertext_len > MAX_WORKSPACE_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
+        return Err(WorkspaceBlobError::CiphertextLenOverflow);
+    }
+    let ciphertext_end = WORKSPACE_BLOB_HEADER_LEN + ciphertext_len;
+    if blob.len() < ciphertext_end {
+        return Err(WorkspaceBlobError::CiphertextTruncated);
+    }
+
+    let aad = aad_workspace_blob(account_number_hash);
+    let plaintext = aead_open_ctx(
+        session_state_key,
+        &nonce,
+        &blob[WORKSPACE_BLOB_HEADER_LEN..ciphertext_end],
+        &aad,
+    )?;
+    Ok(plaintext)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::subkey::{derive_subkey, SubkeyRole};
+
+    fn fixed_key() -> [u8; AEAD_KEY_LEN] {
+        *derive_subkey(&[0x42; 32], SubkeyRole::SessionStateKey)
+    }
+    fn account_hash() -> [u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN] {
+        [0x33; WORKSPACE_BLOB_ACCOUNT_HASH_LEN]
+    }
+    fn nonce() -> [u8; AEAD_NONCE_LEN] {
+        [0x77; AEAD_NONCE_LEN]
+    }
+
+    #[test]
+    fn round_trip_opaque_plaintext() {
+        let key = fixed_key();
+        let h = account_hash();
+        let pt = br#"{"focused":"p1","root":{"k":"leaf","id":"p1","tabs":["n1"],"active":"n1"}}"#;
+        let blob = encode_workspace_blob_raw(&key, &h, pt, &nonce()).unwrap();
+        assert_eq!(&blob[0..4], b"MYW1");
+        assert_eq!(blob[4], 0x01);
+        assert_eq!(blob[5], 0x01);
+        let out = decode_workspace_blob(&key, &h, &blob).unwrap();
+        assert_eq!(out.as_slice(), pt.as_slice());
+    }
+
+    #[test]
+    fn empty_plaintext_round_trips() {
+        let key = fixed_key();
+        let h = account_hash();
+        let blob = encode_workspace_blob_raw(&key, &h, b"", &nonce()).unwrap();
+        let out = decode_workspace_blob(&key, &h, &blob).unwrap();
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn magic_mismatch_rejects() {
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_workspace_blob_raw(&key, &h, b"x", &nonce()).unwrap();
+        blob[0] = b'Z';
+        assert_eq!(
+            decode_workspace_blob(&key, &h, &blob),
+            Err(WorkspaceBlobError::MagicMismatch),
+        );
+    }
+
+    #[test]
+    fn protocol_version_mismatch_rejects() {
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_workspace_blob_raw(&key, &h, b"x", &nonce()).unwrap();
+        blob[4] = 0x02;
+        assert_eq!(
+            decode_workspace_blob(&key, &h, &blob),
+            Err(WorkspaceBlobError::ProtocolVersionMismatch),
+        );
+    }
+
+    #[test]
+    fn unsupported_format_rejects_for_default() {
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_workspace_blob_raw(&key, &h, b"x", &nonce()).unwrap();
+        blob[5] = 0x02;
+        assert_eq!(
+            decode_workspace_blob(&key, &h, &blob),
+            Err(WorkspaceBlobError::FormatUnsupported),
+        );
+    }
+
+    #[test]
+    fn tampered_ciphertext_fails_aead() {
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_workspace_blob_raw(&key, &h, b"hello", &nonce()).unwrap();
+        let last = blob.len() - 1;
+        blob[last] ^= 0xFF;
+        assert_eq!(
+            decode_workspace_blob(&key, &h, &blob),
+            Err(WorkspaceBlobError::CannotDecrypt),
+        );
+    }
+
+    #[test]
+    fn cross_vault_account_hash_fails_aead() {
+        let key = fixed_key();
+        let blob = encode_workspace_blob_raw(&key, &account_hash(), b"hello", &nonce()).unwrap();
+        // Different account_number_hash → different AAD → AEAD verify fails.
+        let other = [0x44; WORKSPACE_BLOB_ACCOUNT_HASH_LEN];
+        assert_eq!(
+            decode_workspace_blob(&key, &other, &blob),
+            Err(WorkspaceBlobError::CannotDecrypt),
+        );
+    }
+
+    #[test]
+    fn header_too_short_rejects() {
+        let key = fixed_key();
+        assert_eq!(
+            decode_workspace_blob(&key, &account_hash(), b"MYW1"),
+            Err(WorkspaceBlobError::HeaderTooShort),
+        );
+    }
+
+    #[test]
+    fn oversize_ciphertext_len_rejects_before_indexing() {
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_workspace_blob_raw(&key, &h, b"x", &nonce()).unwrap();
+        // Force ciphertext_len to a hostile huge value.
+        blob[30..34].copy_from_slice(&u32::MAX.to_be_bytes());
+        assert_eq!(
+            decode_workspace_blob(&key, &h, &blob),
+            Err(WorkspaceBlobError::CiphertextLenOverflow),
+        );
+    }
+}

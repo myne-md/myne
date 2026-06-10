@@ -54,6 +54,7 @@ pub mod subkey;
 pub mod template;
 pub mod types;
 pub mod vault_meta;
+pub mod workspace_blob;
 
 pub use account_number::{
     damm32_table, generate_account_number, parse_account_number, AccountNumber,
@@ -61,8 +62,8 @@ pub use account_number::{
 };
 pub use aead::{
     aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
-    aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap, aead_open_ctx,
-    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap, aad_workspace_blob,
+    aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use attachment_blob::{
     aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id, decode_attachment_blob,
@@ -112,4 +113,9 @@ pub use vault_meta::{
     VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN, VAULT_META_MAGIC,
     VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
+};
+pub use workspace_blob::{
+    decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,
+    MAX_WORKSPACE_PLAINTEXT_LEN, WORKSPACE_BLOB_ACCOUNT_HASH_LEN, WORKSPACE_BLOB_FORMAT_V1,
+    WORKSPACE_BLOB_HEADER_LEN, WORKSPACE_BLOB_MAGIC, WORKSPACE_BLOB_PROTOCOL_VERSION,
 };

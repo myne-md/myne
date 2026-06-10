@@ -305,6 +305,8 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
                          // / grill Q5): no blob-write latency on the fail-closed idle
                          // path — the index rebuilds on the next unlock.
             crate::plugins::notes::search_sync::zeroize_search_index(app);
+            // MYND-166: wipe the staged editor-workspace descriptor too.
+            crate::plugins::workspace::commands::clear_staged_descriptor();
             // MYND-31: wipe the plaintext-derived VaultIndices on the same
             // leg — it is as sensitive as the keys + search index, and
             // rebuilds on the next unlock.

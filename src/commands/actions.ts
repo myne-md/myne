@@ -140,9 +140,31 @@ const showGraphAction: CommandAction = {
   },
 };
 
+const toggleLeftSidebarAction: CommandAction = {
+  id: "view.toggle-notes-sidebar",
+  label: "Toggle notes sidebar",
+  category: "View",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onToggleLeftSidebar();
+  },
+};
+
+const toggleRightSidebarAction: CommandAction = {
+  id: "view.toggle-backlinks-sidebar",
+  label: "Toggle backlinks sidebar",
+  category: "View",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onToggleRightSidebar();
+  },
+};
+
 export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
+  toggleLeftSidebarAction,
+  toggleRightSidebarAction,
   newNoteFromTemplateAction,
   openTodayNoteAction,
   manageTemplatesAction,

@@ -57,20 +57,24 @@ function chipStyle(active: boolean): CSSProperties {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    padding: "5px 8px",
-    // `--paper-3` fill on open/press, transparent at rest so the chip sits
-    // quietly in the sidebar header until interacted with.
+    // Notion-style full-width workspace switcher row at the top of the sidebar
+    // (MYND-166): mark + vault name (flex) + chevron, left-aligned, no border,
+    // subtle `--paper-3` fill on hover/open.
+    width: "100%",
+    padding: "6px 8px",
+    boxSizing: "border-box",
     background: active ? "var(--paper-3)" : "transparent",
-    border: "1px solid var(--line-1)",
+    border: 0,
     borderRadius: "var(--radius-2)",
     cursor: "pointer",
+    textAlign: "left",
     fontFamily: "var(--font-sans)",
   };
 }
 
 const CHIP_MARK_STYLE: CSSProperties = {
-  width: 24,
-  height: 24,
+  width: 22,
+  height: 22,
   flexShrink: 0,
   borderRadius: "var(--radius-1)",
   background: "var(--ink-1)",
@@ -84,6 +88,8 @@ const CHIP_MARK_STYLE: CSSProperties = {
 };
 
 const CHIP_LABEL_STYLE: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   fontWeight: 500,
@@ -91,7 +97,6 @@ const CHIP_LABEL_STYLE: CSSProperties = {
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  maxWidth: 160,
 };
 
 const CHIP_GLYPH_STYLE: CSSProperties = {
@@ -324,11 +329,17 @@ export function VaultSwitcher({
       : "Vault";
 
   return (
-    <div style={{ position: "relative" }} ref={containerRef}>
+    <div style={{ position: "relative", width: "100%" }} ref={containerRef}>
       <button
         type="button"
         disabled={switching}
         onClick={() => setOpen((v) => !v)}
+        onMouseEnter={(e) => {
+          if (!open) e.currentTarget.style.background = "var(--paper-3)";
+        }}
+        onMouseLeave={(e) => {
+          if (!open) e.currentTarget.style.background = "transparent";
+        }}
         aria-label="Switch vault"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -344,7 +355,7 @@ export function VaultSwitcher({
         </span>
         <span style={CHIP_LABEL_STYLE}>{chipLabel}</span>
         <span style={CHIP_GLYPH_STYLE} aria-hidden="true">
-          <Icon name="chevrons-up-down" size={16} />
+          <Icon name="chevrons-up-down" size={14} />
         </span>
       </button>
 

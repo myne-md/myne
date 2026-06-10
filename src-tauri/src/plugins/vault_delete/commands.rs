@@ -163,6 +163,8 @@ pub async fn vault_delete<R: Runtime>(
         Ok(()) | Err(VaultDeleteError::PartialDelete { .. })
     ) {
         crate::plugins::notes::search_sync::zeroize_search_index(&app);
+        // MYND-166: wipe the staged editor-workspace descriptor too.
+        crate::plugins::workspace::commands::clear_staged_descriptor();
         // MYND-31: wipe the plaintext-derived VaultIndices on the same
         // delete-proceeded path so it does not outlive the deleted vault.
         crate::plugins::vault_indices::zeroize_vault_indices(&app);

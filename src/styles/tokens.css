@@ -605,3 +605,32 @@ a:focus-visible,
 /* VAULT LABEL rename input (MYND-205 task 6). Placeholder color cannot be set
    via inline style, so the "Add a label…" hint color (--line-3) lives here. */
 .vault-label-input::placeholder { color: var(--line-3); opacity: 1; }
+
+/* -- Thin scrollbars (MYND-166 behavioral pass) -----------------------------
+   The default WebKit scrollbar is ~15px and reads as a heavy bar. Slim it to
+   a ~4px thumb (10px track minus a 3px transparent padding-box border) with a
+   transparent track, app-wide. Firefox/standards via `scrollbar-width`. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-3);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

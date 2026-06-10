@@ -302,30 +302,29 @@ function App() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <div
-        // macOS overlay-mode title bar — `tauri.conf.json` sets
-        // `titleBarStyle: "Overlay"` so the webview extends under the
-        // traffic-light area. This 38px strip keeps the top region
-        // uniform with the sidebar color (var(--bg-2)) and provides a
-        // drag handle for the window. Traffic lights are positioned
-        // inside this strip via `trafficLightPosition` (x:16, y:20).
-        //
-        // Drag uses Tauri's `data-tauri-drag-region` attribute, NOT CSS
-        // `-webkit-app-region: drag`. The CSS property is a Chromium-only
-        // feature; Tauri's macOS (WKWebView) and Linux (WebKitGTK) webviews
-        // don't implement it, so the strip was a dead zone there. The data
-        // attribute is intercepted by the webview on all platforms and
-        // calls `startDragging()` (permitted via `core:default`).
-        data-tauri-drag-region
-        style={{
-          height: 38,
-          flexShrink: 0,
-          background: "var(--bg-2)",
-          borderBottom: "1px solid var(--line-1)",
-          WebkitUserSelect: "none",
-          userSelect: "none",
-        }}
-      />
+      {/* macOS overlay-mode title bar — `tauri.conf.json` sets
+          `titleBarStyle: "Overlay"` so the webview extends under the
+          traffic-light area. Non-editor stages get this plain 38px window-drag
+          strip; the EDITOR owns its own top row (MYND-166): the per-pane tab
+          strips + the persistent sidebar ribbon sit in the title-bar row, so
+          App renders no strip there.
+
+          Drag uses Tauri's `data-tauri-drag-region` attribute, NOT the
+          Chromium-only `-webkit-app-region: drag` (unsupported in WKWebView /
+          WebKitGTK); the data attribute is intercepted on all platforms. */}
+      {stage.name !== "editor" && (
+        <div
+          data-tauri-drag-region
+          style={{
+            height: 38,
+            flexShrink: 0,
+            background: "var(--bg-2)",
+            borderBottom: "1px solid var(--line-1)",
+            WebkitUserSelect: "none",
+            userSelect: "none",
+          }}
+        />
+      )}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {screen}
       </div>

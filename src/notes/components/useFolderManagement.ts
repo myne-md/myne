@@ -39,6 +39,7 @@ import {
   type FolderDeletePlan,
 } from "../folderActions";
 import { moveNote } from "../moveNote";
+import { writeTabDrag } from "../tabDrag";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
@@ -477,6 +478,11 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     draggedRef.current = id;
     draggedFolderRef.current = null;
     e.dataTransfer.setData(DRAG_MIME, id);
+    // Also carry the workspace tab-open payload (MYND-166) so the SAME drag
+    // can drop on a folder row (folder-move, reads DRAG_MIME) OR on a pane /
+    // tab strip (open as tab / split, reads TAB_DRAG_MIME). `fromPaneId: null`
+    // marks the sidebar origin — the note may not be open in any pane yet.
+    writeTabDrag(e.dataTransfer, { noteId: id, fromPaneId: null });
     e.dataTransfer.effectAllowed = "move";
     setDragKind("note");
   }, []);

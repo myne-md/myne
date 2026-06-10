@@ -906,6 +906,55 @@ AAD_search_index_blob =
 
 **At-rest leakage.** The blob's size leaks a coarse signal about indexed vocabulary / total volume, analogous to the `.myn`-count leak — accepted for v0.1 ([`../threat-model.md`](../threat-model.md) A5 / §7).
 
+### 9.7 Editor workspace-state blob (`vault.workspace`)
+
+`vault.workspace` is a vault-level singleton artifact carrying the editor's **workspace state** (MYND-166): the open-tab set per pane, the recursive pane-split layout, each pane's active tab, the focused pane, and per-tab cursor/scroll positions. It lives next to `vault.meta` at `<vault-root>/vault.workspace` and is AEAD-encrypted under `session_state_key = DeriveSubkey(root_key, "session-state-key")` (§3.2 + §3.4). The open-note set + layout is **activity metadata** (AS3-Sensitive: note ids + structure); persisting it as plaintext local app state would leak which notes a user keeps open — and, via file mtime, *when* they switch between them — to a filesystem adversary (A4/A7). Sealing it under AEAD with a graceful-exit-only write cadence (below) keeps that signal inside the encrypted envelope.
+
+Like `vault.search` (§9.6) and unlike `vault.prefs` (§9.5), the inner plaintext is **opaque to this layer** — the desktop client serializes the (variable, evolving) pane tree and the codec treats it as raw bytes. The `workspace_format_version` byte at offset 5 carries the client's inner-schema version for forward-compat.
+
+#### 9.7.1 Outer envelope layout
+
+```text
+Offset  Size  Field                     Notes
+------  ----  ------------------------  ----------------------------------
+0       4     magic                     ASCII "MYW1"
+4       1     protocol_version          0x01
+5       1     workspace_format_version  0x01 = v0.1 inner schema; an unknown
+                                        value falls to default (§9.7.4)
+6       24    nonce                     XChaCha20-Poly1305 nonce
+30      4     ciphertext_len            big-endian uint32, plaintext_len + 32
+34      M     ciphertext                AEAD ciphertext + 32-byte CTX tag T'
+```
+
+Header is 34 bytes, identical in shape to §9.5.1 / §9.6.1 except offset 5 carries `workspace_format_version` (the pane-tree schema evolves independently of the protocol version). No public `session_state_key_id`, no public `account_number_hash` — both bind via key derivation and AAD without consuming header bytes.
+
+#### 9.7.2 Inner plaintext (client-opaque descriptor)
+
+The inner plaintext is the desktop client's serialized workspace descriptor (v0.1: canonical JSON of `{root, focusedPaneId}` where `root` is the recursive `leaf`/`split` pane tree). This layer does not parse it; cross-implementation byte-stability of the descriptor is the client's concern (the protocol vectors pin only the envelope + AAD, as for `vault.search`). The desktop client structurally validates the descriptor on read and falls back to a single empty pane on any malformation — defense against a tampered-but-AEAD-OK or schema-drifted blob.
+
+#### 9.7.3 AAD construction
+
+`AAD_workspace_blob` mirrors `AAD_prefs_blob` / `AAD_search_index_blob` with role string `"workspace-blob"`:
+
+```text
+"myne.v0.1|"                   10 bytes  (AAD prefix, §5.2)
+0x01                            1 byte   (protocol_version)
+u16_be(14) || "workspace-blob"  16 bytes (length-prefixed role)
+account_number_hash            16 bytes  (vault identity, §9.3 offset 6)
+```
+
+Total 43 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity — `session_state_key` derives directly from `root_key` via `"myne.v0.1 session-state-key"`, independent of the `items_key` lineage (so it survives v005 epoch rotation, same rationale as prefs/search).
+
+#### 9.7.4 Write cadence, size cap, and fall-back semantic
+
+**Write cadence — graceful-exit only.** The descriptor is written on manual lock, idle auto-lock (within its grace window, best-effort), and app quit — **never** on tab open/close/switch or pane-focus change. Per-switch writes would make the blob mtime a high-resolution editor-activity log readable by A4/A7; restricting writes to graceful exits keeps mtime a low-resolution lock/quit signal. Consequence: workspace state is **best-effort, not crash-durable** — a crash drops to the last graceful write (the crash-durable alternative is the rejected mtime leak).
+
+**Size cap.** Implementations SHOULD reject `ciphertext_len > 1048576 + 32` (1 MiB plaintext cap + 32-byte CTX tag), bounding the parser's pre-AEAD allocation — parallel to §9.2 / §9.5.4 / §9.6. Tabs + a small pane tree + cursor offsets are kilobytes; 1 MiB is generous headroom.
+
+**Fall-back semantic.** Reading `vault.workspace` returns the descriptor on success, or the **default workspace** (a single empty pane) on any failure (absent / magic-or-version mismatch / AEAD-fail / oversize / non-UTF-8 / malformed descriptor) — the non-distinguishing-error discipline of §6.4 / §9.5.5, applied to the workspace. An attacker with disk-write access can only reset the workspace to default; arbitrary state injection requires breaking the AEAD. Cross-vault: a `vault.workspace` from vault A fails AEAD under vault B's `session_state_key` (different `root_key`) and `AAD_workspace_blob` (different `account_number_hash`).
+
+**At-rest leakage.** The blob's size leaks a coarse open-tab-count signal, analogous to the `.myn`-count / `vault.search`-size leaks — accepted for v0.1 ([`../threat-model.md`](../threat-model.md) A5 / §7).
+
 ### 9.9 Attachment blob (`MYA1`)
 
 An attachment blob holds one arbitrary file (image, SVG, PDF) as encrypted bytes, stored under `<vault-root>/attachments/<attachment-id-hex>` (§9.1). Attachments ship in v0.1 (this supersedes the earlier Phase-1.5 deferral; `decisions.md`). The blob reuses the `.myn` three-level wrapping pattern (§9.2): a per-attachment random `attachment_key` is wrapped under the vault `itemsKey`, and the file bytes are encrypted under `attachment_key`. Because the key lineage is `itemsKey → attachment_key`, an attachment blob is **independent of any single note** — a deduplicated attachment referenced by many notes has exactly one blob and one key.
@@ -1038,12 +1087,12 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Vault metadata (`vault.meta`) | `MYV1` | `NTV5` | §9.3 | core |
 | Vault prefs (`vault.prefs`) | `MYP1` | `MYP5` | §9.5 | MYND-160 |
 | Search index (`vault.search`) | `MYS1` | `MYS5` | §9.6 | MYND-29 |
-| Workspace state (`vault.workspace`) | `MYW1` (in-flight) | `MYW5` | §9.7 (reserved) | multi-tab/split-pane (spec not yet landed) |
+| Workspace state (`vault.workspace`) | `MYW1` | `MYW5` | §9.7 | MYND-166 |
 | Vault indices (`vault.indices`) | `MYI1` (reserved) | `MYI5` | §9.8 (reserved) | MYND-31 (deferred persistence) |
 | Attachment blob | `MYA1` | `MYA5` | §9.9 | MYND-164 |
 | Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
 
-Section numbers §9.7 (workspace) and §9.8 (vault indices) are **reserved** for in-flight features whose blob specs land separately; attachments occupy §9.9/§9.10 to avoid the collision. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments) use the `MY?5` v005 convention.
+Section number §9.8 (vault indices) is **reserved** for an in-flight feature whose blob spec lands separately; §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10 to avoid the collision. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments) use the `MY?5` v005 convention.
 
 ### 10.4 Migration procedure (cross-major)
 
