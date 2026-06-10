@@ -186,6 +186,41 @@ pub(crate) async fn prefs_read_with_dir(
     ))
 }
 
+/// Internal (non-IPC) setter: record the last successful backup export
+/// (MYND-58; spec §9.5.2 `last_backup_at` — drives the 30-day backup
+/// reminder). Same write discipline as every IPC setter (per-plugin write
+/// mutex + SYNC-6 hold guard). Best-effort at the call site: a failed
+/// prefs write never demotes a verified export.
+pub(crate) async fn record_last_backup_at_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    epoch_seconds: u64,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.last_backup_at = Some(epoch_seconds);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(event = "prefs_written", field = "last_backup_at");
+    Ok(())
+}
+
 /// Slot::Unlocked-gated per-field setter for the
 /// `screen_capture_protection` toggle. Acquires the per-plugin write
 /// mutex, executes a read-modify-write under it, then **after** the
@@ -220,8 +255,9 @@ pub(crate) async fn set_screen_capture_protection_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -274,8 +310,9 @@ pub(crate) async fn set_deliberate_folders_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -326,8 +363,9 @@ pub(crate) async fn set_item_order_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -374,8 +412,9 @@ pub(crate) async fn set_daily_date_format_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -419,8 +458,9 @@ pub(crate) async fn set_daily_folder_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -470,8 +510,9 @@ pub(crate) async fn set_daily_template_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -518,8 +559,9 @@ pub(crate) async fn set_favorites_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -574,8 +616,9 @@ pub(crate) async fn set_auto_lock_timeout_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -632,8 +675,9 @@ pub(crate) async fn set_editor_layout_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -704,8 +748,9 @@ pub(crate) async fn set_theme_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -758,8 +803,9 @@ pub(crate) async fn set_item_colors_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -807,8 +853,9 @@ pub(crate) async fn set_folder_icons_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -870,8 +917,9 @@ pub(crate) async fn vault_set_label_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
 
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
@@ -919,6 +967,20 @@ mod tests {
             .enable_all()
             .build()
             .expect("current-thread runtime build")
+    }
+
+    #[test]
+    fn record_last_backup_at_round_trips_through_prefs() {
+        // MYND-58: the export engine's best-effort recorder writes the
+        // §9.5.2 `last_backup_at` field via the standard setter discipline.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            record_last_backup_at_with_dir(tmp.path(), &state, 1765432100)
+                .await
+                .expect("record");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.last_backup_at, Some(1765432100));
+        });
     }
 
     // ---- helpers -------------------------------------------------------
@@ -1037,6 +1099,7 @@ mod tests {
                     item_order: Vec::new(),
                     editor_layout: None,
                     label: None,
+                    last_backup_at: None,
                 },
                 &[0x77; AEAD_NONCE_LEN],
             )

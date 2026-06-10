@@ -46,6 +46,7 @@ const DEFAULT_PREFS: PrefsView = {
   folder_icons: {},
   item_colors: {},
   label: null,
+  last_backup_at: null,
 };
 
 interface UsePrefsResult {

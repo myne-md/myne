@@ -52,6 +52,12 @@ const PANELS: readonly PanelMeta[] = [
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
+  /** Storage → "Back up vault…" (MYND-56): closes Settings, opens the
+   *  export progress modal (engine MYND-32). */
+  onBackupVault?: () => void;
+  /** Storage → "Restore from backup…" (MYND-56): closes Settings and
+   *  routes into the pre-unlock-class restore Stage flow (MYND-218). */
+  onRestoreBackup?: () => void;
   /**
    * Show a transient post-event toast at the parent's notification
    * surface (Editor's Toast component). Used by AccountPanel after a
@@ -194,6 +200,8 @@ const CONTENT_STYLE: CSSProperties = {
 export function SettingsModal({
   open,
   onClose,
+  onBackupVault,
+  onRestoreBackup,
   onShowToast,
   onForceRelock,
   onDeleteVaultSuccess,
@@ -272,7 +280,13 @@ export function SettingsModal({
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     appearance: <AppearancePanel />,
-    storage: <StoragePanel onImportObsidian={onImportObsidian} />,
+    storage: (
+      <StoragePanel
+        onImportObsidian={onImportObsidian}
+        onBackupVault={onBackupVault}
+        onRestoreBackup={onRestoreBackup}
+      />
+    ),
     about: <AboutPanel />,
   };
 

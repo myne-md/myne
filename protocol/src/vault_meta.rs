@@ -1058,6 +1058,145 @@ mod tests {
             .expect("write vault-meta vectors dump");
     }
 
+    // ---- KAT vector APPEND generator: extra structural parse rejects --
+
+    /// Emits a JSON **array fragment** of 4 additional `parse_fail` cases
+    /// for `myne-test-vectors/vectors/vault-meta/v0.1/cases.json` at
+    /// `/tmp/myne_vault_meta_parse_fail_vectors.json` (MYND-227). The
+    /// objects are spliced by hand into the existing `cases` array — the
+    /// original `emit_vault_meta_vectors_for_paste` stays byte-stable and
+    /// is NOT re-run (vector_id immutability).
+    ///
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_vault_meta_parse_fail_vectors -- --ignored`
+    ///
+    /// The 4 cases close the structural-reject coverage gap (the original
+    /// set pinned only magic + reserved tamper): wrong length (344-byte
+    /// truncation), protocol_version ≠ 0x01, kdf_id ≠ 0x01 and
+    /// argon2_version ≠ 0x13 (the two `parse_kdf_params` rejects — a port
+    /// that skips KDF-param validation parses a blob it cannot honor).
+    /// All four collapse to the same non-distinguishing
+    /// `ProtocolError::InvalidVaultMeta`, matching the existing runner arm.
+    #[test]
+    #[ignore]
+    fn emit_vault_meta_parse_fail_vectors() {
+        extern crate std;
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Identical fixture to emit_vault_meta_vectors_for_paste — the new
+        // tampers derive from the SAME canonical blob the landed
+        // `canonical-roundtrip` case pins.
+        let meta = VaultMeta {
+            account_number_hash: [0xDA; VAULT_META_ACCOUNT_HASH_LEN],
+            kdf_params: FAST_TEST_KDF,
+            random_salt_password: [0xDB; VAULT_META_SALT_RANDOM_LEN],
+            random_salt_recovery: [0xDC; VAULT_META_SALT_RANDOM_LEN],
+            nonce_password_wrap: [0xDD; VAULT_META_NONCE_LEN],
+            enc_root_key_password: [0xDE; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            nonce_recovery_wrap: [0xDF; VAULT_META_NONCE_LEN],
+            enc_root_key_recovery: [0xE0; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            items_key_id: [0xE1; VAULT_META_ITEMS_KEY_ID_LEN],
+            items_key_nonce: [0xE2; VAULT_META_NONCE_LEN],
+            enc_items_key: [0xE3; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+        };
+        let canonical = serialize_vault_meta(&meta);
+        let _ = parse_vault_meta(&canonical).expect("canonical fixture must parse");
+
+        // Byte 22 = kdf_id (start of the 11-byte canonical KDF block at
+        // 22..33); byte 32 = argon2_version (last byte of that block).
+        let truncated: alloc::vec::Vec<u8> = canonical[..VAULT_META_LEN - 1].to_vec();
+        let mut version_tamper = canonical;
+        version_tamper[4] = 0x02;
+        let mut kdf_id_tamper = canonical;
+        kdf_id_tamper[22] = 0x02;
+        let mut argon2_version_tamper = canonical;
+        argon2_version_tamper[32] = 0x10;
+
+        let cases: [(&str, &str, &[u8], &str); 4] = [
+            (
+                "wrong-length-truncated",
+                "Canonical blob from the canonical-roundtrip case truncated to 344 bytes. parse_vault_meta MUST reject with ProtocolError::InvalidVaultMeta — vault.meta is a fixed-width 345-byte record and the length check fires before any field read. Same non-distinguishing variant as every other structural reject.",
+                truncated.as_slice(),
+                "final byte dropped (345 → 344 bytes)",
+            ),
+            (
+                "protocol-version-tamper",
+                "Canonical blob with byte 4 (protocol_version) set to 0x02 instead of 0x01. A v0.1 parser rejects an unknown protocol version before decoding any downstream field — cross-major reads happen only via explicit migration, never via in-place tolerant parsing.",
+                version_tamper.as_slice(),
+                "byte 4 (protocol_version) 0x01 → 0x02",
+            ),
+            (
+                "kdf-id-tamper",
+                "Canonical blob with byte 22 (kdf_id, first byte of the 11-byte canonical KDF-params block at offset 22..33) set to 0x02. Only Argon2id (0x01) is valid in v0.1; parse_kdf_params rejects inside parse_vault_meta. Pins that a port MUST validate the KDF identity at parse time — accepting an unknown kdf_id yields a vault.meta the client cannot honor.",
+                kdf_id_tamper.as_slice(),
+                "byte 22 (kdf_id) 0x01 → 0x02",
+            ),
+            (
+                "argon2-version-tamper",
+                "Canonical blob with byte 32 (argon2_version, last byte of the canonical KDF-params block) set to 0x10 instead of 0x13. Only Argon2 v1.3 (0x13) is valid in v0.1 — deriving under a different Argon2 version would silently produce a wrong wrap key, so the parse layer rejects up front. Same non-distinguishing InvalidVaultMeta.",
+                argon2_version_tamper.as_slice(),
+                "byte 32 (argon2_version) 0x13 → 0x10",
+            ),
+        ];
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+        for (i, (slug, description, blob, tamper)) in cases.iter().enumerate() {
+            assert!(
+                matches!(parse_vault_meta(blob), Err(ProtocolError::InvalidVaultMeta)),
+                "[{slug}] tampered blob must reject with InvalidVaultMeta"
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-meta/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str("      \"expected_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"informational_tamper_description\": \"{}\"\n",
+                json_escape(tamper)
+            ));
+            if i + 1 < cases.len() {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_meta_parse_fail_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-meta parse_fail vectors dump");
+    }
+
     fn hex_lower(bytes: &[u8]) -> alloc::string::String {
         let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
         for b in bytes {

@@ -2320,4 +2320,258 @@ mod tests {
         std::fs::write("/tmp/myne_myn_blob_vectors.json", dump.as_bytes())
             .expect("write myn-blob vectors dump");
     }
+
+    // ---- KAT vector APPEND generator: structural parse rejects --------
+
+    /// Emits a JSON **array fragment** of 9 additional cases for
+    /// `myne-test-vectors/vectors/myn-blob/v0.1/cases.json` at
+    /// `/tmp/myne_myn_blob_parse_fail_vectors.json` (MYND-227), spliced by
+    /// hand into the existing `cases` array. The original
+    /// `emit_myn_blob_vectors_for_paste` stays byte-stable and is NOT
+    /// re-run (vector_id immutability).
+    ///
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_myn_blob_parse_fail_vectors -- --ignored`
+    ///
+    /// 8 `parse_fail` cases — one per named structural check in
+    /// `decode_note_with_cause` (§9.2 layout + §10.1 strict-trailing) —
+    /// plus 1 `decrypt_aead_fail` items_key_id-mismatch case (§6.4 step 2,
+    /// rides the existing schema branch). All nine collapse to the single
+    /// non-distinguishing `DecryptError::CannotDecrypt`; ports MUST reject
+    /// and MUST NOT reveal which rule fired (the internal `DecryptCause`
+    /// is observability-only and never crosses IPC).
+    ///
+    /// The cases deliberately carry the REAL `items_key` (not a dummy):
+    /// the header bytes are not bound into either AAD, so a port that
+    /// skips a structural check decrypts the tampered blob successfully
+    /// and returns Ok — which the runner catches. With a dummy key the
+    /// same buggy port would return its AEAD error and pass silently.
+    #[test]
+    #[ignore]
+    fn emit_myn_blob_parse_fail_vectors() {
+        extern crate std;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Identical fixture to emit_myn_blob_vectors_for_paste; the base
+        // blob equals the landed encrypt-1kb expected blob (NOT the 100-KB
+        // case — keeps the appended hex ~2 KB per case).
+        let items_key: [u8; AEAD_KEY_LEN] = [0xAA; AEAD_KEY_LEN];
+        let items_key_id: [u8; ITEMS_KEY_ID_LEN] = [0xBB; ITEMS_KEY_ID_LEN];
+        let note_uuid: [u8; NOTE_UUID_LEN] = [0xCC; NOTE_UUID_LEN];
+        let item_key: [u8; AEAD_KEY_LEN] = [0xDD; AEAD_KEY_LEN];
+        let item_key_nonce: [u8; AEAD_NONCE_LEN] = [0xEE; AEAD_NONCE_LEN];
+        let content_nonce: [u8; AEAD_NONCE_LEN] = [0xFF; AEAD_NONCE_LEN];
+        let plaintext_1kb: alloc::vec::Vec<u8> = (0..1024u32).map(|i| (i % 256) as u8).collect();
+
+        let base = encode_new_note_blob_raw(
+            &items_key,
+            &items_key_id,
+            &note_uuid,
+            &item_key,
+            &item_key_nonce,
+            &content_nonce,
+            &plaintext_1kb,
+        )
+        .expect("encode base");
+        decode_note(&base, &note_uuid, &items_key, &items_key_id)
+            .expect("base fixture must decode");
+
+        let header_short: alloc::vec::Vec<u8> = MAGIC.to_vec();
+        let mut magic_tamper = base.clone();
+        magic_tamper[0] = b'X';
+        let mut version_tamper = base.clone();
+        version_tamper[OFFSET_PROTOCOL_VERSION] = 0x02;
+        let mut reserved_tamper = base.clone();
+        reserved_tamper[OFFSET_RESERVED] = 0x01;
+        let mut key_len_tamper = base.clone();
+        key_len_tamper[OFFSET_ENC_ITEM_KEY_LEN..OFFSET_ENC_ITEM_KEY]
+            .copy_from_slice(&65u16.to_be_bytes());
+        let mut len_below_tag = base.clone();
+        len_below_tag[OFFSET_CIPHERTEXT_LEN..OFFSET_CIPHERTEXT]
+            .copy_from_slice(&31u32.to_be_bytes());
+        let mut len_overflow = base.clone();
+        len_overflow[OFFSET_CIPHERTEXT_LEN..OFFSET_CIPHERTEXT]
+            .copy_from_slice(&0xFFFF_FFFFu32.to_be_bytes());
+        let mut trailing = base.clone();
+        trailing.push(0x00);
+
+        struct PfCase<'a> {
+            slug: &'a str,
+            description: &'a str,
+            blob: &'a [u8],
+            tamper: &'a str,
+        }
+        let parse_fails = [
+            PfCase {
+                slug: "parse-fail-header-too-short",
+                description: "Only the 4-byte MY01 magic — shorter than the 140-byte fixed prefix (header + content_nonce + ciphertext_len). Rejected before any field read. Like every structural reject in this category it collapses to the single non-distinguishing CannotDecrypt; the per-case naming here documents WHICH check a conforming implementation must perform, not a distinguishable error surface.",
+                blob: header_short.as_slice(),
+                tamper: "blob is the 4 magic bytes only (4 < 140)",
+            },
+            PfCase {
+                slug: "parse-fail-magic-mismatch",
+                description: "First byte of the MY01 magic corrupted to 'X'. A foreign file, a different artifact type, or a forward-incompatible NT05 blob all fail here, before any decryption.",
+                blob: magic_tamper.as_slice(),
+                tamper: "byte 0 (magic[0]) 'M' → 'X'",
+            },
+            PfCase {
+                slug: "parse-fail-protocol-version-mismatch",
+                description: "protocol_version byte (offset 4) set to 0x02 instead of 0x01. A v0.1 decoder rejects an unknown protocol version before decrypting — cross-major reads happen only via explicit migration.",
+                blob: version_tamper.as_slice(),
+                tamper: "byte 4 (protocol_version) 0x01 → 0x02",
+            },
+            PfCase {
+                slug: "parse-fail-reserved-nonzero",
+                description: "reserved byte (offset 5) set to 0x01 instead of 0x00. Reserved bytes are flag carriers for future v0.1.x revisions; a v0.1.0 client cannot honor unknown flags so non-zero is an unconditional reject.",
+                blob: reserved_tamper.as_slice(),
+                tamper: "byte 5 (reserved) 0x00 → 0x01",
+            },
+            PfCase {
+                slug: "parse-fail-enc-item-key-len",
+                description: "enc_item_key_len field (offset 46..48) set to 65 instead of 64 (= 32-byte wrapped item_key + 32-byte CTX tag). v0.1 admits exactly one wrapped-key length; any other value is structural corruption.",
+                blob: key_len_tamper.as_slice(),
+                tamper: "bytes 46..48 (enc_item_key_len) 64 → 65",
+            },
+            PfCase {
+                slug: "parse-fail-ciphertext-len-below-tag",
+                description: "ciphertext_len field (offset 136..140) set to 31 — below the 32-byte CTX commitment tag, so the advertised ciphertext cannot even contain a tag. Rejected at the parse layer.",
+                blob: len_below_tag.as_slice(),
+                tamper: "bytes 136..140 (ciphertext_len) → 31 (< 32-byte CTX tag)",
+            },
+            PfCase {
+                slug: "parse-fail-ciphertext-len-overflow",
+                description: "ciphertext_len field (offset 136..140) set to 0xFFFFFFFF, far above MAX_PLAINTEXT_LEN + 32 (16 MiB + 32). A port MUST bound-check ciphertext_len before allocating or indexing — the cap is the DoS-allocation defense (§9.2).",
+                blob: len_overflow.as_slice(),
+                tamper: "bytes 136..140 (ciphertext_len) → 0xffffffff",
+            },
+            PfCase {
+                slug: "parse-fail-trailing-byte",
+                description: "One 0x00 byte appended after a fully valid blob. §10.1 strict-trailing: blob length MUST equal the declared layout exactly. The sharpest case in the family — a port that tolerantly ignores trailing bytes decodes this blob successfully and returns Ok, which the runner catches (the AEAD tags still verify; only the length discipline rejects it).",
+                blob: trailing.as_slice(),
+                tamper: "one 0x00 byte appended (blob length = declared layout + 1)",
+            },
+        ];
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+        for case in &parse_fails {
+            assert!(
+                matches!(
+                    decode_note(case.blob, &note_uuid, &items_key, &items_key_id),
+                    Err(DecryptError::CannotDecrypt)
+                ),
+                "[{}] tampered blob must reject with CannotDecrypt",
+                case.slug
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"myn-blob/v0.1/{}\",\n",
+                case.slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(case.description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(case.blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_note_uuid_hex\": \"{}\",\n",
+                hex_lower(&note_uuid)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_items_key_hex\": \"{}\",\n",
+                hex_lower(&items_key)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_items_key_id_hex\": \"{}\",\n",
+                hex_lower(&items_key_id)
+            ));
+            dump.push_str("      \"expected_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"informational_tamper_description\": \"{}\"\n",
+                json_escape(case.tamper)
+            ));
+            dump.push_str("    },\n");
+        }
+
+        // decrypt_aead_fail: intact blob, mismatched caller items_key_id
+        // (§6.4 step 2 — the embedded id 0xBB×16 ≠ supplied 0xBD×16).
+        let other_items_key_id: [u8; ITEMS_KEY_ID_LEN] = [0xBD; ITEMS_KEY_ID_LEN];
+        assert!(
+            matches!(
+                decode_note(&base, &note_uuid, &items_key, &other_items_key_id),
+                Err(DecryptError::CannotDecrypt)
+            ),
+            "items_key_id mismatch must reject with CannotDecrypt"
+        );
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"myn-blob/v0.1/decrypt-items-key-id-mismatch\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape(
+                "A fully intact 1-KB blob decoded with a MISMATCHED caller items_key_id (0xbd×16; the blob embeds 0xbb×16). §6.4 step 2: the decoder compares the embedded items_key_id against the caller's active one before any AEAD work and rejects with the same non-distinguishing CannotDecrypt. Pins that a port performs the comparison at all — skipping it would proceed to the outer unwrap and (with the right items_key, as here) decode successfully."
+            )
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&base)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_note_uuid_hex\": \"{}\",\n",
+            hex_lower(&note_uuid)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_hex\": \"{}\",\n",
+            hex_lower(&items_key)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_items_key_id_hex\": \"{}\",\n",
+            hex_lower(&other_items_key_id)
+        ));
+        dump.push_str("      \"expected_kind\": \"aead_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"informational_tamper_description\": \"{}\"\n",
+            json_escape(
+                "intact blob; caller items_key_id 0xbb×16 → 0xbd×16 (embedded id unchanged)"
+            )
+        ));
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_myn_blob_parse_fail_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write myn-blob parse_fail vectors dump");
+    }
 }

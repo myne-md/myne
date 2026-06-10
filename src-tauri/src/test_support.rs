@@ -84,3 +84,28 @@ impl Drop for ScopedTempDir {
         let _ = std::fs::remove_dir_all(&self.path);
     }
 }
+
+/// Write a REAL, structurally-parseable 345-byte `vault.meta` into `dir`
+/// with `account_number_hash` = `seed_byte` repeating (filler key material;
+/// parse-passes, never unlock-passes). Shared by the prefs + backup test
+/// suites — the restore validator's stage-5 parse needs a real header.
+pub(crate) fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
+    let meta = protocol::VaultMeta {
+        account_number_hash: [seed_byte; 16],
+        kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+        random_salt_password: [1u8; 16],
+        random_salt_recovery: [2u8; 16],
+        nonce_password_wrap: [3u8; 24],
+        enc_root_key_password: [4u8; 64],
+        nonce_recovery_wrap: [5u8; 24],
+        enc_root_key_recovery: [6u8; 64],
+        items_key_id: [7u8; 16],
+        items_key_nonce: [8u8; 24],
+        enc_items_key: [9u8; 64],
+    };
+    std::fs::write(
+        dir.join("vault.meta"),
+        protocol::serialize_vault_meta(&meta),
+    )
+    .expect("seed vault.meta");
+}

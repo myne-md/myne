@@ -18,11 +18,14 @@
 // Window-close prompt (Task 12) explicitly excludes ReadyStep — vault
 // is committed, no progress to discard.
 
+import { useState } from "react";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
 import { logErrorKind } from "../../lib/vault-creation-logging";
+import { backupDefaultFilename, exportBackup } from "../../lib/vault-backup";
 import { StepHeading, StepLayout } from "./step-shell";
 
 interface ReadyStepProps {
@@ -45,6 +48,40 @@ interface ReadyStepProps {
 }
 
 export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStepProps) {
+  // First-backup CTA (MYND-56 task 7, B13(b)): inline and non-blocking —
+  // the user is at peak recovery-mindset (phrase just written down), and a
+  // fresh vault's backup is a second copy of vault.meta (the credential
+  // wraps), the repair scenario's raw material. The vault is still LOCKED
+  // here (auto-unlock fires on Done) — locked export is supported by
+  // design (SYNC-6). No modal stacking with the importer onboarding offer.
+  const [backupState, setBackupState] = useState<"idle" | "saving" | "done" | "error">(
+    "idle",
+  );
+  const handleBackupNow = async () => {
+    setBackupState("saving");
+    try {
+      const suggested = await backupDefaultFilename().catch(
+        () => "Myne backup.myne-backup",
+      );
+      const destination = await saveFileDialog({
+        defaultPath: suggested,
+        filters: [{ name: "Myne backup", extensions: ["myne-backup"] }],
+      });
+      if (typeof destination !== "string") {
+        setBackupState("idle"); // dialog dismissed — nothing started
+        return;
+      }
+      // `vaultId` is always populated here (CreateVault passes the
+      // committed id once commit succeeds); the null arm is type-level
+      // defense only — sole-vault targeting would misfire under multi-vault.
+      await exportBackup(destination, vaultId ?? undefined);
+      setBackupState("done");
+    } catch (e) {
+      logErrorKind(e, "ready-step-backup-failed");
+      setBackupState("error");
+    }
+  };
+
   const handleShowVaultFolder = async () => {
     try {
       const base = await appDataDir();
@@ -91,6 +128,18 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           Show vault folder
         </Button>
         <Button
+          variant="secondary"
+          onClick={handleBackupNow}
+          disabled={pending || backupState === "saving" || backupState === "done"}
+          data-testid="create.ready-backup-now"
+        >
+          {backupState === "saving"
+            ? "Backing up…"
+            : backupState === "done"
+              ? "Backed up ✓"
+              : "Back up this vault now"}
+        </Button>
+        <Button
           variant="primary"
           onClick={onDone}
           disabled={pending}
@@ -99,6 +148,15 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           {pending ? "Decrypting…" : "Done"}
         </Button>
       </div>
+      {backupState === "error" && (
+        <div
+          data-testid="create.ready-backup-error"
+          style={{ fontSize: 13, color: "var(--fg-2)", textAlign: "center" }}
+        >
+          Backup didn't complete — no file was left behind. You can back up
+          any time from Settings → Storage.
+        </div>
+      )}
     </StepLayout>
   );
 }

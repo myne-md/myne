@@ -99,6 +99,8 @@ interface UnlockProps {
    * vault_delete extended to accept Slot::Empty + vault.meta-exists".
    */
   onDeleteVaultSuccess: () => void;
+  /** Corrupted-state repair door → `unlock.restore-backup` (MYND-56). */
+  onRestoreBackup: () => void;
   /**
    * Optional one-shot signal carried via `Stage.unlock.suspicionReason`
    * — set only by the change-password modal's force-relock callback
@@ -325,6 +327,7 @@ export function Unlock({
   onStartRecovery,
   onResumeRecovery,
   onDeleteVaultSuccess,
+  onRestoreBackup,
   suspicionReason,
 }: UnlockProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
@@ -421,7 +424,11 @@ export function Unlock({
   // the first frame; password form never mounts.
   if (initialStatus.kind === "Corrupted") {
     return (
-      <FailClosedError reason={{ kind: "corrupted-vault" }} onCtaClick={() => void closeApp()} />
+      <FailClosedError
+        reason={{ kind: "corrupted-vault" }}
+        onCtaClick={() => void closeApp()}
+        onRestoreBackup={onRestoreBackup}
+      />
     );
   }
   if (initialStatus.kind === "IoError") {
@@ -437,7 +444,11 @@ export function Unlock({
   // switches the component to the same fail-closed surface as boot.
   if (state.kind === "corrupted-after-unlock") {
     return (
-      <FailClosedError reason={{ kind: "corrupted-vault" }} onCtaClick={() => void closeApp()} />
+      <FailClosedError
+        reason={{ kind: "corrupted-vault" }}
+        onCtaClick={() => void closeApp()}
+        onRestoreBackup={onRestoreBackup}
+      />
     );
   }
 

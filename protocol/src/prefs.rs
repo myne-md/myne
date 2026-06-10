@@ -345,6 +345,24 @@ pub struct PrefsView {
     /// after `item_order`, before `screen_capture_protection`.
     #[serde(default)]
     pub label: Option<String>,
+
+    /// Last successful vault-backup export, in Unix epoch **seconds**
+    /// (MYND-58, vault-backup-restore epic). `None` ≡ never backed up →
+    /// the field is omitted entirely from the canonical JSON, so a vault
+    /// that never exported a backup is byte-identical to a pre-MYND-58
+    /// `vault.prefs` (existing golden vectors unaffected — migration-less
+    /// additive field like `auto_lock_seconds`). Written by an export
+    /// performed on an UNLOCKED vault; a locked export cannot update it
+    /// (prefs writes need `root_key`) — accepted for a best-effort
+    /// reminder (spec § 9.5.2). Drives the 30-day backup-reminder banner.
+    /// `u64` (no year-2106 truncation); integer-only — floats FORBIDDEN
+    /// (spec § 9.5.2), enforced by the strict `,` terminator on decode.
+    /// **Non-load-bearing** (a tampered / replayed value can at worst
+    /// suppress or force a reminder) — no protective-envelope clamp.
+    /// Canonical key 'l' — sorts after `label` (`lab` < `las`), before
+    /// `screen_capture_protection`.
+    #[serde(default)]
+    pub last_backup_at: Option<u64>,
 }
 
 impl Default for PrefsView {
@@ -369,6 +387,7 @@ impl Default for PrefsView {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         }
     }
 }
@@ -622,6 +641,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // last_backup_at (canonical key 'l' — after 'label' [lab < las], before
+    // 'screen_capture_protection'). Omitted entirely when None so a vault
+    // that never exported a backup is byte-identical to a pre-MYND-58
+    // vault.prefs (preserves existing KAT vectors).
+    if let Some(epoch) = prefs.last_backup_at {
+        out.extend_from_slice(b"\"last_backup_at\":");
+        push_json_uint64(&mut out, epoch);
+        out.push(b',');
+    }
+
     out.extend_from_slice(b"\"screen_capture_protection\":");
     out.extend_from_slice(if prefs.screen_capture_protection {
         b"true"
@@ -749,12 +778,11 @@ fn hex_nibble(n: u8) -> u8 {
     }
 }
 
-/// Append `n` as a canonical decimal integer (no leading zeros, no
-/// trailing `.0` — spec § 9.5.2). `n == 0` emits `"0"`.
-fn push_json_uint(out: &mut Vec<u8>, n: u32) {
-    // u32::MAX is 10 digits; a fixed buffer avoids any alloc churn and
-    // keeps the encoder hand-rolled/audit-clear like the rest of § 9.5.
-    let mut buf = [0u8; 10];
+/// Append `n` as a canonical decimal integer — the `u64` sibling of
+/// [`push_json_uint`] for epoch-seconds fields (`last_backup_at`).
+/// `u64::MAX` is 20 digits.
+fn push_json_uint64(out: &mut Vec<u8>, n: u64) {
+    let mut buf = [0u8; 20];
     let mut i = buf.len();
     let mut v = n;
     loop {
@@ -766,6 +794,14 @@ fn push_json_uint(out: &mut Vec<u8>, n: u32) {
         }
     }
     out.extend_from_slice(&buf[i..]);
+}
+
+/// Append `n` as a canonical decimal integer (no leading zeros, no
+/// trailing `.0` — spec § 9.5.2). `n == 0` emits `"0"`. Delegates to
+/// [`push_json_uint64`] so the hand-rolled digit loop stays single-homed
+/// (one audit surface for the canonical-decimal contract).
+fn push_json_uint(out: &mut Vec<u8>, n: u32) {
+    push_json_uint64(out, u64::from(n));
 }
 
 /// Parse the v0.1 canonical-JSON `vault.prefs` plaintext.
@@ -853,6 +889,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // Parsed from the same monotonic cursor so a later field's key marker is
     // never matched inside a prior field's content.
     let label = parse_optional_string_field(rest, &mut cursor, b"\"label\":")?;
+    // last_backup_at (key 'las' — after 'label' [lab < las], before
+    // screen_capture_protection [l < s]). Parsed from the same monotonic
+    // cursor; the strict `,` terminator inside the helper enforces the
+    // spec § 9.5.2 float ban (screen_capture_protection is mandatory and
+    // canonically later, so a comma always follows a well-formed value).
+    let last_backup_at = parse_optional_uint64_field(rest, &mut cursor, b"\"last_backup_at\":")?;
 
     // ---- screen_capture_protection (required) ----
     let region = &rest[cursor..];
@@ -896,7 +938,55 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         editor_layout,
         theme,
         label,
+        last_backup_at,
     })
+}
+
+/// Parse an OPTIONAL canonical unsigned-integer field whose key marker is
+/// `marker`, searching `rest` from `*cursor` onward (the `u64` epoch-seconds
+/// sibling of [`parse_optional_string_field`]). On a hit, the digits MUST be
+/// followed by `,` — `screen_capture_protection` is mandatory and sorts after
+/// every integer field this helper serves, so a further member always
+/// follows; a trailing `.` (float, FORBIDDEN per spec § 9.5.2) or any other
+/// byte rejects the parse. Advances `*cursor` past the digits on a hit;
+/// returns `None` and leaves `*cursor` unchanged on a miss.
+fn parse_optional_uint64_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Option<u64>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (val, consumed) = parse_json_uint64(&rest[val_start..])?;
+            if rest.get(val_start + consumed) != Some(&b',') {
+                return Err(PrefsBlobError::PlaintextParseFailed);
+            }
+            *cursor = val_start + consumed;
+            Ok(Some(val))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Parse a leading run of ASCII decimal digits into a `u64` — the
+/// epoch-seconds sibling of [`parse_json_uint`]. Consumes ONLY digit bytes;
+/// rejects an empty run and overflow.
+fn parse_json_uint64(bytes: &[u8]) -> Result<(u64, usize), PrefsBlobError> {
+    let mut i = 0;
+    let mut val: u64 = 0;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        let d = (bytes[i] - b'0') as u64;
+        val = val
+            .checked_mul(10)
+            .and_then(|v| v.checked_add(d))
+            .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+        i += 1;
+    }
+    if i == 0 {
+        return Err(PrefsBlobError::PlaintextParseFailed);
+    }
+    Ok((val, i))
 }
 
 /// Parse an OPTIONAL canonical JSON string-valued field whose key marker is
@@ -1106,21 +1196,13 @@ fn parse_json_string_map(bytes: &[u8]) -> Option<(BTreeMap<String, String>, usiz
 /// and overflow. It consumes ONLY digit bytes, so a fractional literal
 /// like `300.5` parses `300` and leaves the `.` for the caller's
 /// terminator check to reject — enforcing the spec § 9.5.2 float ban.
+/// Delegates to [`parse_json_uint64`] (single-homed digit loop); a run
+/// exceeding `u32::MAX` rejects identically to the old in-loop overflow
+/// check, via the `try_from`.
 fn parse_json_uint(bytes: &[u8]) -> Result<(u32, usize), PrefsBlobError> {
-    let mut i = 0;
-    let mut val: u32 = 0;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        let d = (bytes[i] - b'0') as u32;
-        val = val
-            .checked_mul(10)
-            .and_then(|v| v.checked_add(d))
-            .ok_or(PrefsBlobError::PlaintextParseFailed)?;
-        i += 1;
-    }
-    if i == 0 {
-        return Err(PrefsBlobError::PlaintextParseFailed);
-    }
-    Ok((val, i))
+    let (val, consumed) = parse_json_uint64(bytes)?;
+    let val = u32::try_from(val).map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+    Ok((val, consumed))
 }
 
 /// Parse a JSON array of strings starting at `bytes[0] == '['`. Returns the
@@ -1387,6 +1469,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -1408,6 +1491,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1549,6 +1633,7 @@ mod tests {
                 daily_template: None,
                 editor_layout: None,
                 label: None,
+                last_backup_at: None,
             }
         );
     }
@@ -1572,6 +1657,7 @@ mod tests {
                 daily_template: None,
                 editor_layout: None,
                 label: None,
+                last_backup_at: None,
             }
         );
     }
@@ -1715,6 +1801,67 @@ mod tests {
         assert_eq!(parsed.label, None);
     }
 
+    // ---- last_backup_at field (MYND-58, vault-backup-restore epic) ----
+
+    #[test]
+    fn encode_places_last_backup_at_between_label_and_screen_capture() {
+        // Canonical key order: label (lab) < last_backup_at (las) <
+        // screen_capture_protection (s).
+        let encoded = canonical_json_encode(&PrefsView {
+            label: Some(alloc::string::String::from("Work")),
+            last_backup_at: Some(1765000000),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"label":"Work","last_backup_at":1765000000,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn last_backup_at_round_trips_through_decode() {
+        let original = PrefsView {
+            last_backup_at: Some(1765432100),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn last_backup_at_u64_beyond_u32_round_trips() {
+        // Epoch seconds are u64 — a value past the 2106 u32 horizon must
+        // survive (no silent truncation).
+        let original = PrefsView {
+            last_backup_at: Some(u64::from(u32::MAX) + 12345),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.last_backup_at, Some(u64::from(u32::MAX) + 12345));
+    }
+
+    #[test]
+    fn decode_absent_last_backup_at_is_none() {
+        // A pre-MYND-58 blob decodes with last_backup_at == None ("never
+        // backed up"); byte-identity of the default encode is asserted by
+        // encode_omits_label_when_none_byte_identical_to_pre_label.
+        let parsed =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert_eq!(parsed.last_backup_at, None);
+    }
+
+    #[test]
+    fn fractional_last_backup_at_rejects_parse() {
+        // Floats are FORBIDDEN (spec §9.5.2): the digits parse, then the
+        // strict `,` terminator check rejects the `.`.
+        let result = canonical_json_decode(
+            br#"{"last_backup_at":1765000000.5,"screen_capture_protection":true}"#,
+        );
+        assert_eq!(result, Err(PrefsBlobError::PlaintextParseFailed));
+    }
+
     #[test]
     fn encode_emits_theme_last_dark_with_scp_false() {
         let encoded = canonical_json_encode(&PrefsView {
@@ -1752,6 +1899,7 @@ mod tests {
             }),
             theme: Some(ThemeChoice::Dark),
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1858,6 +2006,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1886,6 +2035,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1912,6 +2062,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1937,6 +2088,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2025,6 +2177,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2078,6 +2231,7 @@ mod tests {
             ],
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2110,6 +2264,7 @@ mod tests {
             ],
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2174,6 +2329,7 @@ mod tests {
             ],
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2213,6 +2369,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2238,6 +2395,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2265,6 +2423,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2360,6 +2519,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2429,6 +2589,7 @@ mod tests {
             item_order: alloc::vec![alloc::string::String::from("n1")],
             editor_layout: Some(sample_layout()),
             label: None,
+            last_backup_at: None,
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2688,6 +2849,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2717,6 +2879,7 @@ mod tests {
             daily_template: None,
             editor_layout: None,
             label: None,
+            last_backup_at: None,
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -3007,6 +3170,7 @@ mod tests {
                 daily_template: None,
                 editor_layout: None,
                 label: None,
+                last_backup_at: None,
             },
             &nonce_default,
         )
@@ -3029,6 +3193,7 @@ mod tests {
                 daily_template: None,
                 editor_layout: None,
                 label: None,
+                last_backup_at: None,
             },
             &nonce_toggled,
         )
@@ -3068,6 +3233,7 @@ mod tests {
                 right_collapsed: true,
             }),
             label: None,
+            last_backup_at: None,
         };
         let nonce_populated: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
         let canonical_populated = canonical_json_encode(&prefs_populated);
@@ -3444,6 +3610,308 @@ mod tests {
         dump.push_str("---end label + tolerance prefs vectors---\n");
         std::fs::write("/tmp/myne_vault_prefs_label_vectors.txt", dump.as_bytes())
             .expect("write label prefs vectors dump");
+    }
+
+    /// Generator for the MYND-58 `last_backup_at` vector cases (appended to
+    /// the companion repo's `vault-prefs` family; per-feature-generator
+    /// pattern of [`emit_label_and_tolerance_prefs_vectors`]):
+    ///
+    /// `cargo test -p protocol --lib emit_last_backup_at_prefs_vectors -- --ignored`
+    ///
+    /// - `encrypt-last-backup-at`: `label` + `last_backup_at` both set so the
+    ///   emitted canonical bytes pin the order of the two 'l' keys
+    ///   (`label` [lab] < `last_backup_at` [las] < `screen_capture_protection`)
+    ///   and the bare-decimal u64 epoch encoding.
+    /// - `decrypt-last-backup-at`: round-trip of the blob above; decoders
+    ///   must surface the epoch value.
+    #[test]
+    #[ignore]
+    fn emit_last_backup_at_prefs_vectors() {
+        extern crate std;
+
+        // Same fixed vault-A inputs as the sibling generators; nonce 0xF1 is
+        // the next free entry in the family's nonce registry (0x77, 0x88,
+        // 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE are taken).
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF1; AEAD_NONCE_LEN];
+        let prefs = PrefsView {
+            label: Some(String::from("Work")),
+            last_backup_at: Some(1765432100),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"label":"Work","last_backup_at":1765432100,"screen_capture_protection":true}"#
+                .as_slice(),
+            "canonical plaintext must sort label < last_backup_at < screen_capture_protection",
+        );
+        let blob =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce).expect("encode");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin last_backup_at prefs vectors---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-last-backup-at (MYND-58; lab < las < s; bare u64)\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-last-backup-at (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!("input_blob_hex: {}\n", hex_lower(&blob)));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"label\": \"Work\", \"last_backup_at\": 1765432100, \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str("---end last_backup_at prefs vectors---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_last_backup_vectors.txt",
+            dump.as_bytes(),
+        )
+        .expect("write last_backup_at prefs vectors dump");
+    }
+
+    /// Generator for the MYND-227 structural `parse_fail` vector cases
+    /// (appended to the companion repo's `vault-prefs` family; per-feature-
+    /// generator pattern of [`emit_label_and_tolerance_prefs_vectors`]).
+    /// Emits a JSON **array fragment** of 7 case objects at
+    /// `/tmp/myne_vault_prefs_parse_fail_vectors.json`, spliced by hand
+    /// into the existing `cases` array.
+    ///
+    /// `cargo test -p protocol --lib emit_prefs_parse_fail_vectors -- --ignored`
+    ///
+    /// One case per distinguishable `PrefsBlobError` reject reachable from
+    /// a decode-a-blob vector: the 6 pre-AEAD structural rejects
+    /// (vault-search parity) + the post-AEAD `plaintext_parse_failed`
+    /// (a validly-sealed blob whose inner plaintext is not canonical JSON —
+    /// possible only with the real `prefs_key`, which every case therefore
+    /// carries). Encode-side `CiphertextLenOverflow` + `RandomnessUnavailable`
+    /// cannot be expressed as decode cases and stay unvectored.
+    #[test]
+    #[ignore]
+    fn emit_prefs_parse_fail_vectors() {
+        extern crate std;
+        use crate::aead::{aad_prefs_blob, aead_seal_ctx, CTX_COMMITMENT_TAG_LEN};
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Same fixed vault-A inputs as the sibling generators; nonces 0xF2 +
+        // 0xF3 are the next free entries in the family's nonce registry
+        // (0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xF1 are taken).
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce_base: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
+        let nonce_bad_inner: [u8; AEAD_NONCE_LEN] = [0xF3; AEAD_NONCE_LEN];
+
+        // Base blob for the structural tampers: default PrefsView under the
+        // real key. The header bytes are NOT bound into the AAD, so a port
+        // that skips a structural check will decrypt the tampered blob
+        // successfully and return Ok — which the runner catches. That is
+        // why these cases carry the real root_key instead of a dummy.
+        let base = encode_prefs_blob_raw(
+            &prefs_key_a,
+            &account_hash_a,
+            &PrefsView::default(),
+            &nonce_base,
+        )
+        .expect("encode base");
+
+        let header_short: Vec<u8> = PREFS_BLOB_MAGIC.to_vec();
+        let mut magic_tamper = base.clone();
+        magic_tamper[0] = b'X';
+        let mut version_tamper = base.clone();
+        version_tamper[4] = 0x02;
+        let mut reserved_tamper = base.clone();
+        reserved_tamper[5] = 0x01;
+        let mut len_overflow = base.clone();
+        len_overflow[30..34].copy_from_slice(&0xFFFF_FFFFu32.to_be_bytes());
+        let mut truncated = base.clone();
+        truncated.truncate(truncated.len() - 1);
+
+        // plaintext_parse_failed: a hand-assembled envelope (same header
+        // layout as encode_prefs_blob_raw) sealing bytes that are NOT
+        // canonical JSON. AEAD verification passes — the reject happens at
+        // the inner-plaintext parse stage, distinguishable per §9.5.5.
+        let bad_plaintext = b"this is not canonical json";
+        let aad = aad_prefs_blob(&account_hash_a);
+        let sealed = aead_seal_ctx(&prefs_key_a, &nonce_bad_inner, bad_plaintext, &aad)
+            .expect("seal bad inner");
+        debug_assert_eq!(sealed.len(), bad_plaintext.len() + CTX_COMMITMENT_TAG_LEN);
+        let mut bad_inner = Vec::with_capacity(PREFS_BLOB_HEADER_LEN + sealed.len());
+        bad_inner.extend_from_slice(&PREFS_BLOB_MAGIC);
+        bad_inner.push(PREFS_BLOB_PROTOCOL_VERSION);
+        bad_inner.push(PREFS_BLOB_RESERVED);
+        bad_inner.extend_from_slice(&nonce_bad_inner);
+        bad_inner.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        bad_inner.extend_from_slice(&sealed);
+
+        let cases: [(&str, &str, &[u8], PrefsBlobError, &str); 7] = [
+            (
+                "parse-fail-header-too-short",
+                "Only the 4-byte MYP1 magic — no room for the 34-byte header (magic + version + reserved + 24-byte nonce + 4-byte ciphertext_len). Rejected before any field read.",
+                header_short.as_slice(),
+                PrefsBlobError::HeaderTooShort,
+                "blob is the 4 magic bytes only (4 < 34)",
+            ),
+            (
+                "parse-fail-magic-mismatch",
+                "First byte of the MYP1 magic corrupted to 'X'. Rejected at offset 0 before any decryption — a foreign file, different artifact type, or forward-incompatible MYP5 blob all fail here.",
+                magic_tamper.as_slice(),
+                PrefsBlobError::MagicMismatch,
+                "byte 0 (magic[0]) 'M' → 'X'",
+            ),
+            (
+                "parse-fail-protocol-version-mismatch",
+                "protocol_version byte (offset 4) set to 0x02 instead of 0x01. A v0.1 decoder rejects an unknown protocol version before decrypting.",
+                version_tamper.as_slice(),
+                PrefsBlobError::ProtocolVersionMismatch,
+                "byte 4 (protocol_version) 0x01 → 0x02",
+            ),
+            (
+                "parse-fail-reserved-nonzero",
+                "reserved byte (offset 5) set to 0x01 instead of 0x00. Spec §9.5.1 makes non-zero an unconditional parse rejection — reserved bytes are flag carriers for future v0.1.x revisions and a v0.1.0 client cannot honor unknown flags.",
+                reserved_tamper.as_slice(),
+                PrefsBlobError::ReservedByteNonZero,
+                "byte 5 (reserved) 0x00 → 0x01",
+            ),
+            (
+                "parse-fail-ciphertext-len-overflow",
+                "ciphertext_len field (offset 30..34) set to 0xFFFFFFFF, far above MAX_PREFS_PLAINTEXT_LEN + 32 (64 KiB + 32). The overflow guard rejects before any slice indexing — a port MUST bound-check ciphertext_len before allocating or indexing (DoS-allocation defense, §9.5.4).",
+                len_overflow.as_slice(),
+                PrefsBlobError::CiphertextLenOverflow,
+                "bytes 30..34 (ciphertext_len) → 0xffffffff",
+            ),
+            (
+                "parse-fail-ciphertext-truncated",
+                "Valid header advertising ciphertext_len = N, but the blob is one byte shorter than header + N. Rejected before the AEAD stage.",
+                truncated.as_slice(),
+                PrefsBlobError::CiphertextTruncated,
+                "final byte dropped (blob shorter than header + advertised ciphertext_len)",
+            ),
+            (
+                "parse-fail-plaintext-parse-failed",
+                "A structurally valid envelope sealed under the REAL prefs_key + AAD whose inner plaintext is 'this is not canonical json'. AEAD verification succeeds — the reject fires at the canonical-JSON parse stage. Distinguishable from CannotDecrypt because the tag check already proved the bytes came from a prefs_key holder (corruption past that point is structural, not adversarial). A port that returns its AEAD-failure error here has merged two distinct failure surfaces.",
+                bad_inner.as_slice(),
+                PrefsBlobError::PlaintextParseFailed,
+                "validly-sealed non-JSON inner plaintext (nonce 0xf3×24)",
+            ),
+        ];
+
+        let expected_error_str = |e: &PrefsBlobError| -> &'static str {
+            match e {
+                PrefsBlobError::HeaderTooShort => "header_too_short",
+                PrefsBlobError::MagicMismatch => "magic_mismatch",
+                PrefsBlobError::ProtocolVersionMismatch => "protocol_version_mismatch",
+                PrefsBlobError::ReservedByteNonZero => "reserved_byte_nonzero",
+                PrefsBlobError::CiphertextLenOverflow => "ciphertext_len_overflow",
+                PrefsBlobError::CiphertextTruncated => "ciphertext_truncated",
+                PrefsBlobError::PlaintextParseFailed => "plaintext_parse_failed",
+                other => panic!("unexpected expected-error variant {other:?}"),
+            }
+        };
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+        for (i, (slug, description, blob, expected, tamper)) in cases.iter().enumerate() {
+            assert_eq!(
+                decode_prefs_blob(&prefs_key_a, &account_hash_a, blob).as_ref(),
+                Err(expected),
+                "[{slug}] tampered blob must reject with {expected:?}"
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-prefs/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                hex_lower(&root_a)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                hex_lower(&account_hash_a)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_error\": \"{}\",\n",
+                expected_error_str(expected)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"informational_tamper_description\": \"{}\"\n",
+                json_escape(tamper)
+            ));
+            if i + 1 < cases.len() {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_parse_fail_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs parse_fail vectors dump");
     }
 
     fn hex_lower(bytes: &[u8]) -> alloc::string::String {
