@@ -116,6 +116,13 @@
   --info:          #2c4a7a;
   --info-soft:     var(--accent-soft);
 
+  /* -- Color -- Highlight (==text==) ---------------------------------- */
+  /* Warm-amber wash for `==highlight==` + embedded `<mark>`. The text on top
+     stays `--fg-1`, so the wash VALUE must flip per theme: a light amber in
+     light mode (dark ink reads on it), a dark amber in dark mode (light ink
+     reads on it). Single-sourced like the other dark values below. */
+  --highlight:     #f3e7c4;
+
   /* -- Color -- Label slots (MYND-184; sidebar color labels) ---------- */
   /* Six muted, hue-named DECORATIVE slots for note/folder color dots — NOT a
      repurpose of the semantic state colors. Solid-fill dots, no `-soft`
@@ -209,6 +216,7 @@
   --_warning-soft-dark: #2c2618;
   --_success-dark:      #8cc1a4;
   --_success-soft-dark: #1a2620;
+  --_highlight-dark:    #4f4422;
 
   /* Label slots — dark-surface values (MYND-184). Mirrors colors_and_type.css. */
   --_label-clay-dark:   #d99683;
@@ -277,6 +285,7 @@
   --success-soft: var(--_success-soft-dark);
   --info:         var(--accent);
   --info-soft:    var(--accent-soft);
+  --highlight:    var(--_highlight-dark);
 
   --label-clay:   var(--_label-clay-dark);
   --label-ochre:  var(--_label-ochre-dark);
@@ -331,6 +340,7 @@
     --success-soft: var(--_success-soft-dark);
     --info:         var(--accent);
     --info-soft:    var(--accent-soft);
+    --highlight:    var(--_highlight-dark);
 
     --label-clay:   var(--_label-clay-dark);
     --label-ochre:  var(--_label-ochre-dark);

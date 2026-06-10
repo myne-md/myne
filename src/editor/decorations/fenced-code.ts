@@ -169,11 +169,13 @@ function renderHighlightedCode(
   }
 }
 
-// Card-top bar that replaces the opening fence line in the away state. Carries
-// the language badge + a hover-revealed copy control (top-right). Decorative —
-// never part of the document text, so a fence-to-fence copy stays byte-stable;
-// the copy button writes the block's RAW source (fences + body), not any
-// widget text (MYND-154 task 6).
+// Replaces the opening fence line in the away state. The language badge + the
+// hover-revealed copy control sit in a cluster FLOATED into the card's top-right
+// corner (theme: the bar is a 0-height overlay, the cluster is absolute) so they
+// take no vertical row of their own — the first code line keeps the same 16px top
+// inset as the other three edges (the "2× top padding" fix). Decorative — never
+// part of the document text, so a fence-to-fence copy stays byte-stable; the copy
+// button writes the block's RAW source, not any widget text (MYND-154 task 6).
 class CodeCardBarWidget extends WidgetType {
   constructor(
     private readonly label: string,
@@ -198,6 +200,11 @@ class CodeCardBarWidget extends WidgetType {
     // copy control's visibility when the mouse is anywhere over the block.
     bar.dataset.blockFrom = String(this.from);
 
+    // Badge + copy in one corner cluster (paper-2 backed so it occludes any code
+    // text that runs under it).
+    const cluster = document.createElement("div");
+    cluster.className = "cm-code-bar-cluster";
+
     const copy = makeCopyButton(this.source);
 
     const badge = document.createElement("span");
@@ -205,8 +212,9 @@ class CodeCardBarWidget extends WidgetType {
     badge.textContent = this.label; // textContent — never innerHTML (TB2)
     badge.setAttribute("aria-hidden", "true");
 
-    bar.appendChild(copy);
-    bar.appendChild(badge);
+    cluster.appendChild(copy);
+    cluster.appendChild(badge);
+    bar.appendChild(cluster);
     return bar;
   }
   ignoreEvent(): boolean {
@@ -324,6 +332,18 @@ export function buildCodeBlockDecorations(
       // Closed fence only (>= 2 CodeMark). Unclosed → no card (grill Q11).
       if (node.node.getChildren("CodeMark").length < 2) return false;
 
+      // Mermaid blocks (MYND-49) are rendered by the mermaid decoration as a
+      // diagram, not as a code card — skip here so the two block-replaces don't
+      // collide. (On a render failure the mermaid widget falls back to its own
+      // monospace card, so nothing is lost.)
+      const mInfo = node.node.getChild("CodeInfo");
+      if (
+        mInfo !== null &&
+        doc.sliceString(mInfo.from, mInfo.to).trim().toLowerCase() === "mermaid"
+      ) {
+        return false;
+      }
+
       const quoteDepth = quoteDepthOf(node.node);
       const openLine = doc.lineAt(node.from);
       const closeLine = doc.lineAt(node.to);
@@ -408,7 +428,18 @@ export function buildCodeBlockDecorations(
       const lastBody = doc.line(bodyLast);
       for (let n = bodyFirst; n <= bodyLast; n++) {
         const line = n === bodyLast ? lastBody : doc.line(n);
-        decos.push((n === bodyLast ? cardBodyBottom : cardBody).range(line.from));
+        // The bar is now a 0-height overlay (the badge floats in the corner), so
+        // the FIRST body line is the card's visual top: it carries the top border
+        // + radius + 16px top padding, matching the other three edges.
+        const deco =
+          n === bodyFirst && n === bodyLast
+            ? cardBodyOnly
+            : n === bodyFirst
+              ? cardBodyTop
+              : n === bodyLast
+                ? cardBodyBottom
+                : cardBody;
+        decos.push(deco.range(line.from));
       }
       decos.push(hiddenFence.range(lastBody.to, closeLine.to));
       return false;

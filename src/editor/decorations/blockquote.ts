@@ -79,6 +79,13 @@ function buildBlockquoteDecorations(view: EditorView): DecorationSet {
   // block (an inline marker-replace would overlap the block-replace), and
   // on-cursor the markers reveal anyway.
   const codeLines = new Set<number>();
+  // Lines covered by a table block (MYND-208). Same treatment as code lines: a
+  // table nested in a quote away-state block-replaces the whole table
+  // (`table.ts`), so these lines get the quote BAR (to align with the table's
+  // margin) but NOT the italic body class, and their `>` markers are NOT hidden
+  // here — an inline marker-replace would overlap the table's block-replace and
+  // CM6 would throw. On-cursor the table reveals and the markers show anyway.
+  const tableLines = new Set<number>();
   const markHides: Array<{ from: number; to: number }> = [];
 
   for (const { from, to } of view.visibleRanges) {
@@ -96,6 +103,10 @@ function buildBlockquoteDecorations(view: EditorView): DecorationSet {
           const startLine = view.state.doc.lineAt(node.from).number;
           const endLine = view.state.doc.lineAt(node.to).number;
           for (let n = startLine; n <= endLine; n++) codeLines.add(n);
+        } else if (node.name === "Table") {
+          const startLine = view.state.doc.lineAt(node.from).number;
+          const endLine = view.state.doc.lineAt(node.to).number;
+          for (let n = startLine; n <= endLine; n++) tableLines.add(n);
         } else if (node.name === "QuoteMark") {
           if (!isCursorLine(view, node.from, node.to)) {
             // Hide `>` + trailing space if present.
@@ -119,7 +130,7 @@ function buildBlockquoteDecorations(view: EditorView): DecorationSet {
     // italic body class; all other quote lines get the full `.cm-blockquote`.
     decorations.push(
       Decoration.line(
-        codeLines.has(lineNo)
+        codeLines.has(lineNo) || tableLines.has(lineNo)
           ? { attributes: { style: blockquoteBarStyle(depth) } }
           : {
               class: "cm-blockquote",
@@ -129,10 +140,11 @@ function buildBlockquoteDecorations(view: EditorView): DecorationSet {
     );
   }
   for (const { from: f, to: t } of markHides) {
-    // Skip marker-hides on code-block lines: away-state the card block-replaces
-    // the block (an inline replace would overlap the block-replace); on-cursor
-    // the markers reveal anyway.
-    if (codeLines.has(view.state.doc.lineAt(f).number)) continue;
+    // Skip marker-hides on code-block AND table lines: the away-state card /
+    // table block-replaces the block (an inline replace would overlap the
+    // block-replace); on-cursor the markers reveal anyway.
+    const markLine = view.state.doc.lineAt(f).number;
+    if (codeLines.has(markLine) || tableLines.has(markLine)) continue;
     decorations.push(Decoration.replace({}).range(f, t));
   }
 

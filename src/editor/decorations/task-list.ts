@@ -90,14 +90,17 @@ function buildTaskListDecorations(view: EditorView): DecorationSet {
           }).range(node.from, node.to),
         );
         // Strike + mute the label text of a completed item so done items
-        // visibly recede (MYND-142). Spans the text after the marker to
-        // end-of-line; skipped for empty todos (no text to strike).
+        // visibly recede (MYND-142). Starts at the first non-space AFTER the
+        // marker — so the strike line doesn't run through the gap into the
+        // checkbox — and spans to end-of-line; skipped for empty todos.
         if (checked) {
           const line = view.state.doc.lineAt(node.to);
-          if (line.to > node.to) {
+          const gap = view.state.doc.sliceString(node.to, line.to).match(/^\s+/);
+          const labelStart = node.to + (gap ? gap[0].length : 0);
+          if (line.to > labelStart) {
             decorations.push(
               Decoration.mark({ class: "cm-task-done-label" }).range(
-                node.to,
+                labelStart,
                 line.to,
               ),
             );
