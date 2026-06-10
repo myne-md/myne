@@ -287,8 +287,10 @@ pub(crate) async fn attachment_import_with_dir(
     //     subkey (compute_attachment_id) and the catalog KEK
     //     (AttachmentsCatalogKey); `items_key` wraps the per-attachment
     //     key. All three are dropped at function exit (Zeroizing).
-    let (items_key, items_key_id, root_key) = state
-        .peek_unlocked_attachment_material()
+    // SYNC-6 writer-guard (MYND-32): guard bound across the blob +
+    // catalog atomic_writes below.
+    let (_slots_guard, items_key, items_key_id, root_key) = state
+        .hold_unlocked_attachment_material()
         .await
         .ok_or(AttachmentImportError::Locked)?;
     tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
@@ -531,8 +533,10 @@ pub(crate) async fn attachment_delete_with_dir(
     })?;
     let id_hex = hex_encode(&attachment_id); // canonical lowercase re-encode
 
-    let root_key = state
-        .peek_unlocked_root_key_clone()
+    // SYNC-6 writer-guard (MYND-32): guard bound across the catalog
+    // atomic_write below.
+    let (_slots_guard, root_key) = state
+        .hold_unlocked_root_key()
         .await
         .ok_or(AttachmentDeleteError::Locked)?;
 
@@ -631,8 +635,10 @@ pub(crate) async fn attachment_rename_with_dir(
         return Err(AttachmentRenameError::EmptyFilename);
     }
 
-    let root_key = state
-        .peek_unlocked_root_key_clone()
+    // SYNC-6 writer-guard (MYND-32): guard bound across the catalog
+    // atomic_write below.
+    let (_slots_guard, root_key) = state
+        .hold_unlocked_root_key()
         .await
         .ok_or(AttachmentRenameError::Locked)?;
 

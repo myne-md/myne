@@ -206,6 +206,8 @@ fn vault_prefs_vectors() {
     assert_unique_vector_ids("vault-prefs", cases);
 
     let mut seen_kinds: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    let mut seen_parse_errors: std::collections::BTreeSet<String> =
+        std::collections::BTreeSet::new();
     let mut saw_labeled_encrypt = false;
     let mut saw_labeled_decrypt = false;
     let mut saw_tolerance = false;
@@ -386,18 +388,84 @@ fn vault_prefs_vectors() {
                     }
                 }
             }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "header_too_short" => PrefsBlobError::HeaderTooShort,
+                    "magic_mismatch" => PrefsBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => PrefsBlobError::ProtocolVersionMismatch,
+                    "reserved_byte_nonzero" => PrefsBlobError::ReservedByteNonZero,
+                    "ciphertext_len_overflow" => PrefsBlobError::CiphertextLenOverflow,
+                    "ciphertext_truncated" => PrefsBlobError::CiphertextTruncated,
+                    "plaintext_parse_failed" => PrefsBlobError::PlaintextParseFailed,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with PrefsBlobError"
+                    ),
+                };
+
+                // The REAL prefs_key is load-bearing: header bytes are not
+                // AAD-bound, so an implementation that skips a structural
+                // check decrypts the tampered blob successfully and returns
+                // Ok — caught here. (The plaintext_parse_failed case also
+                // needs the key to get past AEAD at all.)
+                let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+                match decode_prefs_blob(&prefs_key, &account_hash, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(view) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_prefs_blob returned Ok({view:?})"
+                    ),
+                }
+            }
             other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
         }
     }
 
     // Structural coverage pins (mirror the vault_search seen_kinds pattern):
-    // all three case kinds present, the MYND-205 label exercised on both the
-    // encode and decode paths, and at least one §9.5.2 forward-compat
-    // tolerance case (sealed plaintext ≠ canonical re-encode) in the set.
-    for required in ["encrypt", "decrypt_ok", "decrypt_aead_fail"] {
+    // all four case kinds present, the MYND-205 label exercised on both the
+    // encode and decode paths, at least one §9.5.2 forward-compat tolerance
+    // case (sealed plaintext ≠ canonical re-encode) in the set, and every
+    // distinguishable PrefsBlobError decode reject pinned by a parse_fail
+    // case (MYND-227 — a regeneration that drops one fails here).
+    for required in ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"] {
         assert!(
             seen_kinds.contains(required),
             "vault-prefs vectors must cover case_kind '{required}'",
+        );
+    }
+    for required in [
+        "header_too_short",
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "reserved_byte_nonzero",
+        "ciphertext_len_overflow",
+        "ciphertext_truncated",
+        "plaintext_parse_failed",
+    ] {
+        assert!(
+            seen_parse_errors.contains(required),
+            "vault-prefs vectors must include a parse_fail case for '{required}'",
         );
     }
     assert!(
@@ -810,6 +878,18 @@ fn vault_meta_vectors() {
             other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
         }
     }
+
+    // Coverage floor: 2 original tampers (magic / reserved) + the 4 MYND-227
+    // additions (wrong-length / protocol-version / kdf-id / argon2-version).
+    // A regeneration that silently drops parse_fail cases fails here.
+    let parse_fail_count = cases
+        .iter()
+        .filter(|c| c["case_kind"] == "parse_fail")
+        .count();
+    assert!(
+        parse_fail_count >= 6,
+        "vault-meta vectors must keep at least 6 parse_fail cases, found {parse_fail_count}"
+    );
 }
 
 #[test]
@@ -949,6 +1029,8 @@ fn myn_blob_vectors() {
     assert!(!cases.is_empty(), "myn-blob must have at least one case");
     assert_unique_vector_ids("myn-blob", cases);
 
+    let mut seen_kinds = std::collections::HashSet::new();
+
     for case in cases {
         let id = case["vector_id"]
             .as_str()
@@ -956,6 +1038,7 @@ fn myn_blob_vectors() {
         let case_kind = case["case_kind"]
             .as_str()
             .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
 
         match case_kind {
             "encrypt" => {
@@ -1162,8 +1245,60 @@ fn myn_blob_vectors() {
                     ),
                 }
             }
+            "parse_fail" => {
+                // Structural rejects (bad magic / version / reserved /
+                // enc_item_key_len / ciphertext_len bounds / §10.1
+                // strict-trailing). All collapse to the same
+                // non-distinguishing CannotDecrypt as the AEAD failures —
+                // the separate case_kind documents WHICH checks a port must
+                // perform, not a distinguishable error surface. The REAL
+                // items_key is load-bearing: header bytes are not AAD-bound,
+                // so a port that skips a structural check decodes the
+                // tampered blob successfully and returns Ok — caught here.
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let note_uuid: [u8; 16] = hex_decode_array(
+                    case["input_note_uuid_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_note_uuid_hex")),
+                );
+                let items_key: [u8; 32] = hex_decode_array(
+                    case["input_items_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_items_key_hex")),
+                );
+                let items_key_id: [u8; 16] = hex_decode_array(
+                    case["input_items_key_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_items_key_id_hex")),
+                );
+
+                match decode_note(&blob, &note_uuid, &items_key, &items_key_id) {
+                    Err(DecryptError::CannotDecrypt) => {}
+                    Ok(decrypted) => panic!(
+                        "[{id}] expected parse_fail, decode_note returned Ok ({} byte plaintext) — a structural check was skipped",
+                        decrypted.plaintext().len()
+                    ),
+                }
+            }
             other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
         }
+    }
+
+    for kind in [
+        "encrypt",
+        "encrypt_update",
+        "decrypt_ok",
+        "decrypt_aead_fail",
+        "parse_fail",
+    ] {
+        assert!(
+            seen_kinds.contains(kind),
+            "myn-blob missing every case of case_kind '{kind}' — coverage regression"
+        );
     }
 }
 
@@ -2250,6 +2385,33 @@ fn attachment_blob_vectors() {
                     ),
                 }
             }
+            "parse_fail" => {
+                // Structural rejects (§9.9 layout + strict-trailing). Same
+                // non-distinguishing CannotDecrypt as the AEAD failures —
+                // the case_kind documents WHICH checks a port must perform.
+                // The REAL items_key is load-bearing: header bytes are not
+                // AAD-bound, so a port that skips a structural check decodes
+                // the tampered blob successfully and returns Ok — caught here.
+                let blob = hex_decode(field(case, id, "input_attachment_blob_hex"));
+                let attachment_id: [u8; 32] =
+                    hex_decode_array(field(case, id, "input_attachment_id_hex"));
+                let content_type = hex_decode(field(case, id, "input_content_type_utf8_hex"));
+                let items_key: [u8; 32] = hex_decode_array(field(case, id, "input_items_key_hex"));
+                let items_key_id: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_items_key_id_hex"));
+
+                match decode_attachment_blob(&blob, &attachment_id, &content_type, &items_key, &items_key_id)
+                {
+                    Err(AttachmentBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected AttachmentBlobError::CannotDecrypt (structural rejects collapse to the non-distinguishing variant), got {other:?}"
+                    ),
+                    Ok(pt) => panic!(
+                        "[{id}] expected parse_fail, decode returned Ok ({} bytes) — a structural check was skipped",
+                        pt.len()
+                    ),
+                }
+            }
             "aad_construction" => {
                 let builder = field(case, id, "input_aad_builder");
                 let items_key_id: [u8; 16] =
@@ -2300,6 +2462,7 @@ fn attachment_blob_vectors() {
         "decrypt_aead_fail",
         "aad_construction",
         "id_determinism",
+        "parse_fail",
     ] {
         assert!(
             seen_kinds.contains(kind),
@@ -2343,6 +2506,8 @@ fn attachments_catalog_vectors() {
     assert_unique_vector_ids("attachments-catalog", cases);
 
     let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors: std::collections::BTreeSet<String> =
+        std::collections::BTreeSet::new();
     let mut saw_tolerance = false;
 
     for case in cases {
@@ -2454,6 +2619,43 @@ fn attachments_catalog_vectors() {
                     Ok(view) => panic!("[{id}] expected AEAD failure, decode returned Ok({view:?})"),
                 }
             }
+            "parse_fail" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let expected_error = field(case, id, "expected_error");
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "header_too_short" => CatalogBlobError::HeaderTooShort,
+                    "magic_mismatch" => CatalogBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => CatalogBlobError::ProtocolVersionMismatch,
+                    "reserved_byte_nonzero" => CatalogBlobError::ReservedByteNonZero,
+                    "ciphertext_len_overflow" => CatalogBlobError::CiphertextLenOverflow,
+                    "ciphertext_truncated" => CatalogBlobError::CiphertextTruncated,
+                    "plaintext_parse_failed" => CatalogBlobError::PlaintextParseFailed,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with CatalogBlobError"
+                    ),
+                };
+
+                // The REAL catalog_key is load-bearing: header bytes are not
+                // AAD-bound, so an implementation that skips a structural
+                // check decrypts the tampered blob successfully and returns
+                // Ok — caught here. (The plaintext_parse_failed case also
+                // needs the key to get past AEAD at all.)
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+                match decode_attachments_catalog(&catalog_key, &account_hash, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(view) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode returned Ok({view:?})"
+                    ),
+                }
+            }
             "aad_construction" => {
                 let account_hash: [u8; 16] =
                     hex_decode_array(field(case, id, "input_account_number_hash_hex"));
@@ -2474,10 +2676,25 @@ fn attachments_catalog_vectors() {
         "decrypt_ok",
         "decrypt_aead_fail",
         "aad_construction",
+        "parse_fail",
     ] {
         assert!(
             seen_kinds.contains(kind),
             "attachments-catalog missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+    for required in [
+        "header_too_short",
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "reserved_byte_nonzero",
+        "ciphertext_len_overflow",
+        "ciphertext_truncated",
+        "plaintext_parse_failed",
+    ] {
+        assert!(
+            seen_parse_errors.contains(required),
+            "attachments-catalog vectors must include a parse_fail case for '{required}'",
         );
     }
     assert!(
@@ -2624,5 +2841,149 @@ fn damm32_table_vectors() {
     assert!(
         saw_table,
         "damm32-table must include the full 'table' case (the cross-impl ground truth)"
+    );
+}
+
+#[test]
+fn note_template_vectors() {
+    use protocol::{render, supported_tokens, RenderContext};
+
+    let path = companion_vectors_root()
+        .join("note-template")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] note-template: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "note-template");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "note-template must have at least one case"
+    );
+    assert_unique_vector_ids("note-template", cases);
+
+    // Decode a `*_utf8_hex` field into an owned String, failing loudly on
+    // invalid UTF-8 (the hex pins exact bytes; the engine API is &str).
+    let utf8_field = |case: &serde_json::Value, id: &str, key: &str| -> String {
+        let bytes = hex_decode(field(case, id, key));
+        String::from_utf8(bytes).unwrap_or_else(|e| panic!("[{id}] {key} is not valid UTF-8: {e}"))
+    };
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut saw_single_pass_pin = false;
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+
+        match case_kind {
+            "render" => {
+                seen_kinds.insert("render");
+                let template = utf8_field(case, id, "input_template_utf8_hex");
+                // RenderContext carries no serde derives (deliberate — the
+                // engine is `#![no_std]` and host-injected); construct it
+                // field-by-field from the five pinned hex fields.
+                let ctx = RenderContext {
+                    title: utf8_field(case, id, "input_ctx_title_utf8_hex"),
+                    date: utf8_field(case, id, "input_ctx_date_utf8_hex"),
+                    time: utf8_field(case, id, "input_ctx_time_utf8_hex"),
+                    datetime: utf8_field(case, id, "input_ctx_datetime_utf8_hex"),
+                    weekday: utf8_field(case, id, "input_ctx_weekday_utf8_hex"),
+                };
+                let expected = hex_decode(field(case, id, "expected_output_utf8_hex"));
+
+                // A ctx value carrying a `{{token}}` shape marks the
+                // single-pass pin (substituted values are never re-scanned)
+                // — the one render case any re-scanning port fails.
+                if ctx.title.contains("{{")
+                    || ctx.date.contains("{{")
+                    || ctx.time.contains("{{")
+                    || ctx.datetime.contains("{{")
+                    || ctx.weekday.contains("{{")
+                {
+                    saw_single_pass_pin = true;
+                }
+
+                // Defensive cross-check: the informational UTF-8 mirrors (when
+                // present) must agree with the load-bearing hex — a stale
+                // mirror would mislead cross-implementation reviewers. The
+                // NFD-unicode case is exempt from a byte-level template check
+                // by construction: JSON tooling may NFC-normalize the mirror,
+                // which is exactly why the hex is the contract; mismatches
+                // there fail here and force regenerating the mirror honestly.
+                if let Some(info) = case
+                    .get("informational_template_utf8")
+                    .and_then(|v| v.as_str())
+                {
+                    assert_eq!(
+                        info.as_bytes(),
+                        template.as_bytes(),
+                        "[{id}] informational_template_utf8 disagrees with input_template_utf8_hex"
+                    );
+                }
+                if let Some(info) = case
+                    .get("informational_output_utf8")
+                    .and_then(|v| v.as_str())
+                {
+                    assert_eq!(
+                        info.as_bytes(),
+                        expected.as_slice(),
+                        "[{id}] informational_output_utf8 disagrees with expected_output_utf8_hex"
+                    );
+                }
+
+                let actual = render(&template, &ctx);
+                assert_eq!(
+                    actual.as_bytes(),
+                    expected.as_slice(),
+                    "[{id}] note-template render mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                    hex_encode(&expected),
+                    hex_encode(actual.as_bytes()),
+                );
+            }
+            "token_registry" => {
+                seen_kinds.insert("token_registry");
+                let expected: Vec<&str> = case["expected_tokens"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_tokens"))
+                    .iter()
+                    .map(|v| v.as_str().expect("expected_tokens entries must be strings"))
+                    .collect();
+                let actual = supported_tokens();
+                assert_eq!(
+                    actual, expected,
+                    "[{id}] supported_tokens() order/set mismatch — the registry and the vector must move in lockstep"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    for kind in ["render", "token_registry"] {
+        assert!(
+            seen_kinds.contains(kind),
+            "note-template missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+    assert!(
+        saw_single_pass_pin,
+        "note-template vectors must include the single-pass pin (a render case whose ctx value contains a {{{{token}}}} shape that stays literal)"
     );
 }

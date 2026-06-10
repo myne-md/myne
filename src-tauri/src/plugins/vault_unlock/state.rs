@@ -730,6 +730,74 @@ impl VaultRuntimeState {
         })
     }
 
+    /// Writer-quiescence guard for `vault_export_backup` (SYNC-6, MYND-32):
+    /// holding the slots WRITE lock means every `hold_unlocked_*`-bound
+    /// writer has drained and none can start — the export's phase-one copy
+    /// window observes a point-in-time-consistent vault directory. Fair
+    /// queueing orders the export behind in-flight writers and queues new
+    /// writers behind the export. Hold ONLY across the bounded small-member
+    /// copy (immutable attachment blobs stream after the drop).
+    pub async fn quiesce_writers(&self) -> WriterQuiesceGuard<'_> {
+        WriterQuiesceGuard {
+            _guard: self.slots.write().await,
+        }
+    }
+
+    /// Guard-holding sibling of [`Self::peek_unlocked_root_key_and_hash_clone`]
+    /// (SYNC-6, MYND-32 writer-guard extension): returns the slot READ guard
+    /// TOGETHER with the cloned material. Callers bind the guard across their
+    /// disk write — `let (_slots_guard, root_key, _vmh) = …` — so a slots
+    /// WRITE-lock holder (`vault_export_backup`'s quiescence, `vault_lock`,
+    /// `vault_delete`) queues behind the in-flight write instead of observing
+    /// a torn vault directory. Dropping the guard at function exit is the
+    /// release point.
+    pub async fn hold_unlocked_root_key_and_hash(
+        &self,
+    ) -> Option<(SlotReadGuard<'_>, Zeroizing<[u8; AEAD_KEY_LEN]>, [u8; 32])> {
+        let guard = self.slot_read_active().await;
+        let (root_key, hash) = match &*guard {
+            Slot::Unlocked(uv) => (Zeroizing::new(*uv.root_key), uv.vault_meta_bytes_hash),
+            _ => return None,
+        };
+        Some((guard, root_key, hash))
+    }
+
+    /// Guard-holding sibling of [`Self::peek_unlocked_root_key_clone`] —
+    /// see [`Self::hold_unlocked_root_key_and_hash`] for the discipline.
+    pub async fn hold_unlocked_root_key(
+        &self,
+    ) -> Option<(SlotReadGuard<'_>, Zeroizing<[u8; AEAD_KEY_LEN]>)> {
+        let guard = self.slot_read_active().await;
+        let root_key = match &*guard {
+            Slot::Unlocked(uv) => Zeroizing::new(*uv.root_key),
+            _ => return None,
+        };
+        Some((guard, root_key))
+    }
+
+    /// Guard-holding sibling of [`Self::peek_unlocked_attachment_material`] —
+    /// see [`Self::hold_unlocked_root_key_and_hash`] for the discipline.
+    #[allow(clippy::type_complexity)]
+    pub async fn hold_unlocked_attachment_material(
+        &self,
+    ) -> Option<(
+        SlotReadGuard<'_>,
+        Zeroizing<[u8; AEAD_KEY_LEN]>,
+        [u8; 16],
+        Zeroizing<[u8; AEAD_KEY_LEN]>,
+    )> {
+        let guard = self.slot_read_active().await;
+        let (items_key, items_key_id, root_key) = match &*guard {
+            Slot::Unlocked(uv) => (
+                uv.items_key.clone(),
+                uv.items_key_id,
+                Zeroizing::new(*uv.root_key),
+            ),
+            _ => return None,
+        };
+        Some((guard, items_key, items_key_id, root_key))
+    }
+
     /// Atomically commit a `vault.meta` rewrite while holding the
     /// slot's write lock end-to-end: verify the slot is still
     /// [`Slot::Unlocked`] with `expected_hash`, run the `rewrite`
@@ -987,6 +1055,14 @@ impl core::ops::Deref for SlotReadGuard<'_> {
     }
 }
 
+/// Opaque writer-quiescence guard — see
+/// [`VaultRuntimeState::quiesce_writers`]. Exists so the export command can
+/// bind the slots write lock across its phase-one copy without the state's
+/// internals leaking out of this module.
+pub struct WriterQuiesceGuard<'a> {
+    _guard: tokio::sync::RwLockWriteGuard<'a, HashMap<VaultId, Slot>>,
+}
+
 /// Owned payload for the [`Slot::Recovering`] variant. Used by the
 /// `set_recovering` / `take_recovering` helpers so the variant fields
 /// pass as a single bundle across plugin boundaries.
@@ -1165,6 +1241,58 @@ mod tests {
             .enable_all()
             .build()
             .expect("current-thread runtime build")
+    }
+
+    /// SYNC-6 writer-guard mechanism: every `hold_unlocked_*` guard keeps a
+    /// slots WRITE-lock acquisition pending until the guard drops — the
+    /// property the prefs/attachments/search writers rely on so an export's
+    /// quiescence window contains no in-flight writer.
+    #[test]
+    fn hold_guards_block_write_lock_until_dropped() {
+        rt().block_on(async {
+            let state = std::sync::Arc::new(VaultRuntimeState::default());
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            // A second non-Empty entry for the write-lock holder to take.
+            state
+                .set_unlocked(test_vault_id_b(), fixture_unlocked_with_keys(3, 4, 2))
+                .await;
+
+            // Exercise all three hold flavors with the same sequence. A
+            // macro keeps the guard's borrow of `state` scoped per flavor
+            // (a `Box<dyn Any>` erasure would demand 'static).
+            macro_rules! assert_guard_blocks_taker {
+                ($flavor:literal, $hold:expr) => {{
+                    let guard_bundle = $hold.await.expect("slot is unlocked");
+                    let taker = state.take_and_run_blocking_for_id(test_vault_id_b(), || {
+                        Ok::<(), std::convert::Infallible>(())
+                    });
+                    tokio::pin!(taker);
+                    assert!(
+                        tokio::time::timeout(std::time::Duration::from_millis(50), &mut taker)
+                            .await
+                            .is_err(),
+                        concat!(
+                            $flavor,
+                            ": write lock must queue behind a held hold_* guard"
+                        ),
+                    );
+                    drop(guard_bundle);
+                    let taken = tokio::time::timeout(std::time::Duration::from_secs(2), taker)
+                        .await
+                        .expect("taker completes after guard drop");
+                    assert!(taken.is_ok(), "take succeeds after guard drop");
+                    // Restore entry B for the next flavor.
+                    state
+                        .set_unlocked(test_vault_id_b(), fixture_unlocked_with_keys(3, 4, 2))
+                        .await;
+                }};
+            }
+            assert_guard_blocks_taker!("rk+h", state.hold_unlocked_root_key_and_hash());
+            assert_guard_blocks_taker!("rk", state.hold_unlocked_root_key());
+            assert_guard_blocks_taker!("material", state.hold_unlocked_attachment_material());
+        });
     }
 
     #[test]

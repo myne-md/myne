@@ -51,6 +51,8 @@ export type CommandContext = {
   onShowGraph: () => void;
   /** Open the Obsidian vault import flow (folder picker → progress → summary) (MYND-53). */
   onImportObsidian: () => void;
+  /** Open the backup-export flow (save dialog → verified .myne-backup) (MYND-56). */
+  onBackupVault: () => void;
   /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */

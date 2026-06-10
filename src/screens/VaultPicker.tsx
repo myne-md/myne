@@ -46,6 +46,8 @@ import type { VaultSummary } from "../types/vault-summary";
 interface VaultPickerProps {
   /** Row select → App dispatches `picker.select-vault{vaultId}` → unlock. */
   onSelect: (vaultId: VaultId) => void;
+  /** "Restore from backup" → `picker.restore-backup` → restore flow (MYND-56). */
+  onRestoreBackup: () => void;
   /** "Create another" → App dispatches `picker.create-vault` → create-vault. */
   onCreateAnother: () => void;
 }
@@ -273,28 +275,64 @@ function PickerCard({ children }: { children: ReactNode }) {
   );
 }
 
-/** The divider + "Create another vault" action — shared by loaded + failed. */
-function CreateAnother({ onClick }: { onClick: () => void }) {
+/** One accent-tinted picker action link (create / restore share the style). */
+function PickerActionLink({
+  onClick,
+  icon,
+  label,
+  testId,
+}: {
+  onClick: () => void;
+  icon: Parameters<typeof Icon>[0]["name"];
+  label: string;
+  testId: string;
+}) {
   const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+      data-testid={testId}
+      style={{
+        ...CREATE_LINK_STYLE,
+        background: hovered ? "var(--accent-soft)" : "transparent",
+      }}
+    >
+      <Icon name={icon} size={16} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+/** The divider + picker actions — shared by loaded + failed. "Restore from
+ *  backup" sits next to "Create another vault" (SYNC-5 KeepBoth door:
+ *  restoring an additional vault must not require unlocking one first). */
+function CreateAnother({
+  onClick,
+  onRestoreBackup,
+}: {
+  onClick: () => void;
+  onRestoreBackup: () => void;
+}) {
   return (
     <>
       <hr style={DIVIDER_STYLE} />
-      <button
-        type="button"
+      <PickerActionLink
         onClick={onClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onFocus={() => setHovered(true)}
-        onBlur={() => setHovered(false)}
-        data-testid="picker.create-cta"
-        style={{
-          ...CREATE_LINK_STYLE,
-          background: hovered ? "var(--accent-soft)" : "transparent",
-        }}
-      >
-        <Icon name="plus" size={16} />
-        <span>Create another vault</span>
-      </button>
+        icon="plus"
+        label="Create another vault"
+        testId="picker.create-cta"
+      />
+      <PickerActionLink
+        onClick={onRestoreBackup}
+        icon="arrow-down"
+        label="Restore from backup"
+        testId="picker.restore-cta"
+      />
     </>
   );
 }
@@ -350,7 +388,8 @@ function lastUnlockText(lastUnlock: number | null): string {
   return rel === "" ? "" : `opened ${rel}`;
 }
 
-export function VaultPicker({ onSelect, onCreateAnother }: VaultPickerProps) {
+export function VaultPicker({ onSelect, onCreateAnother,
+  onRestoreBackup }: VaultPickerProps) {
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
@@ -400,7 +439,7 @@ export function VaultPicker({ onSelect, onCreateAnother }: VaultPickerProps) {
     return (
       <PickerCard>
         <p style={SUBLINE_STYLE}>No vaults could be loaded right now.</p>
-        <CreateAnother onClick={onCreateAnother} />
+        <CreateAnother onClick={onCreateAnother} onRestoreBackup={onRestoreBackup} />
       </PickerCard>
     );
   }
@@ -421,7 +460,7 @@ export function VaultPicker({ onSelect, onCreateAnother }: VaultPickerProps) {
           />
         ))}
       </div>
-      <CreateAnother onClick={onCreateAnother} />
+      <CreateAnother onClick={onCreateAnother} onRestoreBackup={onRestoreBackup} />
     </PickerCard>
   );
 }

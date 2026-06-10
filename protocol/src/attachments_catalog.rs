@@ -1320,4 +1320,220 @@ mod tests {
         std::fs::write("/tmp/myne_attachments_catalog_vectors.json", d.as_bytes())
             .expect("write attachments-catalog vectors dump");
     }
+
+    // ---- KAT vector APPEND generator: structural parse rejects --------
+
+    /// Emits a JSON **array fragment** of 7 additional `parse_fail` cases
+    /// for `myne-test-vectors/vectors/attachments-catalog/v0.1/cases.json`
+    /// at `/tmp/myne_attachments_catalog_parse_fail_vectors.json`
+    /// (MYND-227), spliced by hand into the existing `cases` array. The
+    /// original `emit_attachments_catalog_vectors_for_paste` stays
+    /// byte-stable and is NOT re-run (vector_id immutability).
+    ///
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_catalog_parse_fail_vectors -- --ignored`
+    ///
+    /// One case per distinguishable `CatalogBlobError` reject reachable
+    /// from a decode-a-blob vector: the 6 pre-AEAD structural rejects
+    /// (vault-search parity) + the post-AEAD `plaintext_parse_failed`
+    /// (a validly-sealed blob whose inner plaintext is not a canonical
+    /// JSON object — possible only with the real `catalog_key`, which
+    /// every case therefore carries).
+    #[test]
+    #[ignore]
+    fn emit_catalog_parse_fail_vectors() {
+        extern crate std;
+
+        fn hex_lower(bytes: &[u8]) -> String {
+            let mut s = String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> String {
+            let mut out = String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Same fixed inputs as emit_attachments_catalog_vectors_for_paste;
+        // nonces 0x99 + 0xAA are the next free entries in this family's
+        // nonce registry (0x77, 0x88 are taken).
+        let root_key: [u8; 32] = [0x42; 32];
+        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        let account_hash: [u8; CATALOG_BLOB_ACCOUNT_HASH_LEN] =
+            [0x33; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+        let nonce_base: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
+        let nonce_bad_inner: [u8; AEAD_NONCE_LEN] = [0xAA; AEAD_NONCE_LEN];
+
+        // Base blob for the structural tampers: the empty catalog under the
+        // real key. Header bytes are not AAD-bound — a port that skips a
+        // structural check decrypts the tampered blob successfully and
+        // returns Ok, which the runner catches (hence real keys, not dummies).
+        let base = encode_attachments_catalog_raw(
+            &catalog_key,
+            &account_hash,
+            &AttachmentsCatalog::empty(),
+            &nonce_base,
+        )
+        .expect("encode base");
+
+        let header_short: Vec<u8> = CATALOG_BLOB_MAGIC.to_vec();
+        let mut magic_tamper = base.clone();
+        magic_tamper[0] = b'X';
+        let mut version_tamper = base.clone();
+        version_tamper[4] = 0x02;
+        let mut reserved_tamper = base.clone();
+        reserved_tamper[5] = 0x01;
+        let mut len_overflow = base.clone();
+        len_overflow[30..34].copy_from_slice(&0xFFFF_FFFFu32.to_be_bytes());
+        let mut truncated = base.clone();
+        truncated.truncate(truncated.len() - 1);
+
+        // plaintext_parse_failed: hand-assembled envelope (assembly mirrors
+        // encode_attachments_catalog_raw) sealing bytes that are not a
+        // canonical JSON object. AEAD passes; the catalog parse rejects.
+        let bad_plaintext: &[u8] = b"not a canonical json object";
+        let aad = aad_attachments_catalog(&account_hash);
+        let sealed = aead_seal_ctx(&catalog_key, &nonce_bad_inner, bad_plaintext, &aad)
+            .expect("seal bad inner");
+        let mut bad_inner = Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed.len());
+        bad_inner.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        bad_inner.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        bad_inner.push(CATALOG_BLOB_RESERVED);
+        bad_inner.extend_from_slice(&nonce_bad_inner);
+        bad_inner.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        bad_inner.extend_from_slice(&sealed);
+
+        let cases: [(&str, &str, &[u8], CatalogBlobError, &str); 7] = [
+            (
+                "parse-fail-header-too-short",
+                "Only the 4-byte MYC1 magic — no room for the 34-byte header (magic + version + reserved + 24-byte nonce + 4-byte ciphertext_len). Rejected before any field read.",
+                header_short.as_slice(),
+                CatalogBlobError::HeaderTooShort,
+                "blob is the 4 magic bytes only (4 < 34)",
+            ),
+            (
+                "parse-fail-magic-mismatch",
+                "First byte of the MYC1 magic corrupted to 'X'. Rejected at offset 0 before any decryption — a foreign file, different artifact type, or forward-incompatible MYC5 blob all fail here.",
+                magic_tamper.as_slice(),
+                CatalogBlobError::MagicMismatch,
+                "byte 0 (magic[0]) 'M' → 'X'",
+            ),
+            (
+                "parse-fail-protocol-version-mismatch",
+                "protocol_version byte (offset 4) set to 0x02 instead of 0x01. A v0.1 decoder rejects an unknown protocol version before decrypting.",
+                version_tamper.as_slice(),
+                CatalogBlobError::ProtocolVersionMismatch,
+                "byte 4 (protocol_version) 0x01 → 0x02",
+            ),
+            (
+                "parse-fail-reserved-nonzero",
+                "reserved byte (offset 5) set to 0x01 instead of 0x00. Reserved bytes are flag carriers for future v0.1.x revisions; non-zero is an unconditional parse rejection.",
+                reserved_tamper.as_slice(),
+                CatalogBlobError::ReservedByteNonZero,
+                "byte 5 (reserved) 0x00 → 0x01",
+            ),
+            (
+                "parse-fail-ciphertext-len-overflow",
+                "ciphertext_len field (offset 30..34) set to 0xFFFFFFFF, far above MAX_CATALOG_PLAINTEXT_LEN + 32 (16 MiB + 32). The overflow guard rejects before any slice indexing — a port MUST bound-check ciphertext_len before allocating or indexing (§9.10 DoS-allocation defense).",
+                len_overflow.as_slice(),
+                CatalogBlobError::CiphertextLenOverflow,
+                "bytes 30..34 (ciphertext_len) → 0xffffffff",
+            ),
+            (
+                "parse-fail-ciphertext-truncated",
+                "Valid header advertising ciphertext_len = N, but the blob is one byte shorter than header + N. Rejected before the AEAD stage.",
+                truncated.as_slice(),
+                CatalogBlobError::CiphertextTruncated,
+                "final byte dropped (blob shorter than header + advertised ciphertext_len)",
+            ),
+            (
+                "parse-fail-plaintext-parse-failed",
+                "A structurally valid envelope sealed under the REAL catalog_key + AAD whose inner plaintext is 'not a canonical json object'. AEAD verification succeeds — the reject fires at the canonical-JSON parse stage, distinct from CannotDecrypt because the tag check already proved the bytes came from a catalog_key holder. Callers then fall back to the empty catalog per §9.10.4 — but the error surface itself is distinguishable and a port MUST NOT report its AEAD-failure error here.",
+                bad_inner.as_slice(),
+                CatalogBlobError::PlaintextParseFailed,
+                "validly-sealed non-JSON inner plaintext (nonce 0xaa×24)",
+            ),
+        ];
+
+        let expected_error_str = |e: &CatalogBlobError| -> &'static str {
+            match e {
+                CatalogBlobError::HeaderTooShort => "header_too_short",
+                CatalogBlobError::MagicMismatch => "magic_mismatch",
+                CatalogBlobError::ProtocolVersionMismatch => "protocol_version_mismatch",
+                CatalogBlobError::ReservedByteNonZero => "reserved_byte_nonzero",
+                CatalogBlobError::CiphertextLenOverflow => "ciphertext_len_overflow",
+                CatalogBlobError::CiphertextTruncated => "ciphertext_truncated",
+                CatalogBlobError::PlaintextParseFailed => "plaintext_parse_failed",
+                other => panic!("unexpected expected-error variant {other:?}"),
+            }
+        };
+
+        let mut dump = String::new();
+        dump.push_str("[\n");
+        for (i, (slug, description, blob, expected, tamper)) in cases.iter().enumerate() {
+            assert_eq!(
+                decode_attachments_catalog(&catalog_key, &account_hash, blob).as_ref(),
+                Err(expected),
+                "[{slug}] tampered blob must reject with {expected:?}"
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"attachments-catalog/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                hex_lower(&root_key)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                hex_lower(&account_hash)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_error\": \"{}\",\n",
+                expected_error_str(expected)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"informational_tamper_description\": \"{}\"\n",
+                json_escape(tamper)
+            ));
+            if i + 1 < cases.len() {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_attachments_catalog_parse_fail_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write attachments-catalog parse_fail vectors dump");
+    }
 }

@@ -186,6 +186,24 @@ fn main() {
                 ]),
             )
             .plugin(
+                "backup",
+                // MYND-32 (vault backup export; restore joins with
+                // MYND-218). `vault_export_backup` is the only path that
+                // writes a `.myne-backup` container — the Rust core does
+                // the IO; no `fs:` write scope is granted for backup files
+                // (narrow-seam posture, the importer precedent). Lock-step
+                // with `permissions/backup/default.toml`; adding a command
+                // here without a matching `commands.allow` entry is a
+                // security regression (the InlinedPlugin mirror is
+                // load-bearing per the `vault-creation` note above).
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "vault_export_backup",
+                    "vault_restore_backup",
+                    "backup_default_filename",
+                    "backup_cancel",
+                ]),
+            )
+            .plugin(
                 "importer",
                 // MYND-53 (importer engine read-seam, SYNC-1). `import_read_dir`
                 // + `import_read_file` are the ONLY external-dir read path — no

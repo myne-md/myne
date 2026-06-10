@@ -1,0 +1,42 @@
+# Permissions for the in-app `backup` Tauri plugin (MYND-32 / MYND-218,
+# epic MYND-217). Picked up under the `backup:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files reference
+# these as `backup:default` (or `backup:allow-<cmd>`).
+#
+# `vault_export_backup` is the ONLY path that writes a `.myne-backup`
+# container: the WebView picks the destination via `dialog:allow-save` and
+# the Rust core does all the IO — no `fs:` write scope is granted for
+# backup files (least-privilege, TB6; the importer read-seam precedent).
+# Adding a command here without a matching `build.rs`
+# `InlinedPlugin::commands` entry is a security regression.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-backup plugin."
+permissions = [
+    "allow-vault-export-backup",
+    "allow-vault-restore-backup",
+    "allow-backup-default-filename",
+    "allow-backup-cancel",
+]
+
+[[permission]]
+identifier = "allow-vault-export-backup"
+description = "Allow invoking backup:vault_export_backup (write a verified .myne-backup container of one vault's ciphertext files to a user-chosen destination; spec §9.11 — members are byte-for-byte copies, read back and hash-verified before the success rename, SYNC-4)."
+commands.allow = ["vault_export_backup"]
+
+[[permission]]
+identifier = "allow-backup-default-filename"
+description = "Allow invoking backup:backup_default_filename (pure naming-rule helper: 'Myne backup <local date> <HHMM>.myne-backup' from caller-supplied local-clock components; carries the product name and a local stamp, never the vault label)."
+commands.allow = ["backup_default_filename"]
+
+[[permission]]
+identifier = "allow-backup-cancel"
+description = "Allow invoking backup:backup_cancel (cooperatively cancel the in-flight backup export; the partial output file is discarded — SYNC-7)."
+commands.allow = ["backup_cancel"]
+
+[[permission]]
+identifier = "allow-vault-restore-backup"
+description = "Allow invoking backup:vault_restore_backup (recreate a vault from a user-chosen .myne-backup file: credential-free validation incl. the embedded vault.meta structural parse, staging into a discovery-invisible directory, atomic commit as a fresh vaults/<id>/ under the lifecycle permit — spec §9.11.6, SYNC-5/6)."
+commands.allow = ["vault_restore_backup"]

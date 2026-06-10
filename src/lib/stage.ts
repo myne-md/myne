@@ -186,7 +186,22 @@ export type Stage =
       vaultId?: VaultId;
     }
   | { name: "recover"; subStep: RecoverSubStep }
-  | { name: "picker" };
+  | { name: "picker" }
+  | {
+      /**
+       * Restore-from-backup flow (MYND-56 / MYND-218). A pre-unlock-class
+       * Stage screen (the 2026-05-08 modal carve-out is post-unlock-only),
+       * reachable from welcome (fresh install), the vault picker, the
+       * corrupted-vault unlock state, and Settings (which routes OUT of the
+       * editor — the flow is one screen for all four entries). Exit is
+       * reprobe-based (MYND-219 / SYNC-16): App.tsx's `reprobe()` re-runs
+       * boot routing, so after a successful restore the user lands on the
+       * picker/unlock with the new vault visible. `entry` is payload (not
+       * part of the discriminator) — copy/back-label only.
+       */
+      name: "restore-backup";
+      entry: "welcome" | "picker" | "corrupted" | "settings";
+    };
 
 /**
  * Action type sent to `transition`. Each action corresponds to a
@@ -380,7 +395,19 @@ export type Action =
    * The fresh `vaults/<new-id>/` minting + guard scoping (SYNC-9) live
    * in the IPC layer (task 7), not here.
    */
-  | { type: "picker.create-vault" };
+  | { type: "picker.create-vault" }
+  /** welcome → restore-backup (fresh-install restore, user-guide UX contract). */
+  | { type: "welcome.restore-backup" }
+  /** picker → restore-backup ("restore an additional vault", SYNC-5 KeepBoth door). */
+  | { type: "picker.restore-backup" }
+  /**
+   * unlock(corrupted) → restore-backup. The fail-closed corrupted screen's
+   * primary CTA (decisions.md 2026-06-10 superseding entry: the single-CTA
+   * posture predates a real restore route).
+   */
+  | { type: "unlock.restore-backup" }
+  /** editor → restore-backup (Settings → Storage entry; flow is pre-unlock-class). */
+  | { type: "editor.restore-backup" };
 
 /**
  * Pure transition function. Returns the next Stage given the previous
@@ -399,6 +426,8 @@ export function transition(prev: Stage, action: Action): Stage {
       switch (action.type) {
         case "create-vault.start":
           return { name: "create-vault" };
+        case "welcome.restore-backup":
+          return { name: "restore-backup", entry: "welcome" };
         default:
           return rejectIllegal(prev, action);
       }
@@ -448,6 +477,9 @@ export function transition(prev: Stage, action: Action): Stage {
           // disagrees with the actual slot at IPC time, the recover
           // screen reducer collapses the mismatch silently per Q4.
           return { name: "recover", subStep: "password-reset" };
+        case "unlock.restore-backup":
+          // Corrupted-vault repair door (decisions.md 2026-06-10 supersede).
+          return { name: "restore-backup", entry: "corrupted" };
         case "unlock.delete-vault-success":
           // Terminal-destructive transition (MYND-108-bis lost-
           // credentials cul-de-sac escape). Dispatched by the
@@ -490,6 +522,11 @@ export function transition(prev: Stage, action: Action): Stage {
             initialStatus: { kind: "Exists" },
             vaultId: action.vaultId,
           };
+        case "editor.restore-backup":
+          // Settings → Storage entry. The flow is pre-unlock-class; the
+          // vault stays Unlocked (restore never touches the slot map) and
+          // the reprobe exit routes by slot priority.
+          return { name: "restore-backup", entry: "settings" };
         case "editor.create-vault":
           // "Create another vault" footer in the account-chip switcher
           // dropdown (MYND-205 task 5) → existing vault-creation flow. Same
@@ -560,12 +597,19 @@ export function transition(prev: Stage, action: Action): Stage {
             initialStatus: { kind: "Exists" },
             vaultId: action.vaultId,
           };
+        case "picker.restore-backup":
+          return { name: "restore-backup", entry: "picker" };
         case "picker.create-vault":
           // "Create another" affordance → existing vault-creation flow.
           return { name: "create-vault" };
         default:
           return rejectIllegal(prev, action);
       }
+    case "restore-backup":
+      // No transition exits: the flow leaves via App.tsx's `reprobe()`
+      // (MYND-219 / SYNC-16), so every (restore-backup × action) pair is
+      // illegal by design.
+      return rejectIllegal(prev, action);
     default:
       return assertNever(prev);
   }
@@ -737,6 +781,13 @@ const LEGAL: Record<string, Stage["name"]> = {
   "recover|recover.delete-vault-success": "welcome",
   "picker|picker.select-vault": "unlock",
   "picker|picker.create-vault": "create-vault",
+  // Restore-from-backup entries (MYND-56). Exit is reprobe-based — no
+  // `restore-backup.*` exit arms exist by design (same posture as
+  // back-from-create).
+  "welcome|welcome.restore-backup": "restore-backup",
+  "picker|picker.restore-backup": "restore-backup",
+  "unlock|unlock.restore-backup": "restore-backup",
+  "editor|editor.restore-backup": "restore-backup",
 };
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
@@ -759,6 +810,9 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   // entries above.
   { name: "editor", vaultId: "00000000-0000-7000-8000-00000000000a" },
   { name: "recover", subStep: "select" },
+  // Restore-from-backup flow (MYND-56). `entry` is payload (copy only);
+  // one entry exercises the variant across every (Stage × Action) pair.
+  { name: "restore-backup", entry: "welcome" },
   { name: "recover", subStep: "phrase-entry" },
   { name: "recover", subStep: "decrypting" },
   { name: "recover", subStep: "password-reset" },

@@ -38,6 +38,13 @@ export type ThemeChoice = "light" | "dark";
 export interface PrefsView {
   screen_capture_protection: boolean;
   /**
+   * Unix epoch seconds of the vault's last backup export (MYND-58,
+   * spec §9.5.2). `null` ≡ never backed up. Drives the 30-day backup
+   * reminder banner. Written by an UNLOCKED export only (the documented
+   * locked-export wrinkle). Serialized from Rust `Option<u64>`.
+   */
+  last_backup_at: number | null;
+  /**
    * Deliberately-created folder paths (canonical trailing-slash form) that
    * persist independently of whether any note carries them — the carrier for
    * empty folders in the virtual-folder model (MYND-144). Absent in pre-MYND-144

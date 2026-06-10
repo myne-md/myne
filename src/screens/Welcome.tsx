@@ -4,9 +4,11 @@ import { RepairResidueBanner } from "../components/RepairResidueBanner";
 
 interface WelcomeProps {
   onCreateVault: () => void;
+  /** Fresh-install restore door (MYND-56; the user-guide UX contract). */
+  onRestoreBackup: () => void;
 }
 
-export function Welcome({ onCreateVault }: WelcomeProps) {
+export function Welcome({ onCreateVault, onRestoreBackup }: WelcomeProps) {
   return (
     <div
       data-testid="welcome.root"
@@ -87,6 +89,13 @@ export function Welcome({ onCreateVault }: WelcomeProps) {
             data-testid="welcome.create-cta"
           >
             Create new vault
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={onRestoreBackup}
+            data-testid="welcome.restore-cta"
+          >
+            Restore from backup
           </Button>
         </div>
 

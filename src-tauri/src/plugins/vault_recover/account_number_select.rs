@@ -108,7 +108,11 @@ pub(crate) fn resolve_vault_by_account_number(
 /// (via a full read then a bounded slice) and copy the fixed-width field. No
 /// AEAD, no key, no allocation of secret material beyond this 16-byte field
 /// (which is itself plaintext-on-disk and only ever compared, never logged).
-fn read_account_number_hash_from_header(vault_root: &Path) -> Option<AccountNumberHash> {
+/// `pub(crate)`: the backup restore engine's collision scan (MYND-218)
+/// reuses this exact header read — one canonical "identity from header,
+/// no parse, no magic gate" primitive (a structurally-damaged twin must
+/// still be matchable; that IS restore's flagship repair case).
+pub(crate) fn read_account_number_hash_from_header(vault_root: &Path) -> Option<AccountNumberHash> {
     let meta_path = vault_root.join("vault.meta");
     let bytes = std::fs::read(meta_path).ok()?;
     let end = ACCOUNT_HASH_OFFSET + VAULT_META_ACCOUNT_HASH_LEN;

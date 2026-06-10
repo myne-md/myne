@@ -197,7 +197,6 @@ fn is_well_formed(vault_dir: &Path) -> bool {
 /// The retry is bounded only as a defensive guard against a pathological
 /// filesystem (a 122-bit random collision is not reachable in practice); the
 /// loop terminates on the first non-colliding id.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn mint_unique_vault_id(base: &Path) -> VaultId {
     let vaults_dir = base.join(VAULTS_DIR_NAME);
     loop {

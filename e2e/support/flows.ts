@@ -7,6 +7,34 @@ import { expect } from "vitest";
 import { testIdSelector, type Session } from "./webdriver";
 
 /**
+ * Fire one production IPC from the page seat and settle-poll its result
+ * (`__TAURI_INTERNALS__.invoke` — real IPC, zero test hooks; the
+ * vault-creation suite's pattern). For backend-only paths a native dialog
+ * blocks WebDriver from reaching through the UI.
+ */
+export async function pageSeatInvoke(
+  session: Session,
+  cmd: string,
+  args: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<{ ok?: unknown; err?: unknown }> {
+  await session.execute(
+    "window.__e2eIpc = undefined;" +
+      "window.__TAURI_INTERNALS__.invoke(arguments[0], arguments[1]).then(" +
+      "function (ok) { window.__e2eIpc = { ok: ok === undefined ? null : ok }; }," +
+      "function (err) { window.__e2eIpc = { err: err }; });",
+    [cmd, args],
+  );
+  return session.waitUntil(
+    async () =>
+      (await session.execute<{ ok?: unknown; err?: unknown } | null>(
+        "return window.__e2eIpc ?? null",
+      )) ?? null,
+    { label: `page-seat ${cmd} settled`, timeoutMs },
+  );
+}
+
+/**
  * Unlock the currently-targeted vault and wait for the editor: the
  * canonical password → submit → `editor.root` sequence shared by every
  * suite that needs an unlocked editor as a step (not as the assertion

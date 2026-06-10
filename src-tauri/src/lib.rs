@@ -1,5 +1,6 @@
 mod atomic_write;
 mod auto_lock;
+mod backup_container;
 mod io_failure_kind;
 mod paths;
 mod plugins;
@@ -49,6 +50,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(plugins::backup::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())

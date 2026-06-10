@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
 import {
   dismissImporterOffer,
+  pageSeatInvoke,
   selectPickerRow,
   switchToVault,
   unlockToEditor,
@@ -66,32 +67,6 @@ async function scrapePhrase(session: Session): Promise<string[]> {
   expect(words.length).toBe(24);
   expect(words.every((w) => w.length > 0)).toBe(true);
   return words;
-}
-
-/** Fire a production IPC from the page seat and poll the stashed
- *  settlement (our `execute` is the W3C SYNC endpoint — it does not
- *  await promises). Args travel as execute() arguments, never via
- *  string interpolation. Returns `{ok}` or `{err}`. */
-async function pageSeatInvoke(
-  session: Session,
-  cmd: string,
-  args: Record<string, unknown>,
-  timeoutMs: number,
-): Promise<{ ok?: unknown; err?: unknown }> {
-  await session.execute(
-    "window.__e2eIpc = undefined;" +
-      "window.__TAURI_INTERNALS__.invoke(arguments[0], arguments[1]).then(" +
-      "function (ok) { window.__e2eIpc = { ok: ok === undefined ? null : ok }; }," +
-      "function (err) { window.__e2eIpc = { err: err }; });",
-    [cmd, args],
-  );
-  return session.waitUntil(
-    async () =>
-      (await session.execute<{ ok?: unknown; err?: unknown } | null>(
-        "return window.__e2eIpc ?? null",
-      )) ?? null,
-    { label: `page-seat ${cmd} settled`, timeoutMs },
-  );
 }
 
 /** Fill the 4-of-24 confirm challenge: each input declares its 1-based

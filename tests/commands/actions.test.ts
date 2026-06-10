@@ -48,6 +48,7 @@ describe("Command palette action registry", () => {
       "snapshots.open",
       "templates.manage",
       "templates.new-note",
+    "vault.backup",
       "vault.import-obsidian",
       "vault.lock",
       "view.toggle-backlinks-sidebar",

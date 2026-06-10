@@ -215,7 +215,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 |---|---|---|
 | `"myne.v0.1 server-auth"` | Sync-server authentication material — **placeholder** | Derived locally and held in memory between unlock and lock; **not transmitted in Phase 1** because no sync server exists. The exact use of this material (simple verifier transmission vs. OPAQUE `export_key` integration) is **deferred to Phase 2**; see §11.1 for the criteria that will resolve the choice. |
 | `"myne.v0.1 itemsKey-wrap"` | KEK for the persistent itemsKey | Active (wraps itemsKey on disk). |
-| `"myne.v0.1 backup-key"` | Local-encrypted backup file derivation root | Active when user exports a backup. |
+| `"myne.v0.1 backup-key"` | Sealed-backup derivation root — **reserved, not used** | **Not used in v0.1** (demoted 2026-06-10; previously "active when user exports a backup"). The v0.1 backup format (§9.11) is a verbatim ciphertext copy with no outer encryption layer: a `root_key`-derived seal would be circular for fresh-machine restore (the credential wraps live inside the backup's own `vault.meta`) and would forbid exporting while locked. The row is retained, like `server-auth`, so the context string stays allocated; a future sealed-backup variant would activate it. See `decisions.md` 2026-06-10. |
 | `"myne.v0.1 prefs-key"` | KEK for `vault.prefs` blob (§9.5) | Active when `vault.prefs` is written. |
 | `"myne.v0.1 search-index-key"` | KEK for `vault.search` blob (§9.6) | Active when `vault.search` is written (MYND-29). |
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
@@ -749,16 +749,16 @@ The KEK is `prefs_key = DeriveSubkey(root_key, "prefs-key")` per §3.2 + §3.4. 
 
 #### 9.5.2 Inner plaintext schema
 
-The inner plaintext is **canonical JSON** of an object whose keys are preference names and whose values are the persisted preference data. v0.1 ships thirteen fields — `auto_lock_seconds` (integer, optional, MYND-121), `daily_date_format` (string, optional, MYND-191), `daily_folder` (string, optional, MYND-191), `daily_template` (string, optional, MYND-191), `deliberate_folders` (string array, set semantics, MYND-144), `editor_layout` (nested object, optional, MYND-137), `favorites` (string array, sequence semantics, MYND-183), `folder_icons` (nested object, optional, MYND-185), `item_colors` (nested object, optional, MYND-184), `item_order` (string array, sequence semantics, MYND-183), `label` (string, optional, MYND-205), `screen_capture_protection` (bool), and `theme` (string, optional, MYND-110). Optional fields are **omitted entirely when unset** (`auto_lock_seconds` when the user has no stored timeout; the three `daily_*` fields when the user has not customized that daily-notes preference; `editor_layout` when the user never customized the sidebar layout; the three arrays when empty; the two decoration maps (`folder_icons`, `item_colors`) when empty; `label` when the user set no vault label; `theme` when the user made no explicit choice, i.e. follows the OS), so a vault that configured none encodes to the single-field form:
+The inner plaintext is **canonical JSON** of an object whose keys are preference names and whose values are the persisted preference data. v0.1 ships fourteen fields — `auto_lock_seconds` (integer, optional, MYND-121), `daily_date_format` (string, optional, MYND-191), `daily_folder` (string, optional, MYND-191), `daily_template` (string, optional, MYND-191), `deliberate_folders` (string array, set semantics, MYND-144), `editor_layout` (nested object, optional, MYND-137), `favorites` (string array, sequence semantics, MYND-183), `folder_icons` (nested object, optional, MYND-185), `item_colors` (nested object, optional, MYND-184), `item_order` (string array, sequence semantics, MYND-183), `label` (string, optional, MYND-205), `last_backup_at` (integer, optional, MYND-58), `screen_capture_protection` (bool), and `theme` (string, optional, MYND-110). Optional fields are **omitted entirely when unset** (`auto_lock_seconds` when the user has no stored timeout; the three `daily_*` fields when the user has not customized that daily-notes preference; `editor_layout` when the user never customized the sidebar layout; the three arrays when empty; the two decoration maps (`folder_icons`, `item_colors`) when empty; `label` when the user set no vault label; `last_backup_at` when the vault was never exported as a backup; `theme` when the user made no explicit choice, i.e. follows the OS), so a vault that configured none encodes to the single-field form:
 
 ```json
 {"screen_capture_protection":true}
 ```
 
-A vault with every field encodes every key (lexicographically sorted — `auto_lock_seconds` precedes `daily_date_format` precedes `daily_folder` precedes `daily_template` precedes `deliberate_folders` precedes `editor_layout` precedes `favorites` precedes `folder_icons` precedes `item_colors` precedes `item_order` precedes `label` precedes `screen_capture_protection` precedes `theme`):
+A vault with every field encodes every key (lexicographically sorted — `auto_lock_seconds` precedes `daily_date_format` precedes `daily_folder` precedes `daily_template` precedes `deliberate_folders` precedes `editor_layout` precedes `favorites` precedes `folder_icons` precedes `item_colors` precedes `item_order` precedes `label` precedes `last_backup_at` precedes `screen_capture_protection` precedes `theme`):
 
 ```json
-{"auto_lock_seconds":300,"daily_date_format":"YYYY-MM-DD","daily_folder":"Daily/","daily_template":"0190…0003","deliberate_folders":["Archive/2025/","Projects/Myne/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"favorites":["0190…0002"],"folder_icons":{"Archive/2025/":"archive","Projects/Myne/":"book"},"item_colors":{"0190…0001":"moss","Projects/Myne/":"slate"},"item_order":["0190…0002","Projects/Myne/","0190…0001","Archive/2025/"],"label":"Work","screen_capture_protection":true,"theme":"dark"}
+{"auto_lock_seconds":300,"daily_date_format":"YYYY-MM-DD","daily_folder":"Daily/","daily_template":"0190…0003","deliberate_folders":["Archive/2025/","Projects/Myne/"],"editor_layout":{"left_collapsed":false,"left_width":312,"right_collapsed":true,"right_width":288},"favorites":["0190…0002"],"folder_icons":{"Archive/2025/":"archive","Projects/Myne/":"book"},"item_colors":{"0190…0001":"moss","Projects/Myne/":"slate"},"item_order":["0190…0002","Projects/Myne/","0190…0001","Archive/2025/"],"label":"Work","last_backup_at":1765432100,"screen_capture_protection":true,"theme":"dark"}
 ```
 
 The `item_order` example interleaves note UUIDs and folder paths in one flat list — `0190…0002` (a note), then `Projects/Myne/` (a folder), then `0190…0001` (a note), then `Archive/2025/` (a folder) — demonstrating that a single sequence expresses notes and folders ordered freely against each other.
@@ -791,6 +791,8 @@ The `item_order` example interleaves note UUIDs and folder paths in one flat lis
 **`item_colors` field (MYND-184).** An optional nested object mapping a sidebar item — a note UUID **or** a canonical trailing-slash folder path, **discriminated by the trailing `/`** exactly as `item_order` discriminates its elements — to a color-slot name, the user's color label for that note or folder (rendered as a small dot). Keys (**NFC-normalized**, emitted in **lexicographic** order) are heterogeneous note-IDs and folder paths in one map; values name a fixed, bounded, theme-aware palette of color slots (**no** arbitrary hex). The object is **omitted entirely when empty**, so a vault that assigned no color is byte-identical to a pre-MYND-184 `vault.prefs` (existing golden vectors unaffected, no outer-envelope change). A decoder that does not find the key MUST treat it as the empty map; an entry whose note/folder no longer exists, or whose value names an unknown slot, is ignored at render time and pruned on the next write. A **note**-keyed entry is stable across note rename/move (the UUID is the filename); a **folder**-keyed entry is prefix-rewritten on folder rename/move and pruned on folder delete (the `deliberate_folders` discipline). AS3-Sensitive (note IDs + folder structure); rides inside the AEAD-encrypted blob. **Non-load-bearing** (cosmetic, AS-low): no protective-envelope clamp; a tampered or replayed `vault.prefs` can at worst surface the wrong color. Conflict semantics for Phase 2 sync are deferred (last-writer-wins).
 
 **`label` field (in-app vault switcher, MYND-205).** An optional string carrying the user's human-readable name for this vault — the name the in-app vault switcher shows. **Omitted entirely when unset**, so a vault that never set a label is byte-identical to a pre-MYND-205 `vault.prefs` (existing golden vectors unaffected, no outer-envelope / magic change — this is a **non-breaking, migration-less additive field** that rides the existing `MYP1` format, exactly like `auto_lock_seconds` and `theme` did; adding it is **not** a major-version event). The value is **NFC-normalized** per the general string rules; it sorts canonically between `item_order` (`i`) and `screen_capture_protection` (`s`). A decoder that does not find the key MUST treat the vault as unlabelled; the client then shows a neutral fallback (`Vault N`). The label lives **encrypted-only** inside `vault.prefs` (never in the on-disk vault registry or the `vaults/<id>/` directory name, which are deliberately decoupled from any per-vault content — see §9.4 / SYNC-3): a filesystem adversary sees only the AEAD ciphertext. It is decrypted into a per-session RAM cache on unlock and is the user's own input on write; it never crosses IPC or touches disk in plaintext otherwise. AS3-Sensitive (a vault name can carry identifying context); rides inside the AEAD-encrypted blob like every other field. **Non-load-bearing** (cosmetic display, AS-low): no protective-envelope clamp — a tampered or replayed `vault.prefs` can at worst surface the wrong display name. Renaming is **unlock-gated by construction** (writing needs `prefs_key`, which only exists for the active/sole-`Unlocked` vault). Conflict semantics for Phase 2 sync are deferred (last-writer-wins; the label syncs with the vault).
+
+**`last_backup_at` field (MYND-58, vault-backup-restore epic).** An optional non-negative integer — the Unix epoch **seconds** of the vault's last successful backup export (§9.11). **Omitted entirely when unset** ("never backed up"), so a vault that never exported a backup is byte-identical to a pre-MYND-58 `vault.prefs` (existing golden vectors unaffected, no outer-envelope change — a migration-less additive field exactly like `auto_lock_seconds`). A decoder that does not find the key MUST treat it as unset. The value is a bare decimal integer; **floating-point is FORBIDDEN** and a fractional value rejects the parse. The field is written by an export performed on an **unlocked** vault; a locked export (§9.11 permits one — the copy needs no key material) cannot update it, because writing `vault.prefs` requires `root_key` — accepted, since the field only drives a best-effort reminder ("you haven't backed up in N days", checked client-side after unlock). Because `vault.prefs` is itself a backup member, a restored vault's `last_backup_at` reflects the export moment — which is accurate. It sorts canonically between `label` (`lab` < `las`) and `screen_capture_protection`. **Non-load-bearing** (a tampered or replayed value can at worst suppress or force a reminder): no protective-envelope clamp. Conflict semantics for Phase 2 sync are deferred (last-writer-wins).
 
 **Schema evolution within v0.1:** Additive — new fields MAY be appended in any v0.1.x minor revision and are read by older v0.1 clients as unknown-and-ignored (per the implementation's serde discipline; older clients SHOULD NOT reject unknown fields). The MYND-110 `theme` field is the textbook additive case: a new optional key whose absence the older client already treats as a default, with the omit-when-unset rule keeping pre-`theme` vaults byte-identical. The MYND-185 `folder_icons` and MYND-184 `item_colors` maps are further textbook additive cases — new optional keys, omit-when-empty, unknown-and-ignored by older clients. Field removal, type changes, and structural restructuring are MAJOR-version events (MYP5). The MYND-183 replacement of `note_order` / `folder_order` with the unified `item_order` is **not** such an event: it is a **pre-release redefinition** of the v0.1 schema, made while Myne is pre-alpha with no shipped vaults — there is no frozen on-disk format to break, so no migration and no major-version bump apply. Performed post-freeze, the same field swap *would* require MYP5; the exception holds only because no v0.1 vault exists in the wild yet (see `../decisions.md`).
 
@@ -1056,6 +1058,167 @@ The AAD is `AAD_attachments_catalog` (§5.2), binding `account_number_hash` so t
 
 Implementations SHOULD reject `ciphertext_len` exceeding an implementation-defined catalog ceiling sized to the vault's attachment count (the catalog is bounded by ~120 bytes of metadata per attachment, dominated by the `.myn`/blob count already exposed at rest). The reference implementation pins this ceiling at **16 MiB** (~140k entries). Read semantic is **fall-back-to-empty** on any failure (file absent / truncated / magic-mismatch / AEAD-fail / inner-parse-fail collapse to the empty catalog `{}`), matching the §9.5.5 / §6.4 non-distinguishing-error discipline. Recommended practice is eager-write of the empty catalog at vault creation so the closed invariant "`vault.attachments` exists for every post-attachments vault" holds; the fall-back-to-empty semantic remains canonical for legacy vaults and recovery.
 
+### 9.11 Vault backup file (`.myne-backup`, `MYB1`)
+
+A **vault backup file** is a single-file, user-initiated copy of one vault, written to
+a user-chosen destination (file extension `.myne-backup`). It is a *state-transfer*
+container, not a portability/export format — the walk-away path for user content remains
+decrypted markdown (`vision.md`); and it is not a sync artifact — no server ever produces,
+receives, or consumes one. Members are **byte-for-byte copies** of the vault's on-disk
+files: the backup introduces **no new cryptography** — no re-encryption, no outer
+envelope, no derived keys (see the `backup-key` note in §3.4). Restoring a backup and
+unlocking the restored vault therefore requires exactly what unlocking the original
+requires: the master password **or** the recovery phrase (both credential wraps travel
+inside the embedded `vault.meta`). The metadata-leak posture and the
+backups-outlive-erase consequences are normative in `threat-model.md` §7.
+
+The spec is producer-agnostic: anything that emits this byte layout is a valid producer.
+One backup file contains exactly one vault.
+
+#### 9.11.1 Container layout
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                Description
+------  ---------  -------------------  ---------------------------------------
+0       4 bytes    magic                ASCII "MYB1"
+4       1 byte     protocol_version     0x01 for this specification
+5       1 byte     reserved             MUST be 0x00; non-zero rejects parse
+6       4 bytes    member_count         N — number of members (u32)
+10      8 bytes    members_total_len    Sum of all member_len values (u64)
+18      4 bytes    member_table_len     T — byte length of the member table (u32)
+22      T bytes    member_table         N records, §9.11.2, sorted lexicographically
+                                        by raw path bytes
+22+T    …          member data          The members' bytes, concatenated in member-
+                                        table order, no padding, no separators
+```
+
+The container carries **no timestamps** of any kind (creation time, per-member mtimes) —
+user-meaningful timestamps live inside the encrypted blobs, and the container adds no
+plaintext time signal beyond what UUIDv7 filenames already expose (§9.1).
+
+#### 9.11.2 Member table record
+
+```
+Offset  Size       Field        Description
+------  ---------  -----------  --------------------------------------------
+0       2 bytes    path_len     P (u16); MUST be 1..=1024
+2       P bytes    path         Relative member path: UTF-8, NFC, '/' separator,
+                                no leading '/', no '.' or '..' segments, no '\'
+2+P     8 bytes    member_len   L — byte length of the member (u64)
+10+P    32 bytes   sha256       SHA-256 over path_len (2 B, big-endian) || path
+                                (P bytes) || the member's L bytes
+```
+
+The hash input deliberately includes the record's own `path_len || path` prefix: a
+corrupted path byte that still parses as allowlist-valid (one flipped hex digit inside a
+UUID filename) would otherwise escape every container check and surface only as a
+single-member AEAD failure at first unlock — after the user may have acted on the
+export's success report. Binding the path into the hash makes path corruption as
+detectable as data corruption, at both verification ends (§9.11.4).
+
+Records are sorted lexicographically by raw `path` bytes; duplicate paths MUST be
+rejected. This makes the encoding of a given member set canonical: two producers backing
+up identical vault state emit identical bytes.
+
+#### 9.11.3 Member set (closed allowlist)
+
+Membership is a **closed allowlist**. Producers MUST include every existing vault file
+matching the IN patterns, MUST NOT include anything else; consumers MUST reject a backup
+containing any path outside the allowlist (unknown members are an error, not a warning —
+this is the §10.6 no-extension-points discipline applied to the container).
+
+| Pattern | Status | Rationale |
+|---|---|---|
+| `vault.meta` | IN — REQUIRED | Credential wraps + KDF params (§9.3); a backup without it is not restorable |
+| `vault.prefs` | IN if present | User data (label, deliberate folders, ordering — AS3) |
+| `notes/<uuid>.myn` | IN | Note content; trash rides inside (`trashed:` frontmatter) |
+| `snapshots/<note-uuid>__<snap-uuid>.myn` | IN | Version history is user data (`decisions.md` 2026-06-10) |
+| `vault.attachments` | IN if present | Authoritative attachment metadata (§9.10) |
+| `attachments/<attachment-id-hex>` | IN | Attachment blobs (§9.9) |
+| `vault.search` | OUT | Pure rebuildable cache; first unlock after restore rebuilds (§9.6.4) |
+| `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
+| `vaults/registry.json` | OUT (structurally) | Per-install plaintext cache living outside the vault root |
+| `vault.workspace` (§9.7), `vault.indices` (§9.8) | RESERVED | In-flight families (§10.3); disposition decided in the same change that lands each family's spec — landing one without amending this table is a spec bug |
+
+Members are verbatim file copies at their exact vault-relative paths. Paths are
+load-bearing: `.myn` filenames are AAD-bound note UUIDs (§6.4), attachment filenames are
+content-addressed ids (§9.9) — a renamed or transformed member fails AEAD/CTX
+verification after restore by construction. The container does **not** record the
+`VaultId` (the `vaults/<id>/` directory name): it is not cryptographically load-bearing,
+and a restoring client mints a fresh one. The `account_number_hash` remains readable
+without credentials at the embedded `vault.meta`'s fixed offset (§9.3), which is what
+permits credential-free same-vault collision detection at restore time.
+
+#### 9.11.4 Integrity semantics (corruption detection, NOT tamper resistance)
+
+The per-member SHA-256 hashes (covering each record's path bytes AND its member data,
+§9.11.2), `member_count`, and `members_total_len` exist to detect **accidental
+corruption and truncation** — a half-copied file on failing media, an interrupted
+download, a flipped path byte. They are **unkeyed**: an adversary who modifies a member
+can recompute them, so the container claims **no tamper resistance**. Substitution, tamper,
+and cross-vault-swap defense remains exactly where it is for the live vault: per-blob
+AEAD verification with AAD binding at unlock (§6.5).
+
+Two normative obligations follow:
+
+- **Producers MUST verify before reporting success:** after the container is fully
+  written to the destination, re-read it *from the destination* and verify every member
+  hash and the totals before the final atomic rename into place. A `.myne-backup` file
+  that exists at its destination has, by construction, passed verification.
+- **Consumers MUST verify before placement:** all member hashes and totals are verified
+  before any restored byte becomes visible to vault discovery.
+
+#### 9.11.5 Consistency contract
+
+The member set MUST be a **point-in-time consistent** copy of the vault directory:
+no member may reflect a state newer than another in a way the live vault could not have
+exhibited at a single instant (e.g., an attachments catalog entry whose blob is absent).
+Per-member integrity is inherited from the per-file atomic-write discipline. The
+quiescence mechanism (locking, copy ordering) is implementation-defined and not visible
+in the wire format.
+
+#### 9.11.6 Validation order and version handling
+
+Consumers validate in this order, all stages credential-free, before any disk placement:
+
+1. `magic` == `MYB1`; `protocol_version` == `0x01`; `reserved` == `0x00`.
+2. `member_count`, `members_total_len`, `member_table_len` sanity (caps below).
+3. Member table parse: path validity (§9.11.2 rules), allowlist membership (§9.11.3),
+   lexicographic order, no duplicates.
+4. Per-member SHA-256 over the member data, plus totals.
+5. Structural parse of the embedded `vault.meta` (§9.3 header rules) — a backup whose
+   `vault.meta` would produce `InvalidVaultMeta` is rejected *here*, so restore can never
+   reproduce the corruption it exists to repair.
+
+AEAD verification of members happens only at first unlock of the restored vault, by
+design (no key material is available, or wanted, at restore time).
+
+**Salvage mode (explicit, user-invoked).** The default consumer posture is
+all-or-nothing: any stage-1..5 failure rejects the whole restore. A consumer MAY offer
+an explicit, user-invoked **salvage** mode for a container that failed verification:
+salvage MAY place only members whose individual table records verify (path + hash +
+family checks), MUST require the embedded `vault.meta` to be among the verified members
+(a backup whose `vault.meta` is damaged is not salvageable — nothing restored from it
+could ever unlock), MUST report the exact skipped-member set to the caller, and MUST
+present the result as a partial restore, never as a complete one. Salvage is a
+disaster-recovery concession, not a relaxation of §9.11.4's default obligations.
+
+Caps and cross-consistency (the step-2 sanity rules — the only validation this container
+owns itself, everything else delegating to the member families): the container MUST
+satisfy `file_length == 22 + member_table_len + members_total_len`,
+`member_table_len == Σ (42 + path_len)` over the records (each record is
+`2 + path_len + 8 + 32` bytes), and `members_total_len == Σ member_len`. `path_len` ≤
+1024; each `member_len` MUST NOT exceed the size cap of the member's own blob family
+(§9.2 for `.myn`, §9.9 for attachment blobs, §9.5.4/§9.10.4 for the singleton blobs,
+§9.3's fixed-length layout for `vault.meta`). Implementations SHOULD additionally bound
+`member_count` and `member_table_len` with implementation-defined ceilings sized to
+realistic vaults, bounding pre-hash allocation per the §9.5.4 discipline (the reference
+implementation pins `member_count` at 2²⁰ and the member table at 16 MiB). A v0.1 client
+MUST reject `MYB5` and any unregistered magic; a v005 client MUST refuse `MYB1` with an
+explicit migration prompt (§10.4). No extension points, no negotiation (§10.1).
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -1091,6 +1254,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Vault indices (`vault.indices`) | `MYI1` (reserved) | `MYI5` | §9.8 (reserved) | MYND-31 (deferred persistence) |
 | Attachment blob | `MYA1` | `MYA5` | §9.9 | MYND-164 |
 | Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
+| Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
 
 Section number §9.8 (vault indices) is **reserved** for an in-flight feature whose blob spec lands separately; §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10 to avoid the collision. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments) use the `MY?5` v005 convention.
 

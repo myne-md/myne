@@ -33,6 +33,14 @@ export type FailClosedReason =
 interface FailClosedErrorProps {
   reason: FailClosedReason;
   onCtaClick: () => void;
+  /**
+   * Corrupted-vault repair door (MYND-56; decisions.md 2026-06-10
+   * superseding entry — the single-CTA fail-closed posture predates a
+   * real restore route). When present on `corrupted-vault`, renders as
+   * the PRIMARY action; the original CTA ("Close app") demotes to
+   * secondary. Other reasons ignore it.
+   */
+  onRestoreBackup?: () => void;
 }
 
 interface ReasonCopy {
@@ -46,7 +54,7 @@ function copyForReason(reason: FailClosedReason): ReasonCopy {
     case "corrupted-vault":
       return {
         title: "Vault file is corrupted.",
-        body: "Recovery flow coming soon. For now, manually restore your vault from a backup file.",
+        body: "If you have a backup, you can restore it — your current files are not touched; the backup is restored as a separate vault first.",
         cta: "Close app",
       };
     case "io-error":
@@ -84,8 +92,21 @@ const CTA_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
-export function FailClosedError({ reason, onCtaClick }: FailClosedErrorProps) {
+const SECONDARY_CTA_STYLE: CSSProperties = {
+  ...CTA_STYLE,
+  background: "transparent",
+  color: "var(--fg-2)",
+  border: "1px solid var(--line-1)",
+};
+
+export function FailClosedError({
+  reason,
+  onCtaClick,
+  onRestoreBackup,
+}: FailClosedErrorProps) {
   const copy = copyForReason(reason);
+  const restoreDoor =
+    reason.kind === "corrupted-vault" ? onRestoreBackup : undefined;
   return (
     <CenteredCard>
       <div
@@ -99,10 +120,20 @@ export function FailClosedError({ reason, onCtaClick }: FailClosedErrorProps) {
           {copy.title}
         </h1>
         <p style={CARD_BODY_STYLE}>{copy.body}</p>
+        {restoreDoor !== undefined && (
+          <button
+            type="button"
+            onClick={restoreDoor}
+            style={CTA_STYLE}
+            data-testid="fail-closed.restore-cta"
+          >
+            Restore from backup…
+          </button>
+        )}
         <button
           type="button"
           onClick={onCtaClick}
-          style={CTA_STYLE}
+          style={restoreDoor !== undefined ? SECONDARY_CTA_STYLE : CTA_STYLE}
           data-testid="fail-closed.cta"
         >
           {copy.cta}

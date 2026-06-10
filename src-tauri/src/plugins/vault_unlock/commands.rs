@@ -1429,6 +1429,7 @@ mod tests {
                     item_order: Vec::new(),
                     editor_layout: None,
                     label: None,
+                    last_backup_at: None,
                 },
             )
             .expect("encode prefs blob");
@@ -1534,6 +1535,7 @@ mod tests {
                 item_order: Vec::new(),
                 editor_layout: None,
                 label: None,
+                last_backup_at: None,
             },
         )
         .expect("encode");

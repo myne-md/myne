@@ -158,9 +158,9 @@ Used in: `threat-model.md` §7; `decisions.md` 2026-05-30 "Auto-lock on idle"
 
 ### **backup-key** &nbsp; 🗝️ *Key/identifier*
 
-A subkey derived from `root_key` via the `derive_key` pattern with context string `"myne.v0.1 backup-key"`. Used to encrypt user-initiated backup files exported from the client. Stored only transiently during the backup operation.
+A subkey context string (`"myne.v0.1 backup-key"`) **reserved but not used in v0.1** (demoted 2026-06-10; the entry previously claimed it encrypts exported backup files). The v0.1 [vault backup file](#vault-backup-file) is a verbatim ciphertext copy with no outer encryption layer; the demotion rationale lives in the §3.4 registry row and `decisions.md` 2026-06-10. Retained, like `server-auth`, so the context string stays allocated for a potential future sealed-backup variant.
 
-Used in: `spec/protocol.md` §3.4
+Used in: `spec/protocol.md` §3.4, §9.11; `decisions.md` 2026-06-10
 
 ### **bidirectional links** &nbsp; 📦 *Product*
 
@@ -249,7 +249,7 @@ Used in: `spec/protocol.md` §3.2, §3.4
 
 ### **context string registry** &nbsp; 📋 *Protocol*
 
-The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `server-auth`, `itemsKey-wrap`, `backup-key`. v005 strings will be registered under the `"myne.v005 "` prefix.
+The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth` and `backup-key` (both reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10). v005 strings will be registered under the `"myne.v005 "` prefix.
 
 Used in: `spec/protocol.md` §3.4
 
@@ -622,6 +622,12 @@ Used in: `decisions.md` 2026-06-07
 A per-language CodeMirror 6 grammar package (`@codemirror/lang-*`, or a CM5 stream-mode from `@codemirror/legacy-modes`) that provides syntax tokenization for a fenced code block's body. "Tier 1" distinguishes these from the Tier-0 core editor packs: they are **hand-curated** (not pulled via `@codemirror/language-data`) to keep the dependency tree minimal (TB9), and **eager-imported** (revised 2026-05-29 from the original lazy plan, which didn't color reliably in the Tauri WebView). Adopted in the 2026-05-29 decision (MYND-154).
 Used in: `src/editor/code-languages.ts`, `design-notes.md` (2026-05-29).
 
+### **last_backup_at** &nbsp; 📦 *Product*
+
+An optional `vault.prefs` field (Unix epoch seconds, encrypted like every pref) recording when the vault was last exported as a [vault backup file](#vault-backup-file); absent ≡ never backed up. Drives the client's backup reminder. Normative field semantics (omit-when-unset, float ban, the locked-export-cannot-update caveat) live in `spec/protocol.md` §9.5.2.
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-10
+
 ### **libsodium** &nbsp; 🛠️ *Tooling*
 
 The canonical cryptographic library across Myne's stack. Used via Rust bindings (`libsodium-sys-stable` or `sodiumoxide`) in the desktop client, Go via `golang.org/x/crypto` (parts of which mirror libsodium primitives) on the server, and `libsodium-js` in the Phase 3 web client. RustCrypto crates are an acceptable fallback for primitives where libsodium bindings prove inadequate, but libsodium remains canonical for audit consistency.
@@ -898,9 +904,15 @@ Build artifacts that can be regenerated bit-for-bit from public source code by i
 Used in: `threat-model.md` §6
 Reference: https://reproducible-builds.org
 
+### **restore (from backup)** &nbsp; 📦 *Product*
+
+Recreating a vault from a [vault backup file](#vault-backup-file): the file is validated credential-free (container structure + per-member SHA-256 + structural parse of the embedded `vault.meta`), staged into a discovery-invisible directory, then committed atomically as a fresh `vaults/<id>/` (new `VaultId` minted; the backup carries none). The restored vault starts locked and unlocks with the master password **or** the recovery phrase, exactly like the original — both credential wraps travel inside the copied `vault.meta`. Identity collisions (same `account_number_hash` already on disk) surface a user choice: keep both side-by-side, or replace the existing vault only after the restore has fully succeeded. Default handling of a damaged backup is all-or-nothing rejection; an explicit salvage mode restores intact members with an honest skipped-list summary. Restoring an old backup is a whole-vault replay — see `threat-model.md` §7.
+
+Used in: `spec/protocol.md` §9.11; `threat-model.md` §7; `decisions.md` 2026-06-10
+
 ### **root_key** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-The cryptographic core of a Myne vault. A 32-byte random value generated by the OS CSPRNG at vault creation. **Not derived from the password** — instead, two copies are stored on disk encrypted under independent wrap keys (`password_wrap_key` and `recovery_wrap_key`), per the dual-credential wrap pattern. Held in client memory only between unlock and lock; zeroized on lock or process exit. Every Myne subkey (the `server-auth` reservation, the active `itemsKey_wrap_key`, the `backup-key`) is derived from `root_key` via the `derive_key` helper. The architecture is essential to recovery — if `root_key` were a function of the password, losing the password would unconditionally destroy the vault.
+The cryptographic core of a Myne vault. A 32-byte random value generated by the OS CSPRNG at vault creation. **Not derived from the password** — instead, two copies are stored on disk encrypted under independent wrap keys (`password_wrap_key` and `recovery_wrap_key`), per the dual-credential wrap pattern. Held in client memory only between unlock and lock; zeroized on lock or process exit. Every Myne subkey (the `server-auth` reservation, the active `itemsKey_wrap_key`, the `backup-key` reservation) is derived from `root_key` via the `derive_key` helper. The architecture is essential to recovery — if `root_key` were a function of the password, losing the password would unconditionally destroy the vault.
 
 Used in: `spec/protocol.md` §3.1
 
@@ -1121,6 +1133,14 @@ A user's encrypted note collection — the unit of Myne's data model. Concretely
 
 Used in: `spec/protocol.md` §9.1
 
+### **vault backup file** &nbsp; 📦 *Product*
+
+*(Alias: `.myne-backup`.)*
+
+A single-file, user-initiated copy of one vault, written to a user-chosen destination with extension `.myne-backup` (magic `MYB1`; format in `spec/protocol.md` §9.11). Members are byte-for-byte ciphertext copies of the vault's files per a closed allowlist ("user data in, caches out": `vault.meta`, `vault.prefs`, notes, snapshots, attachments + catalog; `vault.search` excluded). A plaintext member table carries paths, lengths, and per-member SHA-256 — **unkeyed corruption detection, no tamper-resistance claim**; producers verify by re-reading the destination before reporting success, consumers verify before placement. No new cryptography: no outer envelope, no derived keys (see [backup-key](#backup-key)). Not a sync artifact and not the portability path (that remains decrypted markdown). User-facing term is "backup" — never "archive" or "snapshot". Leak posture and backups-outlive-erase consequences: `threat-model.md` §7.
+
+Used in: `spec/protocol.md` §9.11; `threat-model.md` §7; `decisions.md` 2026-06-10
+
 ### **vault creation session** &nbsp; 📦 *Product*
 
 The backend-resident state held between the `begin` and `commit` IPC calls of the vault-creation flow. A `VaultCreationSession` (Rust struct in `src-tauri/src/plugins/vault_creation/state.rs`) carries the freshly generated `account_number`, `recovery_phrase`, `root_key`, two Argon2id salts, the cached password and recovery wrap keys, the chosen `KdfParams`, and a `created_at: Instant` timestamp. Lives in a `Mutex<HashMap<Uuid, VaultCreationSession>>` indexed by **session token**. Bounded by `MAX_CONCURRENT_SESSIONS = 4` and `SESSION_TTL_SECS = 600` (10 minutes); evicted by a background `tokio::time::interval(60s)` task whose evicted tokens land in a parallel **tombstone** map for up to `TOMBSTONE_RETENTION_SECS = 3600` (1 hour). `root_key` and the wrap keys never cross the IPC boundary — they live only in this session until `commit` consumes it.
@@ -1318,7 +1338,7 @@ Used in: `spec/protocol.md` §4.1
 | `itemsKey` (32 B random) | Wraps every per-note `item_key` | Encrypted in `vault.meta` | Vault lifetime |
 | `item_key` (32 B random) | Encrypts one note's plaintext | Encrypted in `.myn` file | Note lifetime |
 | `server-auth` subkey | Reserved for Phase 2 sync auth | Derived only (not transmitted in v0.1) | Session |
-| `backup-key` | Encrypts user backup files | Derived only | Session |
+| `backup-key` | Reserved for a future sealed-backup variant — not used in v0.1 (demoted 2026-06-10) | Derived only (reserved) | — |
 | `account_number` (95-bit + Damm) | User identifier; bearer token in P2+ | User offline storage | Permanent |
 | `account_number_hash` (SHA-256[:16]) | Argon2id salt binding | `vault.meta` | Vault lifetime |
 

@@ -260,8 +260,10 @@ pub(crate) async fn persist_search_index_with_dir(
     state: &VaultRuntimeState,
     search: &SearchIndexState,
 ) -> Result<(), SearchSyncError> {
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // SYNC-6 writer-guard (MYND-32): guard bound across the atomic_write
+    // below — see `state::hold_unlocked_root_key_and_hash`.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(SearchSyncError::SlotNotUnlocked)?;
     let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;

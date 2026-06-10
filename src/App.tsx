@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Welcome } from "./screens/Welcome";
+import { RestoreBackup } from "./screens/RestoreBackup";
 import { CreateVault } from "./screens/CreateVault";
 import { Unlock } from "./screens/Unlock";
 import { Editor } from "./screens/Editor";
@@ -216,7 +217,12 @@ function App() {
   const screen = (() => {
     switch (stage.name) {
       case "welcome":
-        return <Welcome onCreateVault={() => dispatch({ type: "create-vault.start" })} />;
+        return (
+          <Welcome
+            onCreateVault={() => dispatch({ type: "create-vault.start" })}
+            onRestoreBackup={() => dispatch({ type: "welcome.restore-backup" })}
+          />
+        );
       case "create-vault":
         return (
           <CreateVault
@@ -251,6 +257,7 @@ function App() {
             onDeleteVaultSuccess={() =>
               dispatch({ type: "unlock.delete-vault-success" })
             }
+            onRestoreBackup={() => dispatch({ type: "unlock.restore-backup" })}
             suspicionReason={stage.suspicionReason}
           />
         );
@@ -265,6 +272,7 @@ function App() {
             }
             onSwitchVault={onSwitchVault}
             onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
+            onRestoreBackup={() => dispatch({ type: "editor.restore-backup" })}
             switching={switching}
           />
         );
@@ -295,8 +303,14 @@ function App() {
           <VaultPicker
             onSelect={(vaultId) => dispatch({ type: "picker.select-vault", vaultId })}
             onCreateAnother={() => dispatch({ type: "picker.create-vault" })}
+            onRestoreBackup={() => dispatch({ type: "picker.restore-backup" })}
           />
         );
+      case "restore-backup":
+        // Pre-unlock-class restore flow (MYND-56). Exit (cancel AND done)
+        // is reprobe-based — boot routing decides the return surface, so a
+        // successful restore lands on the picker with the new vault row.
+        return <RestoreBackup entry={stage.entry} onExit={reprobe} />;
     }
   })();
 

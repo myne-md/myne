@@ -1,11 +1,12 @@
-// Settings → Storage panel: read-only vault-location path display +
-// disabled Backup/Restore buttons (enable with MYND-118).
+// Settings → Storage panel: read-only vaults-location path display +
+// Backup/Restore actions (MYND-56; engines MYND-32/MYND-218).
 //
-// Path resolution mirrors `src-tauri/src/paths.rs::vault_dir`'s
-// derivation — `appDataDir() + join("vault")` reads the same Tauri
-// `app_data_dir` source the backend writes to. No new IPC, no
-// capability ACL change. The promise is module-cached so switching
-// rail items doesn't re-fire two Tauri IPCs per visit.
+// Path resolution mirrors `src-tauri/src/paths.rs` post-MYND-165:
+// vaults live under `appDataDir()/vaults/<id>/`; the panel shows the
+// `vaults/` root (the per-id directory name is an opaque UUID — showing
+// the root is the useful, stable path). No new IPC, no capability ACL
+// change. The promise is module-cached so switching rail items doesn't
+// re-fire two Tauri IPCs per visit.
 //
 // Penpot canon: `🔴 screen------settings--storage` (frame id
 // `9fb59646-2811-8082-8007-fd43bc128f9a`).
@@ -24,7 +25,7 @@ function resolveVaultPath(): Promise<string> {
   if (!vaultPathPromise) {
     vaultPathPromise = (async () => {
       const base = await appDataDir();
-      return join(base, "vault");
+      return join(base, "vaults");
     })();
   }
   return vaultPathPromise;
@@ -62,9 +63,17 @@ interface StoragePanelProps {
   /** Open the Obsidian vault import flow (MYND-53). Absent → the control is
    *  disabled (e.g. if Settings is ever shown outside the Editor). */
   onImportObsidian?: () => void;
+  /** "Back up vault…" → export progress modal (MYND-32). */
+  onBackupVault?: () => void;
+  /** "Restore from backup…" → the restore Stage flow (MYND-218). */
+  onRestoreBackup?: () => void;
 }
 
-export function StoragePanel({ onImportObsidian }: StoragePanelProps = {}) {
+export function StoragePanel({
+  onImportObsidian,
+  onBackupVault,
+  onRestoreBackup,
+}: StoragePanelProps = {}) {
   const [vaultPath, setVaultPath] = useState<string>("…");
 
   useEffect(() => {
@@ -85,7 +94,7 @@ export function StoragePanel({ onImportObsidian }: StoragePanelProps = {}) {
     <div style={PANEL_ROOT_STYLE}>
       <ControlBlock
         label="Vault location"
-        helper="Copy this path to back up your vault manually. The folder contains an encrypted vault.meta file plus per-note .myn blobs."
+        helper="Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file."
         control={
           <div style={PATH_ROW_STYLE}>
             <code style={PATH_DISPLAY_STYLE}>{vaultPath}</code>
@@ -124,13 +133,23 @@ export function StoragePanel({ onImportObsidian }: StoragePanelProps = {}) {
 
       <ControlBlock
         label="Backup"
-        helper="Encrypted backup files are decryptable only with this vault's recovery phrase. Backup format and restore flow ship in Phase 1.x."
+        helper="Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password or recovery phrase — exactly like unlock."
         control={
           <div style={BACKUP_BUTTON_ROW_STYLE}>
-            <Button variant="secondary" disabled>
-              Backup vault…
+            <Button
+              variant="secondary"
+              onClick={onBackupVault}
+              disabled={onBackupVault === undefined}
+              data-testid="settings.backup-vault"
+            >
+              Back up vault…
             </Button>
-            <Button variant="secondary" disabled>
+            <Button
+              variant="secondary"
+              onClick={onRestoreBackup}
+              disabled={onRestoreBackup === undefined}
+              data-testid="settings.restore-backup"
+            >
               Restore from backup…
             </Button>
           </div>

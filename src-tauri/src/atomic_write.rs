@@ -185,7 +185,7 @@ fn write_temp(tmp: &Path, bytes: &[u8], fault: Fault) -> std::io::Result<()> {
 /// filesystems); `MoveFileExW(WRITE_THROUGH)` is the canonical Windows
 /// durability primitive.
 #[cfg(unix)]
-fn finalize_atomic(src: &Path, dst: &Path, _replace: bool) -> std::io::Result<()> {
+pub(crate) fn finalize_atomic(src: &Path, dst: &Path, _replace: bool) -> std::io::Result<()> {
     std::fs::rename(src, dst)?;
     let parent = dst
         .parent()
@@ -229,7 +229,7 @@ fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io::Result<()>
     Ok(())
 }
 
-fn tmp_path(path: &Path) -> std::path::PathBuf {
+pub(crate) fn tmp_path(path: &Path) -> std::path::PathBuf {
     let mut p = path.to_path_buf();
     let name = p.file_name().map(|n| n.to_os_string()).unwrap_or_default();
     let mut tmp_name = name;
