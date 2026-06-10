@@ -194,6 +194,7 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
         <select
           aria-labelledby="auto-lock-label"
           aria-describedby="auto-lock-helper"
+          data-testid="settings.auto-lock-select"
           value={seconds}
           onChange={(e) => onChange(Number(e.target.value))}
           style={SELECT_STYLE}

@@ -550,7 +550,11 @@ export function AccountPanel({
           Recovery phrase stays the same.
         </p>
         <div>
-          <Button variant="primary" onClick={() => setView("change-password")}>
+          <Button
+            variant="primary"
+            data-testid="settings.change-password-cta"
+            onClick={() => setView("change-password")}
+          >
             Change password
           </Button>
         </div>
@@ -565,6 +569,7 @@ export function AccountPanel({
         <div style={LABEL_INPUT_ROW_STYLE}>
           <input
             className="vault-label-input"
+            data-testid="settings.label-input"
             type="text"
             value={labelDraft}
             placeholder="Add a label…"
@@ -586,6 +591,7 @@ export function AccountPanel({
           />
           <button
             type="button"
+            data-testid="settings.label-save"
             onClick={handleSaveLabel}
             disabled={labelSaveDisabled}
             style={labelSaveButtonStyle(labelSaveDisabled)}

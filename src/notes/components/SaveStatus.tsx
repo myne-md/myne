@@ -81,7 +81,7 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
   switch (status.status) {
     case "clean":
       return (
-        <span style={ROOT_STYLE} aria-label="Saved" title="Saved">
+        <span data-testid="editor.save-status" style={ROOT_STYLE} aria-label="Saved" title="Saved">
           <span style={DOT_BASE_STYLE} />
           Saved
         </span>
@@ -89,7 +89,12 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
 
     case "editing":
       return (
-        <span style={ROOT_STYLE} aria-label="Editing" title="Editing — autosave is armed">
+        <span
+          data-testid="editor.save-status"
+          style={ROOT_STYLE}
+          aria-label="Editing"
+          title="Editing — autosave is armed"
+        >
           <span style={DOT_BASE_STYLE} />
           Editing…
         </span>
@@ -97,7 +102,7 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
 
     case "saving":
       return (
-        <span style={ROOT_STYLE} aria-label="Saving" title="Saving…">
+        <span data-testid="editor.save-status" style={ROOT_STYLE} aria-label="Saving" title="Saving…">
           <span style={DOT_SAVING_STYLE} />
           <span style={{ color: "var(--fg-1)" }}>Saving…</span>
         </span>
@@ -107,6 +112,7 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
       const rel = formatRelativeTime(status.at);
       return (
         <span
+          data-testid="editor.save-status"
           style={ROOT_STYLE}
           aria-label={`Saved ${rel}`}
           title={`Saved ${rel}`}
@@ -121,6 +127,7 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
     case "error":
       return (
         <span
+          data-testid="editor.save-status"
           style={{ ...ROOT_STYLE, color: "var(--warning)" }}
           aria-label="Save failed"
           title="Save failed — click Retry"

@@ -147,6 +147,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             key={item.id}
             type="button"
             role="menuitem"
+            data-testid="notes.context-menu-item"
             data-item-id={item.id}
             style={style}
             onMouseEnter={() => setHoverId(item.id)}

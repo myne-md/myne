@@ -138,6 +138,7 @@ export function AppearancePanel() {
                     role="radio"
                     aria-checked={t.value === selected}
                     aria-label={`${t.label} theme`}
+                    data-testid={`settings.theme-${t.value}`}
                     onClick={() => void choose(t.value)}
                     style={
                       t.value === selected

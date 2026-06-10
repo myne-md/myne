@@ -1614,6 +1614,7 @@ function BottomBar({
           type="button"
           onClick={onOpenSettings}
           aria-label="Open settings"
+          data-testid="editor.settings-cta"
           title="Settings (⌘,)"
           style={{
             display: "flex",

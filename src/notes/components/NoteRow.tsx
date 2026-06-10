@@ -284,6 +284,7 @@ export function NoteRow(props: NoteRowProps) {
       onContextMenu={handleContextMenu}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
+      data-testid="notes.row"
       data-note-id={record.noteUuid}
       role="button"
       aria-selected={selected}
@@ -466,6 +467,7 @@ function NoteRowRenameInput(props: NoteRowRenameInputProps) {
     <input
       ref={inputRef}
       type="text"
+      data-testid="notes.rename-input"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}

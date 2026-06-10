@@ -68,7 +68,7 @@ export function Toast({ message, onDone, durationMs = 2500, action }: ToastProps
   if (message === null) return null;
 
   return (
-    <div role="status" aria-live="polite" style={TOAST_STYLE}>
+    <div role="status" aria-live="polite" data-testid="editor.toast" style={TOAST_STYLE}>
       <span>{message}</span>
       {action !== undefined && (
         <button type="button" style={ACTION_STYLE} onClick={action.onAction}>

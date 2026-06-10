@@ -174,6 +174,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
           <button
             ref={cancelRef}
             type="button"
+            data-testid="delete-confirm.cancel"
             onClick={onCancel}
             style={CANCEL_BUTTON_STYLE}
           >
@@ -181,6 +182,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
           </button>
           <button
             type="button"
+            data-testid="delete-confirm.confirm"
             onClick={onConfirm}
             style={DELETE_BUTTON_STYLE}
           >
