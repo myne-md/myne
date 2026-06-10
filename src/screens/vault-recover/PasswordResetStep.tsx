@@ -98,6 +98,26 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
         kind: "banner-retry",
         banner: "Unexpected error. Please try again.",
       };
+    case "RecoveryAbortedByLock":
+      // vault_lock raced complete_recovery's Argon2id window — the
+      // slot dropped Recovering→Empty and the recovery material was
+      // zeroized; the rewrite never touched vault.meta. Restart from
+      // phrase-entry (the io-failure outcome's reset shape) with an
+      // informational banner mirroring the change-password lock-race
+      // copy. Vacuous-by-affordance-absence today (§3.3: no Cancel
+      // during decrypting) — pinned for any future Cancel.
+      return {
+        kind: "io-failure",
+        banner: "Recovery cancelled: vault was locked.",
+      };
+    case "WeakNewPassword":
+      // Backend MIN_PASSWORD_LEN floor (belt+suspenders behind the
+      // form's own gate). Stay on password-reset; same copy as the
+      // change-password surface.
+      return {
+        kind: "banner-retry",
+        banner: "New password must be at least 12 characters.",
+      };
   }
 }
 
@@ -184,9 +204,12 @@ export function PasswordResetStep({
           submitLabel="Set new password"
           onSubmit={handleSubmit}
           disabled={inFlight}
+          testIdPrefix="recover.reset"
           errorBanner={
             state.banner != null ? (
-              <DestructiveBanner>{state.banner}</DestructiveBanner>
+              <DestructiveBanner testId="recover.reset-banner">
+                {state.banner}
+              </DestructiveBanner>
             ) : undefined
           }
           helperCopy={

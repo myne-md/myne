@@ -49,23 +49,56 @@ describe("picker.select-vault carries the chosen vaultId onto the unlock Stage",
   });
 });
 
-describe("non-picker paths to unlock leave vaultId undefined (sole-vault None path)", () => {
-  it("editor.lock → unlock has no vaultId", () => {
+describe("vault-addressed exits (MYND-219 / SYNC-17: lock/cancel/relock thread the active id)", () => {
+  it("editor.lock → unlock carries the editor stage's vaultId", () => {
+    const next = transition({ name: "editor", vaultId: VID_A }, { type: "editor.lock" });
+    if (next.name !== "unlock") throw new Error("unreachable");
+    expect(next.vaultId).toBe(VID_A);
+  });
+
+  it("editor.lock from an id-less editor (boot slot-priority entry) leaves vaultId undefined", () => {
     const next = transition({ name: "editor" }, { type: "editor.lock" });
     if (next.name !== "unlock") throw new Error("unreachable");
     expect(next.vaultId).toBeUndefined();
   });
 
-  it("recover.cancel → unlock has no vaultId", () => {
+  it("unlock.success threads the unlock's targeting id onto the editor stage", () => {
     const next = transition(
-      { name: "recover", subStep: "phrase-entry" },
-      { type: "recover.cancel" },
+      { name: "unlock", initialStatus: { kind: "Exists" }, vaultId: VID_B },
+      { type: "unlock.success" },
     );
-    if (next.name !== "unlock") throw new Error("unreachable");
-    expect(next.vaultId).toBeUndefined();
+    if (next.name !== "editor") throw new Error("unreachable");
+    expect(next.vaultId).toBe(VID_B);
   });
 
-  it("create-vault.commit-success → unlock (auto-unlock fallback) has no vaultId", () => {
+  it("recover.cancel → unlock carries the action's vaultId (the recovery's selected target)", () => {
+    const next = transition(
+      { name: "recover", subStep: "phrase-entry" },
+      { type: "recover.cancel", vaultId: VID_A },
+    );
+    if (next.name !== "unlock") throw new Error("unreachable");
+    expect(next.vaultId).toBe(VID_A);
+  });
+
+  it("recover.complete-success → editor carries the recovered vault's id", () => {
+    const next = transition(
+      { name: "recover", subStep: "password-reset" },
+      { type: "recover.complete-success", vaultId: VID_B },
+    );
+    if (next.name !== "editor") throw new Error("unreachable");
+    expect(next.vaultId).toBe(VID_B);
+  });
+
+  it("create-vault.auto-unlock-success → editor carries the created vault's id", () => {
+    const next = transition(
+      { name: "create-vault" },
+      { type: "create-vault.auto-unlock-success", vaultId: VID_A },
+    );
+    if (next.name !== "editor") throw new Error("unreachable");
+    expect(next.vaultId).toBe(VID_A);
+  });
+
+  it("create-vault.commit-success without an id (legacy sole-vault path) leaves vaultId undefined", () => {
     const next = transition(
       { name: "create-vault" },
       { type: "create-vault.commit-success" },

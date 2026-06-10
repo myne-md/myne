@@ -88,10 +88,23 @@ export function FailClosedError({ reason, onCtaClick }: FailClosedErrorProps) {
   const copy = copyForReason(reason);
   return (
     <CenteredCard>
-      <div role="alert" aria-live="assertive" style={{ display: "contents" }}>
-        <h1 style={CARD_TITLE_STYLE}>{copy.title}</h1>
+      <div
+        role="alert"
+        aria-live="assertive"
+        data-testid="fail-closed.root"
+        data-reason={reason.kind}
+        style={{ display: "contents" }}
+      >
+        <h1 style={CARD_TITLE_STYLE} data-testid="fail-closed.title">
+          {copy.title}
+        </h1>
         <p style={CARD_BODY_STYLE}>{copy.body}</p>
-        <button type="button" onClick={onCtaClick} style={CTA_STYLE}>
+        <button
+          type="button"
+          onClick={onCtaClick}
+          style={CTA_STYLE}
+          data-testid="fail-closed.cta"
+        >
           {copy.cta}
         </button>
       </div>

@@ -260,7 +260,7 @@ const CREATE_LINK_STYLE: CSSProperties = {
 /** Card chrome shared by every render state (loading / failed / loaded). */
 function PickerCard({ children }: { children: ReactNode }) {
   return (
-    <div style={ROOT_STYLE}>
+    <div style={ROOT_STYLE} data-testid="picker.root">
       <div style={CARD_STYLE}>
         <div style={BRAND_ROW_STYLE}>
           <MyneMark size={36} />
@@ -286,6 +286,7 @@ function CreateAnother({ onClick }: { onClick: () => void }) {
         onMouseLeave={() => setHovered(false)}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
+        data-testid="picker.create-cta"
         style={{
           ...CREATE_LINK_STYLE,
           background: hovered ? "var(--accent-soft)" : "transparent",
@@ -320,6 +321,8 @@ function VaultRow({
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
+      data-testid="picker.vault-row"
+      data-vault-id={vault.id}
       style={rowStyle(hovered)}
     >
       <span style={ROW_LEFT_STYLE}>

@@ -114,6 +114,41 @@ steps:
       - useradd -m ci && chown -R ci:ci .
       - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH && pnpm install --frozen-lockfile && pnpm build && cargo test -p myne-desktop --no-fail-fast'
 
+  # ─── E2E suite (real binary via tauri-driver) ────────────────
+  # MYND-129 (e2e-harness). Drives the production binary built by
+  # tauri-compile (shared workspace `target/release/myne-desktop`) in a
+  # real WebKitGTK window under xvfb. Merge gate by ratified decision
+  # (epic e2e-testing, SYNC-1); scenario suites: smoke + VR-1 recovery
+  # drill at production KDF (more land per MYND-124/125/126/127).
+  # Also runs the icon asset-check (folded MYND-128, SYNC-19).
+  # depends_on cargo-test-tauri keeps the pnpm-install chain serial
+  # (see the vitest step comment) and the heavy steps sequential.
+  # NOTE: `cargo install tauri-driver` recompiles each run — when the
+  # planned custom CI image lands (see header notes), bake it in.
+  # Test deps stay OUT of release-build steps (TB9) — this step only
+  # consumes the already-built binary.
+  e2e:
+    image: rust:1.90.0-slim
+    depends_on: [cargo-test-tauri]
+    environment:
+      CI: "true"
+    commands:
+      # Runtime-only set: this step consumes a PREBUILT binary, so the
+      # GTK -dev header chains are unnecessary (webkit2gtk-driver drags
+      # the runtime libs transitively); pkg-config/libssl-dev stay for
+      # the tauri-driver cargo install.
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth
+      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
+      - npm install -g pnpm@9
+      - cargo install tauri-driver --locked --version 2.0.6
+      - node scripts/check-icons.mjs
+      # chmod-based fault-injection scenarios require an unprivileged
+      # runner (root bypasses DAC) — same rule as cargo-test-tauri.
+      - useradd -m ci && chown -R ci:ci . /usr/local/cargo/registry
+      # Build the fixture generator as a visible step cost rather than
+      # silently inside the first seeding test's 180 s budget.
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true && pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+
   # ─── Cross-impl vector verification (DISABLED) ───────────────
   # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
   # byte-equality of the public API; without the companion checked out those 13

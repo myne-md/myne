@@ -126,7 +126,17 @@ function App() {
   // `decisions.md` 2026-05-08 "`Stage.unlock.suspicionReason?` field".
   const setStageWithSuspicion = useCallback(
     (status: StageVaultStatus, suspicionReason?: SuspicionReason) => {
-      setStage({ name: "unlock", initialStatus: status, suspicionReason });
+      // Functional set: read the CURRENT stage so the force-relock
+      // unlock stays addressed at the vault that was just relocked
+      // (MYND-219 / SYNC-17 — the editor stage carries the active
+      // vault's id; at ≥2 vaults the sole-vault `None` fallback would
+      // be ambiguous).
+      setStage((curr) => ({
+        name: "unlock",
+        initialStatus: status,
+        suspicionReason,
+        vaultId: curr?.name === "editor" ? curr.vaultId : undefined,
+      }));
     },
     [],
   );
@@ -210,9 +220,17 @@ function App() {
       case "create-vault":
         return (
           <CreateVault
-            onBack={() => dispatch({ type: "create-vault.back" })}
-            onAutoUnlockSuccess={() =>
-              dispatch({ type: "create-vault.auto-unlock-success" })
+            // Back-from-create is reprobe-based (MYND-219 / SYNC-16):
+            // boot routing decides the return surface — welcome at 0
+            // vaults, the lone vault's unlock at 1, the picker at ≥2.
+            // (The former `create-vault.back` → welcome arm stranded
+            // picker/editor entrants on Welcome.)
+            onBack={reprobe}
+            onAutoUnlockSuccess={(vaultId) =>
+              dispatch({
+                type: "create-vault.auto-unlock-success",
+                vaultId: vaultId ?? undefined,
+              })
             }
             onAutoUnlockFailed={(vaultId) =>
               dispatch({
@@ -254,9 +272,9 @@ function App() {
         return (
           <VaultRecover
             initialSubStep={stage.subStep}
-            onCancel={() => dispatch({ type: "recover.cancel" })}
-            onCompleteSuccess={() =>
-              dispatch({ type: "recover.complete-success" })
+            onCancel={(vaultId) => dispatch({ type: "recover.cancel", vaultId })}
+            onCompleteSuccess={(vaultId) =>
+              dispatch({ type: "recover.complete-success", vaultId })
             }
             onDeleteVaultSuccess={() =>
               dispatch({ type: "recover.delete-vault-success" })

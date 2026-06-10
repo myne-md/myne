@@ -49,3 +49,8 @@ dist-ssr/
 # Ephemeral output of penpot-sync skill when Plugin API limits prevent
 # automated fixes — lists manual UI steps the user needs to take.
 manual-fixes-needed.md
+
+# pnpm store leakage from the E2E container (scripts/e2e-local.sh)
+.pnpm-store/
+# E2E failure artifacts (screenshots, page source, driver logs)
+e2e/artifacts/

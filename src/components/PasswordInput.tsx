@@ -90,6 +90,9 @@ export interface PasswordInputProps {
   labelTrailing?: ReactNode;
   /** Disable the input + eye toggle (e.g., during in-flight submit). */
   disabled?: boolean;
+  /** Stable E2E selector rendered as `data-testid` on the INNER input
+   *  element (SYNC-8) — the input is what scenarios type into/assert. */
+  testId?: string;
 }
 
 const labelStyle: CSSProperties = {
@@ -116,6 +119,7 @@ export function PasswordInput({
   autoFocus,
   labelTrailing,
   disabled,
+  testId,
 }: PasswordInputProps) {
   const captionColor =
     captionTone === "danger" ? "var(--danger)" : "var(--fg-3)";
@@ -144,6 +148,7 @@ export function PasswordInput({
           autoComplete="new-password"
           spellCheck={false}
           disabled={disabled}
+          data-testid={testId}
           style={{ paddingRight: 36 }}
         />
         <button

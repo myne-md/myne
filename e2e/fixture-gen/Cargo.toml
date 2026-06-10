@@ -1,0 +1,16 @@
+[package]
+name = "e2e-fixture-gen"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "E2E fixture generator: writes unlockable vaults/<id>/vault.meta layouts with known credentials (e2e-harness task 5; SYNC-2)"
+
+[dependencies]
+# Public protocol API only — composes the same calls the production
+# creation path makes (see src-tauri/src/plugins/vault_creation). No
+# dependency on the app crate; src-tauri/src stays untouched.
+protocol = { path = "../../protocol" }
+getrandom = { version = "0.2", default-features = false }
+uuid = { version = "1", features = ["v7"] }
+zeroize = { version = "1.8", default-features = false }

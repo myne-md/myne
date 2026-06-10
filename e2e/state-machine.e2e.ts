@@ -1,0 +1,435 @@
+// MYND-127 — boot-routing bucket scenarios (e2e-state-machine task 1).
+//
+// `initialStageFromProbe(vaultList, slotMap)` is the routing brain; each
+// scenario here pins one vault-count bucket end-to-end through the
+// production binary (SYNC-4). Vault-count preconditions are declared
+// per scenario (SYNC-6). Slot-priority (reload) buckets live in task 3;
+// picker buckets (≥2) in task 2.
+//
+// SYNC-13: assertion shapes never print fixture credentials.
+
+import { expect, it } from "vitest";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { describeE2E, scenario } from "./support/scenario";
+import {
+  dismissImporterOffer,
+  enterRecoveryPhrase,
+  selectPickerRow,
+  switchToVault,
+  unlockToEditor,
+} from "./support/flows";
+import {
+  corruptVaultMetaWholesale,
+  deleteVaultMetaKeepArtifacts,
+  seedLegacyVault,
+  seedVault,
+  vaultMetaPath,
+  type SeededVault,
+} from "./support/fixtures";
+import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../src/lib/load-bearing-copy";
+
+// Story 12 (boot-probe single-fire, the SM-9 prod replacement) is NOT
+// asserted here — empirically unobservable on the production bundle
+// with zero hooks (SYNC-3/4): WebKitGTK records no resource-timing
+// entry for the `ipc://` scheme (verified in-container: 0 entries),
+// the binary initializes no tracing subscriber (events go nowhere),
+// and a double probe re-renders the same stage without a remount (no
+// DOM symptom). Coverage lands as the task-6 Vitest component test
+// (mocked probe pair + StrictMode double-mount call count); downgrade
+// recorded on MYND-127 with the SM-9/10/11 notes.
+
+describeE2E("boot routing buckets (MYND-127 task 1)", () => {
+  it("0 vaults: empty data dir boots to Welcome", async () => {
+    // Vault-count precondition: 0.
+    await scenario("sm-bucket-0-welcome", {}, async (app) => {
+      await app.session.byTestId("welcome.root", { timeoutMs: 20_000 });
+
+      // Clean fixture ⇒ no orphan-residue banner (MYND-159 surface).
+      expect(await app.session.byTestIdAll("repair-residue.banner")).toHaveLength(0);
+    });
+  });
+
+  it("1 vault: boots to Unlock addressed at the lone vault's id, password opens it", async () => {
+    // Vault-count precondition: 1 (weak KDF — params live in vault.meta,
+    // SYNC-9).
+    let fixture!: SeededVault;
+    await scenario(
+      "sm-bucket-1-unlock",
+      {
+        seed: (appDataDir) => {
+          fixture = seedVault(appDataDir);
+        },
+      },
+      async (app) => {
+        // Story 2: vault-addressed targeting, not just the stage name —
+        // the Stage payload's `vaultId` is observable on the form
+        // (threaded by `initialStageFromProbe`'s single-vault arm).
+        const form = await app.session.byTestId("unlock.form", { timeoutMs: 20_000 });
+        expect(await form.attribute("data-vault-id")).toBe(fixture.vaultId);
+
+        // End-to-end: the password unwraps exactly this vault's meta
+        // through the untouched production unlock path.
+        await unlockToEditor(app.session, fixture.password);
+      },
+    );
+  });
+
+  it("corrupted vault: missing vault.meta with artifacts fails closed, no password form", async () => {
+    // Vault-count precondition: 1 (discovered, not well-formed).
+    let fixture!: SeededVault;
+    await scenario(
+      "sm-bucket-corrupted",
+      {
+        seed: (appDataDir) => {
+          fixture = seedVault(appDataDir);
+          deleteVaultMetaKeepArtifacts(appDataDir, fixture.vaultId);
+        },
+      },
+      async (app) => {
+        // Story 3: unlock(Corrupted) → FailClosedError from the first
+        // frame; the password form never mounts.
+        const failClosed = await app.session.byTestId("fail-closed.root", {
+          timeoutMs: 20_000,
+        });
+        expect(await failClosed.attribute("data-reason")).toBe("corrupted-vault");
+
+        // Single CTA, full-literal copy (fail-closed contract — no
+        // welcome/unlock fallback that could overwrite the vault).
+        expect(await (await app.session.byTestId("fail-closed.cta")).text()).toBe("Close app");
+        expect(await app.session.byTestIdAll("unlock.password-input")).toHaveLength(0);
+      },
+    );
+  });
+
+  // Story 4 (SM-4 rewritten to list-level IoError) — SKIPPED with rationale:
+  // the spec'd injection (chmod fault on `vaults/`) does NOT reach the
+  // unlock(IoError) arm on the production binary. `discover_vaults`
+  // treats an unreadable `vaults/` dir as EMPTY discovery
+  // (`src-tauri/src/vault_registry.rs:133` — "Discovery never fails on a
+  // missing root"), so the boot lands FAIL-OPEN on Welcome; the only
+  // remaining Err arm of `vault_list` is `app_data_dir` resolution
+  // failure, which is not injectable at-rest. Whether list-level
+  // discovery faults should fail open (current) or closed is flagged at
+  // the epic level (e2e-testing sync ledger); this scenario lands when
+  // that posture decision resolves. The unlock(IoError) RENDER path
+  // stays covered by Vitest stage tests.
+  it.skip("list-IoError: vaults/ scan fault fails closed with ioKind copy (blocked on fail-open posture decision)", () => {
+    // Intentionally empty — see the rationale above.
+  });
+});
+
+describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
+  // Distinct per-vault passwords so end-to-end targeting is FALSIFIABLE:
+  // the wrong-vault password must fail, the right-vault one must open.
+  const PASSWORD_A = "e2e-picker-vault-a-pw";
+  const PASSWORD_B = "e2e-picker-vault-b-pw";
+
+  it("2 vaults: boots to picker; row select opens Unlock addressed at exactly that vault", async () => {
+    // Vault-count precondition: 2 (both well-formed, weak KDF).
+    let b!: SeededVault;
+    await scenario(
+      "sm-picker-targeting",
+      {
+        seed: (appDataDir) => {
+          seedVault(appDataDir, { password: PASSWORD_A });
+          b = seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        // Story 5: ≥2 vaults → picker, with one row per vault.
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        const rows = await app.session.byTestIdAll("picker.vault-row");
+        expect(rows).toHaveLength(2);
+
+        // Story 6: selecting B opens Unlock targeted at exactly B.
+        await selectPickerRow(app.session, b.vaultId);
+        const form = await app.session.byTestId("unlock.form");
+        expect(await form.attribute("data-vault-id")).toBe(b.vaultId);
+
+        // Targeting proven end-to-end: A's password fails on B…
+        const input = await app.session.byTestId("unlock.password-input");
+        await input.sendKeys(PASSWORD_A);
+        await (await app.session.byTestId("unlock.submit")).click();
+        const banner = await app.session.byTestId("unlock.error-banner", { timeoutMs: 15_000 });
+        // Full-literal non-distinguishing copy (§7.3, SYNC-8).
+        expect(await banner.text()).toBe(UNLOCK_NON_DISTINGUISHING_BANNER);
+
+        // …and B's password opens B.
+        await input.clear();
+        await input.sendKeys(PASSWORD_B);
+        await (await app.session.byTestId("unlock.submit")).click();
+        await app.session.byTestId("editor.root", { timeoutMs: 30_000 });
+      },
+    );
+  });
+
+  it("2 vaults: picker's Create-another enters the creation flow", async () => {
+    // Vault-count precondition: 2.
+    await scenario(
+      "sm-picker-create-another",
+      {
+        seed: (appDataDir) => {
+          seedVault(appDataDir, { password: PASSWORD_A });
+          seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        await (await app.session.byTestId("picker.create-cta")).click();
+        // Creation flow entry = PasswordStep (its form is the first step).
+        await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+      },
+    );
+  });
+
+  it("2 vaults, one corrupted: picker shows both; fail-closed surfaces only after selection", async () => {
+    // Vault-count precondition: 2 (one garbage vault.meta — lists as
+    // Exists since `is_well_formed` checks presence, not parse; the
+    // corruption is discovered by the unlock attempt's parse step).
+    let b!: SeededVault;
+    await scenario(
+      "sm-picker-corrupted-row",
+      {
+        seed: (appDataDir) => {
+          seedVault(appDataDir, { password: PASSWORD_A });
+          b = seedVault(appDataDir, { password: PASSWORD_B });
+          corruptVaultMetaWholesale(appDataDir, b.vaultId);
+        },
+      },
+      async (app) => {
+        // No pre-routing: boot lands on the picker, both rows present.
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        expect(await app.session.byTestIdAll("picker.vault-row")).toHaveLength(2);
+
+        // Selecting the corrupted vault mounts the password form (the
+        // picker does not pre-probe health)…
+        await selectPickerRow(app.session, b.vaultId);
+        const input = await app.session.byTestId("unlock.password-input");
+
+        // …and the submit's `parse_vault_meta` failure routes to the
+        // fail-closed corrupted-vault surface (InvalidVaultMeta).
+        await input.sendKeys(PASSWORD_B);
+        await (await app.session.byTestId("unlock.submit")).click();
+        const failClosed = await app.session.byTestId("fail-closed.root", {
+          timeoutMs: 15_000,
+        });
+        expect(await failClosed.attribute("data-reason")).toBe("corrupted-vault");
+      },
+    );
+  });
+});
+
+describeE2E("slot-priority reload routing (MYND-127 task 3)", () => {
+  // The Tauri host (and its HashMap<VaultId, Slot>) outlives the JS
+  // runtime across a WebView reload — `refresh()` is the production
+  // Cmd+R path, zero test hooks (SYNC-3). The ≥2-vault recovery-resume
+  // twin lives in MYND-126 (blocked on MYND-220).
+
+  it("Recovering slot: mid-recovery reload boots straight to password-reset, phrase skipped", async () => {
+    // Vault-count precondition: 1 (weak KDF; A8d runs in-app).
+    let fixture!: SeededVault;
+    await scenario(
+      "sm-reload-recovering",
+      {
+        seed: (appDataDir) => {
+          fixture = seedVault(appDataDir);
+        },
+      },
+      async (app) => {
+        // Drive a real recovery to the post-A8d point: slot=Recovering.
+        await app.session.byTestId("unlock.password-input", { timeoutMs: 20_000 });
+        await (await app.session.byTestId("unlock.recovery-link")).click();
+        await enterRecoveryPhrase(app.session, fixture.phrase);
+        await (await app.session.byTestId("recover.submit")).click();
+        await app.session.byTestId("recover.reset.password-input", { timeoutMs: 30_000 });
+
+        // Story 7: the WebView reloads, the host keeps Slot::Recovering,
+        // and the boot probe's slot-priority pins recover(password-reset).
+        await app.session.refresh();
+        await app.session.byTestId("recover.reset.password-input", { timeoutMs: 20_000 });
+        // Phrase entry is skipped — A8d already produced the in-memory
+        // root_key in the pre-reload session.
+        expect(await app.session.byTestIdAll("recover.phrase-cell")).toHaveLength(0);
+      },
+    );
+  });
+
+  it("Unlocked slot: reload boots straight to the editor, no re-challenge", async () => {
+    // Vault-count precondition: 1 (weak KDF).
+    let fixture!: SeededVault;
+    await scenario(
+      "sm-reload-unlocked",
+      {
+        seed: (appDataDir) => {
+          fixture = seedVault(appDataDir);
+        },
+      },
+      async (app) => {
+        // Real unlock → editor (slot=Unlocked).
+        await app.session.byTestId("unlock.password-input", { timeoutMs: 20_000 });
+        await unlockToEditor(app.session, fixture.password);
+
+        // Story 8: reload → slot-priority routes straight back to the
+        // editor; the unlocked session is not re-challenged.
+        await app.session.refresh();
+        await app.session.byTestId("editor.root", { timeoutMs: 20_000 });
+        expect(await app.session.byTestIdAll("unlock.password-input")).toHaveLength(0);
+      },
+    );
+  });
+});
+
+describeE2E("legacy vault/ eager boot migration (MYND-127 task 4)", () => {
+  it("legacy layout migrates before routing; original password opens the migrated vault", async () => {
+    // Vault-count precondition: legacy single-vault layout (no vaults/).
+    let fixture!: SeededVault;
+    await scenario(
+      "sm-legacy-migration",
+      {
+        seed: (appDataDir) => {
+          fixture = seedLegacyVault(appDataDir);
+        },
+      },
+      async (app) => {
+        // Story 9: the setup-hook migration runs BEFORE routing, so the
+        // boot lands on Unlock as one ordinary vault — never Welcome,
+        // never a legacy-aware special screen.
+        const form = await app.session.byTestId("unlock.form", { timeoutMs: 20_000 });
+
+        // Disk contract while still on Unlock: legacy dir gone, exactly
+        // one freshly-minted vaults/<id>/ with the 345-byte meta.
+        expect(existsSync(join(app.appDataDir, "vault"))).toBe(false);
+        const ids = readdirSync(join(app.appDataDir, "vaults"), { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => d.name);
+        expect(ids).toHaveLength(1);
+        const migratedId = ids[0];
+        // Migration mints a FRESH id — the pre-migration one is retired.
+        expect(migratedId).not.toBe(fixture.vaultId);
+        expect(statSync(vaultMetaPath(app.appDataDir, migratedId)).size).toBe(345);
+
+        // Registry coherent: the cache names exactly the migrated id
+        // (shape per `vault_registry.rs::serialize_registry`).
+        const registry = JSON.parse(
+          readFileSync(join(app.appDataDir, "vaults", "registry.json"), "utf8"),
+        ) as { version: number; vaults: Array<{ id: string }> };
+        expect(registry.version).toBe(1);
+        expect(registry.vaults.map((v) => v.id)).toEqual([migratedId]);
+
+        // Routed as that one vault (vault-addressed unlock target).
+        expect(await form.attribute("data-vault-id")).toBe(migratedId);
+
+        // The pre-migration password opens the migrated vault — the
+        // bytes moved, the crypto did not.
+        await unlockToEditor(app.session, fixture.password);
+      },
+    );
+  });
+});
+
+describeE2E("in-app switcher transitions (MYND-127 task 5)", () => {
+  const PASSWORD_A = "e2e-switch-vault-a-pw";
+  const PASSWORD_B = "e2e-switch-vault-b-pw";
+
+  it("editor → switch-vault locks the current vault and opens the target's unlock", async () => {
+    // Vault-count precondition: 2.
+    let a!: SeededVault;
+    let b!: SeededVault;
+    await scenario(
+      "sm-switcher-transition",
+      {
+        seed: (appDataDir) => {
+          a = seedVault(appDataDir, { password: PASSWORD_A });
+          b = seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        // Boot to picker, open A.
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        await selectPickerRow(app.session, a.vaultId);
+        await unlockToEditor(app.session, PASSWORD_A);
+        await dismissImporterOffer(app.session);
+
+        // Story 10: account-chip switch to B → editor.switch-vault →
+        // unlock(Exists, vaultId: B). (The transient switching overlay
+        // is too short-lived under a weak-KDF flush to gate on.)
+        await switchToVault(app.session, b.vaultId);
+        const formB = await app.session.byTestId("unlock.form", { timeoutMs: 15_000 });
+        expect(await formB.attribute("data-vault-id")).toBe(b.vaultId);
+
+        // B's unlock completes on B.
+        await unlockToEditor(app.session, PASSWORD_B);
+
+        // Sole-Unlocked invariant (SYNC-1): the switch relocked A, so
+        // routing back to A re-challenges with the password form rather
+        // than reopening a still-unlocked slot.
+        await switchToVault(app.session, a.vaultId);
+        const formA = await app.session.byTestId("unlock.form", { timeoutMs: 15_000 });
+        expect(await formA.attribute("data-vault-id")).toBe(a.vaultId);
+        await app.session.byTestId("unlock.password-input");
+      },
+    );
+  });
+
+  it("editor → account-chip Create-another enters the creation flow", async () => {
+    // Vault-count precondition: 2 (any unlocked editor).
+    let a!: SeededVault;
+    await scenario(
+      "sm-switcher-create-entry",
+      {
+        seed: (appDataDir) => {
+          a = seedVault(appDataDir, { password: PASSWORD_A });
+          seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        await selectPickerRow(app.session, a.vaultId);
+        await unlockToEditor(app.session, PASSWORD_A);
+        await dismissImporterOffer(app.session);
+
+        // editor.create-vault: chip dropdown → "Create another vault".
+        await (await app.session.byTestId("switcher.chip")).click();
+        await (await app.session.byTestId("switcher.create-cta")).click();
+        await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+      },
+    );
+  });
+});
+
+describeE2E("SM-12 no stage shortcut (MYND-127 task 6)", () => {
+  it("?test-stage=editor has zero routing effect on the production bundle", async () => {
+    // Vault-count precondition: 0 (any editor landing would be a leak).
+    await scenario("sm-12-no-shortcut", {}, async (app) => {
+      await app.session.byTestId("welcome.root", { timeoutMs: 20_000 });
+
+      // Re-enter the app with the would-be dev shortcut present at BOOT
+      // (full navigation → fresh JS runtime → boot probe re-runs with
+      // the param in place). MYND-80 acceptance: no URL parameter may
+      // bypass production routing.
+      await app.session.execute(
+        "location.href = location.origin + location.pathname + '?test-stage=editor'",
+      );
+      // Anchor on the POST-navigation document: only it carries the
+      // param (the predicate swallows transient mid-navigation errors).
+      await app.session.waitUntil(
+        async () => {
+          try {
+            return (
+              (await app.session.execute<string>("return location.search")) ===
+                "?test-stage=editor" || null
+            );
+          } catch {
+            return null;
+          }
+        },
+        { label: "post-navigation document", timeoutMs: 20_000 },
+      );
+
+      // Normal boot routing applies: empty dir → Welcome, never editor.
+      await app.session.byTestId("welcome.root", { timeoutMs: 20_000 });
+      expect(await app.session.byTestIdAll("editor.root")).toHaveLength(0);
+    });
+  });
+});

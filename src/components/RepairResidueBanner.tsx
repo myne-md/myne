@@ -76,6 +76,7 @@ export function RepairResidueBanner() {
 
   return (
     <div
+      data-testid="repair-residue.banner"
       style={{
         border: "1px solid var(--line-1)",
         borderRadius: 10,

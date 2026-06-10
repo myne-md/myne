@@ -137,7 +137,35 @@ export type VaultRecoveryError =
    * (panic in the blocking task, runtime shutdown). User-facing
    * CTA is "try again" — recoverable banner, not a credential error.
    */
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  /**
+   * `vault_lock` (or another slot-dropping action) fired while
+   * `complete_recovery`'s Argon2id-bound derivation ran in
+   * `spawn_blocking` — the post-Argon2id slot peek found
+   * `Slot::Recovering` dropped to `Slot::Empty`; the rewrite was
+   * bailed without touching `vault.meta` and the recovery material
+   * zeroized with the slot. The user restarts from A8d
+   * (phrase-entry). Symmetric with `VaultLockedDuringChange`
+   * (change-password). Contract is vacuous-by-affordance-absence
+   * today (no Cancel during decrypting per `recovery-flow.md` §3.3)
+   * but pinned for any future Cancel affordance.
+   *
+   * (MYND-219 / SYNC-18(c): mirror drift fix — the variant existed
+   * Rust-side without a TS twin.)
+   */
+  | { kind: "RecoveryAbortedByLock" }
+  /**
+   * Backend min-length floor (`protocol::MIN_PASSWORD_LEN`, 12
+   * Unicode chars) rejected the new password chosen during the
+   * post-recovery password reset (A8f). The frontend form already
+   * gates this; the backend arm is belt+suspenders against a
+   * frontend bypass. Shared variant name with the creation /
+   * change-password `WeakNewPassword`.
+   *
+   * (MYND-219 / SYNC-18(c): mirror drift fix — the variant existed
+   * Rust-side without a TS twin.)
+   */
+  | { kind: "WeakNewPassword" };
 
 /**
  * Type-narrowing helper. Use to access `e.detail.io_error_kind`

@@ -34,6 +34,7 @@
 
 import type { RecoverSubStep } from "../../lib/stage";
 import type { DeleteVaultPartialFailContext } from "../../lib/vault-delete";
+import { RECOVERY_NON_DISTINGUISHING_BANNER as NON_DISTINGUISHING_BANNER } from "../../lib/load-bearing-copy";
 
 /** Reason used to render `<FailClosedError>`. Recover never produces
  *  `io-error` here — IO failures stay banner-retry per Q7 (E1/E2). */
@@ -179,11 +180,6 @@ export function initialState(initialSubStep: RecoverSubStep): VaultRecoverState 
   };
 }
 
-/** Spec §3.4 non-distinguishing banner. Co-located with the reducer
- *  so the create-vs-recover boundary can't drift the wording. */
-const NON_DISTINGUISHING_BANNER =
-  "Phrase or vault file is invalid. Please try again.";
-
 function sanitizeCellValue(value: string): string {
   // Q5 P5 — typed whitespace is filtered out at the reducer level
   // (defense in depth; the input component also blocks at onChange).
@@ -315,9 +311,15 @@ export function vaultRecoverReducer(
           // retries the same submit shortly.
           return { ...state, banner: action.outcome.banner };
         case "io-failure":
-          // A8f IO/JoinFailure: slot dropped recovering material on
-          // failure (post-take_recovering closure), so slot is now
-          // Empty. User must re-enter phrase.
+          // A8f IO/JoinFailure: the rewrite never landed (atomic
+          // rename gates), and the HOST keeps `Slot::Recovering` —
+          // the snapshot-clone pipeline never consumed the slot
+          // (pinned by the vr11′ E2E scenario; an earlier version of
+          // this comment wrongly claimed the slot drops to Empty).
+          // UI-side we bounce to phrase-entry with the banner; a
+          // re-entered phrase silently advances via the Q4
+          // RecoveryAlreadyInProgress swap, and a plain unlock
+          // attempt surfaces the resume banner instead.
           return {
             ...state,
             subStep: "phrase-entry",

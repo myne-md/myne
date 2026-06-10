@@ -81,6 +81,13 @@ interface PasswordCreateFormProps {
   emptyCaption?: string;
   /** Auto-focus the password field on mount. Default: true. */
   autoFocus?: boolean;
+  /**
+   * Stable E2E selector prefix (SYNC-8). When set, the form renders
+   * `data-testid` on its interactive elements:
+   * `<prefix>.password-input`, `<prefix>.confirm-input`,
+   * `<prefix>.submit`.
+   */
+  testIdPrefix?: string;
 }
 
 const DEFAULT_EMPTY_CAPTION =
@@ -95,7 +102,9 @@ export function PasswordCreateForm({
   secondaryAction,
   emptyCaption = DEFAULT_EMPTY_CAPTION,
   autoFocus = true,
+  testIdPrefix,
 }: PasswordCreateFormProps) {
+  const tid = (suffix: string) => (testIdPrefix ? `${testIdPrefix}.${suffix}` : undefined);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -158,6 +167,7 @@ export function PasswordCreateForm({
         captionTone={passwordTone}
         autoFocus={autoFocus}
         disabled={disabled}
+        testId={tid("password-input")}
         labelTrailing={
           <button
             type="button"
@@ -197,6 +207,7 @@ export function PasswordCreateForm({
         caption={mismatch ? "Passwords do not match." : undefined}
         captionTone="danger"
         disabled={disabled}
+        testId={tid("confirm-input")}
       />
 
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -205,6 +216,7 @@ export function PasswordCreateForm({
             variant="ghost"
             onClick={secondaryAction.onClick}
             icon={secondaryAction.icon}
+            data-testid={tid("secondary")}
           >
             {secondaryAction.label}
           </Button>
@@ -214,6 +226,7 @@ export function PasswordCreateForm({
           variant="primary"
           onClick={handleSubmit}
           disabled={!submitReady || disabled}
+          data-testid={tid("submit")}
         >
           {submitLabel}
         </Button>

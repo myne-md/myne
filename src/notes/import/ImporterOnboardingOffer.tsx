@@ -57,6 +57,7 @@ export function ImporterOnboardingOffer({
       role="dialog"
       aria-modal="true"
       aria-labelledby="importer-offer-title"
+      data-testid="importer.offer-root"
       style={BACKDROP_STYLE}
       onClick={(e) => {
         if (e.target === e.currentTarget) onDismiss();
@@ -124,10 +125,10 @@ export function ImporterOnboardingOffer({
         </p>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
-          <Button variant="ghost" onClick={onDismiss}>
+          <Button variant="ghost" onClick={onDismiss} data-testid="importer.offer-dismiss">
             Not now
           </Button>
-          <Button variant="primary" icon="folder" onClick={onChoose}>
+          <Button variant="primary" icon="folder" onClick={onChoose} data-testid="importer.offer-choose">
             Choose folder…
           </Button>
         </div>

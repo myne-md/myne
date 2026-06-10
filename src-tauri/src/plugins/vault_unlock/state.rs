@@ -188,6 +188,29 @@ impl VaultRuntimeState {
         self.active_or_recovering_vault_id().await
     }
 
+    /// The `VaultId` of the sole `Recovering` entry, if any (MYND-220 /
+    /// VR-18).
+    ///
+    /// `complete_recovery`'s `None`-target resolution: a RESUMED
+    /// password-reset (post-WebView-reload) carries no UI-side id —
+    /// the `recover` Stage has no vaultId payload and the reducer
+    /// re-mounts with `vaultId = null` — but the runtime owns recovery
+    /// identity, so the sole `Recovering` slot IS the exact A8f target.
+    /// Distinct from [`Self::active_vault_or_recovering_for_probe`]:
+    /// this resolver must NEVER yield an `Unlocked` entry (A8f's slot
+    /// peek would correctly reject it, but the path/slot key pair must
+    /// not diverge onto the wrong vault first). Deterministic min-by-id
+    /// mirrors the sibling resolvers (SYNC-1 forbids two `Recovering`
+    /// entries; the tiebreak is defensive).
+    pub async fn recovering_vault_id(&self) -> Option<VaultId> {
+        let slots = self.slots.read().await;
+        slots
+            .iter()
+            .filter(|(_, slot)| matches!(slot, Slot::Recovering { .. }))
+            .map(|(id, _)| *id)
+            .min()
+    }
+
     /// Internal active-or-recovering resolver (see the public
     /// [`Self::active_vault_or_recovering_for_probe`] wrapper).
     async fn active_or_recovering_vault_id(&self) -> Option<VaultId> {
@@ -1845,6 +1868,42 @@ mod tests {
             drop(editor_view);
             // The Recovering entry survives — present but never editor-reachable.
             assert_eq!(state.slot_kind(id_recovering).await, SlotKind::Recovering);
+        });
+    }
+
+    #[test]
+    fn recovering_vault_id_resolves_the_sole_recovering_entry() {
+        // MYND-220 / VR-18: the resumed A8f's `None`-target resolution.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            assert_eq!(
+                state.recovering_vault_id().await,
+                None,
+                "no Recovering entry → None (cold path falls to the disk heuristic)"
+            );
+            let id = test_vault_id_b();
+            state.set_recovering(id, fixture_recovering()).await;
+            assert_eq!(state.recovering_vault_id().await, Some(id));
+        });
+    }
+
+    #[test]
+    fn recovering_vault_id_never_yields_an_unlocked_entry() {
+        // Distinct from `active_vault_or_recovering_for_probe`: an
+        // `Unlocked` sibling must NOT shadow the Recovering target —
+        // A8f's path/slot pair must land on the recovery, not the
+        // editor's vault.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let id_unlocked = test_vault_id();
+            let id_recovering = test_vault_id_b();
+            state
+                .set_unlocked(id_unlocked, fixture_unlocked_with_keys(0x11, 0x22, 0x33))
+                .await;
+            state
+                .set_recovering(id_recovering, fixture_recovering())
+                .await;
+            assert_eq!(state.recovering_vault_id().await, Some(id_recovering));
         });
     }
 

@@ -259,9 +259,11 @@ export function PhraseEntryStep({
         <h1 style={TITLE_STYLE}>Recover your vault.</h1>
         <p style={BODY_STYLE}>Enter your recovery phrase. 24 BIP-39 words.</p>
 
-        {state.banner != null && <DestructiveBanner>{state.banner}</DestructiveBanner>}
+        {state.banner != null && (
+          <DestructiveBanner testId="recover.banner">{state.banner}</DestructiveBanner>
+        )}
 
-        <div style={GRID_STYLE}>
+        <div style={GRID_STYLE} data-testid="recover.phrase-grid">
           {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => {
             const inputId = `${baseId}-cell-${i}`;
             const focused = focusedIndex === i;
@@ -283,6 +285,8 @@ export function PhraseEntryStep({
                   inputMode="text"
                   style={CELL_INPUT_STYLE}
                   aria-label={`Word ${i + 1}`}
+                  data-testid="recover.phrase-cell"
+                  data-index={i + 1}
                 />
               </label>
             );
@@ -290,13 +294,19 @@ export function PhraseEntryStep({
         </div>
 
         <div style={FOOTER_STYLE}>
-          <button type="button" onClick={onCancel} style={CANCEL_STYLE}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={CANCEL_STYLE}
+            data-testid="recover.cancel"
+          >
             ← Back
           </button>
           <button
             type="button"
             onClick={() => dispatch({ type: "request-delete" })}
             style={DELETE_LINK_STYLE}
+            data-testid="recover.delete-link"
           >
             Delete vault and start over
           </button>
@@ -306,6 +316,7 @@ export function PhraseEntryStep({
             onClick={handleSubmit}
             disabled={!allFilled}
             style={submitStyle(!allFilled)}
+            data-testid="recover.submit"
           >
             Unlock
           </button>

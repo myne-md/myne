@@ -80,6 +80,8 @@ export function PhraseStep({
 
       <div style={{ position: "relative" }}>
         <div
+          data-testid="create.phrase-grid"
+          data-revealed={revealed}
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
@@ -96,6 +98,8 @@ export function PhraseStep({
           {phrase.map((word, i) => (
             <div
               key={i}
+              data-testid="create.phrase-word"
+              data-index={i + 1}
               style={{
                 display: "flex",
                 alignItems: "baseline",
@@ -126,6 +130,7 @@ export function PhraseStep({
           <button
             type="button"
             onClick={() => dispatch({ type: "PHRASE_REVEALED" })}
+            data-testid="create.phrase-reveal"
             style={{
               position: "absolute",
               inset: 0,
@@ -169,13 +174,19 @@ export function PhraseStep({
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <Button variant="ghost" onClick={onCancelSession} icon="arrow-left">
+        <Button
+          variant="ghost"
+          onClick={onCancelSession}
+          icon="arrow-left"
+          data-testid="create.phrase-back"
+        >
           Back
         </Button>
         <div style={{ flex: 1 }} />
         <Button
           variant="primary"
           onClick={() => dispatch({ type: "PHRASE_ACKED" })}
+          data-testid="create.phrase-continue"
         >
           I've saved this — confirm phrase
         </Button>

@@ -14,6 +14,8 @@ import type { CSSProperties, ReactNode } from "react";
 
 interface DestructiveBannerProps {
   children: ReactNode;
+  /** Stable E2E selector rendered as `data-testid` (SYNC-8). */
+  testId?: string;
 }
 
 const STYLE: CSSProperties = {
@@ -26,9 +28,9 @@ const STYLE: CSSProperties = {
   color: "var(--danger)",
 };
 
-export function DestructiveBanner({ children }: DestructiveBannerProps) {
+export function DestructiveBanner({ children, testId }: DestructiveBannerProps) {
   return (
-    <div role="alert" style={STYLE}>
+    <div role="alert" data-testid={testId} style={STYLE}>
       {children}
     </div>
   );

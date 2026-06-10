@@ -306,9 +306,22 @@ pub async fn complete_recovery<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<(), VaultRecoveryError> {
     // SYNC-6 targeting: `Some(id)` commits against exactly `vaults/<id>/`;
-    // `None`/malformed → the sole-vault fallback. The parsed id keys BOTH the
+    // `None`/malformed → resolution below. The resolved id keys BOTH the
     // path resolution and the slot map so they cannot diverge.
     let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
+    // MYND-220 (VR-18): a RESUMED reset (post-WebView-reload) carries no
+    // UI-side id — the runtime owns recovery identity, so resolve the sole
+    // `Recovering` slot BEFORE the transitional sole-on-disk heuristic
+    // (`current_vault_root_from_base` falls through to the legacy `vault/`
+    // path at ≥2 vaults and would miss the Recovering vault entirely,
+    // bouncing the user in a `VaultRecoveryRequiresActiveSession` loop
+    // mid-recovery). Cold single-vault resets keep the old fallback via
+    // `vault_meta_path(None)` when no slot is Recovering (defensive — the
+    // command is only reachable with a Recovering slot in normal flow).
+    let target = match target {
+        Some(id) => Some(id),
+        None => state.recovering_vault_id().await,
+    };
     let vault_path = vault_meta_path(&app, target)?;
     complete_recovery_with_path(new_password, target, &vault_path, state.inner()).await?;
 
