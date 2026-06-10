@@ -170,6 +170,25 @@ frontmatter flag (the inverse-visibility twin of `trashed:`; `markdown-dialect.m
   the WebView boundary — same Rust↔TS discipline as `MIN_PASSWORD_LEN`
   (drift-check is the follow-up safety net; both sides pinned by equivalent tests).
 
+## Test observability (E2E contract — SYNC-8)
+
+The real-IPC E2E suites (`e2e/`, see `e2e/CLAUDE.md` + `docs/dev/e2e.md`)
+locate everything by `data-testid`. **A screen without testids is invisible to
+E2E — adding a user-facing flow means adding its testid pass in the same
+change.**
+
+- Naming: `<screen>.<element>` (`unlock.password-input`, `picker.vault-row`,
+  `create.phrase-grid`). Repeated rows carry a discriminator attribute
+  (`data-vault-id`, `data-index`); booleans as `data-*` strings
+  (`data-revealed`, `data-active`). Never put anything beyond the SYNC-7
+  pre-unlock leak budget into a `data-*` attribute.
+- Curated-prop components take an explicit `testId` / `testIdPrefix` prop
+  (`PasswordInput`, `PasswordCreateForm`'s `tid()` helper, `DestructiveBanner`,
+  `BlockingProgressStep`) — no rest-spread escape hatches for styling.
+- **Load-bearing user-facing copy lives in `src/lib/load-bearing-copy.ts`**
+  (non-distinguishing banners etc.). Production renders the constant; E2E
+  asserts it by full-literal equality. Don't inline-duplicate such strings.
+
 ## Common commands
 
 ```bash
@@ -177,6 +196,7 @@ pnpm install
 pnpm dev                # Vite only — useful when testing UI in isolation
 pnpm tauri dev          # full app (Vite + Rust core)
 pnpm build              # tsc typecheck + vite build → dist/
+pnpm test:e2e           # E2E suites — Linux-only; on macOS use ./scripts/e2e-local.sh
 ```
 
 ## Gotchas

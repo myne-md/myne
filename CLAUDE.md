@@ -40,6 +40,8 @@ brew install lefthook && lefthook install   # one-time per clone; activates git 
 
 Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fast lint set (rustfmt-check, `tsc --noEmit`, whitespace, EOF newline, secret pattern guard, single-Cargo.lock check); `pre-push` runs the full battery (`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `pnpm build`). CI is self-hosted Woodpecker via the Forgejo mirror (`.woodpecker.yml`, Linux runner; `design-notes.md` 2026-05-01) — the hooks are the local pre-push net, CI is the remote gate, and the `e2e` step drives the production binary via tauri-driver (`docs/dev/e2e.md`). Bypass with `git commit --no-verify` only when you understand why.
 
+**A new user-facing flow ships WITH its E2E coverage**: the same change carries the `data-testid` pass (`src/CLAUDE.md` "Test observability") and an `e2e/` scenario on the harness (`e2e/CLAUDE.md`, procedure `docs/dev/e2e.md`). A PR that adds a flow without its E2E scenario gets rejected in review.
+
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.
 
 JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vite.config.ts`/`vitest.config.ts`, specs under `tests/**/*.test.ts`). `tsc` via `pnpm build` is the typecheck; for Rust use `cargo test`. (Note: `tests/` is outside `tsc`'s `include: ["src"]`, so Vitest is the only check that exercises test files.)
