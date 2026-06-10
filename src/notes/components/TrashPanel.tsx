@@ -222,6 +222,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
         style={PANEL_STYLE}
         role="dialog"
         aria-modal="true"
+        data-testid="trash.panel"
         aria-labelledby="trash-panel-title"
       >
         <div style={HEADER_STYLE}>
@@ -252,6 +253,8 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                 <button
                   type="button"
                   style={ROW_BTN_STYLE}
+                  data-testid="trash.restore"
+                  data-note-id={r.noteUuid}
                   onClick={() => restore(r.noteUuid)}
                 >
                   Restore
@@ -259,6 +262,8 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                 <button
                   type="button"
                   style={PURGE_BTN_STYLE}
+                  data-testid="trash.delete"
+                  data-note-id={r.noteUuid}
                   onClick={() =>
                     setConfirm({
                       kind: "single",
@@ -280,6 +285,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
             <button
               type="button"
               style={EMPTY_TRASH_BTN_STYLE}
+              data-testid="trash.empty"
               onClick={() =>
                 setConfirm({
                   kind: "empty",
@@ -290,7 +296,12 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
               Empty trash
             </button>
           )}
-          <button type="button" style={CLOSE_BTN_STYLE} onClick={onClose}>
+          <button
+            type="button"
+            style={CLOSE_BTN_STYLE}
+            data-testid="trash.close"
+            onClick={onClose}
+          >
             Close
           </button>
         </div>

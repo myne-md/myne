@@ -107,8 +107,42 @@ export class Element {
     await this.sendKeys("\uE003".repeat((current ?? "").length) + text);
   }
 
+  /** Right-click via the W3C Actions API (context-menu affordances —
+   *  e.g. note/folder rows). Element-origin pointer move targets the
+   *  in-view center; button 2 down+up synthesizes `contextmenu`. */
+  async rightClick(): Promise<void> {
+    await this.session.send("POST", "/actions", {
+      actions: [
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: { [ELEMENT_KEY]: this.elementId },
+              x: 0,
+              y: 0,
+            },
+            { type: "pointerDown", button: 2 },
+            { type: "pointerUp", button: 2 },
+          ],
+        },
+      ],
+    });
+  }
+
   text(): Promise<string> {
     return this.session.send("GET", this.path("/text"));
+  }
+
+  /** Full text including nested descendants. This driver's W3C getText
+   *  drops text inside child elements (observed on switcher rows and
+   *  CodeMirror lines) — prefer this whenever the target nests its
+   *  copy; keep `text()` for direct text nodes (banner literals). */
+  async textContent(): Promise<string> {
+    return (await this.property<string>("textContent")) ?? "";
   }
 
   /** DOM attribute as serialized in markup (e.g. `data-vault-id`). */

@@ -136,6 +136,7 @@ export function PasswordChangeForm({
         {onCancel && (
           <button
             type="button"
+            data-testid="change-password.cancel"
             onClick={onCancel}
             disabled={inFlight}
             style={{
@@ -154,7 +155,7 @@ export function PasswordChangeForm({
         )}
       </div>
 
-      {error && <DestructiveBanner>{error}</DestructiveBanner>}
+      {error && <DestructiveBanner testId="change-password.error">{error}</DestructiveBanner>}
 
       <div
         style={{
@@ -165,6 +166,7 @@ export function PasswordChangeForm({
       >
         <PasswordInput
           label="Current password"
+          testId="change-password.current"
           value={current}
           onChange={setCurrent}
           show={showCurrent}
@@ -175,6 +177,7 @@ export function PasswordChangeForm({
 
         <PasswordInput
           label="New password"
+          testId="change-password.new"
           value={next}
           onChange={setNext}
           show={showNext}
@@ -195,6 +198,7 @@ export function PasswordChangeForm({
 
         <PasswordInput
           label="Confirm new password"
+          testId="change-password.confirm"
           value={confirm}
           onChange={setConfirm}
           show={showConfirm}
@@ -211,6 +215,7 @@ export function PasswordChangeForm({
       >
         <Button
           variant="primary"
+          data-testid="change-password.submit"
           onClick={handleSubmit}
           disabled={!submitReady || inFlight}
         >

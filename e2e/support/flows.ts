@@ -50,6 +50,28 @@ export async function dismissImporterOffer(session: Session): Promise<void> {
   await session.waitForGone(testIdSelector("importer.offer-root"));
 }
 
+/** Open the Settings modal from the editor's gear button and wait for
+ *  the dialog root. Optionally switch to a rail tab (the modal always
+ *  opens on Account). */
+export async function openSettings(
+  session: Session,
+  tab?: "account" | "privacy" | "appearance" | "storage" | "about",
+): Promise<void> {
+  await (await session.byTestId("editor.settings-cta")).click();
+  await session.byTestId("settings.modal");
+  if (tab && tab !== "account") {
+    await (await session.byTestId(`settings.tab-${tab}`)).click();
+  }
+}
+
+/** Close the Settings modal via its × button and wait for the dialog
+ *  to unmount (backdrop click is gated during child in-flight; the
+ *  explicit button is the deterministic path). */
+export async function closeSettings(session: Session): Promise<void> {
+  await (await session.byTestId("settings.close")).click();
+  await session.waitForGone(testIdSelector("settings.modal"));
+}
+
 /**
  * Complete the post-recovery password reset (A8f): fill both fields,
  * wait out the zxcvbn gate, submit. Used by the VR-1 drill and the

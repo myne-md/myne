@@ -539,6 +539,7 @@ export function NoteList({ onNewFromTemplate }: NoteListProps = {}) {
         <button
           type="button"
           style={FOOTER_ENTRY_STYLE}
+          data-testid="notes.trash-open"
           onClick={() => setTrashOpen(true)}
           title="Open the trash"
         >
@@ -573,9 +574,15 @@ function EmptyState({
           <IconButton
             icon="folder-plus"
             label="New folder"
+            testId="notes.new-folder"
             onClick={() => fm.startNewFolder("")}
           />
-          <IconButton icon="file-plus" label="New note" onClick={onCreate} />
+          <IconButton
+            icon="file-plus"
+            label="New note"
+            testId="notes.create"
+            onClick={onCreate}
+          />
           {onNewFromTemplate && (
             <IconButton
               icon="chevron-down"
@@ -967,11 +974,13 @@ function PopulatedList({
           <IconButton
             icon="folder-plus"
             label="New folder"
+            testId="notes.new-folder"
             onClick={() => fm.startNewFolder("")}
           />
           <IconButton
             icon="file-plus"
             label="New note (⌘N)"
+            testId="notes.create"
             onClick={onCreate}
           />
           {onNewFromTemplate && (
@@ -1250,6 +1259,7 @@ function NewFolderInput({
       <input
         ref={ref}
         type="text"
+        data-testid="notes.new-folder-input"
         placeholder={parentPath === "" ? "New folder" : `New folder in ${parentPath}`}
         style={NEW_FOLDER_INPUT_STYLE}
         onContextMenu={(e) => e.stopPropagation()}

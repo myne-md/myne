@@ -272,6 +272,8 @@ export function FolderRow({
       }}
       role="treeitem"
       aria-expanded={empty ? undefined : expanded}
+      data-testid="notes.folder-row"
+      data-folder-path={node.path}
       title={node.path}
     >
       {reorderPlace && (

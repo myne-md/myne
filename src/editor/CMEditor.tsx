@@ -113,6 +113,7 @@ export function CMEditor(props: CMEditorProps) {
   return (
     <div
       ref={hostRef}
+      data-testid="editor.content"
       style={style ?? { width: "100%", minHeight: 360 }}
     />
   );

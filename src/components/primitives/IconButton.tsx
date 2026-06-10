@@ -18,6 +18,8 @@ interface IconButtonProps {
   iconSize?: number;
   /** Dim + disable the button (no hover, no click). Default false. */
   disabled?: boolean;
+  /** E2E observability hook (`data-testid`), SYNC-8 curated-prop pattern. */
+  testId?: string;
 }
 
 const ICON_BUTTON_STYLE: CSSProperties = {
@@ -40,12 +42,14 @@ export function IconButton({
   onClick,
   iconSize = 16,
   disabled = false,
+  testId,
 }: IconButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       style={{
         ...ICON_BUTTON_STYLE,
         ...(disabled ? { cursor: "not-allowed", opacity: 0.4 } : null),

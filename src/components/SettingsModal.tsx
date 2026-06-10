@@ -281,6 +281,7 @@ export function SettingsModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-modal-title"
+      data-testid="settings.modal"
       style={BACKDROP_STYLE}
       onClick={handleBackdropClick}
     >
@@ -292,6 +293,7 @@ export function SettingsModal({
           <button
             type="button"
             aria-label="Close settings"
+            data-testid="settings.close"
             onClick={onClose}
             disabled={childInFlight}
             style={{
@@ -321,6 +323,7 @@ export function SettingsModal({
                   }}
                   type="button"
                   role="tab"
+                  data-testid={`settings.tab-${panel.id}`}
                   aria-selected={isSelected}
                   aria-controls={`settings-panel-${panel.id}`}
                   tabIndex={isSelected ? 0 : -1}
