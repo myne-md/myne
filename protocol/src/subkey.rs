@@ -29,11 +29,13 @@
 //!
 //! v0.1 registers these roles:
 //!
-//! | Variant                        | Registered string   |
-//! |--------------------------------|---------------------|
-//! | [`SubkeyRole::ItemsKeyWrap`]   | `itemsKey-wrap`     |
-//! | [`SubkeyRole::PrefsKey`]       | `prefs-key`         |
-//! | [`SubkeyRole::SearchIndexKey`] | `search-index-key`  |
+//! | Variant                                | Registered string         |
+//! |----------------------------------------|---------------------------|
+//! | [`SubkeyRole::ItemsKeyWrap`]           | `itemsKey-wrap`           |
+//! | [`SubkeyRole::PrefsKey`]               | `prefs-key`               |
+//! | [`SubkeyRole::SearchIndexKey`]         | `search-index-key`        |
+//! | [`SubkeyRole::AttachmentsCatalogKey`]  | `attachments-catalog-key` |
+//! | [`SubkeyRole::AttachmentsIdHmac`]      | `attachments-id-hmac`     |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -336,7 +338,7 @@ mod tests {
     /// act, not a side effect of `cargo test`. Run with:
     /// `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored`
     ///
-    /// The 12 cases cover the v0.1 input space:
+    /// The 16 cases cover the v0.1 input space:
     /// - 4 baseline: `ItemsKeyWrap` + `PrefsKey` × {all-zero, all-0xFF} root
     /// - 6 pseudorandom-root: those two roles × 3 distinct SHA-256-derived
     ///   roots (alpha / beta / gamma seeds). The alpha pair carries
@@ -346,6 +348,11 @@ mod tests {
     ///   pseudorandom root (the latter carries `informational_info_utf8_hex`
     ///   so the third role's canonical `"myne.v0.1 search-index-key"` info
     ///   assembly is documented for porters).
+    /// - 4 attachment roles (MYND-164): `AttachmentsCatalogKey` +
+    ///   `AttachmentsIdHmac` × {all-zero, alpha} root — every registered
+    ///   role is now pinned directly in this family, not only transitively
+    ///   through the `attachment-blob` / `attachments-catalog` families.
+    ///   The alpha pair carries `informational_info_utf8_hex`.
     ///
     /// Cross-role independence is implicit: every root appears with
     /// both roles; the integration runner asserts byte-equality for
@@ -411,7 +418,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 12] = [
+        let cases: [Case<'_>; 16] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -496,6 +503,34 @@ mod tests {
                 SubkeyRole::SearchIndexKey,
                 true,
             ),
+            (
+                "zero-root-attachments-catalog-key",
+                "All-zero root_key with the AttachmentsCatalogKey role (MYND-164, §9.10). KEK for the vault.attachments catalog blob; role string 'attachments-catalog-key' (23 ASCII bytes). Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the catalog lineage onto another role's info string.",
+                &zero_root,
+                SubkeyRole::AttachmentsCatalogKey,
+                false,
+            ),
+            (
+                "prn-alpha-attachments-catalog-key",
+                "Pseudorandom alpha root with the AttachmentsCatalogKey role. The informational_info_utf8_hex field carries the canonical 33-byte HKDF info bytes ('myne.v0.1 attachments-catalog-key'). §9.10.1 domain-separation pair: the same root also derives 'attachments-id-hmac' (next vector) — a catalog KEK and an id-HMAC key that must never coincide; the two vectors share input_root_key_hex but produce byte-different subkeys.",
+                &alpha,
+                SubkeyRole::AttachmentsCatalogKey,
+                true,
+            ),
+            (
+                "zero-root-attachments-id-hmac",
+                "All-zero root_key with the AttachmentsIdHmac role (MYND-164, §9.9). Keys the HMAC-SHA-256 that derives deterministic attachment-ids — NOT a blob KEK; role string 'attachments-id-hmac' (19 ASCII bytes).",
+                &zero_root,
+                SubkeyRole::AttachmentsIdHmac,
+                false,
+            ),
+            (
+                "prn-alpha-attachments-id-hmac",
+                "Pseudorandom alpha root with the AttachmentsIdHmac role. The informational_info_utf8_hex field carries the canonical 29-byte HKDF info bytes ('myne.v0.1 attachments-id-hmac'). Domain-separation pair with the alpha attachments-catalog-key vector above (§9.10.1).",
+                &alpha,
+                SubkeyRole::AttachmentsIdHmac,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -503,7 +538,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {

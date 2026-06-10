@@ -1102,6 +1102,41 @@ mod tests {
 
         let aad = aad_attachments_catalog(&account_hash);
 
+        // Forward-compat tolerance case (§ 9.10.2): seal a plaintext carrying
+        // an unknown additive per-entry field (`future_flag`, in sorted
+        // position between `filename` and `size` — the cursor-based decoder
+        // expects additive fields at their lexicographic position). The typed
+        // encoder can only emit canonical v0.1 plaintexts, so assemble the
+        // blob manually (assembly mirrors `encode_attachments_catalog_raw`).
+        let nonce_tolerance: [u8; AEAD_NONCE_LEN] = [0x88; AEAD_NONCE_LEN];
+        let pt_future: &[u8] = br#"{"aa11":{"content_type":"image/png","created_at":1700000000,"filename":"photo.png","future_flag":true,"size":12345}}"#;
+        let sealed_future =
+            aead_seal_ctx(&catalog_key, &nonce_tolerance, pt_future, &aad).expect("seal future");
+        let mut blob_tolerance = Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed_future.len());
+        blob_tolerance.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        blob_tolerance.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        blob_tolerance.push(CATALOG_BLOB_RESERVED);
+        blob_tolerance.extend_from_slice(&nonce_tolerance);
+        blob_tolerance.extend_from_slice(&(sealed_future.len() as u32).to_be_bytes());
+        blob_tolerance.extend_from_slice(&sealed_future);
+        // Self-validate: decode drops the unknown field and recovers the
+        // known entry; the canonical re-encode of the decoded catalog is the
+        // expected plaintext (NOT the sealed bytes).
+        let dec_tolerance =
+            decode_attachments_catalog(&catalog_key, &account_hash, &blob_tolerance)
+                .expect("decode tolerance");
+        assert_eq!(dec_tolerance.entries.len(), 1);
+        assert_eq!(
+            dec_tolerance.entries.get("aa11"),
+            Some(&AttachmentMeta {
+                content_type: "image/png".to_string(),
+                created_at: 1_700_000_000,
+                filename: "photo.png".to_string(),
+                size: 12345,
+            }),
+        );
+        let pt_tolerance_expected = canonical_json_encode(&dec_tolerance);
+
         let mut d = String::new();
         d.push_str("{\n");
         d.push_str("  \"schema\": \"attachments-catalog\",\n");
@@ -1247,6 +1282,35 @@ mod tests {
         d.push_str(&alloc::format!(
             "      \"expected_aad_hex\": \"{}\"\n",
             hex_lower(&aad)
+        ));
+        d.push_str("    },\n");
+
+        // decrypt_ok (forward-compat tolerance, § 9.10.2)
+        d.push_str("    {\n");
+        d.push_str(
+            "      \"vector_id\": \"attachments-catalog/v0.1/decrypt-unknown-field-tolerated\",\n",
+        );
+        d.push_str("      \"description\": \"Forward-compat (§9.10.2): the sealed plaintext carries an unknown additive per-entry field (future_flag, in sorted position filename<future_flag<size); decoders must ignore it and recover the known fields. expected_plaintext_canonical_utf8_hex is the canonical re-encode of the decoded catalog (without the unknown field), NOT the sealed bytes; informational_sealed_plaintext_utf8_hex carries the sealed plaintext verbatim.\",\n");
+        d.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        d.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_tolerance)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"informational_sealed_plaintext_utf8_hex\": \"{}\",\n",
+            hex_lower(pt_future)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
+            hex_lower(&pt_tolerance_expected)
         ));
         d.push_str("    }\n");
 
