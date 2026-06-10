@@ -152,9 +152,34 @@ fn phrase_normalize_vectors() {
 #[test]
 fn vault_prefs_vectors() {
     use protocol::{
-        decode_prefs_blob, derive_subkey, encode_prefs_blob_raw, PrefsBlobError, PrefsView,
-        SubkeyRole,
+        aad_prefs_blob, aead_seal_ctx, decode_prefs_blob, derive_subkey, encode_prefs_blob_raw,
+        PrefsBlobError, PrefsView, SubkeyRole, PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC,
+        PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
     };
+
+    /// Assemble a MYP1 blob over caller-supplied raw plaintext bytes —
+    /// the byte layout `encode_prefs_blob_raw` produces, but without the
+    /// typed `PrefsView` → canonical-JSON step, so the §9.5.2 tolerance
+    /// case (sealed plaintext carrying an unknown future field) can be
+    /// reconstructed from pub exports only (mirrors
+    /// `build_catalog_blob_from_plaintext`).
+    fn build_prefs_blob_from_plaintext(
+        prefs_key: &[u8; 32],
+        account_hash: &[u8; 16],
+        plaintext: &[u8],
+        nonce: &[u8; 24],
+    ) -> Vec<u8> {
+        let aad = aad_prefs_blob(account_hash);
+        let sealed = aead_seal_ctx(prefs_key, nonce, plaintext, &aad).expect("seal plaintext");
+        let mut blob = Vec::with_capacity(PREFS_BLOB_HEADER_LEN + sealed.len());
+        blob.extend_from_slice(&PREFS_BLOB_MAGIC);
+        blob.push(PREFS_BLOB_PROTOCOL_VERSION);
+        blob.push(PREFS_BLOB_RESERVED);
+        blob.extend_from_slice(nonce);
+        blob.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        blob.extend_from_slice(&sealed);
+        blob
+    }
 
     let path = companion_vectors_root()
         .join("vault-prefs")
@@ -180,6 +205,11 @@ fn vault_prefs_vectors() {
     assert!(!cases.is_empty(), "vault-prefs must have at least one case");
     assert_unique_vector_ids("vault-prefs", cases);
 
+    let mut seen_kinds: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    let mut saw_labeled_encrypt = false;
+    let mut saw_labeled_decrypt = false;
+    let mut saw_tolerance = false;
+
     for case in cases {
         let id = case["vector_id"]
             .as_str()
@@ -187,6 +217,7 @@ fn vault_prefs_vectors() {
         let case_kind = case["case_kind"]
             .as_str()
             .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind);
 
         match case_kind {
             "encrypt" => {
@@ -252,6 +283,10 @@ fn vault_prefs_vectors() {
                     hex_encode(&expected),
                     hex_encode(&actual),
                 );
+
+                if prefs.label.is_some() {
+                    saw_labeled_encrypt = true;
+                }
             }
             "decrypt_ok" => {
                 let blob = hex_decode(
@@ -285,6 +320,41 @@ fn vault_prefs_vectors() {
                     actual, expected_view,
                     "[{id}] vault-prefs decrypt_ok mismatch"
                 );
+
+                // Make `expected_plaintext_canonical_utf8_hex` load-bearing:
+                // re-encode the decoded view under the blob's own nonce and
+                // compare against a blob sealed over the pinned canonical
+                // plaintext. Equal iff the canonical re-encode of the view
+                // matches the pinned bytes. For the §9.5.2 tolerance case
+                // the re-encoded blob then DIFFERS from input_blob_hex
+                // (the sealed plaintext carried an unknown future field).
+                let expected_pt = hex_decode(
+                    case["expected_plaintext_canonical_utf8_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{id}] missing expected_plaintext_canonical_utf8_hex")
+                        }),
+                );
+                let nonce: [u8; 24] = blob[6..30].try_into().expect("blob header nonce");
+                let reencoded = encode_prefs_blob_raw(&prefs_key, &account_hash, &actual, &nonce)
+                    .unwrap_or_else(|e| panic!("[{id}] re-encode failed: {e:?}"));
+                let from_pinned_pt = build_prefs_blob_from_plaintext(
+                    &prefs_key,
+                    &account_hash,
+                    &expected_pt,
+                    &nonce,
+                );
+                assert_eq!(
+                    reencoded, from_pinned_pt,
+                    "[{id}] canonical re-encode of the decoded view disagrees with expected_plaintext_canonical_utf8_hex",
+                );
+
+                if actual.label.is_some() {
+                    saw_labeled_decrypt = true;
+                }
+                if reencoded != blob {
+                    saw_tolerance = true;
+                }
             }
             "decrypt_aead_fail" => {
                 let blob = hex_decode(
@@ -319,6 +389,29 @@ fn vault_prefs_vectors() {
             other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
         }
     }
+
+    // Structural coverage pins (mirror the vault_search seen_kinds pattern):
+    // all three case kinds present, the MYND-205 label exercised on both the
+    // encode and decode paths, and at least one §9.5.2 forward-compat
+    // tolerance case (sealed plaintext ≠ canonical re-encode) in the set.
+    for required in ["encrypt", "decrypt_ok", "decrypt_aead_fail"] {
+        assert!(
+            seen_kinds.contains(required),
+            "vault-prefs vectors must cover case_kind '{required}'",
+        );
+    }
+    assert!(
+        saw_labeled_encrypt,
+        "vault-prefs vectors must include an encrypt case with a set MYND-205 label",
+    );
+    assert!(
+        saw_labeled_decrypt,
+        "vault-prefs vectors must include a decrypt_ok case surfacing a set MYND-205 label",
+    );
+    assert!(
+        saw_tolerance,
+        "vault-prefs vectors must include a §9.5.2 unknown-field tolerance decrypt_ok case",
+    );
 }
 
 #[test]
@@ -444,6 +537,8 @@ fn hkdf_sha256_vectors() {
     );
     assert_unique_vector_ids("hkdf-sha256", cases);
 
+    let mut seen_roles: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+
     for case in cases {
         let id = case["vector_id"]
             .as_str()
@@ -467,10 +562,13 @@ fn hkdf_sha256_vectors() {
             "itemsKey-wrap" => SubkeyRole::ItemsKeyWrap,
             "prefs-key" => SubkeyRole::PrefsKey,
             "search-index-key" => SubkeyRole::SearchIndexKey,
+            "attachments-catalog-key" => SubkeyRole::AttachmentsCatalogKey,
+            "attachments-id-hmac" => SubkeyRole::AttachmentsIdHmac,
             other => panic!(
                 "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
             ),
         };
+        seen_roles.insert(role_str);
 
         // Defensive cross-check: if the case carries the optional
         // `informational_info_utf8_hex` field, verify it matches the
@@ -500,6 +598,23 @@ fn hkdf_sha256_vectors() {
             "[{id}] hkdf-sha256 subkey mismatch (role={role_str})\n  expected_hex: {}\n  actual_hex:   {}",
             hex_encode(&expected),
             hex_encode(&*actual),
+        );
+    }
+
+    // Structural coverage pin: every registered SubkeyRole must appear in
+    // the vector set directly — a new role landing in the enum without a
+    // companion-repo case fails here, not silently (mirrors the builder
+    // pins in ctx_aead_vectors / aad_construction_vectors).
+    for required in [
+        "itemsKey-wrap",
+        "prefs-key",
+        "search-index-key",
+        "attachments-catalog-key",
+        "attachments-id-hmac",
+    ] {
+        assert!(
+            seen_roles.contains(required),
+            "hkdf-sha256 vectors must cover every registered SubkeyRole; missing '{required}'",
         );
     }
 }
@@ -2228,6 +2343,7 @@ fn attachments_catalog_vectors() {
     assert_unique_vector_ids("attachments-catalog", cases);
 
     let mut seen_kinds = std::collections::HashSet::new();
+    let mut saw_tolerance = false;
 
     for case in cases {
         let id = case["vector_id"]
@@ -2306,6 +2422,22 @@ fn attachments_catalog_vectors() {
                     catalog, catalog_from_pt,
                     "[{id}] decoded catalog disagrees with expected canonical plaintext"
                 );
+
+                // §9.10.2 tolerance detection: re-encode the decoded catalog
+                // under the blob's own nonce; a byte difference from the
+                // input blob means the sealed plaintext carried unknown
+                // additive fields the decoder dropped.
+                let blob_nonce: [u8; 24] = blob[6..30].try_into().expect("blob header nonce");
+                let reencoded = encode_attachments_catalog_raw(
+                    &catalog_key,
+                    &account_hash,
+                    &catalog,
+                    &blob_nonce,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] re-encode failed: {e:?}"));
+                if reencoded != blob {
+                    saw_tolerance = true;
+                }
             }
             "decrypt_aead_fail" => {
                 let blob = hex_decode(field(case, id, "input_blob_hex"));
@@ -2348,6 +2480,10 @@ fn attachments_catalog_vectors() {
             "attachments-catalog missing every case of case_kind '{kind}' — coverage regression"
         );
     }
+    assert!(
+        saw_tolerance,
+        "attachments-catalog vectors must include a §9.10.2 unknown-field tolerance decrypt_ok case",
+    );
 }
 
 /// Helper: build a MYC1 blob directly from a canonical-JSON plaintext,

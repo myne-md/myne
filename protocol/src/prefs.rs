@@ -3261,6 +3261,191 @@ mod tests {
             .expect("write prefs vectors dump");
     }
 
+    /// Generator for the MYND-205 `label` + §9.5.2 forward-compat vector
+    /// cases (appended to the companion repo's `vault-prefs` family; the
+    /// per-feature-generator pattern of [`emit_decorations_prefs_vector`]
+    /// keeps the original [`emit_prefs_vectors_for_paste`] stable):
+    ///
+    /// `cargo test -p protocol --lib emit_label_and_tolerance_prefs_vectors -- --ignored`
+    ///
+    /// - `encrypt-labeled`: `item_order` + `label` set, the label given in
+    ///   NFD in this source (`Cafe\u{0301}`) so the emitted canonical bytes
+    ///   pin the NFC normalization (`Caf\u{e9}`) AND the canonical key order
+    ///   `item_order` (i) < `label` (l) < `screen_capture_protection` (s).
+    /// - `decrypt-labeled`: round-trip of the blob above; decoders must
+    ///   surface the label.
+    /// - `decrypt-unknown-field-tolerated`: a blob sealed over a plaintext
+    ///   carrying a genuinely unknown future field (`zz_future_pref`, in
+    ///   sorted position after `theme`); decoders must recover the known
+    ///   fields and ignore the unknown one (spec § 9.5.2 forward-compat).
+    ///   Sealed manually (header assembly mirrors `encode_prefs_blob_raw`)
+    ///   because the typed encoder can only emit canonical v0.1 plaintexts.
+    #[test]
+    #[ignore]
+    fn emit_label_and_tolerance_prefs_vectors() {
+        extern crate std;
+
+        // Same fixed vault-A inputs as the sibling generators; nonces 0xDD /
+        // 0xEE are the next free entries in the family's nonce registry
+        // (0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC are taken).
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        // --- encrypt-labeled + decrypt-labeled -----------------------------
+        let nonce_labeled: [u8; AEAD_NONCE_LEN] = [0xDD; AEAD_NONCE_LEN];
+        let prefs_labeled = PrefsView {
+            item_order: alloc::vec![
+                String::from("0190a000-0000-7000-8000-000000000001"),
+                String::from("Projects/Myne/"),
+            ],
+            // NFD on purpose: 'e' + U+0301 combining acute. The encoder must
+            // emit the NFC form (U+00E9, bytes c3 a9).
+            label: Some(String::from("Cafe\u{301}")),
+            ..PrefsView::default()
+        };
+        let canonical_labeled = canonical_json_encode(&prefs_labeled);
+        assert_eq!(
+            canonical_labeled.as_slice(),
+            b"{\"item_order\":[\"0190a000-0000-7000-8000-000000000001\",\"Projects/Myne/\"],\"label\":\"Caf\xc3\xa9\",\"screen_capture_protection\":true}"
+                .as_slice(),
+            "canonical plaintext must NFC-normalize the label and sort i < l < s",
+        );
+        let blob_labeled = encode_prefs_blob_raw(
+            &prefs_key_a,
+            &account_hash_a,
+            &prefs_labeled,
+            &nonce_labeled,
+        )
+        .expect("encode labeled");
+        // Round-trip self-validation: the decoded view carries the NFC label.
+        let expected_labeled_view = PrefsView {
+            item_order: prefs_labeled.item_order.clone(),
+            label: Some(String::from("Caf\u{e9}")),
+            ..PrefsView::default()
+        };
+        let decoded_labeled =
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_labeled).expect("decode");
+        assert_eq!(decoded_labeled, expected_labeled_view);
+
+        // --- decrypt-unknown-field-tolerated -------------------------------
+        let nonce_tolerance: [u8; AEAD_NONCE_LEN] = [0xEE; AEAD_NONCE_LEN];
+        // `zz_future_pref` sorts after `theme` — the cursor-based decoder
+        // expects additive fields at their lexicographic position.
+        let plaintext_future: &[u8] =
+            br#"{"screen_capture_protection":true,"theme":"dark","zz_future_pref":7}"#;
+        let aad = aad_prefs_blob(&account_hash_a);
+        let sealed =
+            aead_seal_ctx(&prefs_key_a, &nonce_tolerance, plaintext_future, &aad).expect("seal");
+        let mut blob_tolerance = Vec::with_capacity(PREFS_BLOB_HEADER_LEN + sealed.len());
+        blob_tolerance.extend_from_slice(&PREFS_BLOB_MAGIC);
+        blob_tolerance.push(PREFS_BLOB_PROTOCOL_VERSION);
+        blob_tolerance.push(PREFS_BLOB_RESERVED);
+        blob_tolerance.extend_from_slice(&nonce_tolerance);
+        blob_tolerance.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        blob_tolerance.extend_from_slice(&sealed);
+
+        let expected_tolerance_view = PrefsView {
+            theme: Some(ThemeChoice::Dark),
+            ..PrefsView::default()
+        };
+        let decoded_tolerance = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_tolerance)
+            .expect("decode tolerance blob");
+        assert_eq!(
+            decoded_tolerance, expected_tolerance_view,
+            "unknown future field must be ignored, known fields recovered",
+        );
+        // The canonical re-encode of the decoded view — what the runner pins
+        // as expected_plaintext_canonical_utf8_hex (NOT the sealed bytes).
+        let canonical_tolerance = canonical_json_encode(&decoded_tolerance);
+        assert_eq!(
+            canonical_tolerance.as_slice(),
+            br#"{"screen_capture_protection":true,"theme":"dark"}"#.as_slice(),
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin label + tolerance prefs vectors---\n\n");
+
+        dump.push_str("# case 1/3: encrypt-labeled (MYND-205; NFD source -> NFC bytes; i<l<s)\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_labeled)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical_labeled).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!(
+            "prefs_nonce_hex: {}\n",
+            hex_lower(&nonce_labeled)
+        ));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob_labeled)
+        ));
+
+        dump.push_str("# case 2/3: decrypt-labeled (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!(
+            "input_blob_hex: {}\n",
+            hex_lower(&blob_labeled)
+        ));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_labeled)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"item_order\": [\"0190a000-0000-7000-8000-000000000001\", \"Projects/Myne/\"], \"label\": \"Café\", \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str(
+            "# case 3/3: decrypt-unknown-field-tolerated (spec \u{a7}9.5.2 forward-compat)\n",
+        );
+        dump.push_str(&alloc::format!(
+            "input_blob_hex: {}\n",
+            hex_lower(&blob_tolerance)
+        ));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "informational_sealed_plaintext_utf8_hex: {}\n",
+            hex_lower(plaintext_future)
+        ));
+        dump.push_str(&alloc::format!(
+            "informational_sealed_plaintext_utf8: {}\n",
+            core::str::from_utf8(plaintext_future).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_tolerance)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"screen_capture_protection\": true, \"theme\": \"dark\" }\n\n",
+        );
+
+        dump.push_str("---end label + tolerance prefs vectors---\n");
+        std::fs::write("/tmp/myne_vault_prefs_label_vectors.txt", dump.as_bytes())
+            .expect("write label prefs vectors dump");
+    }
+
     fn hex_lower(bytes: &[u8]) -> alloc::string::String {
         let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
         for b in bytes {

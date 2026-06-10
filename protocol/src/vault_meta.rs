@@ -689,11 +689,22 @@ mod tests {
         assert_eq!(&a[153..345], &b[153..345]);
     }
 
-    /// One-shot helper: dump the byte-stable output of
-    /// `rewrite_vault_meta_password_side` for a canonical fixed input
-    /// set to `/tmp/myne_vault_meta_rewrite_vector.txt`, ready for
-    /// paste into
-    /// `myne-test-vectors/vectors/vault_meta_rewrite/v0.1/cases.json`.
+    /// One-shot helper: dump the byte-stable outputs of
+    /// `rewrite_vault_meta_password_side` for three fixed input sets to
+    /// `/tmp/myne_vault_meta_rewrite_vector.txt`, ready for paste into
+    /// `myne-test-vectors/vectors/vault_meta_rewrite/v0.1/cases.json`:
+    ///
+    /// - `canonical-fast-kdf`: the original FAST_TEST_KDF case (shipped
+    ///   vector; emitted byte-identically for regen verification).
+    /// - `unicode-password-fast-kdf`: non-ASCII password — pins that the
+    ///   rewrite path feeds the password's UTF-8 bytes verbatim to
+    ///   Argon2id (no normalization on this path; `derive_password_wrap_key`
+    ///   takes `password.as_bytes()`).
+    /// - `canonical-kdf-params`: existing meta carries the production
+    ///   `DEFAULT_V0_1_KDF_PARAMS` (m=256 MiB, t=3, p=2) — pins that the
+    ///   preserved-from-input params are USED by the derivation, not just
+    ///   byte-copied into the output. **~3 s + 256 MiB peak** for this
+    ///   block alone.
     ///
     /// `#[ignore]` because regenerating vectors should be a deliberate
     /// act, not a side effect of `cargo test`. Run with
@@ -705,9 +716,59 @@ mod tests {
     #[ignore]
     fn emit_vector_hex_for_paste() {
         extern crate std;
+
+        #[allow(clippy::too_many_arguments)] // paste-format dump helper; args mirror the vector fields 1:1
+        fn push_block(
+            dump: &mut alloc::string::String,
+            title: &str,
+            existing_bytes: &[u8],
+            password: &str,
+            fresh_salt: &[u8; ARGON2_SALT_LEN],
+            fresh_nonce: &[u8; AEAD_NONCE_LEN],
+            params: &KdfParams,
+            expected: &[u8],
+        ) {
+            dump.push_str(&alloc::format!("---begin vector ({title})---\n"));
+            dump.push_str(&alloc::format!(
+                "existing_vault_meta_hex: {}\n",
+                hex_lower(existing_bytes)
+            ));
+            dump.push_str(&alloc::format!(
+                "root_key_hex: {}\n",
+                hex_lower(&TEST_ROOT_KEY)
+            ));
+            dump.push_str(&alloc::format!(
+                "new_password_utf8_hex: {}\n",
+                hex_lower(password.as_bytes())
+            ));
+            dump.push_str(&alloc::format!("new_password_utf8: {password}\n"));
+            dump.push_str(&alloc::format!(
+                "fresh_salt_hex: {}\n",
+                hex_lower(fresh_salt)
+            ));
+            dump.push_str(&alloc::format!(
+                "fresh_nonce_hex: {}\n",
+                hex_lower(fresh_nonce)
+            ));
+            dump.push_str(&alloc::format!(
+                "kdf_params: m_kib={} t={} p={} argon2_version=0x{:02x}\n",
+                params.m_kib,
+                params.t,
+                params.p,
+                params.argon2_version,
+            ));
+            dump.push_str(&alloc::format!(
+                "expected_vault_meta_hex: {}\n",
+                hex_lower(expected)
+            ));
+            dump.push_str(&alloc::format!("---end vector ({title})---\n\n"));
+        }
+
+        let mut dump = alloc::string::String::new();
+
+        // Block 1 — the shipped canonical-fast-kdf vector, byte-identical.
         let existing = fixture_existing_meta();
         let existing_bytes = serialize_vault_meta(&existing);
-
         let bytes = rewrite_vault_meta_password_side(
             &existing,
             &TEST_ROOT_KEY,
@@ -716,41 +777,87 @@ mod tests {
             &TEST_FRESH_NONCE,
         )
         .unwrap();
+        push_block(
+            &mut dump,
+            "canonical-fast-kdf",
+            &existing_bytes,
+            "new-pw",
+            &TEST_FRESH_SALT,
+            &TEST_FRESH_NONCE,
+            &FAST_TEST_KDF,
+            &bytes,
+        );
 
-        let mut dump = alloc::string::String::new();
-        dump.push_str("---begin vector---\n");
-        dump.push_str(&alloc::format!(
-            "existing_vault_meta_hex: {}\n",
-            hex_lower(&existing_bytes)
-        ));
-        dump.push_str(&alloc::format!(
-            "root_key_hex: {}\n",
-            hex_lower(&TEST_ROOT_KEY)
-        ));
-        dump.push_str(&alloc::format!(
-            "new_password_utf8_hex: {}\n",
-            hex_lower(b"new-pw")
-        ));
-        dump.push_str(&alloc::format!(
-            "fresh_salt_hex: {}\n",
-            hex_lower(&TEST_FRESH_SALT)
-        ));
-        dump.push_str(&alloc::format!(
-            "fresh_nonce_hex: {}\n",
-            hex_lower(&TEST_FRESH_NONCE)
-        ));
-        dump.push_str(&alloc::format!(
-            "kdf_params: m_kib={} t={} p={} argon2_version=0x{:02x}\n",
-            FAST_TEST_KDF.m_kib,
-            FAST_TEST_KDF.t,
-            FAST_TEST_KDF.p,
-            FAST_TEST_KDF.argon2_version,
-        ));
-        dump.push_str(&alloc::format!(
-            "expected_vault_meta_hex: {}\n",
-            hex_lower(&bytes)
-        ));
-        dump.push_str("---end vector---\n");
+        // Block 2 — non-ASCII password, same fast-KDF fixture; fresh
+        // salt/nonce 0xE1/0xF1 keep the vector distinct + byte-stable.
+        let salt_unicode: [u8; ARGON2_SALT_LEN] = [0xE1; ARGON2_SALT_LEN];
+        let nonce_unicode: [u8; AEAD_NONCE_LEN] = [0xF1; AEAD_NONCE_LEN];
+        let password_unicode = "na\u{ef}ve-P\u{e4}ssw\u{f6}rd";
+        let bytes_unicode = rewrite_vault_meta_password_side(
+            &existing,
+            &TEST_ROOT_KEY,
+            password_unicode,
+            &salt_unicode,
+            &nonce_unicode,
+        )
+        .unwrap();
+        push_block(
+            &mut dump,
+            "unicode-password-fast-kdf",
+            &existing_bytes,
+            password_unicode,
+            &salt_unicode,
+            &nonce_unicode,
+            &FAST_TEST_KDF,
+            &bytes_unicode,
+        );
+
+        // Block 3 — existing meta carries the production canonical params;
+        // the single Argon2id derivation here costs ~3 s + 256 MiB peak.
+        let existing_canonical = VaultMeta {
+            kdf_params: crate::types::DEFAULT_V0_1_KDF_PARAMS,
+            ..fixture_existing_meta()
+        };
+        let existing_canonical_bytes = serialize_vault_meta(&existing_canonical);
+        let salt_canonical: [u8; ARGON2_SALT_LEN] = [0xE2; ARGON2_SALT_LEN];
+        let nonce_canonical: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
+        let bytes_canonical = rewrite_vault_meta_password_side(
+            &existing_canonical,
+            &TEST_ROOT_KEY,
+            "new-pw",
+            &salt_canonical,
+            &nonce_canonical,
+        )
+        .unwrap();
+        // Self-validate the property this vector pins: under identical
+        // password/salt/nonce, canonical params must produce a different
+        // password-side seal than the fast params (params are USED, not
+        // just copied).
+        let bytes_fast_same_inputs = rewrite_vault_meta_password_side(
+            &existing,
+            &TEST_ROOT_KEY,
+            "new-pw",
+            &salt_canonical,
+            &nonce_canonical,
+        )
+        .unwrap();
+        // enc_root_key_password @ spec § 9.3 offsets 89..153.
+        assert_ne!(
+            bytes_canonical[89..153],
+            bytes_fast_same_inputs[89..153],
+            "canonical vs fast kdf_params must change the derived wrap key",
+        );
+        push_block(
+            &mut dump,
+            "canonical-kdf-params",
+            &existing_canonical_bytes,
+            "new-pw",
+            &salt_canonical,
+            &nonce_canonical,
+            &crate::types::DEFAULT_V0_1_KDF_PARAMS,
+            &bytes_canonical,
+        );
+
         std::fs::write("/tmp/myne_vault_meta_rewrite_vector.txt", dump.as_bytes())
             .expect("write vector dump");
     }
