@@ -6,61 +6,66 @@
 //! layout — there is exactly one on-disk invariant for every downstream
 //! probe / resolver (PRD §Solution; grill Q3, 2026-06-08).
 //!
+//! ## Why staging (the 2026-06-11 data-loss incident, MYND-253)
+//!
+//! The original design treated the mere presence of `vault/` as proof that
+//! every `vaults/<id>/` was a discardable partial, and deleted them all
+//! before re-copying. That invariant is FALSE: an unrelated code path (a
+//! resolver `create_dir_all` side effect) materialized an *empty* legacy
+//! `vault/` on a machine whose real vaults lived under `vaults/<id>/`, and
+//! the next boot's discard pass destroyed them. Real vault directories are
+//! now NEVER deleted, under any precondition — interrupted copies live in
+//! discovery-invisible staging directories instead (the `vault_restore_backup`
+//! placement mechanics, §9.11 / SYNC-5).
+//!
 //! ## Step order (the data-loss-impossible contract)
 //!
-//! When a legacy `<app_data_dir>/vault/` directory exists:
-//!
-//! 1. **Discard every partial `vaults/<id>/`** first. The old `vault/` being
-//!    present means migration is unfinished, and the only way a `vaults/<id>/`
-//!    can exist while `vault/` still does is as a partial from an interrupted
-//!    run — so every such directory is discardable. (A fresh install has no
-//!    `vaults/`; a completed migration deleted `vault/`.)
-//! 2. **Mint** a fresh [`VaultId`](crate::vault_id::VaultId) via
-//!    [`mint_unique_vault_id`] (collision-retry) into the now-clean
-//!    `vaults/` — the migration target is `vaults/<minted-id>/`.
-//! 3. **Copy** the entire legacy `vault/` tree into `vaults/<id>/` —
-//!    faithfully, with no hardcoded artefact allowlist: every child present
-//!    (the `notes/`, `snapshots/`, `attachments/` directory trees, the
-//!    `vault.meta` / `vault.prefs` / `vault.search` / `vault.attachments`
-//!    top-level blobs, and any future or unexpected sibling) is carried over,
-//!    each file via [`crate::atomic_write::atomic_write`]'s temp+fsync+rename
-//!    durability. Copying everything on disk — rather than a fixed
-//!    enumeration coupled-by-comment to the verify taxonomy — means no
-//!    artefact is ever silently left behind (the drift class that an
-//!    allowlist missing `vault.search` would have introduced).
-//! 4. **fsync** the new vault root (and its subdirectories) so the new
+//! 0. **Sweep stale residue** — leftover `.migration-staging-*` /
+//!    `.migration-trash-*` directories from crashed prior runs are removed.
+//!    Unconditional (runs even when no `vault/` is present — an interrupt
+//!    after the commit rename leaves residue but no legacy dir), and never
+//!    creates `vaults/` itself.
+//! 1. **Classify the legacy dir.** Absent ⇒ `NothingToMigrate`. Present but
+//!    *effectively empty* (no files anywhere in the tree besides OS junk —
+//!    `.DS_Store` & co.) ⇒ remove it and return `RemovedEmptyLegacy`: there
+//!    is nothing to migrate, and leaving it would re-trigger this pipeline
+//!    every boot. Present with content that is neither empty nor a
+//!    recognizable vault ([`vault_artifacts_present`] false) ⇒
+//!    `SkippedUnrecognizedLegacy`, touching NOTHING — unknown bytes are
+//!    preserved-by-default, only provably-nothing is ever removed.
+//! 2. **Copy into staging**: the entire legacy tree goes into
+//!    `vaults/.migration-staging-<pid>-<n>/` — faithfully, with no hardcoded
+//!    artefact allowlist: every child present (the `notes/`, `snapshots/`,
+//!    `attachments/` directory trees, the `vault.meta` / `vault.prefs` /
+//!    `vault.search` / `vault.attachments` top-level blobs, and any future or
+//!    unexpected sibling) is carried over, each file via
+//!    [`crate::atomic_write::atomic_write`]'s temp+fsync+rename durability.
+//!    The staging name never parses as a [`VaultId`](crate::vault_id::VaultId),
+//!    so discovery / boot / picker cannot see a half-staged vault.
+//! 3. **fsync** the staging root (and its subdirectories) so the new
 //!    directory entries reach the OS journal before the verify reads them.
-//! 5. **Verify** the new dir: [`vault_artifacts_present`] returns `true`
-//!    (the artefact taxonomy is present + readable). A failed verify aborts
-//!    *before* the old `vault/` is touched.
-//! 6. **Delete the old `vault/` LAST.** Only after a clean verify is the old
-//!    directory removed. The old `vault/` is the untouched source of truth
-//!    for every step until this final unlink.
+//! 4. **Verify** the staged dir: [`vault_artifacts_present`] returns `true`.
+//!    A failed verify aborts *before* anything visible changes.
+//! 5. **Commit rename**: mint a fresh id ([`mint_unique_vault_id`],
+//!    collision-retry) and `rename` the staged dir to `vaults/<id>/` in one
+//!    same-filesystem syscall, then best-effort-sync the `vaults/` handle.
+//! 6. **Retire the old `vault/` LAST**, also by rename — into
+//!    `vaults/.migration-trash-<pid>-<n>/` (atomic: the "migration
+//!    unfinished" signal disappears in one syscall, so a partially-deleted
+//!    legacy tree can never be re-migrated as a truncated source), then
+//!    best-effort delete the trash dir.
 //!
 //! ## Recovery rule (interrupted migration)
 //!
 //! The presence of the old `vault/` directory **is** the "migration
-//! unfinished" signal. A crash / power loss at any point before step 6
-//! leaves `vault/` intact, so the next boot:
-//!
-//! - sees `vault/` still present ⇒ migration did not finish,
-//! - **discards every partial `vaults/<id>/`** left by the interrupted run(s)
-//!   (step 1), and
-//! - **re-runs** the whole copy from the untouched old `vault/`.
-//!
-//! Because the old `vault/` is removed only after a verified-complete copy,
-//! there is **no window** in which both the old and new directories are
-//! gone, and no window in which a partial new dir is mistaken for a complete
-//! one (the verify gate + delete-old-last ordering closes both). Data loss
-//! is structurally impossible.
-//!
-//! Each re-run discards **all** prior partials before minting a *fresh* id,
-//! so repeated interrupts never accumulate sibling directories — the disk
-//! holds at most one `vaults/<id>/` (the in-progress copy) plus the
-//! untouched `vault/` at any moment, and after a clean run exactly one
-//! `vaults/<id>/` and no `vault/`. The discard sweep removes only directories
-//! whose name parses as a `VaultId`; the best-effort `registry.json` cache
-//! (and any non-vault sibling) is left untouched.
+//! unfinished" signal. A crash / power loss before step 6's rename leaves
+//! `vault/` intact, so the next boot re-runs the whole pipeline from the
+//! untouched source; whatever the interrupted run staged is invisible
+//! residue that step 0 reclaims. A crash *between* step 5 and step 6 (the
+//! two adjacent commit syscalls) leaves a committed copy AND the legacy
+//! source, so the next boot migrates again and the user sees a duplicate
+//! vault — the deliberate failure direction: a duplicate is recoverable,
+//! deleting a real vault is not. No window deletes data, ever.
 //!
 //! ## Fault-injection seam (mirrors MYND-88 `atomic_write`)
 //!
@@ -69,17 +74,15 @@
 //! [`Fault::None`], so in non-test builds the enum has only that one variant
 //! and every `match fault` arm compiles out — the production migration is
 //! byte-identical to a seam-free implementation (zero runtime cost). The
-//! injected faults model a crash at each of the three interrupt points
-//! between the durable steps:
+//! injected faults model a crash at each interrupt point between the
+//! durable steps:
 //!
-//! - [`Fault::StopAfterCopyBeforeFsync`] — files copied, before the dir fsync.
-//! - [`Fault::StopAfterFsyncBeforeVerify`] — copied + fsynced, before verify.
-//! - [`Fault::StopAfterVerifyBeforeDeleteOld`] — verified, before the
-//!   old-`vault/` delete (the last and most dangerous interrupt — the new
-//!   dir is complete but the old one has not yet been removed).
-//!
-//! In every case the old `vault/` is left intact and the next (fault-free)
-//! re-run discards the partial new dir and completes cleanly.
+//! - [`Fault::StopAfterCopyBeforeFsync`] — staged, before the dir fsync.
+//! - [`Fault::StopAfterFsyncBeforeVerify`] — staged + fsynced, before verify.
+//! - [`Fault::StopAfterVerifyBeforeRename`] — verified, before the commit
+//!   rename: nothing visible exists yet, the re-run starts over.
+//! - [`Fault::StopAfterRenameBeforeTrash`] — committed, before the legacy
+//!   retire — the duplicate-producing window documented above.
 //!
 //! ## Logging discipline
 //!
@@ -94,32 +97,50 @@ use crate::plugins::vault_creation::commands::vault_artifacts_present;
 use crate::vault_registry::mint_unique_vault_id;
 use std::path::{Path, PathBuf};
 
+/// Prefix of the discovery-invisible staging directories under `vaults/`
+/// (never parses as a `VaultId`; leading dot keeps it out of casual `ls`).
+/// Distinct from restore's `.restore-staging-` so the two sweeps can never
+/// reclaim each other's residue.
+const STAGING_PREFIX: &str = ".migration-staging-";
+
+/// Prefix of the post-commit trash directory the old `vault/` is renamed
+/// into (step 6) before its best-effort delete.
+const TRASH_PREFIX: &str = ".migration-trash-";
+
+/// File names that do NOT count as content when classifying a legacy
+/// `vault/` as effectively empty — OS metadata droppings only. Anything
+/// else (unknown bytes included) makes the dir non-empty and therefore
+/// non-removable.
+const JUNK_FILE_NAMES: &[&str] = &[".DS_Store", "Thumbs.db", "desktop.ini"];
+
 /// Test-only fault-injection points for the boot-migration interrupted-
 /// recovery contract — the structural parallel of MYND-88's `atomic_write`
 /// [`Fault`](crate::atomic_write) seam.
 ///
 /// In non-test builds the enum has only the [`Fault::None`] variant, so the
-/// `match fault` arms in [`migrate_legacy_vault_inner`] compile out and the
+/// `match fault` arms in [`stage_verify_commit`] compile out and the
 /// production migration is byte-identical to a seam-free implementation
 /// (zero runtime cost).
 #[derive(Clone, Copy)]
 enum Fault {
     /// Production path: no injected failure.
     None,
-    /// Crash *after* the artefacts are copied into `vaults/<id>/` but
-    /// *before* the new-dir fsync — the earliest interrupt point.
+    /// Crash *after* the artefacts are copied into staging but *before* the
+    /// staging fsync — the earliest interrupt point.
     #[cfg(test)]
     StopAfterCopyBeforeFsync,
     /// Crash *after* the copy + fsync but *before* the verify step.
     #[cfg(test)]
     StopAfterFsyncBeforeVerify,
-    /// Crash *after* a clean verify but *before* the old-`vault/` delete —
-    /// the last interrupt point. The new dir is complete and verified, yet
-    /// the old `vault/` has not been removed, so the next boot still treats
-    /// the migration as unfinished and re-runs (discarding this verified-but-
-    /// uncommitted new dir).
+    /// Crash *after* a clean verify but *before* the commit rename — nothing
+    /// visible exists yet; the re-run starts over from the intact legacy.
     #[cfg(test)]
-    StopAfterVerifyBeforeDeleteOld,
+    StopAfterVerifyBeforeRename,
+    /// Crash *after* the commit rename but *before* the legacy dir is
+    /// retired — the two-syscall window that yields a duplicate vault on
+    /// the next boot (deliberately: duplicate over deletion).
+    #[cfg(test)]
+    StopAfterRenameBeforeTrash,
 }
 
 /// Outcome of a boot-migration attempt. The path is **internal-only** — it is
@@ -129,6 +150,16 @@ pub(crate) enum MigrationOutcome {
     /// No legacy `vault/` directory present — nothing to migrate (fresh
     /// install, or a boot after a prior successful migration). No-op.
     NothingToMigrate,
+    /// A legacy `vault/` existed but held no content (only OS junk and/or
+    /// empty subdirectories) — it was removed so it cannot re-trigger the
+    /// pipeline, and nothing else was touched. The 2026-06-11 incident
+    /// precondition resolves here, with real `vaults/<id>/` dirs untouched.
+    RemovedEmptyLegacy,
+    /// A legacy `vault/` existed with content this module does not recognize
+    /// as a vault ([`vault_artifacts_present`] false, yet not effectively
+    /// empty — e.g. only a `vault.search`). NOTHING was touched: unknown
+    /// bytes are preserved-by-default and surface via tracing for a human.
+    SkippedUnrecognizedLegacy,
     /// A legacy `vault/` was migrated to `vaults/<id>/`; the old `vault/` is
     /// gone. Carries the new vault root (internal-only).
     Migrated(PathBuf),
@@ -152,49 +183,92 @@ pub(crate) fn migrate_legacy_vault(base: &Path) -> std::io::Result<MigrationOutc
 /// `match fault` arm below is compiled out.
 #[cfg_attr(not(test), allow(unused_variables))]
 fn migrate_legacy_vault_inner(base: &Path, fault: Fault) -> std::io::Result<MigrationOutcome> {
+    let vaults_dir = base.join(VAULTS_DIR_NAME);
+
+    // (0) Reclaim residue from crashed prior runs BEFORE the legacy early
+    // return: an interrupt between the commit rename and the legacy retire
+    // leaves trash/staging on disk but no `vault/`, so a sweep gated on the
+    // legacy dir would never run again. Boot is strictly serial (this runs
+    // in `setup` before any IPC handler; `tauri-plugin-single-instance`
+    // excludes sibling processes; restore staging uses a different prefix),
+    // so ANY `.migration-*` entry here is stale by construction — no
+    // live-pid exemption needed, unlike restore's in-process-concurrent
+    // `sweep_stale_staging`.
+    sweep_stale_migration_residue(&vaults_dir);
+
     let legacy = base.join(LEGACY_VAULT_DIR_NAME);
 
-    // The presence of the legacy `vault/` directory IS the "migration
-    // unfinished / not-yet-run" signal. Absent ⇒ nothing to do (fresh
-    // install, or a boot after a prior successful migration that deleted it).
+    // (1) Classify. Absent ⇒ nothing to do (fresh install, or a boot after
+    // a prior successful migration that retired it).
     if !legacy.is_dir() {
         return Ok(MigrationOutcome::NothingToMigrate);
     }
 
+    if dir_is_effectively_empty(&legacy)? {
+        // Provably nothing to migrate — remove the trigger so it cannot
+        // re-enter this pipeline every boot. This is the ONLY branch that
+        // deletes a legacy dir without staging it first, and it is gated on
+        // recursive enumeration finding zero non-junk files — NOT on the
+        // fixed `vault_artifacts_present` taxonomy (which would mistake an
+        // unlisted artefact like `vault.search` for nothing).
+        tracing::info!(
+            stage = "vault_migration_removed_empty_legacy",
+            "legacy vault/ holds no content — removed; nothing migrated"
+        );
+        remove_empty_legacy(&legacy)?;
+        return Ok(MigrationOutcome::RemovedEmptyLegacy);
+    }
+
+    if !vault_artifacts_present(&legacy)? {
+        // Content exists but is not a recognizable vault. Preserve-by-
+        // default: touch nothing, tell a human via tracing.
+        tracing::warn!(
+            stage = "vault_migration_skipped_unrecognized_legacy",
+            "legacy vault/ holds unrecognized content — left untouched"
+        );
+        return Ok(MigrationOutcome::SkippedUnrecognizedLegacy);
+    }
+
     tracing::info!(
         stage = "vault_migration_begin",
-        "legacy vault/ present — migrating to vaults/<id>/"
+        "legacy vault/ present — migrating to vaults/<id>/ via staging"
     );
 
-    // (1) Discard EVERY partial `vaults/<id>/` BEFORE minting/copying. The
-    // old `vault/` being present means the migration is unfinished, and the
-    // ONLY way a `vaults/<id>/` can exist while `vault/` still does is as a
-    // partial from an interrupted run (a fresh install has no `vaults/`; a
-    // completed migration deleted `vault/`). So every `vaults/<id>/` here is
-    // discardable partial state. Discarding all of them — not just the
-    // about-to-be-minted target — is what prevents siblings accumulating
-    // across repeated interrupts (each interrupted run minted its own id).
-    discard_all_partial_vault_dirs(base)?;
+    // (2)–(6) Stage, verify, commit. A failure anywhere removes the staging
+    // dir (best-effort — a crash instead of an Err leaves it for step 0).
+    std::fs::create_dir_all(&vaults_dir)?;
+    let staging = residue_dir(&vaults_dir, STAGING_PREFIX);
+    let result = stage_verify_commit(base, &vaults_dir, &legacy, &staging, fault);
+    if result.is_err() {
+        let _ = std::fs::remove_dir_all(&staging);
+    }
+    result
+}
 
-    // (2) Mint a fresh, collision-free target id into the now-clean `vaults/`.
-    // A re-run always mints a NEW id (the prior partials were discarded
-    // above), so no half-written bytes from a predecessor ever survive.
-    let id = mint_unique_vault_id(base);
-    let new_root = base.join(VAULTS_DIR_NAME).join(id.to_string());
+/// Steps 2–6: copy the legacy tree into `staging`, verify it, commit it to
+/// `vaults/<minted-id>/` by rename, then retire the legacy dir by rename.
+/// Carved out so the caller owns the staging cleanup on every `Err` path.
+#[cfg_attr(not(test), allow(unused_variables))]
+fn stage_verify_commit(
+    base: &Path,
+    vaults_dir: &Path,
+    legacy: &Path,
+    staging: &Path,
+    fault: Fault,
+) -> std::io::Result<MigrationOutcome> {
+    // (2) Copy every artefact into staging via atomic_write durability.
+    copy_vault_tree(legacy, staging)?;
 
-    // (3) Copy every artefact into the new root via atomic_write durability.
-    copy_vault_tree(&legacy, &new_root)?;
-
-    // --- Interrupt point A: after copy, before the new-dir fsync. ---
+    // --- Interrupt point A: after copy, before the staging fsync. ---
     #[cfg(test)]
     if let Fault::StopAfterCopyBeforeFsync = fault {
         return Err(interrupt_error("StopAfterCopyBeforeFsync"));
     }
 
-    // (4) fsync the new vault root + its subdirectories so the new directory
+    // (3) fsync the staging root + its subdirectories so the new directory
     // entries reach the OS journal before the verify reads them (and before
-    // the old dir is deleted).
-    fsync_dir_tree(&new_root)?;
+    // the commit rename publishes them).
+    fsync_dir_tree(staging)?;
 
     // --- Interrupt point B: after fsync, before verify. ---
     #[cfg(test)]
@@ -202,13 +276,13 @@ fn migrate_legacy_vault_inner(base: &Path, fault: Fault) -> std::io::Result<Migr
         return Err(interrupt_error("StopAfterFsyncBeforeVerify"));
     }
 
-    // (5) Verify the new dir is a present + readable vault BEFORE touching
-    // the old one. A failed/partial copy fails the verify and aborts here,
-    // leaving the old `vault/` untouched for the next boot to retry.
-    if !vault_artifacts_present(&new_root)? {
+    // (4) Verify the staged dir is a present + readable vault BEFORE
+    // publishing anything. A failed/partial copy fails the verify and
+    // aborts here, leaving the old `vault/` untouched for the next boot.
+    if !vault_artifacts_present(staging)? {
         tracing::error!(
             stage = "vault_migration_verify_failed",
-            "migrated vaults/<id>/ failed the artefact-present verify; aborting before old vault/ delete"
+            "staged copy failed the artefact-present verify; aborting before any visible change"
         );
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
@@ -216,70 +290,124 @@ fn migrate_legacy_vault_inner(base: &Path, fault: Fault) -> std::io::Result<Migr
         ));
     }
 
-    // --- Interrupt point C: after verify, before the old-vault/ delete. ---
-    // The last and most dangerous interrupt — the new dir is complete and
-    // verified, but the old `vault/` still exists, so the next boot re-runs
-    // (discarding this verified-but-uncommitted dir). No data loss.
+    // --- Interrupt point C: after verify, before the commit rename. ---
+    // Nothing visible exists yet — the re-run starts over from the intact
+    // legacy, and step 0 reclaims this staging dir.
     #[cfg(test)]
-    if let Fault::StopAfterVerifyBeforeDeleteOld = fault {
-        return Err(interrupt_error("StopAfterVerifyBeforeDeleteOld"));
+    if let Fault::StopAfterVerifyBeforeRename = fault {
+        return Err(interrupt_error("StopAfterVerifyBeforeRename"));
     }
 
-    // (6) Delete the old `vault/` LAST. Only now — after a verified-complete
-    // copy — is the source of truth removed. This is the single commit point;
-    // its completion is what makes the migration "finished".
-    delete_old_vault(&legacy)?;
+    // (5) Commit: mint a fresh, collision-free id and publish the staged
+    // tree in one same-filesystem rename. `mint_unique_vault_id` loops until
+    // `!exists()`, so the rename can never land on an existing directory.
+    let id = mint_unique_vault_id(base);
+    let new_root = vaults_dir.join(id.to_string());
+    std::fs::rename(staging, &new_root)?;
+    sync_dir_best_effort(vaults_dir);
+
+    // --- Interrupt point D: after the commit rename, before the legacy
+    // retire — the documented duplicate-producing window. ---
+    #[cfg(test)]
+    if let Fault::StopAfterRenameBeforeTrash = fault {
+        return Err(interrupt_error("StopAfterRenameBeforeTrash"));
+    }
+
+    // (6) Retire the old `vault/` LAST, by atomic rename into a trash dir —
+    // the single migration commit point for the "unfinished" signal. A
+    // recursive delete here could fail partway and leave a truncated legacy
+    // tree to be re-migrated as if complete; the rename cannot.
+    retire_old_vault(legacy, vaults_dir)?;
 
     tracing::info!(
         stage = "vault_migration_complete",
-        "migration committed — old vault/ removed"
+        "migration committed — old vault/ retired"
     );
     Ok(MigrationOutcome::Migrated(new_root))
 }
 
-/// Discard EVERY `vaults/<id>/` partial under `base` before a (re-)copy.
-///
-/// Called only when the old `vault/` is present (migration unfinished), where
-/// any `vaults/<id>/` is necessarily a partial from an interrupted run — see
-/// the call site. Removing *all* of them (not just the next target) is what
-/// keeps siblings from accumulating across repeated interrupts: each
-/// interrupted attempt minted its own distinct id, so a per-target discard
-/// would leave the previous attempt's dir behind. Only directories whose name
-/// parses as a [`VaultId`](crate::vault_id::VaultId) are removed — the
-/// best-effort `registry.json` cache (and any non-vault sibling) is left
-/// untouched.
-///
-/// A no-op when `vaults/` is absent (the common fresh-migration case).
-/// Surfaces an IO error so a failure to clear a stale partial does not
-/// silently co-mingle with a fresh copy.
-fn discard_all_partial_vault_dirs(base: &Path) -> std::io::Result<()> {
-    let vaults_dir = base.join(VAULTS_DIR_NAME);
-    let entries = match std::fs::read_dir(&vaults_dir) {
-        Ok(entries) => entries,
-        // No `vaults/` dir at all → nothing to discard.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(e),
-    };
-    for entry in entries {
+/// `true` when `dir`'s tree contains no files besides [`JUNK_FILE_NAMES`]
+/// (empty subdirectories permitted). The deletion gate for
+/// [`MigrationOutcome::RemovedEmptyLegacy`] — deliberately an exhaustive
+/// enumeration, not the `vault_artifacts_present` taxonomy: the predicate's
+/// fixed list cannot prove absence-of-content, only absence-of-known-kinds.
+/// Symlinks count as content (not followed).
+fn dir_is_effectively_empty(dir: &Path) -> std::io::Result<bool> {
+    for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        let is_vault_dir = path.is_dir()
-            && path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| crate::vault_id::VaultId::parse(n).is_ok());
-        if is_vault_dir {
-            tracing::warn!(
-                stage = "vault_migration_discard_partial",
-                "discarding a partial vaults/<id>/ from an interrupted run before re-copy"
-            );
-            std::fs::remove_dir_all(&path)?;
+        if std::fs::symlink_metadata(&path)?.is_dir() {
+            if !dir_is_effectively_empty(&path)? {
+                return Ok(false);
+            }
+        } else {
+            let name = entry.file_name();
+            let is_junk = name.to_str().is_some_and(|n| JUNK_FILE_NAMES.contains(&n));
+            if !is_junk {
+                return Ok(false);
+            }
         }
+    }
+    Ok(true)
+}
+
+/// Remove an effectively-empty legacy `vault/` (junk files + empty subdirs
+/// only — gated by [`dir_is_effectively_empty`] at the call site), then
+/// (Unix) `sync_all` the parent so the removal of the directory entry is
+/// durable and cannot resurrect the boot-loop trigger.
+fn remove_empty_legacy(legacy: &Path) -> std::io::Result<()> {
+    std::fs::remove_dir_all(legacy)?;
+    #[cfg(unix)]
+    if let Some(parent) = legacy.parent() {
+        std::fs::File::open(parent)?.sync_all()?;
     }
     Ok(())
 }
 
-/// Copy the **entire** legacy vault tree into `new_root`, faithfully — every
+/// Retire the old `vault/` by atomic rename into `vaults/.migration-trash-*`,
+/// (Unix) `sync_all` the parent so the disappearance of the "unfinished"
+/// signal is durable, then best-effort delete the trash. A partially-deleted
+/// trash dir is invisible residue for the next boot's sweep — never a
+/// re-migration source.
+fn retire_old_vault(legacy: &Path, vaults_dir: &Path) -> std::io::Result<()> {
+    let trash = residue_dir(vaults_dir, TRASH_PREFIX);
+    std::fs::rename(legacy, &trash)?;
+    #[cfg(unix)]
+    if let Some(parent) = legacy.parent() {
+        std::fs::File::open(parent)?.sync_all()?;
+    }
+    let _ = std::fs::remove_dir_all(&trash);
+    Ok(())
+}
+
+/// Mint a fresh process-unique residue path under `vaults/` with the given
+/// prefix (staging or trash). The pid + counter shape mirrors restore's
+/// `staging_dir`; the name never parses as a `VaultId`.
+fn residue_dir(vaults_dir: &Path, prefix: &str) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    vaults_dir.join(format!("{prefix}{}-{n}", std::process::id()))
+}
+
+/// Remove every `.migration-staging-*` / `.migration-trash-*` entry under
+/// `vaults/`. Best-effort, never creates `vaults/`, never touches any other
+/// name (restore's `.restore-staging-*` included). See the step-0 call site
+/// for why no live-pid exemption applies here.
+fn sweep_stale_migration_residue(vaults_dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(vaults_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if name.starts_with(STAGING_PREFIX) || name.starts_with(TRASH_PREFIX) {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
+/// Copy the **entire** legacy vault tree into `staging`, faithfully — every
 /// child present under `legacy/` is carried over, with no hardcoded allowlist.
 /// Each regular file goes through [`crate::atomic_write::atomic_write`]
 /// (temp+fsync+rename); each subdirectory (`notes/`, `snapshots/`,
@@ -293,11 +421,11 @@ fn discard_all_partial_vault_dirs(base: &Path) -> std::io::Result<()> {
 /// old allowlist missed) and any future artefact. Nothing on disk is ever left
 /// behind, so the migration cannot lose data to a stale enumeration.
 ///
-/// The verify (`vault_artifacts_present` on `new_root`) still gates the
-/// delete-old-last commit: a complete copy of a real vault trivially passes,
-/// since every artefact the predicate looks for is among the copied children.
-fn copy_vault_tree(legacy: &Path, new_root: &Path) -> std::io::Result<()> {
-    copy_dir_recursive(legacy, new_root)
+/// The verify (`vault_artifacts_present` on the staged tree) still gates the
+/// commit rename: a complete copy of a real vault trivially passes, since
+/// every artefact the predicate looks for is among the copied children.
+fn copy_vault_tree(legacy: &Path, staging: &Path) -> std::io::Result<()> {
+    copy_dir_recursive(legacy, staging)
 }
 
 /// Recursively copy `src_dir` into `dst_dir`, preserving the tree shape. Each
@@ -325,9 +453,8 @@ fn copy_dir_recursive(src_dir: &Path, dst_dir: &Path) -> std::io::Result<()> {
 
 /// Copy one file's bytes from `src` to `dst` with [`crate::atomic_write`]
 /// durability (temp+fsync+rename). `replace = false` — the destination is a
-/// freshly-minted (or freshly-discarded) directory, so a pre-existing target
-/// would be a bug; the create-only mode surfaces it rather than silently
-/// overwriting.
+/// freshly-minted staging directory, so a pre-existing target would be a
+/// bug; the create-only mode surfaces it rather than silently overwriting.
 ///
 /// The bytes are ciphertext blobs (the entire vault tree is encrypted at
 /// rest), so reading them into memory for the copy never exposes plaintext —
@@ -370,23 +497,18 @@ fn sync_one_dir(dir: &Path) -> std::io::Result<()> {
     std::fs::File::open(dir)?.sync_all()
 }
 
-/// Remove the old `vault/` directory tree LAST — the single migration commit
-/// point. Recursively unlinks it, then (Unix) `sync_all`s the parent so the
-/// removal of the `vault/` directory entry is itself durable: a power loss
-/// after this returns must not resurrect the old dir and trigger a spurious
-/// re-migration onto a now-committed new layout.
-fn delete_old_vault(legacy: &Path) -> std::io::Result<()> {
-    std::fs::remove_dir_all(legacy)?;
+/// Best-effort variant of [`sync_one_dir`] for the post-rename `vaults/`
+/// handle — the rename itself is the commit; a failed journal hint must not
+/// turn a committed migration into a reported failure. No-op on non-Unix.
+fn sync_dir_best_effort(dir: &Path) {
     #[cfg(unix)]
     {
-        if let Some(parent) = legacy.parent() {
-            // Best-effort journal-commit of the removal; a failure here does
-            // not undo the unlink (the dir is already gone), but surface it
-            // so the boot wiring can log it.
-            std::fs::File::open(parent)?.sync_all()?;
-        }
+        let _ = sync_one_dir(dir);
     }
-    Ok(())
+    #[cfg(not(unix))]
+    {
+        let _ = dir;
+    }
 }
 
 /// Construct the `Interrupted`-kind error a fault-injection point returns,
@@ -409,7 +531,7 @@ pub(crate) fn migration_failure_kind(e: &std::io::Error) -> crate::io_failure_ki
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::ScopedTempDir;
+    use crate::test_support::{seed_real_vault_meta, ScopedTempDir};
     use crate::vault_id::VaultId;
 
     // ---- fixtures -------------------------------------------------------
@@ -487,13 +609,29 @@ mod tests {
         manifest
     }
 
-    /// Resolve the SINGLE `vaults/<id>/` directory under `base`, asserting
-    /// exactly one is present. Used post-migration to find the new root
-    /// without knowing the minted id.
-    fn sole_new_vault_root(base: &Path) -> PathBuf {
+    /// Seed a REAL sibling `vaults/<id>/` (a fully-formed vault that must
+    /// survive every migration scenario — the 2026-06-11 incident victim).
+    /// Returns its root.
+    fn seed_real_sibling_vault(base: &Path, seed_byte: u8) -> PathBuf {
+        let root = base.join(VAULTS_DIR_NAME).join(VaultId::mint().to_string());
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        seed_real_vault_meta(&root, seed_byte);
+        std::fs::write(
+            root.join("notes/0190b000-0000-7000-8000-000000000002.myn"),
+            [seed_byte; 64],
+        )
+        .unwrap();
+        root
+    }
+
+    /// Collect every `vaults/<id>/` root under `base` (name parses as a
+    /// `VaultId`), sorted for stable assertions.
+    fn vault_roots(base: &Path) -> Vec<PathBuf> {
         let vaults = base.join(VAULTS_DIR_NAME);
-        let mut found: Vec<PathBuf> = std::fs::read_dir(&vaults)
-            .unwrap()
+        let Ok(entries) = std::fs::read_dir(&vaults) else {
+            return Vec::new();
+        };
+        let mut found: Vec<PathBuf> = entries
             .filter_map(|e| e.ok())
             .map(|e| e.path())
             .filter(|p| {
@@ -503,6 +641,15 @@ mod tests {
                         .is_some_and(|n| VaultId::parse(n).is_ok())
             })
             .collect();
+        found.sort();
+        found
+    }
+
+    /// Resolve the SINGLE `vaults/<id>/` directory under `base`, asserting
+    /// exactly one is present. Used post-migration to find the new root
+    /// without knowing the minted id.
+    fn sole_new_vault_root(base: &Path) -> PathBuf {
+        let mut found = vault_roots(base);
         assert_eq!(
             found.len(),
             1,
@@ -540,7 +687,7 @@ mod tests {
         // Old vault/ is gone.
         assert!(
             !tmp.path().join(LEGACY_VAULT_DIR_NAME).exists(),
-            "old vault/ must be deleted last"
+            "old vault/ must be retired last"
         );
         // New vaults/<id>/ holds every artefact, byte-identical.
         let new_root = sole_new_vault_root(tmp.path());
@@ -548,6 +695,18 @@ mod tests {
         assert_manifest_byte_identical(&new_root, &manifest);
         // The new root's name parses as a VaultId.
         assert!(VaultId::parse(new_root.file_name().unwrap().to_str().unwrap()).is_ok());
+        // No staging / trash residue survives a clean run's own sweep window.
+        assert!(
+            std::fs::read_dir(tmp.path().join(VAULTS_DIR_NAME))
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .all(|e| {
+                    let n = e.file_name();
+                    let n = n.to_str().unwrap_or_default().to_owned();
+                    !n.starts_with(STAGING_PREFIX) && !n.starts_with(TRASH_PREFIX)
+                }),
+            "clean migration must leave no staging/trash residue"
+        );
     }
 
     #[test]
@@ -625,7 +784,7 @@ mod tests {
         // No vault/ at all.
         let outcome = migrate_legacy_vault(tmp.path()).unwrap();
         assert_eq!(outcome, MigrationOutcome::NothingToMigrate);
-        // No vaults/ dir materialized.
+        // No vaults/ dir materialized (the residue sweep must not create it).
         assert!(
             !tmp.path().join(VAULTS_DIR_NAME).exists(),
             "fresh install must not create vaults/"
@@ -650,33 +809,110 @@ mod tests {
         assert_eq!(sole_new_vault_root(tmp.path()), new_root);
     }
 
+    // ---- the 2026-06-11 incident class (MYND-253) ------------------------
+
     #[test]
-    fn legacy_dir_present_but_empty_migrates_then_noop() {
-        // A degenerate empty `vault/` (no artefacts) is still "present" so the
-        // migration runs; the verify fails (no artefacts), the old dir is NOT
-        // deleted, and an error surfaces — the old dir stays for the next boot.
-        let tmp = ScopedTempDir::new("mig-empty-legacy").unwrap();
+    fn empty_legacy_is_removed_and_real_sibling_vaults_survive() {
+        // THE incident regression. An empty legacy `vault/` (materialized by
+        // a resolver side effect) must NEVER cause the deletion of real
+        // `vaults/<id>/` siblings — under the old discard-all design this
+        // exact precondition wiped them.
+        let tmp = ScopedTempDir::new("mig-incident").unwrap();
+        let sibling_a = seed_real_sibling_vault(tmp.path(), 0x33);
+        let sibling_b = seed_real_sibling_vault(tmp.path(), 0x44);
+        let before_a = read_tree(&sibling_a);
+        let before_b = read_tree(&sibling_b);
+
         std::fs::create_dir_all(tmp.path().join(LEGACY_VAULT_DIR_NAME)).unwrap();
 
-        let err = migrate_legacy_vault(tmp.path())
-            .expect_err("empty legacy vault/ fails the artefact verify");
-        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
-        // Old (empty) vault/ is intact — never deleted on a failed verify.
-        assert!(tmp.path().join(LEGACY_VAULT_DIR_NAME).is_dir());
-        // No partial new dir survives the next run's pre-copy discard, but a
-        // partial may exist now; the invariant under test is old-dir-intact.
+        let outcome = migrate_legacy_vault(tmp.path()).unwrap();
+        assert_eq!(outcome, MigrationOutcome::RemovedEmptyLegacy);
+
+        // The trigger is gone — no boot-loop — and the siblings are intact.
+        assert!(!tmp.path().join(LEGACY_VAULT_DIR_NAME).exists());
+        assert_eq!(read_tree(&sibling_a), before_a, "sibling A must survive");
+        assert_eq!(read_tree(&sibling_b), before_b, "sibling B must survive");
+        assert_eq!(vault_roots(tmp.path()).len(), 2, "no vault added/removed");
+
+        // Next boot is a clean no-op.
+        assert_eq!(
+            migrate_legacy_vault(tmp.path()).unwrap(),
+            MigrationOutcome::NothingToMigrate
+        );
+    }
+
+    #[test]
+    fn junk_only_legacy_counts_as_empty_and_is_removed() {
+        // OS droppings + empty subdirs are not content: the legacy dir is
+        // still provably empty and is removed without touching anything else.
+        let tmp = ScopedTempDir::new("mig-junk-empty").unwrap();
+        let legacy = tmp.path().join(LEGACY_VAULT_DIR_NAME);
+        std::fs::create_dir_all(legacy.join("notes")).unwrap();
+        std::fs::write(legacy.join(".DS_Store"), b"finder droppings").unwrap();
+        std::fs::write(legacy.join("notes/.DS_Store"), b"more droppings").unwrap();
+
+        let outcome = migrate_legacy_vault(tmp.path()).unwrap();
+        assert_eq!(outcome, MigrationOutcome::RemovedEmptyLegacy);
+        assert!(!legacy.exists());
+    }
+
+    #[test]
+    fn artifact_bearing_legacy_migrates_alongside_real_sibling() {
+        // The falsified old invariant, head-on: a REAL legacy migration with
+        // a REAL pre-existing sibling vault. The old discard-all deleted the
+        // sibling; the staging design must migrate the legacy NEXT TO it.
+        let tmp = ScopedTempDir::new("mig-sibling").unwrap();
+        let sibling = seed_real_sibling_vault(tmp.path(), 0x55);
+        let before = read_tree(&sibling);
+        let manifest = seed_legacy_vault(tmp.path());
+
+        let outcome = migrate_legacy_vault(tmp.path()).unwrap();
+        let MigrationOutcome::Migrated(new_root) = outcome else {
+            panic!("expected Migrated, got {outcome:?}");
+        };
+
+        // Sibling untouched, byte-identical; legacy retired; migrated copy
+        // complete — two vaults total.
+        assert_eq!(read_tree(&sibling), before, "sibling must survive");
+        assert!(!tmp.path().join(LEGACY_VAULT_DIR_NAME).exists());
+        assert_manifest_byte_identical(&new_root, &manifest);
+        assert_eq!(vault_roots(tmp.path()).len(), 2);
+    }
+
+    #[test]
+    fn unrecognized_legacy_content_is_skipped_untouched() {
+        // Content that is neither empty nor a recognizable vault (e.g. only a
+        // `vault.search` — absent from the vault_artifacts_present taxonomy)
+        // must be preserved-by-default: no migration, no deletion, no staging.
+        let tmp = ScopedTempDir::new("mig-unrecognized").unwrap();
+        let legacy = tmp.path().join(LEGACY_VAULT_DIR_NAME);
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::write(legacy.join("vault.search"), b"MYS1-orphan-index").unwrap();
+        let before = read_tree(&legacy);
+
+        let outcome = migrate_legacy_vault(tmp.path()).unwrap();
+        assert_eq!(outcome, MigrationOutcome::SkippedUnrecognizedLegacy);
+        assert_eq!(
+            read_tree(&legacy),
+            before,
+            "unknown bytes must be preserved"
+        );
+        assert!(
+            vault_roots(tmp.path()).is_empty(),
+            "nothing may be staged or committed for unrecognized content"
+        );
     }
 
     // ---- interrupted migration: fault at EACH step ----------------------
     //
-    // The heart of acceptance (PRD §Testing; à la MYND-88). For each of the
-    // three interrupt points: (a) the old vault/ is intact + fully readable,
-    // (b) a fault-free re-run discards the partial new dir and completes,
-    // (c) every artefact is byte-identical to the original.
+    // For each pre-commit interrupt point: (a) the old vault/ is intact +
+    // fully readable, (b) NOTHING visible exists under vaults/<id>/ (the
+    // staging design's core promise — a partial is never publishable), and
+    // (c) a fault-free re-run completes byte-identical.
 
-    /// Drive one interrupt point: inject `fault`, assert the old vault/ is
-    /// intact, then re-run clean and assert a complete byte-identical
-    /// migration with the old dir gone and exactly one new dir.
+    /// Drive one pre-commit interrupt point: inject `fault`, assert the old
+    /// vault/ is intact and nothing visible was published, then re-run clean
+    /// and assert a complete byte-identical migration.
     fn assert_interrupt_then_clean_rerun(label: &str, fault: Fault) {
         let tmp = ScopedTempDir::new(label).unwrap();
         let manifest = seed_legacy_vault(tmp.path());
@@ -706,7 +942,14 @@ mod tests {
             "{label}: old vault/ bytes must be untouched by the interrupted run"
         );
 
-        // (b) Fault-free re-run discards any partial new dir + completes.
+        // (b) Nothing visible was published — a partial NEVER lands as a
+        // `vaults/<id>/` (the discovery-invisible staging promise).
+        assert!(
+            vault_roots(tmp.path()).is_empty(),
+            "{label}: an interrupted run must not publish any vaults/<id>/"
+        );
+
+        // (c) Fault-free re-run completes the migration.
         let outcome = migrate_legacy_vault(tmp.path()).unwrap();
         assert!(
             matches!(outcome, MigrationOutcome::Migrated(_)),
@@ -714,14 +957,11 @@ mod tests {
         );
         assert!(
             !legacy.exists(),
-            "{label}: re-run must delete old vault/ last"
+            "{label}: re-run must retire old vault/ last"
         );
 
-        // Exactly one new dir (the partial from the interrupted run was
-        // discarded, not left as a second sibling).
+        // Exactly one new dir, every artefact byte-identical to the original.
         let new_root = sole_new_vault_root(tmp.path());
-
-        // (c) Every artefact byte-identical to the original.
         assert_manifest_byte_identical(&new_root, &manifest);
         assert!(
             vault_artifacts_present(&new_root).unwrap(),
@@ -740,63 +980,88 @@ mod tests {
     }
 
     #[test]
-    fn interrupt_after_verify_before_delete_old_recovers_no_data_loss() {
-        // The most dangerous interrupt: the new dir is complete + verified,
-        // yet the old vault/ is not deleted, so the migration is still
-        // "unfinished" and the re-run discards the verified-but-uncommitted
-        // dir. No data-loss window.
-        assert_interrupt_then_clean_rerun("mig-int-verify", Fault::StopAfterVerifyBeforeDeleteOld);
+    fn interrupt_after_verify_before_rename_recovers_no_data_loss() {
+        assert_interrupt_then_clean_rerun("mig-int-verify", Fault::StopAfterVerifyBeforeRename);
     }
 
     #[test]
-    fn interrupt_leaves_a_partial_new_dir_that_rerun_discards() {
-        // Explicitly assert the partial-discard half of the recovery rule:
-        // after an interrupt that copied files, a partial vaults/<id>/ DOES
-        // exist; the re-run must discard it (mint a fresh id) rather than
-        // leave two sibling vault dirs.
-        let tmp = ScopedTempDir::new("mig-partial-discard").unwrap();
+    fn interrupt_after_rename_before_trash_duplicates_but_never_loses() {
+        // The documented two-syscall window: the staged copy is committed but
+        // the legacy retire did not happen. The re-run migrates AGAIN —
+        // yielding a duplicate vault, never deleting the committed one, and
+        // never touching an unrelated sibling. Duplicate over deletion.
+        let tmp = ScopedTempDir::new("mig-int-trash").unwrap();
+        let sibling = seed_real_sibling_vault(tmp.path(), 0x66);
+        let before_sibling = read_tree(&sibling);
+        let manifest = seed_legacy_vault(tmp.path());
+        let legacy = tmp.path().join(LEGACY_VAULT_DIR_NAME);
+
+        let err = migrate_legacy_vault_inner(tmp.path(), Fault::StopAfterRenameBeforeTrash)
+            .expect_err("injected fault must surface as Err");
+        assert_eq!(err.kind(), std::io::ErrorKind::Interrupted);
+
+        // Committed copy exists, legacy still present (signal not retired).
+        assert!(legacy.is_dir(), "legacy survives until the trash rename");
+        assert_eq!(
+            vault_roots(tmp.path()).len(),
+            2,
+            "sibling + the committed copy"
+        );
+
+        // Clean re-run: a second migrated copy appears; nothing is deleted.
+        let outcome = migrate_legacy_vault(tmp.path()).unwrap();
+        assert!(matches!(outcome, MigrationOutcome::Migrated(_)));
+        assert!(!legacy.exists());
+        let roots = vault_roots(tmp.path());
+        assert_eq!(
+            roots.len(),
+            3,
+            "sibling + two duplicate migrated copies — duplication, never loss"
+        );
+        assert_eq!(read_tree(&sibling), before_sibling, "sibling untouched");
+        for root in roots.iter().filter(|r| **r != sibling) {
+            assert_manifest_byte_identical(root, &manifest);
+        }
+    }
+
+    #[test]
+    fn interrupt_publishes_no_visible_partial() {
+        // Explicitly pin the staging promise: after an interrupt that copied
+        // files, NO `vaults/<id>/` exists (the old design left a visible
+        // partial here and relied on discard-all — the incident's weapon).
+        let tmp = ScopedTempDir::new("mig-no-partial").unwrap();
         seed_legacy_vault(tmp.path());
 
-        // Interrupt after the copy — a partial new dir now exists on disk.
         let _ = migrate_legacy_vault_inner(tmp.path(), Fault::StopAfterCopyBeforeFsync)
             .expect_err("fault surfaces");
-        let vaults = tmp.path().join(VAULTS_DIR_NAME);
-        let partial_count = std::fs::read_dir(&vaults)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path().is_dir()
-                    && e.file_name()
-                        .to_str()
-                        .is_some_and(|n| VaultId::parse(n).is_ok())
-            })
-            .count();
-        assert_eq!(partial_count, 1, "interrupted copy left one partial dir");
+        assert!(
+            vault_roots(tmp.path()).is_empty(),
+            "no visible vaults/<id>/ may exist after an interrupted copy"
+        );
 
-        // Re-run: must end with EXACTLY one vault dir (partial discarded, not
-        // accumulated). `sole_new_vault_root` asserts the count == 1.
+        // Re-run: ends with EXACTLY one vault dir.
         migrate_legacy_vault(tmp.path()).unwrap();
         let _ = sole_new_vault_root(tmp.path());
     }
 
     #[test]
     fn repeated_interrupts_never_accumulate_sibling_dirs() {
-        // Crash at every step in sequence, re-attempting each time; the final
-        // clean run must still leave exactly one vault dir — partials never
-        // accumulate across multiple interrupted attempts.
+        // Crash at every pre-commit step in sequence, re-attempting each
+        // time; the final clean run must still leave exactly one vault dir —
+        // staging residue never accumulates into visible siblings.
         let tmp = ScopedTempDir::new("mig-repeat-int").unwrap();
         let manifest = seed_legacy_vault(tmp.path());
 
         for fault in [
             Fault::StopAfterCopyBeforeFsync,
             Fault::StopAfterFsyncBeforeVerify,
-            Fault::StopAfterVerifyBeforeDeleteOld,
+            Fault::StopAfterVerifyBeforeRename,
         ] {
             let err = migrate_legacy_vault_inner(tmp.path(), fault).expect_err("fault surfaces");
             assert_eq!(err.kind(), std::io::ErrorKind::Interrupted);
             assert!(
                 tmp.path().join(LEGACY_VAULT_DIR_NAME).is_dir(),
-                "old vault/ survives every interrupt"
+                "old vault/ survives every pre-commit interrupt"
             );
         }
 
@@ -805,6 +1070,38 @@ mod tests {
         assert!(!tmp.path().join(LEGACY_VAULT_DIR_NAME).exists());
         let new_root = sole_new_vault_root(tmp.path());
         assert_manifest_byte_identical(&new_root, &manifest);
+    }
+
+    // ---- residue sweep ---------------------------------------------------
+
+    #[test]
+    fn stale_residue_swept_even_without_legacy_dir() {
+        // An interrupt at point D leaves residue but NO legacy dir, so the
+        // sweep must run before the legacy early-return — and must never
+        // touch restore's staging or real vaults.
+        let tmp = ScopedTempDir::new("mig-sweep").unwrap();
+        let vaults = tmp.path().join(VAULTS_DIR_NAME);
+        let sibling = seed_real_sibling_vault(tmp.path(), 0x77);
+        let before = read_tree(&sibling);
+
+        let stale_staging = vaults.join(format!("{STAGING_PREFIX}99999-0"));
+        let stale_trash = vaults.join(format!("{TRASH_PREFIX}99999-1"));
+        let restore_staging = vaults.join(".restore-staging-99999-0");
+        for dir in [&stale_staging, &stale_trash, &restore_staging] {
+            std::fs::create_dir_all(dir).unwrap();
+            std::fs::write(dir.join("residue.bin"), b"stale bytes").unwrap();
+        }
+
+        let outcome = migrate_legacy_vault(tmp.path()).unwrap();
+        assert_eq!(outcome, MigrationOutcome::NothingToMigrate);
+
+        assert!(!stale_staging.exists(), "stale migration staging reclaimed");
+        assert!(!stale_trash.exists(), "stale migration trash reclaimed");
+        assert!(
+            restore_staging.is_dir(),
+            "restore's staging prefix must never be touched by migration"
+        );
+        assert_eq!(read_tree(&sibling), before, "sibling untouched by sweep");
     }
 
     // ---- helpers --------------------------------------------------------

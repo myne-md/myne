@@ -142,10 +142,14 @@ pub async fn vault_delete<R: Runtime>(
     // slot-map key is the same `VaultId` so the per-id slot peek + keyed
     // `take_and_run_blocking_for_id` zeroize only the targeted slot.
     let target = VaultId::parse_optional(vault_id.as_deref());
-    let vault_dir =
-        crate::paths::vault_dir_for_id(&app, target).map_err(|_| VaultDeleteError::Io {
+    // Non-creating resolver (MYND-253): delete destroys an EXISTING vault;
+    // a stale/forged id must resolve to a path the scan below turns into
+    // VaultNotFound — never materialize an empty `vaults/<bogus-id>/`.
+    let vault_dir = crate::paths::vault_root_for_id_optional(&app, target).map_err(|_| {
+        VaultDeleteError::Io {
             io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
-        })?;
+        }
+    })?;
     // Name the slot-map key: the explicit `target` when present, else the
     // sole-vault id derived from the resolved root (same derivation as
     // `unlock` / `recover` when no explicit id was threaded).

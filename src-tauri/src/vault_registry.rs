@@ -379,6 +379,85 @@ fn parse_registry(bytes: &[u8]) -> Option<VaultRegistry> {
     Some(VaultRegistry { entries })
 }
 
+// ---- boot self-heal: file-free vault-dir prune (MYND-253) ---------------
+
+/// Remove every `vaults/<id>/` directory whose tree contains **zero files**
+/// (empty subdirectories permitted) — the boot self-heal for leftovers that
+/// discovery would otherwise flag `Corrupted` forever (e.g. the empty dir
+/// the pre-fix migration stranded after the 2026-06-11 incident, or an
+/// interrupted create).
+///
+/// Structurally incapable of deleting data: the walk refuses the whole
+/// directory if ANY non-directory entry exists anywhere in it (even OS junk
+/// like `.DS_Store` — preservation beats tidiness here), and removal is
+/// bottom-up `remove_dir` (rmdir) only, which the OS rejects atomically on a
+/// non-empty directory. Names that do not parse as a [`VaultId`] (including
+/// `registry.json` and the `.migration-*` / `.restore-staging-*` residue
+/// prefixes) are never touched. Best-effort: failures are swallowed — the
+/// sweep re-runs every boot.
+pub(crate) fn sweep_empty_vault_dirs(base: &Path) {
+    let vaults_dir = base.join(VAULTS_DIR_NAME);
+    let Ok(entries) = std::fs::read_dir(&vaults_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let names_a_vault = path.is_dir()
+            && path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| VaultId::parse(n).is_ok());
+        if !names_a_vault {
+            continue;
+        }
+        if tree_has_any_file(&path) {
+            continue;
+        }
+        tracing::info!(
+            stage = "vault_registry_sweep_empty_dir",
+            "pruning a file-free vaults/<id>/ leftover"
+        );
+        prune_empty_tree(&path);
+    }
+}
+
+/// `true` when `dir`'s tree contains at least one non-directory entry
+/// (symlinks included — not followed). Unreadable subtrees count as content,
+/// failing safe toward preservation.
+fn tree_has_any_file(dir: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return true;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        match std::fs::symlink_metadata(&path) {
+            Ok(meta) if meta.is_dir() => {
+                if tree_has_any_file(&path) {
+                    return true;
+                }
+            }
+            // Any file/symlink — or anything we cannot classify — is content.
+            _ => return true,
+        }
+    }
+    false
+}
+
+/// Bottom-up `remove_dir`-only prune of a tree [`tree_has_any_file`] already
+/// proved file-free. Best-effort; a concurrent write between the check and
+/// the rmdir makes the rmdir fail atomically and the dir survives.
+fn prune_empty_tree(dir: &Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_dir()) {
+                prune_empty_tree(&path);
+            }
+        }
+    }
+    let _ = std::fs::remove_dir(dir);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -858,5 +937,88 @@ mod tests {
         let parsed = parse_registry(json.as_bytes()).expect("missing last_unlock is tolerated");
         assert_eq!(parsed.entries.len(), 1);
         assert!(parsed.entries[0].last_unlock_ms.is_none());
+    }
+
+    // ---- sweep_empty_vault_dirs (MYND-253 boot self-heal) ----------------
+
+    #[test]
+    fn sweep_removes_zero_entry_vault_dir() {
+        // The 2026-06-11 incident leftover shape: a `vaults/<id>/` with
+        // nothing inside, flagged `Corrupted` by discovery until pruned.
+        let tmp = ScopedTempDir::new("sweep-empty").unwrap();
+        let id = VaultId::mint();
+        let dir = tmp.path().join(VAULTS_DIR_NAME).join(id.to_string());
+        std::fs::create_dir_all(&dir).unwrap();
+
+        sweep_empty_vault_dirs(tmp.path());
+        assert!(!dir.exists(), "a zero-entry vaults/<id>/ must be pruned");
+    }
+
+    #[test]
+    fn sweep_prunes_file_free_tree_with_empty_subdirs() {
+        // An interrupted create can leave `vaults/<id>/notes/` with no files
+        // anywhere — plain rmdir of the root would fail forever; the
+        // bottom-up prune heals it.
+        let tmp = ScopedTempDir::new("sweep-tree").unwrap();
+        let id = VaultId::mint();
+        let dir = tmp.path().join(VAULTS_DIR_NAME).join(id.to_string());
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+        std::fs::create_dir_all(dir.join("snapshots")).unwrap();
+
+        sweep_empty_vault_dirs(tmp.path());
+        assert!(!dir.exists(), "a file-free tree must be pruned bottom-up");
+    }
+
+    #[test]
+    fn sweep_never_touches_a_dir_holding_any_file() {
+        // One file ANYWHERE in the tree — even unrecognized bytes, even OS
+        // junk — vetoes the whole prune. Preservation beats tidiness.
+        let tmp = ScopedTempDir::new("sweep-veto").unwrap();
+
+        let with_meta = tmp
+            .path()
+            .join(VAULTS_DIR_NAME)
+            .join(VaultId::mint().to_string());
+        std::fs::create_dir_all(&with_meta).unwrap();
+        std::fs::write(with_meta.join(VAULT_META_FILE_NAME), b"real vault").unwrap();
+
+        let with_nested_file = tmp
+            .path()
+            .join(VAULTS_DIR_NAME)
+            .join(VaultId::mint().to_string());
+        std::fs::create_dir_all(with_nested_file.join("notes")).unwrap();
+        std::fs::write(with_nested_file.join("notes/.DS_Store"), b"junk").unwrap();
+
+        sweep_empty_vault_dirs(tmp.path());
+        assert!(with_meta.join(VAULT_META_FILE_NAME).is_file());
+        assert!(with_nested_file.join("notes/.DS_Store").is_file());
+    }
+
+    #[test]
+    fn sweep_skips_non_vaultid_names_and_registry_file() {
+        // Names that don't parse as a VaultId (residue prefixes included)
+        // and the registry cache are out of scope, empty or not.
+        let tmp = ScopedTempDir::new("sweep-skip").unwrap();
+        let vaults = tmp.path().join(VAULTS_DIR_NAME);
+        let staging = vaults.join(".migration-staging-1-0");
+        let plain = vaults.join("not-a-vault-id");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::create_dir_all(&plain).unwrap();
+        std::fs::write(vaults.join(REGISTRY_FILE_NAME), b"{}").unwrap();
+
+        sweep_empty_vault_dirs(tmp.path());
+        assert!(staging.is_dir(), "residue dirs belong to their own sweeps");
+        assert!(plain.is_dir(), "non-VaultId names are never touched");
+        assert!(vaults.join(REGISTRY_FILE_NAME).is_file());
+    }
+
+    #[test]
+    fn sweep_is_noop_when_vaults_dir_absent() {
+        let tmp = ScopedTempDir::new("sweep-absent").unwrap();
+        sweep_empty_vault_dirs(tmp.path());
+        assert!(
+            !tmp.path().join(VAULTS_DIR_NAME).exists(),
+            "the sweep must not create vaults/"
+        );
     }
 }
