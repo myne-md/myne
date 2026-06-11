@@ -1359,4 +1359,902 @@ mod tests {
         ));
         assert!(!dest.exists());
     }
+
+    // ---- companion test vectors (MYND-254) -----------------------------
+    //
+    // The `backup-container` family is the first whose generator + runner
+    // live OUTSIDE the protocol crate: the codec is std/fs/streaming-bound
+    // (file-path API, tokio hooks) and cannot move into the no_std
+    // protocol crate, so the vectors are minted and verified here. Both
+    // follow the protocol/tests/vectors.rs conventions: skip-if-missing
+    // runner, lowercase hex, `vector_id` uniqueness, coverage floors.
+
+    fn hex_encode(bytes: &[u8]) -> String {
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for b in bytes {
+            out.push_str(&format!("{b:02x}"));
+        }
+        out
+    }
+
+    fn hex_decode(s: &str) -> Vec<u8> {
+        assert!(
+            s.bytes().all(|b| b.is_ascii_hexdigit()),
+            "hex string must contain only ASCII hex digits, got {s:?}"
+        );
+        assert!(s.len().is_multiple_of(2), "hex string length must be even");
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("ASCII-hex pre-validated"))
+            .collect()
+    }
+
+    /// Map a `MemberFamily` to the vector family string (schema enum).
+    fn family_str(family: MemberFamily) -> &'static str {
+        match family {
+            MemberFamily::VaultMeta => "vault-meta",
+            MemberFamily::VaultPrefs => "vault-prefs",
+            MemberFamily::Note => "note",
+            MemberFamily::Snapshot => "snapshot",
+            MemberFamily::AttachmentsCatalog => "attachments-catalog",
+            MemberFamily::AttachmentBlob => "attachment-blob",
+        }
+    }
+
+    /// Hand-assemble `header || table || data` with caller-chosen header
+    /// fields — for fixtures `write_container` refuses to produce
+    /// (non-canonical tables, hostile ceilings).
+    fn raw_container(
+        member_count: u32,
+        members_total_len: u64,
+        member_table_len: u32,
+        table: &[u8],
+        data: &[u8],
+    ) -> Vec<u8> {
+        let mut out = Vec::with_capacity(22 + table.len() + data.len());
+        out.extend_from_slice(&BACKUP_CONTAINER_MAGIC);
+        out.push(BACKUP_CONTAINER_PROTOCOL_VERSION);
+        out.push(BACKUP_CONTAINER_RESERVED);
+        out.extend_from_slice(&member_count.to_be_bytes());
+        out.extend_from_slice(&members_total_len.to_be_bytes());
+        out.extend_from_slice(&member_table_len.to_be_bytes());
+        out.extend_from_slice(table);
+        out.extend_from_slice(data);
+        out
+    }
+
+    /// One §9.11.2 record: `path_len (u16 BE) || path || member_len (u64
+    /// BE) || sha256`.
+    fn raw_record(path: &str, member_len: u64, sha256: &[u8; 32]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(RECORD_FIXED_LEN as usize + path.len());
+        out.extend_from_slice(&(path.len() as u16).to_be_bytes());
+        out.extend_from_slice(path.as_bytes());
+        out.extend_from_slice(&member_len.to_be_bytes());
+        out.extend_from_slice(sha256);
+        out
+    }
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/backup-container/v0.1/cases.json` as a
+    /// pretty-printed JSON file at
+    /// `/tmp/myne_backup_container_vectors.json`, ready to copy verbatim
+    /// into the companion repo.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act, not a
+    /// side effect of `cargo test`. Run with:
+    /// `cargo test -p myne-desktop --lib emit_backup_container_vectors_for_paste -- --ignored`
+    ///
+    /// 32 cases pin (MYND-254 / §9.11), self-asserted at mint:
+    /// - 2 `encode` — deterministic member-set → container bytes:
+    ///   minimal (vault.meta only) + full-allowlist (one member per
+    ///   §9.11.3 family, input deliberately UNSORTED to pin writer-sorts
+    ///   canonical raw-byte lexicographic order).
+    /// - 2 `verify_ok` — the same two containers parsed back to their
+    ///   `(path, len, sha256)` record triples; the sha256 values
+    ///   independently pin the §9.11.2 hash formula
+    ///   `SHA-256(path_len_be16 || path || member_bytes)`.
+    /// - 14 `verify_fail` — every vectorable `BackupContainerError`
+    ///   variant (13) + the MYB5 v005-reservation magic case. The two
+    ///   ceiling cases are 22-byte header-only files, pinning the
+    ///   §9.11.6 stage order (ceilings BEFORE the file-length equation).
+    /// - 14 `classify_path` — the §9.11.3 closed-allowlist grammar from
+    ///   BOTH directions: one accept per family + 8 load-bearing rejects
+    ///   (reserved-out singletons, *.tmp, vault-external, uppercase /
+    ///   wrong-length hex, malformed snapshot pair).
+    ///
+    /// `Cancelled` + `Io` are runtime conditions, not byte-derivable —
+    /// not vectored (documented in the category's `schema.md`).
+    #[test]
+    #[ignore]
+    fn emit_backup_container_vectors_for_paste() {
+        fn json_escape(input: &str) -> String {
+            let mut out = String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        let dir = ScopedTempDir::new("bc-vectors").unwrap();
+
+        // ---- encode fixtures ----------------------------------------
+        // Member bodies are arbitrary ciphertext stand-ins — the
+        // container never parses member content (§9.11.4 scope).
+        const ATT_ID: &str = "abababababababababababababababababababababababababababababababab";
+        let note_path = "notes/0190a000-0000-7000-8000-00000000000a.myn";
+        let snap_path =
+            "snapshots/0190a000-0000-7000-8000-00000000000a__0190a000-0000-7000-8000-00000000000b.myn";
+        let att_path = format!("attachments/{ATT_ID}");
+
+        let member_bodies: Vec<(&str, Vec<u8>)> = vec![
+            ("vault.meta", vec![0xAB; 345]),
+            ("vault.prefs", b"prefs-ciphertext-stand-in".to_vec()),
+            (note_path, b"note-ciphertext-stand-in".to_vec()),
+            (snap_path, b"snapshot-ciphertext-stand-in".to_vec()),
+            ("vault.attachments", b"catalog-ciphertext-stand-in".to_vec()),
+            (&att_path, vec![0xEE; 32]),
+        ];
+        let body_of = |path: &str| -> &[u8] {
+            &member_bodies
+                .iter()
+                .find(|(p, _)| *p == path)
+                .expect("known member path")
+                .1
+        };
+        // Write each body to a temp source file.
+        let src_of = |idx: usize, body: &[u8]| -> PathBuf {
+            let src = dir.path().join(format!("m{idx}"));
+            fs::write(&src, body).unwrap();
+            src
+        };
+        let sources: Vec<PathBuf> = member_bodies
+            .iter()
+            .enumerate()
+            .map(|(i, (_, body))| src_of(i, body))
+            .collect();
+
+        // Minimal: vault.meta only.
+        let minimal_members: Vec<(String, PathBuf)> =
+            vec![("vault.meta".into(), sources[0].clone())];
+        let minimal_dest = dir.path().join("minimal.myne-backup");
+        let minimal_records = write_container(&minimal_dest, &minimal_members).expect("minimal");
+        let minimal_bytes = fs::read(&minimal_dest).unwrap();
+        assert_eq!(minimal_bytes.len(), 22 + 52 + 345, "minimal layout pin");
+
+        // Full allowlist: one member per family, input DELIBERATELY
+        // unsorted (the writer sorts by raw path bytes).
+        let full_members_unsorted: Vec<(String, PathBuf)> = vec![
+            ("vault.meta".into(), sources[0].clone()),
+            (snap_path.into(), sources[3].clone()),
+            (att_path.clone(), sources[5].clone()),
+            ("vault.prefs".into(), sources[1].clone()),
+            (note_path.into(), sources[2].clone()),
+            ("vault.attachments".into(), sources[4].clone()),
+        ];
+        let full_dest = dir.path().join("full.myne-backup");
+        let full_records = write_container(&full_dest, &full_members_unsorted).expect("full");
+        let full_bytes = fs::read(&full_dest).unwrap();
+        // Canonical order pin: attachments/* < notes/* < snapshots/* <
+        // vault.attachments < vault.meta < vault.prefs.
+        let expected_order: Vec<&str> = vec![
+            &att_path,
+            note_path,
+            snap_path,
+            "vault.attachments",
+            "vault.meta",
+            "vault.prefs",
+        ];
+        assert_eq!(
+            full_records
+                .iter()
+                .map(|r| r.path.as_str())
+                .collect::<Vec<_>>(),
+            expected_order,
+            "writer must sort members by raw path bytes",
+        );
+
+        // ---- verify_fail fixtures (self-asserted below) --------------
+        let zero_sha = [0u8; 32];
+
+        let vf_header_short = minimal_bytes[..10].to_vec();
+        let mut vf_magic = minimal_bytes.clone();
+        vf_magic[0] = b'X';
+        let mut vf_myb5 = minimal_bytes.clone();
+        vf_myb5[3] = b'5'; // "MYB5"
+        let mut vf_version = minimal_bytes.clone();
+        vf_version[4] = 0x02;
+        let mut vf_reserved = minimal_bytes.clone();
+        vf_reserved[5] = 0x01;
+        // 22-byte header-only files: ceilings fire BEFORE the file-length
+        // equation (§9.11.6 stage order pin).
+        let vf_count_overflow = raw_container(MAX_MEMBER_COUNT + 1, 0, 0, &[], &[]);
+        let vf_table_overflow = raw_container(1, 0, MAX_MEMBER_TABLE_LEN + 1, &[], &[]);
+        // Hand-assembled tables the writer refuses to produce.
+        let rec_traversal = raw_record("..", 0, &zero_sha);
+        let vf_path_invalid = raw_container(1, 0, rec_traversal.len() as u32, &rec_traversal, &[]);
+        let rec_search = raw_record("vault.search", 0, &zero_sha);
+        let vf_not_allowlisted = raw_container(1, 0, rec_search.len() as u32, &rec_search, &[]);
+        let rec_meta_empty = raw_record("vault.meta", 0, &zero_sha);
+        let mut dup_table = rec_meta_empty.clone();
+        dup_table.extend_from_slice(&rec_meta_empty);
+        let vf_duplicate = raw_container(2, 0, dup_table.len() as u32, &dup_table, &[]);
+        let rec_prefs_empty = raw_record("vault.prefs", 0, &zero_sha);
+        let mut misorder_table = rec_prefs_empty.clone();
+        misorder_table.extend_from_slice(&rec_meta_empty);
+        let vf_order = raw_container(2, 0, misorder_table.len() as u32, &misorder_table, &[]);
+        // vault.meta declared + carried at 346 bytes: the equations hold,
+        // the §9.3-derived family cap (<= 345) fires at table parse.
+        let rec_meta_346 = raw_record("vault.meta", 346, &zero_sha);
+        let vf_len_overflow = raw_container(
+            1,
+            346,
+            rec_meta_346.len() as u32,
+            &rec_meta_346,
+            &vec![0xAB; 346],
+        );
+        let vf_lengths = minimal_bytes[..minimal_bytes.len() - 1].to_vec();
+        let mut vf_hash = minimal_bytes.clone();
+        let last = vf_hash.len() - 1;
+        vf_hash[last] ^= 0x01;
+
+        let verify_fail_cases: Vec<(&str, &str, &Vec<u8>, BackupContainerError)> = vec![
+            (
+                "verify-fail-header-too-short",
+                "First 10 bytes of the minimal container — no room for the 22-byte fixed header. Rejected before any field read (§9.11.6 stage 1).",
+                &vf_header_short,
+                BackupContainerError::HeaderTooShort,
+            ),
+            (
+                "verify-fail-magic-mismatch",
+                "First byte of the MYB1 magic corrupted to 'X'. Rejected at offset 0 before any other work (§9.11.6 stage 1).",
+                &vf_magic,
+                BackupContainerError::MagicMismatch,
+            ),
+            (
+                "verify-fail-magic-myb5-reserved",
+                "Magic reads 'MYB5' — the reserved v005 container magic (§10.3). A v0.1 consumer MUST reject it; it collapses to the same magic_mismatch variant (the caller re-checks the bytes to phrase a migration prompt, §9.11.6).",
+                &vf_myb5,
+                BackupContainerError::MagicMismatch,
+            ),
+            (
+                "verify-fail-protocol-version-mismatch",
+                "protocol_version byte (offset 4) set to 0x02 instead of 0x01 (§9.11.6 stage 1).",
+                &vf_version,
+                BackupContainerError::ProtocolVersionMismatch,
+            ),
+            (
+                "verify-fail-reserved-byte-nonzero",
+                "reserved byte (offset 5) set to 0x01 — §9.11.1 says MUST be 0x00.",
+                &vf_reserved,
+                BackupContainerError::ReservedByteNonZero,
+            ),
+            (
+                "verify-fail-member-count-overflow",
+                "22-byte header-only file advertising member_count = 2^20 + 1 (above the §9.11.6 reference ceiling) with zero totals. The ceiling check fires at stage 2 BEFORE the file-length equation — this case pins the validation order, not just the variant.",
+                &vf_count_overflow,
+                BackupContainerError::MemberCountOverflow,
+            ),
+            (
+                "verify-fail-member-table-overflow",
+                "22-byte header-only file advertising member_table_len = 16 MiB + 1 (above the §9.11.6 reference ceiling). A port that checks the file-length equation first would mislabel this lengths_inconsistent — the ceiling MUST fire first (stage-order pin).",
+                &vf_table_overflow,
+                BackupContainerError::MemberTableOverflow,
+            ),
+            (
+                "verify-fail-path-invalid",
+                "Hand-assembled single-member container whose record path is '..' (a dot segment, §9.11.2 path-rule violation; the traversal pin). Length equations hold; the path rules fire at table parse (stage 3).",
+                &vf_path_invalid,
+                BackupContainerError::PathInvalid,
+            ),
+            (
+                "verify-fail-path-not-allowlisted",
+                "Hand-assembled single-member container whose record path is 'vault.search' — structurally a valid path but reserved OUT of the §9.11.3 closed allowlist (rebuildable cache). Readers MUST reject, not skip.",
+                &vf_not_allowlisted,
+                BackupContainerError::PathNotAllowlisted,
+            ),
+            (
+                "verify-fail-duplicate-path",
+                "Hand-assembled container with two identical 'vault.meta' records. Duplicates MUST reject (§9.11.2).",
+                &vf_duplicate,
+                BackupContainerError::DuplicatePath,
+            ),
+            (
+                "verify-fail-path-order-violation",
+                "Hand-assembled container whose records appear as vault.prefs then vault.meta — violating the canonical raw-path-byte lexicographic order ('vault.meta' < 'vault.prefs', §9.11.2).",
+                &vf_order,
+                BackupContainerError::PathOrderViolation,
+            ),
+            (
+                "verify-fail-member-len-overflow",
+                "vault.meta member declared AND carried at 346 bytes — one over the §9.3-derived family cap (<= 345 at the container layer; the exact-345 structural check is the restore engine's stage 5). The length equations hold, so only the family-cap check (stage 3) can reject.",
+                &vf_len_overflow,
+                BackupContainerError::MemberLenOverflow,
+            ),
+            (
+                "verify-fail-lengths-inconsistent",
+                "The minimal container truncated by one byte: file_length no longer equals 22 + member_table_len + members_total_len (§9.11.6 stage 2). Covers any truncation past the header.",
+                &vf_lengths,
+                BackupContainerError::LengthsInconsistent,
+            ),
+            (
+                "verify-fail-hash-mismatch",
+                "Last data byte of the minimal container XOR 0x01. Header, table and equations all hold; only the streamed per-member SHA-256 (stage 4) catches it. Unkeyed hash — corruption detection, NOT tamper resistance (§9.11.4).",
+                &vf_hash,
+                BackupContainerError::HashMismatch,
+            ),
+        ];
+
+        // ---- classify_path fixtures -----------------------------------
+        let classify_cases: Vec<(&str, &str, &str, &str)> = vec![
+            (
+                "classify-vault-meta",
+                "vault.meta — the REQUIRED member (§9.11.3).",
+                "vault.meta",
+                "vault-meta",
+            ),
+            (
+                "classify-vault-prefs",
+                "vault.prefs — IN when present (§9.11.3).",
+                "vault.prefs",
+                "vault-prefs",
+            ),
+            (
+                "classify-note",
+                "notes/<uuid>.myn with a strict lowercase-hyphenated disk-format UUID (36 chars, hyphens at 8/13/18/23). Filenames are AAD-load-bearing — a renamed member fails AEAD at first unlock.",
+                "notes/0190a000-0000-7000-8000-000000000001.myn",
+                "note",
+            ),
+            (
+                "classify-snapshot",
+                "snapshots/<note-uuid>__<snap-uuid>.myn — two disk-format UUIDs joined by a double underscore.",
+                "snapshots/0190a000-0000-7000-8000-000000000001__0190a000-0000-7000-8000-000000000002.myn",
+                "snapshot",
+            ),
+            (
+                "classify-attachments-catalog",
+                "vault.attachments — the §9.10 catalog singleton, IN when present.",
+                "vault.attachments",
+                "attachments-catalog",
+            ),
+            (
+                "classify-attachment-blob",
+                "attachments/<64-lowercase-hex> — content-addressed §9.9 blob id (the filename IS the content address; load-bearing).",
+                "attachments/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "attachment-blob",
+            ),
+            (
+                "classify-reject-vault-search",
+                "vault.search is reserved OUT (§9.11.3) — a rebuildable cache; including it would only grow the container.",
+                "vault.search",
+                "rejected",
+            ),
+            (
+                "classify-reject-vault-workspace",
+                "vault.workspace is reserved OUT (§9.11.3) — session state, rebuildable by design (§9.7.4 fall-back-to-default).",
+                "vault.workspace",
+                "rejected",
+            ),
+            (
+                "classify-reject-registry-json",
+                "registry.json lives OUTSIDE the vault root (per-install plaintext) — never a member.",
+                "registry.json",
+                "rejected",
+            ),
+            (
+                "classify-reject-tmp-residue",
+                "A *.tmp atomic-write residue under notes/ — excluded by the closed grammar (the '.myn' suffix match is exact).",
+                "notes/0190a000-0000-7000-8000-000000000001.myn.tmp",
+                "rejected",
+            ),
+            (
+                "classify-reject-uppercase-attachment-hex",
+                "attachments/<64-UPPERCASE-hex> — attachment ids are lowercase hex on disk; the grammar is case-sensitive.",
+                "attachments/0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+                "rejected",
+            ),
+            (
+                "classify-reject-short-attachment-hex",
+                "attachments/<63-hex> — the id MUST be exactly 64 hex chars (a 32-byte content address).",
+                "attachments/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde",
+                "rejected",
+            ),
+            (
+                "classify-reject-uppercase-uuid",
+                "notes/<UPPERCASE-uuid>.myn — disk-format UUIDs are strict lowercase; uuid-library leniency (uppercase/braced forms) MUST NOT leak into the grammar.",
+                "notes/0190A000-0000-7000-8000-000000000001.myn",
+                "rejected",
+            ),
+            (
+                "classify-reject-snapshot-missing-pair",
+                "snapshots/<uuid>.myn without the '__<snap-uuid>' pair — the snapshot grammar requires both UUIDs.",
+                "snapshots/0190a000-0000-7000-8000-000000000001.myn",
+                "rejected",
+            ),
+        ];
+
+        // ---- self-assertions at mint ----------------------------------
+        let scratch = dir.path().join("scratch.bin");
+        for (slug, _, bytes, expected) in &verify_fail_cases {
+            fs::write(&scratch, bytes).unwrap();
+            match read_and_verify_container(&scratch) {
+                Err(e) if e == *expected => {}
+                other => panic!("{slug}: expected Err({expected:?}), got {other:?}"),
+            }
+        }
+        for (slug, _, path, family) in &classify_cases {
+            let got = validate_member_path(path)
+                .ok()
+                .and_then(|()| classify_member_path(path))
+                .map(family_str)
+                .unwrap_or("rejected");
+            assert_eq!(got, *family, "{slug}: classifier disagrees at mint");
+        }
+        let verified_minimal = read_and_verify_container(&minimal_dest).expect("minimal verifies");
+        assert_eq!(verified_minimal, minimal_records);
+        let verified_full = read_and_verify_container(&full_dest).expect("full verifies");
+        assert_eq!(verified_full, full_records);
+
+        // ---- emission --------------------------------------------------
+        let mut dump = String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"backup-container\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.11\",\n");
+        dump.push_str("  \"description\": \"Pins the MYB1 .myne-backup container codec (MYND-254; codec landed MYND-217, spec §9.11): write_container + read_and_verify_container + the §9.11.3 closed-allowlist classifier in src-tauri/src/backup_container.rs (package myne-desktop — the first family whose reference implementation lives OUTSIDE the protocol crate; the codec is std/fs-bound by design). The container is a credential-free, UNKEYED integrity layer: per-member SHA-256 over path_len_be16 || path || member_bytes detects accidental corruption, never tampering (tamper defense = per-blob AEAD). Member content is opaque at this layer; vault.meta presence + exact-345 structural parse is the restore engine's stage 5 and is deliberately NOT vectored here. 32 cases: 2 encode (minimal vault.meta-only + full-allowlist; input member order is deliberately UNSORTED — the writer must sort by raw path bytes, so same member set always yields identical container bytes) + 2 verify_ok (records with independently checkable sha256_hex) + 14 verify_fail (all 13 vectorable BackupContainerError variants + the MYB5 v005-reservation magic case; the two ceiling cases are 22-byte header-only files pinning the §9.11.6 stage order: ceilings BEFORE the file-length equation) + 14 classify_path (one accept per family + 8 load-bearing rejects). Cases generated by `cargo test -p myne-desktop --lib emit_backup_container_vectors_for_paste -- --ignored` (in src-tauri/src/backup_container.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        let emit_encode = |dump: &mut String,
+                           slug: &str,
+                           description: &str,
+                           members: &[(String, PathBuf)],
+                           container: &[u8]| {
+            dump.push_str("    {\n");
+            dump.push_str(&format!(
+                "      \"vector_id\": \"backup-container/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"encode\",\n");
+            dump.push_str("      \"input_members\": [\n");
+            for (i, (path, _)) in members.iter().enumerate() {
+                dump.push_str(&format!(
+                    "        {{ \"path\": \"{}\", \"bytes_hex\": \"{}\" }}{}\n",
+                    json_escape(path),
+                    hex_encode(body_of(path)),
+                    if i + 1 == members.len() { "" } else { "," }
+                ));
+            }
+            dump.push_str("      ],\n");
+            dump.push_str(&format!(
+                "      \"expected_container_hex\": \"{}\"\n",
+                hex_encode(container)
+            ));
+            dump.push_str("    },\n");
+        };
+
+        emit_encode(
+            &mut dump,
+            "encode-minimal-vault-meta-only",
+            "The smallest valid container: the single REQUIRED member vault.meta (345 bytes, §9.3 fixed length; content is an opaque 0xAB fill — the container never parses member bytes). Layout: 22-byte header + one 52-byte record (42 fixed + 10-byte path) + 345 data bytes = 419 total.",
+            &minimal_members,
+            &minimal_bytes,
+        );
+        emit_encode(
+            &mut dump,
+            "encode-full-allowlist-canonical-order",
+            "One member per §9.11.3 family, presented in DELIBERATELY unsorted input order. The writer MUST sort records by raw path bytes (attachments/* < notes/* < snapshots/* < vault.attachments < vault.meta < vault.prefs) and lay data in table order — so the same member set always encodes to identical bytes regardless of input order (§9.11.2 canonical-encoding pin).",
+            &full_members_unsorted,
+            &full_bytes,
+        );
+
+        let emit_verify_ok = |dump: &mut String,
+                              slug: &str,
+                              description: &str,
+                              container: &[u8],
+                              records: &[MemberRecord]| {
+            dump.push_str("    {\n");
+            dump.push_str(&format!(
+                "      \"vector_id\": \"backup-container/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"verify_ok\",\n");
+            dump.push_str(&format!(
+                "      \"input_container_hex\": \"{}\",\n",
+                hex_encode(container)
+            ));
+            dump.push_str("      \"expected_member_records\": [\n");
+            for (i, rec) in records.iter().enumerate() {
+                dump.push_str(&format!(
+                    "        {{ \"path\": \"{}\", \"len\": {}, \"sha256_hex\": \"{}\" }}{}\n",
+                    json_escape(&rec.path),
+                    rec.len,
+                    hex_encode(&rec.sha256),
+                    if i + 1 == records.len() { "" } else { "," }
+                ));
+            }
+            dump.push_str("      ]\n");
+            dump.push_str("    },\n");
+        };
+
+        emit_verify_ok(
+            &mut dump,
+            "verify-ok-minimal",
+            "Parse + verify the minimal container back to its single record. The sha256_hex value is independently checkable: SHA-256(path_len_be16 || path || member_bytes) per §9.11.2 — the hash formula pin.",
+            &minimal_bytes,
+            &minimal_records,
+        );
+        emit_verify_ok(
+            &mut dump,
+            "verify-ok-full-allowlist",
+            "Parse + verify the full-allowlist container back to its six records in table (canonical) order.",
+            &full_bytes,
+            &full_records,
+        );
+
+        let emit_verify_fail =
+            |dump: &mut String,
+             slug: &str,
+             description: &str,
+             container: &[u8],
+             expected_error: &BackupContainerError| {
+                dump.push_str("    {\n");
+                dump.push_str(&format!(
+                    "      \"vector_id\": \"backup-container/v0.1/{slug}\",\n"
+                ));
+                dump.push_str(&format!(
+                    "      \"description\": \"{}\",\n",
+                    json_escape(description)
+                ));
+                dump.push_str("      \"case_kind\": \"verify_fail\",\n");
+                dump.push_str(&format!(
+                    "      \"input_container_hex\": \"{}\",\n",
+                    hex_encode(container)
+                ));
+                dump.push_str(&format!(
+                    "      \"expected_error\": \"{}\"\n",
+                    error_str(expected_error)
+                ));
+                dump.push_str("    },\n");
+            };
+
+        for (slug, description, bytes, expected) in &verify_fail_cases {
+            emit_verify_fail(&mut dump, slug, description, bytes, expected);
+        }
+
+        let total_classify = classify_cases.len();
+        for (i, (slug, description, path, family)) in classify_cases.iter().enumerate() {
+            dump.push_str("    {\n");
+            dump.push_str(&format!(
+                "      \"vector_id\": \"backup-container/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"classify_path\",\n");
+            dump.push_str(&format!(
+                "      \"input_member_path\": \"{}\",\n",
+                json_escape(path)
+            ));
+            dump.push_str(&format!("      \"expected_family\": \"{family}\"\n"));
+            if i + 1 < total_classify {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        fs::write("/tmp/myne_backup_container_vectors.json", dump.as_bytes())
+            .expect("write backup-container vectors dump");
+    }
+
+    /// `expected_error` string for a vectorable [`BackupContainerError`]
+    /// variant — kept in lockstep with the runner's reverse match and the
+    /// companion schema's enum. `Cancelled` / `Io` are runtime conditions,
+    /// not byte-derivable, and never appear in vectors.
+    fn error_str(e: &BackupContainerError) -> &'static str {
+        match e {
+            BackupContainerError::HeaderTooShort => "header_too_short",
+            BackupContainerError::MagicMismatch => "magic_mismatch",
+            BackupContainerError::ProtocolVersionMismatch => "protocol_version_mismatch",
+            BackupContainerError::ReservedByteNonZero => "reserved_byte_nonzero",
+            BackupContainerError::MemberCountOverflow => "member_count_overflow",
+            BackupContainerError::MemberTableOverflow => "member_table_overflow",
+            BackupContainerError::PathInvalid => "path_invalid",
+            BackupContainerError::PathNotAllowlisted => "path_not_allowlisted",
+            BackupContainerError::DuplicatePath => "duplicate_path",
+            BackupContainerError::PathOrderViolation => "path_order_violation",
+            BackupContainerError::MemberLenOverflow => "member_len_overflow",
+            BackupContainerError::LengthsInconsistent => "lengths_inconsistent",
+            BackupContainerError::HashMismatch => "hash_mismatch",
+            BackupContainerError::Cancelled | BackupContainerError::Io(_) => {
+                unreachable!("runtime-only variants are never vectored")
+            }
+        }
+    }
+
+    /// Byte-level integration runner against the `myne-test-vectors/`
+    /// companion checkout — the src-tauri sibling of
+    /// `protocol/tests/vectors.rs`. Skips with an explanatory message when
+    /// the companion repo is not checked out.
+    #[test]
+    fn backup_container_vectors() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("myne-test-vectors")
+            .join("vectors")
+            .join("backup-container")
+            .join("v0.1")
+            .join("cases.json");
+
+        if !path.exists() {
+            eprintln!(
+                "[skip] backup-container: companion repo fixture not present at {}",
+                path.display()
+            );
+            return;
+        }
+
+        let raw =
+            fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let doc: serde_json::Value =
+            serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+        assert_eq!(doc["schema"], "backup-container");
+        assert_eq!(doc["protocol_version"], "v0.1");
+
+        let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+        assert!(
+            cases.len() >= 32,
+            "backup-container must carry at least 32 vectors (2 encode + 2 verify_ok + 14 verify_fail + 14 classify_path); found {}",
+            cases.len()
+        );
+        let mut seen_ids = std::collections::HashSet::with_capacity(cases.len());
+        for case in cases {
+            let id = case["vector_id"]
+                .as_str()
+                .expect("vector_id must be a string");
+            assert!(
+                seen_ids.insert(id),
+                "[backup-container] duplicate vector_id '{id}' in cases array"
+            );
+        }
+
+        let dir = ScopedTempDir::new("bc-vector-run").unwrap();
+        let mut seen_kinds = std::collections::HashSet::new();
+        let mut seen_errors = std::collections::HashSet::new();
+        let mut accepted_families = std::collections::HashSet::new();
+        let mut rejected_paths = std::collections::HashSet::new();
+
+        for (case_idx, case) in cases.iter().enumerate() {
+            let id = case["vector_id"]
+                .as_str()
+                .expect("vector_id must be a string");
+            let case_kind = case["case_kind"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+            seen_kinds.insert(case_kind.to_string());
+
+            match case_kind {
+                "encode" => {
+                    let members_json = case["input_members"]
+                        .as_array()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_members"));
+                    // Pass members through in the order given — the
+                    // vectors present them unsorted to pin writer-sorts.
+                    let mut members: Vec<(String, PathBuf)> =
+                        Vec::with_capacity(members_json.len());
+                    for (i, m) in members_json.iter().enumerate() {
+                        let member_path = m["path"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] member {i} missing path"));
+                        let bytes = hex_decode(
+                            m["bytes_hex"]
+                                .as_str()
+                                .unwrap_or_else(|| panic!("[{id}] member {i} missing bytes_hex")),
+                        );
+                        let src = dir.path().join(format!("case{case_idx}-m{i}"));
+                        fs::write(&src, &bytes).unwrap();
+                        members.push((member_path.to_string(), src));
+                    }
+                    let expected = hex_decode(
+                        case["expected_container_hex"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] missing expected_container_hex")),
+                    );
+
+                    let dest = dir.path().join(format!("case{case_idx}.myne-backup"));
+                    write_container(&dest, &members)
+                        .unwrap_or_else(|e| panic!("[{id}] write_container failed: {e:?}"));
+                    let actual = fs::read(&dest).unwrap();
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "[{id}] backup-container encode mismatch ({} bytes)",
+                        expected.len(),
+                    );
+                }
+                "verify_ok" => {
+                    let bytes = hex_decode(
+                        case["input_container_hex"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] missing input_container_hex")),
+                    );
+                    let expected_records = case["expected_member_records"]
+                        .as_array()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_member_records"));
+
+                    let dest = dir.path().join(format!("case{case_idx}.myne-backup"));
+                    fs::write(&dest, &bytes).unwrap();
+                    let records = read_and_verify_container(&dest)
+                        .unwrap_or_else(|e| panic!("[{id}] verify failed: {e:?}"));
+
+                    assert_eq!(
+                        records.len(),
+                        expected_records.len(),
+                        "[{id}] record count mismatch"
+                    );
+                    for (i, (rec, exp)) in records.iter().zip(expected_records).enumerate() {
+                        assert_eq!(
+                            rec.path,
+                            exp["path"].as_str().unwrap_or_else(|| panic!(
+                                "[{id}] expected record {i} missing path"
+                            )),
+                            "[{id}] record {i} path mismatch (table order is canonical)"
+                        );
+                        assert_eq!(
+                            rec.len,
+                            exp["len"].as_u64().unwrap_or_else(|| panic!(
+                                "[{id}] expected record {i} missing len"
+                            )),
+                            "[{id}] record {i} len mismatch"
+                        );
+                        assert_eq!(
+                            hex_encode(&rec.sha256),
+                            exp["sha256_hex"].as_str().unwrap_or_else(|| panic!(
+                                "[{id}] expected record {i} missing sha256_hex"
+                            )),
+                            "[{id}] record {i} sha256 mismatch (hash = SHA-256(path_len_be16 || path || member_bytes))"
+                        );
+                    }
+                }
+                "verify_fail" => {
+                    let bytes = hex_decode(
+                        case["input_container_hex"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] missing input_container_hex")),
+                    );
+                    let expected_error = case["expected_error"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                    seen_errors.insert(expected_error.to_string());
+
+                    let expected_variant = match expected_error {
+                        "header_too_short" => BackupContainerError::HeaderTooShort,
+                        "magic_mismatch" => BackupContainerError::MagicMismatch,
+                        "protocol_version_mismatch" => {
+                            BackupContainerError::ProtocolVersionMismatch
+                        }
+                        "reserved_byte_nonzero" => BackupContainerError::ReservedByteNonZero,
+                        "member_count_overflow" => BackupContainerError::MemberCountOverflow,
+                        "member_table_overflow" => BackupContainerError::MemberTableOverflow,
+                        "path_invalid" => BackupContainerError::PathInvalid,
+                        "path_not_allowlisted" => BackupContainerError::PathNotAllowlisted,
+                        "duplicate_path" => BackupContainerError::DuplicatePath,
+                        "path_order_violation" => BackupContainerError::PathOrderViolation,
+                        "member_len_overflow" => BackupContainerError::MemberLenOverflow,
+                        "lengths_inconsistent" => BackupContainerError::LengthsInconsistent,
+                        "hash_mismatch" => BackupContainerError::HashMismatch,
+                        other => panic!(
+                            "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with BackupContainerError (and error_str)"
+                        ),
+                    };
+
+                    let dest = dir.path().join(format!("case{case_idx}.myne-backup"));
+                    fs::write(&dest, &bytes).unwrap();
+                    match read_and_verify_container(&dest) {
+                        Err(e) if e == expected_variant => {}
+                        Err(other) => panic!(
+                            "[{id}] expected verify_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                        ),
+                        Ok(records) => panic!(
+                            "[{id}] expected verify_fail '{expected_error}', read_and_verify_container returned Ok ({} records)",
+                            records.len()
+                        ),
+                    }
+                }
+                "classify_path" => {
+                    let member_path = case["input_member_path"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_member_path"));
+                    let expected_family = case["expected_family"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_family"));
+
+                    let got = validate_member_path(member_path)
+                        .ok()
+                        .and_then(|()| classify_member_path(member_path))
+                        .map(family_str)
+                        .unwrap_or("rejected");
+                    assert_eq!(
+                        got, expected_family,
+                        "[{id}] §9.11.3 allowlist classification mismatch for {member_path:?}"
+                    );
+                    if got == "rejected" {
+                        rejected_paths.insert(member_path.to_string());
+                    } else {
+                        accepted_families.insert(got);
+                    }
+                }
+                other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            }
+        }
+
+        // Coverage floors (vault-search parity): every case_kind, every
+        // vectorable error variant, every family accepted at least once,
+        // and the two reserved-out singletons rejected at least once.
+        for kind in ["encode", "verify_ok", "verify_fail", "classify_path"] {
+            assert!(
+                seen_kinds.contains(kind),
+                "backup-container missing every case of case_kind '{kind}' — coverage regression"
+            );
+        }
+        for err in [
+            "header_too_short",
+            "magic_mismatch",
+            "protocol_version_mismatch",
+            "reserved_byte_nonzero",
+            "member_count_overflow",
+            "member_table_overflow",
+            "path_invalid",
+            "path_not_allowlisted",
+            "duplicate_path",
+            "path_order_violation",
+            "member_len_overflow",
+            "lengths_inconsistent",
+            "hash_mismatch",
+        ] {
+            assert!(
+                seen_errors.contains(err),
+                "backup-container missing verify_fail coverage for BackupContainerError '{err}' — every vectorable reject must be pinned"
+            );
+        }
+        for family in [
+            "vault-meta",
+            "vault-prefs",
+            "note",
+            "snapshot",
+            "attachments-catalog",
+            "attachment-blob",
+        ] {
+            assert!(
+                accepted_families.contains(family),
+                "backup-container missing a classify_path accept for family '{family}' — the §9.11.3 grammar must be pinned from the accept side too"
+            );
+        }
+        for must_reject in ["vault.search", "vault.workspace"] {
+            assert!(
+                rejected_paths.contains(must_reject),
+                "backup-container missing the classify_path reject for '{must_reject}' — the reserved-out singletons are load-bearing"
+            );
+        }
+    }
 }

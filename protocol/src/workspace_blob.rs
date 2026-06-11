@@ -347,4 +347,408 @@ mod tests {
             Err(WorkspaceBlobError::CiphertextLenOverflow),
         );
     }
+
+    // ---- KAT vector regenerator (companion repo) ----------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/vault-workspace/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_vault_workspace_vectors.json`,
+    /// ready to copy verbatim into the companion repo.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act, not a
+    /// side effect of `cargo test`. Run with:
+    /// `cargo test -p protocol --lib emit_vault_workspace_vectors_for_paste -- --ignored`
+    ///
+    /// 12 cases pin (MYND-254 / §9.7):
+    /// - 3 `encrypt` × {empty / small pane-tree descriptor / 1-KB opaque
+    ///   plaintext} — pin the `MYW1` byte output. `session_state_key` is
+    ///   derived from `root_key` via `SubkeyRole::SessionStateKey` so the
+    ///   vector exercises the full root_key → KEK → blob lineage.
+    /// - 1 `decrypt_ok` (small-descriptor round-trip) — proves the decoder
+    ///   recovers the opaque inner plaintext.
+    /// - 2 `decrypt_aead_fail` — (a) single-byte CTX-tag tamper, (b)
+    ///   cross-vault (wrong `account_number_hash` via the AAD binding).
+    ///   Both collapse to `WorkspaceBlobError::CannotDecrypt`
+    ///   non-distinguishing per spec §6.4.
+    /// - 6 `parse_fail` — one per distinguishable pre-decryption reject
+    ///   (`MagicMismatch`, `ProtocolVersionMismatch`, `FormatUnsupported`,
+    ///   `HeaderTooShort`, `CiphertextTruncated`, `CiphertextLenOverflow`).
+    ///   These run BEFORE decryption; the caller collapses every variant to
+    ///   the default (empty) workspace per §9.7.4, but a port MUST surface
+    ///   the specific reject so that fall-back stays honest.
+    ///
+    /// `PlaintextTooLarge` + `RandomnessUnavailable` are encode-side and
+    /// cannot be expressed as a decode-a-blob case, so they are not
+    /// vectored (documented in the category's `schema.md`).
+    #[test]
+    #[ignore]
+    fn emit_vault_workspace_vectors_for_paste() {
+        extern crate std;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Distinct byte patterns per field — easy visual cross-check.
+        // root_key (NOT the KEK): the runner derives session_state_key from
+        // this via derive_subkey(SubkeyRole::SessionStateKey), exactly as a
+        // production caller would. account_hash binds via the AAD. Patterns
+        // match this test mod's fixtures (0x42 root / 0x33 hash / 0x77
+        // nonce) so unit tests and vectors stay visually aligned.
+        let root_key: [u8; 32] = [0x42; 32];
+        let account_hash: [u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN] =
+            [0x33; WORKSPACE_BLOB_ACCOUNT_HASH_LEN];
+        let other_account_hash: [u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN] =
+            [0x44; WORKSPACE_BLOB_ACCOUNT_HASH_LEN];
+        let nonce: [u8; AEAD_NONCE_LEN] = [0x77; AEAD_NONCE_LEN];
+
+        let session_state_key = derive_subkey(&root_key, SubkeyRole::SessionStateKey);
+
+        // Deterministic opaque plaintexts (the codec is payload-agnostic).
+        // The small case is a realistic single-pane workspace descriptor —
+        // the same fixture the round_trip_opaque_plaintext unit test pins.
+        let plaintext_empty: alloc::vec::Vec<u8> = alloc::vec::Vec::new();
+        let plaintext_small: alloc::vec::Vec<u8> =
+            (*br#"{"focused":"p1","root":{"k":"leaf","id":"p1","tabs":["n1"],"active":"n1"}}"#)
+                .to_vec();
+        let plaintext_1kb: alloc::vec::Vec<u8> = (0..1024u32).map(|i| (i % 256) as u8).collect();
+
+        let blob_empty =
+            encode_workspace_blob_raw(&session_state_key, &account_hash, &plaintext_empty, &nonce)
+                .expect("encode empty");
+        let blob_small =
+            encode_workspace_blob_raw(&session_state_key, &account_hash, &plaintext_small, &nonce)
+                .expect("encode small");
+        let blob_1kb =
+            encode_workspace_blob_raw(&session_state_key, &account_hash, &plaintext_1kb, &nonce)
+                .expect("encode 1kb");
+
+        // Round-trip sanity on the small blob.
+        let decoded = decode_workspace_blob(&session_state_key, &account_hash, &blob_small)
+            .expect("decode small round-trip");
+        assert_eq!(decoded.as_slice(), plaintext_small.as_slice());
+
+        // decrypt_aead_fail (a): flip the final byte (inside the CTX tag).
+        let mut blob_tag_tamper = blob_small.clone();
+        let last = blob_tag_tamper.len() - 1;
+        blob_tag_tamper[last] ^= 0xFF;
+        assert_eq!(
+            decode_workspace_blob(&session_state_key, &account_hash, &blob_tag_tamper),
+            Err(WorkspaceBlobError::CannotDecrypt),
+            "tag tamper must reject"
+        );
+        // decrypt_aead_fail (b): valid blob, wrong account_hash (AAD bind).
+        assert_eq!(
+            decode_workspace_blob(&session_state_key, &other_account_hash, &blob_small),
+            Err(WorkspaceBlobError::CannotDecrypt),
+            "cross-vault account_hash must reject"
+        );
+
+        // parse_fail blobs: corrupt a valid blob per structural reject.
+        let mut pf_magic = blob_small.clone();
+        pf_magic[0] = b'X';
+        let mut pf_version = blob_small.clone();
+        pf_version[4] = 0x02;
+        let mut pf_workspace_format = blob_small.clone();
+        pf_workspace_format[5] = 0x02;
+        let pf_header_short: alloc::vec::Vec<u8> = WORKSPACE_BLOB_MAGIC.to_vec(); // 4 bytes < 34
+        let mut pf_truncated = blob_small.clone();
+        pf_truncated.truncate(pf_truncated.len() - 1);
+        let mut pf_len_overflow = blob_small.clone();
+        pf_len_overflow[30..34].copy_from_slice(&0xFFFF_FFFFu32.to_be_bytes());
+
+        let root_key_hex = hex_lower(&root_key);
+        let account_hash_hex = hex_lower(&account_hash);
+        let other_account_hash_hex = hex_lower(&other_account_hash);
+        let nonce_hex = hex_lower(&nonce);
+        let session_state_key_hex = hex_lower(&*session_state_key);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"vault-workspace\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.7 + §3.4 + §5.2 + §6.4\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_workspace_blob_raw + protocol::decode_workspace_blob byte mapping for the MYW1 vault.workspace encrypted editor-workspace-state codec (MYND-254; codec landed MYND-166). The inner plaintext is OPAQUE (client-serialized pane-tree descriptor) — no canonical-JSON discipline, unlike vault-prefs. session_state_key = derive_subkey(root_key, SubkeyRole::SessionStateKey) (role 'session-state-key'); account_number_hash binds via aad_workspace_blob (role 'workspace-blob' — a DISTINCT load-bearing string). 12 cases: 3 encrypt (empty / small descriptor / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4) + 6 parse_fail (one per distinguishable pre-decryption structural reject). Cases generated by `cargo test -p protocol --lib emit_vault_workspace_vectors_for_paste -- --ignored` (in protocol/src/workspace_blob.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // ---- encrypt closure ----------------------------------------
+        let emit_encrypt = |dump: &mut alloc::string::String,
+                            slug: &str,
+                            description: &str,
+                            plaintext: &[u8],
+                            blob: &[u8],
+                            include_info: bool,
+                            trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-workspace/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"encrypt\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                root_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                account_hash_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_plaintext_hex\": \"{}\",\n",
+                hex_lower(plaintext)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_nonce_hex\": \"{}\",\n",
+                nonce_hex
+            ));
+            if include_info {
+                dump.push_str(&alloc::format!(
+                    "      \"informational_session_state_key_hex\": \"{}\",\n",
+                    session_state_key_hex
+                ));
+            }
+            dump.push_str(&alloc::format!(
+                "      \"expected_workspace_blob_hex\": \"{}\"\n",
+                hex_lower(blob)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-empty",
+            "Encode an empty inner plaintext (no restored workspace — the caller-side default). The smallest valid MYW1 blob: 34-byte header + 0-byte ciphertext + 32-byte CTX tag = 66 bytes. ciphertext_len field = 32.",
+            &plaintext_empty,
+            &blob_empty,
+            true,
+            true,
+        );
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-small-descriptor",
+            "Encode a 75-byte single-pane workspace descriptor (a realistic serialized pane tree: one leaf pane, one tab, focused). The codec is byte-transparent — the JSON shape is the desktop client's, not the codec's. Expected blob = 34 + 75 + 32 = 141 bytes.",
+            &plaintext_small,
+            &blob_small,
+            false,
+            true,
+        );
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-1kb",
+            "Encode a 1024-byte plaintext where byte i = (i mod 256). Mid-size case — exercises a full XChaCha20 keystream block plus tail. Expected blob = 34 + 1024 + 32 = 1090 bytes.",
+            &plaintext_1kb,
+            &blob_1kb,
+            false,
+            true,
+        );
+
+        // ---- decrypt_ok ---------------------------------------------
+        dump.push_str("    {\n");
+        dump.push_str(
+            "      \"vector_id\": \"vault-workspace/v0.1/decrypt-ok-small-descriptor\",\n",
+        );
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Round-trip the small-descriptor blob back to its opaque plaintext under the matching root_key (→ session_state_key) + account_number_hash. Proves the decoder's header parse + AEAD unwrap reconstruct the exact inner bytes the desktop layer will deserialize.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_small)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            root_key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            account_hash_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_hex\": \"{}\"\n",
+            hex_lower(&plaintext_small)
+        ));
+        dump.push_str("    },\n");
+
+        // ---- decrypt_aead_fail closure ------------------------------
+        let emit_aead_fail = |dump: &mut alloc::string::String,
+                              slug: &str,
+                              description: &str,
+                              blob: &[u8],
+                              account_hash_arg_hex: &str,
+                              tamper_desc: &str,
+                              trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-workspace/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"decrypt_aead_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                root_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                account_hash_arg_hex
+            ));
+            dump.push_str("      \"expected_kind\": \"aead_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"informational_tamper_description\": \"{}\"\n",
+                json_escape(tamper_desc)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_aead_fail(
+            &mut dump,
+            "decrypt-tampered-ctx-tag",
+            "Take the small-descriptor blob and flip the final byte (inside the 32-byte CTX commitment tag) via XOR 0xFF. The decoder MUST surface a non-distinguishing CannotDecrypt — the recomputed CTX commitment no longer matches. Same observable outcome as the cross-vault case below (spec §6.4).",
+            &blob_tag_tamper,
+            &account_hash_hex,
+            "final byte (inside CTX tag) flipped via XOR 0xFF",
+            true,
+        );
+
+        emit_aead_fail(
+            &mut dump,
+            "decrypt-cross-vault-account-hash",
+            "Take the intact small-descriptor blob but decrypt under a DIFFERENT account_number_hash (0x44×16 instead of 0x33×16). aad_workspace_blob binds the account hash, so the AAD differs and AEAD verification fails — a blob from vault A cannot be opened against vault B. Collapses to the same CannotDecrypt as the tamper case; ports MUST NOT distinguish the two.",
+            &blob_small,
+            &other_account_hash_hex,
+            "intact blob decrypted under wrong account_number_hash (0x44×16)",
+            true,
+        );
+
+        // ---- parse_fail closure -------------------------------------
+        let emit_parse_fail = |dump: &mut alloc::string::String,
+                               slug: &str,
+                               description: &str,
+                               blob: &[u8],
+                               expected_error: &str,
+                               trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-workspace/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_error\": \"{}\"\n",
+                expected_error
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-magic-mismatch",
+            "First byte of the MYW1 magic corrupted to 'X'. Rejected at offset 0 before any decryption (magic-byte-before-decrypt discipline, §9.7.1).",
+            &pf_magic,
+            "magic_mismatch",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-protocol-version-mismatch",
+            "protocol_version byte (offset 4) set to 0x02 instead of 0x01. A v0.1 decoder rejects an unknown protocol version before decrypting.",
+            &pf_version,
+            "protocol_version_mismatch",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-format-unsupported",
+            "workspace_format_version byte (offset 5) set to 0x02 — a future pane-tree serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls back to the default (empty) workspace (§9.7.4). This is the forward-migration hook and is load-bearing.",
+            &pf_workspace_format,
+            "format_unsupported",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-header-too-short",
+            "Only the 4-byte MYW1 magic, no room for the 34-byte header. Rejected before any field read.",
+            &pf_header_short,
+            "header_too_short",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-ciphertext-truncated",
+            "Valid header advertising ciphertext_len = N, but the blob is one byte shorter than header + N. Rejected before the AEAD stage.",
+            &pf_truncated,
+            "ciphertext_truncated",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-ciphertext-len-overflow",
+            "ciphertext_len field (offset 30..34) set to 0xFFFFFFFF, far above MAX_WORKSPACE_PLAINTEXT_LEN + 32 (1 MiB + 32). The overflow guard rejects before any slice indexing — a port MUST bound-check ciphertext_len before allocating or indexing.",
+            &pf_len_overflow,
+            "ciphertext_len_overflow",
+            false,
+        );
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_vault_workspace_vectors.json", dump.as_bytes())
+            .expect("write vault-workspace vectors dump");
+    }
 }

@@ -144,6 +144,11 @@ cargo check -p myne_desktop_lib
 cargo clippy -p myne_desktop_lib --all-targets -- -D warnings
 pnpm tauri dev          # full app loop (from repo root)
 pnpm tauri build        # production bundle (from repo root)
+
+# backup-container test vectors (MYND-254 — the one vector family hosted
+# here instead of protocol/; see src/backup_container.rs test mod):
+cargo test -p myne-desktop --lib backup_container               # incl. the companion-repo runner
+cargo test -p myne-desktop --lib emit_backup_container_vectors_for_paste -- --ignored   # regenerate
 ```
 
 ## Gotchas
