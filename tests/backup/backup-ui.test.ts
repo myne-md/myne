@@ -1,12 +1,8 @@
-// MYND-56 task 9: the backup-reminder predicate's truth table and the
-// exhaustiveness of both closed-enum → copy mappings. Pure logic only —
-// no Tauri, no DOM.
+// MYND-56 task 9: exhaustiveness of both closed-enum → copy mappings.
+// Pure logic only — no Tauri, no DOM. (The 30-day reminder predicate that
+// used to live here was removed with the banner, decisions.md 2026-06-11.)
 
 import { describe, expect, it } from "vitest";
-import {
-  BACKUP_REMINDER_DAYS,
-  shouldShowBackupReminder,
-} from "../../src/lib/vault-backup";
 import {
   exportErrorMessage,
   restoreErrorMessage,
@@ -15,52 +11,6 @@ import type {
   BackupExportError,
   BackupRestoreError,
 } from "../../src/types/backup-export-error";
-
-const DAY = 24 * 60 * 60;
-const NOW = 1_765_432_100;
-
-describe("shouldShowBackupReminder (SYNC-9, 30-day banner)", () => {
-  const base = {
-    vaultNonEmpty: true,
-    lastBackupAt: null as number | null,
-    nowSeconds: NOW,
-    dismissedThisSession: false,
-  };
-
-  it("shows for a never-backed-up, non-empty vault", () => {
-    expect(shouldShowBackupReminder(base)).toBe(true);
-  });
-
-  it("never shows for an empty vault (fresh create)", () => {
-    expect(shouldShowBackupReminder({ ...base, vaultNonEmpty: false })).toBe(
-      false,
-    );
-  });
-
-  it("hides while the backup is fresh, shows once past the threshold", () => {
-    expect(
-      shouldShowBackupReminder({ ...base, lastBackupAt: NOW - DAY }),
-    ).toBe(false);
-    expect(
-      shouldShowBackupReminder({
-        ...base,
-        lastBackupAt: NOW - BACKUP_REMINDER_DAYS * DAY,
-      }),
-    ).toBe(false); // exactly at the boundary: not yet "older than"
-    expect(
-      shouldShowBackupReminder({
-        ...base,
-        lastBackupAt: NOW - (BACKUP_REMINDER_DAYS * DAY + 1),
-      }),
-    ).toBe(true);
-  });
-
-  it("session dismissal wins over every other condition", () => {
-    expect(
-      shouldShowBackupReminder({ ...base, dismissedThisSession: true }),
-    ).toBe(false);
-  });
-});
 
 describe("closed-enum error copy maps", () => {
   it("covers every BackupExportError variant with non-empty copy", () => {
