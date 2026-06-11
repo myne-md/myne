@@ -23,65 +23,18 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  createNote,
+  dismissImporterOffer,
+  editorText,
+  typeIntoEditor,
+  unlockToEditor,
+  waitForSaved,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
-
-/** Create a note via the sidebar CTA and commit `title` through the
- *  inline-rename input (Enter). Leaves the note selected. */
-async function createNote(session: Session, title: string): Promise<void> {
-  await (await session.byTestId("notes.create")).click();
-  const rename = await session.byTestId("notes.rename-input");
-  await rename.sendKeys(`${title}`);
-  await session.waitForGone(testIdSelector("notes.rename-input"));
-}
-
-/** Type into the live CodeMirror document. A plain element click does
- *  NOT focus CM under this driver (activeElement stays put); sendKeys'
- *  implicit focus does, but keys sent during that focus settle drop
- *  silently (observed as a truncated leading edge). So: probe with a
- *  sacrificial character until one actually lands — proof the key
- *  pipeline is live — then send the payload and verify it arrived.
- *  Callers' asserts are `includes(...)`, so stray probe chars are
- *  harmless. */
-async function typeIntoEditor(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement(CM_CONTENT);
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await editorText(session)).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(text);
-  await session.waitUntil(async () => (await editorText(session)).includes(text) || null, {
-    label: "typed text landed in the document",
-  });
-}
-
-/** Wait until the autosave badge settles on "Saved" AFTER having seen
- *  the edit register ("Editing…"/"Saving…") — polling for "Saved" alone
- *  could match the pre-edit clean state. */
-async function waitForSaved(session: Session): Promise<void> {
-  // The post-edit saved state renders "Saved·<rel>" (separator + relative
-  // time) — distinguishable from the pre-edit clean state's bare "Saved",
-  // so this can't pass before the edit's own save actually landed.
-  await session.waitUntil(
-    async () =>
-      (await (await session.byTestId("editor.save-status")).textContent()).includes("Saved·") ||
-      null,
-    { label: "autosave settled on Saved·<rel>", timeoutMs: 15_000 },
-  );
-}
-
-/** Current CodeMirror document text (`textContent()` — the doc lives in
- *  nested .cm-line elements this driver's getText drops). Re-found per
- *  call: CM remounts across relock/reload. */
-async function editorText(session: Session): Promise<string> {
-  return (await session.waitForElement(CM_CONTENT)).textContent();
-}
+// createNote / typeIntoEditor / waitForSaved / editorText moved to
+// support/flows.ts (shared with the PS-1 plaintext-residue suite).
 
 /** Right-click an element and pick a context-menu item by its
  *  `data-item-id`. */
