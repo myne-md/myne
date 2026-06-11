@@ -654,7 +654,7 @@ Used in: `spec/markdown-dialect.md` §3.2; `decisions.md` 2026-05-30
 
 ### **local graph** &nbsp; 📦 *Product*
 
-The open note's neighborhood (1-2 hop) subgraph in the [graph view](#graph-view) — the note plus the notes it links to and that link to it, expanded one or two hops (MYND-199). It is a MODE of the graph modal (a note-relative entry centered on the open note), NOT a separate sidebar pane — a deliberate choice to keep the persistent UI calm (a persistent animated graph beside the editor would be the loudest element against the no-decorative-motion canon; deferred behind a dogfood trip-wire as a v1.x canon amendment). A single click pivots (re-centers on the clicked node, no navigation); a double-click opens the note. "Zoom out" returns to the whole-vault graph.
+The open note's neighborhood (1-2 hop) subgraph in the [graph view](#graph-view) — the note plus the notes it links to and that link to it, expanded one or two hops (MYND-199). It is a MODE of the graph modal (a note-relative entry centered on the open note), NOT a separate sidebar pane — a deliberate choice to keep the persistent UI calm (a persistent animated graph beside the editor would be the loudest element against the no-decorative-motion canon; deferred behind a dogfood trip-wire as a v1.x canon amendment). A single click pivots (re-centers on the clicked node, no navigation); a double-click opens the note. Selecting the "All" filter chip returns to the whole-vault graph.
 
 Used in: `vision.md` Phase 1 Scope (graph view)
 

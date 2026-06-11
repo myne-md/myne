@@ -1667,7 +1667,7 @@ function BottomBar({
         <button
           type="button"
           onClick={handleLockClick}
-          aria-label="Vault'u kilitle"
+          aria-label="Lock vault"
           data-testid="editor.lock-cta"
           style={{
             display: "flex",

@@ -13,14 +13,13 @@
 // (`folderKey` + `foldSegment(title)`), so the importer's match key is the
 // resolver's key, not a second scheme (not content-hash, not source-path).
 //
-// RESIDUAL (documented): Myne's frontmatter-only-title model does not persist a
-// note's filename. An imported file with NO frontmatter `title:` becomes an
-// "Untitled" note (no persisted title), so it carries no matchable (folder,
-// title) identity — re-importing an untitled-note vault therefore creates
-// duplicates rather than skipping. Dedup is exact for FM-titled notes (and for
-// imports whose filename matches an existing note's title). This is inherent to
-// the frontmatter-only-title decision (2026-05-28) and the (folder, title)
-// identity SYNC-5 mandated; it is not papered over with a content hash.
+// Identity coverage: the importer injects `title:` from the source filename when
+// an imported file has no frontmatter `title:` of its own (the §6 sanctioned
+// transform, `decisions.md` 2026-06-09 + `markdown-dialect.md` §3.6.1), so every
+// imported note carries a matchable (folder, title) identity and re-imports
+// dedup exactly — no content hash needed. A truly title-less ("Untitled") note
+// with no matchable identity arises only OUTSIDE the importer (a Myne-native
+// note the user never named); it is not reachable through this import path.
 
 import { foldSegment, folderKey } from "../../dialect/folderPath";
 
