@@ -17,7 +17,7 @@ The account number is **not** a key. It does not encrypt anything. Possession of
 ## 2. Format
 
 ```
-Display form:   MY-XXXX-XXXX-XXXX-XXXX-X
+Display form:   MY-XXXX-XXXX-XXXX-XXXX-XXXX
 Canonical form: 20 uppercase Crockford base32 characters
 
 Layout:
