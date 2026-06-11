@@ -93,17 +93,26 @@ pub fn run() {
             // the app still starts (the transitional resolver falls back to
             // the legacy `vault/` until a later boot completes the move).
             match app.path().app_data_dir() {
-                Ok(base) => match vault_migration::migrate_legacy_vault(&base) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        let kind = vault_migration::migration_failure_kind(&e);
-                        tracing::error!(
-                            stage = "vault_migration_failed",
-                            io_failure_kind = ?kind,
-                            "boot migration failed; old vault/ left intact for next-boot retry"
-                        );
+                Ok(base) => {
+                    match vault_migration::migrate_legacy_vault(&base) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            let kind = vault_migration::migration_failure_kind(&e);
+                            tracing::error!(
+                                stage = "vault_migration_failed",
+                                io_failure_kind = ?kind,
+                                "boot migration failed; old vault/ left intact for next-boot retry"
+                            );
+                        }
                     }
-                },
+                    // MYND-253 self-heal: prune file-free `vaults/<id>/`
+                    // leftovers (an interrupted create, or the empty dir the
+                    // pre-fix migration stranded) so discovery does not flag
+                    // them `Corrupted` forever. rmdir-only — structurally
+                    // incapable of deleting data — and deliberately HERE,
+                    // not in discovery: read paths stay side-effect-free.
+                    vault_registry::sweep_empty_vault_dirs(&base);
+                }
                 Err(_) => {
                     tracing::error!(
                         stage = "vault_migration_app_data_dir",

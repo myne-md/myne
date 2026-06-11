@@ -64,10 +64,15 @@ pub async fn vault_export_backup<R: Runtime>(
     destination: String,
 ) -> Result<ExportSummary, BackupExportError> {
     let target = VaultId::parse_optional(vault_id.as_deref());
-    let vault_dir =
-        crate::paths::vault_dir_for_id(&app, target).map_err(|_| BackupExportError::Io {
+    // Non-creating resolver (MYND-253): export reads an EXISTING vault; a
+    // missing/forged target must fail the vault.meta probe below cleanly —
+    // the old creating resolver materialized an empty legacy `vault/` here,
+    // the trigger of the 2026-06-11 data-loss incident.
+    let vault_dir = crate::paths::vault_root_for_id_optional(&app, target).map_err(|_| {
+        BackupExportError::Io {
             io_error_kind: IoFailureKind::Other,
-        })?;
+        }
+    })?;
     let destination = PathBuf::from(destination);
 
     // Progress forwarder: counts-only payloads to the WebView (SYNC-7).

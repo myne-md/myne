@@ -294,27 +294,22 @@ pub fn current_vault_id<R: Runtime>(app: &AppHandle<R>) -> Result<VaultId, AppEr
     Ok(current_vault_id_from_base(&app_data_dir(app)?))
 }
 
-/// Resolve the vault directory and ensure it exists. The returned
-/// `PathBuf` points at the current vault root (`vaults/<id>/`, or the
-/// transitional legacy `vault/`) and the directory is `create_dir_all`'d
-/// before return.
-pub fn vault_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppError> {
-    // The non-creating resolver owns the base-path lookup + error mapping;
-    // this adds only the `create_dir_all` side effect.
-    let dir = vault_dir_path(app)?;
-    std::fs::create_dir_all(&dir)?;
-    Ok(dir)
-}
-
 /// Resolve the vault directory for an OPTIONAL explicit [`VaultId`] and ensure
-/// it exists — the TARGETING counterpart to [`vault_dir`] (sub-feature 2 task
-/// 4, SYNC-6 create targeting).
+/// it exists — the CREATE-flow targeting resolver (sub-feature 2 task 4,
+/// SYNC-6 create targeting). `vault_creation::commit` is its ONLY intended
+/// caller: creating a vault root is exclusively the create / restore /
+/// migration flows' privilege. Every other command resolves through the
+/// non-creating [`vault_root_for_id_optional`] — a resolver `create_dir_all`
+/// side effect on a probe path is what materialized the empty legacy `vault/`
+/// behind the 2026-06-11 data-loss incident (MYND-253).
 ///
 /// - `Some(id)` → `<app_data_dir>/vaults/<id>/`, `create_dir_all`'d (the
-///   picker / create flow of sub-feature 3+ passes the minted/chosen id).
-/// - `None` → the sole-vault fallback ([`vault_dir`]), which preserves the
-///   current single-vault create destination (legacy `vault/` on a fresh
-///   install until the boot migration of task 4 mints a real id).
+///   create flow passes the minted/chosen id).
+/// - `None` → the sole-vault fallback path ([`vault_dir_path`]), returned
+///   WITHOUT creating it. In the create flow this arm is reachable only with
+///   an absent/expired session, where commit fails at the session take
+///   before any write — so nothing legitimate ever needs the legacy dir
+///   materialized here.
 pub fn vault_dir_for_id<R: Runtime>(
     app: &AppHandle<R>,
     vault_id: Option<VaultId>,
@@ -325,17 +320,37 @@ pub fn vault_dir_for_id<R: Runtime>(
             std::fs::create_dir_all(&dir)?;
             Ok(dir)
         }
-        // sole-vault fallback until picker (sub-feature 3).
-        None => vault_dir(app),
+        // sole-vault fallback until picker (sub-feature 3) — path only.
+        None => vault_dir_path(app),
+    }
+}
+
+/// Resolve the vault directory for an OPTIONAL explicit [`VaultId`] **without
+/// creating anything** — the targeting resolver for every command that reads
+/// or destroys an EXISTING vault (`vault_delete`, `vault_export_backup`).
+///
+/// - `Some(id)` → `<app_data_dir>/vaults/<id>/` (path only; a stale or
+///   forged IPC id resolves to a non-existent path the caller's own probe —
+///   `vault.meta` check / delete scan — turns into a clean `VaultNotFound`,
+///   instead of materializing an empty `vaults/<bogus-id>/` that discovery
+///   would flag `Corrupted`).
+/// - `None` → the sole-vault fallback ([`vault_dir_path`]).
+pub fn vault_root_for_id_optional<R: Runtime>(
+    app: &AppHandle<R>,
+    vault_id: Option<VaultId>,
+) -> Result<PathBuf, AppError> {
+    match vault_id {
+        Some(id) => vault_root_for_id(app, id),
+        None => vault_dir_path(app),
     }
 }
 
 /// Resolve the vault directory path **without creating it**.
 ///
 /// Used by read-only probes — `vault_repair`'s residue scan (MYND-159) —
-/// that must not have the side effect of materializing an empty vault
-/// directory on a device that never created a vault. [`vault_dir`] (which
-/// `create_dir_all`s) stays the canonical resolver for write paths.
+/// and by the `None` arms of the targeting resolvers above: nothing outside
+/// the create / restore / migration flows may materialize a vault directory
+/// as a side effect (the 2026-06-11 incident class, MYND-253).
 pub fn vault_dir_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppError> {
     // TRANSITIONAL (multi-vault sub-feature 2 — SYNC-6): replace with
     // active-VaultId resolution.
@@ -353,9 +368,10 @@ pub fn vault_dir_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppErro
 /// `AppError` shape collapses kind information into `IoErrorKind::Other`,
 /// which would lose that signal.
 ///
-/// Idempotent: `create_dir_all` is recursive, so a missing
-/// `vaults/<id>` parent is created in the same call; second call on the
-/// same `app` is a no-op.
+/// Idempotent: a second call on the same `app` is a no-op. The vault ROOT
+/// must already exist — child resolvers never create vault roots (the
+/// 2026-06-11 incident class, MYND-253); a missing root surfaces as
+/// `NotFound` instead of being silently materialized.
 ///
 /// Tested via the lower-level [`notes_dir_under`] helper (which takes a
 /// base path directly, allowing `ScopedTempDir` exercise without
@@ -375,7 +391,11 @@ pub fn notes_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
 /// `parent` is the vault root (`vaults/<id>/`) in production; tests pass a
 /// `ScopedTempDir` path so `notes_dir`'s behavior can be exercised
 /// without spinning up a Tauri runtime.
+///
+/// The root itself must already exist ([`require_vault_root`]) — only the
+/// `notes/` child is ever created here.
 pub(crate) fn notes_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
+    require_vault_root(parent)?;
     let dir = parent.join("notes");
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
@@ -399,10 +419,31 @@ pub fn snapshots_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf>
 /// Pure helper — joins `parent` with `"snapshots"` and `create_dir_all`s the
 /// result. Used by [`snapshots_dir`] (Tauri-aware caller) and tests (which pass
 /// a `ScopedTempDir` path to exercise behavior without a Tauri runtime).
+///
+/// The root itself must already exist ([`require_vault_root`]) — only the
+/// `snapshots/` child is ever created here.
 pub(crate) fn snapshots_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
+    require_vault_root(parent)?;
     let dir = parent.join("snapshots");
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
+}
+
+/// Guard for the child-directory resolvers: the vault ROOT must already
+/// exist. Child resolvers never create vault roots — a recursive
+/// `create_dir_all` here once materialized a phantom vault root for a
+/// locked/absent vault, the trigger class of the 2026-06-11 data-loss
+/// incident (MYND-253). Vault roots are created only by the create /
+/// restore / migration flows.
+fn require_vault_root(parent: &Path) -> std::io::Result<()> {
+    if parent.is_dir() {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "vault root does not exist",
+        ))
+    }
 }
 
 /// [`current_vault_root`] re-mapped into the `std::io::Result` universe the
@@ -454,18 +495,30 @@ mod tests {
     }
 
     #[test]
-    fn notes_dir_under_creates_missing_parent() {
-        // `create_dir_all` is recursive — even if `parent` (a
-        // `vaults/<id>/` root) doesn't exist, the call should create both.
-        let tmp = ScopedTempDir::new("notes-dir-recursive").unwrap();
+    fn notes_dir_under_rejects_missing_parent_without_creating_it() {
+        // Child resolvers never create vault roots (MYND-253): a missing
+        // `vaults/<id>/` root must surface as NotFound, and NOTHING may be
+        // materialized — the recursive-create behavior this test used to
+        // pin is the trigger class of the 2026-06-11 data-loss incident.
+        let tmp = ScopedTempDir::new("notes-dir-no-root").unwrap();
         let nested_parent = tmp
             .path()
             .join("vaults")
             .join("vault-that-doesnt-exist-yet");
-        let result = notes_dir_under(&nested_parent).unwrap();
-        assert!(result.is_dir());
-        assert!(nested_parent.is_dir(), "parent must be created too");
-        assert_eq!(result, nested_parent.join("notes"));
+
+        let err = notes_dir_under(&nested_parent)
+            .expect_err("a missing vault root must be rejected, not created");
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+        assert!(
+            !nested_parent.exists(),
+            "the resolver must not materialize the vault root"
+        );
+
+        // Same contract for the snapshots sibling.
+        let err = snapshots_dir_under(&nested_parent)
+            .expect_err("a missing vault root must be rejected, not created");
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+        assert!(!nested_parent.exists());
     }
 
     // ---- notes_dir_under: file-at-notes-path defensive -----------------
