@@ -133,6 +133,49 @@ export class Element {
     });
   }
 
+  /** Click while holding ONE modifier key, via the W3C Actions API with
+   *  the key + pointer input sources run in lockstep (the modifier is DOWN
+   *  across the pointer move/down/up ticks, then released). Drives the
+   *  workspace open-modifier affordances on a note row (`NoteRow`): Control
+   *  ("") or Meta ("") → open in a new tab; Alt ("") →
+   *  open to the side / split. Pass `key` as a `\uE0xx` escape, never a
+   *  literal (the invisible-key hazard — see the U+E007 memory). */
+  async modifierClick(key: string): Promise<void> {
+    await this.session.send("POST", "/actions", {
+      actions: [
+        {
+          type: "key",
+          id: "kbd",
+          actions: [
+            { type: "keyDown", value: key },
+            { type: "pause", duration: 0 },
+            { type: "pause", duration: 0 },
+            { type: "pause", duration: 0 },
+            { type: "keyUp", value: key },
+          ],
+        },
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            { type: "pause", duration: 0 },
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: { [ELEMENT_KEY]: this.elementId },
+              x: 0,
+              y: 0,
+            },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 0 },
+          ],
+        },
+      ],
+    });
+  }
+
   text(): Promise<string> {
     return this.session.send("GET", this.path("/text"));
   }

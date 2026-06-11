@@ -151,6 +151,8 @@ export function TabStrip({
       }}
       role="tablist"
       aria-label="Open notes"
+      data-testid="editor.tab-strip"
+      data-pane-id={paneId}
       // Whole strip is a drop target (reorder / move / open) — dropping in the
       // empty trailing space appends, dropping among the tabs inserts.
       onDragOver={(e) => {
@@ -279,7 +281,9 @@ function Tab({ id, paneId, title, active, dirty, onActivate, onClose }: TabProps
     <div
       role="tab"
       aria-selected={active}
+      data-testid="editor.tab"
       data-note-id={id}
+      data-active={active}
       title={text}
       draggable
       onDragStart={handleDragStart}

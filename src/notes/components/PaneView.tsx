@@ -376,6 +376,9 @@ export function PaneView({
   return (
     <section
       onMouseDownCapture={focusThisPane}
+      data-testid="editor.pane"
+      data-pane-id={leaf.id}
+      data-focused={focused}
       style={{
         position: "relative",
         flex: 1,
