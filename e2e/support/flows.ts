@@ -1,7 +1,9 @@
 // Shared in-app flow fragments used by multiple scenario suites.
 //
 // SYNC-13: helpers here never log credential-bearing values; assertion
-// shapes are length-only / index-only.
+// shapes are length-only / index-only. The note-editing helpers carry
+// note-content markers — the accepted in-source scenario-constant
+// class (not credentials; see the notes suite header).
 
 import { expect } from "vitest";
 import { testIdSelector, type Session } from "./webdriver";
@@ -117,6 +119,75 @@ export async function completePasswordReset(
     timeoutMs: 15_000,
   });
   await submit.click();
+}
+
+const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+
+/** Create a note via the sidebar CTA and commit `title` through the
+ *  inline-rename input (Enter). Leaves the note selected. */
+export async function createNote(session: Session, title: string): Promise<void> {
+  await (await session.byTestId("notes.create")).click();
+  const rename = await session.byTestId("notes.rename-input");
+  await rename.sendKeys(`${title}`);
+  await session.waitForGone(testIdSelector("notes.rename-input"));
+}
+
+/** Type into the live CodeMirror document. A plain element click does
+ *  NOT focus CM under this driver (activeElement stays put); sendKeys'
+ *  implicit focus does, but keys sent during that focus settle drop
+ *  silently (observed as a truncated leading edge). So: probe with a
+ *  sacrificial character until one actually lands — proof the key
+ *  pipeline is live — then send the payload and verify it arrived.
+ *  The async note-content load can ALSO reset the document mid-stream
+ *  (observed: probe chars wiped + the payload's leading edge swallowed
+ *  by the fresh doc), so a payload that didn't land gets ONE re-send.
+ *  Callers' asserts are `includes(...)`, so stray probe chars and a
+ *  leftover truncated fragment are harmless. */
+export async function typeIntoEditor(session: Session, text: string): Promise<void> {
+  const content = await session.waitForElement(CM_CONTENT);
+  await content.click();
+  await session.waitUntil(
+    async () => {
+      await content.sendKeys("q");
+      return (await editorText(session)).includes("q") || null;
+    },
+    { label: "keystroke pipeline established", timeoutMs: 10_000 },
+  );
+  const landed = async () => (await editorText(session)).includes(text) || null;
+  await content.sendKeys(text);
+  try {
+    await session.waitUntil(landed, {
+      label: "typed text landed in the document",
+      timeoutMs: 5_000,
+    });
+  } catch {
+    await content.sendKeys(text);
+    await session.waitUntil(landed, {
+      label: "typed text landed in the document (after re-send)",
+    });
+  }
+}
+
+/** Wait until the autosave badge settles on "Saved" AFTER having seen
+ *  the edit register ("Editing…"/"Saving…") — polling for "Saved" alone
+ *  could match the pre-edit clean state. */
+export async function waitForSaved(session: Session): Promise<void> {
+  // The post-edit saved state renders "Saved·<rel>" (separator + relative
+  // time) — distinguishable from the pre-edit clean state's bare "Saved",
+  // so this can't pass before the edit's own save actually landed.
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("editor.save-status")).textContent()).includes("Saved·") ||
+      null,
+    { label: "autosave settled on Saved·<rel>", timeoutMs: 15_000 },
+  );
+}
+
+/** Current CodeMirror document text (`textContent()` — the doc lives in
+ *  nested .cm-line elements this driver's getText drops). Re-found per
+ *  call: CM remounts across relock/reload. */
+export async function editorText(session: Session): Promise<string> {
+  return (await session.waitForElement(CM_CONTENT)).textContent();
 }
 
 /**

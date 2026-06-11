@@ -232,7 +232,15 @@ export class Session {
     );
   }
 
-  /** Poll an arbitrary predicate (for non-element conditions). */
+  /** Poll an arbitrary predicate (for non-element conditions).
+   *
+   *  A stale-element error thrown INSIDE the predicate counts as "not
+   *  yet", not as a failure: it means the DOM moved between a find and
+   *  the dependent read (React remounts race every handle — observed on
+   *  `waitForGone`'s mid-enumeration unmounts and on CodeMirror reads
+   *  across reload), and the next tick re-finds a fresh handle. A
+   *  predicate that keeps hitting stale exhausts the budget and fails
+   *  with this label, never silently passes. */
   async waitUntil<T>(
     fn: () => Promise<T | null | undefined | false>,
     opts?: FindOptions & { label?: string },
@@ -241,7 +249,13 @@ export class Session {
     const interval = opts?.intervalMs ?? DEFAULT_INTERVAL_MS;
     const deadline = Date.now() + timeout;
     for (;;) {
-      const result = await fn();
+      let result: T | null | undefined | false;
+      try {
+        result = await fn();
+      } catch (e) {
+        if (!(e instanceof WebDriverError && e.code === "stale element reference")) throw e;
+        result = null;
+      }
       if (result) return result;
       if (Date.now() >= deadline) {
         throw new Error(`waitUntil(${opts?.label ?? "predicate"}) timed out after ${timeout} ms`);

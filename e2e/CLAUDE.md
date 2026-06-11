@@ -21,7 +21,11 @@
   length-only counts, emptiness booleans, in-page reductions (see
   `captureFailureOutcome`). In-source scenario constants are the accepted
   exception. `e2e/artifacts/` may capture credentials on failure — gitignored,
-  never attach to public issues.
+  never attach to public issues. The at-rest plaintext residue proof is PS-1
+  (`plaintext-residue.e2e.ts`, MYND-228): note-content markers are the
+  in-source-constant class; the needle-design rule (single lowercase-alnum
+  tokens ≥24 chars — tokenizer-survivable) lives in the
+  `support/plaintext-scan.ts` header.
 - **Load-bearing banner copy is asserted by FULL-LITERAL equality** via
   `src/lib/load-bearing-copy.ts` (or `ioBanner(...)` where production renders
   that mapping). A copy collapse must fail a test.
@@ -50,6 +54,12 @@
   (keystrokes APPEND after a silent no-op clear).
 - Elements go STALE on step remount (e.g. Back navigation) — re-fetch handles
   after any sub-step transition.
+- Post-exit assertions (disk state AFTER the app quit): launch with
+  `keepDataDir: true`, capture `dataHome` in the SEED callback (the
+  launch-failure path leaks the dir otherwise), gate on
+  `waitForFsQuiescence` after `scenario()` returns (WebKit's auxiliary
+  processes flush late), and own the final `rmSync` in a `finally`.
+  PS-1 (`plaintext-residue.e2e.ts`) is the template.
 - Definition of done for a new/changed scenario: **green 3× consecutive in the
   container** (`./scripts/e2e-local.sh`, `--skip-build` when only test files
   changed; production-code changes need the full rebuild).
