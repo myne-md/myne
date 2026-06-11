@@ -51,9 +51,6 @@ import { Toast } from "../components/Toast";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
 import { BackupExportModal } from "../components/backup/BackupExportModal";
-import { BackupReminderBanner } from "../components/backup/BackupReminderBanner";
-import { shouldShowBackupReminder } from "../lib/vault-backup";
-import { usePrefs } from "../hooks/usePrefs";
 import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
@@ -360,24 +357,8 @@ function EditorChrome({
   const ws = useWorkspace();
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
-  // Backup-export modal (MYND-56 task 1) + the 30-day reminder's
-  // session-scoped dismissal (SYNC-9 — deliberately no persistent snooze).
+  // Backup-export modal (MYND-56 task 1).
   const [backupExportOpen, setBackupExportOpen] = useState<boolean>(false);
-  const [backupReminderDismissed, setBackupReminderDismissed] = useState<boolean>(false);
-  const { prefs: reminderPrefs } = usePrefs();
-  // Memoized so the editor's keystroke re-renders don't re-evaluate the
-  // predicate; `Date.now()` is sampled when a meaningful input changes,
-  // which is more than fresh enough for a 30-day threshold.
-  const showBackupReminder = useMemo(
-    () =>
-      shouldShowBackupReminder({
-        vaultNonEmpty: ctx.cache.size > 0,
-        lastBackupAt: reminderPrefs.last_backup_at,
-        nowSeconds: Math.floor(Date.now() / 1000),
-        dismissedThisSession: backupReminderDismissed,
-      }),
-    [ctx.cache.size, reminderPrefs.last_backup_at, backupReminderDismissed],
-  );
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
   const [graphOpen, setGraphOpen] = useState<boolean>(false);
   // MYND-53 — Obsidian importer: the active-import modal + the onboarding offer
@@ -673,12 +654,6 @@ function EditorChrome({
         minHeight: 0,
       }}
     >
-      {showBackupReminder && (
-        <BackupReminderBanner
-          onBackUpNow={() => setBackupExportOpen(true)}
-          onDismiss={() => setBackupReminderDismissed(true)}
-        />
-      )}
       {/* Transient "saving…" overlay during a multi-vault switch (MYND-205).
           Shows while `switchVault`'s param-less `vault_lock()` flushes the
           prior vault + tears it down, before the Stage routes to the target's

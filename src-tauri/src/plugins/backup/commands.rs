@@ -53,9 +53,9 @@ pub struct ExportSummary {
     pub prefs_included: bool,
 }
 
-/// Export the vault at `vault_id` (explicit id, or the sole vault when
-/// absent — the `vault_delete` targeting pattern) as a `.myne-backup` file
-/// at `destination`.
+/// Export the vault at `vault_id` (explicit id, else the ACTIVE unlocked
+/// vault, else the sole-vault fallback) as a `.myne-backup` file at
+/// `destination`.
 #[tauri::command]
 pub async fn vault_export_backup<R: Runtime>(
     app: AppHandle<R>,
@@ -63,7 +63,15 @@ pub async fn vault_export_backup<R: Runtime>(
     vault_id: Option<String>,
     destination: String,
 ) -> Result<ExportSummary, BackupExportError> {
-    let target = VaultId::parse_optional(vault_id.as_deref());
+    // Active-vault resolution (the prefs/notes/workspace pattern): the
+    // editor's "Back up vault" carries no id, and the legacy sole-vault
+    // disk heuristic mis-resolves once `vaults/<id>/` roots exist — it
+    // materialized an empty legacy dir and reported VaultNotFound for an
+    // open vault.
+    let target = match VaultId::parse_optional(vault_id.as_deref()) {
+        Some(id) => Some(id),
+        None => state.active_vault_id().await,
+    };
     // Non-creating resolver (MYND-253): export reads an EXISTING vault; a
     // missing/forged target must fail the vault.meta probe below cleanly —
     // the old creating resolver materialized an empty legacy `vault/` here,

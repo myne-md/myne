@@ -39,7 +39,7 @@ const backupVaultAction: CommandAction = {
   category: "Vault",
   // Editor-stage guarded like the importer entry: the flow's natural home
   // is the unlocked session (and the unlocked export records
-  // `last_backup_at`, the reminder's clock — spec §9.5.2).
+  // `last_backup_at` — spec §9.5.2).
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onBackupVault();

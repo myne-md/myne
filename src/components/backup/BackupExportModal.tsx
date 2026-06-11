@@ -1,7 +1,7 @@
 // Backup-export progress modal (MYND-56 task 1; engine MYND-32).
 //
 // Post-unlock modal carve-out (decisions.md 2026-05-08) — solicited via the
-// Settings button / palette action / reminder banner. Importer anatomy:
+// Settings button / palette action. Importer anatomy:
 // inert while running (no backdrop/Esc dismiss), the error state closes via
 // its explicit button only. Success closes itself and hands the parent a
 // Toast line — the file's existence already means "verified" (SYNC-4).
@@ -10,10 +10,11 @@
 // overwrite confirm) → `vault_export_backup` with `backup://progress`
 // counts. Cancel → `backup_cancel` (cooperative; partial output discarded).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
+import { Spinner } from "../Spinner";
 import { exportErrorMessage } from "../../lib/backup-errors";
 import {
   backupCancel,
@@ -29,6 +30,33 @@ import type {
 type ExportState =
   | { step: "running"; progress: BackupProgress | null }
   | { step: "error"; message: string };
+
+// Modal anatomy shared with DeleteAttachmentDialog: padded body + a
+// right-aligned footer row, all tokens (src/CLAUDE.md "Design tokens").
+const BODY_STYLE: CSSProperties = {
+  padding: "var(--space-4) var(--space-5)",
+  fontFamily: "var(--font-sans)",
+  fontSize: 14,
+  lineHeight: 1.6,
+  color: "var(--fg-1)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+};
+
+const FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "var(--space-2)",
+  padding: "var(--space-3) var(--space-5) var(--space-4)",
+};
+
+const PROGRESS_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-3)",
+  color: "var(--fg-2)",
+};
 
 interface BackupExportModalProps {
   open: boolean;
@@ -116,42 +144,46 @@ export function BackupExportModal({
       onClose={state.step === "error" ? onClose : () => {}}
     >
       {state.step === "running" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div
-            data-testid="backup-export.progress"
-            style={{ fontSize: 14, color: "var(--fg-2)" }}
-          >
-            {state.progress === null
-              ? "Preparing…"
-              : state.progress.phase === "verify"
-                ? `Verifying ${state.progress.done} of ${state.progress.total}…`
-                : `Copying ${state.progress.done} of ${state.progress.total}…`}
+        <>
+          <div style={BODY_STYLE}>
+            <div style={PROGRESS_ROW_STYLE} data-testid="backup-export.progress">
+              <Spinner size={16} />
+              <span>
+                {state.progress === null
+                  ? "Preparing…"
+                  : state.progress.phase === "verify"
+                    ? `Verifying ${state.progress.done} of ${state.progress.total}…`
+                    : `Copying ${state.progress.done} of ${state.progress.total}…`}
+              </span>
+            </div>
           </div>
-          <div>
+          <div style={FOOTER_STYLE}>
             <Button
-              variant="secondary"
+              variant="ghost"
               onClick={() => void backupCancel()}
               data-testid="backup-export.cancel"
             >
               Cancel
             </Button>
           </div>
-        </div>
+        </>
       )}
       {state.step === "error" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div
-            data-testid="backup-export.error"
-            style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}
-          >
-            {state.message}
+        <>
+          <div style={BODY_STYLE}>
+            <div
+              data-testid="backup-export.error"
+              style={{ color: "var(--fg-2)" }}
+            >
+              {state.message}
+            </div>
           </div>
-          <div>
+          <div style={FOOTER_STYLE}>
             <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
           </div>
-        </div>
+        </>
       )}
     </ModalShell>
   );
