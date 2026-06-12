@@ -1,0 +1,44 @@
+# Permissions for the in-app `pdf-export` Tauri plugin (MYND-255 task 4,
+# epic export-suite). Picked up under the `pdf-export:` ACL namespace only
+# because `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `pdf-export:default` / `pdf-export:page` (or
+# `pdf-export:allow-<cmd>`).
+#
+# TWO SEATS, deliberately split:
+#   - `default` — the MAIN window's seat (capabilities/default.json):
+#     `pdf_export_render` only. The main window can START an export but
+#     can never play the hidden page's role.
+#   - `page` — the hidden render window's seat (capabilities/pdf-export.json,
+#     windows: ["pdf-export"]): `pdf_export_payload` + `pdf_export_ready`
+#     only. The hidden window can fetch its staged payload and signal
+#     layout settle, and can invoke NOTHING else — not even
+#     `pdf_export_render` (least-privilege, TB6).
+#
+# Adding a command here without a matching `build.rs`
+# `InlinedPlugin::commands` entry is a security regression.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the pdf-export plugin — the MAIN window's render trigger only (the hidden page's commands live in the `page` set)."
+permissions = ["allow-pdf-export-render"]
+
+[[set]]
+identifier = "page"
+description = "Hidden render-window seat: payload fetch + readiness signal only. Granted exclusively by capabilities/pdf-export.json (windows: [\"pdf-export\"]); never add this set to the main window's capability."
+permissions = ["allow-pdf-export-payload", "allow-pdf-export-ready"]
+
+[[permission]]
+identifier = "allow-pdf-export-render"
+description = "Allow invoking pdf-export:pdf_export_render (stash the already-emitted HTML projection, drive the hidden window + native print-to-PDF, atomically publish the PDF at a user-chosen destination — deliberate TB3 egress under the OS save dialog's consent)."
+commands.allow = ["pdf_export_render"]
+
+[[permission]]
+identifier = "allow-pdf-export-payload"
+description = "Allow invoking pdf-export:pdf_export_payload (hidden render window fetches the staged HTML + title for the in-flight export session)."
+commands.allow = ["pdf_export_payload"]
+
+[[permission]]
+identifier = "allow-pdf-export-ready"
+description = "Allow invoking pdf-export:pdf_export_ready (hidden render window signals fonts/images/layout settled, releasing the native capture)."
+commands.allow = ["pdf_export_ready"]

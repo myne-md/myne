@@ -24,10 +24,11 @@ use std::path::Path;
 
 use protocol::{
     aad_password_wrap, aad_recovery_wrap, aad_vault_items_key_wrap, aead_open_ctx, aead_seal_ctx,
-    derive_password_wrap_key, derive_recovery_wrap_key, derive_subkey, generate_account_number,
-    generate_recovery_phrase, generate_root_key, parse_vault_meta, serialize_vault_meta, KdfParams,
-    ProtocolError, SubkeyRole, VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN,
-    VAULT_META_LEN,
+    compute_attachment_id, derive_password_wrap_key, derive_recovery_wrap_key, derive_subkey,
+    encode_attachment_blob, encode_attachments_catalog, encode_new_note, generate_account_number,
+    generate_recovery_phrase, generate_root_key, parse_vault_meta, serialize_vault_meta,
+    AttachmentMeta, AttachmentsCatalog, KdfParams, ProtocolError, SubkeyRole, VaultMeta,
+    ACCOUNT_NUMBER_HASH_LEN, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN, VAULT_META_LEN,
 };
 use zeroize::Zeroizing;
 
@@ -72,6 +73,18 @@ pub struct Fixture {
     pub account: String,
     /// The serialized 345-byte `vault.meta`.
     pub meta_bytes: [u8; VAULT_META_LEN],
+    /// Account-number hash (§ 9.3 offset 6) — the AAD ingredient every
+    /// vault-level blob (prefs / search / catalog / …) binds to.
+    pub account_hash: [u8; ACCOUNT_NUMBER_HASH_LEN],
+    /// The unwrapped root key — retained so suite builders (e.g.
+    /// [`write_export_suite`]) can derive vault-level subkeys exactly
+    /// like the unlocked production host. Fixture credentials are
+    /// per-run throwaways; `Zeroizing` keeps the drop discipline anyway.
+    pub root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    /// The unwrapped items key (`vault.meta` § 9.3 offset 281, opened).
+    pub items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    /// UUIDv7 bytes identifying [`Self::items_key`].
+    pub items_key_id: [u8; 16],
 }
 
 fn random_bytes<const N: usize>() -> Result<[u8; N], ProtocolError> {
@@ -143,6 +156,10 @@ pub fn build_fixture(password: &str, kdf_params: KdfParams) -> Result<Fixture, P
         phrase: phrase.words().join(" "),
         account: account.display.clone(),
         meta_bytes: serialize_vault_meta(&meta),
+        account_hash: account.hash,
+        root_key,
+        items_key,
+        items_key_id,
     })
 }
 
@@ -196,6 +213,197 @@ pub fn unwrap_root_key_with_phrase(
         &meta.enc_root_key_recovery,
         &aad,
     )
+}
+
+// ---- Note-export E2E suite (MYND-116 task 5) ----------------------------
+//
+// Pre-baked note + attachment content for `e2e/note-export.e2e.ts`:
+// one note WITHOUT attachments (byte-verbatim export assert) and one
+// note WITH two canonical form-C embeds whose catalog filenames
+// COLLIDE (exercising the export-side " (1)" suffix-dedup). Composed
+// from the protocol public API only (`encode_new_note`,
+// `encode_attachment_blob`, `encode_attachments_catalog`), the same
+// calls the production write paths make — the blobs decrypt through
+// the untouched production read/export paths.
+
+/// One attachment of the export suite, as the TS harness needs it.
+pub struct ExportSuiteAttachment {
+    /// 64-char lowercase-hex content-addressed attachment-id — the
+    /// `attachments/<id>` blob filename and the form-C embed target.
+    pub id_hex: String,
+    /// Catalog display filename (BOTH suite attachments share it, so
+    /// the export dedups the second to `"… (1).png"`).
+    pub filename: String,
+    /// Plaintext file bytes (ASCII by construction — JSON-emittable).
+    pub contents: String,
+    /// Catalog MIME hint.
+    pub content_type: String,
+}
+
+/// IDs + plaintexts the note-export E2E scenario asserts against.
+pub struct ExportSuite {
+    /// Note WITHOUT attachment refs (canonical lowercase-hyphenated UUID).
+    pub plain_note_id: String,
+    /// Its exact decrypted plaintext (the byte-verbatim export oracle).
+    pub plain_note_plaintext: String,
+    /// Note WITH the two form-C embeds.
+    pub attachments_note_id: String,
+    /// Its exact decrypted plaintext (embeds reference [`Self::attachments`]).
+    pub attachments_note_plaintext: String,
+    /// The two attachments, in first-appearance (= export-naming) order.
+    pub attachments: Vec<ExportSuiteAttachment>,
+    /// Note WITH one form-C `.pdf` embed — the MYND-255 PDF-export
+    /// exclusion-notice bait (a `.pdf` attachment cannot be embedded in
+    /// the generated PDF, so exporting this note raises the notice).
+    pub pdf_note_id: String,
+    /// Its exact decrypted plaintext (embeds [`Self::pdf_attachment`]).
+    pub pdf_note_plaintext: String,
+    /// The `.pdf` attachment the pdf note embeds.
+    pub pdf_attachment: ExportSuiteAttachment,
+}
+
+/// Lowercase-hex render of an attachment id.
+fn hex_lower(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+const PLAIN_NOTE_PLAINTEXT: &str = "---\ntitle: Plain Note\n---\n\n# Plain Note\n\nVerbatim export proof body — line one.\nLine two stays byte-identical through the round trip.\n";
+
+const ATTACHMENT_ONE_CONTENTS: &str = "fixture-attachment-bytes:one\n";
+const ATTACHMENT_TWO_CONTENTS: &str = "fixture-attachment-bytes:two (different from one)\n";
+const ATTACHMENT_SHARED_FILENAME: &str = "evidence.png";
+const ATTACHMENT_CONTENT_TYPE: &str = "image/png";
+const ATTACHMENT_CREATED_AT: u64 = 1_770_000_000;
+
+// MYND-255 PDF-note bait: the FILENAME extension (`.pdf`) is what the
+// HTML projection's exclusion logic keys on; the bytes are ASCII
+// placeholder content (the scenario never opens them as a PDF).
+const PDF_ATTACHMENT_CONTENTS: &str = "fixture-attachment-bytes:pdf placeholder\n";
+const PDF_ATTACHMENT_FILENAME: &str = "report.pdf";
+const PDF_ATTACHMENT_CONTENT_TYPE: &str = "application/pdf";
+
+/// Map a protocol-side encode failure into `io::Error` so the writer
+/// keeps [`write_fixture`]'s `io::Result` surface (a fixture binary —
+/// the message is for the harness operator, nothing secret rides it).
+fn proto_io<E: core::fmt::Debug>(e: E) -> std::io::Error {
+    std::io::Error::other(format!("protocol encode failed: {:?}", e))
+}
+
+/// Write the note-export suite into `<base>/vaults/<vault_id>/`:
+/// `notes/<id>.myn` ×3, `attachments/<id-hex>` ×3, and the `MYC1`
+/// `vault.attachments` catalog. Call once per fixture, right after
+/// [`write_fixture`].
+pub fn write_export_suite(base: &Path, fixture: &Fixture) -> std::io::Result<ExportSuite> {
+    let vault_dir = base.join("vaults").join(&fixture.vault_id);
+    // Build attachment ids first — the notes' plaintexts embed them.
+    // The first two are the MYND-116 dedup bait (shared image filename);
+    // the third is the MYND-255 `.pdf` exclusion bait.
+    let files = [
+        (
+            ATTACHMENT_ONE_CONTENTS,
+            ATTACHMENT_SHARED_FILENAME,
+            ATTACHMENT_CONTENT_TYPE,
+        ),
+        (
+            ATTACHMENT_TWO_CONTENTS,
+            ATTACHMENT_SHARED_FILENAME,
+            ATTACHMENT_CONTENT_TYPE,
+        ),
+        (
+            PDF_ATTACHMENT_CONTENTS,
+            PDF_ATTACHMENT_FILENAME,
+            PDF_ATTACHMENT_CONTENT_TYPE,
+        ),
+    ];
+    let mut attachments = Vec::with_capacity(files.len());
+    let mut catalog = AttachmentsCatalog::empty();
+    let attachments_dir = vault_dir.join("attachments");
+    fs::create_dir_all(&attachments_dir)?;
+    for (contents, filename, content_type) in files {
+        let id = compute_attachment_id(&fixture.root_key, contents.as_bytes());
+        let id_hex = hex_lower(&id);
+        let blob = encode_attachment_blob(
+            &fixture.items_key,
+            &fixture.items_key_id,
+            &id,
+            content_type.as_bytes(),
+            contents.as_bytes(),
+        )
+        .map_err(proto_io)?;
+        fs::write(attachments_dir.join(&id_hex), &blob)?;
+        catalog.entries.insert(
+            id_hex.clone(),
+            AttachmentMeta {
+                content_type: content_type.to_string(),
+                created_at: ATTACHMENT_CREATED_AT,
+                filename: filename.to_string(),
+                size: contents.len() as u64,
+            },
+        );
+        attachments.push(ExportSuiteAttachment {
+            id_hex,
+            filename: filename.to_string(),
+            contents: contents.to_string(),
+            content_type: content_type.to_string(),
+        });
+    }
+    // Split the `.pdf` bait off — `attachments` stays the MYND-116
+    // two-image dedup pair the markdown scenarios index into.
+    let pdf_attachment = attachments.pop().expect("three files were pushed");
+
+    // MYC1 catalog under the canonical subkey + account-hash AAD — the
+    // exact composition `attachments::commands::read_catalog` reverses.
+    let catalog_key = derive_subkey(&fixture.root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_blob = encode_attachments_catalog(&catalog_key, &fixture.account_hash, &catalog)
+        .map_err(proto_io)?;
+    fs::write(vault_dir.join("vault.attachments"), &catalog_blob)?;
+
+    // The attachments note: two canonical form-C embeds
+    // (`![[att:<id>|<name>]]`), shared display filename → dedup.
+    let attachments_note_plaintext = format!(
+        "---\ntitle: Attachments Note\n---\n\n# Attachments Note\n\nFirst: ![[att:{id1}|{name}]]\n\nSecond (same display name, different bytes): ![[att:{id2}|{name}]]\n",
+        id1 = attachments[0].id_hex,
+        id2 = attachments[1].id_hex,
+        name = ATTACHMENT_SHARED_FILENAME,
+    );
+
+    // The pdf note: one form-C `.pdf` embed — the projection excludes
+    // it, so the MYND-255 pre-export notice fires on this note.
+    let pdf_note_plaintext = format!(
+        "---\ntitle: PDF Note\n---\n\n# PDF Note\n\nEmbedded report: ![[att:{id}|{name}]]\n",
+        id = pdf_attachment.id_hex,
+        name = PDF_ATTACHMENT_FILENAME,
+    );
+
+    let notes_dir = vault_dir.join("notes");
+    fs::create_dir_all(&notes_dir)?;
+    let write_note = |plaintext: &str| -> std::io::Result<String> {
+        let note_uuid = uuid::Uuid::now_v7();
+        let blob = encode_new_note(
+            &fixture.items_key,
+            &fixture.items_key_id,
+            note_uuid.as_bytes(),
+            plaintext.as_bytes(),
+        )
+        .map_err(proto_io)?;
+        let id = note_uuid.hyphenated().to_string().to_lowercase();
+        fs::write(notes_dir.join(format!("{}.myn", id)), &blob)?;
+        Ok(id)
+    };
+    let plain_note_id = write_note(PLAIN_NOTE_PLAINTEXT)?;
+    let attachments_note_id = write_note(&attachments_note_plaintext)?;
+    let pdf_note_id = write_note(&pdf_note_plaintext)?;
+
+    Ok(ExportSuite {
+        plain_note_id,
+        plain_note_plaintext: PLAIN_NOTE_PLAINTEXT.to_string(),
+        attachments_note_id,
+        attachments_note_plaintext,
+        attachments,
+        pdf_note_id,
+        pdf_note_plaintext,
+        pdf_attachment,
+    })
 }
 
 #[cfg(test)]
@@ -288,6 +496,95 @@ mod tests {
         );
         assert_eq!(offsets::ENC_ROOT_KEY_RECOVERY + 64, offsets::ITEMS_KEY_ID);
         assert_eq!(offsets::ENC_ITEMS_KEY + 64, offsets::END);
+    }
+
+    /// The export-suite artifacts must open through the SAME protocol
+    /// read math the production export commands run: `decode_note`
+    /// under (items_key, items_key_id), `decode_attachment_blob` under
+    /// the catalog's content_type AAD, and the MYC1 catalog under the
+    /// `AttachmentsCatalogKey` subkey + account-hash AAD. Also pins the
+    /// dedup-bait shape: two DISTINCT ids sharing one display filename,
+    /// both embedded in the attachments note's plaintext.
+    #[test]
+    fn export_suite_round_trips_the_production_read_paths() {
+        let f = build_fixture(PW, WEAK_TEST_KDF).expect("build");
+        let tmp = std::env::temp_dir().join(format!("fixture-gen-export-suite-{}", f.vault_id));
+        write_fixture(&tmp, &f).expect("write fixture");
+        let suite = write_export_suite(&tmp, &f).expect("write export suite");
+        let vault_dir = tmp.join("vaults").join(&f.vault_id);
+
+        // Notes decrypt to the advertised plaintexts.
+        for (id, expected) in [
+            (&suite.plain_note_id, &suite.plain_note_plaintext),
+            (
+                &suite.attachments_note_id,
+                &suite.attachments_note_plaintext,
+            ),
+            (&suite.pdf_note_id, &suite.pdf_note_plaintext),
+        ] {
+            let blob = std::fs::read(vault_dir.join("notes").join(format!("{}.myn", id)))
+                .expect("read note blob");
+            let uuid = uuid::Uuid::parse_str(id).expect("canonical uuid");
+            let decrypted =
+                protocol::decode_note(&blob, uuid.as_bytes(), &f.items_key, &f.items_key_id)
+                    .expect("note decrypts");
+            assert_eq!(decrypted.plaintext(), expected.as_bytes());
+        }
+
+        // Two image attachments: distinct ids, shared filename,
+        // content-addressed. The `.pdf` bait (MYND-255) rides separately:
+        // a distinct id, a `.pdf` filename, embedded in the pdf note.
+        assert_eq!(suite.attachments.len(), 2);
+        assert_ne!(suite.attachments[0].id_hex, suite.attachments[1].id_hex);
+        assert_eq!(suite.attachments[0].filename, suite.attachments[1].filename);
+        assert!(suite.pdf_attachment.filename.ends_with(".pdf"));
+        assert!(suite.pdf_note_plaintext.contains(&format!(
+            "![[att:{}|{}]]",
+            suite.pdf_attachment.id_hex, suite.pdf_attachment.filename
+        )));
+        for att in suite.attachments.iter().chain([&suite.pdf_attachment]) {
+            if att.id_hex != suite.pdf_attachment.id_hex {
+                assert!(suite
+                    .attachments_note_plaintext
+                    .contains(&format!("![[att:{}|{}]]", att.id_hex, att.filename)));
+            }
+            let blob = std::fs::read(vault_dir.join("attachments").join(&att.id_hex))
+                .expect("read attachment blob");
+            let mut id = [0u8; 32];
+            for (i, byte) in id.iter_mut().enumerate() {
+                *byte = u8::from_str_radix(&att.id_hex[i * 2..i * 2 + 2], 16).expect("hex");
+            }
+            assert_eq!(
+                id,
+                compute_attachment_id(&f.root_key, att.contents.as_bytes())
+            );
+            let decrypted = protocol::decode_attachment_blob(
+                &blob,
+                &id,
+                att.content_type.as_bytes(),
+                &f.items_key,
+                &f.items_key_id,
+            )
+            .expect("attachment decrypts");
+            assert_eq!(decrypted.as_slice(), att.contents.as_bytes());
+        }
+
+        // Catalog opens under the canonical subkey + account-hash AAD
+        // and carries exactly the three entries (two images + the pdf).
+        let catalog_key = derive_subkey(&f.root_key, SubkeyRole::AttachmentsCatalogKey);
+        let catalog_blob =
+            std::fs::read(vault_dir.join("vault.attachments")).expect("read catalog");
+        let catalog =
+            protocol::decode_attachments_catalog(&catalog_key, &f.account_hash, &catalog_blob)
+                .expect("catalog decrypts");
+        assert_eq!(catalog.entries.len(), 3);
+        for att in suite.attachments.iter().chain([&suite.pdf_attachment]) {
+            let meta = catalog.entries.get(&att.id_hex).expect("entry present");
+            assert_eq!(meta.filename, att.filename);
+            assert_eq!(meta.size, att.contents.len() as u64);
+        }
+
+        std::fs::remove_dir_all(&tmp).ok();
     }
 
     #[test]

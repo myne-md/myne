@@ -110,9 +110,16 @@ export function mapImportedFile(
       patchTitleField(utf8Encoder.encode(plaintext), readTimeTitle),
     );
   }
-  const preexistingFolder: PreexistingFolder | null = hasPreexistingFolder
-    ? { existing: String((fm as Record<string, unknown>)["folder"]), derivedFromPath: folder }
+  // Equality suppression (SYNC-8, export-suite): a file whose own `folder:`
+  // already equals the path-derived folder needs no attention — flagging it
+  // would mark every note of a re-imported Myne export tree.
+  const existingFolder = hasPreexistingFolder
+    ? String((fm as Record<string, unknown>)["folder"])
     : null;
+  const preexistingFolder: PreexistingFolder | null =
+    existingFolder !== null && existingFolder !== folder
+      ? { existing: existingFolder, derivedFromPath: folder }
+      : null;
 
   const illegalFlags: IllegalSegmentFlag[] = [];
 

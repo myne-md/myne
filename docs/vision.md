@@ -70,7 +70,7 @@ The list of explicit non-goals is longer than usual because privacy products die
 - Minimal graph view (d3-force layout + hand-rolled canvas render, separate panel, lazy-loaded)
 - Obsidian vault importer (`.md` files, YAML frontmatter, `[[wikilinks]]`)
 
-**Definition of done.** v1.0 ships when a real user can install the desktop app, generate a recovery phrase, write notes for 30 days, deliberately lose their password, recover the vault from the phrase, and at no point have plaintext touched the disk outside the in-memory editor session.
+**Definition of done.** v1.0 ships when a real user can install the desktop app, generate a recovery phrase, write notes for 30 days, deliberately lose their password, recover the vault from the phrase, and at no point have plaintext touched the disk outside the in-memory editor session (user-initiated export excepted — see `threat-model.md` §3 TB3).
 
 Everything else — sync server, mobile, web, sharing, real-time collaboration, plugin API — is explicitly out of scope for v1.0 and lives in later phases.
 

@@ -127,8 +127,11 @@ fn main() {
                     "note_update",
                     "note_delete",
                     "note_list",
+                    "note_titles_batch",
                     "note_search",
                     "note_snapshot_flush",
+                    "note_export_as_markdown",
+                    "note_export_attachments",
                 ]),
             )
             .plugin(
@@ -204,6 +207,20 @@ fn main() {
                 ]),
             )
             .plugin(
+                "export",
+                // MYND-211 (whole-vault plaintext markdown tree export).
+                // `vault_export_markdown` is the only path that writes the
+                // exported tree — the Rust core does the IO; the WebView
+                // only picks the destination via the dialog plugin (the
+                // backup narrow-seam posture). Lock-step with
+                // `permissions/export/default.toml`; adding a command here
+                // without a matching `commands.allow` entry is a security
+                // regression (the InlinedPlugin mirror is load-bearing per
+                // the `vault-creation` note above).
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["vault_export_markdown", "vault_export_cancel"]),
+            )
+            .plugin(
                 "importer",
                 // MYND-53 (importer engine read-seam, SYNC-1). `import_read_dir`
                 // + `import_read_file` are the ONLY external-dir read path — no
@@ -215,6 +232,25 @@ fn main() {
                 // `vault-creation` note above).
                 tauri_build::InlinedPlugin::new()
                     .commands(&["import_read_dir", "import_read_file"]),
+            )
+            .plugin(
+                "pdf-export",
+                // MYND-255 task 4 (per-note PDF export). Two seats:
+                // `pdf_export_render` is invoked by the MAIN window
+                // (`pdf-export:default` in capabilities/default.json);
+                // `pdf_export_payload` + `pdf_export_ready` are the
+                // hidden render window's page-seat commands, granted
+                // ONLY by capabilities/pdf-export.json (windows:
+                // ["pdf-export"]). Adding a command here without a
+                // matching `commands.allow` entry in
+                // `permissions/pdf-export/default.toml` is a security
+                // regression (the InlinedPlugin mirror is load-bearing
+                // per the `vault-creation` note above).
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "pdf_export_render",
+                    "pdf_export_payload",
+                    "pdf_export_ready",
+                ]),
             )
             .plugin(
                 "workspace",

@@ -180,6 +180,10 @@ pub async fn unlock<R: Runtime>(
         // MYND-166: drop the prior vault's staged editor-workspace descriptor
         // so the switch can't flush vault A's layout into vault B.
         crate::plugins::workspace::commands::clear_staged_descriptor();
+        // MYND-255: destroy the hidden pdf-export render window and wipe its
+        // stashed HTML payload — vault A's plaintext projection must not
+        // survive the switch into vault B's session.
+        crate::plugins::pdf_export::teardown_on_lock(&app);
         crate::plugins::vault_indices::zeroize_vault_indices(&app);
         crate::plugins::attachments::zeroize_attachment_refs(&app);
         // MYND-205: the prior vault is now locked (its keys were zeroized by
@@ -727,6 +731,11 @@ pub async fn lock<R: Runtime>(
     // MYND-166: wipe the staged editor-workspace descriptor on the same lock
     // path (AS3 note-ids + layout, as sensitive as the index).
     crate::plugins::workspace::commands::clear_staged_descriptor();
+    // MYND-255: destroy the hidden pdf-export render window (a
+    // plaintext-bearing second WebView) and wipe its stashed HTML payload on
+    // the same lock path — locking means locked for every plaintext surface,
+    // not just "main".
+    crate::plugins::pdf_export::teardown_on_lock(&app);
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //

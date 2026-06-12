@@ -13,6 +13,7 @@
       "identifier": "opener:allow-open-path",
       "allow": [{ "path": "$APPDATA/vault" }]
     },
+    "opener:allow-reveal-item-in-dir",
     "vault-creation:default",
     "vault-unlock:default",
     "vault-recover:default",
@@ -26,6 +27,8 @@
     "attachments:default",
     "importer:default",
     "backup:default",
+    "export:default",
+    "pdf-export:default",
     "workspace:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
