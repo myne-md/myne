@@ -400,6 +400,12 @@ The two on-disk wrapped copies of `root_key` in `vault.meta`. Each is 32 bytes o
 
 Used in: `spec/protocol.md` §3.1, §9.3
 
+### **export** &nbsp; 📦 *Product*
+
+A one-shot, user-initiated operation that decrypts user content and writes it as ordinary **unencrypted** files to a destination the user explicitly chose via the OS file dialog — per-note markdown, the whole-vault markdown tree, attachment files, or a rendered PDF. Export is the portability path ("you walk away with your files", `vision.md`): the markdown forms write the stored plaintext **verbatim** (frontmatter included; the only sanctioned mutation is the attachments-mode embed rewrite, `markdown-dialect.md` §6). Terminology wall: an export is never a [vault backup file](#vault-backup-file) (that stays exactly as encrypted as the vault) and never a snapshot (version history). Threat-model framing: a deliberate plaintext crossing of TB3 under user authority — the artifact is outside Myne's protection from the moment it is written (`threat-model.md` §3 TB3, §5). There is no plaintext *mode*: no watch, mirror, or export-on-save exists.
+
+Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 2026-06-11 (export suite)
+
 ### **fall-to-rebuild** &nbsp; 📋 *Protocol*
 
 The fallback path for loading the [search index](#search-index) when the cached `vault.search` blob (`spec/protocol.md` §9.6) cannot be trusted or used — blob absent, magic / version mismatch, AEAD-verification failure, or an unreadable staleness manifest. Instead of incrementally reconciling the cached index against the notes, the client **rebuilds it from scratch** by decrypting every `.myn`. Rebuild always recovers the correct index, so `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more. The complement of the **incremental reconcile** happy path (re-index only the notes whose `content_nonce` changed) — fall-to-rebuild is the always-correct safety net beneath it (`decisions.md` 2026-05-31).

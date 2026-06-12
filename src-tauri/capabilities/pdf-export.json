@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pdf-export",
+  "description": "Near-empty capability for the hidden pdf-export render window (MYND-255). The window is plaintext-bearing but can only fetch its staged payload and signal readiness — no core surface, no fs/dialog/clipboard, nothing else.",
+  "windows": ["pdf-export"],
+  "permissions": ["pdf-export:page"]
+}

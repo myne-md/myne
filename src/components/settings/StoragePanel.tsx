@@ -59,6 +59,21 @@ const BACKUP_BUTTON_ROW_STYLE: CSSProperties = {
   gap: "var(--space-2)",
 };
 
+// Export block (MYND-211): row body + right-aligned action, per the
+// Penpot frame `section------export — settings storage block (MYND-211)`.
+const EXPORT_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-2)",
+};
+
+const EXPORT_BODY_STYLE: CSSProperties = {
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+};
+
 interface StoragePanelProps {
   /** Open the Obsidian vault import flow (MYND-53). Absent → the control is
    *  disabled (e.g. if Settings is ever shown outside the Editor). */
@@ -67,12 +82,17 @@ interface StoragePanelProps {
   onBackupVault?: () => void;
   /** "Restore from backup…" → the restore Stage flow (MYND-218). */
   onRestoreBackup?: () => void;
+  /** "Export…" → the whole-vault markdown export modal (MYND-211). Absent →
+   *  disabled, same defensive degrade as the other rows (Settings only opens
+   *  from the unlocked editor, so the vault is unlocked by construction). */
+  onExportVault?: () => void;
 }
 
 export function StoragePanel({
   onImportObsidian,
   onBackupVault,
   onRestoreBackup,
+  onExportVault,
 }: StoragePanelProps = {}) {
   const [vaultPath, setVaultPath] = useState<string>("…");
 
@@ -151,6 +171,24 @@ export function StoragePanel({
               data-testid="settings.restore-backup"
             >
               Restore from backup…
+            </Button>
+          </div>
+        }
+      />
+
+      <ControlBlock
+        label="Export"
+        helper="Plain markdown tree — not encrypted."
+        control={
+          <div style={EXPORT_ROW_STYLE}>
+            <span style={EXPORT_BODY_STYLE}>Export vault as Markdown</span>
+            <Button
+              variant="secondary"
+              onClick={onExportVault}
+              disabled={onExportVault === undefined}
+              data-testid="vault-export.block-button"
+            >
+              Export…
             </Button>
           </div>
         }

@@ -47,10 +47,13 @@ import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { GraphView } from "../notes/components/GraphView";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
-import { Toast } from "../components/Toast";
+import { Toast, type ToastAction } from "../components/Toast";
+import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
 import { BackupExportModal } from "../components/backup/BackupExportModal";
+import { VaultExportModal } from "../components/export/VaultExportModal";
+import { collectFolderOptions } from "../components/export/vaultExportFlow";
 import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
@@ -62,6 +65,17 @@ import {
   resolveTodayNote,
 } from "../notes";
 import { prefsRead } from "../lib/prefs";
+import {
+  exportToastAction,
+  noteExportOptions,
+  runNoteExportFlow,
+  runNotePdfExportFlow,
+  type AttachmentPreflightChoice,
+  type ExportToast,
+  type NoteExportUiHooks,
+} from "../notes/exportFlow";
+import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
+import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
 import {
   SECTION_HEADING_STYLE,
@@ -225,7 +239,7 @@ export function Editor({
 }: EditorProps) {
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<EditorToast | null>(null);
 
   const probed = useRef(false);
   useEffect(() => {
@@ -311,8 +325,8 @@ export function Editor({
           settingsOpen={settingsOpen}
           onRestoreBackup={onRestoreBackup}
           setSettingsOpen={setSettingsOpen}
-          toastMessage={toastMessage}
-          setToastMessage={setToastMessage}
+          toast={toast}
+          setToast={setToast}
         />
       </WorkspaceProvider>
       </div>
@@ -326,6 +340,14 @@ export function Editor({
  * hook, Tauri close-intercept (T28), editor-blur listener (T29), and
  * the BottomBar's save-status / Lock-flush wiring.
  */
+/** The Editor's single bottom-right toast: a message plus an optional
+ *  inline action (the export flow's "Show in folder", MYND-116 task 4 —
+ *  the soft-trash Undo precedent lives in NoteList's own toast). */
+type EditorToast = {
+  message: string;
+  action?: ToastAction;
+};
+
 type EditorChromeProps = {
   onLock?: () => void;
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
@@ -336,8 +358,8 @@ type EditorChromeProps = {
   settingsOpen: boolean;
   onRestoreBackup: () => void;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
-  toastMessage: string | null;
-  setToastMessage: Dispatch<SetStateAction<string | null>>;
+  toast: EditorToast | null;
+  setToast: Dispatch<SetStateAction<EditorToast | null>>;
 };
 
 function EditorChrome({
@@ -350,15 +372,91 @@ function EditorChrome({
   settingsOpen,
   onRestoreBackup,
   setSettingsOpen,
-  toastMessage,
-  setToastMessage,
+  toast,
+  setToast,
 }: EditorChromeProps) {
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  // Plain-message sink for the pre-existing string consumers (Settings,
+  // backup export, importer); the export flow goes through the structured
+  // `showExportToast` below so success can carry its reveal action.
+  const showToastMessage = useCallback(
+    (message: string) => setToast({ message }),
+    [setToast],
+  );
+  const showExportToast = useCallback(
+    (t: ExportToast) =>
+      setToast({
+        message: t.message,
+        action: exportToastAction(t, () => setToast(null)),
+      }),
+    [setToast],
+  );
+  // Pre-flight "Include N attachments" modal (MYND-116 task 3): the flow
+  // asks through a promise-backed hook; the payload state mounts the
+  // modal, and settling either way unmounts it. Identical from the
+  // context-menu and palette paths — both receive the same hooks.
+  const [exportPreflight, setExportPreflight] = useState<{
+    count: number;
+    resolve: (choice: AttachmentPreflightChoice | null) => void;
+  } | null>(null);
+  const confirmAttachments = useCallback(
+    (count: number) =>
+      new Promise<AttachmentPreflightChoice | null>((resolve) => {
+        setExportPreflight({ count, resolve });
+      }),
+    [],
+  );
+  // PDF pre-export exclusion notice (MYND-255 task 5) — same promise-
+  // backed pattern: the payload state mounts `NotePdfExportNotice`, and
+  // settling either way unmounts it.
+  const [pdfPreflight, setPdfPreflight] = useState<{
+    excluded: readonly ExcludedAttachment[];
+    resolve: (proceed: boolean) => void;
+  } | null>(null);
+  const confirmPdfExclusions = useCallback(
+    (excluded: readonly ExcludedAttachment[]) =>
+      new Promise<boolean>((resolve) => {
+        setPdfPreflight({ excluded, resolve });
+      }),
+    [],
+  );
+  // If the Editor unmounts mid-question (lock / force-relock), resolve
+  // any pending pre-flight with its cancel value so the awaiting flow
+  // (and, on the PDF path, its held body string) isn't stranded forever.
+  const exportPreflightRef = useRef(exportPreflight);
+  exportPreflightRef.current = exportPreflight;
+  const pdfPreflightRef = useRef(pdfPreflight);
+  pdfPreflightRef.current = pdfPreflight;
+  useEffect(
+    () => () => {
+      exportPreflightRef.current?.resolve(null);
+      pdfPreflightRef.current?.resolve(false);
+    },
+    [],
+  );
+  const exportHooks = useMemo<NoteExportUiHooks>(
+    () => ({
+      showToast: showExportToast,
+      confirmAttachments,
+      confirmPdfExclusions,
+    }),
+    [showExportToast, confirmAttachments, confirmPdfExclusions],
+  );
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   // Backup-export modal (MYND-56 task 1).
   const [backupExportOpen, setBackupExportOpen] = useState<boolean>(false);
+  // Whole-vault markdown export modal (MYND-211 task 3) — same Editor-local
+  // boolean carve-out; opened from Settings → Storage and the palette.
+  const [vaultExportOpen, setVaultExportOpen] = useState<boolean>(false);
+  // Scope-dropdown options: the sidebar's folder-tree source, derived only
+  // while the modal is open (cache identity changes on every mutation).
+  const vaultExportFolders = useMemo(
+    () =>
+      vaultExportOpen ? collectFolderOptions(ctx.cache.values()) : [],
+    [vaultExportOpen, ctx.cache],
+  );
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
   const [graphOpen, setGraphOpen] = useState<boolean>(false);
   // MYND-53 — Obsidian importer: the active-import modal + the onboarding offer
@@ -389,7 +487,7 @@ function EditorChrome({
     (result: ImportResult) => {
       const skipped =
         result.skippedExisting > 0 ? ` · ${result.skippedExisting} skipped` : "";
-      setToastMessage(
+      showToastMessage(
         `Imported ${result.imported} ${result.imported === 1 ? "note" : "notes"}${skipped}`,
       );
       // Repopulate the sidebar so the imported notes appear immediately.
@@ -399,7 +497,7 @@ function EditorChrome({
           /* sidebar stays as-is until the next refresh — non-fatal */
         });
     },
-    [ctx, setToastMessage],
+    [ctx, showToastMessage],
   );
 
   // Cmd/Ctrl+Shift+G toggles the whole-vault graph (MYND-198, SYNC-7) — the
@@ -711,6 +809,7 @@ function EditorChrome({
               />
               <NotesSidebarList
                 onNewFromTemplate={() => setNewFromTemplateOpen(true)}
+                exportHooks={exportHooks}
               />
             </div>
           </SidebarPane>
@@ -802,7 +901,7 @@ function EditorChrome({
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        onShowToast={setToastMessage}
+        onShowToast={showToastMessage}
         onForceRelock={onForceRelock}
         onDeleteVaultSuccess={onDeleteVaultSuccess}
         onImportObsidian={() => {
@@ -817,11 +916,20 @@ function EditorChrome({
           setSettingsOpen(false);
           onRestoreBackup();
         }}
+        onExportVault={() => {
+          setSettingsOpen(false);
+          setVaultExportOpen(true);
+        }}
       />
       <BackupExportModal
         open={backupExportOpen}
         onClose={() => setBackupExportOpen(false)}
-        onShowToast={setToastMessage}
+        onShowToast={showToastMessage}
+      />
+      <VaultExportModal
+        open={vaultExportOpen}
+        onClose={() => setVaultExportOpen(false)}
+        folders={vaultExportFolders}
       />
       <TemplatesManager
         open={templatesOpen}
@@ -886,6 +994,10 @@ function EditorChrome({
           setPaletteOpen(false);
           setBackupExportOpen(true);
         }}
+        onExportVaultMarkdown={() => {
+          setPaletteOpen(false);
+          setVaultExportOpen(true);
+        }}
         onOpenAttachments={() => {
           setPaletteOpen(false);
           setCenterView("attachments");
@@ -906,6 +1018,27 @@ function EditorChrome({
           setPaletteOpen(false);
           setSnapshotsOpen(true);
         }}
+        onExportNoteMarkdown={() => {
+          // Same shared flow as the sidebar context-menu item (MYND-116) —
+          // zero divergence. The action is hidden when no note is selected
+          // (registry visibility), so the null check is defensive only.
+          setPaletteOpen(false);
+          const id = ctx.selectedId;
+          if (id === null) return;
+          void runNoteExportFlow(
+            noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
+          );
+        }}
+        onExportNotePdf={() => {
+          // PDF sibling (MYND-255) — same shared-flow discipline as the
+          // markdown action above.
+          setPaletteOpen(false);
+          const id = ctx.selectedId;
+          if (id === null) return;
+          void runNotePdfExportFlow(
+            noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
+          );
+        }}
         onShowGraph={() => {
           setPaletteOpen(false);
           setGraphOpen(true);
@@ -925,7 +1058,39 @@ function EditorChrome({
       />
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
       <WorkspaceHotkeys />
-      <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
+      <NoteExportModal
+        open={exportPreflight !== null}
+        attachmentCount={exportPreflight?.count ?? 0}
+        onCancel={() => {
+          exportPreflight?.resolve(null);
+          setExportPreflight(null);
+        }}
+        onConfirm={(includeAttachments) => {
+          exportPreflight?.resolve({ includeAttachments });
+          setExportPreflight(null);
+        }}
+      />
+      <NotePdfExportNotice
+        open={pdfPreflight !== null}
+        excludedAttachments={pdfPreflight?.excluded ?? []}
+        onCancel={() => {
+          pdfPreflight?.resolve(false);
+          setPdfPreflight(null);
+        }}
+        onConfirm={() => {
+          pdfPreflight?.resolve(true);
+          setPdfPreflight(null);
+        }}
+      />
+      <Toast
+        message={toast?.message ?? null}
+        action={toast?.action}
+        // Action-bearing toasts (export success "Show in folder") get the
+        // soft-trash Undo precedent's 6 s window (NoteList.tsx) — 2.5 s is
+        // not enough to read the message AND click the inline action.
+        durationMs={toast?.action !== undefined ? 6000 : 2500}
+        onDone={() => setToast(null)}
+      />
     </div>
     </CenterViewProvider>
   );
@@ -1055,9 +1220,12 @@ type CommandPaletteHostProps = {
   onManageTemplates: () => void;
   onNewNoteFromTemplate: () => void;
   onOpenSnapshots: () => void;
+  onExportNoteMarkdown: () => void;
+  onExportNotePdf: () => void;
   onShowGraph: () => void;
   onImportObsidian: () => void;
   onBackupVault: () => void;
+  onExportVaultMarkdown: () => void;
   onLockFlushed: () => Promise<void>;
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
@@ -1071,9 +1239,12 @@ function CommandPaletteHost({
   onManageTemplates,
   onNewNoteFromTemplate,
   onOpenSnapshots,
+  onExportNoteMarkdown,
+  onExportNotePdf,
   onShowGraph,
   onImportObsidian,
   onBackupVault,
+  onExportVaultMarkdown,
   onLockFlushed,
   onToggleLeftSidebar,
   onToggleRightSidebar,
@@ -1129,9 +1300,12 @@ function CommandPaletteHost({
       onOpenTodayNote,
       onOpenAttachments,
       onOpenSnapshots,
+      onExportNoteMarkdown,
+      onExportNotePdf,
       onShowGraph,
       onImportObsidian,
       onBackupVault,
+      onExportVaultMarkdown,
       onToggleLeftSidebar,
       onToggleRightSidebar,
       onSelectNote: async (id) => {
@@ -1150,9 +1324,12 @@ function CommandPaletteHost({
       onOpenTodayNote,
       onOpenAttachments,
       onOpenSnapshots,
+      onExportNoteMarkdown,
+      onExportNotePdf,
       onShowGraph,
       onImportObsidian,
       onBackupVault,
+      onExportVaultMarkdown,
       onToggleLeftSidebar,
       onToggleRightSidebar,
     ],

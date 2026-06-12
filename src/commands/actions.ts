@@ -46,6 +46,20 @@ const backupVaultAction: CommandAction = {
   },
 };
 
+const exportVaultMarkdownAction: CommandAction = {
+  id: "vault.export-markdown",
+  label: "Export vault as Markdown…",
+  category: "Vault",
+  // Editor-stage guarded, vault-level (no note selection needed): the
+  // plaintext tree export requires an unlocked vault, and the editor is the
+  // only stage that satisfies that. Opens the SAME three-phase modal as the
+  // Settings → Storage Export block (MYND-211) — zero divergence.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onExportVaultMarkdown();
+  },
+};
+
 const importObsidianAction: CommandAction = {
   id: "vault.import-obsidian",
   label: "Import Obsidian vault…",
@@ -139,6 +153,41 @@ const openSnapshotsAction: CommandAction = {
   },
 };
 
+const exportNoteMarkdownAction: CommandAction = {
+  id: "note.export-markdown",
+  label: "Export note as Markdown…",
+  category: "Editor",
+  // Editor-only and per-note like Snapshots (MYND-97): the flow exports the
+  // SELECTED note, so it is hidden when nothing is open. Runs the exact same
+  // shared flow as the sidebar context-menu item (src/notes/exportFlow.ts) —
+  // deliberate plaintext egress (TB3); the OS save dialog is the consent.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null
+      ? "show"
+      : "hidden",
+  run: (ctx) => {
+    ctx.onExportNoteMarkdown();
+  },
+};
+
+const exportNotePdfAction: CommandAction = {
+  id: "note.export-pdf",
+  label: "Export note as PDF…",
+  category: "Editor",
+  // Sibling of note.export-markdown with the SAME visibility rules
+  // (MYND-255, SYNC-5): editor stage AND a selected note, else hidden.
+  // Runs the exact same shared flow as the sidebar context-menu item
+  // (src/notes/exportFlow.ts::runNotePdfExportFlow) — deliberate
+  // plaintext egress (TB3); the OS save dialog is the consent.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null
+      ? "show"
+      : "hidden",
+  run: (ctx) => {
+    ctx.onExportNotePdf();
+  },
+};
+
 const showGraphAction: CommandAction = {
   id: "graph.show",
   label: "Show graph view…",
@@ -183,8 +232,11 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   manageTemplatesAction,
   openAttachmentsAction,
   openSnapshotsAction,
+  exportNoteMarkdownAction,
+  exportNotePdfAction,
   showGraphAction,
   importObsidianAction,
   backupVaultAction,
+  exportVaultMarkdownAction,
   convertWikilinksAction,
 ]);

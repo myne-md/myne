@@ -47,12 +47,18 @@ export type CommandContext = {
   onOpenAttachments: () => void;
   /** Open the snapshots / file-recovery panel for the selected note (MYND-97). */
   onOpenSnapshots: () => void;
+  /** Run the per-note markdown-export flow for the selected note (MYND-116). */
+  onExportNoteMarkdown: () => void;
+  /** Run the per-note PDF-export flow for the selected note (MYND-255). */
+  onExportNotePdf: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
   onShowGraph: () => void;
   /** Open the Obsidian vault import flow (folder picker → progress → summary) (MYND-53). */
   onImportObsidian: () => void;
   /** Open the backup-export flow (save dialog → verified .myne-backup) (MYND-56). */
   onBackupVault: () => void;
+  /** Open the whole-vault markdown export modal (three-phase, MYND-211). */
+  onExportVaultMarkdown: () => void;
   /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */

@@ -156,6 +156,19 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 - **Security:** `securityLevel:'strict'` + `htmlLabels:false` → mermaid sanitizes its own SVG via its bundled DOMPurify (no click/script/`<foreignObject>`, no raw-HTML labels). No remote fetch. `threat-model.md` §6.
 - **Mandatory fallback:** parse-error / load-failure → monospace code card (mermaid is never a hard dependency of the render surface).
 
+### PDF footer stamping (MYND-255 hotfix) — `src-tauri/Cargo.toml`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `lopdf` | 0.41.0 (`default-features = false`) | Post-process the captured per-note export PDF to stamp a per-page footer (note title bottom-left, "X / Y" counter bottom-right) — `src-tauri/src/plugins/pdf_export/footer.rs` | **+16 `Cargo.lock` entries measured**: 12 new names (`lopdf`, `aes`, `block-padding`, `cbc`, `ecb`, `encoding_rs`, `md-5`, `rangemap`, `stringprep`, `ttf-parser`, `unicode-bidi`, `unicode-properties`) + 4 new duplicate versions of already-locked names (`chacha20` 0.10, `cpufeatures` 0.3, `rand` 0.10, `rand_core` 0.10) — all pure-Rust, permissive-licensed | MIT | `decisions.md` 2026-06-11 PDF-pipeline entry (footer amendment); owner request 2026-06-11 |
+
+- **Non-existence of alternative:** a per-page "X / Y" total-aware page counter cannot be drawn by the capture engines themselves — WebKit print engines (macOS WKWebView, Linux WebKitGTK) do not implement CSS `@page` margin boxes (`@bottom-left`/`@bottom-right` + `counter(page)`/`counter(pages)` are effectively Chromium-print-only), and the in-document-flow CSS tricks can't know the total page count before pagination. A hand-rolled stamper was rejected: it would have to correctly parse and rewrite three engine dialects (classic xref tables AND xref/object streams, per platform arm) — exactly the "non-trivial parsing" class "The bar" Q1 excludes from hand-rolling.
+- **Maintained:** active (J-F-Liu/lopdf, releases well within 12 months; 0.41.0 current at adoption); multiple maintainers/contributors, large install base — bus-factor low-medium.
+- **Features trimmed:** `default-features = false` drops the `chrono`/`jiff`/`rayon`/`time` date-object + parallel-parse conveniences; the stamper needs parse + content append + full-rewrite save only.
+- **Crypto note (not a primitive-set change):** several transitives (`aes`/`cbc`/`ecb`/`chacha20`/`md-5`/`rand`) are lopdf's own **encrypted-PDF support**, non-optional upstream. Myne never invokes that code path (capture output is never encrypted), no Myne key material flows through lopdf, and the project's closed RustCrypto primitive set (`decisions.md` 2026-04-28) is unchanged — this is dependency-tree surface (TB9), not protocol crypto.
+- **Lazy/cold-path:** invoked only inside the `pdf_export` finalize path (user-initiated export command), never on the boot/unlock/cold path; **fail-open** — a stamp failure publishes the unstamped capture (the footer is cosmetic, the export must not break).
+- **Hash-pinning:** exact `0.41.0` in `Cargo.toml`, single workspace `Cargo.lock` updated; added to `src-tauri/` only (never `protocol/`).
+
 ## Reference
 
 - `threat-model.md` §6 — compensating controls

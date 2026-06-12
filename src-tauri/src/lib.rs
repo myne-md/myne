@@ -1,6 +1,7 @@
 mod atomic_write;
 mod auto_lock;
 mod backup_container;
+mod export_naming;
 mod io_failure_kind;
 mod paths;
 mod plugins;
@@ -51,6 +52,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(plugins::backup::init())
+        .plugin(plugins::export::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
@@ -64,6 +66,7 @@ pub fn run() {
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::workspace::init())
+        .plugin(plugins::pdf_export::init())
         // MYND-169: the `attachment://<id>` async custom-URI-scheme
         // handler — decrypts a `MYA1` blob in memory, re-sniffs the
         // content-type from the decrypted bytes, and serves ONLY an

@@ -3,11 +3,17 @@
 //! (`e2e/support/fixtures.ts::seedVault`) via
 //! `cargo run --release -p e2e-fixture-gen -- …`.
 //!
-//!   e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>]
+//!   e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>] [--export-suite]
 //!
 //! Writes `<base>/vaults/<uuidv7>/vault.meta` per vault and prints one
 //! JSON object to stdout:
 //!   {"vaults":[{"vaultId":"…","password":"…","phrase":"…","account":"…"}]}
+//!
+//! `--export-suite` additionally lays the MYND-116 note-export suite
+//! into every generated vault (a plain note + an attachments note with
+//! two colliding-filename form-C embeds + MYA1 blobs + MYC1 catalog)
+//! and extends each vault entry with an `"exportSuite":{…}` object
+//! carrying the ids and exact plaintexts the scenario asserts against.
 //!
 //! Hand-rolled arg parsing + JSON emit — this binary deliberately adds
 //! no clap/serde_json to the workspace (dependency-policy discipline);
@@ -18,7 +24,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use e2e_fixture_gen::{build_fixture, offsets, write_fixture, WEAK_TEST_KDF};
+use e2e_fixture_gen::{build_fixture, offsets, write_export_suite, write_fixture, WEAK_TEST_KDF};
 use protocol::DEFAULT_V0_1_KDF_PARAMS;
 
 const DEFAULT_PASSWORD: &str = "e2e-fixture-password-1";
@@ -41,7 +47,7 @@ fn json_escape(s: &str) -> String {
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage: e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>]"
+        "usage: e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>] [--export-suite]"
     );
     ExitCode::from(2)
 }
@@ -51,6 +57,7 @@ fn main() -> ExitCode {
     let mut count: usize = 1;
     let mut kdf = WEAK_TEST_KDF;
     let mut password = DEFAULT_PASSWORD.to_string();
+    let mut export_suite = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -79,6 +86,7 @@ fn main() -> ExitCode {
                 }
                 None => return usage(),
             },
+            "--export-suite" => export_suite = true,
             _ => return usage(),
         }
     }
@@ -99,12 +107,49 @@ fn main() -> ExitCode {
             eprintln!("error: write failed: {}", e.kind());
             return ExitCode::FAILURE;
         }
+        // The export-suite JSON rides each vault entry so the TS layer
+        // (e2e/support/fixtures.ts) asserts against the EXACT bytes this
+        // binary wrote — note plaintexts are in-source scenario content,
+        // not credentials (SYNC-13 applies to passwords/phrases only).
+        let mut export_suite_json = String::new();
+        if export_suite {
+            let suite = match write_export_suite(&base, &fixture) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("error: export-suite write failed: {}", e.kind());
+                    return ExitCode::FAILURE;
+                }
+            };
+            let attachment_json = |a: &e2e_fixture_gen::ExportSuiteAttachment| {
+                format!(
+                    "{{\"idHex\":\"{}\",\"filename\":\"{}\",\"contents\":\"{}\",\"contentType\":\"{}\"}}",
+                    a.id_hex,
+                    json_escape(&a.filename),
+                    json_escape(&a.contents),
+                    json_escape(&a.content_type),
+                )
+            };
+            let attachments_json: Vec<String> =
+                suite.attachments.iter().map(&attachment_json).collect();
+            export_suite_json = format!(
+                ",\"exportSuite\":{{\"plainNoteId\":\"{}\",\"plainNotePlaintext\":\"{}\",\"attachmentsNoteId\":\"{}\",\"attachmentsNotePlaintext\":\"{}\",\"attachments\":[{}],\"pdfNoteId\":\"{}\",\"pdfNotePlaintext\":\"{}\",\"pdfAttachment\":{}}}",
+                suite.plain_note_id,
+                json_escape(&suite.plain_note_plaintext),
+                suite.attachments_note_id,
+                json_escape(&suite.attachments_note_plaintext),
+                attachments_json.join(","),
+                suite.pdf_note_id,
+                json_escape(&suite.pdf_note_plaintext),
+                attachment_json(&suite.pdf_attachment),
+            );
+        }
         entries.push(format!(
-            "{{\"vaultId\":\"{}\",\"password\":\"{}\",\"phrase\":\"{}\",\"account\":\"{}\"}}",
+            "{{\"vaultId\":\"{}\",\"password\":\"{}\",\"phrase\":\"{}\",\"account\":\"{}\"{}}}",
             fixture.vault_id,
             json_escape(&fixture.password),
             fixture.phrase,
             fixture.account,
+            export_suite_json,
         ));
     }
 

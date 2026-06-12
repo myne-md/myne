@@ -136,7 +136,10 @@ fn hex_encode(bytes: &[u8]) -> String {
 /// value. Returns `None` on any malformation (wrong length, non-hex, or
 /// uppercase — the canonical form is lowercase). Strict: this is the
 /// inverse of [`hex_encode`] for an [`ATTACHMENT_ID_LEN`]-byte id.
-fn hex_decode_id(s: &str) -> Option<[u8; ATTACHMENT_ID_LEN]> {
+/// `pub(crate)`: also consumed by the notes plugin's
+/// `note_export_attachments` (MYND-115 task 4 — cross-plugin reuse, the
+/// `VaultRuntimeState`-borrow precedent).
+pub(crate) fn hex_decode_id(s: &str) -> Option<[u8; ATTACHMENT_ID_LEN]> {
     if s.len() != ATTACHMENT_ID_LEN * 2 {
         return None;
     }
@@ -163,7 +166,9 @@ fn hex_val(b: u8) -> Option<u8> {
 /// Read `vault.meta` and return its 16-byte `account_number_hash`
 /// (offset 6), the binding identity for the catalog AAD (§ 9.10.3).
 /// Generic over the caller's error type via the two `From` impls.
-fn read_account_number_hash(
+/// `pub(crate)`: also consumed by the notes plugin's
+/// `note_export_attachments` (MYND-115 task 4).
+pub(crate) fn read_account_number_hash(
     vault_meta_path: &Path,
 ) -> std::io::Result<Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], MetaParseFailed>> {
     let bytes = std::fs::read(vault_meta_path)?;
@@ -174,7 +179,7 @@ fn read_account_number_hash(
 
 /// Zero-sized marker for a `vault.meta` parse failure, mapped to each
 /// command's `InvalidVaultMeta` variant at the call site.
-struct MetaParseFailed;
+pub(crate) struct MetaParseFailed;
 
 /// Current UNIX time in whole seconds, saturating at 0 if the clock is
 /// before the epoch (cannot happen in practice). Used for the catalog
@@ -679,7 +684,11 @@ pub(crate) async fn attachment_rename_with_dir(
 /// genuine IO failure (permission denied) must surface rather than be
 /// masked as an empty catalog (which would then be overwritten on the
 /// subsequent atomic_write, silently destroying the real catalog).
-fn read_catalog(
+/// `pub(crate)`: also consumed (read-only) by the notes plugin's
+/// `note_export_attachments` (MYND-115 task 4) — there a masked-empty
+/// catalog would mis-report every referenced attachment as missing, so
+/// the hard-IO-error surface is the right one for it too.
+pub(crate) fn read_catalog(
     catalog_path: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
@@ -693,6 +702,47 @@ fn read_catalog(
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(AttachmentsCatalog::empty()),
         Err(e) => Err(e),
     }
+}
+
+/// Closed failure surface of [`load_catalog_for_export`] — the two
+/// export callers map each variant onto their own error enums (with
+/// their own stage-tagged tracing), keeping the closed-enum logging
+/// discipline at the call sites.
+pub(crate) enum CatalogLoadError {
+    /// `vault.meta` exists but does not parse — the catalog AAD
+    /// identity cannot be derived.
+    InvalidVaultMeta,
+    /// IO failure reading `vault.meta`.
+    MetaIo(std::io::ErrorKind),
+    /// Hard IO failure reading `vault.attachments` (absence is NOT an
+    /// error — it decodes to the empty catalog per [`read_catalog`]).
+    CatalogIo(std::io::ErrorKind),
+}
+
+/// The full catalog-for-export ritual, owned by the attachments
+/// plugin: read `vault.meta`'s `account_number_hash` (the catalog AAD
+/// identity, §9.10.3), derive the catalog KEK from `root_key`, and
+/// [`read_catalog`]. Shared by the per-note attachments export
+/// (`plugins::notes`) and the whole-vault tree export
+/// (`plugins::export`) — both read-only consumers where a
+/// masked-empty catalog would mis-report referenced attachments as
+/// missing, so the hard-IO-error surface is the right one.
+pub(crate) fn load_catalog_for_export(
+    vault_root: &Path,
+    root_key: &[u8; 32],
+) -> Result<AttachmentsCatalog, CatalogLoadError> {
+    let account_number_hash = match read_account_number_hash(&vault_root.join("vault.meta")) {
+        Ok(Ok(h)) => h,
+        Ok(Err(MetaParseFailed)) => return Err(CatalogLoadError::InvalidVaultMeta),
+        Err(e) => return Err(CatalogLoadError::MetaIo(e.kind())),
+    };
+    let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+    read_catalog(
+        &vault_root.join("vault.attachments"),
+        &catalog_key,
+        &account_number_hash,
+    )
+    .map_err(|e| CatalogLoadError::CatalogIo(e.kind()))
 }
 
 /// Read + decode the catalog, collapsing ANY failure (including IO) to

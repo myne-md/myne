@@ -26,7 +26,10 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onNewNoteFromTemplate: vi.fn(),
     onOpenTodayNote: vi.fn(),
     onOpenAttachments: vi.fn(),
+    onExportNoteMarkdown: vi.fn(),
+    onExportNotePdf: vi.fn(),
     onImportObsidian: vi.fn(),
+    onExportVaultMarkdown: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -45,10 +48,13 @@ describe("Command palette action registry", () => {
       "attachments.open",
       "daily.open-today",
       "graph.show",
+      "note.export-markdown",
+      "note.export-pdf",
       "snapshots.open",
       "templates.manage",
       "templates.new-note",
     "vault.backup",
+      "vault.export-markdown",
       "vault.import-obsidian",
       "vault.lock",
       "view.toggle-backlinks-sidebar",
@@ -98,6 +104,60 @@ describe("Command palette action visibility per Stage", () => {
     });
   }
 
+  // "Export note as Markdown…" visibility matrix (MYND-116 task 2): per-note
+  // like snapshots.open — editor stage AND a selected note, else hidden.
+  it("\"Export note as Markdown…\" is HIDDEN outside the editor stage (even with a note selected)", () => {
+    for (const stage of nonEditorStages) {
+      const ctx = makeContext({ stageName: stage, selectedNoteId: "note-1" });
+      expect(find("note.export-markdown").visibility(ctx)).toBe("hidden");
+    }
+  });
+
+  it("\"Export note as Markdown…\" is HIDDEN in the editor when no note is open", () => {
+    const ctx = makeContext({ stageName: "editor", selectedNoteId: null });
+    expect(find("note.export-markdown").visibility(ctx)).toBe("hidden");
+  });
+
+  it("\"Export note as Markdown…\" is SHOWN in the editor with a note open", () => {
+    const ctx = makeContext({ stageName: "editor", selectedNoteId: "note-1" });
+    expect(find("note.export-markdown").visibility(ctx)).toBe("show");
+  });
+
+  // "Export note as PDF…" mirrors the markdown action's visibility matrix
+  // exactly (MYND-255, SYNC-5): per-note like snapshots.open — editor stage
+  // AND a selected note, else hidden.
+  it("\"Export note as PDF…\" is HIDDEN outside the editor stage (even with a note selected)", () => {
+    for (const stage of nonEditorStages) {
+      const ctx = makeContext({ stageName: stage, selectedNoteId: "note-1" });
+      expect(find("note.export-pdf").visibility(ctx)).toBe("hidden");
+    }
+  });
+
+  it("\"Export note as PDF…\" is HIDDEN in the editor when no note is open", () => {
+    const ctx = makeContext({ stageName: "editor", selectedNoteId: null });
+    expect(find("note.export-pdf").visibility(ctx)).toBe("hidden");
+  });
+
+  it("\"Export note as PDF…\" is SHOWN in the editor with a note open", () => {
+    const ctx = makeContext({ stageName: "editor", selectedNoteId: "note-1" });
+    expect(find("note.export-pdf").visibility(ctx)).toBe("show");
+  });
+
+  it("\"Export note as PDF…\" visibility matches \"Export note as Markdown…\" in every probed context (sibling rule)", () => {
+    const contexts = [
+      makeContext({ stageName: "editor", selectedNoteId: "note-1" }),
+      makeContext({ stageName: "editor", selectedNoteId: null }),
+      ...nonEditorStages.map((stage) =>
+        makeContext({ stageName: stage, selectedNoteId: "note-1" }),
+      ),
+    ];
+    for (const ctx of contexts) {
+      expect(find("note.export-pdf").visibility(ctx)).toBe(
+        find("note.export-markdown").visibility(ctx),
+      );
+    }
+  });
+
   it("\"Convert wikilinks…\" is HIDDEN when no note selected", () => {
     const ctx = makeContext({
       stageName: "editor",
@@ -116,6 +176,21 @@ describe("Command palette action visibility per Stage", () => {
     expect(find("wikilinks.convert-in-this-note").visibility(ctx)).toBe(
       "disabled",
     );
+  });
+
+  it("\"Export vault as Markdown…\" is SHOWN in editor + HIDDEN elsewhere (vault-level — no note needed, MYND-211)", () => {
+    for (const stage of editorStages) {
+      expect(
+        find("vault.export-markdown").visibility(
+          makeContext({ stageName: stage, selectedNoteId: null }),
+        ),
+      ).toBe("show");
+    }
+    for (const stage of nonEditorStages) {
+      expect(
+        find("vault.export-markdown").visibility(makeContext({ stageName: stage })),
+      ).toBe("hidden");
+    }
   });
 
   it("\"Import Obsidian vault…\" is SHOWN in editor + HIDDEN elsewhere (MYND-53 backend + UI landed)", () => {
@@ -157,6 +232,24 @@ describe("Command palette action run() side effects", () => {
     );
     action.run(makeContext({ onOpenAttachments }));
     expect(onOpenAttachments).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Export note as Markdown…\" calls onExportNoteMarkdown — the shared-flow callback (MYND-116)", () => {
+    const onExportNoteMarkdown = vi.fn();
+    find("note.export-markdown").run(makeContext({ onExportNoteMarkdown }));
+    expect(onExportNoteMarkdown).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Export note as PDF…\" calls onExportNotePdf — the shared-flow callback (MYND-255)", () => {
+    const onExportNotePdf = vi.fn();
+    find("note.export-pdf").run(makeContext({ onExportNotePdf }));
+    expect(onExportNotePdf).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Export vault as Markdown…\" calls onExportVaultMarkdown — the same modal as the Settings Export block (MYND-211)", () => {
+    const onExportVaultMarkdown = vi.fn();
+    find("vault.export-markdown").run(makeContext({ onExportVaultMarkdown }));
+    expect(onExportVaultMarkdown).toHaveBeenCalledTimes(1);
   });
 
   it("\"Import Obsidian vault…\" calls onImportObsidian (MYND-53)", () => {

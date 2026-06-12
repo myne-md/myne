@@ -284,6 +284,8 @@ When Myne authors new content (slash command, selection toolbar, keyboard shortc
 
 Everything else in an imported note is byte-for-byte preserved per the list above. (Skipping a non-note entry — §3.6.3 — writes nothing, so it is not a transform at all.)
 
+**Sanctioned export transform (the C1 allowlist, export side — MYND-115/MYND-211, `decisions.md` 2026-06-11).** Exactly one export-time mutation is a documented exception, and it applies only to the **derived export artifact**, never to the stored note: in an **attachments-included** export (per-note or vault tree), each form-C embed `![[att:<id>|filename]]` in the *exported copy* is rewritten to reference the attachment file actually written beside it (its final, collision-suffixed filename) — inverting importer transform 2's form-C rewrite: form-C embeds return to plain wikilink embeds `![[<final filename>]]` referencing the exported file. Refs originally ingested from markdown-image form (`![](img.png)`) also come back out in wikilink form — they converge rather than byte-revert — so import → export → import round-trips (re-import re-ingests either form into form C), without the transform being byte-inverse for markdown-form ingests. The default (no-attachments) export writes the stored plaintext **byte-for-byte verbatim**, embeds included; the vault's encrypted blob is never modified by any export path.
+
 ## 7. Out of scope for v0.1
 
 The following syntax is **not** parsed or rendered in v0.1. Authoring affordances do not produce them; imported content containing them is preserved byte-for-byte and rendered as plain text:

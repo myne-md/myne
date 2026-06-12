@@ -307,6 +307,11 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
             crate::plugins::notes::search_sync::zeroize_search_index(app);
             // MYND-166: wipe the staged editor-workspace descriptor too.
             crate::plugins::workspace::commands::clear_staged_descriptor();
+            // MYND-255: destroy the hidden pdf-export render window (a
+            // plaintext-bearing second WebView) and wipe its stashed
+            // HTML payload on the SAME leg — locking means locked for
+            // every plaintext surface, not just "main".
+            crate::plugins::pdf_export::teardown_on_lock(app);
             // MYND-31: wipe the plaintext-derived VaultIndices on the same
             // leg — it is as sensitive as the keys + search index, and
             // rebuilds on the next unlock.

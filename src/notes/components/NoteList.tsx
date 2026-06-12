@@ -30,6 +30,12 @@ import { TrashPanel } from "./TrashPanel";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deriveFolderTree } from "../folderTree";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import {
+  noteExportOptions,
+  runNoteExportFlow,
+  runNotePdfExportFlow,
+  type NoteExportUiHooks,
+} from "../exportFlow";
 import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
@@ -396,9 +402,13 @@ const CASE_MERGE_ACTIONS_STYLE: CSSProperties = {
  *  hosted here. */
 interface NoteListProps {
   onNewFromTemplate?: () => void;
+  /** UI hooks for the per-note export flow (MYND-116) — the Editor's
+   *  structured toast sink + the pre-flight "Include N attachments"
+   *  modal hook. Optional so isolated NoteList renders stay inert. */
+  exportHooks?: NoteExportUiHooks;
 }
 
-export function NoteList({ onNewFromTemplate }: NoteListProps = {}) {
+export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {}) {
   const ctx = useSelectedNote();
   // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
   // pane to the editor — covers the Enter-on-already-selected edge the
@@ -532,6 +542,7 @@ export function NoteList({ onNewFromTemplate }: NoteListProps = {}) {
           onCreate={handleCreate}
           fm={fm}
           onNewFromTemplate={onNewFromTemplate}
+          exportHooks={exportHooks}
         />
       )}
       <div style={FOOTER_WRAP_STYLE}>
@@ -619,6 +630,7 @@ function PopulatedList({
   onCreate,
   fm,
   onNewFromTemplate,
+  exportHooks,
 }: {
   rows: VisibleRow[];
   favRows: VisibleRow[];
@@ -627,6 +639,7 @@ function PopulatedList({
   onCreate: () => void;
   fm: FolderManagement;
   onNewFromTemplate?: () => void;
+  exportHooks?: NoteExportUiHooks;
 }) {
   const ctx = useSelectedNote();
   // SYNC-9 exclusive active-state (MYND-164): opening a note from the sidebar
@@ -820,13 +833,41 @@ function PopulatedList({
           }),
       },
       {
+        // Per-note plaintext egress (MYND-116) — live tree note rows only;
+        // Trash / Templates surfaces deliberately don't carry it.
+        id: "export-markdown",
+        label: "Export as Markdown…",
+        onSelect: () =>
+          void runNoteExportFlow(
+            noteExportOptions(
+              menu.id,
+              ctx.cache.get(menu.id)?.title ?? null,
+              exportHooks,
+            ),
+          ),
+      },
+      {
+        // Sibling PDF egress (MYND-255) — same export group, same shared-
+        // flow discipline (runNotePdfExportFlow is the palette's flow too).
+        id: "export-pdf",
+        label: "Export as PDF…",
+        onSelect: () =>
+          void runNotePdfExportFlow(
+            noteExportOptions(
+              menu.id,
+              ctx.cache.get(menu.id)?.title ?? null,
+              exportHooks,
+            ),
+          ),
+      },
+      {
         id: "delete",
         label: "Delete",
         destructive: true,
         onSelect: () => void handleTrash(menu.id),
       },
     ];
-  }, [menu, ctx, handleTrash, fm, favSet, openNote]);
+  }, [menu, ctx, handleTrash, fm, favSet, openNote, exportHooks]);
 
   // Folder context-menu items (right-click a folder row).
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {

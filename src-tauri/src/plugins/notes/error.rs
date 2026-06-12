@@ -574,6 +574,226 @@ impl From<std::io::Error> for NoteTitleBatchError {
     }
 }
 
+/// Single error type returned across the IPC boundary by
+/// [`super::commands::note_export_as_markdown`].
+///
+/// Hand-mirrored on the TS side at `src/types/note-export-error.ts`.
+/// Variant set is closed; adding a variant is an IPC contract change
+/// that requires updating both sides.
+///
+/// Asymmetry vs [`NoteReadError`] is intentional (MYND-115, export-suite
+/// PRD "Error enum" decision):
+///
+/// - ⊕ `InvalidDestination` — the user-chosen `target_path` has no
+///   existing parent directory (backup precedent:
+///   `BackupExportError::InvalidDestination`).
+/// - ⊕ `TargetAlreadyExists` — `overwrite=false` collision with an
+///   existing file at `target_path`; consent travels explicitly (the OS
+///   save dialog is the consent source), so the backend never silently
+///   clobbers (`decisions.md` 2026-06-11 export-suite overwrite-consent
+///   rule).
+/// - ⊖ `NotesDirNotADirectory` removed — the export read path treats a
+///   corrupt `<vault>/notes` shape as a residual `Io` failure; the CRUD
+///   commands own the structural bug-canary.
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteExportError {
+    /// Slot is `Empty` or `Recovering`. Frontend routes the user to the
+    /// lock screen via `vault_status` / `vault_slot_kind`; if this
+    /// surfaces from `note_export_as_markdown`, a router bug.
+    #[error("vault not unlocked")]
+    VaultNotUnlocked,
+
+    /// `note_id` failed strict parse via `super::note_id::NoteId::parse`
+    /// — checked strictly BEFORE any path use, so a malformed id never
+    /// touches the filesystem. The internal sub-cause is emitted via
+    /// `tracing::debug!(stage = ?cause)` and does **not** cross the IPC
+    /// boundary as a distinguisher. Bug-canary: backend always returns
+    /// canonical `note_id` strings, so anything else is a UI regression.
+    #[error("invalid note id")]
+    InvalidNoteId,
+
+    /// `<vault>/notes/<note_id>.myn` does not exist. UI: "Bu not
+    /// silinmiş olabilir." A normal user-flow outcome (note deleted
+    /// between the context-menu open and the dialog confirm).
+    #[error("note not found")]
+    NoteNotFound,
+
+    /// AEAD-tag failure on `decode_note`. **By design this single tag
+    /// does NOT distinguish** parse-level failure, `items_key_id`
+    /// mismatch, outer-AEAD failure, or inner-AEAD failure — see
+    /// `protocol.md` §6.4. The codec's internal sub-cause flows through
+    /// its own `tracing::debug!` inside `decode_note`.
+    #[error("note cannot be decrypted")]
+    CannotDecrypt,
+
+    /// AEAD authenticity passed but the recovered plaintext bytes are
+    /// not valid UTF-8 — mirror of
+    /// [`NoteReadError::InvalidPlaintextEncoding`] (structural
+    /// corruption / foreign-writer suspicion). The export never writes
+    /// the garbage bytes: corruption is surfaced, not exported.
+    #[error("plaintext is not valid utf-8")]
+    InvalidPlaintextEncoding,
+
+    /// The user-chosen `target_path` is not usable: its parent directory
+    /// does not exist or is not a directory (backup precedent —
+    /// `BackupExportError::InvalidDestination`). The OS save dialog
+    /// normally guarantees a valid parent; this fires when the directory
+    /// vanished between dialog confirm and the write.
+    #[error("destination is invalid")]
+    InvalidDestination,
+
+    /// `overwrite=false` and a file already exists at `target_path`.
+    /// Mapped from the `atomic_write(replace=false)` pre-rename
+    /// `AlreadyExists` check, which fires before the temp sibling is
+    /// created — the existing target is untouched. The caller decides
+    /// whether to re-invoke with `overwrite=true` (the OS dialog's
+    /// "Replace" consent).
+    #[error("target file already exists")]
+    TargetAlreadyExists,
+
+    /// File-system IO failure during `notes_dir` resolution, the blob
+    /// read, or the destination write. The bounded [`IoFailureKind`]
+    /// keeps OS error messages off the wire. `NotFound` on the blob read
+    /// is special-cased upstream as [`Self::NoteNotFound`];
+    /// `AlreadyExists` on the write as [`Self::TargetAlreadyExists`].
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error
+    /// (panic in the blocking task, runtime shutdown). User-facing CTA
+    /// is "try again".
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteExportError {
+    fn from(e: std::io::Error) -> Self {
+        // `NotFound` (blob read) and `AlreadyExists` (destination write)
+        // are special-cased by the calling command (mapped to
+        // `NoteNotFound` / `TargetAlreadyExists`). This `From` handles
+        // the residual cases where an `io::Error` bubbles up
+        // unclassified.
+        NoteExportError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
+/// Single error type returned across the IPC boundary by
+/// [`super::commands::note_export_attachments`] — the opt-in
+/// attachments-included export sibling (MYND-115 task 4).
+///
+/// Hand-mirrored on the TS side at `src/types/note-export-error.ts`.
+/// Variant set is closed; adding a variant is an IPC contract change
+/// that requires updating both sides.
+///
+/// A SEPARATE enum from [`NoteExportError`] (not an extension): the
+/// sibling command has its own failure surface (note-filename
+/// bug-canary, `vault.meta`/catalog access, per-attachment outcomes)
+/// and folding those into the verbatim path's enum would force its TS
+/// consumers to handle variants that path can never produce.
+///
+/// **All-or-nothing contract:** every referenced attachment is catalog-
+/// resolved AND decrypted in memory BEFORE the first byte lands at the
+/// destination, so [`Self::AttachmentMissing`] /
+/// [`Self::AttachmentCorrupt`] (and every pre-write variant) leave the
+/// destination untouched. A residual write-phase IO failure rolls back
+/// the files this invocation created (best-effort), never pre-existing
+/// ones.
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteExportAttachmentsError {
+    /// Slot is `Empty` or `Recovering` — same routing as
+    /// [`NoteExportError::VaultNotUnlocked`].
+    #[error("vault not unlocked")]
+    VaultNotUnlocked,
+
+    /// `note_id` failed strict parse — checked BEFORE any path use;
+    /// mirror of [`NoteExportError::InvalidNoteId`].
+    #[error("invalid note id")]
+    InvalidNoteId,
+
+    /// `note_filename` is not a bare, legal filename (empty, `.`/`..`,
+    /// or contains a path separator). Bug-canary: the UI derives the
+    /// name from the OS save dialog's final path component, so anything
+    /// else is a frontend regression — never sanitized host-side.
+    #[error("invalid note filename")]
+    InvalidNoteFilename,
+
+    /// `<vault>/notes/<note_id>.myn` does not exist.
+    #[error("note not found")]
+    NoteNotFound,
+
+    /// AEAD-tag failure decrypting the NOTE blob (non-distinguishing
+    /// per `protocol.md` §6.4) — mirror of
+    /// [`NoteExportError::CannotDecrypt`]. Attachment-blob decrypt
+    /// failures surface as [`Self::AttachmentCorrupt`] instead.
+    #[error("note cannot be decrypted")]
+    CannotDecrypt,
+
+    /// Note AEAD passed but the plaintext is not valid UTF-8 — the
+    /// export writes nothing (corruption surfaced, not exported).
+    #[error("plaintext is not valid utf-8")]
+    InvalidPlaintextEncoding,
+
+    /// `vault.meta` exists but does not parse — the attachments-catalog
+    /// AAD identity (`account_number_hash`) cannot be read, so no
+    /// referenced attachment can be resolved. Only reachable when the
+    /// note references at least one attachment (the no-embeds path
+    /// never touches `vault.meta`).
+    #[error("vault metadata is invalid")]
+    InvalidVaultMeta,
+
+    /// The user-chosen `target_dir` does not exist or is not a
+    /// directory (backup precedent — the OS dialog normally guarantees
+    /// it; this fires when it vanished between confirm and write).
+    #[error("destination is invalid")]
+    InvalidDestination,
+
+    /// `overwrite=false` and a file already exists at
+    /// `<target_dir>/<note_filename>` — the NOTE file's overwrite
+    /// consent (SYNC-2); checked BEFORE any attachment write so the
+    /// rejection leaves the destination untouched. Attachment files are
+    /// NEVER overwritten regardless of this flag (they suffix-dedup).
+    #[error("note target file already exists")]
+    TargetAlreadyExists,
+
+    /// A referenced attachment is missing: its id has no
+    /// `vault.attachments` catalog entry, or the catalog entry exists
+    /// but the `attachments/<id>` blob file is gone. Detected during
+    /// the pre-write validation pass — nothing was written.
+    #[error("referenced attachment is missing")]
+    AttachmentMissing,
+
+    /// A referenced attachment's blob exists but fails to decrypt
+    /// (AEAD-tag failure — corruption / tampering). Detected during the
+    /// pre-write validation pass — nothing was written.
+    #[error("referenced attachment cannot be decrypted")]
+    AttachmentCorrupt,
+
+    /// Residual file-system IO failure (vault reads or destination
+    /// writes). `NotFound` on the note read is special-cased upstream
+    /// as [`Self::NoteNotFound`]; on a blob read as
+    /// [`Self::AttachmentMissing`].
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error.
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteExportAttachmentsError {
+    fn from(e: std::io::Error) -> Self {
+        // `NotFound` / `AlreadyExists` are special-cased at the call
+        // sites; this `From` handles the residual unclassified cases.
+        NoteExportAttachmentsError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1259,6 +1479,252 @@ mod tests {
         let mapped: NoteTitleBatchError = raw.into();
         match mapped {
             NoteTitleBatchError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteExportError
+    // =====================================================================
+
+    fn serialize_export(e: &NoteExportError) -> String {
+        serde_json::to_string(e).expect("NoteExportError must serialize cleanly")
+    }
+
+    // ---- NoteExportError serde shape -----------------------------------
+
+    #[test]
+    fn export_vault_not_unlocked_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::VaultNotUnlocked),
+            r#"{"kind":"VaultNotUnlocked"}"#
+        );
+    }
+
+    #[test]
+    fn export_invalid_note_id_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::InvalidNoteId),
+            r#"{"kind":"InvalidNoteId"}"#
+        );
+    }
+
+    #[test]
+    fn export_note_not_found_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::NoteNotFound),
+            r#"{"kind":"NoteNotFound"}"#
+        );
+    }
+
+    #[test]
+    fn export_cannot_decrypt_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::CannotDecrypt),
+            r#"{"kind":"CannotDecrypt"}"#
+        );
+    }
+
+    #[test]
+    fn export_invalid_plaintext_encoding_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::InvalidPlaintextEncoding),
+            r#"{"kind":"InvalidPlaintextEncoding"}"#
+        );
+    }
+
+    #[test]
+    fn export_invalid_destination_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::InvalidDestination),
+            r#"{"kind":"InvalidDestination"}"#
+        );
+    }
+
+    #[test]
+    fn export_target_already_exists_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::TargetAlreadyExists),
+            r#"{"kind":"TargetAlreadyExists"}"#
+        );
+    }
+
+    #[test]
+    fn export_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteExportError::Io {
+            io_error_kind: IoFailureKind::PermissionDenied,
+        };
+        assert_eq!(
+            serialize_export(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}"#
+        );
+    }
+
+    #[test]
+    fn export_join_failure_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_export(&NoteExportError::JoinFailure),
+            r#"{"kind":"JoinFailure"}"#
+        );
+    }
+
+    // ---- Closed-payload exhaustiveness pin -----------------------------
+
+    #[test]
+    fn export_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteExportError) {
+            match e {
+                NoteExportError::VaultNotUnlocked => {}
+                NoteExportError::InvalidNoteId => {}
+                NoteExportError::NoteNotFound => {}
+                NoteExportError::CannotDecrypt => {}
+                NoteExportError::InvalidPlaintextEncoding => {}
+                NoteExportError::InvalidDestination => {}
+                NoteExportError::TargetAlreadyExists => {}
+                NoteExportError::Io { io_error_kind: _ } => {}
+                NoteExportError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteExportError::VaultNotUnlocked);
+    }
+
+    // ---- From<std::io::Error> mapping ----------------------------------
+
+    #[test]
+    fn export_from_io_error_routes_via_closed_enum_for_permission_denied() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteExportError = raw.into();
+        match mapped {
+            NoteExportError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn export_from_io_error_no_space_collapses_to_no_space() {
+        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
+        let mapped: NoteExportError = raw.into();
+        match mapped {
+            NoteExportError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteExportAttachmentsError
+    // =====================================================================
+
+    fn serialize_export_attachments(e: &NoteExportAttachmentsError) -> String {
+        serde_json::to_string(e).expect("NoteExportAttachmentsError must serialize cleanly")
+    }
+
+    // ---- NoteExportAttachmentsError serde shape -------------------------
+
+    #[test]
+    fn export_attachments_unit_variants_serialize_with_kind_tag() {
+        for (e, expected) in [
+            (
+                NoteExportAttachmentsError::VaultNotUnlocked,
+                r#"{"kind":"VaultNotUnlocked"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::InvalidNoteId,
+                r#"{"kind":"InvalidNoteId"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::InvalidNoteFilename,
+                r#"{"kind":"InvalidNoteFilename"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::NoteNotFound,
+                r#"{"kind":"NoteNotFound"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::CannotDecrypt,
+                r#"{"kind":"CannotDecrypt"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::InvalidPlaintextEncoding,
+                r#"{"kind":"InvalidPlaintextEncoding"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::InvalidVaultMeta,
+                r#"{"kind":"InvalidVaultMeta"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::InvalidDestination,
+                r#"{"kind":"InvalidDestination"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::TargetAlreadyExists,
+                r#"{"kind":"TargetAlreadyExists"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::AttachmentMissing,
+                r#"{"kind":"AttachmentMissing"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::AttachmentCorrupt,
+                r#"{"kind":"AttachmentCorrupt"}"#,
+            ),
+            (
+                NoteExportAttachmentsError::JoinFailure,
+                r#"{"kind":"JoinFailure"}"#,
+            ),
+        ] {
+            assert_eq!(serialize_export_attachments(&e), expected);
+        }
+    }
+
+    #[test]
+    fn export_attachments_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteExportAttachmentsError::Io {
+            io_error_kind: IoFailureKind::NoSpace,
+        };
+        assert_eq!(
+            serialize_export_attachments(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"NoSpace"}}"#
+        );
+    }
+
+    // ---- Closed-payload exhaustiveness pin -----------------------------
+
+    #[test]
+    fn export_attachments_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteExportAttachmentsError) {
+            match e {
+                NoteExportAttachmentsError::VaultNotUnlocked => {}
+                NoteExportAttachmentsError::InvalidNoteId => {}
+                NoteExportAttachmentsError::InvalidNoteFilename => {}
+                NoteExportAttachmentsError::NoteNotFound => {}
+                NoteExportAttachmentsError::CannotDecrypt => {}
+                NoteExportAttachmentsError::InvalidPlaintextEncoding => {}
+                NoteExportAttachmentsError::InvalidVaultMeta => {}
+                NoteExportAttachmentsError::InvalidDestination => {}
+                NoteExportAttachmentsError::TargetAlreadyExists => {}
+                NoteExportAttachmentsError::AttachmentMissing => {}
+                NoteExportAttachmentsError::AttachmentCorrupt => {}
+                NoteExportAttachmentsError::Io { io_error_kind: _ } => {}
+                NoteExportAttachmentsError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteExportAttachmentsError::VaultNotUnlocked);
+    }
+
+    // ---- From<std::io::Error> mapping ----------------------------------
+
+    #[test]
+    fn export_attachments_from_io_error_routes_via_closed_enum() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteExportAttachmentsError = raw.into();
+        match mapped {
+            NoteExportAttachmentsError::Io { io_error_kind } => {
                 assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
             }
             other => panic!("expected Io variant, got {other:?}"),

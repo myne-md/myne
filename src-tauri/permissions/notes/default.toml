@@ -21,6 +21,8 @@ permissions = [
     "allow-note-titles-batch",
     "allow-note-search",
     "allow-note-snapshot-flush",
+    "allow-note-export-as-markdown",
+    "allow-note-export-attachments",
 ]
 
 [[permission]]
@@ -62,3 +64,13 @@ commands.allow = ["note_search"]
 identifier = "allow-note-snapshot-flush"
 description = "Allow invoking notes:note_snapshot_flush (MYND-96 — force-capture an encrypted snapshot of the open note's current .myn on editor-close / before vault-lock, bypassing the coalescing window; verbatim copy, no decryption; best-effort, emits a non-blocking snapshot://write-failed event on failure)."
 commands.allow = ["note_snapshot_flush"]
+
+[[permission]]
+identifier = "allow-note-export-as-markdown"
+description = "Allow invoking notes:note_export_as_markdown (MYND-115 — decrypt one note and write its full plaintext byte-for-byte verbatim to a user-chosen path via atomic_write; deliberate user-initiated plaintext egress across TB3 under dialog-plugin authority; overwrite consent travels explicitly — overwrite=false rejects an existing target with TargetAlreadyExists)."
+commands.allow = ["note_export_as_markdown"]
+
+[[permission]]
+identifier = "allow-note-export-attachments"
+description = "Allow invoking notes:note_export_attachments (MYND-115 — opt-in attachments-included export: decrypt one note plus every form-C-referenced attachment and write them side-by-side into a user-chosen directory, with embeds rewritten to the final collision-suffixed filenames per the markdown-dialect §6 sanctioned export transform; attachments never overwrite anything; the note file's overwrite consent travels explicitly; the vault's stored blob is never modified)."
+commands.allow = ["note_export_attachments"]

@@ -28,6 +28,9 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use crate::atomic_write;
+use crate::export_naming::{
+    rewrite_embeds_to_final_names, sanitize_export_component, suffixed_filename, DEDUP_RETRY_CAP,
+};
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
 use crate::plugins::vault_unlock::state::{Slot, SlotKind, VaultRuntimeState};
@@ -39,8 +42,8 @@ use tauri::{AppHandle, Emitter, Runtime, State};
 use zeroize::Zeroizing;
 
 use super::error::{
-    NoteCreateError, NoteDeleteError, NoteListError, NoteReadError, NoteTitleBatchError,
-    NoteTitleError, NoteUpdateError,
+    NoteCreateError, NoteDeleteError, NoteExportAttachmentsError, NoteExportError, NoteListError,
+    NoteReadError, NoteTitleBatchError, NoteTitleError, NoteUpdateError,
 };
 use super::note_id::NoteId;
 use super::title_extract::{extract_title_slices, resolve_note_title};
@@ -455,6 +458,756 @@ fn note_read_error_kind(e: &NoteReadError) -> &'static str {
         NoteReadError::NotesDirNotADirectory => "NotesDirNotADirectory",
         NoteReadError::Io { .. } => "Io",
         NoteReadError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// Export one note's FULL decrypted plaintext — frontmatter included,
+/// byte-for-byte verbatim, ZERO post-processing (no newline / BOM /
+/// CRLF normalization, no embed rewriting) — to a user-chosen file
+/// path (MYND-115). This is a deliberate, user-initiated plaintext
+/// egress across TB3: the destination comes from the OS save dialog
+/// (`threat-model.md` §3 TB3 egress exception; `decisions.md`
+/// 2026-06-11 export-suite entry).
+///
+/// **Pipeline** (decrypt mirrors the [`note_read`] shape):
+/// 1. Strict [`NoteId::parse`] — BEFORE any path use; a malformed id
+///    never touches the filesystem.
+/// 2. Slot read guard + `Slot::Unlocked(uv)` match (clone `items_key`
+///    into `Zeroizing`; `Recovering` structurally rejected). Guard held
+///    across `spawn_blocking` for `vault_lock` fair-queueing.
+/// 3. `spawn_blocking { dest parent check → std::fs::read →
+///    decode_note → UTF-8 boundary → atomic_write_unclobbered }` — the
+///    destination write rides the export-destination variant of the
+///    canonical temp + sync + rename helper (randomized `create_new`
+///    temp name, so a user file at the destination can never be
+///    clobbered by the temp — 115-F1); a failed write leaves no temp
+///    sibling at the destination.
+/// 4. Drop guard, emit `event = "note_exported"`.
+///
+/// **Overwrite consent travels explicitly:** `overwrite=false` maps the
+/// `atomic_write(replace=false)` pre-rename `AlreadyExists` to
+/// [`NoteExportError::TargetAlreadyExists`] with the existing target
+/// untouched; `overwrite=true` (the OS dialog's "Replace") replaces.
+///
+/// **Failure mapping** (closed-enum, mirrors [`NoteReadError`] plus the
+/// destination pair — see `error.rs` type-level rationale):
+/// `InvalidNoteId` / `VaultNotUnlocked` / `NoteNotFound` /
+/// `CannotDecrypt` / `InvalidPlaintextEncoding` (corruption is
+/// surfaced, never exported as garbage bytes) / `InvalidDestination`
+/// (parent missing or not a dir, backup precedent) /
+/// `TargetAlreadyExists` / `Io` / `JoinFailure`.
+#[tauri::command]
+pub async fn note_export_as_markdown<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+    target_path: String,
+    overwrite: bool,
+) -> Result<(), NoteExportError> {
+    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
+        // No `NotesDirNotADirectory` variant on the export surface (see
+        // `error.rs` type-level rationale) — resolution failures collapse
+        // into the residual `Io` (closed `IoFailureKind`, DENY-list-safe).
+        let io_kind = from_io_error_kind(e.kind());
+        tracing::error!(
+            stage = "notes_dir",
+            error_kind = "Io",
+            io_failure_kind = ?io_kind,
+            "note_export notes_dir resolution failed"
+        );
+        NoteExportError::Io {
+            io_error_kind: io_kind,
+        }
+    })?;
+    note_export_with_dir(
+        notes_dir,
+        state.inner(),
+        note_id,
+        PathBuf::from(target_path),
+        overwrite,
+    )
+    .await
+}
+
+/// Inner — pure-and-testable helper. Mirror of [`note_read_with_dir`];
+/// takes `notes_dir` + `target_path` directly so tests exercise the
+/// full pipeline (parse → slot guard → decrypt → verbatim atomic write)
+/// under a `ScopedTempDir` without spinning up a Tauri runtime.
+pub(crate) async fn note_export_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    note_id: String,
+    target_path: PathBuf,
+    overwrite: bool,
+) -> Result<(), NoteExportError> {
+    // Strict-parse FIRST — before any path concatenation or fs touch.
+    // Sub-cause emits to `tracing::debug!(stage = ?cause)`; IPC sees only
+    // the single `InvalidNoteId` variant per `decisions.md` 2026-05-07.
+    let note_id = NoteId::parse(&note_id).map_err(|cause| {
+        tracing::debug!(stage = ?cause, "note_export note_id strict-parse failed");
+        NoteExportError::InvalidNoteId
+    })?;
+    tracing::debug!(stage = "note_id_parse", outcome = "ok");
+
+    // Slot guard. Held across spawn_blocking so vault_lock waits for the
+    // in-flight decrypt via `tokio::sync::RwLock` fair queueing — same
+    // load-bearing pattern as `note_read_with_dir`.
+    let slot = state.slot_read_active().await;
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_export rejected: slot is not Unlocked"
+            );
+            return Err(NoteExportError::VaultNotUnlocked);
+        }
+    };
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+
+    // Destination check, read, AEAD decrypt, UTF-8 boundary, and the
+    // verbatim write all run inside spawn_blocking — same bundling
+    // rationale as `note_read_with_dir` (sync fs ops off the runtime
+    // thread). The decrypted plaintext stays inside the closure: it goes
+    // `Zeroizing<Vec<u8>>` → disk with no intermediate copy and never
+    // crosses IPC.
+    let started = Instant::now();
+    let join_result = tokio::task::spawn_blocking(move || -> Result<(), NoteExportError> {
+        // Destination validation per the backup precedent
+        // (`backup::commands::export_phase_one`): parent must exist and
+        // be a directory. The OS save dialog normally guarantees this;
+        // it fires when the directory vanished between confirm and write.
+        if !paths::parent_dir_ok(&target_path) {
+            tracing::error!(
+                stage = "dest_check",
+                error_kind = "InvalidDestination",
+                "note_export destination parent missing or not a directory"
+            );
+            return Err(NoteExportError::InvalidDestination);
+        }
+
+        let blob = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                let io_kind_raw = e.kind();
+                let mapped = match io_kind_raw {
+                    std::io::ErrorKind::NotFound => NoteExportError::NoteNotFound,
+                    _ => NoteExportError::Io {
+                        io_error_kind: from_io_error_kind(io_kind_raw),
+                    },
+                };
+                tracing::error!(
+                    stage = "read_blob",
+                    error_kind = note_export_error_kind(&mapped),
+                    "note_export blob read failed"
+                );
+                return Err(mapped);
+            }
+        };
+        // `decode_note` parameter order is (blob, note_uuid, items_key,
+        // items_key_id) — note_uuid is the SECOND argument. The codec
+        // emits its sub-cause via `tracing::debug!` internally; the host
+        // adds a parallel non-distinguishing event (`protocol.md` §6.4).
+        let decrypted = decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id).map_err(
+            |_: DecryptError| {
+                tracing::debug!(
+                    stage = "decode",
+                    outcome = "cannot_decrypt",
+                    "note_export decode_note returned CannotDecrypt"
+                );
+                NoteExportError::CannotDecrypt
+            },
+        )?;
+        // UTF-8 boundary at the command layer — mirror of `note_read`'s.
+        // Validates in place (no copy); on failure the export writes
+        // NOTHING: corruption is surfaced, not exported as a file of
+        // garbage bytes claiming to be markdown.
+        if std::str::from_utf8(decrypted.plaintext()).is_err() {
+            tracing::error!(
+                stage = "utf8_check",
+                error_kind = "InvalidPlaintextEncoding",
+                "note_export post-AEAD plaintext is not valid UTF-8 — structural corruption suspected"
+            );
+            return Err(NoteExportError::InvalidPlaintextEncoding);
+        }
+        // Verbatim byte-for-byte write of the full decrypted plaintext
+        // through the export-destination variant of the canonical
+        // helper: same durability mechanics, randomized `create_new`
+        // temp name, so a pre-existing user file shaped like a temp
+        // sibling is never truncated (115-F1). The temp lives at the
+        // user-chosen export destination, never inside the vault (TB3
+        // egress exception; `src-tauri/CLAUDE.md` "Atomic file
+        // writes"). A returned error drops the partial temp on the way
+        // out. `replace=false` rejects a pre-existing target BEFORE the
+        // temp is created, so the existing file stays untouched.
+        if let Err(e) = atomic_write::atomic_write_unclobbered(
+            &target_path,
+            decrypted.plaintext(),
+            /* replace = */ overwrite,
+        ) {
+            let mapped = match e.kind() {
+                std::io::ErrorKind::AlreadyExists => NoteExportError::TargetAlreadyExists,
+                other => NoteExportError::Io {
+                    io_error_kind: from_io_error_kind(other),
+                },
+            };
+            tracing::error!(
+                stage = "atomic_write",
+                error_kind = note_export_error_kind(&mapped),
+                "note_export atomic_write failed"
+            );
+            return Err(mapped);
+        }
+        // mtime fidelity (SYNC-13): after the atomic rename, stamp the
+        // exported file's modified time from the frontmatter `updated:`
+        // field. Best-effort and structurally non-fatal — the export
+        // already succeeded; absent/unparsable `updated:` keeps the
+        // natural export time, and a set failure only warns (see
+        // `export_mtime` module docs).
+        super::export_mtime::apply_updated_mtime(&target_path, decrypted.plaintext());
+        // Closure exit: `decrypted` (Zeroizing) drops, plaintext bytes
+        // in RAM wipe. The on-disk copy is the user's deliberate egress.
+        Ok(())
+    })
+    .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_export read+decode+write panicked or runtime shutdown"
+            );
+            return Err(NoteExportError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(())) => {}
+    }
+    tracing::debug!(
+        stage = "export_write",
+        duration_ms = duration_ms,
+        "note_export decrypt + verbatim atomic write succeeded"
+    );
+
+    drop(slot);
+
+    tracing::debug!(stage = "success", event = "note_exported");
+    Ok(())
+}
+
+/// Static-string label for [`NoteExportError`] variants — same
+/// drift-detector discipline as [`note_create_error_kind`] /
+/// [`note_read_error_kind`]. A new variant compile-fails this match.
+fn note_export_error_kind(e: &NoteExportError) -> &'static str {
+    match e {
+        NoteExportError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteExportError::InvalidNoteId => "InvalidNoteId",
+        NoteExportError::NoteNotFound => "NoteNotFound",
+        NoteExportError::CannotDecrypt => "CannotDecrypt",
+        NoteExportError::InvalidPlaintextEncoding => "InvalidPlaintextEncoding",
+        NoteExportError::InvalidDestination => "InvalidDestination",
+        NoteExportError::TargetAlreadyExists => "TargetAlreadyExists",
+        NoteExportError::Io { .. } => "Io",
+        NoteExportError::JoinFailure => "JoinFailure",
+    }
+}
+
+/// Export one note WITH its referenced attachments, side-by-side, into
+/// a user-chosen directory (MYND-115 task 4) — the opt-in
+/// attachments-included export and the first attachment-plaintext-to-
+/// disk path. Returns the number of attachment files written.
+///
+/// **One command writes BOTH the note and its attachments** (signature
+/// `note_export_attachments(note_id, target_dir, note_filename,
+/// overwrite)` rather than a two-command attachments-then-note
+/// composition): the note's embeds must be rewritten to the FINAL
+/// (collision-suffixed) attachment filenames, so the name map and the
+/// note write are one atomic unit of intent — splitting them across two
+/// IPC round-trips would force the map through the WebView and invite
+/// drift between what landed and what the note references. The UI
+/// computes `note_filename` from the OS save dialog; `overwrite`
+/// governs the NOTE file only (SYNC-2 — the dialog's "Replace" is the
+/// consent source). Attachment files are NEVER overwritten: collisions
+/// (with pre-existing files or between attachments) deterministically
+/// retry with `" (1)"`, `" (2)"`, … suffixes before the extension.
+///
+/// **The sanctioned export transform** (`markdown-dialect.md` §6,
+/// export side): each canonical form-C embed `![[att:<id>|name]]` in
+/// the EXPORTED copy is rewritten to `![[<final-filename>]]` — the
+/// inverse of the importer's form-C rewrite (which turns
+/// `![[image.png]]` into form C), so import → export → import
+/// round-trips. (Refs the importer ingested from markdown-image form
+/// `![](img.png)` converge to the wikilink form rather than
+/// byte-reverting — convergent, not byte-inverse; dialect §6.) Every byte outside the rewritten embed spans is
+/// preserved; a note with no embeds exports byte-verbatim. The vault's
+/// stored blob is NEVER modified.
+///
+/// **All-or-nothing:** every referenced attachment is catalog-resolved
+/// and decrypted in memory BEFORE the first byte lands at the
+/// destination — a missing/corrupt attachment (or the `overwrite=false`
+/// note-target rejection) writes nothing. A residual write-phase IO
+/// failure best-effort-removes the files this invocation created.
+#[tauri::command]
+pub async fn note_export_attachments<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+    target_dir: String,
+    note_filename: String,
+    overwrite: bool,
+) -> Result<usize, NoteExportAttachmentsError> {
+    let vault_root =
+        paths::active_vault_root_io(&app, state.active_vault_id().await).map_err(|e| {
+            let io_kind = from_io_error_kind(e.kind());
+            tracing::error!(
+                stage = "vault_root",
+                error_kind = "Io",
+                io_failure_kind = ?io_kind,
+                "note_export_attachments vault root resolution failed"
+            );
+            NoteExportAttachmentsError::Io {
+                io_error_kind: io_kind,
+            }
+        })?;
+    note_export_attachments_with_root(
+        vault_root,
+        state.inner(),
+        note_id,
+        PathBuf::from(target_dir),
+        note_filename,
+        overwrite,
+    )
+    .await
+}
+
+/// One decrypted-and-validated attachment held in memory between the
+/// pre-write validation pass and the write pass.
+struct PendingAttachment {
+    /// 64-char lowercase-hex attachment-id (the rewrite-map key).
+    id: String,
+    /// Sanitized export filename (catalog display name, made path- and
+    /// embed-grammar-safe).
+    filename: String,
+    /// Decrypted file bytes — `Zeroizing`, wiped on drop.
+    bytes: zeroize::Zeroizing<Vec<u8>>,
+}
+
+/// Inner — pure-and-testable helper of [`note_export_attachments`].
+/// Takes the vault root + destination directly so tests exercise the
+/// full pipeline under a `ScopedTempDir` without a Tauri runtime.
+pub(crate) async fn note_export_attachments_with_root(
+    vault_root: PathBuf,
+    state: &VaultRuntimeState,
+    note_id: String,
+    target_dir: PathBuf,
+    note_filename: String,
+    overwrite: bool,
+) -> Result<usize, NoteExportAttachmentsError> {
+    // Strict-parse FIRST — before any path concatenation or fs touch
+    // (same discipline as `note_export_with_dir`).
+    let note_id = NoteId::parse(&note_id).map_err(|cause| {
+        tracing::debug!(stage = ?cause, "note_export_attachments note_id strict-parse failed");
+        NoteExportAttachmentsError::InvalidNoteId
+    })?;
+    // Bug-canary: the UI derives `note_filename` from the OS save
+    // dialog's final path component — anything traversal-shaped is a
+    // frontend regression, rejected (never sanitized) host-side.
+    if note_filename.is_empty()
+        || note_filename == "."
+        || note_filename == ".."
+        || note_filename
+            .chars()
+            .any(|c| c == '/' || c == '\\' || c.is_control())
+    {
+        tracing::error!(
+            stage = "note_filename_check",
+            error_kind = "InvalidNoteFilename",
+            "note_export_attachments rejected a non-bare note filename"
+        );
+        return Err(NoteExportAttachmentsError::InvalidNoteFilename);
+    }
+    tracing::debug!(stage = "note_id_parse", outcome = "ok");
+
+    // Slot guard — note decrypt needs `items_key`; the catalog KEK
+    // derivation needs `root_key`. `hold_unlocked_attachment_material`
+    // clones all three out of `Slot::Unlocked` under the read guard,
+    // which is held across `spawn_blocking` for `vault_lock` fair
+    // queueing (the `note_read` / `attachment_import` pattern).
+    let Some((slot_guard, items_key, items_key_id, root_key)) =
+        state.hold_unlocked_attachment_material().await
+    else {
+        tracing::debug!(
+            stage = "slot_check",
+            outcome = "vault_locked",
+            "note_export_attachments rejected: slot is not Unlocked"
+        );
+        return Err(NoteExportAttachmentsError::VaultNotUnlocked);
+    };
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+
+    let started = Instant::now();
+    let join_result =
+        tokio::task::spawn_blocking(move || -> Result<usize, NoteExportAttachmentsError> {
+            // (1) Destination validation — the directory the OS dialog
+            //     produced must still exist.
+            if !target_dir.is_dir() {
+                tracing::error!(
+                    stage = "dest_check",
+                    error_kind = "InvalidDestination",
+                    "note_export_attachments destination missing or not a directory"
+                );
+                return Err(NoteExportAttachmentsError::InvalidDestination);
+            }
+
+            // (2) Read + decrypt + UTF-8-check the NOTE (mirror of
+            //     `note_export_with_dir`).
+            let note_path = vault_root
+                .join("notes")
+                .join(format!("{}.myn", uuid::Uuid::from_bytes(note_uuid_bytes)));
+            let blob = match std::fs::read(&note_path) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    let mapped = match e.kind() {
+                        std::io::ErrorKind::NotFound => NoteExportAttachmentsError::NoteNotFound,
+                        other => NoteExportAttachmentsError::Io {
+                            io_error_kind: from_io_error_kind(other),
+                        },
+                    };
+                    tracing::error!(
+                        stage = "read_blob",
+                        error_kind = note_export_attachments_error_kind(&mapped),
+                        "note_export_attachments note blob read failed"
+                    );
+                    return Err(mapped);
+                }
+            };
+            let decrypted = decode_note(&blob, &note_uuid_bytes, &items_key, &items_key_id)
+                .map_err(|_: DecryptError| {
+                    tracing::debug!(
+                        stage = "decode",
+                        outcome = "cannot_decrypt",
+                        "note_export_attachments decode_note returned CannotDecrypt"
+                    );
+                    NoteExportAttachmentsError::CannotDecrypt
+                })?;
+            let Ok(plaintext) = std::str::from_utf8(decrypted.plaintext()) else {
+                tracing::error!(
+                    stage = "utf8_check",
+                    error_kind = "InvalidPlaintextEncoding",
+                    "note_export_attachments post-AEAD plaintext is not valid UTF-8"
+                );
+                return Err(NoteExportAttachmentsError::InvalidPlaintextEncoding);
+            };
+
+            // (3) Locate the canonical form-C embeds (document order) and
+            //     reduce to unique ids by FIRST appearance — the
+            //     deterministic processing/naming order.
+            let spans = crate::plugins::attachments::reconcile::extract_att_embed_spans(plaintext);
+            let mut unique_ids: Vec<&str> = Vec::new();
+            {
+                let mut seen = std::collections::HashSet::new();
+                for span in &spans {
+                    if seen.insert(span.id) {
+                        unique_ids.push(span.id);
+                    }
+                }
+            }
+
+            // (4) Pre-write validation pass: catalog-resolve AND decrypt
+            //     EVERY referenced attachment in memory before any write —
+            //     the all-or-nothing gate (a missing/corrupt attachment
+            //     fails the export with the destination untouched). Skipped
+            //     entirely when the note has no embeds (no vault.meta /
+            //     catalog read on that path).
+            let mut pending: Vec<PendingAttachment> = Vec::with_capacity(unique_ids.len());
+            if !unique_ids.is_empty() {
+                use crate::plugins::attachments::commands::{
+                    hex_decode_id, load_catalog_for_export, CatalogLoadError,
+                };
+                let catalog =
+                    load_catalog_for_export(&vault_root, &root_key).map_err(|e| match e {
+                        CatalogLoadError::InvalidVaultMeta => {
+                            tracing::error!(
+                                stage = "read_meta",
+                                error_kind = "InvalidVaultMeta",
+                                "note_export_attachments vault.meta parse failed"
+                            );
+                            NoteExportAttachmentsError::InvalidVaultMeta
+                        }
+                        CatalogLoadError::MetaIo(kind) => {
+                            let io_kind = from_io_error_kind(kind);
+                            tracing::error!(
+                                stage = "read_meta",
+                                error_kind = "Io",
+                                io_failure_kind = ?io_kind,
+                                "note_export_attachments vault.meta read failed"
+                            );
+                            NoteExportAttachmentsError::Io {
+                                io_error_kind: io_kind,
+                            }
+                        }
+                        CatalogLoadError::CatalogIo(kind) => {
+                            let io_kind = from_io_error_kind(kind);
+                            tracing::error!(
+                                stage = "read_catalog",
+                                error_kind = "Io",
+                                io_failure_kind = ?io_kind,
+                                "note_export_attachments catalog read failed"
+                            );
+                            NoteExportAttachmentsError::Io {
+                                io_error_kind: io_kind,
+                            }
+                        }
+                    })?;
+
+                for id_hex in &unique_ids {
+                    let Some(meta) = catalog.entries.get(*id_hex) else {
+                        tracing::error!(
+                            stage = "catalog_lookup",
+                            error_kind = "AttachmentMissing",
+                            "note_export_attachments referenced id absent from catalog"
+                        );
+                        return Err(NoteExportAttachmentsError::AttachmentMissing);
+                    };
+                    // The span scanner only yields 64-lowercase-hex ids, so
+                    // this decode is structurally infallible; the defensive
+                    // mapping keeps the closed surface if that ever drifts.
+                    let Some(id_bytes) = hex_decode_id(id_hex) else {
+                        return Err(NoteExportAttachmentsError::AttachmentMissing);
+                    };
+                    let blob = match std::fs::read(vault_root.join("attachments").join(id_hex)) {
+                        Ok(bytes) => bytes,
+                        Err(e) => {
+                            let mapped = match e.kind() {
+                                std::io::ErrorKind::NotFound => {
+                                    NoteExportAttachmentsError::AttachmentMissing
+                                }
+                                other => NoteExportAttachmentsError::Io {
+                                    io_error_kind: from_io_error_kind(other),
+                                },
+                            };
+                            tracing::error!(
+                                stage = "read_attachment_blob",
+                                error_kind = note_export_attachments_error_kind(&mapped),
+                                "note_export_attachments attachment blob read failed"
+                            );
+                            return Err(mapped);
+                        }
+                    };
+                    let bytes = protocol::decode_attachment_blob(
+                        &blob,
+                        &id_bytes,
+                        meta.content_type.as_bytes(),
+                        &items_key,
+                        &items_key_id,
+                    )
+                    .map_err(|_| {
+                        tracing::error!(
+                            stage = "decode_attachment",
+                            error_kind = "AttachmentCorrupt",
+                            "note_export_attachments attachment blob failed to decrypt"
+                        );
+                        NoteExportAttachmentsError::AttachmentCorrupt
+                    })?;
+                    pending.push(PendingAttachment {
+                        id: (*id_hex).to_string(),
+                        filename: sanitize_export_component(&meta.filename, "attachment"),
+                        bytes,
+                    });
+                }
+            }
+
+            // (5) Note-target overwrite pre-check (SYNC-2) — BEFORE any
+            //     write, so `overwrite=false` + existing note file rejects
+            //     with the destination untouched. (The final
+            //     `atomic_write(replace=overwrite)` still guards the race.)
+            let note_target = target_dir.join(&note_filename);
+            if !overwrite && note_target.exists() {
+                tracing::debug!(
+                    stage = "note_target_check",
+                    error_kind = "TargetAlreadyExists",
+                    "note_export_attachments note target exists and overwrite consent is absent"
+                );
+                return Err(NoteExportAttachmentsError::TargetAlreadyExists);
+            }
+
+            // (6) Write the attachments with deterministic suffix-dedup.
+            //     `atomic_write_unclobbered(replace=false)` is the collision
+            //     oracle for PRE-EXISTING files; `assigned` covers names
+            //     taken earlier in this run plus the note's own filename
+            //     (so an attachment can never occupy the name the note is
+            //     about to take — `replace=overwrite` on the note write
+            //     would otherwise clobber it). The unclobbered variant's
+            //     randomized `create_new` temps also make the temp-vs-
+            //     final-name collision structurally impossible (115-F1
+            //     variant 2: an attachment finally named `x.png.tmp`
+            //     written before its `x.png` sibling used to be destroyed
+            //     by the later write's fixed-name temp).
+            let mut written: Vec<PathBuf> = Vec::new();
+            let mut final_names: std::collections::HashMap<String, String> =
+                std::collections::HashMap::with_capacity(pending.len());
+            let mut assigned: std::collections::HashSet<String> = std::collections::HashSet::new();
+            assigned.insert(note_filename.clone());
+            for p in &pending {
+                let mut n: u32 = 0;
+                let final_name = loop {
+                    if n > DEDUP_RETRY_CAP {
+                        // Pathological collision flood — bail closed.
+                        rollback_written_exports(&written);
+                        tracing::error!(
+                            stage = "attachment_write",
+                            error_kind = "Io",
+                            "note_export_attachments exceeded the suffix-dedup retry cap"
+                        );
+                        return Err(NoteExportAttachmentsError::Io {
+                            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+                        });
+                    }
+                    let candidate = if n == 0 {
+                        p.filename.clone()
+                    } else {
+                        suffixed_filename(&p.filename, n)
+                    };
+                    if assigned.contains(&candidate) {
+                        n += 1;
+                        continue;
+                    }
+                    match atomic_write::atomic_write_unclobbered(
+                        &target_dir.join(&candidate),
+                        &p.bytes,
+                        /* replace = */ false,
+                    ) {
+                        Ok(()) => break candidate,
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => n += 1,
+                        Err(e) => {
+                            rollback_written_exports(&written);
+                            let io_kind = from_io_error_kind(e.kind());
+                            tracing::error!(
+                                stage = "attachment_write",
+                                error_kind = "Io",
+                                io_failure_kind = ?io_kind,
+                                "note_export_attachments attachment write failed"
+                            );
+                            return Err(NoteExportAttachmentsError::Io {
+                                io_error_kind: io_kind,
+                            });
+                        }
+                    }
+                };
+                written.push(target_dir.join(&final_name));
+                assigned.insert(final_name.clone());
+                final_names.insert(p.id.clone(), final_name);
+            }
+
+            // (7) The sanctioned export transform: splice each embed span
+            //     to `![[<final-filename>]]` (inverse of the importer's
+            //     rewrite); every byte outside the spans is preserved. With
+            //     no spans this reproduces the plaintext byte-for-byte.
+            let rewritten = zeroize::Zeroizing::new(rewrite_embeds_to_final_names(
+                plaintext,
+                &spans,
+                &final_names,
+            ));
+            if let Err(e) = atomic_write::atomic_write_unclobbered(
+                &note_target,
+                rewritten.as_bytes(),
+                /* replace = */ overwrite,
+            ) {
+                rollback_written_exports(&written);
+                let mapped = match e.kind() {
+                    std::io::ErrorKind::AlreadyExists => {
+                        NoteExportAttachmentsError::TargetAlreadyExists
+                    }
+                    other => NoteExportAttachmentsError::Io {
+                        io_error_kind: from_io_error_kind(other),
+                    },
+                };
+                tracing::error!(
+                    stage = "note_write",
+                    error_kind = note_export_attachments_error_kind(&mapped),
+                    "note_export_attachments note write failed"
+                );
+                return Err(mapped);
+            }
+
+            // (8) mtime fidelity (SYNC-13) — the FM block is untouched by
+            //     the embed rewrite, so the rewritten bytes carry the same
+            //     `updated:`. Best-effort, structurally non-fatal.
+            super::export_mtime::apply_updated_mtime(&note_target, rewritten.as_bytes());
+
+            // Closure exit: `decrypted`, `pending` bytes, and `rewritten`
+            // (all Zeroizing) drop and wipe. The on-disk copies are the
+            // user's deliberate egress.
+            Ok(written.len())
+        })
+        .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    let attachment_count = match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_export_attachments worker panicked or runtime shutdown"
+            );
+            return Err(NoteExportAttachmentsError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(count)) => count,
+    };
+    drop(slot_guard);
+
+    // Counts-only success event — no path, no note_id, no filenames.
+    tracing::debug!(
+        stage = "success",
+        event = "note_exported_with_attachments",
+        attachment_count = attachment_count,
+        duration_ms = duration_ms,
+    );
+    Ok(attachment_count)
+}
+
+/// Best-effort rollback of the attachment files THIS invocation
+/// created (never pre-existing ones — only paths that came out of a
+/// successful `atomic_write(replace=false)` above). Unlink failures
+/// only warn: the export is already failing with the real error.
+fn rollback_written_exports(written: &[PathBuf]) {
+    for path in written {
+        if let Err(e) = std::fs::remove_file(path) {
+            let io_kind = from_io_error_kind(e.kind());
+            tracing::warn!(
+                stage = "export_rollback",
+                io_failure_kind = ?io_kind,
+                "note_export_attachments rollback unlink failed (best-effort)"
+            );
+        }
+    }
+}
+
+/// Static-string label for [`NoteExportAttachmentsError`] variants —
+/// same drift-detector discipline as [`note_export_error_kind`].
+fn note_export_attachments_error_kind(e: &NoteExportAttachmentsError) -> &'static str {
+    match e {
+        NoteExportAttachmentsError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteExportAttachmentsError::InvalidNoteId => "InvalidNoteId",
+        NoteExportAttachmentsError::InvalidNoteFilename => "InvalidNoteFilename",
+        NoteExportAttachmentsError::NoteNotFound => "NoteNotFound",
+        NoteExportAttachmentsError::CannotDecrypt => "CannotDecrypt",
+        NoteExportAttachmentsError::InvalidPlaintextEncoding => "InvalidPlaintextEncoding",
+        NoteExportAttachmentsError::InvalidVaultMeta => "InvalidVaultMeta",
+        NoteExportAttachmentsError::InvalidDestination => "InvalidDestination",
+        NoteExportAttachmentsError::TargetAlreadyExists => "TargetAlreadyExists",
+        NoteExportAttachmentsError::AttachmentMissing => "AttachmentMissing",
+        NoteExportAttachmentsError::AttachmentCorrupt => "AttachmentCorrupt",
+        NoteExportAttachmentsError::Io { .. } => "Io",
+        NoteExportAttachmentsError::JoinFailure => "JoinFailure",
     }
 }
 
@@ -4562,5 +5315,1292 @@ mod tests {
                 "no unlocked vault must yield the clean guard error, got {result:?}"
             );
         });
+    }
+
+    // =====================================================================
+    // note_export_as_markdown (MYND-115)
+    // =====================================================================
+
+    /// Fixture body deliberately stressing the verbatim contract:
+    /// frontmatter block, trailing whitespace on a line, markdown
+    /// escapes, a literal CRLF, and NO trailing newline — the export
+    /// must reproduce every byte without normalization.
+    const EXPORT_FIXTURE_PLAINTEXT: &str = "---\ntitle: Exported Note\nupdated: 2026-06-11T10:00:00Z\n---\n\n# Heading\n\nbody with \\*escapes\\* and trailing spaces   \nliteral CRLF here\r\n\ttab-indented last line, no trailing newline";
+
+    /// Set up an unlocked-state scratch vault with one note containing
+    /// [`EXPORT_FIXTURE_PLAINTEXT`]; returns (scratch, notes_dir, state,
+    /// note_id_str).
+    async fn export_fixture() -> (ScopedTempDir, PathBuf, VaultRuntimeState, String) {
+        let scratch = ScopedTempDir::new("note-export").unwrap();
+        let notes_dir = notes_dir_under(scratch.path()).unwrap();
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(
+                test_vault_id(),
+                fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ),
+            )
+            .await;
+        let note_id_str = note_create_with_dir(
+            notes_dir.clone(),
+            &state,
+            EXPORT_FIXTURE_PLAINTEXT.to_string(),
+        )
+        .await
+        .expect("fixture note create must succeed");
+        (scratch, notes_dir, state, note_id_str)
+    }
+
+    // ---- happy path: verbatim byte identity -----------------------------
+
+    #[test]
+    fn export_writes_bytes_identical_to_stored_plaintext() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            // overwrite=false + absent target → writes (the false+absent
+            // arm of the overwrite matrix rides the happy path).
+            let target = scratch.path().join("exported.md");
+
+            note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false)
+                .await
+                .expect("export to an absent target must succeed");
+
+            let on_disk = std::fs::read(&target).unwrap();
+            assert_eq!(
+                on_disk,
+                EXPORT_FIXTURE_PLAINTEXT.as_bytes(),
+                "exported bytes must be identical to the stored plaintext"
+            );
+            // No temp sibling left behind on the success path either
+            // (naming-agnostic: the unclobbered helper's temps are
+            // randomized `<name>.<pid>-<n>.tmp` siblings).
+            assert!(no_tmp_residue(scratch.path()));
+        });
+    }
+
+    /// `true` when `dir` holds no `*.tmp`-suffixed entry — the
+    /// naming-agnostic temp-residue probe (covers both the legacy
+    /// `<name>.tmp` shape and the unclobbered `<name>.<pid>-<n>.tmp`
+    /// shape).
+    fn no_tmp_residue(dir: &Path) -> bool {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .all(|e| !e.file_name().to_string_lossy().ends_with(".tmp"))
+    }
+
+    // ---- overwrite matrix ------------------------------------------------
+
+    #[test]
+    fn export_overwrite_false_existing_target_rejects_and_leaves_target_untouched() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            let target = scratch.path().join("exported.md");
+            std::fs::write(&target, b"sentinel: pre-existing bytes").unwrap();
+
+            let result =
+                note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false).await;
+            assert!(matches!(result, Err(NoteExportError::TargetAlreadyExists)));
+
+            // Target untouched (replace=false rejects BEFORE creating
+            // the temp sibling) and no temp left behind.
+            assert_eq!(
+                std::fs::read(&target).unwrap(),
+                b"sentinel: pre-existing bytes"
+            );
+            assert!(no_tmp_residue(scratch.path()));
+        });
+    }
+
+    #[test]
+    fn export_overwrite_true_replaces_existing_target() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            let target = scratch.path().join("exported.md");
+            std::fs::write(&target, b"sentinel: pre-existing bytes").unwrap();
+
+            note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), true)
+                .await
+                .expect("export with overwrite=true must replace");
+            assert_eq!(
+                std::fs::read(&target).unwrap(),
+                EXPORT_FIXTURE_PLAINTEXT.as_bytes()
+            );
+        });
+    }
+
+    // ---- 115-F1: user file shaped like a temp sibling survives -----------
+
+    /// A pre-existing USER file literally named `<target>.tmp` at the
+    /// export destination must survive byte-identical through BOTH
+    /// overwrite modes — the legacy fixed-temp-name `atomic_write`
+    /// would have truncated it and renamed it over the target.
+    #[test]
+    fn export_preexisting_user_tmp_sibling_survives_both_overwrite_modes() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            let target = scratch.path().join("exported.md");
+            let user_tmp = scratch.path().join("exported.md.tmp");
+            std::fs::write(&user_tmp, b"user file, not a temp").unwrap();
+
+            // overwrite=false + absent target: export succeeds AROUND
+            // the user file.
+            note_export_with_dir(
+                notes_dir.clone(),
+                &state,
+                note_id_str.clone(),
+                target.clone(),
+                false,
+            )
+            .await
+            .expect("export must succeed");
+            assert_eq!(
+                std::fs::read(&target).unwrap(),
+                EXPORT_FIXTURE_PLAINTEXT.as_bytes()
+            );
+            assert_eq!(std::fs::read(&user_tmp).unwrap(), b"user file, not a temp");
+
+            // overwrite=true over the existing target: user file STILL
+            // untouched.
+            note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), true)
+                .await
+                .expect("export with overwrite=true must succeed");
+            assert_eq!(
+                std::fs::read(&target).unwrap(),
+                EXPORT_FIXTURE_PLAINTEXT.as_bytes()
+            );
+            assert_eq!(std::fs::read(&user_tmp).unwrap(), b"user file, not a temp");
+        });
+    }
+
+    // ---- slot guards -----------------------------------------------------
+
+    #[test]
+    fn export_slot_empty_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-export-slot-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            let target = scratch.path().join("exported.md");
+
+            let result = note_export_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                target.clone(),
+                false,
+            )
+            .await;
+            assert!(matches!(result, Err(NoteExportError::VaultNotUnlocked)));
+            assert!(!target.exists());
+        });
+    }
+
+    #[test]
+    fn export_slot_recovering_rejects_with_vault_not_unlocked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-export-slot-recovering").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
+                .await;
+            let target = scratch.path().join("exported.md");
+
+            let result = note_export_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                target.clone(),
+                false,
+            )
+            .await;
+            assert!(matches!(result, Err(NoteExportError::VaultNotUnlocked)));
+            assert!(!target.exists());
+        });
+    }
+
+    // ---- strict NoteId parse before any fs touch -------------------------
+
+    #[test]
+    fn export_invalid_note_id_rejects_before_any_fs_touch() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, _note_id_str) = export_fixture().await;
+            // Target under a MISSING parent: if the destination check (or
+            // any fs touch) ran before the strict parse, this would surface
+            // `InvalidDestination` instead of `InvalidNoteId`.
+            let target = scratch.path().join("no-such-dir").join("exported.md");
+
+            let result = note_export_with_dir(
+                notes_dir,
+                &state,
+                "not-a-note-id".to_string(),
+                target.clone(),
+                true,
+            )
+            .await;
+            assert!(matches!(result, Err(NoteExportError::InvalidNoteId)));
+            assert!(!target.exists());
+            assert!(!scratch.path().join("no-such-dir").exists());
+        });
+    }
+
+    // ---- destination validation (backup precedent) -----------------------
+
+    #[test]
+    fn export_to_missing_parent_is_invalid_destination() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            let target = scratch.path().join("no-such-dir").join("exported.md");
+
+            let result =
+                note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false).await;
+            assert!(matches!(result, Err(NoteExportError::InvalidDestination)));
+            assert!(!target.exists());
+        });
+    }
+
+    #[test]
+    fn export_to_parent_that_is_a_file_is_invalid_destination() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            let not_a_dir = scratch.path().join("not-a-dir");
+            std::fs::write(&not_a_dir, b"regular file").unwrap();
+            let target = not_a_dir.join("exported.md");
+
+            let result = note_export_with_dir(notes_dir, &state, note_id_str, target, false).await;
+            assert!(matches!(result, Err(NoteExportError::InvalidDestination)));
+        });
+    }
+
+    // ---- missing note ------------------------------------------------------
+
+    #[test]
+    fn export_missing_note_is_note_not_found() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, _note_id_str) = export_fixture().await;
+            let target = scratch.path().join("exported.md");
+
+            let result = note_export_with_dir(
+                notes_dir,
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                target.clone(),
+                false,
+            )
+            .await;
+            assert!(matches!(result, Err(NoteExportError::NoteNotFound)));
+            assert!(!target.exists());
+        });
+    }
+
+    // ---- post-AEAD UTF-8 boundary: never write garbage ---------------------
+
+    #[test]
+    fn export_non_utf8_plaintext_is_invalid_plaintext_encoding_and_writes_nothing() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-export-non-utf8").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+
+            // Forge a valid v0.1 blob (AEAD verifies) whose plaintext is
+            // not UTF-8 — same `_raw` surface as the `note_read` boundary
+            // test above.
+            let items_key = [FIXTURE_ITEMS_BYTE; 32];
+            let items_key_id = [FIXTURE_ITEMS_ID_BYTE; 16];
+            let bad_plaintext: &[u8] = &[0xFF, 0xFE];
+            let (note_id, _path) = forge_note_blob_with_plaintext(
+                &notes_dir,
+                &items_key,
+                &items_key_id,
+                bad_plaintext,
+            );
+            let target = scratch.path().join("exported.md");
+
+            let result = note_export_with_dir(
+                notes_dir,
+                &state,
+                note_id.to_string(),
+                target.clone(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportError::InvalidPlaintextEncoding)
+            ));
+            // Corruption is surfaced, not exported: no target, no temp.
+            assert!(!target.exists());
+            assert!(no_tmp_residue(scratch.path()));
+        });
+    }
+
+    // ---- corrupted blob: CannotDecrypt -------------------------------------
+
+    #[test]
+    fn export_corrupted_blob_is_cannot_decrypt_and_writes_nothing() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            // Flip the last ciphertext byte → AEAD-tag failure.
+            let note_id = NoteId::parse(&note_id_str).unwrap();
+            let blob_path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+            let mut blob = std::fs::read(&blob_path).unwrap();
+            let last = blob.len() - 1;
+            blob[last] ^= 0xFF;
+            std::fs::write(&blob_path, &blob).unwrap();
+            let target = scratch.path().join("exported.md");
+
+            let result =
+                note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false).await;
+            assert!(matches!(result, Err(NoteExportError::CannotDecrypt)));
+            assert!(!target.exists());
+        });
+    }
+
+    // ---- forced write failure: no temp sibling ------------------------------
+
+    #[cfg(unix)]
+    #[test]
+    fn export_write_failure_leaves_no_temp_sibling() {
+        use std::os::unix::fs::PermissionsExt;
+
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            // Read-only destination directory: `atomic_write` fails at
+            // temp-file creation (PermissionDenied) and must leave no
+            // `.tmp` behind. (Same forcing approach as the read-only-dir
+            // cases elsewhere; the `Fault` seam is private to
+            // `atomic_write`'s own test mod.)
+            let ro_dir = scratch.path().join("read-only");
+            std::fs::create_dir(&ro_dir).unwrap();
+            std::fs::set_permissions(&ro_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+            let target = ro_dir.join("exported.md");
+
+            let result =
+                note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false).await;
+
+            // Restore perms BEFORE asserting so ScopedTempDir cleanup works
+            // even if an assert fails.
+            std::fs::set_permissions(&ro_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+            assert!(matches!(
+                result,
+                Err(NoteExportError::Io {
+                    io_error_kind: crate::io_failure_kind::IoFailureKind::PermissionDenied,
+                })
+            ));
+            assert!(!target.exists());
+            // No residue under either temp naming; in fact nothing at all
+            // landed in the destination dir.
+            assert_eq!(std::fs::read_dir(&ro_dir).unwrap().count(), 0);
+        });
+    }
+
+    // ---- mtime fidelity (SYNC-13, task 3) ------------------------------------
+
+    /// The epoch instant of [`EXPORT_FIXTURE_PLAINTEXT`]'s
+    /// `updated: 2026-06-11T10:00:00Z` line.
+    const EXPORT_FIXTURE_UPDATED_EPOCH: u64 = 1_781_172_000;
+
+    fn mtime_epoch_secs(path: &Path) -> u64 {
+        std::fs::metadata(path)
+            .unwrap()
+            .modified()
+            .unwrap()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+
+    fn now_epoch_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+
+    #[test]
+    fn export_sets_mtime_from_frontmatter_updated() {
+        rt().block_on(async {
+            let (scratch, notes_dir, state, note_id_str) = export_fixture().await;
+            let target = scratch.path().join("exported.md");
+
+            note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false)
+                .await
+                .expect("export must succeed");
+
+            // ±5 s tolerance for coarse-mtime filesystems (FAT's 2 s
+            // granularity etc.); `set_modified` itself is exact.
+            let mtime = mtime_epoch_secs(&target);
+            assert!(
+                mtime.abs_diff(EXPORT_FIXTURE_UPDATED_EPOCH) <= 5,
+                "exported file mtime ({mtime}) must equal the frontmatter \
+                 updated: instant ({EXPORT_FIXTURE_UPDATED_EPOCH})"
+            );
+        });
+    }
+
+    #[test]
+    fn export_without_updated_field_keeps_natural_export_time() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-export-mtime-absent").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# no frontmatter\nbody".to_string(),
+            )
+            .await
+            .unwrap();
+            let target = scratch.path().join("exported.md");
+
+            note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false)
+                .await
+                .unwrap();
+
+            let mtime = mtime_epoch_secs(&target);
+            assert!(
+                mtime.abs_diff(now_epoch_secs()) <= 120,
+                "absent updated: must leave the natural export time (~now), got {mtime}"
+            );
+        });
+    }
+
+    #[test]
+    fn export_with_unparsable_updated_keeps_natural_export_time() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-export-mtime-bad").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "---\nupdated: yesterday-ish\n---\n\nbody".to_string(),
+            )
+            .await
+            .unwrap();
+            let target = scratch.path().join("exported.md");
+
+            note_export_with_dir(notes_dir, &state, note_id_str, target.clone(), false)
+                .await
+                .unwrap();
+
+            let mtime = mtime_epoch_secs(&target);
+            assert!(
+                mtime.abs_diff(now_epoch_secs()) <= 120,
+                "unparsable updated: must leave the natural export time (~now), got {mtime}"
+            );
+        });
+    }
+
+    // mtime-set FAILURE non-fatality: not portably forcible at this layer
+    // (the file was just created by us, so it is writable). Covered by
+    // code structure instead — `export_mtime::apply_updated_mtime`
+    // returns `()` (it cannot fail the export by construction) and its
+    // missing-file no-op is pinned by
+    // `export_mtime::tests::apply_on_missing_file_is_a_nonfatal_noop`.
+
+    // ---- error_kind label ----------------------------------------------------
+
+    #[test]
+    fn export_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::VaultNotUnlocked),
+            "VaultNotUnlocked"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::InvalidNoteId),
+            "InvalidNoteId"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::NoteNotFound),
+            "NoteNotFound"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::CannotDecrypt),
+            "CannotDecrypt"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::InvalidPlaintextEncoding),
+            "InvalidPlaintextEncoding"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::InvalidDestination),
+            "InvalidDestination"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::TargetAlreadyExists),
+            "TargetAlreadyExists"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }),
+            "Io"
+        );
+        assert_eq!(
+            note_export_error_kind(&NoteExportError::JoinFailure),
+            "JoinFailure"
+        );
+    }
+
+    // =====================================================================
+    // note_export_attachments (MYND-115 task 4)
+    // =====================================================================
+
+    use crate::plugins::attachments::commands::{attachment_import_with_dir, ImportSource};
+
+    /// Sniffable fixture payloads (PNG magic / `%PDF-` magic) with
+    /// distinct tails so distinct imports get distinct content-addressed
+    /// ids.
+    const ATT_PNG_A: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xA1, 0xA2];
+    const ATT_PNG_B: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xB1, 0xB2];
+    const ATT_PDF: &[u8] = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n";
+
+    /// Seed a parse-passing `vault.meta` (the catalog AAD identity
+    /// source) at the vault root — mirror of the attachments plugin's
+    /// own test seeder.
+    fn seed_export_vault_meta(vault_root: &Path) {
+        let meta = protocol::VaultMeta {
+            account_number_hash: [0x33; protocol::VAULT_META_ACCOUNT_HASH_LEN],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+        };
+        std::fs::write(
+            vault_root.join("vault.meta"),
+            protocol::serialize_vault_meta(&meta),
+        )
+        .expect("seed vault.meta");
+    }
+
+    /// Unlocked-state scratch vault wired for the attachments-included
+    /// export: vault.meta + notes/ + an `out/` destination directory.
+    /// Returns (scratch, state); the vault root is `scratch.path()` and
+    /// the destination is `scratch.path()/out`.
+    async fn export_att_fixture() -> (ScopedTempDir, VaultRuntimeState) {
+        let scratch = ScopedTempDir::new("note-export-att").unwrap();
+        seed_export_vault_meta(scratch.path());
+        notes_dir_under(scratch.path()).unwrap();
+        std::fs::create_dir(scratch.path().join("out")).unwrap();
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(
+                test_vault_id(),
+                fixture_unlocked_with_keys(
+                    FIXTURE_ROOT_BYTE,
+                    FIXTURE_ITEMS_BYTE,
+                    FIXTURE_ITEMS_ID_BYTE,
+                ),
+            )
+            .await;
+        (scratch, state)
+    }
+
+    /// Import inline bytes as an attachment under the fixture vault and
+    /// return the 64-hex content-addressed id.
+    async fn import_att(
+        vault_root: &Path,
+        state: &VaultRuntimeState,
+        bytes: &[u8],
+        filename: &str,
+    ) -> String {
+        attachment_import_with_dir(
+            vault_root,
+            state,
+            ImportSource::Bytes {
+                bytes: bytes.to_vec(),
+                filename: Some(filename.to_string()),
+            },
+        )
+        .await
+        .expect("fixture attachment import must succeed")
+        .id
+    }
+
+    /// Non-recursive listing of the destination dir's entry names,
+    /// sorted — the "nothing written" / side-by-side assertions.
+    fn dir_names(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    // ---- happy path: side-by-side + sanctioned rewrite -------------------
+
+    #[test]
+    fn export_attachments_writes_note_and_attachments_side_by_side_with_rewritten_embeds() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            let id_png = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            let id_pdf = import_att(&vault_root, &state, ATT_PDF, "doc.pdf").await;
+
+            let plaintext = format!(
+                "---\ntitle: T\nupdated: 2026-06-11T10:00:00Z\n---\n\nintro ![[att:{id_png}|photo.png]] mid\n![[att:{id_pdf}|doc.pdf]]\ntail, no trailing newline"
+            );
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext.clone(),
+            )
+            .await
+            .unwrap();
+
+            let count = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await
+            .expect("attachments-included export must succeed");
+            assert_eq!(count, 2);
+
+            // Attachments side-by-side under their catalog filenames,
+            // decrypted byte-for-byte.
+            assert_eq!(std::fs::read(out.join("photo.png")).unwrap(), ATT_PNG_A);
+            assert_eq!(std::fs::read(out.join("doc.pdf")).unwrap(), ATT_PDF);
+
+            // The exported note: byte-exact expected plaintext — embeds
+            // rewritten to `![[<final-filename>]]` (the importer
+            // transform's inverse), every other byte preserved.
+            let expected = "---\ntitle: T\nupdated: 2026-06-11T10:00:00Z\n---\n\nintro ![[photo.png]] mid\n![[doc.pdf]]\ntail, no trailing newline";
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                expected.as_bytes()
+            );
+
+            // mtime fidelity rides the same path (task 3 helper reuse).
+            let mtime = mtime_epoch_secs(&out.join("note.md"));
+            assert!(mtime.abs_diff(EXPORT_FIXTURE_UPDATED_EPOCH) <= 5);
+
+            // Exactly the three expected files — no temp siblings.
+            assert_eq!(dir_names(&out), vec!["doc.pdf", "note.md", "photo.png"]);
+
+            // The vault's stored blob is NEVER modified by export.
+            let note_id2 =
+                NoteId::parse(dir_names(&vault_root.join("notes"))[0].trim_end_matches(".myn"))
+                    .unwrap();
+            let stored = std::fs::read(
+                vault_root
+                    .join("notes")
+                    .join(format!("{}.myn", note_id2.as_uuid())),
+            )
+            .unwrap();
+            let dec = protocol::decode_note(
+                &stored,
+                note_id2.as_uuid().as_bytes(),
+                &[FIXTURE_ITEMS_BYTE; 32],
+                &[FIXTURE_ITEMS_ID_BYTE; 16],
+            )
+            .unwrap();
+            assert_eq!(dec.plaintext(), plaintext.as_bytes());
+        });
+    }
+
+    // ---- deterministic suffix-dedup ---------------------------------------
+
+    #[test]
+    fn export_attachments_dedups_colliding_filenames_deterministically() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            // Two DIFFERENT attachments sharing the display filename,
+            // plus a pre-existing file at the destination with that
+            // same name.
+            let id_a = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            let id_b = import_att(&vault_root, &state, ATT_PNG_B, "photo.png").await;
+            std::fs::write(out.join("photo.png"), b"sentinel: pre-existing").unwrap();
+
+            let plaintext = format!("a ![[att:{id_a}|photo.png]] b ![[att:{id_b}|photo.png]] c");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext.clone())
+                .await
+                .unwrap();
+
+            let count = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await
+            .unwrap();
+            assert_eq!(count, 2);
+
+            // Deterministic: first appearance → " (1)", second → " (2)";
+            // the pre-existing file is untouched.
+            assert_eq!(
+                std::fs::read(out.join("photo.png")).unwrap(),
+                b"sentinel: pre-existing"
+            );
+            assert_eq!(std::fs::read(out.join("photo (1).png")).unwrap(), ATT_PNG_A);
+            assert_eq!(std::fs::read(out.join("photo (2).png")).unwrap(), ATT_PNG_B);
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                b"a ![[photo (1).png]] b ![[photo (2).png]] c"
+            );
+        });
+    }
+
+    /// 115-F1 variant 2: an attachment whose FINAL name is `x.png.tmp`
+    /// written before its `x.png` sibling used to be destroyed by the
+    /// later write's fixed-name temp (`x.png` + `.tmp`); with the
+    /// unclobbered helper's randomized `create_new` temps both files
+    /// land intact and the embeds point at real files.
+    #[test]
+    fn export_attachments_tmp_shaped_final_name_survives_its_sibling() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            // Document order writes "x.png.tmp" FIRST, then "x.png".
+            let id_tmpish = import_att(&vault_root, &state, ATT_PNG_A, "x.png.tmp").await;
+            let id_plain = import_att(&vault_root, &state, ATT_PNG_B, "x.png").await;
+
+            let plaintext =
+                format!("a ![[att:{id_tmpish}|x.png.tmp]] b ![[att:{id_plain}|x.png]] c");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            let count = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await
+            .expect("export with a .tmp-shaped attachment name must succeed");
+            assert_eq!(count, 2);
+
+            // BOTH attachments landed intact — the later write's temp
+            // never occupied (or destroyed) the earlier final name.
+            assert_eq!(std::fs::read(out.join("x.png.tmp")).unwrap(), ATT_PNG_A);
+            assert_eq!(std::fs::read(out.join("x.png")).unwrap(), ATT_PNG_B);
+            assert_eq!(dir_names(&out), vec!["note.md", "x.png", "x.png.tmp"]);
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                b"a ![[x.png.tmp]] b ![[x.png]] c"
+            );
+        });
+    }
+
+    #[test]
+    fn export_attachments_same_id_referenced_twice_writes_one_file() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            let id = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+
+            let plaintext = format!("x ![[att:{id}|alias-one.png]] y ![[att:{id}]] z");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            let count = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await
+            .unwrap();
+
+            // One id → one exported file, both spans rewritten to it.
+            assert_eq!(count, 1);
+            assert_eq!(dir_names(&out), vec!["note.md", "photo.png"]);
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                b"x ![[photo.png]] y ![[photo.png]] z"
+            );
+        });
+    }
+
+    // ---- default (no-embeds) path stays byte-verbatim ---------------------
+
+    #[test]
+    fn export_attachments_note_without_embeds_exports_byte_verbatim() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            // Includes a RAW media ref and a plain wikilink — neither is
+            // a canonical form-C embed, so no byte may change.
+            let plaintext = "---\ntitle: T\n---\n\n![[image.png]] and [[Other Note|alias]]\ntrailing spaces   \nno trailing newline";
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext.to_string(),
+            )
+            .await
+            .unwrap();
+
+            let count = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(count, 0);
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                plaintext.as_bytes(),
+                "no-embeds export must be byte-verbatim"
+            );
+            assert_eq!(dir_names(&out), vec!["note.md"]);
+        });
+    }
+
+    // ---- all-or-nothing: missing / corrupt referenced attachment ----------
+
+    #[test]
+    fn export_attachments_missing_catalog_entry_errors_and_writes_nothing() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            // A real attachment AND a never-imported id: the validation
+            // pass must fail the whole export before any write.
+            let id_real = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            let id_ghost = "f".repeat(64);
+
+            let plaintext = format!("![[att:{id_real}|photo.png]] ![[att:{id_ghost}|ghost.png]]");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            let result = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::AttachmentMissing)
+            ));
+            assert!(dir_names(&out).is_empty(), "nothing may be written");
+        });
+    }
+
+    #[test]
+    fn export_attachments_corrupt_blob_errors_and_writes_nothing() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            let id = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            // Flip the stored blob's last byte → AEAD-tag failure.
+            let blob_path = vault_root.join("attachments").join(&id);
+            let mut blob = std::fs::read(&blob_path).unwrap();
+            let last = blob.len() - 1;
+            blob[last] ^= 0xFF;
+            std::fs::write(&blob_path, &blob).unwrap();
+
+            let plaintext = format!("![[att:{id}|photo.png]]");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            let result = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::AttachmentCorrupt)
+            ));
+            assert!(dir_names(&out).is_empty(), "nothing may be written");
+        });
+    }
+
+    #[test]
+    fn export_attachments_missing_blob_file_is_attachment_missing() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            let id = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            // Catalog entry stays; the blob file vanishes.
+            std::fs::remove_file(vault_root.join("attachments").join(&id)).unwrap();
+
+            let plaintext = format!("![[att:{id}|photo.png]]");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            let result = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::AttachmentMissing)
+            ));
+            assert!(dir_names(&out).is_empty());
+        });
+    }
+
+    // ---- note-file overwrite matrix (SYNC-2; note file ONLY) --------------
+
+    #[test]
+    fn export_attachments_note_overwrite_false_existing_rejects_and_writes_nothing() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            let id = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            std::fs::write(out.join("note.md"), b"sentinel: pre-existing note").unwrap();
+
+            let plaintext = format!("![[att:{id}|photo.png]]");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            let result = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::TargetAlreadyExists)
+            ));
+            // The pre-check fires BEFORE the attachment writes: the
+            // destination holds only the untouched sentinel.
+            assert_eq!(dir_names(&out), vec!["note.md"]);
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                b"sentinel: pre-existing note"
+            );
+        });
+    }
+
+    #[test]
+    fn export_attachments_note_overwrite_true_replaces_note_file() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            let id = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            std::fs::write(out.join("note.md"), b"sentinel: pre-existing note").unwrap();
+
+            let plaintext = format!("![[att:{id}|photo.png]]");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            let count = note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                true,
+            )
+            .await
+            .expect("overwrite=true must replace the note file");
+            assert_eq!(count, 1);
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                b"![[photo.png]]"
+            );
+            assert_eq!(std::fs::read(out.join("photo.png")).unwrap(), ATT_PNG_A);
+        });
+    }
+
+    // ---- catalog-filename sanitation (traversal-shaped display name) ------
+
+    #[test]
+    fn export_attachments_sanitizes_traversal_shaped_catalog_filename() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            // The catalog display filename is free-form (rename allows
+            // anything non-empty) — a separator-bearing name must NOT
+            // escape the destination directory.
+            let id = import_att(&vault_root, &state, ATT_PNG_A, "../escape.png").await;
+
+            let plaintext = format!("![[att:{id}|x]]");
+            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
+                .await
+                .unwrap();
+
+            note_export_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await
+            .unwrap();
+
+            // Lands INSIDE `out/` under the sanitized name; nothing at
+            // the traversal target.
+            assert_eq!(dir_names(&out), vec![".._escape.png", "note.md"]);
+            assert!(!vault_root.join("escape.png").exists());
+            assert_eq!(
+                std::fs::read(out.join("note.md")).unwrap(),
+                b"![[.._escape.png]]"
+            );
+        });
+    }
+
+    // ---- guards ------------------------------------------------------------
+
+    #[test]
+    fn export_attachments_locked_vault_rejects() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-export-att-locked").unwrap();
+            std::fs::create_dir(scratch.path().join("out")).unwrap();
+            let state = VaultRuntimeState::default(); // Empty slot
+            let result = note_export_attachments_with_root(
+                scratch.path().to_path_buf(),
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                scratch.path().join("out"),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::VaultNotUnlocked)
+            ));
+            assert!(dir_names(&scratch.path().join("out")).is_empty());
+        });
+    }
+
+    #[test]
+    fn export_attachments_invalid_note_id_rejects_before_any_fs_touch() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let result = note_export_attachments_with_root(
+                scratch.path().to_path_buf(),
+                &state,
+                "not-a-note-id".to_string(),
+                scratch.path().join("no-such-dir"),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            // InvalidNoteId, NOT InvalidDestination — the parse runs first.
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::InvalidNoteId)
+            ));
+        });
+    }
+
+    #[test]
+    fn export_attachments_traversal_shaped_note_filename_rejects() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let out = scratch.path().join("out");
+            for bad in ["", ".", "..", "../escape.md", "a/b.md", "a\\b.md"] {
+                let result = note_export_attachments_with_root(
+                    scratch.path().to_path_buf(),
+                    &state,
+                    "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                    out.clone(),
+                    bad.to_string(),
+                    false,
+                )
+                .await;
+                assert!(
+                    matches!(result, Err(NoteExportAttachmentsError::InvalidNoteFilename)),
+                    "must reject note_filename {bad:?}"
+                );
+            }
+            assert!(dir_names(&out).is_empty());
+        });
+    }
+
+    #[test]
+    fn export_attachments_missing_target_dir_is_invalid_destination() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let plaintext = "body";
+            let note_id =
+                note_create_with_dir(scratch.path().join("notes"), &state, plaintext.to_string())
+                    .await
+                    .unwrap();
+            let result = note_export_attachments_with_root(
+                scratch.path().to_path_buf(),
+                &state,
+                note_id,
+                scratch.path().join("no-such-dir"),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::InvalidDestination)
+            ));
+        });
+    }
+
+    #[test]
+    fn export_attachments_missing_note_is_note_not_found() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let out = scratch.path().join("out");
+            let result = note_export_attachments_with_root(
+                scratch.path().to_path_buf(),
+                &state,
+                "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                out.clone(),
+                "note.md".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(NoteExportAttachmentsError::NoteNotFound)
+            ));
+            assert!(dir_names(&out).is_empty());
+        });
+    }
+
+    // (The pure export-naming helpers — sanitize / suffix-dedup /
+    // embed rewrite — moved to `crate::export_naming` with their
+    // tests.)
+
+    // ---- error_kind label ------------------------------------------------------
+
+    #[test]
+    fn export_attachments_error_kind_label_covers_every_variant() {
+        use crate::io_failure_kind::IoFailureKind;
+        for (e, expected) in [
+            (
+                NoteExportAttachmentsError::VaultNotUnlocked,
+                "VaultNotUnlocked",
+            ),
+            (NoteExportAttachmentsError::InvalidNoteId, "InvalidNoteId"),
+            (
+                NoteExportAttachmentsError::InvalidNoteFilename,
+                "InvalidNoteFilename",
+            ),
+            (NoteExportAttachmentsError::NoteNotFound, "NoteNotFound"),
+            (NoteExportAttachmentsError::CannotDecrypt, "CannotDecrypt"),
+            (
+                NoteExportAttachmentsError::InvalidPlaintextEncoding,
+                "InvalidPlaintextEncoding",
+            ),
+            (
+                NoteExportAttachmentsError::InvalidVaultMeta,
+                "InvalidVaultMeta",
+            ),
+            (
+                NoteExportAttachmentsError::InvalidDestination,
+                "InvalidDestination",
+            ),
+            (
+                NoteExportAttachmentsError::TargetAlreadyExists,
+                "TargetAlreadyExists",
+            ),
+            (
+                NoteExportAttachmentsError::AttachmentMissing,
+                "AttachmentMissing",
+            ),
+            (
+                NoteExportAttachmentsError::AttachmentCorrupt,
+                "AttachmentCorrupt",
+            ),
+            (
+                NoteExportAttachmentsError::Io {
+                    io_error_kind: IoFailureKind::Other,
+                },
+                "Io",
+            ),
+            (NoteExportAttachmentsError::JoinFailure, "JoinFailure"),
+        ] {
+            assert_eq!(note_export_attachments_error_kind(&e), expected);
+        }
     }
 }
