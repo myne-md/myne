@@ -71,6 +71,39 @@ export async function switchToVault(session: Session, vaultId: string): Promise<
   ).click();
 }
 
+/** Open the command palette via its Ctrl+K hotkey (the Linux-container
+ *  modifier — `CommandPaletteHotkey` listens for metaKey||ctrlKey + k/p) and
+ *  wait for the palette input. Pure-key chord through the W3C Actions API:
+ *  Control DOWN → k DOWN → k UP → Control UP. Then optionally filter by
+ *  typing `query` and run the matching action row by its `data-action-id`. */
+export async function runPaletteAction(
+  session: Session,
+  actionId: string,
+  query: string,
+): Promise<void> {
+  const CONTROL = "\uE009"; // W3C Actions API code point for Control
+  await session.send("POST", "/actions", {
+    actions: [
+      {
+        type: "key",
+        id: "kbd",
+        actions: [
+          { type: "keyDown", value: CONTROL },
+          { type: "keyDown", value: "k" },
+          { type: "keyUp", value: "k" },
+          { type: "keyUp", value: CONTROL },
+        ],
+      },
+    ],
+  });
+  await (await session.byTestId("palette.input")).sendKeys(query);
+  await (
+    await session.waitForElement(
+      testIdSelector("palette.option", { "data-action-id": actionId }),
+    )
+  ).click();
+}
+
 /** A fresh vault's first unlocked editor shows the importer onboarding
  *  offer (MYND-53) over a full-screen backdrop that intercepts clicks.
  *  Dismiss it the way a user would; the dismissal persists in

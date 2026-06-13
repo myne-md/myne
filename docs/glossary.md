@@ -1047,6 +1047,10 @@ Adversary class A10. Nation-state-class adversary with zero-day capabilities, su
 
 Used in: `threat-model.md` §1 (A10)
 
+### **stray attachment file** &nbsp; 📋 *Protocol*
+
+An [`MYA1`](#mya1) blob present on disk at `attachments/<attachment-id-hex>` whose id is **absent from the [`vault.attachments`](#vaultattachments) catalog** — a crash remnant from a "clean unused attachments" sweep interrupted between its catalog rewrite and the blob unlinks (the catalog-first ordering deletes the entry first). The unlock-time reconcile unlinks stray files (canonical 64-char lowercase-hex names only), but **never** a cataloged id — including a zero-reference [unused attachment](#unused-attachment) awaiting the user's explicit sweep — and skips entirely if the catalog is present-but-undecodable (no mass-delete on corruption). Distinct from an *unused* attachment, which is cataloged and user-visible. (MYND-171; `decisions.md` 2026-06-13)
+
 ### **supply-chain compromise** &nbsp; ⚠️ *Threat*
 
 Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships malicious code. Myne's mitigations are hash-pinned lockfiles, minimal direct-dependency surface, dependency-review at update time, and `cargo-vet`/`cargo-audit` in CI. Status: Best-effort — cannot fully defend against a determined attacker in the dependency graph, but the Tauri/Cargo dependency tree is materially smaller than Electron/npm would be.
@@ -1108,6 +1112,10 @@ Used in: `spec/markdown-dialect.md` §3.6.1, `decisions.md` 2026-06-03 + 2026-05
 A line in the system where the security model changes — what is trusted on one side is not trusted on the other. Myne catalogs nine boundaries (TB1–TB9). See `threat-model.md` §3 for the full table.
 
 Used in: `threat-model.md` §3
+
+### **unused attachment** &nbsp; 📋 *Protocol*
+
+An [attachment](#attachment) referenced by **zero live notes** — either orphaned (its referencing note(s) deleted) or never inserted (imported into the library but not yet embedded). It stays in the [`vault.attachments`](#vaultattachments) catalog and visible in the library (Myne is library-first; `protocol.md` §9.10 keeps metadata after note deletion); it is **never** auto-deleted. The only thing that removes it is the explicit user-triggered "Clean unused attachments" sweep, which recomputes the zero-reference set authoritatively (scanning every note, fail-closed) and cryptographically erases the confirmed set. Distinct from a [stray attachment file](#stray-attachment-file) (catalog-less crash remnant). (MYND-171; `decisions.md` 2026-06-13)
 
 ### **UUIDv4** &nbsp; 📋 *Protocol*
 

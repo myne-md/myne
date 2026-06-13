@@ -33,8 +33,10 @@
 //! ## Capability ACL
 //!
 //! `attachments:default` bundles `allow-attachment-import`,
-//! `allow-catalog-list`, `allow-attachment-delete`. Main-window-only —
-//! the import/delete writes and the catalog read are privileged
+//! `allow-catalog-list`, `allow-attachment-delete`,
+//! `allow-attachment-rename`, the reconcile trio, and
+//! `allow-attachment-unused-list` (MYND-171). Main-window-only — the
+//! import/delete/cleanup writes and the catalog/scan reads are privileged
 //! operations on vault state.
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
@@ -78,6 +80,15 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,
+            // MYND-171: the unused-attachment query behind the "Clean
+            // unused attachments" review dialog — catalog entries with zero
+            // live note references, computed authoritatively (decrypts every
+            // note), fail-closed. Read-only; no mutation.
+            commands::attachment_unused_list,
+            // MYND-171: the confirm-step batched erase — re-verifies each
+            // id is still zero-reference (TOCTOU + fail-closed), then
+            // catalog-first rewrite → blob unlinks. Irreversible.
+            commands::attachment_clean_unused,
             // MYND-169 SYNC-6: the reconcile IPC surface over the in-RAM
             // attachment reference graph (rebuild-on-unlock + live note
             // lifecycle drive `apply`/`remove`; the library queries
