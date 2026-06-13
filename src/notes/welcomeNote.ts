@@ -30,11 +30,17 @@ export const WELCOME_NOTE_TITLE = "Welcome to Myne";
 
 /** The Welcome note body (Markdown). No leading `# H1`: the title chip
  *  already shows "Welcome to Myne", so a duplicate heading would just be
- *  noise. The `[[My First Idea]]` wikilink is intentionally broken so a
- *  curious click demonstrates the unwritten-note UX. */
-const WELCOME_NOTE_BODY = `Your **password** and **recovery phrase** are the only keys to these notes. Lose both and no one can recover them.
+ *  noise. The myne.md link is a bare URL on purpose — only bare URLs and
+ *  `<angle>` autolinks are click-to-open in the editor (`[text](url)` links
+ *  render but aren't clickable, autolink.ts). A friendly welcome, not a
+ *  feature tour. */
+const WELCOME_NOTE_BODY = `Welcome to Myne, your private space to think and write.
 
-This is an ordinary note — edit, rename, or delete it. Markdown works, and you can link notes like [[My First Idea]] (that link's broken on purpose — click it).
+Everything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.
+
+This is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.
+
+We're glad you're here. To learn more about Myne, visit https://myne.md
 `;
 
 const utf8Encoder = new TextEncoder();

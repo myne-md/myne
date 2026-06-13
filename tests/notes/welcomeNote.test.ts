@@ -39,8 +39,16 @@ describe("WELCOME_NOTE_MARKDOWN (MYND-118)", () => {
     expect(WELCOME_NOTE_MARKDOWN).not.toContain("# Welcome to Myne");
   });
 
-  it("keeps the safety reminder and the intentionally-broken wikilink", () => {
+  it("keeps the safety reminder and a clickable bare-URL link to the site", () => {
     expect(WELCOME_NOTE_MARKDOWN).toContain("recovery phrase");
-    expect(WELCOME_NOTE_MARKDOWN).toContain("[[My First Idea]]");
+    // Bare URL (not `[text](url)`) so the editor's autolink makes it
+    // click-to-open; clickable links are bare-URL / `<angle>` only.
+    expect(WELCOME_NOTE_MARKDOWN).toContain("https://myne.md");
+    expect(WELCOME_NOTE_MARKDOWN).not.toContain("](http");
+  });
+
+  it("has no dead wikilink and no 'broken link' framing", () => {
+    expect(WELCOME_NOTE_MARKDOWN).not.toContain("[[");
+    expect(WELCOME_NOTE_MARKDOWN.toLowerCase()).not.toContain("broken");
   });
 });
