@@ -881,13 +881,31 @@ function EditorChrome({
       {/* Sidebar toggles, floated into the editor's top corners (the title-bar
           row), level with the macOS traffic lights. */}
       <div
-        style={{ position: "absolute", top: 6, left: LEFT_TOGGLE_X, zIndex: 30 }}
+        style={{
+          position: "absolute",
+          top: 6,
+          left: LEFT_TOGGLE_X,
+          zIndex: 30,
+          display: "flex",
+          alignItems: "center",
+          gap: TITLE_BAR_CLUSTER_GAP,
+        }}
       >
         <TitleBarToggle
           side="left"
           collapsed={leftCollapsed}
           onToggle={layout.toggleLeftCollapsed}
           disabled={forced.forceLeftCollapsed}
+        />
+        <TitleBarNavButton
+          direction="back"
+          onClick={ws.goBack}
+          disabled={!ws.canGoBack}
+        />
+        <TitleBarNavButton
+          direction="forward"
+          onClick={ws.goForward}
+          disabled={!ws.canGoForward}
         />
       </div>
       {centerView !== "attachments" && (
@@ -1128,6 +1146,25 @@ const SIDEBAR_COLUMN_STYLE: CSSProperties = {
 
 /** Fixed width of a `TitleBarToggle` button. */
 const TITLE_BAR_TOGGLE_WIDTH = 30;
+/** Fixed width of a back / forward `TitleBarNavButton` (MYND-260). */
+const TITLE_BAR_NAV_WIDTH = 26;
+/** Gap between the left toggle and each nav button in the top-left cluster. */
+const TITLE_BAR_CLUSTER_GAP = 2;
+/** Shared chrome-button styling for the floated title-bar controls (sidebar
+ *  toggle + back/forward nav). Each button adds its own `width` and the
+ *  disabled-dependent `cursor`/`opacity`. */
+const TITLE_BAR_BUTTON_BASE: CSSProperties = {
+  display: "flex",
+  alignSelf: "center",
+  alignItems: "center",
+  justifyContent: "center",
+  height: 26,
+  flexShrink: 0,
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-3)",
+};
 
 // Sidebar toggles float in the editor's top corners (the OS title-bar row),
 // Obsidian-style — there is no separate top bar; each top pane's tab strip
@@ -1138,8 +1175,12 @@ const TITLE_BAR_TOGGLE_WIDTH = 30;
 const LEFT_TOGGLE_X = IS_MAC ? TRAFFIC_LIGHT_GAP + 16 : 12;
 /** Right toggle's x offset from the right edge. */
 const RIGHT_TOGGLE_X = 8;
+/** Full width of the top-left control cluster: the sidebar toggle plus the
+ *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
+const LEFT_CONTROLS_WIDTH =
+  TITLE_BAR_TOGGLE_WIDTH + 2 * (TITLE_BAR_CLUSTER_GAP + TITLE_BAR_NAV_WIDTH);
 /** Left clearance: the top-left surface must keep its content past this. */
-const LEFT_CLEARANCE = LEFT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
+const LEFT_CLEARANCE = LEFT_TOGGLE_X + LEFT_CONTROLS_WIDTH + 8;
 /** Right clearance: the top-right surface must keep its content before this. */
 const RIGHT_CLEARANCE = RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
 
@@ -1216,22 +1257,51 @@ function TitleBarToggle({
       data-side={side}
       data-collapsed={collapsed ? "true" : "false"}
       style={{
-        display: "flex",
-        alignSelf: "center",
-        alignItems: "center",
-        justifyContent: "center",
+        ...TITLE_BAR_BUTTON_BASE,
         width: TITLE_BAR_TOGGLE_WIDTH,
-        height: 26,
-        flexShrink: 0,
-        border: 0,
-        borderRadius: "var(--radius-1)",
-        background: "transparent",
-        color: "var(--fg-3)",
         cursor: disabled ? "default" : "pointer",
         opacity: disabled ? 0.4 : 1,
       }}
     >
       <Icon name={icon} size={16} />
+    </button>
+  );
+}
+
+/**
+ * Back / forward note-navigation button (MYND-260), sitting in the top-left
+ * cluster immediately right of the left sidebar toggle. Browser-style: steps
+ * the focused pane through the sequence of notes it has shown. Disabled
+ * (greyed) when there is no history in that direction — matching the
+ * `TitleBarToggle` disabled treatment.
+ */
+function TitleBarNavButton({
+  direction,
+  onClick,
+  disabled,
+}: {
+  direction: "back" | "forward";
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  const label = direction === "back" ? "Go back" : "Go forward";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      data-testid={`editor.nav-${direction}`}
+      data-disabled={disabled ? "true" : "false"}
+      style={{
+        ...TITLE_BAR_BUTTON_BASE,
+        width: TITLE_BAR_NAV_WIDTH,
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      <Icon name={direction === "back" ? "arrow-left" : "arrow-right"} size={16} />
     </button>
   );
 }
@@ -1477,22 +1547,26 @@ function SidebarBootstrap() {
  *   Ctrl+Tab / +Shift       next / prev tab in the focused pane
  *   Cmd/Ctrl+\ / +Shift     split the focused pane right / down
  *   Cmd/Ctrl+Alt+Arrows     move focus to the next / prev pane
+ *   Cmd/Ctrl+[ / ]          navigate back / forward through note history
  */
+// True when keystrokes are landing in a plain (non-editor) text field — a
+// sidebar rename / search box — where the window shortcuts must stand down.
+// The CM6 surface (`.cm-content`) is NOT plain: shortcuts stay live there.
+function isTypingInPlainInput(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return (
+    (tag === "input" || tag === "textarea") &&
+    !target.classList.contains("cm-content")
+  );
+}
+
 function WorkspaceHotkeys() {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target !== null) {
-        const tag = target.tagName.toLowerCase();
-        if (
-          (tag === "input" || tag === "textarea") &&
-          !target.classList.contains("cm-content")
-        ) {
-          return;
-        }
-      }
+      if (isTypingInPlainInput(e.target)) return;
       const mod = e.metaKey || e.ctrlKey;
 
       // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused pane.
@@ -1555,6 +1629,29 @@ function WorkspaceHotkeys() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [ws, ctx]);
+
+  // Cmd/Ctrl+[ and ] — back / forward through note history (MYND-260). These
+  // live in their OWN capture-phase listener rather than the bubble-phase
+  // switch above because CM's `defaultKeymap` binds `Mod-[`/`Mod-]` to
+  // indentLess/indentMore and consumes them in its own DOM handlers: a
+  // bubble-phase handler would fire too late (CM already indented). Capturing
+  // at the window first + `stopPropagation` keeps the chord from reaching CM,
+  // so it navigates instead of indenting. Skips a plain (non-editor) input so
+  // a sidebar rename field still types brackets normally.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.key !== "[" && e.key !== "]") return;
+      if (isTypingInPlainInput(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "[") ws.goBack();
+      else ws.goForward();
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [ws]);
+
   return null;
 }
 
