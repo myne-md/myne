@@ -233,6 +233,9 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       expect(welcomeNoteId).toBeTruthy();
       const welcomeTab = await app.session.byTestId("editor.tab", { timeoutMs: 15_000 });
       expect(await welcomeTab.attribute("data-note-id")).toBe(welcomeNoteId);
+      // Title is frontmatter-`title:` driven (no body-H1 fallback), so the
+      // row must read "Welcome to Myne", never the "Untitled" placeholder.
+      expect(await welcomeRow.textContent()).toContain("Welcome to Myne");
     });
   });
 });
