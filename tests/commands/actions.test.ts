@@ -168,13 +168,13 @@ describe("Command palette action visibility per Stage", () => {
     );
   });
 
-  it("\"Convert wikilinks…\" is DISABLED when a note is selected (stub for editor-mvp-wikilinks)", () => {
+  it("\"Convert imported wikilinks…\" is SHOWN when a note is selected (live, MYND-84)", () => {
     const ctx = makeContext({
       stageName: "editor",
       selectedNoteId: "note-1",
     });
     expect(find("wikilinks.convert-in-this-note").visibility(ctx)).toBe(
-      "disabled",
+      "show",
     );
   });
 

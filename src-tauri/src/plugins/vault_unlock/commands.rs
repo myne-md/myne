@@ -208,6 +208,20 @@ pub async fn unlock<R: Runtime>(
         crate::vault_registry::record_unlock(&base, &target_id, now_ms);
     }
 
+    // ---- MYND-85: roll-forward-recover a crashed transactional rename ----
+    //
+    // BEFORE any resolution index is built — the inline search hydration
+    // below AND the TS-orchestrated VaultIndices rebuild that runs after
+    // this command returns — reconcile a rename transaction (`wikilink.md`
+    // §8.3 / WL-7) that crashed mid-commit: a present `.rename-journal`
+    // marker rolls every staged `<uuid>.myn.tmp` forward to `.myn`; an
+    // absent marker rolls orphan `.tmp` back (delete). This MUST precede
+    // resolution so the rebuilt graph + the editor observe the committed
+    // link bodies, never a half-renamed vault. Idempotent + best-effort:
+    // a failure leaves the residue for the next unlock to retry (the
+    // marker is the durable WAL), so it never blocks unlock.
+    recover_pending_rename_on_unlock(&app, state.inner()).await;
+
     // ---- MYND-160 pipeline steps 4-6 (post-`set_unlocked` orchestration) ----
     //
     // The grill (Q5.1) frames these as part of the unlock "pipeline";
@@ -340,6 +354,59 @@ fn prefs_read_error_kind(e: &crate::plugins::prefs::PrefsReadError) -> &'static 
         PrefsReadError::SlotNotUnlocked => "slot_not_unlocked",
         PrefsReadError::Io { .. } => "io_error",
         PrefsReadError::InvalidVaultMeta => "invalid_vault_meta",
+    }
+}
+
+/// MYND-85 (§8.3 / WL-7): on unlock, roll a crashed transactional rename
+/// forward (or back) BEFORE any resolution index is built. Resolves the
+/// just-unlocked vault's `notes/` dir via the active slot id (SYNC-6) and
+/// delegates to the testable [`recover_pending_rename_in_dir`] core.
+///
+/// Best-effort: a `notes_dir` resolution failure is logged with a bounded
+/// io-failure kind and skipped (no path / id ever logged) — the
+/// `.rename-journal` marker is the durable WAL, so a missed recovery is
+/// retried idempotently on the next unlock and never blocks this one.
+pub(crate) async fn recover_pending_rename_on_unlock<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &VaultRuntimeState,
+) {
+    let notes_dir = match crate::paths::notes_dir_for(app, state.active_vault_id().await) {
+        Ok(d) => d,
+        Err(e) => {
+            tracing::warn!(
+                event = "rename_recovery_skipped",
+                reason = "notes_dir_resolution_failed",
+                io_failure_kind = ?from_io_error_kind(e.kind()),
+            );
+            return;
+        }
+    };
+    recover_pending_rename_in_dir(notes_dir).await;
+}
+
+/// Testable core of [`recover_pending_rename_on_unlock`]: run
+/// `note_txn::recover_pending_rename` on a resolved `notes/` dir from a
+/// blocking thread (fsync + rename I/O must not stall the async runtime).
+/// Best-effort — every failure is logged (bounded kind, no path) and
+/// swallowed so the next unlock retries the idempotent recovery.
+pub(crate) async fn recover_pending_rename_in_dir(notes_dir: PathBuf) {
+    match tokio::task::spawn_blocking(move || crate::note_txn::recover_pending_rename(&notes_dir))
+        .await
+    {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => {
+            tracing::warn!(
+                event = "rename_recovery_failed",
+                io_failure_kind = ?from_io_error_kind(e.kind()),
+                "pending rename recovery failed; left for next-unlock retry",
+            );
+        }
+        Err(_join) => {
+            tracing::warn!(
+                event = "rename_recovery_join_failed",
+                "pending rename recovery task panicked or runtime shutdown",
+            );
+        }
     }
 }
 
@@ -1236,6 +1303,9 @@ mod tests {
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
     use crate::plugins::vault_unlock::state::test_vault_id;
     use crate::test_support::{ScratchVault, FAST_TEST_KDF};
+    // `ScopedTempDir` is imported at module scope further down (vault_list
+    // tests); `use` is order-independent so it is in scope for the
+    // rename-recovery tests above.
 
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
@@ -1269,6 +1339,63 @@ mod tests {
         assert!(!is_vault_switch(Some(b), b));
         // A DIFFERENT vault was active → switch (must wipe global indices).
         assert!(is_vault_switch(Some(a), b));
+    }
+
+    // ---- MYND-85 task 3c: on-unlock rename recovery wiring -------------
+
+    #[test]
+    fn recover_pending_rename_in_dir_rolls_a_committed_transaction_forward() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("unlock-rename-recovery").unwrap();
+            let notes_dir = crate::paths::notes_dir_under(scratch.path()).unwrap();
+            // Simulate a crash AFTER the commit marker landed: a staged
+            // `<name>.myn.tmp` + the `.rename-journal` marker, with the live
+            // `.myn` still holding pre-rename content. The on-unlock helper
+            // must roll the staged blob forward (the §8.3 WAL guarantee).
+            std::fs::write(notes_dir.join("note-a.myn"), b"OLD").unwrap();
+            std::fs::write(notes_dir.join("note-a.myn.tmp"), b"NEW").unwrap();
+            std::fs::write(notes_dir.join(".rename-journal"), b"").unwrap();
+
+            recover_pending_rename_in_dir(notes_dir.clone()).await;
+
+            assert_eq!(
+                std::fs::read(notes_dir.join("note-a.myn")).unwrap(),
+                b"NEW",
+                "marker present → staged blob rolled forward to .myn"
+            );
+            assert!(
+                !notes_dir.join("note-a.myn.tmp").exists(),
+                ".tmp consumed by the roll-forward"
+            );
+            assert!(
+                !notes_dir.join(".rename-journal").exists(),
+                "marker cleared after recovery"
+            );
+        });
+    }
+
+    #[test]
+    fn recover_pending_rename_in_dir_rolls_an_uncommitted_transaction_back() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("unlock-rename-rollback").unwrap();
+            let notes_dir = crate::paths::notes_dir_under(scratch.path()).unwrap();
+            // Crash BEFORE the marker: staged `.tmp` but NO `.rename-journal`.
+            // The live `.myn` must be kept and the orphan `.tmp` swept.
+            std::fs::write(notes_dir.join("note-a.myn"), b"OLD").unwrap();
+            std::fs::write(notes_dir.join("note-a.myn.tmp"), b"NEW").unwrap();
+
+            recover_pending_rename_in_dir(notes_dir.clone()).await;
+
+            assert_eq!(
+                std::fs::read(notes_dir.join("note-a.myn")).unwrap(),
+                b"OLD",
+                "no marker → roll back: live .myn kept pre-rename"
+            );
+            assert!(
+                !notes_dir.join("note-a.myn.tmp").exists(),
+                "orphan .tmp swept on roll-back"
+            );
+        });
     }
 
     /// Index-bleed guard (task 2): on a vault switch the four-surface lock

@@ -300,6 +300,93 @@ impl From<std::io::Error> for NoteUpdateError {
 }
 
 /// Single error type returned across the IPC boundary by
+/// [`super::commands::note_write_batch_transactional`] — the §8.3
+/// all-or-nothing multi-note rewrite that backs wikilink rename
+/// auto-update (MYND-85 / WL-7).
+///
+/// Hand-mirrored on the TS side at `src/types/note-batch-error.ts`.
+/// Variant set is closed; adding a variant is an IPC contract change
+/// that requires updating both sides.
+///
+/// The variant set is **identical to [`NoteUpdateError`]** by design:
+/// the batch is N parallel `note_update` AEAD pipelines committed under
+/// one transaction, so every per-note failure mode (`NoteNotFound`,
+/// `CannotDecrypt`, `PlaintextTooLarge`, `InvalidNoteId`) and every
+/// structural / IO / join failure is reachable here too. A failure on
+/// **any** note aborts the **whole** batch with the vault left
+/// pre-rename (`note_txn::write_batch_transactional`); there is no
+/// per-item partial-success surface — that is the §8.3 guarantee. The
+/// failure tag never names *which* note failed (no `note_id` crosses
+/// the boundary as a distinguisher; `src-tauri/CLAUDE.md`
+/// secret-handling discipline).
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteBatchError {
+    /// Slot is `Empty` or `Recovering`. Frontend routes the user to the
+    /// lock screen; if this surfaces from a rename auto-update, a router
+    /// bug (rename runs only while unlocked).
+    #[error("vault not unlocked")]
+    VaultNotUnlocked,
+
+    /// One of the batch's `note_id` strings failed strict parse via
+    /// `super::note_id::NoteId::parse` — checked for every entry BEFORE
+    /// any filesystem touch, so a malformed id never reaches a path. The
+    /// internal sub-cause is emitted via `tracing::debug!(stage = ?cause)`
+    /// and does **not** cross the IPC boundary as a distinguisher.
+    /// Bug-canary: the orchestrator only ever passes canonical ids.
+    #[error("invalid note id")]
+    InvalidNoteId,
+
+    /// A `<vault>/notes/<note_id>.myn` in the batch does not exist —
+    /// e.g. an inbound note was deleted between the rewrite plan and the
+    /// commit. The whole batch aborts untouched (nothing staged).
+    #[error("note not found")]
+    NoteNotFound,
+
+    /// A rewritten body exceeds `protocol::MAX_PLAINTEXT_LEN` (16 MiB).
+    /// Mapped from `protocol::ProtocolError::PlaintextTooLarge`; the
+    /// protocol crate is the sole enforcement point (no host pre-check).
+    #[error("plaintext too large")]
+    PlaintextTooLarge,
+
+    /// AEAD-tag failure decoding an existing `.myn` blob in the batch.
+    /// Non-distinguishing per `protocol.md` §6.4 — same boundary policy
+    /// as [`NoteUpdateError::CannotDecrypt`].
+    #[error("note cannot be decrypted")]
+    CannotDecrypt,
+
+    /// `<vault>/notes` exists as a regular file rather than a directory —
+    /// defensive bug-canary parallel to the matching variant on the
+    /// other notes-error enums.
+    #[error("vault notes path is not a directory")]
+    NotesDirNotADirectory,
+
+    /// File-system IO failure during `notes_dir` resolution, a blob read,
+    /// or the transactional stage / commit. The bounded [`IoFailureKind`]
+    /// keeps OS error messages off the wire.
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error
+    /// (panic in the blocking task, runtime shutdown). Also the landing
+    /// site for the `unreachable!` v0.1 AEAD-seal-failure path. CTA:
+    /// "try again".
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for NoteBatchError {
+    fn from(e: std::io::Error) -> Self {
+        // `NotFound` (blob read) is special-cased at the call site
+        // (mapped to `NoteNotFound`). This `From` handles the residual
+        // cases where an `io::Error` bubbles up unclassified.
+        NoteBatchError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
+/// Single error type returned across the IPC boundary by
 /// [`super::commands::note_delete`].
 ///
 /// Hand-mirrored on the TS side at `src/types/note-delete-error.ts`.
@@ -1145,6 +1232,134 @@ mod tests {
         match mapped {
             NoteUpdateError::Io { io_error_kind } => {
                 assert_eq!(io_error_kind, IoFailureKind::Other);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    // =====================================================================
+    // NoteBatchError
+    // =====================================================================
+
+    fn serialize_batch(e: &NoteBatchError) -> String {
+        serde_json::to_string(e).expect("NoteBatchError must serialize cleanly")
+    }
+
+    // ---- NoteBatchError serde shape ------------------------------------
+
+    #[test]
+    fn batch_vault_not_unlocked_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_batch(&NoteBatchError::VaultNotUnlocked),
+            r#"{"kind":"VaultNotUnlocked"}"#
+        );
+    }
+
+    #[test]
+    fn batch_invalid_note_id_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_batch(&NoteBatchError::InvalidNoteId),
+            r#"{"kind":"InvalidNoteId"}"#
+        );
+    }
+
+    #[test]
+    fn batch_note_not_found_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_batch(&NoteBatchError::NoteNotFound),
+            r#"{"kind":"NoteNotFound"}"#
+        );
+    }
+
+    #[test]
+    fn batch_plaintext_too_large_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_batch(&NoteBatchError::PlaintextTooLarge),
+            r#"{"kind":"PlaintextTooLarge"}"#
+        );
+    }
+
+    #[test]
+    fn batch_cannot_decrypt_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_batch(&NoteBatchError::CannotDecrypt),
+            r#"{"kind":"CannotDecrypt"}"#
+        );
+    }
+
+    #[test]
+    fn batch_notes_dir_not_a_directory_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_batch(&NoteBatchError::NotesDirNotADirectory),
+            r#"{"kind":"NotesDirNotADirectory"}"#
+        );
+    }
+
+    #[test]
+    fn batch_io_serializes_with_io_failure_kind_payload() {
+        let e = NoteBatchError::Io {
+            io_error_kind: IoFailureKind::NoSpace,
+        };
+        assert_eq!(
+            serialize_batch(&e),
+            r#"{"kind":"Io","detail":{"io_error_kind":"NoSpace"}}"#
+        );
+    }
+
+    #[test]
+    fn batch_join_failure_serializes_with_kind_tag() {
+        assert_eq!(
+            serialize_batch(&NoteBatchError::JoinFailure),
+            r#"{"kind":"JoinFailure"}"#
+        );
+    }
+
+    // ---- Closed-payload exhaustiveness pin -----------------------------
+    //
+    // Mirror of `update_all_variants_have_closed_payloads_only`. If a
+    // future variant is added to `NoteBatchError`, the exhaustive match
+    // stops compiling; the reviewer must add the arm AND verify the new
+    // variant's payload is closed (no `String`, no `note_id`, no
+    // unbounded-shape data crossing the IPC boundary).
+
+    #[test]
+    fn batch_all_variants_have_closed_payloads_only() {
+        fn assert_closed(e: &NoteBatchError) {
+            match e {
+                NoteBatchError::VaultNotUnlocked => {}
+                NoteBatchError::InvalidNoteId => {}
+                NoteBatchError::NoteNotFound => {}
+                NoteBatchError::PlaintextTooLarge => {}
+                NoteBatchError::CannotDecrypt => {}
+                NoteBatchError::NotesDirNotADirectory => {}
+                NoteBatchError::Io { io_error_kind: _ } => {}
+                NoteBatchError::JoinFailure => {}
+            }
+        }
+        assert_closed(&NoteBatchError::VaultNotUnlocked);
+    }
+
+    // ---- From<std::io::Error> mapping ----------------------------------
+
+    #[test]
+    fn batch_from_io_error_routes_via_closed_enum_for_permission_denied() {
+        let raw = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let mapped: NoteBatchError = raw.into();
+        match mapped {
+            NoteBatchError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::PermissionDenied);
+            }
+            other => panic!("expected Io variant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn batch_from_io_error_no_space_collapses_to_no_space() {
+        let raw = std::io::Error::from(std::io::ErrorKind::StorageFull);
+        let mapped: NoteBatchError = raw.into();
+        match mapped {
+            NoteBatchError::Io { io_error_kind } => {
+                assert_eq!(io_error_kind, IoFailureKind::NoSpace);
             }
             other => panic!("expected Io variant, got {other:?}"),
         }

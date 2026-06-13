@@ -40,6 +40,7 @@ const SUPPRESS_NODE_NAMES = new Set<string>([
 export function isSlashSuppressed(
   state: { doc: { sliceString: (a: number, b: number) => string; length: number } } & Parameters<typeof syntaxTree>[0],
   pos: number,
+  nodeNames: ReadonlySet<string> = SUPPRESS_NODE_NAMES,
 ): boolean {
   const tree = syntaxTree(state);
   let suppressed = false;
@@ -47,7 +48,7 @@ export function isSlashSuppressed(
     from: Math.max(0, pos - 1),
     to: pos,
     enter: (node) => {
-      if (SUPPRESS_NODE_NAMES.has(node.name)) {
+      if (nodeNames.has(node.name)) {
         suppressed = true;
         return false;
       }

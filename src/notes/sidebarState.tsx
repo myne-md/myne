@@ -19,6 +19,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -36,7 +37,14 @@ import {
   type TitleRecord,
 } from "./loadNoteBatch";
 import { noteRead } from "./readNote";
-import { renameNote } from "./renameNote";
+import { renamedTitleBody } from "./renameNote";
+import { resolverNotesFromCache } from "./resolverNotes";
+import {
+  defaultRenameInboundDeps,
+  planRenameBatch,
+} from "./renameInbound";
+import { renameFlushHooks } from "./renameFlushHook";
+import { noteWriteBatchTransactional } from "./noteWriteBatch";
 import {
   rebuildVaultIndices,
   reindexNote,
@@ -450,6 +458,11 @@ const SidebarStateContext = createContext<UseSelectedNoteReturn | null>(null);
  */
 export function SidebarStateProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SidebarState>(EMPTY_SIDEBAR_STATE);
+  // Always-current snapshot of `state` for synchronous reads inside async
+  // callbacks (e.g. `commitRename` must read the PRE-rename cache before the
+  // optimistic `setState` updater is flushed). Updated on every render.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const select = useCallback((id: NoteId | null) => {
     setState((prev) => ({ ...prev, selectedId: id }));
@@ -498,6 +511,16 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
 
   const commitRename = useCallback(
     async (id: NoteId, currentBytes: string, newTitle: string) => {
+      // Capture the PRE-rename title + resolver note-set SYNCHRONOUSLY from the
+      // state ref, BEFORE the optimistic mutation: inbound `[[Old Title]]`
+      // links must resolve against the note-set where this note still carries
+      // its old title (else nothing resolves to it and no inbound rewrite is
+      // planned). The ref read is reliable here — the `setState` updater below
+      // may not have flushed by the time the `try` block reads these (MYND-85 /
+      // WL-7).
+      const preCache = stateRef.current.cache;
+      const oldTitle: string | null = preCache.get(id)?.title ?? null;
+      const preNotes = resolverNotesFromCache(preCache);
       let snapshot: RenameSnapshot = { prevTitle: null };
       setState((prev) => {
         const result = applyOptimisticRename(prev, id, newTitle);
@@ -505,15 +528,34 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
         return { ...result.next, renamingId: null };
       });
       try {
-        await renameNote(id, currentBytes, newTitle);
-        // Refresh in the background to pull the canonical title +
-        // updatedAt from the backend (defensive — the optimistic title
-        // matches what we just wrote, but updatedAt only refreshes
-        // after the round-trip).
+        // §8.3 transactional rename auto-update: the renamed note's new body
+        // (title surgery) PLUS every inbound `[[…]]`-bearing note rewrite are
+        // committed all-or-nothing — a partial commit would leave an
+        // un-rewritten `[[Old Title]]` resolving to nothing. WL-8 open-dirty
+        // pre-flight (inside `planRenameBatch`) flushes panes before reading
+        // so an open+dirty inbound note is never disk-clobbered (SYNC-15).
+        const plan = await planRenameBatch(
+          // `renameFlushHooks()` already yields `{ openNoteIds, flushOpenPanes }`,
+          // the exact surface `defaultRenameInboundDeps` consumes.
+          defaultRenameInboundDeps(renameFlushHooks()),
+          {
+            renamedNoteId: id,
+            oldTitle,
+            newTitle,
+            renamedNewBody: renamedTitleBody(currentBytes, newTitle),
+            preNotes,
+          },
+        );
+        await noteWriteBatchTransactional(plan.batch);
+        // Refresh in the background to pull the canonical title + updatedAt
+        // from the backend (defensive — the optimistic title matches what we
+        // just wrote, but updatedAt only refreshes after the round-trip).
         await refreshOne(id);
-        // MYND-31: the title changed → re-index so backlink resolution
-        // tracks the new title-key (live).
+        // MYND-31: the renamed note's title-key changed AND every inbound
+        // note's wikilink edges changed → re-index all of them so backlink /
+        // graph resolution tracks the new state (live).
         void reindexNote(id);
+        for (const inboundId of plan.inboundIds) void reindexNote(inboundId);
         // If we just renamed the OPEN note, its on-disk body now carries
         // the new title but the editor's local content (and the autosave
         // writer's view of it) is stale — a subsequent autosave would
