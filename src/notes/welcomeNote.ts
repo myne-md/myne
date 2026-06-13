@@ -18,22 +18,37 @@
 // existing restore path opens it — no Editor changes, no first-note
 // auto-select special case.
 
+import { patchTitleField } from "../dialect";
 import { noteCreate } from "./createNote";
 import { emptyWorkspace, openInFocusedTab } from "./workspaceState";
 import { serializeWorkspace, workspaceWrite } from "../lib/workspace-persist";
 
-/**
- * The Welcome note body (Markdown). The `# H1` becomes the sidebar/tab
- * title ("Welcome to Myne") — notes carry no separate title field. The
- * `[[My First Idea]]` wikilink is intentionally broken so a curious click
- * demonstrates the unwritten-note UX.
- */
-export const WELCOME_NOTE_MARKDOWN = `# Welcome to Myne
+/** The sidebar/tab title. Notes derive their title from the frontmatter
+ *  `title:` field ONLY — never a body `# H1` (loadNoteBatch.ts) — so the
+ *  Welcome note must carry it in frontmatter or it renders as "Untitled". */
+export const WELCOME_NOTE_TITLE = "Welcome to Myne";
 
-Your **password** and **recovery phrase** are the only keys to these notes. Lose both and no one can recover them.
+/** The Welcome note body (Markdown). No leading `# H1`: the title chip
+ *  already shows "Welcome to Myne", so a duplicate heading would just be
+ *  noise. The `[[My First Idea]]` wikilink is intentionally broken so a
+ *  curious click demonstrates the unwritten-note UX. */
+const WELCOME_NOTE_BODY = `Your **password** and **recovery phrase** are the only keys to these notes. Lose both and no one can recover them.
 
 This is an ordinary note — edit, rename, or delete it. Markdown works, and you can link notes like [[My First Idea]] (that link's broken on purpose — click it).
 `;
+
+const utf8Encoder = new TextEncoder();
+const utf8Decoder = new TextDecoder();
+
+/**
+ * Full note plaintext: a frontmatter `title:` block (so the sidebar/tab
+ * shows "Welcome to Myne", not "Untitled") followed by the Markdown body.
+ * Built via the canonical dialect helper so quoting/format match every
+ * other Myne-written note.
+ */
+export const WELCOME_NOTE_MARKDOWN = utf8Decoder.decode(
+  patchTitleField(utf8Encoder.encode(WELCOME_NOTE_BODY), WELCOME_NOTE_TITLE),
+);
 
 /**
  * Best-effort: create the Welcome note and pre-seed the workspace so the
