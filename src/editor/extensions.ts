@@ -40,6 +40,10 @@ import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { myneDecorations } from "./decorations";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
+import { noteSetExtension } from "./wikilink/note-set";
+import { wikilinkHoverExtension } from "./wikilink/hover";
+import { wikilinkPickerExtension } from "./wikilink/picker";
+import { activeViewExtension } from "./active-view";
 import { attachmentCatalogExtension } from "./attachments/catalog";
 import { attachmentPasteDropExtension } from "./attachments/paste-drop";
 import { attachmentInsertPlaceholderExtension } from "./attachments/insert-placeholder";
@@ -92,8 +96,17 @@ export function myneExtensions(): readonly Extension[] {
     // the doc, so the placeholder can't be persisted.
     attachmentInsertPlaceholderExtension(),
     ...myneDecorations(),
+    // WL-5: the live resolver note-set facet (seeded empty; the host
+    // reconfigures it from `useResolverNotes()`). MUST precede the chip + hover
+    // so the facet exists when they read it.
+    noteSetExtension(),
     ...wikilinkChipExtensions(),
+    // Hover-tooltip R1 (§6.2): resolved path / "(N matches)" / "(no match)".
+    wikilinkHoverExtension(),
     slashMenuExtension(),
+    // `[[` note picker (MYND-38) — fuzzy note search → canonical §3 emit. Reads
+    // the WL-5 note-set facet; reuses the slash-menu surface + fuzzyFilter.
+    wikilinkPickerExtension(),
     // `{{` token autocomplete — active only inside a `template: true` note
     // (MYND-189). Sits alongside the slash menu; both are floating menus.
     templateTokenMenuExtension(),
@@ -123,5 +136,8 @@ export function myneExtensions(): readonly Extension[] {
     ]),
     myneTheme,
     EditorView.lineWrapping,
+    // Register the focused view so command-palette actions (R2 convert, MYND-84)
+    // can reach the active pane's view + WL-5 note-set.
+    activeViewExtension(),
   ];
 }

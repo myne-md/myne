@@ -561,6 +561,33 @@ export const myneTheme = EditorView.theme({
     backgroundColor: "var(--paper-3, #ece9e2)",
     fontStyle: "italic",
   },
+  // §5.3 broken-link styling (MYND-37/83): a wikilink whose target matches no
+  // note — faded foreground, italic, no underline. Same chip surface as the
+  // default (background/border/radius unchanged) so only the text reads "dead".
+  ".cm-wikilink-chip-broken": {
+    color: "var(--fg-3)",
+    fontStyle: "italic",
+    textDecoration: "none",
+  },
+  // Generic tooltip surface (Myne design system). CM6's default `.cm-tooltip`
+  // is a light box that clashes with the dark editor; bring it onto the paper
+  // surface. The autocomplete tooltip's 2-class rule (`.cm-tooltip-autocomplete`)
+  // is more specific and still wins for itself.
+  ".cm-tooltip": {
+    backgroundColor: "var(--paper, #faf8f3)",
+    border: "1px solid var(--line-2, #c8c7c1)",
+    borderRadius: "var(--radius-2, 6px)",
+    boxShadow: "var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08))",
+    color: "var(--fg-1)",
+  },
+  // §6.2 hover-tooltip R1 content — the inner text on the `.cm-tooltip` surface.
+  ".cm-wikilink-hover": {
+    padding: "4px 8px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    color: "var(--fg-2)",
+    whiteSpace: "nowrap",
+  },
 
   // Footnotes (MYND-153) — decorations/footnote.ts.
   // Inline `[^N]` reference marker: a raised, smaller, link-colored glyph; the

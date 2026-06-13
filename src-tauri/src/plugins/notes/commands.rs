@@ -36,14 +36,15 @@ use crate::paths;
 use crate::plugins::vault_unlock::state::{Slot, SlotKind, VaultRuntimeState};
 use crate::search::{MatchedIn, SearchIndexState};
 use protocol::{decode_note, encode_new_note, encode_update, DecryptError, ProtocolError};
+use serde::Deserialize;
 use std::path::PathBuf;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Runtime, State};
 use zeroize::Zeroizing;
 
 use super::error::{
-    NoteCreateError, NoteDeleteError, NoteExportAttachmentsError, NoteExportError, NoteListError,
-    NoteReadError, NoteTitleBatchError, NoteTitleError, NoteUpdateError,
+    NoteBatchError, NoteCreateError, NoteDeleteError, NoteExportAttachmentsError, NoteExportError,
+    NoteListError, NoteReadError, NoteTitleBatchError, NoteTitleError, NoteUpdateError,
 };
 use super::note_id::NoteId;
 use super::title_extract::{extract_title_slices, resolve_note_title};
@@ -1698,6 +1699,288 @@ fn note_update_error_kind(e: &NoteUpdateError) -> &'static str {
     }
 }
 
+/// One note in a transactional batch rewrite: the canonical `note_id`
+/// string + the full rewritten plaintext body that replaces it. Mirrors
+/// the `note_update` IPC shape (`{ noteId, plaintext }`) per item; the
+/// frontend (`src/notes/renameInbound.ts`, MYND-85 task 4) builds the
+/// array from `planInboundRewrites`. `plaintext` is the *new* body
+/// (title swap on the renamed note, inbound `[[…]]` rewrites on the
+/// others), NOT a diff.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteBatchUpdate {
+    pub note_id: String,
+    pub plaintext: String,
+}
+
+/// `note_write_batch_transactional` — re-encrypt and atomically rewrite
+/// **N existing notes all-or-nothing** (`wikilink.md` §8.3 / WL-7). This
+/// is the host half of wikilink rename auto-update: a title rename
+/// rewrites the renamed note's own body PLUS every inbound `[[…]]`-bearing
+/// note, and §8.3 requires the whole set to land together — a partial
+/// commit genuinely breaks links (an un-rewritten `[[Old Title]]`
+/// resolves to no note). The TS orchestrator (MYND-85 task 4) pre-flushes
+/// any open+dirty inbound pane (WL-8 / SYNC-15) before invoking, so this
+/// command only ever disk-rewrites notes it is safe to clobber.
+///
+/// Each item runs the **same AEAD pipeline as `note_update`** — read the
+/// existing `.myn` → `decode_note` (preserves the per-note `item_key`
+/// typestate) → `encode_update` (fresh `content_nonce`, §6.3 byte-
+/// identical 0..47+N). The N encoded blobs are then committed through
+/// [`crate::note_txn::write_batch_transactional`]: stage every
+/// `<uuid>.myn.tmp` → empty `.rename-journal` marker → commit all renames
+/// → clear marker; a crash mid-commit is roll-forward-recovered on the
+/// next unlock ([`crate::note_txn::recover_pending_rename`], MYND-85
+/// task 3c). Any per-note failure (missing file, decrypt failure,
+/// oversize body) aborts the **whole** batch with the vault untouched —
+/// there is no per-item partial-success surface.
+///
+/// **Secret-handling** (`src-tauri/CLAUDE.md`): every plaintext is
+/// first-line `Zeroizing`-wrapped; `note_id`, plaintext, and full paths
+/// never reach any `tracing` line; the encode runs on a `spawn_blocking`
+/// thread with the slot read-guard held across it (same `vault_lock`
+/// fair-queueing as `note_update`).
+///
+/// On success, each rewritten note is re-indexed into the live search
+/// index (MYND-29 parity with `note_update`); the wikilink-graph reindex
+/// is the orchestrator's job (it bumps the index nonce after this
+/// resolves). Snapshots are deliberately NOT captured here — a rename is
+/// a deterministic, reversible mechanical rewrite, and coupling the
+/// transaction to the best-effort snapshot subsystem would add a
+/// failure-ambiguity surface for no integrity gain (§8.3 is about
+/// crash-atomicity, not undo history).
+#[tauri::command]
+pub async fn note_write_batch_transactional<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    search: State<'_, SearchIndexState>,
+    notes: Vec<NoteBatchUpdate>,
+) -> Result<(), NoteBatchError> {
+    // First-line Plaintext-IPC discipline: bound every body to a
+    // `Zeroizing<String>` so each wipes on every early-return and at
+    // function exit rather than lingering as plain `String` across the
+    // `.await`. Keep the (id, body) pairs in this outer scope for the
+    // post-commit re-index; the inner helper takes a borrowed slice and
+    // re-wraps a fresh clone per body for the move into `spawn_blocking`.
+    let items: Vec<(String, Zeroizing<String>)> = notes
+        .into_iter()
+        .map(|n| (n.note_id, Zeroizing::new(n.plaintext)))
+        .collect();
+
+    // Empty batch is a no-op success (a rename with zero inbound links and
+    // — by the orchestrator's construction — at least the renamed note,
+    // but defend the degenerate call anyway). Resolve `notes_dir` only
+    // when there is work.
+    if items.is_empty() {
+        return Ok(());
+    }
+
+    let notes_dir =
+        paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "NotesDirNotADirectory",
+                    "note_write_batch notes_dir resolution conflicted with a non-dir entry"
+                );
+                NoteBatchError::NotesDirNotADirectory
+            }
+            other => {
+                let io_kind = from_io_error_kind(other);
+                tracing::error!(
+                    stage = "notes_dir",
+                    error_kind = "Io",
+                    io_failure_kind = ?io_kind,
+                    "note_write_batch notes_dir resolution failed"
+                );
+                NoteBatchError::Io {
+                    io_error_kind: io_kind,
+                }
+            }
+        })?;
+
+    note_write_batch_with_dir(notes_dir, state.inner(), &items).await?;
+
+    // MYND-29 parity with `note_update`: re-index every rewritten note so
+    // full-text search reflects the new bodies (esp. the renamed note's
+    // new title). The graph/backlink reindex is the orchestrator's
+    // follow-up (it bumps the index nonce once this resolves).
+    for (note_id, plaintext) in &items {
+        let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
+        search.upsert(note_id, &title, plaintext);
+    }
+    tracing::debug!(
+        stage = "success",
+        count = items.len(),
+        "note_write_batch committed + re-indexed"
+    );
+    Ok(())
+}
+
+/// Testable core of [`note_write_batch_transactional`]: takes a resolved
+/// `notes_dir` + borrowed `(id, body)` slice so tests exercise the full
+/// parse → slot-guard → AEAD → transactional-commit pipeline under a
+/// `ScopedTempDir` without a Tauri runtime. Mirror of
+/// [`note_update_with_dir`], generalized to N notes under one transaction.
+pub(crate) async fn note_write_batch_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    items: &[(String, Zeroizing<String>)],
+) -> Result<(), NoteBatchError> {
+    if items.is_empty() {
+        return Ok(());
+    }
+
+    // Strict-parse EVERY note_id before any filesystem touch (a malformed
+    // id never reaches a path). Re-wrap each body in a fresh `Zeroizing`
+    // clone to move into the blocking closure; the caller's originals stay
+    // for re-indexing.
+    let mut parsed: Vec<(NoteId, Zeroizing<String>)> = Vec::with_capacity(items.len());
+    for (id, body) in items {
+        let note_id = NoteId::parse(id).map_err(|cause| {
+            tracing::debug!(stage = ?cause, "note_write_batch note_id strict-parse failed");
+            NoteBatchError::InvalidNoteId
+        })?;
+        parsed.push((note_id, Zeroizing::new((**body).clone())));
+    }
+
+    // Slot read guard. Held across `spawn_blocking` so `vault_lock`
+    // fair-queues behind the whole transaction — same uniform pattern as
+    // `note_update_with_dir`.
+    let slot = state.slot_read_active().await;
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_write_batch rejected: slot is not Unlocked"
+            );
+            return Err(NoteBatchError::VaultNotUnlocked);
+        }
+    };
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    // spawn_blocking pipeline: for each note read .myn → decode_note →
+    // encode_update; build the TxnBlob set; then commit all-or-nothing.
+    // Every fallible step aborts the whole closure (and thus the batch)
+    // BEFORE `write_batch_transactional` stages anything, so a failure
+    // leaves the vault untouched.
+    let started = Instant::now();
+    let join_result = tokio::task::spawn_blocking(move || -> Result<(), NoteBatchError> {
+        let mut blobs: Vec<crate::note_txn::TxnBlob> = Vec::with_capacity(parsed.len());
+        for (note_id, plaintext) in &parsed {
+            let uuid = note_id.as_uuid();
+            let note_uuid_bytes = *uuid.as_bytes();
+            let dst = notes_dir.join(format!("{uuid}.myn"));
+
+            let old_blob = std::fs::read(&dst).map_err(|e| {
+                let mapped = match e.kind() {
+                    std::io::ErrorKind::NotFound => NoteBatchError::NoteNotFound,
+                    other => NoteBatchError::Io {
+                        io_error_kind: from_io_error_kind(other),
+                    },
+                };
+                tracing::error!(
+                    stage = "fs_read",
+                    error_kind = note_batch_error_kind(&mapped),
+                    "note_write_batch blob read failed"
+                );
+                mapped
+            })?;
+
+            let decrypted = decode_note(&old_blob, &note_uuid_bytes, &items_key, &items_key_id)
+                .map_err(|_: DecryptError| {
+                    tracing::debug!(
+                        stage = "decode_note",
+                        outcome = "cannot_decrypt",
+                        "note_write_batch decode_note returned CannotDecrypt"
+                    );
+                    NoteBatchError::CannotDecrypt
+                })?;
+
+            let new_blob = match encode_update(decrypted, plaintext.as_bytes()) {
+                Ok(b) => b,
+                Err(ProtocolError::PlaintextTooLarge) => {
+                    tracing::debug!(
+                        stage = "encode_update",
+                        error_kind = "PlaintextTooLarge",
+                        "note_write_batch rejected: a rewritten body exceeds MAX_PLAINTEXT_LEN"
+                    );
+                    return Err(NoteBatchError::PlaintextTooLarge);
+                }
+                Err(_other_protocol_err) => {
+                    // Unreachable under v0.1 fixed params (see note_update).
+                    tracing::error!(
+                        stage = "encode_update",
+                        error_kind = "JoinFailure",
+                        "note_write_batch encode_update returned an unreachable ProtocolError under v0.1 fixed params"
+                    );
+                    return Err(NoteBatchError::JoinFailure);
+                }
+            };
+
+            blobs.push(crate::note_txn::TxnBlob {
+                path: dst,
+                bytes: new_blob,
+            });
+        }
+
+        // All N encoded — commit atomically (§8.3 / WL-7).
+        crate::note_txn::write_batch_transactional(&notes_dir, &blobs).map_err(|e| {
+            let mapped = NoteBatchError::Io {
+                io_error_kind: from_io_error_kind(e.kind()),
+            };
+            tracing::error!(
+                stage = "write_batch_transactional",
+                error_kind = note_batch_error_kind(&mapped),
+                "note_write_batch transactional commit failed"
+            );
+            mapped
+        })
+    })
+    .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_write_batch pipeline panicked or runtime shutdown"
+            );
+            return Err(NoteBatchError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(())) => {}
+    }
+    tracing::debug!(
+        stage = "encode_commit",
+        duration_ms = duration_ms,
+        "note_write_batch read + AEAD + transactional commit succeeded"
+    );
+
+    // Explicit drop — make the lock-release point visible.
+    drop(slot);
+    Ok(())
+}
+
+/// Stable `&'static str` tag for a [`NoteBatchError`] used in `tracing`
+/// (the enum itself never crosses a log line). Mirror of
+/// [`note_update_error_kind`].
+fn note_batch_error_kind(e: &NoteBatchError) -> &'static str {
+    match e {
+        NoteBatchError::VaultNotUnlocked => "VaultNotUnlocked",
+        NoteBatchError::InvalidNoteId => "InvalidNoteId",
+        NoteBatchError::NoteNotFound => "NoteNotFound",
+        NoteBatchError::PlaintextTooLarge => "PlaintextTooLarge",
+        NoteBatchError::CannotDecrypt => "CannotDecrypt",
+        NoteBatchError::NotesDirNotADirectory => "NotesDirNotADirectory",
+        NoteBatchError::Io { .. } => "Io",
+        NoteBatchError::JoinFailure => "JoinFailure",
+    }
+}
+
 /// Hard-delete an existing `.myn` note. See module-level docs for the
 /// broader pipeline narration.
 ///
@@ -2686,6 +2969,187 @@ mod tests {
                 snaps.len(),
                 1,
                 "an update within the coalescing window must not add a snapshot"
+            );
+        });
+    }
+
+    // ---- MYND-85 transactional batch rewrite (§8.3 / WL-7) --------------
+
+    /// Helper: decode an on-disk `.myn` under the fixture keys and assert
+    /// its plaintext equals `expect`.
+    fn assert_on_disk_body(notes_dir: &Path, id: &str, expect: &str) {
+        let note_id = NoteId::parse(id).unwrap();
+        let blob = std::fs::read(notes_dir.join(format!("{}.myn", note_id.as_uuid()))).unwrap();
+        let items_key = [FIXTURE_ITEMS_BYTE; 32];
+        let items_key_id = [FIXTURE_ITEMS_ID_BYTE; 16];
+        let dec = protocol::decode_note(
+            &blob,
+            note_id.as_uuid().as_bytes(),
+            &items_key,
+            &items_key_id,
+        )
+        .expect("on-disk blob must decrypt under fixture keys");
+        assert_eq!(dec.plaintext(), expect.as_bytes());
+    }
+
+    #[test]
+    fn note_write_batch_rewrites_all_and_each_decrypts_to_new_body() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-batch-roundtrip").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+
+            // Three existing notes (the renamed note + two inbound).
+            let id_a =
+                note_create_with_dir(notes_dir.clone(), &state, "# Old Title\nbody A".into())
+                    .await
+                    .unwrap();
+            let id_b =
+                note_create_with_dir(notes_dir.clone(), &state, "see [[Old Title]] here".into())
+                    .await
+                    .unwrap();
+            let id_c = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "and [[Old Title|alias]] too".into(),
+            )
+            .await
+            .unwrap();
+
+            // Simulate the rename rewrite: renamed note's own title swap +
+            // inbound link rewrites.
+            let items: Vec<(String, Zeroizing<String>)> = vec![
+                (id_a.clone(), Zeroizing::new("# New Title\nbody A".into())),
+                (
+                    id_b.clone(),
+                    Zeroizing::new("see [[New Title]] here".into()),
+                ),
+                (
+                    id_c.clone(),
+                    Zeroizing::new("and [[New Title|alias]] too".into()),
+                ),
+            ];
+            note_write_batch_with_dir(notes_dir.clone(), &state, &items)
+                .await
+                .expect("transactional batch must commit");
+
+            assert_on_disk_body(&notes_dir, &id_a, "# New Title\nbody A");
+            assert_on_disk_body(&notes_dir, &id_b, "see [[New Title]] here");
+            assert_on_disk_body(&notes_dir, &id_c, "and [[New Title|alias]] too");
+
+            // No transaction residue.
+            let residue = std::fs::read_dir(&notes_dir)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    let n = e.file_name();
+                    let n = n.to_string_lossy();
+                    n.ends_with(".tmp") || n == ".rename-journal"
+                })
+                .count();
+            assert_eq!(residue, 0, "no .tmp / marker left after a committed batch");
+        });
+    }
+
+    #[test]
+    fn note_write_batch_aborts_whole_set_when_one_note_missing() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-batch-abort").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+
+            let id_a = note_create_with_dir(notes_dir.clone(), &state, "real A v1".into())
+                .await
+                .unwrap();
+            // A canonical-but-nonexistent id (never created on disk).
+            let phantom = NoteId::new_v7().as_uuid().to_string();
+
+            let items: Vec<(String, Zeroizing<String>)> = vec![
+                (id_a.clone(), Zeroizing::new("real A v2".into())),
+                (phantom, Zeroizing::new("ghost".into())),
+            ];
+            let err = note_write_batch_with_dir(notes_dir.clone(), &state, &items)
+                .await
+                .expect_err("a missing note must abort the whole batch");
+            assert!(
+                matches!(err, NoteBatchError::NoteNotFound),
+                "expected NoteNotFound, got {err:?}"
+            );
+
+            // The real note is UNCHANGED — the vault is left pre-rename.
+            assert_on_disk_body(&notes_dir, &id_a, "real A v1");
+            let residue = std::fs::read_dir(&notes_dir)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    let n = e.file_name();
+                    let n = n.to_string_lossy();
+                    n.ends_with(".tmp") || n == ".rename-journal"
+                })
+                .count();
+            assert_eq!(residue, 0, "aborted batch leaves no staged residue");
+        });
+    }
+
+    #[test]
+    fn note_write_batch_empty_is_a_noop() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-batch-empty").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(
+                        FIXTURE_ROOT_BYTE,
+                        FIXTURE_ITEMS_BYTE,
+                        FIXTURE_ITEMS_ID_BYTE,
+                    ),
+                )
+                .await;
+            note_write_batch_with_dir(notes_dir, &state, &[])
+                .await
+                .expect("empty batch is a no-op success");
+        });
+    }
+
+    #[test]
+    fn note_write_batch_rejected_when_slot_locked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("note-batch-locked").unwrap();
+            let notes_dir = notes_dir_under(scratch.path()).unwrap();
+            // Default slot is Empty (locked).
+            let state = VaultRuntimeState::default();
+            let items: Vec<(String, Zeroizing<String>)> = vec![(
+                NoteId::new_v7().as_uuid().to_string(),
+                Zeroizing::new("x".into()),
+            )];
+            let err = note_write_batch_with_dir(notes_dir, &state, &items)
+                .await
+                .expect_err("a locked slot must reject the batch");
+            assert!(
+                matches!(err, NoteBatchError::VaultNotUnlocked),
+                "expected VaultNotUnlocked, got {err:?}"
             );
         });
     }

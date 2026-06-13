@@ -1,0 +1,351 @@
+// `[[` note-picker CM6 ViewPlugin (`wikilink.md` §6.1). Opens a floating,
+// fuzzy-searchable list of vault notes when the user types `[[` (or via the
+// `/wiki` slash command / `Cmd+Shift+L`), and inserts the canonical §3 link via
+// the shared `emitNoteWikilink` emitter (WL-4). Candidates come from the WL-5
+// note-set facet (`readNoteSet`); ranking reuses the shared `fuzzyFilter` scorer
+// — no new dependency. Modeled on `src/editor/template-tokens/plugin.ts`
+// (closeBrackets-aware `[[`/`]]`, the same move/confirm/dismiss primitives).
+//
+// The in-progress `[[…]]` the picker is authoring is kept as RAW, editable text
+// (no chip, not atomic) while the picker is open — see `pickerActiveFromField`,
+// which the chip + atomic-range builders read to skip the active node. This
+// avoids mutating the doc (no `]]` strip) or moving the cursor, so arrow keys /
+// clicks behave normally; the menu is navigated with ↑/↓ + Enter.
+
+import {
+  Prec,
+  StateEffect,
+  StateField,
+  type Extension,
+} from "@codemirror/state";
+import {
+  EditorView,
+  ViewPlugin,
+  keymap,
+  type Command,
+  type KeyBinding,
+  type PluginValue,
+  type ViewUpdate,
+} from "@codemirror/view";
+import { computePosition } from "../positioning";
+import { ensureFloatingStyles } from "../floating-styles";
+import { isSlashSuppressed } from "../slash/plugin";
+import { readNoteSet } from "./note-set";
+import { rankNotes, type PickerRow } from "./picker-rank";
+import { emitNoteWikilink } from "./emit";
+
+// The picker AUTHORS wikilinks, so the cursor being inside a (new, empty)
+// wikilink is the TRIGGER, not a suppressor — only code spans / URLs suppress
+// it. (The shared `isSlashSuppressed` default includes "Wikilink", which would
+// block the picker the moment closeBrackets formed `[[]]`.)
+const PICKER_SUPPRESS_NODES: ReadonlySet<string> = new Set([
+  "FencedCode",
+  "CodeBlock",
+  "InlineCode",
+  "URL",
+]);
+
+/** The `[[` start of the wikilink the picker is actively authoring, or null.
+ *  The chip + atomic-range builders (`chip-widget.ts`) skip the node at this
+ *  position so the in-progress `[[filter]]` stays raw/editable (no chip,
+ *  backspace-safe) until the picker closes. Position is mapped through edits. */
+export const setPickerActiveFrom = StateEffect.define<number | null>();
+export const pickerActiveFromField = StateField.define<number | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setPickerActiveFrom)) value = e.value;
+    }
+    if (value !== null && tr.docChanged) value = tr.changes.mapPos(value, -1);
+    return value;
+  },
+});
+
+type MenuState = {
+  triggerFrom: number; // position of the first `[` of `[[`
+  triggerTo: number; // cursor head (end of the typed filter)
+  selectedIndex: number;
+};
+
+class WikilinkPickerView implements PluginValue {
+  private container: HTMLDivElement | null = null;
+  private state: MenuState | null = null;
+  private rafHandle: number | null = null;
+  private destroyed = false;
+
+  constructor(private readonly view: EditorView) {
+    ensureFloatingStyles();
+  }
+
+  update(update: ViewUpdate): void {
+    if (update.docChanged) {
+      const head = update.view.state.selection.main.head;
+      if (this.state === null) {
+        const before = update.view.state.doc.sliceString(Math.max(0, head - 2), head);
+        if (
+          before === "[[" &&
+          !isSlashSuppressed(update.view.state, head - 1, PICKER_SUPPRESS_NODES)
+        ) {
+          this.open(head - 2, head);
+        }
+      } else {
+        this.state = { ...this.state, triggerTo: head, selectedIndex: 0 };
+        this.scheduleRender();
+      }
+    }
+    if (update.selectionSet && this.state !== null) {
+      const head = update.view.state.selection.main.head;
+      if (head < this.state.triggerFrom + 2 || head > this.state.triggerTo + 1) {
+        this.close();
+      }
+    }
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+    this.clearMenu();
+  }
+
+  private currentFilter(): string {
+    if (this.state === null) return "";
+    return this.view.state.doc.sliceString(this.state.triggerFrom + 2, this.state.triggerTo);
+  }
+
+  /** The ranked rows for the current filter — the one source render/move/confirm
+   *  agree on. */
+  private currentRows(): PickerRow[] {
+    return rankNotes(this.currentFilter(), readNoteSet(this.view.state));
+  }
+
+  private open(triggerFrom: number, triggerTo: number): void {
+    this.state = { triggerFrom, triggerTo, selectedIndex: 0 };
+    // Mark this `[[…]]` as the active picker node so the chip + atomicity skip
+    // it — the in-progress text stays raw/editable (no doc mutation, no cursor
+    // move). The `]]` is left intact; `applyRow` replaces the whole span.
+    this.setActiveFrom(triggerFrom);
+    this.scheduleRender();
+  }
+
+  /** Publish the active `[[` start (or null) to `pickerActiveFromField`. Deferred
+   *  via microtask because open()/close() can run during an update, where
+   *  `dispatch` throws. */
+  private setActiveFrom(from: number | null): void {
+    queueMicrotask(() => {
+      if (this.destroyed) return;
+      if (this.view.state.field(pickerActiveFromField, false) === from) return;
+      this.view.dispatch({ effects: setPickerActiveFrom.of(from) });
+    });
+  }
+
+  /** DOM + state teardown only (no field dispatch) — used by `applyRow`, which
+   *  clears the field synchronously in its own insert transaction. */
+  private clearMenu(): void {
+    if (this.rafHandle !== null) {
+      cancelAnimationFrame(this.rafHandle);
+      this.rafHandle = null;
+    }
+    if (this.container !== null) {
+      this.container.remove();
+      this.container = null;
+    }
+    this.state = null;
+  }
+
+  private close(): void {
+    this.clearMenu();
+    this.setActiveFrom(null);
+  }
+
+  private scheduleRender(): void {
+    if (this.rafHandle !== null) return;
+    this.rafHandle = requestAnimationFrame(() => {
+      this.rafHandle = null;
+      this.render();
+    });
+  }
+
+  private render(): void {
+    if (this.state === null) return;
+    const filter = this.currentFilter();
+    // A `]`/`[`/newline in the filter means the user left the link → close
+    // (note titles/paths legitimately contain spaces, `-`, `/`, digits — those
+    // do NOT close).
+    if (/[[\]\n]/.test(filter)) {
+      this.close();
+      return;
+    }
+    const rows = this.currentRows();
+    if (rows.length === 0) {
+      // No matches → close (never create a note, §6.1/§9).
+      this.close();
+      return;
+    }
+    if (this.state.selectedIndex >= rows.length) {
+      this.state.selectedIndex = rows.length - 1;
+    }
+
+    if (this.container === null) {
+      this.container = document.createElement("div");
+      this.container.className = "cm-slash-menu cm-wiki-picker";
+      this.container.setAttribute("role", "menu");
+      document.body.appendChild(this.container);
+    }
+    this.container.replaceChildren();
+    let selectedRow: HTMLDivElement | null = null;
+    rows.forEach((row, i) => {
+      const el = document.createElement("div");
+      el.className = "cm-slash-menu-row cm-wiki-picker-row";
+      if (i === this.state!.selectedIndex) {
+        el.classList.add("cm-slash-menu-row-selected");
+        selectedRow = el;
+      }
+      el.setAttribute("role", "menuitem");
+      el.addEventListener("mouseenter", () => {
+        if (this.state === null || this.state.selectedIndex === i) return;
+        this.state.selectedIndex = i;
+        this.container
+          ?.querySelectorAll(".cm-slash-menu-row")
+          .forEach((r, idx) => r.classList.toggle("cm-slash-menu-row-selected", idx === i));
+      });
+      const title = document.createElement("span");
+      title.className = "cm-slash-menu-label cm-wiki-picker-title";
+      title.textContent = row.note.title ?? "";
+      const path = document.createElement("span");
+      path.className = "cm-wiki-picker-path";
+      path.textContent = row.path;
+      el.append(title, path);
+      el.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        this.applyRow(row);
+      });
+      this.container!.appendChild(el);
+    });
+
+    const surfaceWidth = 320;
+    const surfaceHeight = Math.min(12 + rows.length * 40, 320);
+    const coords = this.view.coordsAtPos(this.state.triggerTo);
+    let anchorRect;
+    if (coords !== null) {
+      anchorRect = { left: coords.left, top: coords.top, right: coords.right, bottom: coords.bottom };
+    } else {
+      const editorRect = this.view.contentDOM.getBoundingClientRect();
+      anchorRect = {
+        left: editorRect.left + 16,
+        top: editorRect.top + 16,
+        right: editorRect.left + 32,
+        bottom: editorRect.top + 32,
+      };
+    }
+    const pos = computePosition({
+      anchor: anchorRect,
+      surfaceWidth,
+      surfaceHeight,
+      preferredPlacement: "below",
+    });
+    this.container.style.position = "fixed";
+    this.container.style.left = `${pos.left}px`;
+    this.container.style.top = `${pos.top}px`;
+    this.container.style.width = `${surfaceWidth}px`;
+    this.container.style.zIndex = "1000";
+
+    if (selectedRow !== null) {
+      (selectedRow as HTMLDivElement).scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  private applyRow(row: PickerRow): void {
+    if (this.state === null) return;
+    const { triggerFrom, triggerTo } = this.state;
+    this.clearMenu();
+    // Consume a trailing auto-closed `]]` / `]` (closeBrackets) so we don't
+    // leave a dangling `]]` after the emitted link's own `]]`.
+    let end = triggerTo;
+    if (this.view.state.doc.sliceString(triggerTo, triggerTo + 2) === "]]") {
+      end = triggerTo + 2;
+    } else if (this.view.state.doc.sliceString(triggerTo, triggerTo + 1) === "]") {
+      end = triggerTo + 1;
+    }
+    const insert = emitNoteWikilink(row.note.folder, row.note.title ?? "");
+    this.view.dispatch({
+      changes: { from: triggerFrom, to: end, insert },
+      selection: { anchor: triggerFrom + insert.length },
+      // Clear the active node IN THIS transaction so the freshly-inserted link
+      // chips immediately (not skipped as "still being authored").
+      effects: setPickerActiveFrom.of(null),
+    });
+    this.view.focus();
+  }
+
+  move(delta: number): boolean {
+    if (this.state === null) return false;
+    const n = this.currentRows().length;
+    if (n === 0) return false;
+    this.state = {
+      ...this.state,
+      selectedIndex: (this.state.selectedIndex + delta + n) % n,
+    };
+    this.scheduleRender();
+    return true;
+  }
+
+  confirm(): boolean {
+    if (this.state === null) return false;
+    const row = this.currentRows()[this.state.selectedIndex];
+    if (row !== undefined) {
+      this.applyRow(row);
+    } else {
+      this.close();
+    }
+    return true;
+  }
+
+  dismiss(): boolean {
+    if (this.state === null) return false;
+    this.close();
+    return true;
+  }
+
+  isOpen(): boolean {
+    return this.state !== null;
+  }
+}
+
+const wikilinkPickerPlugin = ViewPlugin.fromClass(WikilinkPickerView);
+
+/** Programmatically open the picker at the cursor (for `/wiki` + `Cmd+Shift+L`).
+ *  Inserts a BARE `[[` (no closeBrackets auto-close on a programmatic dispatch),
+ *  which the plugin's `update` then opens on. */
+export const openWikilinkPicker: Command = (view) => {
+  const head = view.state.selection.main.head;
+  if (isSlashSuppressed(view.state, head, PICKER_SUPPRESS_NODES)) return false;
+  view.dispatch({
+    changes: { from: head, insert: "[[" },
+    selection: { anchor: head + 2 },
+  });
+  view.focus();
+  return true;
+};
+
+function wikilinkPickerKeymap(): readonly KeyBinding[] {
+  const whenOpen =
+    (fn: (v: WikilinkPickerView) => boolean): Command =>
+    (view) => {
+      const inst = view.plugin(wikilinkPickerPlugin);
+      if (inst === null || !inst.isOpen()) return false;
+      return fn(inst);
+    };
+  return [
+    { key: "ArrowDown", run: whenOpen((v) => v.move(1)) },
+    { key: "ArrowUp", run: whenOpen((v) => v.move(-1)) },
+    { key: "Enter", run: whenOpen((v) => v.confirm()) },
+    { key: "Escape", run: whenOpen((v) => v.dismiss()) },
+  ];
+}
+
+export function wikilinkPickerExtension(): Extension {
+  return [
+    pickerActiveFromField,
+    wikilinkPickerPlugin,
+    Prec.highest(keymap.of(wikilinkPickerKeymap())),
+  ];
+}

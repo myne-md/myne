@@ -72,6 +72,17 @@ describe("Wikilink chip atomic-range (A1-A8)", () => {
     expect(mounted.view.state.doc.toString()).toBe("before  after");
   });
 
+  // §10 / `[[` picker: an EMPTY `[[]]` is plain text, NOT an atomic chip — the
+  // cursor edits it freely (in-progress picker text stays editable; backspace
+  // removes one char, not the whole span). MYND-38 fix.
+  it("empty [[]] is not atomic — backspace deletes one bracket", () => {
+    const doc = "x [[]] y";
+    const rightOfEmpty = doc.indexOf("]]") + 2;
+    mounted = mount(doc, rightOfEmpty);
+    deleteCharBackward(mounted.view);
+    expect(mounted.view.state.doc.toString()).toBe("x [[] y");
+  });
+
   // A2 — ArrowLeft from immediately right of `[[Note]]` jumps cursor to
   // immediately left of the chip in a single keystroke (no intermediate
   // stop inside `[[Note]]`).

@@ -1139,6 +1139,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `attachments/<attachment-id-hex>` | IN | Attachment blobs (§9.9) |
 | `vault.search` | OUT | Pure rebuildable cache; first unlock after restore rebuilds (§9.6.4) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
+| `.rename-journal` (notes dir) | OUT | Empty roll-forward marker for the transactional multi-note rename (§9.12); transient WAL sentinel, never user data |
 | `vaults/registry.json` | OUT (structurally) | Per-install plaintext cache living outside the vault root |
 | `vault.workspace` (§9.7), `vault.indices` (§9.8) | RESERVED | In-flight families (§10.3); disposition decided in the same change that lands each family's spec — landing one without amending this table is a spec bug |
 
@@ -1218,6 +1219,62 @@ realistic vaults, bounding pre-hash allocation per the §9.5.4 discipline (the r
 implementation pins `member_count` at 2²⁰ and the member table at 16 MiB). A v0.1 client
 MUST reject `MYB5` and any unregistered magic; a v005 client MUST refuse `MYB1` with an
 explicit migration prompt (§10.4). No extension points, no negotiation (§10.1).
+
+### 9.12 Transactional multi-note rename (the rename journal)
+
+A title rename that auto-updates wikilinks (`markdown-dialect.md` wikilink §8) rewrites
+the renamed note's own `.myn` blob **plus** every inbound `[[…]]`-bearing note that
+resolved to it. This rewrite is **all-or-nothing**: a partial commit would leave some
+inbound `[[Old Title]]` references un-rewritten, and because resolution is title-keyed
+(§5.3 / wikilink §5.3) an un-rewritten title-only link then resolves to **no note** —
+i.e. a partial commit silently breaks links. The per-blob atomic-write discipline (each
+`.myn` written to `<uuid>.myn.tmp` → fsync → atomic `rename(2)` → parent-dir fsync) makes
+each *single* blob durable but is **not** collectively atomic across N blobs. The rename
+journal restores all-or-nothing across the whole set.
+
+**Two-phase write + roll-forward WAL.** The writer:
+
+1. **Stage.** Encode every updated blob (the renamed note + each inbound note) and write
+   each to its `<uuid>.myn.tmp`, `fsync`'d. Any failure in this phase deletes every staged
+   `.tmp` and aborts — no live `.myn` was touched, so the vault is unchanged.
+2. **Mark.** Once all stages are durable, write an **empty** `.rename-journal` marker in
+   the notes directory (`fsync` the file + the parent directory). The marker is
+   content-free — its mere existence is the commit signal.
+3. **Commit.** Atomically `rename(2)` every `<uuid>.myn.tmp` → `<uuid>.myn`.
+4. **Clear.** Delete the marker (and `fsync` the parent directory).
+
+**Recovery (on vault-open, BEFORE the index rebuild).** A client reconciles any pending
+rename before resolution runs:
+
+- **Marker present** → a commit was in progress and (by phase 1) every staged blob is
+  durable → **roll forward**: `rename(2)` every orphan `<uuid>.myn.tmp` → `<uuid>.myn`,
+  then delete the marker.
+- **Marker absent** → either a stage crashed before the marker, or a lone per-blob
+  `atomic_write` crashed before its own rename → **roll back**: delete every orphan
+  `<uuid>.myn.tmp`.
+
+Recovery is idempotent: a crash *during* recovery leaves the same marker-present /
+marker-absent state, so the next open re-drives it to the same outcome.
+
+**Single-writer invariant.** v0.1 is single-writer-per-vault (one unlocked client; the
+`tauri-plugin-single-instance` + slot CAS guards, §9 / `decisions.md` 2026-05-06). No
+`<uuid>.myn.tmp` exists except as in-flight transaction residue, so the recovery sweep
+cannot mistake a concurrent writer's staging file for abandoned residue.
+
+**Integrity and attack surface.** The marker is **not** a magic-byte blob and carries no
+data — no note UUIDs, no titles, no counts — so it adds no metadata surface beyond the
+`.tmp` staging set already inherent to *any* note write. A disk-write adversary who plants
+a marker and a forged `<uuid>.myn.tmp` cannot inject readable content: a rolled-forward
+blob is still AEAD/CTX-verified with full AAD binding on the next read (§6.4), so a forged
+blob fails to decrypt exactly as a tampered live `.myn` would. This is the same
+corruption-detection-not-tamper-resistance posture as §9.11.4 — the journal changes *when*
+blobs become live, never *whether* they are authenticated. Both the marker and the staged
+`.tmp` files are **OUT** of the backup container (§9.11.3): a backup is a point-in-time
+consistent snapshot (§9.11.5) and never captures an in-flight rename.
+
+This mechanism introduces **no new load-bearing identifier** and is **not** a major-version
+event: the staged blobs are ordinary `MY01` `.myn` files, and the marker is an empty
+sentinel with a fixed conventional name (`.rename-journal`), not a versioned format.
 
 ## 10. Protocol Versioning & Migration
 

@@ -40,6 +40,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::note_create,
             commands::note_read,
             commands::note_update,
+            commands::note_write_batch_transactional,
             commands::note_delete,
             commands::note_list,
             commands::note_titles_batch,

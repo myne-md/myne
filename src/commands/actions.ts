@@ -3,14 +3,15 @@
 // Five actions per MYND-86 acceptance: Lock vault, Open settings, Switch to
 // note, Import Obsidian vault, Convert wikilinks in this note.
 //
-// Two of the five are intentionally `disabled` stubs in v1.0 — the
-// underlying features ship in their own future PRDs. They appear in the
-// palette so the discoverable surface is honest about what's coming; per
-// the work item: "palette never exposes actions unavailable in the
-// current state" — these stubs ARE "available in the current state"
-// (they don't depend on stage), they're just not yet built.
+// "Convert imported wikilinks in this note" went live in MYND-84 (R2, §7.1).
+// Any remaining `disabled` stub ships in its own future PRD — it appears in the
+// palette so the discoverable surface is honest about what's coming; per the
+// work item: "palette never exposes actions unavailable in the current state"
+// — such a stub IS "available in the current state" (it doesn't depend on
+// stage), it's just not yet built.
 
 import type { CommandAction } from "./registry";
+import { runWikilinkConvert } from "../editor/wikilink/convert-command";
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
@@ -126,15 +127,15 @@ const openAttachmentsAction: CommandAction = {
 
 const convertWikilinksAction: CommandAction = {
   id: "wikilinks.convert-in-this-note",
-  label: "Convert wikilinks in this note…",
+  label: "Convert imported wikilinks in this note…",
   category: "Editor",
-  disabledHint: "Ships in editor-mvp-wikilinks",
+  // R2 (MYND-84): per-note conversion of imported title-only wikilinks to the
+  // canonical §3 path form, with a mandatory diff preview. Editor-only + per-note
+  // (acts on the active buffer); the empty case shows a toast, never a modal.
   visibility: (ctx) =>
-    ctx.stageName === "editor" && ctx.selectedNoteId !== null
-      ? "disabled"
-      : "hidden",
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden",
   run: () => {
-    // No-op while disabled.
+    void runWikilinkConvert();
   },
 };
 

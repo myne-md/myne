@@ -1,7 +1,7 @@
 // Slash command registry — 11 commands (per PRD story 34).
 //
-// `/wiki` is explicitly excluded; it ships in `editor-mvp-wikilinks`
-// alongside the autocomplete picker.
+// `/wiki` (MYND-38) opens the note picker (it replaces the trigger with `[[`,
+// which the WikilinkPickerView detects and opens on).
 
 import type { EditorView } from "@codemirror/view";
 import { pickAndInsert } from "../attachments/picker";
@@ -150,6 +150,22 @@ export function slashCommands(): readonly SlashCommand[] {
           userEvent: "slash.apply",
         });
         void pickAndInsert(v, f);
+      },
+    },
+    {
+      // `/wiki` (MYND-38): replace the trigger with `[[`, which the picker
+      // opens on (same path as typing `[[`). No closeBrackets auto-close on a
+      // programmatic dispatch, so the in-progress filter stays chip-free.
+      id: "wiki",
+      label: "Wiki link",
+      icon: "[[",
+      apply: (v, f, t) => {
+        v.dispatch({
+          changes: { from: f, to: t, insert: "[[" },
+          selection: { anchor: f + 2 },
+          userEvent: "slash.apply",
+        });
+        v.focus();
       },
     },
   ];

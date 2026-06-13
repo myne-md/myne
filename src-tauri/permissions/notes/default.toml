@@ -16,6 +16,7 @@ permissions = [
     "allow-note-create",
     "allow-note-read",
     "allow-note-update",
+    "allow-note-write-batch-transactional",
     "allow-note-delete",
     "allow-note-list",
     "allow-note-titles-batch",
@@ -39,6 +40,11 @@ commands.allow = ["note_read"]
 identifier = "allow-note-update"
 description = "Allow invoking notes:note_update (re-encrypt an existing .myn note in place under the persistent item_key with a fresh content_nonce per protocol.md §6.3; bytes 0..47+N byte-identical across update revisions; atomic_write replace=true)."
 commands.allow = ["note_update"]
+
+[[permission]]
+identifier = "allow-note-write-batch-transactional"
+description = "Allow invoking notes:note_write_batch_transactional (MYND-85 / wikilink.md §8.3 — re-encrypt and atomically rewrite N existing .myn notes all-or-nothing for wikilink rename auto-update; same per-note AEAD pipeline as note_update, committed via the two-phase .rename-journal transaction so a crash mid-commit is roll-forward-recovered on next unlock; any per-note failure aborts the whole batch with the vault left pre-rename)."
+commands.allow = ["note_write_batch_transactional"]
 
 [[permission]]
 identifier = "allow-note-delete"

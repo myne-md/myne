@@ -3,6 +3,7 @@ mod auto_lock;
 mod backup_container;
 mod export_naming;
 mod io_failure_kind;
+mod note_txn;
 mod paths;
 mod plugins;
 mod protocol_error_kind;

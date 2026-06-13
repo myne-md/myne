@@ -22,6 +22,13 @@ export interface ResolverNote {
   folder: string | null;
 }
 
+/** The note's vault-relative path (`<folder>/<title>.md`; root → `<title>.md`).
+ *  The single home for this projection — the picker, hover, and conversion all
+ *  import it so the displayed path never drifts between surfaces. */
+export function notePath(n: ResolverNote): string {
+  return `${n.folder ?? ""}${n.title ?? ""}.md`;
+}
+
 /**
  * The id set of a live resolver note-set — the ONE place this is built (SYNC-3
  * trash exclusion). The resolver note-set is already the live (non-trashed,
@@ -42,8 +49,13 @@ export type WikilinkResolution =
       ambiguous: boolean;
       /** Number of notes whose title matched (≥ 1). */
       matchCount: number;
+      /** All notes whose title matched (length === matchCount), in the
+       *  resolver's deterministic filter order. The single canonical candidate
+       *  list (WL-3): #3 picker + #4 inline-ambiguity read this, never
+       *  re-filtering titles. For a single hit this is the one resolved note. */
+      candidates: ResolverNote[];
     }
-  | { status: "broken"; matchCount: 0 };
+  | { status: "broken"; matchCount: 0; candidates: ResolverNote[] };
 
 /** Split a wikilink target into its title component + (for path forms) folder.
  *  Exported so the VaultIndices edge extractor derives the folded title-key
@@ -90,7 +102,7 @@ export function resolveWikilink(
   );
 
   // (5) zero hits → broken
-  if (candidates.length === 0) return { status: "broken", matchCount: 0 };
+  if (candidates.length === 0) return { status: "broken", matchCount: 0, candidates: [] };
   // (2) single hit → resolve (survives folder move: title unchanged)
   if (candidates.length === 1) {
     return {
@@ -98,6 +110,7 @@ export function resolveWikilink(
       noteUuid: candidates[0]!.noteUuid,
       ambiguous: false,
       matchCount: 1,
+      candidates,
     };
   }
 
@@ -111,6 +124,7 @@ export function resolveWikilink(
         noteUuid: folderMatches[0]!.noteUuid,
         ambiguous: false,
         matchCount: candidates.length,
+        candidates,
       };
     }
   }
@@ -128,5 +142,28 @@ export function resolveWikilink(
     noteUuid: pick.noteUuid,
     ambiguous: true,
     matchCount: candidates.length,
+    candidates,
   };
+}
+
+/** The display-hint surface (§6.2). A pure function of `WikilinkResolution`
+ *  alone (note-set-free) — the single source of truth for the parenthetical /
+ *  broken-link copy that the chip hover (#2), picker (#3), and R2 conversion (#4)
+ *  render. `text` carries ONLY the parenthetical: `"(no match)"` for broken,
+ *  `"(N matches)"` for an ambiguous resolve, and `""` for a clean single hit
+ *  (the caller composes the "Display → path" line for a clean hit). The
+ *  `broken` / `ambiguous` booleans let callers branch on state (e.g. #2's
+ *  broken-chip styling) without re-reading `status`. */
+export function resolutionHint(res: WikilinkResolution): {
+  text: string;
+  broken: boolean;
+  ambiguous: boolean;
+} {
+  if (res.status === "broken") {
+    return { broken: true, ambiguous: false, text: "(no match)" };
+  }
+  if (res.ambiguous) {
+    return { broken: false, ambiguous: true, text: `(${res.matchCount} matches)` };
+  }
+  return { broken: false, ambiguous: false, text: "" };
 }

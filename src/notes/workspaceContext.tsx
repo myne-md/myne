@@ -19,6 +19,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -26,6 +27,7 @@ import {
 } from "react";
 import type { NoteId } from "./sidebarState";
 import {
+  allOpenNotes,
   closePane as closePaneOp,
   closeTab as closeTabOp,
   collectLeaves,
@@ -45,6 +47,10 @@ import {
   type WorkspaceNode,
   type WorkspaceState,
 } from "./workspaceState";
+import {
+  clearRenameFlushHooks,
+  registerRenameFlushHooks,
+} from "./renameFlushHook";
 
 function newPaneId(): PaneId {
   return crypto.randomUUID();
@@ -233,6 +239,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ),
     );
   }, []);
+
+  // WL-8 rename auto-update seam: expose the open-note set + flush-all to the
+  // rename orchestrator, which runs in `SidebarStateProvider` (mounted ABOVE
+  // this provider, so it can't read this context directly). `stateRef` keeps
+  // the registered `openNoteIds` closure reading the latest pane tree without
+  // re-registering on every state change; `flushAll` is stable.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useEffect(() => {
+    registerRenameFlushHooks({
+      openNoteIds: () => new Set(allOpenNotes(stateRef.current)),
+      flushOpenPanes: flushAll,
+    });
+    return () => clearRenameFlushHooks();
+  }, [flushAll]);
 
   const leaves = collectLeaves(state.root);
   const focused = focusedLeaf(state);
