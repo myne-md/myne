@@ -114,6 +114,82 @@ describe("useWorkspace — per-pane tab ops", () => {
   });
 });
 
+describe("useWorkspace — back/forward history (MYND-260)", () => {
+  it("steps back and forward through the sequence of opened notes", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openInFocused("A"));
+    act(() => result.current.openInFocused("B"));
+    act(() => result.current.openInFocused("C"));
+    expect(result.current.focusedLeaf.activeTab).toBe("C");
+    expect(result.current.canGoBack).toBe(true);
+    expect(result.current.canGoForward).toBe(false);
+
+    act(() => result.current.goBack());
+    expect(result.current.focusedLeaf.activeTab).toBe("B");
+    expect(result.current.canGoBack).toBe(true);
+    expect(result.current.canGoForward).toBe(true);
+
+    act(() => result.current.goBack());
+    expect(result.current.focusedLeaf.activeTab).toBe("A");
+    expect(result.current.canGoBack).toBe(false);
+
+    act(() => result.current.goForward());
+    expect(result.current.focusedLeaf.activeTab).toBe("B");
+    act(() => result.current.goForward());
+    expect(result.current.focusedLeaf.activeTab).toBe("C");
+    expect(result.current.canGoForward).toBe(false);
+  });
+
+  it("re-opens a note that has left the strip (browse-replace flow)", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    // openInFocused reuses the active slot, so A leaves the strip when B opens.
+    act(() => result.current.openInFocused("A"));
+    act(() => result.current.openInFocused("B"));
+    expect(result.current.focusedLeaf.tabs).toEqual(["B"]);
+
+    act(() => result.current.goBack());
+    expect(result.current.focusedLeaf.activeTab).toBe("A");
+    expect(result.current.focusedLeaf.tabs).toEqual(["A"]);
+  });
+
+  it("opening a fresh note after a back truncates the forward tail", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openInFocused("A"));
+    act(() => result.current.openInFocused("B"));
+    act(() => result.current.goBack()); // back to A — B is now forward
+    expect(result.current.canGoForward).toBe(true);
+
+    act(() => result.current.openInFocused("C")); // new branch drops B
+    expect(result.current.focusedLeaf.activeTab).toBe("C");
+    expect(result.current.canGoForward).toBe(false);
+    act(() => result.current.goBack());
+    expect(result.current.focusedLeaf.activeTab).toBe("A");
+  });
+
+  it("both directions are disabled before any second note opens", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    expect(result.current.canGoBack).toBe(false);
+    expect(result.current.canGoForward).toBe(false);
+    act(() => result.current.openInFocused("A"));
+    expect(result.current.canGoBack).toBe(false);
+    expect(result.current.canGoForward).toBe(false);
+  });
+
+  it("keeps independent history per pane (follows focus)", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openInFocused("A"));
+    act(() => result.current.openInFocused("B")); // home pane: [A,B]
+    const homeId = result.current.focusedPaneId;
+    act(() => result.current.openToSide("X")); // side pane focused, fresh history
+    expect(result.current.canGoBack).toBe(false); // side pane has only X
+
+    act(() => result.current.focusPane(homeId)); // back to home pane
+    expect(result.current.canGoBack).toBe(true); // home still remembers A
+    act(() => result.current.goBack());
+    expect(result.current.focusedLeaf.activeTab).toBe("A");
+  });
+});
+
 describe("useWorkspace — flush registry", () => {
   it("flushAll calls every registered pane flusher; unregister stops it", async () => {
     const { result } = renderHook(() => useWorkspace(), { wrapper });
