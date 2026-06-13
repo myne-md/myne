@@ -1,10 +1,13 @@
-// Slash command registry — 11 commands (per PRD story 34).
+// Slash command registry.
 //
 // `/wiki` (MYND-38) opens the note picker (it replaces the trigger with `[[`,
-// which the WikilinkPickerView detects and opens on).
+// which the WikilinkPickerView detects and opens on). `/table` (MYND-162)
+// inserts an empty 2×2 grid and focuses the first cell.
 
 import type { EditorView } from "@codemirror/view";
 import { pickAndInsert } from "../attachments/picker";
+import { requestTableCellFocus } from "../decorations/table";
+import { emptyTableGrid, serializeTable } from "../decorations/table-model";
 
 export type SlashCommand = {
   id: string;
@@ -46,6 +49,40 @@ function insertAtTrigger(
     selection: {
       anchor: triggerFrom + (caretOffsetFromInsertStart ?? insert.length),
     },
+    userEvent: "slash.apply",
+  });
+}
+
+/**
+ * Insert an empty 2×2 GFM table at the slash trigger, blank-line-separated from
+ * surrounding content so two `/table` inserts never merge into one table
+ * (`@lezer/markdown` joins adjacent table-row lines). A leading blank is added
+ * when the previous line is non-blank (e.g. another table's last row); a trailing
+ * blank when the following content is non-blank. There is always ≥1 newline after
+ * the table so a cursor line exists below it. The cursor lands in the first cell.
+ */
+function insertTable(view: EditorView, triggerFrom: number, triggerTo: number): void {
+  const source = serializeTable(emptyTableGrid(2, 1));
+  const doc = view.state.doc;
+  const triggerLine = doc.lineAt(triggerFrom);
+
+  const beforeOnLine = doc.sliceString(triggerLine.from, triggerFrom);
+  const prevLine = triggerLine.number > 1 ? doc.line(triggerLine.number - 1) : null;
+  const needLead =
+    beforeOnLine.trim() === "" && prevLine !== null && prevLine.text.trim() !== "";
+  const lead = needLead ? "\n" : "";
+
+  const afterOnLine = doc.sliceString(triggerTo, triggerLine.to);
+  const nextLine = triggerLine.number < doc.lines ? doc.line(triggerLine.number + 1) : null;
+  const followingNonBlank =
+    afterOnLine.trim() !== "" || (nextLine !== null && nextLine.text.trim() !== "");
+  const trail = followingNonBlank ? "\n\n" : "\n";
+
+  const tableFrom = triggerFrom + lead.length;
+  requestTableCellFocus(view, tableFrom, 0, 0); // before dispatch → rebuilt widget consumes it
+  view.dispatch({
+    changes: { from: triggerFrom, to: triggerTo, insert: `${lead}${source}${trail}` },
+    selection: { anchor: tableFrom + 2 }, // first header cell content (fallback caret)
     userEvent: "slash.apply",
   });
 }
@@ -109,6 +146,15 @@ export function slashCommands(): readonly SlashCommand[] {
       label: "Divider",
       icon: "—",
       apply: (v, f, t) => insertAtTrigger(v, f, t, "---\n"),
+    },
+    {
+      // `/table` (MYND-162): insert a canonical empty 2×2 GFM table (header +
+      // delimiter + one body row) and land the cursor in the first cell, where
+      // the editable grid takes over.
+      id: "table",
+      label: "Table",
+      icon: "▦",
+      apply: (v, f, t) => insertTable(v, f, t),
     },
     {
       id: "link",

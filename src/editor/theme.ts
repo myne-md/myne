@@ -23,6 +23,10 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-content": {
     caretColor: "var(--accent, #2c4a7a)",
+    // Fill the scroller so the empty area below the text is part of the editable
+    // surface — clicking there reaches the editor (and lands the caret on the
+    // last line, MYND-162 feedback) instead of being dead space.
+    minHeight: "100%",
   },
   "&.cm-focused": {
     outline: "none",
@@ -307,10 +311,15 @@ export const myneTheme = EditorView.theme({
   // their own box without breaking the editor's vertical layout.
   // `padding` (not `margin`) for the same height-map reason as the math/mermaid
   // block widgets above — an outer margin here drifts every click below the table.
+  // inline-block + max-width:100% + overflow-x:auto is the proven "scroll inside
+  // the widget, never the editor" pattern (mirrors `.cm-mermaid-card`). A `block`
+  // here fills the editor width and lets a wide table overflow into the editor's
+  // own horizontal scroller (MYND-162 feedback: "only the table should scroll").
   ".cm-table-scroll": {
-    display: "block",
+    display: "inline-block",
     overflowX: "auto",
     maxWidth: "100%",
+    verticalAlign: "top",
     padding: "10px 0",
   },
   ".cm-table": {
@@ -326,15 +335,191 @@ export const myneTheme = EditorView.theme({
     padding: "6px 12px",
     textAlign: "left",
     verticalAlign: "top",
+    position: "relative", // anchors the per-cell affordances
+    // Default (empty 2×2) columns are evenly sized at this width; long content
+    // does NOT wrap — the cell widens and the whole table scrolls horizontally
+    // (`.cm-table-scroll`), Obsidian-style, instead of growing a tall wall.
+    minWidth: "6em",
+    whiteSpace: "nowrap",
   },
+  // Borders-only table (MYND-162 feedback): no header fill, no zebra striping —
+  // cells share the editor background; the header reads as distinct by its bold
+  // weight alone. A single surface colour + the cell borders, Obsidian-style.
   ".cm-table th": {
     fontWeight: "700",
-    backgroundColor: "var(--paper-3, #ece9e2)",
   },
-  // Zebra striping on alternating body rows (PRD story 8). Lighter than the
-  // header fill so the header still reads as distinct.
-  ".cm-table-row-alt td": {
-    backgroundColor: "var(--paper-2, #f3f1eb)",
+  // Rendered cell content lives in its own block span so a cell keeps the exact
+  // same box whether it shows rendered marks or the edit input (no resize on
+  // focus, MYND-162 feedback). `display: block` so the input's `width: 100%`
+  // fills the cell without the input's intrinsic size widening it.
+  ".cm-table-cell-text": {
+    display: "block",
+    minWidth: "0",
+  },
+  // An empty cell reserves a full line so it matches the height of filled cells
+  // (otherwise an empty row collapses thinner — MYND-162 feedback).
+  ".cm-table-cell-text:empty::before": {
+    content: '"\\00a0"', // non-breaking space
+  },
+  // In-place cell editor (decorations/table.ts, MYND-162). A bare field that
+  // fills its cell and inherits the cell's font / colour / left alignment, so the
+  // active cell reads as the same grid — no border or focus ring, just a caret.
+  ".cm-table-cell-input": {
+    width: "100%",
+    minWidth: "0", // never widen the cell from the input's intrinsic size
+    boxSizing: "border-box",
+    border: "none",
+    outline: "none",
+    boxShadow: "none",
+    appearance: "none",
+    WebkitAppearance: "none",
+    padding: "0",
+    margin: "0",
+    background: "transparent",
+    font: "inherit",
+    lineHeight: "inherit",
+    color: "inherit",
+    textAlign: "inherit", // matches the rendered cell (left by default)
+    caretColor: "var(--accent, #2c4a7a)",
+  },
+  // Visible text selection inside a cell editor — the editor's default
+  // `::selection` is `--paper-3`, identical to a header cell's fill, so a
+  // selection there is invisible. Use a tinted accent instead.
+  ".cm-table-cell-input::selection": {
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 28%, transparent)",
+  },
+  // While editing, the rendered text is replaced by the input and the host's
+  // min-width is pinned (in JS) to the frozen rendered width so the cell can't
+  // collapse. `min-height` keeps an EMPTY cell one line tall so the caret shows.
+  ".cm-table-cell-text.cm-table-cell-editing": {
+    minHeight: "1.5em",
+  },
+
+  // Editable-table affordances (decorations/table.ts, MYND-162). The editable
+  // table is a CSS GRID so the add-row / add-column controls are grid cells
+  // ATTACHED to the table (and scroll WITH it), Obsidian-style — not floaters at
+  // the viewport edge. `contain: inline-size` keeps the (possibly very wide) table
+  // from growing `.cm-content`, so only this box scrolls, never the editor. The
+  // left/top padding forms the reorder gutters. Every affordance reveals only when
+  // its OWN edge zone is hovered (not on whole-table hover).
+  ".cm-table-block": {
+    position: "relative",
+    display: "block",
+    maxWidth: "100%",
+  },
+  ".cm-table-editable": {
+    position: "relative",
+    display: "grid",
+    gridTemplateColumns: "auto auto",
+    gridTemplateRows: "auto auto",
+    gridTemplateAreas: '"tbl addcol" "addrow ."',
+    justifyContent: "start",
+    gap: "3px",
+    width: "100%",
+    boxSizing: "border-box",
+    contain: "inline-size",
+    overflowX: "auto",
+    overflowY: "visible",
+    padding: "16px 0 0 34px", // top = column-handle gutter, left = row-handle gutter
+  },
+  ".cm-table-editable > table": { gridArea: "tbl" },
+  // Reorder handles — bare six-dot grips in the gutter (no chip), revealed only
+  // when their own edge strip is hovered: the strip above a column / left of a row.
+  ".cm-table-handle": {
+    position: "absolute",
+    boxSizing: "border-box",
+    background: "transparent",
+    color: "var(--fg-3, #888)",
+    cursor: "grab",
+    opacity: "0",
+    transition: "opacity 0.1s ease, color 0.1s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "15px",
+    lineHeight: "1",
+    userSelect: "none",
+  },
+  ".cm-table-handle::before": { content: '"\\283f"' }, // ⠿ six-dot grip
+  ".cm-table-handle-col": { top: "-16px", left: "0", right: "0", height: "16px" },
+  ".cm-table-handle-row": { left: "-16px", top: "0", bottom: "0", width: "16px" },
+  ".cm-table-handle-col:hover, .cm-table-handle-row:hover": { opacity: "1" },
+  ".cm-table-handle:hover": { color: "var(--accent, #2c4a7a)" },
+  ".cm-table-handle:active": {
+    cursor: "grabbing",
+    color: "var(--accent, #2c4a7a)",
+    opacity: "1",
+  },
+  // Delete controls — a small × in the gutter beside each reorder handle, revealed
+  // together with it (delete-column above the column, delete-row left of the row).
+  ".cm-table-del": {
+    position: "absolute",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "15px",
+    height: "15px",
+    border: "none",
+    borderRadius: "3px",
+    background: "transparent",
+    color: "var(--fg-3, #888)",
+    cursor: "pointer",
+    fontSize: "13px",
+    lineHeight: "1",
+    padding: "0",
+    opacity: "0",
+    transition: "opacity 0.1s ease, color 0.1s ease",
+  },
+  ".cm-table-del::before": { content: '"\\00d7"' }, // ×
+  ".cm-table-del:hover": { color: "var(--extended-color-red-600, #c0392b)" },
+  ".cm-table-del-col": { top: "-16px", right: "0" },
+  ".cm-table-del-row": { left: "-31px", top: "50%", transform: "translateY(-50%)" },
+  ".cm-table-handle-col:hover ~ .cm-table-del-col, .cm-table-del-col:hover": {
+    opacity: "1",
+  },
+  ".cm-table-handle-row:hover ~ .cm-table-del-row, .cm-table-del-row:hover": {
+    opacity: "1",
+  },
+  // Add controls — grid cells attached to the table's right (full height) / bottom
+  // (full width); each reveals only when its own edge zone is hovered.
+  ".cm-table-add-col, .cm-table-add-row": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
+    border: "1px solid var(--line-1, #d8d5cc)",
+    background: "transparent",
+    color: "var(--fg-3, #888)",
+    cursor: "pointer",
+    padding: "0",
+    fontSize: "15px",
+    lineHeight: "1",
+    opacity: "0",
+    transition: "opacity 0.1s ease, background 0.1s ease, color 0.1s ease",
+  },
+  ".cm-table-add-col::before, .cm-table-add-row::before": { content: '"+"' },
+  ".cm-table-add-col": { gridArea: "addcol", width: "18px", borderRadius: "0 4px 4px 0" },
+  ".cm-table-add-row": { gridArea: "addrow", height: "18px", borderRadius: "0 0 4px 4px" },
+  // Revealed via JS (`.cm-revealed`, see revealOnHover) so it never sticks open
+  // after a widget rebuild; the accent highlight is on real `:hover`.
+  ".cm-table-add-col.cm-revealed, .cm-table-add-row.cm-revealed": {
+    opacity: "1",
+  },
+  ".cm-table-add-col:hover, .cm-table-add-row:hover": {
+    background: "var(--accent-soft, #e8edf5)",
+    color: "var(--accent, #2c4a7a)",
+  },
+  // Drag-reorder feedback (#13): the row/column being dragged is tinted so you
+  // see what you're moving; the drop target shows an insertion-edge LINE (left
+  // edge for a column, top edge for a row) marking where it will land — not a box.
+  ".cm-table-dragging": {
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 14%, transparent)",
+  },
+  ".cm-table-drop-col": {
+    boxShadow: "inset 2px 0 0 0 var(--accent, #2c4a7a)",
+  },
+  ".cm-table-drop-row": {
+    boxShadow: "inset 0 2px 0 0 var(--accent, #2c4a7a)",
   },
 
   // Fenced code-block card from decorations/fenced-code.ts (MYND-154). Built
