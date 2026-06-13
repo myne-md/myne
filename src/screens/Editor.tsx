@@ -107,6 +107,7 @@ import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
+import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
 import { CenterViewProvider, type CenterView } from "./centerView";
 import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
@@ -538,6 +539,21 @@ function EditorChrome({
   const layout = useEditorLayout();
   const rowRef = useRef<HTMLDivElement | null>(null);
 
+  // MYND-192 — transient responsive auto-collapse. When the window gets too
+  // narrow to fit the center editor + sidebars, the backlinks (right) pane
+  // yields first, then the notes (left). It is a non-persisted override:
+  // effective collapse = the user's persisted choice OR a width-forced
+  // collapse, and widening restores the manual state untouched. Feed the
+  // RENDERED widths (0 for a manually-collapsed side) so a collapsed side
+  // frees room for the other.
+  const forced = useResponsiveCollapse(
+    rowRef,
+    layout.leftCollapsed ? 0 : layout.leftWidth,
+    layout.rightCollapsed ? 0 : layout.rightWidth,
+  );
+  const leftCollapsed = layout.leftCollapsed || forced.forceLeftCollapsed;
+  const rightCollapsed = layout.rightCollapsed || forced.forceRightCollapsed;
+
   // MYND-170 (SYNC-9) exclusive active-state: selecting a note in the sidebar
   // (from ANY source — row click, keyboard nav, command palette, favorites,
   // jump-from-attachment) closes the Attachments view and returns the center
@@ -777,7 +793,7 @@ function EditorChrome({
         }}
       >
         <SidebarBootstrap />
-        {!layout.leftCollapsed && (
+        {!leftCollapsed && (
           <SidebarPane
             side="left"
             width={layout.leftWidth}
@@ -842,11 +858,11 @@ function EditorChrome({
             node={ws.root}
             focusedPaneId={ws.focusedPaneId}
             onReadout={onReadout}
-            leftInset={layout.leftCollapsed ? LEFT_CLEARANCE : 0}
-            rightInset={layout.rightCollapsed ? RIGHT_CLEARANCE : 0}
+            leftInset={leftCollapsed ? LEFT_CLEARANCE : 0}
+            rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
           />
         )}
-        {centerView !== "attachments" && !layout.rightCollapsed && (
+        {centerView !== "attachments" && !rightCollapsed && (
           <SidebarPane
             side="right"
             width={layout.rightWidth}
@@ -869,8 +885,9 @@ function EditorChrome({
       >
         <TitleBarToggle
           side="left"
-          collapsed={layout.leftCollapsed}
+          collapsed={leftCollapsed}
           onToggle={layout.toggleLeftCollapsed}
+          disabled={forced.forceLeftCollapsed}
         />
       </div>
       {centerView !== "attachments" && (
@@ -884,8 +901,9 @@ function EditorChrome({
         >
           <TitleBarToggle
             side="right"
-            collapsed={layout.rightCollapsed}
+            collapsed={rightCollapsed}
             onToggle={layout.toggleRightCollapsed}
+            disabled={forced.forceRightCollapsed}
           />
         </div>
       )}
@@ -1049,11 +1067,13 @@ function EditorChrome({
         }}
         onToggleLeftSidebar={() => {
           setPaletteOpen(false);
-          layout.toggleLeftCollapsed();
+          // MYND-192 — a width-forced collapse can't be toggled away (and
+          // must not persist a manual flip the narrow window imposed).
+          if (!forced.forceLeftCollapsed) layout.toggleLeftCollapsed();
         }}
         onToggleRightSidebar={() => {
           setPaletteOpen(false);
-          layout.toggleRightCollapsed();
+          if (!forced.forceRightCollapsed) layout.toggleRightCollapsed();
         }}
       />
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
@@ -1164,10 +1184,15 @@ function TitleBarToggle({
   side,
   collapsed,
   onToggle,
+  disabled = false,
 }: {
   side: "left" | "right";
   collapsed: boolean;
   onToggle: () => void;
+  /** MYND-192 — true when the sidebar is collapsed by a too-narrow window;
+   *  the toggle is inert (can't expand into space that isn't there, and
+   *  must not persist a manual flip the responsive override imposed). */
+  disabled?: boolean;
 }) {
   const icon =
     side === "left"
@@ -1184,8 +1209,12 @@ function TitleBarToggle({
     <button
       type="button"
       onClick={onToggle}
+      disabled={disabled}
       aria-label={label}
       title={label}
+      data-testid="editor.sidebar-toggle"
+      data-side={side}
+      data-collapsed={collapsed ? "true" : "false"}
       style={{
         display: "flex",
         alignSelf: "center",
@@ -1198,7 +1227,8 @@ function TitleBarToggle({
         borderRadius: "var(--radius-1)",
         background: "transparent",
         color: "var(--fg-3)",
-        cursor: "pointer",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.4 : 1,
       }}
     >
       <Icon name={icon} size={16} />
