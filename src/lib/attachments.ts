@@ -97,6 +97,34 @@ export type AttachmentRenameError =
   | { kind: "InvalidVaultMeta" }
   | { kind: "EncodeFailed" };
 
+/** Error surface of {@link attachmentUnusedList} — mirror of `AttachmentUnusedListError`. */
+export type AttachmentUnusedListError =
+  | { kind: "Locked" }
+  | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
+  | { kind: "InvalidVaultMeta" }
+  | { kind: "NoteScanFailed" }
+  | { kind: "JoinFailure" };
+
+/** Error surface of {@link attachmentCleanUnused} — mirror of `AttachmentCleanUnusedError`. */
+export type AttachmentCleanUnusedError =
+  | { kind: "Locked" }
+  | { kind: "InvalidId" }
+  | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
+  | { kind: "InvalidVaultMeta" }
+  | { kind: "NoteScanFailed" }
+  | { kind: "EncodeFailed" }
+  | { kind: "JoinFailure" };
+
+/** Outcome of {@link attachmentCleanUnused} — TS mirror of the Rust `CleanResult`. */
+export interface CleanResult {
+  /** Attachments removed from the catalog (logically deleted). */
+  deleted: number;
+  /** Requested ids NOT removed — now referenced (TOCTOU) or already gone. */
+  skipped: number;
+  /** Bytes freed by the blob unlinks that succeeded this call. */
+  bytes_reclaimed: number;
+}
+
 /**
  * Read the full attachments catalog for the library UI. Slot::Unlocked-
  * gated; falls back to an empty list on any catalog decode failure
@@ -143,4 +171,32 @@ export async function attachmentRename(
   filename: string,
 ): Promise<void> {
   await invoke<void>("plugin:attachments|attachment_rename", { id, filename });
+}
+
+/**
+ * List the **unused** attachments — catalog entries referenced by zero live
+ * notes (Slot::Unlocked-gated). Backs the "Clean unused attachments" review
+ * dialog. Computed authoritatively host-side (decrypts + scans every note);
+ * "unused" includes never-inserted imports, and shared/deduped attachments
+ * referenced by any remaining note are excluded. **Fail-closed**: if a note
+ * cannot be read/decrypted the call rejects with `NoteScanFailed`
+ * ({@link AttachmentUnusedListError}) rather than under-reporting references.
+ */
+export async function attachmentUnusedList(): Promise<CatalogEntry[]> {
+  return await invoke<CatalogEntry[]>("plugin:attachments|attachment_unused_list");
+}
+
+/**
+ * Erase the confirmed unused attachments (Slot::Unlocked-gated, irreversible
+ * cryptographic erase — no trash). Re-verifies each id is still referenced by
+ * zero notes before erasing, so a re-referenced or already-gone id is counted
+ * in `skipped`, not deleted. Drops survivors from the catalog (catalog-first)
+ * then unlinks their blobs. Rejects with {@link AttachmentCleanUnusedError}
+ * ({@link AttachmentCleanUnusedError.NoteScanFailed} aborts with nothing
+ * deleted). Returns a {@link CleanResult} summary.
+ */
+export async function attachmentCleanUnused(ids: string[]): Promise<CleanResult> {
+  return await invoke<CleanResult>("plugin:attachments|attachment_clean_unused", {
+    ids,
+  });
 }

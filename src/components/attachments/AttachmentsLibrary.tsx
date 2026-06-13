@@ -28,11 +28,14 @@ import {
 import { createPortal } from "react-dom";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import {
+  attachmentCleanUnused,
   attachmentDelete,
   attachmentImport,
   attachmentRename,
+  attachmentUnusedList,
   catalogList,
   type CatalogEntry,
+  type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { referencingNotes } from "../../notes/attachmentRefs";
@@ -44,6 +47,7 @@ import { Select, type SelectOption } from "../primitives/Select";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
 import { UsedInNotesPopover } from "./UsedInNotesPopover";
 import { DeleteAttachmentDialog } from "./DeleteAttachmentDialog";
+import { CleanUnusedAttachmentsDialog } from "./CleanUnusedAttachmentsDialog";
 import {
   formatBytes,
   formatCreatedAt,
@@ -203,6 +207,24 @@ const CENTER_MESSAGE_STYLE: CSSProperties = {
 
 // ---- main component -------------------------------------------------------
 
+// Transient bottom-center toast for the "nothing to clean" / scan-error
+// feedback (auto-dismissed after 2.5 s, matching Toast.tsx).
+const CLEAN_NOTICE_STYLE: CSSProperties = {
+  position: "absolute",
+  bottom: "var(--space-5)",
+  left: "50%",
+  transform: "translateX(-50%)",
+  padding: "var(--space-2) var(--space-4)",
+  borderRadius: 8,
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  boxShadow: "var(--shadow-2, 0 4px 16px rgba(0,0,0,0.18))",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  color: "var(--fg-1)",
+  zIndex: 10,
+};
+
 export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   const ctx = useSelectedNote();
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
@@ -228,6 +250,13 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     entry: CatalogEntry;
     noteIds: string[];
   } | null>(null);
+
+  // Clean-unused flow (MYND-171): the fetched unused set drives the review
+  // dialog; `checkingUnused` gates the CTA during the authoritative scan;
+  // `cleanNotice` is the transient "nothing to clean" / error feedback.
+  const [cleanupTarget, setCleanupTarget] = useState<CatalogEntry[] | null>(null);
+  const [checkingUnused, setCheckingUnused] = useState(false);
+  const [cleanNotice, setCleanNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -342,6 +371,43 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     );
   }, [deleteTarget]);
 
+  // Clean unused: run the authoritative scan; open the review dialog when
+  // there's something to clean, else surface a transient "nothing to clean"
+  // notice. A scan failure (e.g. an unreadable note → NoteScanFailed) surfaces
+  // a notice rather than opening a (possibly unsafe) list.
+  const handleCleanUnused = useCallback(async () => {
+    setCheckingUnused(true);
+    setCleanNotice(null);
+    try {
+      const unused = await attachmentUnusedList();
+      if (unused.length === 0) {
+        setCleanNotice("No unused attachments to clean.");
+      } else {
+        setCleanupTarget(unused);
+      }
+    } catch {
+      setCleanNotice("Couldn't check for unused attachments. Try again.");
+    } finally {
+      setCheckingUnused(false);
+    }
+  }, []);
+
+  const handleCleanConfirm = useCallback(
+    async (ids: string[]): Promise<CleanResult> => {
+      const result = await attachmentCleanUnused(ids);
+      await refresh(); // reconcile the library to disk truth
+      return result;
+    },
+    [refresh],
+  );
+
+  // Auto-dismiss the transient clean-up notice (2.5 s, matching Toast).
+  useEffect(() => {
+    if (cleanNotice === null) return;
+    const t = setTimeout(() => setCleanNotice(null), 2500);
+    return () => clearTimeout(t);
+  }, [cleanNotice]);
+
   const handleJump = useCallback(
     (id: NoteId) => {
       void ctx.open(id).catch(() => {});
@@ -381,6 +447,8 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
         display: "flex",
         flexDirection: "column",
         background: "var(--bg-1)",
+        // Anchor the transient clean-up notice (absolute, bottom-center).
+        position: "relative",
       }}
     >
       <div style={TOOLBAR_STYLE}>
@@ -428,6 +496,16 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           <ViewToggleButton view={view} onToggle={() => setView((v) => (v === "grid" ? "list" : "grid"))} />
           <Button
             variant="secondary"
+            icon="trash-2"
+            onClick={() => void handleCleanUnused()}
+            disabled={checkingUnused || importing}
+            data-testid="attachments.clean-unused-cta"
+            title="Delete attachments not used in any note"
+          >
+            {checkingUnused ? "Checking…" : "Clean unused"}
+          </Button>
+          <Button
+            variant="secondary"
             icon="download"
             onClick={() => void handleImport()}
             disabled={importing}
@@ -472,6 +550,24 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           onConfirm={handleDeleteConfirm}
           onClose={() => setDeleteTarget(null)}
         />
+      )}
+
+      {cleanupTarget !== null && (
+        <CleanUnusedAttachmentsDialog
+          attachments={cleanupTarget}
+          onConfirm={handleCleanConfirm}
+          onClose={() => setCleanupTarget(null)}
+        />
+      )}
+
+      {cleanNotice !== null && (
+        <div
+          role="status"
+          data-testid="attachments.clean-notice"
+          style={CLEAN_NOTICE_STYLE}
+        >
+          {cleanNotice}
+        </div>
       )}
     </main>
   );

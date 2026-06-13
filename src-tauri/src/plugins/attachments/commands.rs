@@ -22,15 +22,16 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::{
-    AttachmentDeleteError, AttachmentImportError, AttachmentRenameError, CatalogListError,
+    AttachmentCleanUnusedError, AttachmentDeleteError, AttachmentImportError,
+    AttachmentRenameError, AttachmentUnusedListError, CatalogListError,
 };
 use super::sniff::sniff_content_type;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    compute_attachment_id, derive_subkey, encode_attachment_blob, encode_attachments_catalog,
-    parse_vault_meta, read_or_empty, AttachmentMeta, AttachmentsCatalog, SubkeyRole,
-    ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
-    VAULT_META_ACCOUNT_HASH_LEN,
+    compute_attachment_id, decode_attachments_catalog, derive_subkey, encode_attachment_blob,
+    encode_attachments_catalog, parse_vault_meta, read_or_empty, AttachmentMeta,
+    AttachmentsCatalog, SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN,
+    MAX_ATTACHMENT_LEN, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -505,6 +506,439 @@ pub(crate) async fn catalog_list_with_dir(
         count = rows.len()
     );
     Ok(rows)
+}
+
+// ---- attachment_unused_list ---------------------------------------------
+
+/// `Slot::Unlocked`-gated read of the **unused** attachments — catalog
+/// entries referenced by ZERO live notes (MYND-171, attachment cleanup).
+/// The backing query for the "Clean unused attachments" review dialog.
+///
+/// Computed **authoritatively**: every `.myn` is decrypted host-side and
+/// scanned for canonical `![[att:<id>]]` embeds (the union is the
+/// referenced set); the catalog minus that set is "unused". It does NOT
+/// trust the best-effort in-RAM reconcile graph — a swallowed `apply` there
+/// would under-count references and risk listing a still-referenced
+/// attachment for deletion. "Unused" deliberately includes a
+/// never-inserted import (zero references is zero references); shared/
+/// deduped attachments referenced by any remaining note are never listed.
+///
+/// **Fail-closed**: if any note cannot be read / decrypted / UTF-8-decoded
+/// the whole list fails (`NoteScanFailed`) — better to refuse cleanup than
+/// to under-report references. Returns the unused rows in catalog id order
+/// (the `BTreeMap` iteration order), each a [`CatalogEntry`] the dialog
+/// renders (thumbnail / filename / size).
+#[tauri::command]
+pub async fn attachment_unused_list<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
+    let dir =
+        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentUnusedListError::from)?;
+    attachment_unused_list_with_dir(&dir, state.inner()).await
+}
+
+/// Testable core of [`attachment_unused_list`].
+pub(crate) async fn attachment_unused_list_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
+    // Hold the slot guard across the whole compute (catalog read + note
+    // scan) — the import/delete writer-guard pattern. Clone the material
+    // once: root_key derives the catalog KEK; items_key + items_key_id
+    // decrypt the notes.
+    let (_slots_guard, items_key, items_key_id, root_key) = state
+        .hold_unlocked_attachment_material()
+        .await
+        .ok_or(AttachmentUnusedListError::Locked)?;
+
+    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))? {
+        Ok(h) => h,
+        Err(MetaParseFailed) => return Err(AttachmentUnusedListError::InvalidVaultMeta),
+    };
+
+    // Hard-IO surfaces (`read_catalog`, not `read_catalog_or_empty`): a
+    // masked-empty catalog would report a populated vault as "nothing to
+    // clean". Absent catalog → empty → empty unused list (correct).
+    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog = read_catalog(
+        &vault_dir.join("vault.attachments"),
+        &catalog_key,
+        &account_number_hash,
+    )
+    .map_err(AttachmentUnusedListError::from)?;
+
+    // Authoritative reference scan over ALL notes, fail-closed. Decrypts
+    // every note → CPU/IO-bound → spawn_blocking. `items_key` +
+    // `items_key_id` move into the closure (Zeroizing wipes on exit).
+    let notes_dir = vault_dir.join("notes");
+    let referenced = tokio::task::spawn_blocking(move || {
+        crate::plugins::notes::commands::collect_referenced_attachment_ids(
+            &notes_dir,
+            &items_key,
+            &items_key_id,
+        )
+    })
+    .await
+    .map_err(|_join| AttachmentUnusedListError::JoinFailure)??;
+
+    let rows: Vec<CatalogEntry> = catalog
+        .entries
+        .into_iter()
+        .filter(|(id, _meta)| !referenced.contains(id))
+        .map(|(id, meta)| CatalogEntry {
+            id,
+            content_type: meta.content_type,
+            created_at: meta.created_at,
+            filename: meta.filename,
+            size: meta.size,
+        })
+        .collect();
+
+    tracing::debug!(
+        stage = "success",
+        event = "attachment_unused_listed",
+        count = rows.len()
+    );
+    Ok(rows)
+}
+
+// ---- attachment_clean_unused --------------------------------------------
+
+/// The outcome of an [`attachment_clean_unused`] sweep, surfaced to the
+/// post-confirm summary. Hand-mirrored on the TS side.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct CleanResult {
+    /// Number of attachments removed from the catalog (logically deleted).
+    pub deleted: usize,
+    /// Number of requested ids NOT removed — either now referenced by a
+    /// note (TOCTOU re-verify caught it) or already absent from the catalog.
+    pub skipped: usize,
+    /// Total bytes freed by the blob unlinks that succeeded this call. A
+    /// blob whose unlink failed / was already gone contributes 0 (its bytes
+    /// are reclaimed by the unlock-time stray-file scan instead).
+    pub bytes_reclaimed: u64,
+}
+
+/// Decide the survivor set and rewrite the catalog **catalog-first**
+/// (MYND-171 Q5): drop every requested id that is present in the catalog
+/// AND not in `referenced` (re-verified zero references), then atomic-write
+/// the catalog ONCE. Returns the survivors (id + size, for the subsequent
+/// blob unlinks) and the skipped count. The caller holds the catalog write
+/// mutex across this call + the unlinks.
+///
+/// Catalog-first is deliberate and the OPPOSITE of single `attachment_delete`
+/// (which unlinks first): a crash after this returns but before the unlinks
+/// leaves catalog-less *stray blob files* — invisible to the user and swept
+/// by the unlock-time scan — rather than dangling catalog entries that would
+/// fail to open. `pub(crate)` so the crash-ordering test can stop here and
+/// assert "catalog updated, blob still present".
+pub(crate) fn rewrite_catalog_dropping_unused(
+    vault_dir: &Path,
+    catalog_key: &[u8; 32],
+    account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    requested: &[String],
+    referenced: &std::collections::HashSet<String>,
+) -> Result<(Vec<(String, u64)>, usize), AttachmentCleanUnusedError> {
+    let catalog_path = vault_dir.join("vault.attachments");
+    let mut catalog = read_catalog(&catalog_path, catalog_key, account_number_hash)
+        .map_err(AttachmentCleanUnusedError::from)?;
+
+    let mut survivors: Vec<(String, u64)> = Vec::new();
+    let mut skipped = 0usize;
+    for id in requested {
+        match catalog.entries.get(id) {
+            // Present + still zero-reference → erase. (Capture size before
+            // the entry is dropped so the summary can report bytes freed.)
+            Some(meta) if !referenced.contains(id) => survivors.push((id.clone(), meta.size)),
+            // Absent (already gone) OR now referenced (TOCTOU) → skip.
+            _ => skipped += 1,
+        }
+    }
+
+    if !survivors.is_empty() {
+        for (id, _) in &survivors {
+            catalog.entries.remove(id);
+        }
+        let catalog_bytes = encode_attachments_catalog(catalog_key, account_number_hash, &catalog)
+            .map_err(|_| AttachmentCleanUnusedError::EncodeFailed)?;
+        crate::atomic_write::atomic_write(&catalog_path, &catalog_bytes, /* replace = */ true)
+            .map_err(AttachmentCleanUnusedError::from)?;
+    }
+
+    Ok((survivors, skipped))
+}
+
+/// `Slot::Unlocked`-gated batched erase of unused attachments — the
+/// confirm step of "Clean unused attachments" (MYND-171). For each id the
+/// user confirmed: re-verify it is STILL referenced by zero notes (the
+/// authoritative, fail-closed scan — a note edited since the review list
+/// was shown can have re-referenced it), drop the survivors from the
+/// catalog in ONE atomic rewrite (catalog-first), then unlink their blobs.
+///
+/// Irreversible cryptographic erase (no trash tier). A requested id that
+/// became referenced, or is already gone, is counted in `skipped`, not
+/// erased. A note that cannot be read/decrypted during the re-verify aborts
+/// the whole sweep (`NoteScanFailed`) with nothing deleted — fail-closed,
+/// the same safety posture as `attachment_unused_list`.
+#[tauri::command]
+pub async fn attachment_clean_unused<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    ids: Vec<String>,
+) -> Result<CleanResult, AttachmentCleanUnusedError> {
+    let dir =
+        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentCleanUnusedError::from)?;
+    attachment_clean_unused_with_dir(&dir, state.inner(), ids).await
+}
+
+/// Testable core of [`attachment_clean_unused`].
+pub(crate) async fn attachment_clean_unused_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    ids: Vec<String>,
+) -> Result<CleanResult, AttachmentCleanUnusedError> {
+    // Canonicalize + strict-validate every id FIRST (bug-canary; the UI
+    // only passes catalog ids). Reject the whole batch on any malformation
+    // — a partial erase from a malformed set would be worse than a loud no-op.
+    let mut requested: Vec<String> = Vec::with_capacity(ids.len());
+    for id in &ids {
+        let bytes = hex_decode_id(id).ok_or(AttachmentCleanUnusedError::InvalidId)?;
+        requested.push(hex_encode(&bytes)); // canonical lowercase
+    }
+
+    let (_slots_guard, items_key, items_key_id, root_key) = state
+        .hold_unlocked_attachment_material()
+        .await
+        .ok_or(AttachmentCleanUnusedError::Locked)?;
+
+    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))? {
+        Ok(h) => h,
+        Err(MetaParseFailed) => return Err(AttachmentCleanUnusedError::InvalidVaultMeta),
+    };
+    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+
+    // Authoritative re-verify scan over ALL notes (fail-closed). Decrypts
+    // every note → spawn_blocking. This closes the review→confirm TOCTOU:
+    // an id re-referenced since the list was shown is in `referenced` and
+    // gets skipped below. (Residual: a note save landing in the sub-ms
+    // window between this scan and the catalog write below is not covered —
+    // there is no vault-wide write lock in v0.1; Phase 2 sync revisit.)
+    let notes_dir = vault_dir.join("notes");
+    let referenced = tokio::task::spawn_blocking(move || {
+        crate::plugins::notes::commands::collect_referenced_attachment_ids(
+            &notes_dir,
+            &items_key,
+            &items_key_id,
+        )
+    })
+    .await
+    .map_err(|_join| AttachmentCleanUnusedError::JoinFailure)??;
+
+    // Serialize the catalog RMW + unlinks against concurrent import/delete.
+    let _write_guard = catalog_write_mutex().lock().await;
+
+    // Catalog-first: drop survivors + rewrite the catalog, THEN unlink.
+    let (survivors, skipped) = rewrite_catalog_dropping_unused(
+        vault_dir,
+        &catalog_key,
+        &account_number_hash,
+        &requested,
+        &referenced,
+    )?;
+
+    let attachments_dir = vault_dir.join("attachments");
+    let mut bytes_reclaimed = 0u64;
+    for (id, size) in &survivors {
+        match std::fs::remove_file(attachments_dir.join(id)) {
+            Ok(()) => bytes_reclaimed += *size,
+            // Already gone: the catalog entry is dropped regardless (still
+            // "deleted"); no bytes to count (reclaimed earlier).
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            // Unlink failed AFTER the catalog commit: the attachment is
+            // logically deleted (catalog entry gone); the blob is now a
+            // catalog-less stray file the unlock-time scan reclaims. Don't
+            // fail the sweep over a cleanup remnant — log + carry on.
+            Err(e) => {
+                tracing::warn!(
+                    stage = "blob_unlink",
+                    io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                    "attachment_clean_unused blob unlink failed post-catalog-commit; \
+                     left as a stray file for the unlock-time scan"
+                );
+            }
+        }
+    }
+
+    tracing::info!(
+        stage = "success",
+        event = "attachment_cleanup_done",
+        deleted = survivors.len(),
+        skipped = skipped
+    );
+    Ok(CleanResult {
+        deleted: survivors.len(),
+        skipped,
+        bytes_reclaimed,
+    })
+}
+
+// ---- unlock-time stray-blob reclaim (MYND-171) --------------------------
+
+/// Outcome of the unlock-time stray-blob reclaim. Logged (not surfaced to
+/// the WebView — this runs inside the unlock pipeline, best-effort).
+pub(crate) enum StrayReclaimOutcome {
+    /// `n` catalog-less hex blobs were unlinked (`n` may be 0).
+    Removed(usize),
+    /// The catalog file exists but did not decode — the valid-id set is
+    /// untrustworthy, so the scan was **skipped** (nothing removed). The
+    /// load-bearing fail-closed branch: a corrupt/tampered catalog must NOT
+    /// make every blob look "stray" and trigger a mass deletion on unlock.
+    SkipUndecodableCatalog,
+    /// Filesystem error reading the catalog or scanning the dir.
+    Io(std::io::ErrorKind),
+}
+
+/// Remove catalog-less attachment blobs from `attachments_dir` — the pure
+/// directory scan. A file is removed ONLY when its name is a canonical
+/// 64-char lowercase-hex id (a final blob name) AND absent from `valid_ids`.
+/// A cataloged id (incl. a zero-reference orphan the user has not swept) is
+/// NEVER removed; a non-hex name (`.tmp`, `.DS_Store`, an interrupted-import
+/// temp) is left untouched. Returns the count removed.
+pub(crate) fn reclaim_stray_blobs_in_dir(
+    attachments_dir: &Path,
+    valid_ids: &std::collections::HashSet<String>,
+) -> std::io::Result<usize> {
+    let entries = match std::fs::read_dir(attachments_dir) {
+        Ok(e) => e,
+        // No attachments dir yet → nothing to reclaim.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(e) => return Err(e),
+    };
+    let mut removed = 0usize;
+    for entry in entries {
+        let entry = entry?;
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else {
+            // Non-UTF-8 filename — leave it (never a canonical blob name).
+            continue;
+        };
+        // Touch ONLY canonical 64-char lowercase-hex final blob names.
+        // `hex_decode_id` enforces exactly that (rejects uppercase, wrong
+        // length, non-hex, and any suffix like `.tmp`).
+        if hex_decode_id(name).is_none() {
+            continue;
+        }
+        // A cataloged id — including a zero-reference orphan awaiting the
+        // user's explicit sweep — is never auto-removed. This is the guard
+        // that keeps this scan from becoming the auto-GC the design rejects.
+        if valid_ids.contains(name) {
+            continue;
+        }
+        match std::fs::remove_file(entry.path()) {
+            Ok(()) => removed += 1,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(removed)
+}
+
+/// Build the valid-id set from the catalog (fail-closed on an **undecodable**
+/// catalog) and reclaim catalog-less stray blobs. Sync; testable without a
+/// Tauri runtime. Uses [`decode_attachments_catalog`] directly (NOT
+/// `read_or_empty`): a present-but-undecodable catalog yields
+/// [`StrayReclaimOutcome::SkipUndecodableCatalog`] rather than an empty set —
+/// otherwise a transiently-corrupt catalog would mark every blob stray and
+/// delete the whole attachment store on unlock. A genuinely absent catalog
+/// (`NotFound`) is the empty set: any hex blob is then a true orphan.
+pub(crate) fn reclaim_stray_blobs(
+    vault_dir: &Path,
+    catalog_key: &[u8; 32],
+    account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+) -> StrayReclaimOutcome {
+    let valid_ids: std::collections::HashSet<String> =
+        match std::fs::read(vault_dir.join("vault.attachments")) {
+            Ok(bytes) => {
+                match decode_attachments_catalog(catalog_key, account_number_hash, &bytes) {
+                    Ok(catalog) => catalog.entries.into_keys().collect(),
+                    Err(_) => return StrayReclaimOutcome::SkipUndecodableCatalog,
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => std::collections::HashSet::new(),
+            Err(e) => return StrayReclaimOutcome::Io(e.kind()),
+        };
+    match reclaim_stray_blobs_in_dir(&vault_dir.join("attachments"), &valid_ids) {
+        Ok(n) => StrayReclaimOutcome::Removed(n),
+        Err(e) => StrayReclaimOutcome::Io(e.kind()),
+    }
+}
+
+/// Unlock-time orchestration of [`reclaim_stray_blobs`] — wired into the
+/// unlock pipeline after `recover_pending_rename_on_unlock`. Best-effort:
+/// any failure is logged with a bounded reason and never blocks unlock. Holds
+/// the catalog write mutex across the read+scan so it cannot race a
+/// concurrent import/delete catalog RMW (none can occur at unlock time in
+/// Phase 1's single window, but the guard keeps the invariant explicit).
+pub(crate) async fn reclaim_stray_attachment_blobs<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &VaultRuntimeState,
+) {
+    let Ok(vault_dir) = crate::paths::active_vault_root_io(app, state.active_vault_id().await)
+    else {
+        tracing::warn!(
+            event = "stray_scan_skipped",
+            reason = "vault_dir_resolution_failed"
+        );
+        return;
+    };
+    let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
+        // A concurrent lock raced (Phase 2 only) — skip.
+        tracing::warn!(event = "stray_scan_skipped", reason = "slot_not_unlocked");
+        return;
+    };
+    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta")) {
+        Ok(Ok(h)) => h,
+        Ok(Err(MetaParseFailed)) => {
+            tracing::warn!(event = "stray_scan_skipped", reason = "invalid_vault_meta");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(
+                event = "stray_scan_skipped",
+                reason = "meta_io",
+                io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+            );
+            return;
+        }
+    };
+    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+
+    let _write_guard = catalog_write_mutex().lock().await;
+    let vault_dir_owned = vault_dir.clone();
+    let outcome = tokio::task::spawn_blocking(move || {
+        reclaim_stray_blobs(&vault_dir_owned, &catalog_key, &account_number_hash)
+    })
+    .await;
+
+    match outcome {
+        Ok(StrayReclaimOutcome::Removed(n)) if n > 0 => {
+            tracing::info!(event = "stray_blobs_reclaimed", count = n);
+        }
+        Ok(StrayReclaimOutcome::Removed(_)) => {}
+        Ok(StrayReclaimOutcome::SkipUndecodableCatalog) => {
+            tracing::warn!(event = "stray_scan_skipped", reason = "catalog_undecodable");
+        }
+        Ok(StrayReclaimOutcome::Io(kind)) => {
+            tracing::warn!(
+                event = "stray_scan_io",
+                io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(kind),
+            );
+        }
+        Err(_join) => {
+            tracing::warn!(event = "stray_scan_skipped", reason = "join_failure");
+        }
+    }
 }
 
 // ---- attachment_delete --------------------------------------------------
@@ -1325,5 +1759,387 @@ mod tests {
         let kek = derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey);
         let id_hmac = derive_subkey(&root, SubkeyRole::AttachmentsIdHmac);
         assert_ne!(*kek, *id_hmac);
+    }
+
+    // ---- attachment_unused_list (MYND-171) ----------------------------
+
+    /// A PNG payload tagged with a distinguishing byte: distinct tags yield
+    /// distinct content-addressed ids (identical bytes would dedup to one).
+    fn png_with_tag(tag: u8) -> Vec<u8> {
+        let mut v = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        v.push(tag);
+        v
+    }
+
+    async fn import_tagged(tmp: &ScopedTempDir, state: &VaultRuntimeState, tag: u8) -> String {
+        attachment_import_with_dir(
+            tmp.path(),
+            state,
+            ImportSource::Bytes {
+                bytes: png_with_tag(tag),
+                filename: Some(format!("a{tag}.png")),
+            },
+        )
+        .await
+        .expect("import")
+        .id
+    }
+
+    async fn create_note(notes_dir: &Path, state: &VaultRuntimeState, body: &str) -> String {
+        std::fs::create_dir_all(notes_dir).unwrap();
+        crate::plugins::notes::commands::note_create_with_dir(
+            notes_dir.to_path_buf(),
+            state,
+            body.to_string(),
+        )
+        .await
+        .expect("note_create")
+    }
+
+    /// Unused ids as an order-independent set (the command returns catalog
+    /// `BTreeMap` order; tests assert membership, not order).
+    async fn unused_ids(
+        tmp: &ScopedTempDir,
+        state: &VaultRuntimeState,
+    ) -> std::collections::BTreeSet<String> {
+        attachment_unused_list_with_dir(tmp.path(), state)
+            .await
+            .expect("unused_list")
+            .into_iter()
+            .map(|e| e.id)
+            .collect()
+    }
+
+    #[test]
+    fn unused_list_rejects_when_locked() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("attach-unused-locked").unwrap();
+            let state = VaultRuntimeState::default(); // Empty slot
+            let result = attachment_unused_list_with_dir(tmp.path(), &state).await;
+            assert!(matches!(result, Err(AttachmentUnusedListError::Locked)));
+        });
+    }
+
+    #[test]
+    fn unused_list_empty_when_no_attachments() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            assert!(unused_ids(&tmp, &state).await.is_empty());
+        });
+    }
+
+    #[test]
+    fn unused_list_reports_never_referenced_and_orphaned() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let notes_dir = tmp.path().join("notes");
+            let a = import_tagged(&tmp, &state, 1).await;
+            let b = import_tagged(&tmp, &state, 2).await;
+
+            // `a` referenced by a note; `b` imported but never inserted →
+            // the never-referenced import IS unused.
+            let _note_a = create_note(&notes_dir, &state, &format!("![[att:{a}]]")).await;
+            assert_eq!(
+                unused_ids(&tmp, &state).await,
+                std::collections::BTreeSet::from([b.clone()])
+            );
+
+            // Reference `b` too → nothing unused.
+            let note_b = create_note(&notes_dir, &state, &format!("![[att:{b}]]")).await;
+            assert!(unused_ids(&tmp, &state).await.is_empty());
+
+            // Delete the note referencing `b` (orphan it) → `b` unused again.
+            std::fs::remove_file(notes_dir.join(format!("{note_b}.myn"))).unwrap();
+            assert_eq!(
+                unused_ids(&tmp, &state).await,
+                std::collections::BTreeSet::from([b.clone()])
+            );
+
+            // `a` is never offered for cleanup — it stayed referenced.
+            assert!(!unused_ids(&tmp, &state).await.contains(&a));
+        });
+    }
+
+    #[test]
+    fn unused_list_excludes_deduped_shared_attachment() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let notes_dir = tmp.path().join("notes");
+            let a = import_tagged(&tmp, &state, 7).await;
+            // Two notes embed the SAME content-addressed id (one shared
+            // blob); the second uses the alias form to exercise that parse.
+            let n1 = create_note(&notes_dir, &state, &format!("![[att:{a}]]")).await;
+            let _n2 = create_note(&notes_dir, &state, &format!("see ![[att:{a}|pic]] ok")).await;
+
+            // Remove the first note; the second still references `a`.
+            std::fs::remove_file(notes_dir.join(format!("{n1}.myn"))).unwrap();
+            assert!(
+                unused_ids(&tmp, &state).await.is_empty(),
+                "a shared attachment must not be listed unused while any note references it"
+            );
+        });
+    }
+
+    #[test]
+    fn unused_list_fail_closed_on_unreadable_note() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let notes_dir = tmp.path().join("notes");
+            // `_a` would be unused — but an unreadable note must abort the
+            // whole computation rather than risk a false "unused" verdict.
+            let _a = import_tagged(&tmp, &state, 9).await;
+            let nid = create_note(&notes_dir, &state, "plain note, no embeds").await;
+            // Corrupt the blob in place → decode fails → fail-closed.
+            std::fs::write(
+                notes_dir.join(format!("{nid}.myn")),
+                b"not a valid MY01 blob",
+            )
+            .unwrap();
+            let result = attachment_unused_list_with_dir(tmp.path(), &state).await;
+            assert!(matches!(
+                result,
+                Err(AttachmentUnusedListError::NoteScanFailed)
+            ));
+        });
+    }
+
+    // ---- attachment_clean_unused (MYND-171) ---------------------------
+
+    fn blob_exists(tmp: &ScopedTempDir, id: &str) -> bool {
+        tmp.path().join("attachments").join(id).exists()
+    }
+
+    async fn catalog_ids(tmp: &ScopedTempDir, state: &VaultRuntimeState) -> Vec<String> {
+        catalog_list_with_dir(tmp.path(), state)
+            .await
+            .expect("catalog_list")
+            .into_iter()
+            .map(|e| e.id)
+            .collect()
+    }
+
+    #[test]
+    fn clean_unused_erases_orphan_and_reports_counts() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let a = import_tagged(&tmp, &state, 1).await; // unused, 9 bytes
+            assert!(blob_exists(&tmp, &a));
+
+            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![a.clone()])
+                .await
+                .expect("clean");
+            assert_eq!(
+                result,
+                CleanResult {
+                    deleted: 1,
+                    skipped: 0,
+                    bytes_reclaimed: png_with_tag(1).len() as u64,
+                }
+            );
+            // Catalog entry dropped + blob unlinked.
+            assert!(!catalog_ids(&tmp, &state).await.contains(&a));
+            assert!(!blob_exists(&tmp, &a));
+        });
+    }
+
+    #[test]
+    fn clean_unused_skips_referenced_toctou() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let notes_dir = tmp.path().join("notes");
+            let a = import_tagged(&tmp, &state, 2).await;
+            // A note references `a` — simulates a note that gained the
+            // reference between the review list and the confirm.
+            create_note(&notes_dir, &state, &format!("![[att:{a}]]")).await;
+
+            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![a.clone()])
+                .await
+                .expect("clean");
+            assert_eq!(
+                result,
+                CleanResult {
+                    deleted: 0,
+                    skipped: 1,
+                    bytes_reclaimed: 0,
+                }
+            );
+            // Still-referenced attachment is untouched.
+            assert!(catalog_ids(&tmp, &state).await.contains(&a));
+            assert!(blob_exists(&tmp, &a));
+        });
+    }
+
+    #[test]
+    fn clean_unused_fail_closed_on_unreadable_note() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let notes_dir = tmp.path().join("notes");
+            let a = import_tagged(&tmp, &state, 3).await; // would be erased
+            let nid = create_note(&notes_dir, &state, "plain note").await;
+            std::fs::write(notes_dir.join(format!("{nid}.myn")), b"corrupt blob").unwrap();
+
+            let result =
+                attachment_clean_unused_with_dir(tmp.path(), &state, vec![a.clone()]).await;
+            assert!(matches!(
+                result,
+                Err(AttachmentCleanUnusedError::NoteScanFailed)
+            ));
+            // Nothing erased — the corrupt note aborted the whole sweep.
+            assert!(catalog_ids(&tmp, &state).await.contains(&a));
+            assert!(blob_exists(&tmp, &a));
+        });
+    }
+
+    #[test]
+    fn clean_unused_rejects_invalid_id() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let result =
+                attachment_clean_unused_with_dir(tmp.path(), &state, vec!["not-hex".into()]).await;
+            assert!(matches!(result, Err(AttachmentCleanUnusedError::InvalidId)));
+        });
+    }
+
+    #[test]
+    fn clean_unused_idempotent_when_blob_already_gone() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let a = import_tagged(&tmp, &state, 4).await;
+            // Blob vanished out-of-band (e.g. a prior interrupted sweep);
+            // the catalog still lists it.
+            std::fs::remove_file(tmp.path().join("attachments").join(&a)).unwrap();
+
+            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![a.clone()])
+                .await
+                .expect("clean");
+            assert_eq!(
+                result,
+                CleanResult {
+                    deleted: 1,
+                    skipped: 0,
+                    bytes_reclaimed: 0, // blob already gone — no bytes freed now
+                }
+            );
+            assert!(!catalog_ids(&tmp, &state).await.contains(&a));
+        });
+    }
+
+    #[test]
+    fn rewrite_catalog_dropping_unused_is_catalog_first() {
+        // Simulates a crash AFTER the catalog rewrite but BEFORE the blob
+        // unlinks: the catalog must already be updated (entry dropped) while
+        // the blob still sits on disk as a catalog-less stray file — the
+        // recoverable state the unlock-time scan (task 3) reclaims. Proves
+        // catalog-first ordering without a panic seam.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let a = import_tagged(&tmp, &state, 5).await;
+
+            let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
+            let account_number_hash = [SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+            let referenced = std::collections::HashSet::<String>::new();
+
+            let (survivors, skipped) = rewrite_catalog_dropping_unused(
+                tmp.path(),
+                &catalog_key,
+                &account_number_hash,
+                std::slice::from_ref(&a),
+                &referenced,
+            )
+            .expect("catalog rewrite");
+
+            assert_eq!(skipped, 0);
+            assert_eq!(survivors, vec![(a.clone(), png_with_tag(5).len() as u64)]);
+            // Catalog-first: entry already dropped on disk...
+            assert!(!catalog_ids(&tmp, &state).await.contains(&a));
+            // ...but the blob is untouched (the unlink step hasn't run) —
+            // a stray file for the unlock-time scan, NOT a dangling entry.
+            assert!(blob_exists(&tmp, &a));
+        });
+    }
+
+    // ---- unlock-time stray-blob reclaim (MYND-171, task 3) ------------
+
+    #[test]
+    fn reclaim_stray_blobs_in_dir_removes_only_catalog_less_hex() {
+        let tmp = ScopedTempDir::new("attach-stray-dir").unwrap();
+        let dir = tmp.path().join("attachments");
+        std::fs::create_dir_all(&dir).unwrap();
+        let stray = "a".repeat(64); // 64-hex, NOT cataloged → removed
+        let cataloged = "b".repeat(64); // 64-hex, cataloged → kept
+        std::fs::write(dir.join(&stray), b"x").unwrap();
+        std::fs::write(dir.join(&cataloged), b"x").unwrap();
+        std::fs::write(dir.join("notes.txt"), b"x").unwrap(); // non-hex → kept
+        std::fs::write(dir.join("c".repeat(63)), b"x").unwrap(); // wrong length → kept
+
+        let valid: std::collections::HashSet<String> = std::iter::once(cataloged.clone()).collect();
+        let removed = reclaim_stray_blobs_in_dir(&dir, &valid).unwrap();
+
+        assert_eq!(removed, 1);
+        assert!(!dir.join(&stray).exists(), "catalog-less hex blob removed");
+        assert!(dir.join(&cataloged).exists(), "cataloged id preserved");
+        assert!(dir.join("notes.txt").exists(), "non-hex left untouched");
+        assert!(
+            dir.join("c".repeat(63)).exists(),
+            "wrong-length left untouched"
+        );
+    }
+
+    #[test]
+    fn reclaim_stray_blobs_in_dir_empty_when_absent() {
+        let tmp = ScopedTempDir::new("attach-stray-absent").unwrap();
+        let dir = tmp.path().join("attachments"); // never created
+        let valid = std::collections::HashSet::new();
+        assert_eq!(reclaim_stray_blobs_in_dir(&dir, &valid).unwrap(), 0);
+    }
+
+    #[test]
+    fn reclaim_stray_blobs_removes_stray_keeps_cataloged_with_good_catalog() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let a = import_tagged(&tmp, &state, 1).await; // cataloged
+            let stray = "f".repeat(64);
+            std::fs::write(tmp.path().join("attachments").join(&stray), b"x").unwrap();
+
+            let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
+            let account_number_hash = [SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+            let outcome = reclaim_stray_blobs(tmp.path(), &catalog_key, &account_number_hash);
+
+            match outcome {
+                StrayReclaimOutcome::Removed(n) => assert_eq!(n, 1),
+                _ => panic!("expected Removed(1)"),
+            }
+            assert!(blob_exists(&tmp, &a), "cataloged blob preserved");
+            assert!(
+                !tmp.path().join("attachments").join(&stray).exists(),
+                "catalog-less stray blob removed"
+            );
+        });
+    }
+
+    #[test]
+    fn reclaim_stray_blobs_fail_closed_on_undecodable_catalog() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let a = import_tagged(&tmp, &state, 1).await; // real catalog + blob
+            let stray = "f".repeat(64);
+            std::fs::write(tmp.path().join("attachments").join(&stray), b"x").unwrap();
+
+            // Corrupt the catalog: present-but-undecodable MUST abort the scan
+            // (otherwise every blob looks stray → mass deletion on unlock).
+            std::fs::write(tmp.path().join("vault.attachments"), b"garbage not MYC1").unwrap();
+
+            let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
+            let account_number_hash = [SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+            let outcome = reclaim_stray_blobs(tmp.path(), &catalog_key, &account_number_hash);
+
+            assert!(matches!(
+                outcome,
+                StrayReclaimOutcome::SkipUndecodableCatalog
+            ));
+            // Nothing removed — both the cataloged blob AND the stray survive.
+            assert!(blob_exists(&tmp, &a));
+            assert!(tmp.path().join("attachments").join(&stray).exists());
+        });
     }
 }

@@ -410,6 +410,7 @@ export function CommandPalette({
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
+          data-testid="palette.input"
         />
         <div style={LIST_STYLE} role="listbox">
           {rows.length === 0 ? (
@@ -462,6 +463,8 @@ function renderRow(
       aria-selected={selected}
       aria-disabled={isDisabled}
       data-row-index={index}
+      data-testid="palette.option"
+      data-action-id={row.kind === "action" ? row.action.id : undefined}
       onMouseDown={(e) => {
         e.preventDefault();
         if (!isDisabled) void runRow(row);

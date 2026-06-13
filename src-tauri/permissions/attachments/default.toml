@@ -16,7 +16,7 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + reconcile (apply / remove / referencing)."
+description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + reconcile (apply / remove / referencing) + unused-list."
 permissions = [
   "allow-attachment-import",
   "allow-catalog-list",
@@ -25,6 +25,8 @@ permissions = [
   "allow-attachment-refs-apply",
   "allow-attachment-refs-remove",
   "allow-attachment-refs-referencing",
+  "allow-attachment-unused-list",
+  "allow-attachment-clean-unused",
 ]
 
 [[permission]]
@@ -61,3 +63,13 @@ commands.allow = ["attachment_refs_remove"]
 identifier = "allow-attachment-refs-referencing"
 description = "Allow invoking attachments:attachment_refs_referencing (Slot::Unlocked-gated query of the note-ids referencing one attachment-id — the library's 'used in N notes' count + the delete-warning's note list; SYNC-6 amended exposes ids, not just a count)."
 commands.allow = ["attachment_refs_referencing"]
+
+[[permission]]
+identifier = "allow-attachment-unused-list"
+description = "Allow invoking attachments:attachment_unused_list (Slot::Unlocked-gated read of the unused-attachment set behind the 'Clean unused attachments' review dialog — catalog entries referenced by zero live notes, computed authoritatively by decrypting + scanning every note for canonical ![[att:<id>]] embeds; fail-closed on an unreadable note; read-only, no mutation; MYND-171)."
+commands.allow = ["attachment_unused_list"]
+
+[[permission]]
+identifier = "allow-attachment-clean-unused"
+description = "Allow invoking attachments:attachment_clean_unused (Slot::Unlocked-gated batched cryptographic erase of confirmed unused attachments — re-verifies each id is still referenced by zero notes via the authoritative fail-closed scan, drops survivors from the MYC1 catalog in one atomic rewrite catalog-first, then unlinks their MYA1 blobs; a re-referenced or already-gone id is skipped; returns deleted/skipped/bytes-reclaimed counts; MYND-171)."
+commands.allow = ["attachment_clean_unused"]

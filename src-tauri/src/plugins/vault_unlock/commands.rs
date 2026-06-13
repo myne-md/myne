@@ -222,6 +222,19 @@ pub async fn unlock<R: Runtime>(
     // marker is the durable WAL), so it never blocks unlock.
     recover_pending_rename_on_unlock(&app, state.inner()).await;
 
+    // ---- MYND-171: reclaim catalog-less stray attachment blobs ----------
+    //
+    // Finish any "clean unused attachments" sweep that crashed between its
+    // catalog rewrite (which drops the entry first) and the blob unlinks:
+    // unlink every `attachments/<64-hex>` file ABSENT from the catalog.
+    // Strictly scoped — a cataloged id (incl. a zero-reference orphan the
+    // user has not swept) is NEVER touched, so this is NOT an auto-GC. Runs
+    // here (post-unlock, slot Unlocked → catalog KEK derivable) and is
+    // fail-closed on an undecodable catalog (never mass-deletes on
+    // corruption). Best-effort: any failure is logged and never blocks unlock.
+    crate::plugins::attachments::commands::reclaim_stray_attachment_blobs(&app, state.inner())
+        .await;
+
     // ---- MYND-160 pipeline steps 4-6 (post-`set_unlocked` orchestration) ----
     //
     // The grill (Q5.1) frames these as part of the unlock "pipeline";
