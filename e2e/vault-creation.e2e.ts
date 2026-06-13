@@ -219,6 +219,20 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       // under the session's filesystem surface (needle indices only).
       const hits = scanForPlaintext(app.dataHome, [words.join(" "), VC1_PASSWORD]);
       expect(hits).toEqual([]);
+
+      // MYND-118 — a freshly-created vault is seeded with one onboarding
+      // "Welcome to Myne" note, auto-opened in the editor via the pre-seeded
+      // workspace descriptor. A vault with no welcome note would show zero
+      // rows AND zero tabs, so the row's presence plus a tab carrying the
+      // SAME note id proves the whole chain: created → listed → restored
+      // open. (Lives on VC-1 — the epic's one production-KDF creation that
+      // lands in the editor — rather than a second multi-minute creation.)
+      await dismissImporterOffer(app.session);
+      const welcomeRow = await app.session.byTestId("notes.row", { timeoutMs: 15_000 });
+      const welcomeNoteId = await welcomeRow.attribute("data-note-id");
+      expect(welcomeNoteId).toBeTruthy();
+      const welcomeTab = await app.session.byTestId("editor.tab", { timeoutMs: 15_000 });
+      expect(await welcomeTab.attribute("data-note-id")).toBe(welcomeNoteId);
     });
   });
 });
