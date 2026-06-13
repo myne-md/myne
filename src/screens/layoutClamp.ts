@@ -92,6 +92,54 @@ export function clampSidebarWidthForLayout(
   return Math.round(Math.min(perSide, effectiveMax));
 }
 
+// ---- responsive auto-collapse (MYND-192) -----------------------------
+
+/** Which sidebars a narrow window forces collapsed (transient override). */
+export interface ResponsiveCollapse {
+  readonly forceLeftCollapsed: boolean;
+  readonly forceRightCollapsed: boolean;
+}
+
+/**
+ * Responsive auto-collapse decision (MYND-192). Given the live three-pane
+ * row width and the CURRENTLY-RENDERED sidebar widths (`0` for a side the
+ * user has manually collapsed), decide which sidebars must collapse so the
+ * center editor keeps {@link CENTER_MIN_WIDTH}. The right (backlinks)
+ * sidebar yields first, then the left (notes) — the note list is the more
+ * load-bearing of the two.
+ *
+ * This is a TRANSIENT, non-persisted override: it never writes vault.prefs
+ * and never mutates the user's manual collapse preference. Widen the window
+ * and the sidebars return to exactly the state the user last chose
+ * (effective collapse = manual ‖ forced).
+ *
+ * Pure + stateless, so no hysteresis: collapsing a sidebar does NOT change
+ * the row's outer width (the row fills the window), so the decision can
+ * never feed back into its own input and oscillate. A non-finite /
+ * non-positive `rowWidth` (first paint, pre-measurement) forces nothing —
+ * the persisted layout shows until the first real measure.
+ */
+export function computeResponsiveCollapse(
+  rowWidth: number,
+  openLeftWidth: number,
+  openRightWidth: number,
+): ResponsiveCollapse {
+  if (!Number.isFinite(rowWidth) || rowWidth <= 0) {
+    return { forceLeftCollapsed: false, forceRightCollapsed: false };
+  }
+  const H = RESIZE_HANDLE_HIT_ZONE;
+  // Center + both sidebars (at their rendered widths) still fit? Keep both.
+  if (rowWidth >= openLeftWidth + openRightWidth + 2 * H + CENTER_MIN_WIDTH) {
+    return { forceLeftCollapsed: false, forceRightCollapsed: false };
+  }
+  // Drop the right; does center + left now fit? Keep the left.
+  if (rowWidth >= openLeftWidth + H + CENTER_MIN_WIDTH) {
+    return { forceLeftCollapsed: false, forceRightCollapsed: true };
+  }
+  // Still too narrow — collapse both; the center takes the whole row.
+  return { forceLeftCollapsed: true, forceRightCollapsed: true };
+}
+
 // ---- DEV-only self-verify harness ------------------------------------
 //
 // Runs once per module load in dev (gated by `import.meta.env.DEV`), the
@@ -156,6 +204,25 @@ export function verifyClampInvariants(): void {
     clampSidebarWidthForLayout(300, LEFT_BOUNDS, DEFAULT_LEFT_WIDTH, NaN, 0) !== 300
   ) {
     fail("unknown container width must degrade to per-side clamp");
+  }
+
+  // responsive auto-collapse (MYND-192). Defaults 260/280:
+  //   need-both = 260+280+16+360 = 916; need-left = 260+8+360 = 628.
+  const wide = computeResponsiveCollapse(1400, DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH);
+  if (wide.forceLeftCollapsed || wide.forceRightCollapsed) {
+    fail("wide row must force no collapse");
+  }
+  const mid = computeResponsiveCollapse(700, DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH);
+  if (mid.forceLeftCollapsed || !mid.forceRightCollapsed) {
+    fail("medium row must force right-only collapse");
+  }
+  const tiny = computeResponsiveCollapse(500, DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH);
+  if (!tiny.forceLeftCollapsed || !tiny.forceRightCollapsed) {
+    fail("narrow row must force both collapse");
+  }
+  const unmeasured = computeResponsiveCollapse(0, DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH);
+  if (unmeasured.forceLeftCollapsed || unmeasured.forceRightCollapsed) {
+    fail("pre-measure row must force nothing");
   }
 }
 
