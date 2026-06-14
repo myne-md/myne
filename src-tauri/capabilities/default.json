@@ -30,6 +30,7 @@
     "export:default",
     "pdf-export:default",
     "workspace:default",
+    "spell:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-clear",

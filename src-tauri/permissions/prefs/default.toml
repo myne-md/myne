@@ -30,6 +30,8 @@ permissions = [
   "allow-set-item-colors",
   "allow-set-folder-icons",
   "allow-vault-set-label",
+  "allow-set-spell-enabled",
+  "allow-set-spell-languages",
 ]
 
 [[permission]]
@@ -132,3 +134,18 @@ commands.allow = ["set_folder_icons"]
 identifier = "allow-vault-set-label"
 description = "Allow invoking prefs:vault_set_label (Slot::Unlocked-gated setter for the per-vault label field — the in-app vault switcher's human-readable name; Option<String> where None clears it; atomic-writes vault.prefs with no native side-effect, then refreshes the per-session RAM label cache so vault_list reflects the rename immediately)."
 commands.allow = ["vault_set_label"]
+
+# MYND-267 spell-checker: two write setters for the spell-check prefs
+# (spell_enabled toggle + spell_languages set). Both inherit the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. Both atomic-write
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-spell-enabled"
+description = "Allow invoking prefs:set_spell_enabled (Slot::Unlocked-gated setter for the spell_enabled toggle; atomic-writes vault.prefs with no native side-effect; the default-ON policy is applied host-side at read time)."
+commands.allow = ["set_spell_enabled"]
+
+[[permission]]
+identifier = "allow-set-spell-languages"
+description = "Allow invoking prefs:set_spell_languages (Slot::Unlocked-gated setter for the spell_languages set — the active spell-check language tags, SYNC-11 union; codec NFC-sorts+dedupes; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_spell_languages"]

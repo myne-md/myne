@@ -89,6 +89,13 @@ const ROLE_STR_ATTACHMENTS_ID_HMAC: &[u8] = b"attachments-id-hmac";
 /// and survives a v005 epoch rotation.
 const ROLE_STR_SESSION_STATE_KEY: &[u8] = b"session-state-key";
 
+/// Registered role string for the v0.1 personal-dictionary blob KEK
+/// (MYND-266; encrypts the `vault.dictionary` blob — `dictionary_blob.rs`,
+/// `protocol.md` § 9.13 + § 3.4). Load-bearing: drift silently changes the
+/// KEK. `root_key`-derived (like prefs/search/workspace), so it is
+/// `itemsKey`-independent and survives a v005 epoch rotation.
+const ROLE_STR_PERSONAL_DICT_KEY: &[u8] = b"personal-dictionary-key";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -126,6 +133,12 @@ pub enum SubkeyRole {
     /// under XChaCha20-Poly1305 (CTX commitment outer). Distinct from
     /// `PrefsKey`/`SearchIndexKey` so the three blobs are domain-separated.
     SessionStateKey,
+    /// KEK for the v0.1 personal-dictionary blob (`vault.dictionary`,
+    /// `MYD1`, MYND-266). Encrypts the user's added-words + vault-wide
+    /// ignore set under XChaCha20-Poly1305 (CTX commitment outer). Distinct
+    /// from the other `root_key`-derived blob KEKs so every blob family is
+    /// cryptographically domain-separated.
+    PersonalDictKey,
 }
 
 impl SubkeyRole {
@@ -140,6 +153,7 @@ impl SubkeyRole {
             SubkeyRole::AttachmentsCatalogKey => ROLE_STR_ATTACHMENTS_CATALOG_KEY,
             SubkeyRole::AttachmentsIdHmac => ROLE_STR_ATTACHMENTS_ID_HMAC,
             SubkeyRole::SessionStateKey => ROLE_STR_SESSION_STATE_KEY,
+            SubkeyRole::PersonalDictKey => ROLE_STR_PERSONAL_DICT_KEY,
         }
     }
 }
@@ -236,6 +250,27 @@ mod tests {
             SubkeyRole::AttachmentsIdHmac.role_str(),
             b"attachments-id-hmac"
         );
+    }
+
+    #[test]
+    fn personal_dict_key_role_string_matches_spec_registry() {
+        // MYND-266 registry entry "myne.v0.1 personal-dictionary-key" (§ 9.13).
+        // Frozen + load-bearing: drift silently changes the vault.dictionary KEK.
+        assert_eq!(
+            SubkeyRole::PersonalDictKey.role_str(),
+            b"personal-dictionary-key"
+        );
+    }
+
+    #[test]
+    fn personal_dict_key_is_distinct_from_other_root_key_blobs() {
+        // The dictionary KEK must differ from prefs/search/workspace KEKs so
+        // the blob families are domain-separated (HKDF info-string property).
+        let root = [0u8; 32];
+        let dict = derive_subkey(&root, SubkeyRole::PersonalDictKey);
+        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
+        assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SessionStateKey));
     }
 
     #[test]
@@ -427,6 +462,7 @@ mod tests {
                 SubkeyRole::AttachmentsCatalogKey => "attachments-catalog-key",
                 SubkeyRole::AttachmentsIdHmac => "attachments-id-hmac",
                 SubkeyRole::SessionStateKey => "session-state-key",
+                SubkeyRole::PersonalDictKey => "personal-dictionary-key",
             }
         }
 

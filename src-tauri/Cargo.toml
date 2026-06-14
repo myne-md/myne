@@ -71,6 +71,7 @@ postcard = { version = "1", default-features = false, features = ["alloc"] }
 # introduced in MYND-22's foundation hardening. Sister-crate audit
 # anchor per `decisions.md` 2026-05-06 entry.
 sha2 = { version = "0.10", default-features = false }
+spellbook = "=0.4.2"
 
 # PDF export per-page footer stamping (MYND-255 hotfix, owner-requested):
 # post-processes the captured PDF to draw the document title (bottom-left)

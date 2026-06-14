@@ -70,6 +70,12 @@ A SHA-256 hash of the canonical account number. **Truncation differs by use site
 
 Used in: `spec/protocol.md` §3.1, §8.3; `spec/account-number.md` §6, §7
 
+### **Active language set** &nbsp; 📦 *Product*
+
+The set of bundled dictionaries the [spell checker](#spell-check) currently checks against (SYNC-11). A word is accepted if it is valid in **any** member of the set (set-union, no per-note language detection) or in the **Personal dictionary**. The set is settings-driven (Settings → Appearance language picker) and defaults to the OS locale when bundled, unioned with en-US; it is passed to the engine's batch check as the `spell_check` command's `langs` argument. v0.1 bundles 23 languages (Turkish deferred).
+
+Used in: MYND-262, MYND-267; `src-tauri/src/spell/`.
+
 ### **adversary class** &nbsp; ⚠️ *Threat*
 
 A category of attacker against which the threat model defines a specific defensive posture. Myne catalogs 13 classes (A1–A13) with explicit Strong / Mitigated / Best-effort / Out-of-scope status per class. Refer to `threat-model.md` §1 for the full catalog rather than enumerating individual classes here.
@@ -589,6 +595,17 @@ The KEK derived from `root_key` via `derive_key(root_key, "myne.v0.1 itemsKey-wr
 
 Used in: `spec/protocol.md` §3.3
 
+### **Ignore list (spell-check)** &nbsp; 📦 *Product*
+
+The set of words the spell checker suppresses without treating as correct
+elsewhere (MYND-266). v0.1 has a vault-wide ignore set, persisted (folded) in the
+encrypted `vault.dictionary` blob (§9.13), plus a RAM-only "ignore this session"
+set that is never written. Distinct from the **Personal dictionary**: ignoring a
+word silences its squiggle; adding a word to the personal dictionary asserts it
+is correctly spelled.
+
+Used in: `spec/protocol.md` §9.13; MYND-266.
+
 ### **KDF (Key Derivation Function)** &nbsp; 🏗️ *Construction*
 
 The generic class of functions that derive cryptographic keys from input keying material plus context. Myne uses two KDFs: Argon2id for password-stretching at vault unlock, HKDF-SHA-256 for fast subkey derivation post-unlock.
@@ -819,6 +836,18 @@ Password-Based Key Derivation Function 2. **Not used by Myne** — referenced on
 
 Used in: `spec/protocol.md` §7.1
 Reference: RFC 8018.
+
+### **Personal dictionary** &nbsp; 📦 *Product*
+
+The user's own set of words the spell checker treats as correctly spelled
+(MYND-266) — names, project terms, coined words. AS3-Sensitive vocabulary,
+stored encrypted in the per-vault `vault.dictionary` blob (`MYD1`, §9.13),
+hydrated into RAM on unlock and zeroized on lock. "Add to dictionary" in the
+correction menu appends to it. Matching is case-insensitive (folded); storage is
+exact NFC. Distinct from the **Ignore list** (which suppresses without asserting
+correctness) and from the bundled read-only language dictionaries.
+
+Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **Phase 1, Phase 2, Phase 3, Phase 4** &nbsp; 📦 *Product*
 
@@ -1082,6 +1111,25 @@ Used in: tag-system (MYND-45), `spec/markdown-dialect.md` §3.7.7
 The derived index of a vault's tags — inline `#tags` ∪ frontmatter `tags:` (source-agnostic union) — part of VaultIndices (MYND-31). Tags are folded to a canonical key (`foldSegment` = NFC + Unicode lowercase, the §3.7.8 tag-identity rule) on the TS side; the index stores the exact folded tag and derives a hierarchy by splitting nested `#a/b/c` on `/` (direct + subtree counts). `by_tag` is subtree-inclusive — a parent tag includes its descendants. The Rust index is trash-blind; trashed members are excluded TS-side via the `isTrashed` live-set.
 
 Used in: VaultIndices (MYND-31), `spec/markdown-dialect.md` §3.7
+
+### **Spell check** &nbsp; 📦 *Product*
+
+Myne's offline spell checker (epic MYND-261): a Rust-core engine (the `spellbook`
+Hunspell-format speller) flags misspelled words in the editor with a squiggle, and
+a correction menu offers suggestions plus add-to-dictionary / ignore. Fully local
+— bundled dictionaries, no network, no OS/cloud speller (note content is
+AS3-Sensitive). A word is correct if valid in **any** active-language dictionary
+(set-union, no per-note language detection) or in the **Personal dictionary**.
+v0.1 bundles 23 languages (en-US + 22 verified-loadable, AGPL-compatible dicts);
+Turkish is deferred (a spellbook flag-format incompatibility).
+
+Used in: `spec/protocol.md` §9.13; MYND-261…267.
+
+### **Suggestion (spell-check)** &nbsp; 📦 *Product*
+
+A candidate correct spelling the [spell checker](#spell-check) offers for a misspelled word, produced by the `spellbook` speller and surfaced (capped at 5, SYNC-14) in the right-click correction menu. Choosing one applies a surgical, byte-stable range edit that replaces exactly the flagged word; it is a presentation affordance only — never an auto-correct, never mutating the buffer until the user picks one. Distinct from the **Personal dictionary** / **Ignore list** actions in the same menu (which change verdicts, not text).
+
+Used in: MYND-265; `src/editor/spell/correction-menu.ts`.
 
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 

@@ -272,6 +272,20 @@ fn main() {
                     "workspace_write",
                     "workspace_stage",
                 ]),
+            )
+            .plugin(
+                "spell",
+                // MYND-262/266: spell_check (read) + add_to_personal_dictionary /
+                // ignore_word_in_vault (Slot::Unlocked-gated writers). InlinedPlugin
+                // mirror load-bearing per the vault-creation note above; lock-step
+                // with `permissions/spell/default.toml` or the ACL resolver never
+                // authorizes the `plugin:spell|<cmd>` invoke.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "spell_check",
+                    "spell_set_active_languages",
+                    "add_to_personal_dictionary",
+                    "ignore_word_in_vault",
+                ]),
             ),
     )
     .unwrap();

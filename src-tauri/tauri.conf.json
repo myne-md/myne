@@ -35,6 +35,31 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "resources/dictionaries/en-US": "dictionaries/en-US",
+      "resources/dictionaries/en-GB": "dictionaries/en-GB",
+      "resources/dictionaries/bg": "dictionaries/bg",
+      "resources/dictionaries/ca": "dictionaries/ca",
+      "resources/dictionaries/de": "dictionaries/de",
+      "resources/dictionaries/es": "dictionaries/es",
+      "resources/dictionaries/fa": "dictionaries/fa",
+      "resources/dictionaries/fr": "dictionaries/fr",
+      "resources/dictionaries/he": "dictionaries/he",
+      "resources/dictionaries/hr": "dictionaries/hr",
+      "resources/dictionaries/hu": "dictionaries/hu",
+      "resources/dictionaries/it": "dictionaries/it",
+      "resources/dictionaries/ko": "dictionaries/ko",
+      "resources/dictionaries/lt": "dictionaries/lt",
+      "resources/dictionaries/lv": "dictionaries/lv",
+      "resources/dictionaries/nl": "dictionaries/nl",
+      "resources/dictionaries/pl": "dictionaries/pl",
+      "resources/dictionaries/pt": "dictionaries/pt",
+      "resources/dictionaries/ro": "dictionaries/ro",
+      "resources/dictionaries/ru": "dictionaries/ru",
+      "resources/dictionaries/sk": "dictionaries/sk",
+      "resources/dictionaries/sl": "dictionaries/sl",
+      "resources/dictionaries/sv": "dictionaries/sv"
+    }
   }
 }
