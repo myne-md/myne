@@ -177,6 +177,9 @@ pub async fn unlock<R: Runtime>(
     // path.
     if is_vault_switch(active_before, target_id) {
         crate::plugins::notes::search_sync::zeroize_search_index(&app);
+        // MYND-262/266: drop the prior vault's spell engine + personal/ignore
+        // sets before the new vault hydrates — no cross-vault dictionary bleed.
+        crate::spell::sync::zeroize_spell(&app);
         // MYND-166: drop the prior vault's staged editor-workspace descriptor
         // so the switch can't flush vault A's layout into vault B.
         crate::plugins::workspace::commands::clear_staged_descriptor();
@@ -271,6 +274,10 @@ pub async fn unlock<R: Runtime>(
     // unlock (no blob) is a full rebuild — a known latency cost the Task 9
     // benchmark will quantify.
     crate::plugins::notes::search_sync::hydrate_search_index(&app, state.inner()).await;
+
+    // MYND-262/266: load the bundled dictionaries (en-US, SYNC-12) + hydrate the
+    // personal/ignore sets from vault.dictionary. Best-effort, like search.
+    crate::spell::sync::hydrate_spell(&app, state.inner()).await;
 
     Ok(())
 }
@@ -811,6 +818,9 @@ pub async fn lock<R: Runtime>(
     // survive the manual lock. The persist above already flushed it to the
     // `vault.search` blob (persist-then-wipe); the next unlock reloads it.
     crate::plugins::notes::search_sync::zeroize_search_index(&app);
+    // MYND-262/266: wipe the spell engine + personal/ignore sets on lock (each
+    // add already persisted, so nothing to flush — only RAM to zeroize).
+    crate::spell::sync::zeroize_spell(&app);
     // MYND-166: wipe the staged editor-workspace descriptor on the same lock
     // path (AS3 note-ids + layout, as sensitive as the index).
     crate::plugins::workspace::commands::clear_staged_descriptor();
@@ -1585,6 +1595,8 @@ mod tests {
                     editor_layout: None,
                     label: None,
                     last_backup_at: None,
+                    spell_enabled: None,
+                    spell_languages: Vec::new(),
                 },
             )
             .expect("encode prefs blob");
@@ -1691,6 +1703,8 @@ mod tests {
                 editor_layout: None,
                 label: None,
                 last_backup_at: None,
+                spell_enabled: None,
+                spell_languages: Vec::new(),
             },
         )
         .expect("encode");

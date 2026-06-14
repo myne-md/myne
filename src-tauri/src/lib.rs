@@ -11,8 +11,10 @@ mod screen_capture;
 mod search;
 mod snapshot_policy;
 mod snapshot_store;
+mod spell;
 #[cfg(test)]
 mod test_support;
+mod text;
 mod vault_id;
 mod vault_meta_hash;
 // SAFETY-CRITICAL eager boot migration `vault/` → `vaults/<id>/` (MYND-202
@@ -68,6 +70,9 @@ pub fn run() {
         .plugin(plugins::importer::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
+        // MYND-262: offline spell-check engine (spellbook). Binds spell_check +
+        // add/ignore commands; SpellState is managed in setup below.
+        .plugin(spell::init())
         // MYND-169: the `attachment://<id>` async custom-URI-scheme
         // handler — decrypts a `MYA1` blob in memory, re-sniffs the
         // content-type from the decrypted bytes, and serves ONLY an
@@ -136,6 +141,11 @@ pub fn run() {
             // incrementally by the notes lifecycle (create/update/delete) and
             // queried by the search command; cleared on lock (Task 8).
             app.manage(search::SearchIndexState::default());
+            // MYND-262/266: app-level live spell engine + personal/ignore sets.
+            // Dictionaries loaded + personal/ignore hydrated on unlock
+            // (spell::sync::hydrate_spell), wiped on lock (zeroize_spell) —
+            // twin of SearchIndexState's residency discipline.
+            app.manage(spell::state::SpellState::default());
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink
             // graph + backlinks + tag index), rebuilt on unlock by the
             // TS-orchestrated sweep and wiped on lock alongside the search

@@ -1,0 +1,39 @@
+# Permissions for the in-app `spell` Tauri plugin (MYND-262 / MYND-266).
+# Picked up under the `spell:` ACL namespace because `build.rs` declares this
+# as an `InlinedPlugin`. Capability files reference `spell:default`.
+#
+# The two write commands (add_to_personal_dictionary / ignore_word_in_vault)
+# inherit the same main-window-only invariant as the prefs setters — v0.2
+# multi-window MUST NOT grant them to any non-main window (they write the
+# encrypted vault.dictionary blob).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the spell plugin — batch check + personal-dictionary writers."
+permissions = [
+  "allow-spell-check",
+  "allow-spell-set-active-languages",
+  "allow-add-to-personal-dictionary",
+  "allow-ignore-word-in-vault",
+]
+
+[[permission]]
+identifier = "allow-spell-check"
+description = "Allow invoking spell:spell_check (batch per-viewport spell check over the active-language dictionaries; lazily loads an active language's bundled dictionary on first use; infallible-empty when no vault/dicts are loaded; returns per-word misspelled+suggestions, no plaintext beyond the words the caller already holds)."
+commands.allow = ["spell_check"]
+
+[[permission]]
+identifier = "allow-spell-set-active-languages"
+description = "Allow invoking spell:spell_set_active_languages (RAM-only: unloads dictionaries for deactivated languages so the loaded set follows the settings picker; no disk write, no plaintext)."
+commands.allow = ["spell_set_active_languages"]
+
+[[permission]]
+identifier = "allow-add-to-personal-dictionary"
+description = "Allow invoking spell:add_to_personal_dictionary (Slot::Unlocked-gated; adds a word to the vault's personal set and persists the encrypted vault.dictionary blob)."
+commands.allow = ["add_to_personal_dictionary"]
+
+[[permission]]
+identifier = "allow-ignore-word-in-vault"
+description = "Allow invoking spell:ignore_word_in_vault (Slot::Unlocked-gated; adds a word to the vault-wide ignore set and persists the encrypted vault.dictionary blob)."
+commands.allow = ["ignore_word_in_vault"]
