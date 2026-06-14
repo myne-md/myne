@@ -65,6 +65,7 @@ const TYPE_FILTER_OPTIONS: readonly SelectOption<TypeFilter>[] = [
   { value: "all", label: "All types" },
   { value: "image", label: "Images" },
   { value: "pdf", label: "PDFs" },
+  { value: "audio", label: "Audio" },
   { value: "other", label: "Other" },
 ];
 
@@ -448,9 +449,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     onExport: () => handleExport(entry),
     onDelete: () => void openDeleteDialog(entry),
     onJump: handleJump,
-    // A non-renderable (octet-stream / "other") attachment has no inline
-    // preview — same fallback as the editor file-card; Preview is hidden.
-    previewable: kindOf(entry.content_type) !== "other",
+    // Only image/PDF open the shared lightbox preview. Audio plays inline in
+    // its own tile (its own play button), and a generic ("other") file has no
+    // inline preview — same fallback as the editor file-card; Preview hidden.
+    previewable:
+      kindOf(entry.content_type) === "image" || kindOf(entry.content_type) === "pdf",
     actionMenuOpen: openActionMenuId === entry.id,
     onToggleActionMenu: () =>
       setOpenActionMenuId((cur) => (cur === entry.id ? null : entry.id)),
@@ -462,6 +465,10 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       style={{
         flex: 1,
         minWidth: 0,
+        // Allow this flex-column item to shrink below its content height so the
+        // SCROLL_STYLE child (overflowY: auto) actually scrolls instead of the
+        // grid overflowing the pane (flexbox min-height:auto trap).
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         background: "var(--bg-1)",

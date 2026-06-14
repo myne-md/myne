@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS Info.plist additions, merged into the bundle by Tauri (and used for
+  `tauri dev` on macOS). NSMicrophoneUsageDescription is REQUIRED for the
+  voice-notes mic capture (MYND-259): without it, the TCC microphone prompt
+  cannot appear and CoreAudio access is denied (often surfacing as silence).
+-->
+<plist version="1.0">
+  <dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Myne uses the microphone only when you record a voice note. Audio is encrypted on your device and never leaves it.</string>
+  </dict>
+</plist>

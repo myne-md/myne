@@ -86,6 +86,18 @@ sha2 = { version = "0.10", default-features = false }
 # rewrite save only. MIT.
 lopdf = { version = "0.41.0", default-features = false }
 
+# Native microphone capture for voice notes (MYND-259). Pure-Rust cross-
+# platform audio I/O over the OS backends (CoreAudio / WASAPI / ALSA); chosen
+# over WebView MediaRecorder so captured PCM stays Rust-side + Zeroize-able
+# (never the JS heap), the codec is uniform across the three OS WebViews, and
+# the unreliable WebKitGTK MediaRecorder path is avoided (`decisions.md`
+# voice-notes entry). Command-path only (`plugins/attachments/voice/`), never
+# on the boot path; v0.1 records WAV with no encoder dependency. NOTE: the
+# Linux build needs the ALSA dev headers (`libasound2-dev`) for cpal's
+# alsa-sys backend. A dependency is a security decision — record in
+# `docs/dependency-policy.md`. Apache-2.0/MIT.
+cpal = "0.15"
+
 # Desktop-only: collapse the parallel-instance race source at process
 # boundary (a second app launch redirects to the existing window
 # instead of opening a new one). Defends against the catastrophic-

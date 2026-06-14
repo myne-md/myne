@@ -320,6 +320,9 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
             // graph on the same leg — the note-ids / attachment-ids it
             // holds are correlation tags (AS3), rebuilt on the next unlock.
             crate::plugins::attachments::zeroize_attachment_refs(app);
+            // MYND-259: abort any in-progress voice recording on the same leg
+            // so the mic + RAM PCM buffer never outlive the locked session.
+            crate::plugins::attachments::abort_active_recording(app);
         });
     }
 }

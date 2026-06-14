@@ -7,7 +7,7 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** A line-icon glyph name → its child SVG element strings (path `d` only). */
-type IconName = "image" | "image-off" | "file" | "file-warning";
+type IconName = "image" | "image-off" | "file" | "file-warning" | "play" | "pause";
 
 function el(tag: string, attrs: Record<string, string>): SVGElement {
   const node = document.createElementNS(SVG_NS, tag);
@@ -64,6 +64,17 @@ export function makeAttachmentIcon(name: IconName): SVGSVGElement {
         el("path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }),
         el("path", { d: "M5 18v-2" }),
         el("path", { d: "M5 22h.01" }),
+      );
+      break;
+    case "play":
+      // Lucide "play": the audio-player play affordance (voice notes, MYND-259).
+      svg.append(el("polygon", { points: "6 3 20 12 6 21" }));
+      break;
+    case "pause":
+      // Lucide "pause": the audio-player pause affordance.
+      svg.append(
+        el("rect", { x: "14", y: "4", width: "4", height: "16", rx: "1" }),
+        el("rect", { x: "6", y: "4", width: "4", height: "16", rx: "1" }),
       );
       break;
   }

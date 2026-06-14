@@ -84,6 +84,18 @@ function pad2(n: number): string {
   return n.toString().padStart(2, "0");
 }
 
+/**
+ * The shared `YYYY-MM-DD HH-MM-SS` stamp used by the attachment auto-names
+ * (pasted image, recorded voice note). Locale-independent + filename-safe
+ * (dashes, not colons). `now`-injectable for deterministic tests.
+ */
+export function fileNameTimestamp(now: Date): string {
+  return (
+    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ` +
+    `${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`
+  );
+}
+
 /** The file extension implied by a clipboard image MIME, for the paste
  *  auto-name. Mirrors the host's `auto_filename` allowlist; defaults to
  *  `png` (the dominant clipboard-image type) when the MIME is unknown. */
@@ -113,10 +125,7 @@ export function extensionForMime(mime: string): string {
  * deterministic tests.
  */
 export function autoPasteName(mime: string, now: Date = new Date()): string {
-  const stamp =
-    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ` +
-    `${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
-  return `Pasted image ${stamp}.${extensionForMime(mime)}`;
+  return `Pasted image ${fileNameTimestamp(now)}.${extensionForMime(mime)}`;
 }
 
 // ---- import over IPC ----------------------------------------------------

@@ -47,8 +47,10 @@ pub mod reconcile;
 pub mod reconcile_commands;
 pub mod scheme;
 pub mod sniff;
+pub mod voice;
 
 pub use reconcile::AttachmentRefsState;
+pub use voice::{abort_active_recording, VoiceRecordState};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{AppHandle, Manager, Runtime};
@@ -101,6 +103,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             reconcile_commands::attachment_refs_apply,
             reconcile_commands::attachment_refs_remove,
             reconcile_commands::attachment_refs_referencing,
+            // MYND-259 (voice notes): native mic capture → WAV → stored as an
+            // ordinary audio/wav attachment. Slot::Unlocked-gated; the in-RAM
+            // PCM never crosses IPC (stop encrypts in Rust, returns metadata).
+            voice::commands::voice_record_start,
+            voice::commands::voice_record_stop,
+            voice::commands::voice_record_cancel,
         ])
         .build()
 }
