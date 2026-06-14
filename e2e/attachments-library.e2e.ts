@@ -1,0 +1,201 @@
+// al1 — attachments library: import → tile/thumbnail → rename →
+// used-in-notes → delete, plus MYA1/MYC1 at-rest magic (MYND-230,
+// e2e-wave-2). Vault-count precondition: 1.
+//
+// Pins the attachments LIBRARY surface through the production binary
+// end-to-end, the counterpart to ac1 (clean-unused) and gf1 (generic
+// export):
+//   - SETUP is page-seat IPC (`pageSeatInvoke` — production IPC, zero test
+//     hooks; the ac1/gf1 precedent), because attachment import terminates at
+//     a native file dialog WebDriver can't drive. A known image and a known
+//     generic file are imported as inline bytes, plus a note that references
+//     the image (so the used-in-notes surface has a row to list).
+//   - The library is opened through the REAL command-palette action
+//     `attachments.open` (the ac1 entry path), then driven by real clicks:
+//     the ⋮ menu Rename / Delete items, the inline rename input, the
+//     used-in-notes trigger + popover row, the DeleteAttachmentDialog confirm.
+//   - User-visible outcomes are asserted by testid; the catalog truth is
+//     re-read via page-seat `catalog_list`. At rest, the per-attachment MYA1
+//     blob (`attachments/<id-hex>`) and the MYC1 catalog (`vault.attachments`)
+//     are magic-byte-asserted after import (the positive control complementing
+//     PS-1's negative residue scan), and the blob file is asserted GONE after
+//     the delete.
+//
+// Thumbnail is asserted as element-present + resolved non-empty `src` only,
+// NOT pixel/decode success (the gf1 fragility precedent). The in-note
+// tombstone widget render after delete is library-scoped OUT (editor
+// CM6-widget territory; gf1-deferred).
+//
+// SYNC-13: attachment-ids, filenames, and the note body are scenario content,
+// not credentials; no password/phrase appears in any assert. KDF: weak
+// generator fixtures (unlock reads params from vault.meta).
+//
+// ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per
+// `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
+// `./scripts/e2e-local.sh` before merge (it introduces the
+// attachments-library tile/⋮-menu/rename/used-in-notes/delete testids and
+// the MYA1/MYC1 at-rest asserters).
+
+import { existsSync } from "node:fs";
+import { expect, it } from "vitest";
+import { describeE2E, scenario } from "./support/scenario";
+import {
+  assertAttachmentBlobMagic,
+  assertCatalogMagic,
+  attachmentBlobPath,
+  seedVault,
+  type SeededVault,
+} from "./support/fixtures";
+import {
+  dismissImporterOffer,
+  pageSeatInvoke,
+  runPaletteAction,
+  unlockToEditor,
+} from "./support/flows";
+import { testIdSelector, type Session } from "./support/webdriver";
+
+const IPC_TIMEOUT = 15_000;
+/** W3C Actions API code point for Enter — sent as an explicit escape, never a
+ *  literal newline (the invisible-key hazard). */
+const ENTER = "";
+
+/** A minimal PNG (8-byte signature → sniffs image/png) tagged with a
+ *  distinguishing byte so distinct tags yield distinct content-addressed ids. */
+function pngBytes(tag: number): number[] {
+  return [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, tag];
+}
+
+/** Opaque bytes the magic-byte sniffer does NOT recognize → stored as
+ *  application/octet-stream (the generic-file path). */
+const DOC_BYTES: number[] = Array.from(
+  new TextEncoder().encode("opaque generic library file — MYND-230 al1"),
+);
+
+async function importBytes(
+  s: Session,
+  bytes: number[],
+  filename: string,
+): Promise<string> {
+  const r = await pageSeatInvoke(
+    s,
+    "plugin:attachments|attachment_import",
+    { source: { kind: "bytes", bytes, filename } },
+    IPC_TIMEOUT,
+  );
+  expect(r.err, "attachment_import should succeed").toBeUndefined();
+  return (r.ok as { id: string }).id;
+}
+
+/** Catalog rows re-read via page-seat IPC (the disk truth). */
+async function catalog(s: Session): Promise<Array<{ id: string; filename: string }>> {
+  const r = await pageSeatInvoke(s, "plugin:attachments|catalog_list", {}, IPC_TIMEOUT);
+  expect(r.err, "catalog_list should succeed").toBeUndefined();
+  return r.ok as Array<{ id: string; filename: string }>;
+}
+
+describeE2E("attachments library (MYND-230)", () => {
+  it("al1 — import, thumbnail, rename, used-in-notes, delete + MYA1/MYC1 at rest", async () => {
+    let seeded: SeededVault;
+    await scenario(
+      "al1-attachments-library",
+      { seed: (dir) => void (seeded = seedVault(dir, {})) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, seeded.password);
+        await dismissImporterOffer(s);
+
+        // ---- setup (page-seat IPC): one image, one generic file, one note
+        //      that references the image ----
+        const imageId = await importBytes(s, pngBytes(1), "diagram.png");
+        const genericId = await importBytes(s, DOC_BYTES, "budget.docx");
+        const noteRes = await pageSeatInvoke(
+          s,
+          "plugin:notes|note_create",
+          { plaintext: `![[att:${imageId}]]` },
+          IPC_TIMEOUT,
+        );
+        expect(noteRes.err, "note_create should succeed").toBeUndefined();
+        const noteId = noteRes.ok as string;
+
+        // ---- at-rest positive control: MYA1 blob + MYC1 catalog after import ----
+        assertAttachmentBlobMagic(app.appDataDir, seeded.vaultId, imageId);
+        assertAttachmentBlobMagic(app.appDataDir, seeded.vaultId, genericId);
+        assertCatalogMagic(app.appDataDir, seeded.vaultId);
+
+        // ---- open the library via the real command palette ----
+        await runPaletteAction(s, "attachments.open", "attach");
+
+        // ---- the imported image tile is present; its thumbnail <img> carries
+        //      a resolved (non-empty) src — element + src only, no decode ----
+        const imageTile = await s.waitForElement(
+          testIdSelector("attachments.tile", { "data-id": imageId }),
+        );
+        expect(imageTile).toBeDefined();
+        const thumb = await s.waitForElement(
+          testIdSelector("attachments.thumbnail", { "data-id": imageId }),
+        );
+        const src = await thumb.property<string>("src");
+        expect(src, "thumbnail <img> resolves a non-empty src").toBeTruthy();
+        expect(src.length).toBeGreaterThan(0);
+
+        // ---- rename via ⋮ → Rename → inline input; catalog reflects it ----
+        const NEW_NAME = "renamed-diagram.png";
+        await (await tileTrigger(s, imageId)).click();
+        await (await s.byTestId("attachments.action-rename")).click();
+        const renameInput = await s.byTestId("attachments.rename-input");
+        await renameInput.replaceText(NEW_NAME);
+        await renameInput.sendKeys(ENTER);
+        await s.waitForGone(testIdSelector("attachments.rename-input"));
+        await s.waitUntil(
+          async () => {
+            const rows = await catalog(s);
+            return rows.find((e) => e.id === imageId)?.filename === NEW_NAME || null;
+          },
+          { label: "catalog reflects the renamed filename", timeoutMs: IPC_TIMEOUT },
+        );
+
+        // ---- used-in-notes: the popover lists the referencing note ----
+        await (
+          await s.waitForElement(
+            testIdSelector("attachments.used-in-notes-trigger", { "data-id": imageId }),
+          )
+        ).click();
+        const usedRow = await s.waitForElement(
+          testIdSelector("attachments.used-in-notes-row", { "data-note-id": noteId }),
+        );
+        expect(usedRow, "used-in-notes popover lists the referencing note").toBeDefined();
+
+        // ---- delete via ⋮ → Delete → DeleteAttachmentDialog confirm ----
+        const blobPath = attachmentBlobPath(app.appDataDir, seeded.vaultId, imageId);
+        expect(existsSync(blobPath), "blob exists before delete").toBe(true);
+        await (await tileTrigger(s, imageId)).click();
+        await (await s.byTestId("attachments.action-delete")).click();
+        await (await s.byTestId("delete-attachment.confirm")).click();
+        await s.waitForGone(testIdSelector("delete-attachment.confirm"));
+
+        // ---- catalog row gone + MYA1 blob file gone (library-scoped; NO
+        //      in-note tombstone-render assertion) ----
+        await s.waitUntil(
+          async () => {
+            const rows = await catalog(s);
+            return rows.every((e) => e.id !== imageId) || null;
+          },
+          { label: "catalog row removed after delete", timeoutMs: IPC_TIMEOUT },
+        );
+        await s.waitForGone(testIdSelector("attachments.tile", { "data-id": imageId }));
+        expect(existsSync(blobPath), "MYA1 blob file removed after delete").toBe(false);
+      },
+    );
+  });
+});
+
+/** Re-fetch THIS tile's ⋮ actions trigger (handles go stale across the
+ *  menu-close / rename remount between the two ⋮ opens). The trigger is the
+ *  `attachments.actions-trigger` inside the tile addressed by its data-id. */
+async function tileTrigger(s: Session, attachmentId: string) {
+  return s.waitForElement(
+    testIdSelector("attachments.tile", { "data-id": attachmentId }) +
+      " " +
+      testIdSelector("attachments.actions-trigger"),
+  );
+}

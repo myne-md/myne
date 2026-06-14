@@ -99,6 +99,9 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Search-index blob magic | `MYS1` (file `vault.search`; §9.6) |
 | Workspace-state blob magic | `MYW1` (file `vault.workspace`; §9.7) |
 | Subkey role string (workspace KEK) | `"session-state-key"` (HKDF context `"myne.v0.1 session-state-key"`; §9.7.3) |
+| Vault-indices blob magic | `MYI1` (file `vault.indices`; §9.8) |
+| Subkey role string (vault-indices KEK) | `"vault-indices-key"` (HKDF context `"myne.v0.1 vault-indices-key"`; §9.8) |
+| AAD role string (vault-indices blob) | `"vault-indices-blob"` (length-prefixed; §9.8.3) |
 | Attachment blob magic | `MYA1` (files `attachments/<attachment-id-hex>`; §9.9) |
 | Attachments catalog magic | `MYC1` (file `vault.attachments`; §9.10) |
 | Vault backup container magic | `MYB1` (files `*.myne-backup`; §9.11) |
@@ -109,7 +112,7 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Account-number display prefix | `MY-` + five dash-separated 4-char Crockford groups (27-char display form, `account-number.md` §3; the old `MY-XXXX-XXXX-XXXX-XXXX-X` sketch was illustrative shorthand — the last group is 4 chars, ending in the Damm-32 check char) |
 | Damm-32 quasigroup table | frozen literal, `account-number.md` §4.2 — determines which 20-char strings are valid and which check char generation emits; changing it rejects already-distributed account numbers and breaks cross-impl validity agreement |
 
-v005 reservations: `NT05`/`NTV5` (per-note / vault-meta) + `MYP5`/`MYS5`/`MYW5`/`MYA5`/`MYC5`/`MYB5`/`MYD5` (prefs / search / workspace / attachment / attachments-catalog / backup-container / personal-dictionary) magic, `"myne.v005|"` AAD prefix, `"myne.v005 "` HKDF context prefix — see the normative magic-allocation table in `docs/spec/protocol.md` §10.3 (which is the single source of truth for magic allocation, incl. the reserved `MYI1` VaultIndices magic). v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.
+v005 reservations: `NT05`/`NTV5` (per-note / vault-meta) + `MYP5`/`MYS5`/`MYW5`/`MYI5`/`MYA5`/`MYC5`/`MYB5`/`MYD5` (prefs / search / workspace / vault-indices / attachment / attachments-catalog / backup-container / personal-dictionary) magic, `"myne.v005|"` AAD prefix, `"myne.v005 "` HKDF context prefix — see the normative magic-allocation table in `docs/spec/protocol.md` §10.3 (which is the single source of truth for magic allocation; `MYI1`/§9.8 VaultIndices landed with MYND-271). v0.1 and v005 are **forward-incompatible by design** — no extension points, no algorithm-agility headers; cross-major reads happen only via explicit user-initiated migration.
 
 ## Crypto primitives baseline (summary)
 

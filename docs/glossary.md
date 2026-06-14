@@ -462,6 +462,12 @@ The property that compromise of a long-term key does not enable decryption of pa
 
 Used in: `threat-model.md` §7; `spec/protocol.md` §3.3 (forward-compat note)
 
+### **frontmatter** &nbsp; 📦 *Product*
+
+The optional YAML metadata block delimited by `---` lines at the top of a note's decrypted markdown (`spec/markdown-dialect.md` §3.6). Carries the five Myne-managed canonical fields (`updated:` / `title:` / `folder:` / `trashed:` / `template:`, §3.6.1) plus arbitrary user-authored keys, all preserved byte-for-byte on write (unknown-field-preservation + §6 C1). The editor's recognizer only *delimits* the block; a separate read-only [property](#property) parse (Saved Views / MYND-271) reads the YAML *body* to type each key for the [property index](#property). Not to be confused with the inline `#tag` / frontmatter `tags:` distinction (§3.7).
+
+Used in: `spec/markdown-dialect.md` §3.6
+
 ### **γ1+γ2 hybrid autosave** &nbsp; 📦 *Product*
 
 The canonical Myne autosave call-pattern locked in `decisions.md` 2026-05-07 "`note_update` IPC … UI-level autosave coalescing": a UI-side state machine composing **γ1 idle-debounce** (a save fires after the user has been idle for N milliseconds since the last keystroke) + **γ2 max-debounce** (a save fires regardless every M milliseconds during sustained typing, so a writer who never pauses still gets a save) + a **latest-wins single-in-flight gate** (if a save is already in flight when another fire is due, the in-flight completes first, then a single follow-up save fires with the latest body — no IPC thrashing) + canonical **flush triggers** (`flush-on-vault-lock` from the original entry; `flush-on-blur` and `flush-on-window-close` pinned by `decisions.md` 2026-05-15). Phase 1 v0.1 timings are N=1000ms, M=10000ms. The pattern lives entirely in the UI; the Rust `note_update` command is stateless and plaintext-blind. Backend-side queueing (γ3) was explicitly rejected because the `notes` plugin holds no own state per `decisions.md` 2026-05-07 "notes plugin scaffold". The Greek-letter naming is internal shorthand inherited from the 2026-05-07 MYND-27 grill where four call-pattern alternatives were enumerated (α stateless, β stateful-handle, γ hybrid, δ deferred — α + γ shipped).
@@ -774,6 +780,10 @@ The 4-byte ASCII magic identifying a v0.1 [attachment](#attachment) blob (`spec/
 
 The 4-byte ASCII magic identifying the v0.1 [`vault.attachments`](#vaultattachments) catalog blob (`spec/protocol.md` §9.10), the authoritative per-attachment metadata store. A `MYP1`-style 34-byte envelope over canonical JSON; KEK `DeriveSubkey(root_key, "attachments-catalog-key")`. Registered in §10.3 with its v005-reserved sibling `MYC5`. The "C" is for *catalog* — chosen after the initial `MYI1` proposal collided with the already-reserved VaultIndices magic (`decisions.md` 2026-06-07).
 
+### **MYI1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying a v0.1 [`vault.indices`](#vaultindices) blob (`spec/protocol.md` §9.8) — the encrypted-at-rest structured-metadata index (wikilink graph + tag index + title resolution + typed [property](#property) records). Parallel to `MYS1` (search) / `MYW1` (workspace) in the v0.1 magic-byte family; the structural twin of `MYS1` but a **distinct family** (one magic per family). The magic was **reserved by VaultIndices since 2026-06-07 (MYND-31)** — which is why the attachments catalog took `MYC1` after its initial `MYI1` proposal collided — and the blob spec landed with MYND-271. Registered in §10.3 alongside its v005-reserved sibling `MYI5`. Implementations MUST reject any candidate `vault.indices` whose first four bytes do not match `MYI1` — and [fall to rebuild](#fall-to-rebuild) rather than treating the rejection as data loss.
+
 ### **MYP1** &nbsp; 📋 *Protocol*
 
 The 4-byte ASCII magic identifying a v0.1 `vault.prefs` blob. Parallel to `MY01` (per-note) and `MYV1` (vault metadata) in the v0.1 magic-byte family. Registered in `spec/protocol.md` §10.3's major-version registry alongside its v005-reserved sibling `MYP5`. Implementations MUST reject any candidate `vault.prefs` whose first four bytes do not match `MYP1`.
@@ -897,6 +907,12 @@ Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `v
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
+### **property** &nbsp; 📦 *Product*
+
+A typed `key → value` pair derived from a note's YAML [frontmatter](#frontmatter) body by the Saved Views property-index (MYND-271). Every arbitrary frontmatter key is read and coerced to exactly one Myne type — `string` / `number` / `date` / `list` / `checkbox` — by the canonical value-typing ruleset (`spec/markdown-dialect.md` §3.6.4); the property-index is the **single type authority** for the Saved Views epic (sibling features consume its typing, never redefine it). Tags (`#tag` ∪ frontmatter `tags:`) and the `folder:` value are queryable alongside properties as pseudo-properties. The parse is read-only and non-mutating (the `.myn` file stays source of truth); the typed values live in the derived [vault.indices](#vaultindices) / `MYI1` cache. A [saved view](#saved-view) filters and sorts on properties.
+
+Used in: `spec/markdown-dialect.md` §3.6, §3.6.4 (MYND-271)
+
 ### **protocol identifier** &nbsp; 📋 *Protocol*
 
 The string `"myne-protocol-v0.1"` that names this specification. Distinct from the protocol version *byte* (`0x01`), the AAD prefix (`"myne.v0.1|"`), and the context-string prefix (`"myne.v0.1 "`). All four reference the same major version but appear in different call sites.
@@ -976,6 +992,12 @@ Used in: `spec/protocol.md` §2.2
 A non-secret, per-vault random value mixed into KDF input to prevent precomputation attacks across accounts and time. Myne constructs two distinct 16-byte salts — `salt_password` and `salt_recovery` — each from a SHA-256 of `(domain prefix || account_number_hash || random_16_bytes)`, with the random component generated once at vault creation and stored in `vault.meta`.
 
 Used in: `spec/protocol.md` §3.1
+
+### **saved view** &nbsp; 📦 *Product*
+
+A named, **read-only** derived view over a vault's own plain-markdown notes (Saved Views epic, MYND-271) — a filter (over [properties](#property), tags, folders) + a sort + an optional `groupBy`, rendered as one of a closed set of [view types](#view-type). The Obsidian-Bases analogue, deliberately narrowed: **no database, no formula/code-eval** — only a declarative, closed-allow-list query (the query-engine sub-feature) over the derived property index. The view *definition* is authored content persisted in `vault.prefs` / `MYP1` (not the index blob); the data it queries lives in the rebuildable [vault.indices](#vaultindices) / `MYI1` cache. Because it is read-only over plain markdown with `.myn` as the source of truth, it does **not** violate the `vision.md` "no databases" / "no proprietary format" anti-features (same precedent class as the [search index](#search-index)); see `decisions.md` 2026-06-14 "Saved Views is a read-only derived projection over plain markdown, not a database".
+
+Used in: Saved Views (MYND-271); `decisions.md` 2026-06-14
 
 ### **screen-capture protection** &nbsp; 📦 *Product*
 
@@ -1283,6 +1305,18 @@ Used in: `spec/protocol.md` §9.5; `decisions.md` 2026-05-27 "Vault preferences 
 
 The vault-level singleton catalog ([`MYC1`](#myc1) blob, `spec/protocol.md` §9.10) holding **authoritative** per-[attachment](#attachment) metadata — `id → {content_type, created_at, filename, size}` — so the attachments library can display an attachment even when no note references it (the filename survives note deletion; the in-note alias is a cosmetic copy). AEAD-encrypted under a `root_key`-derived KEK (`"myne.v0.1 attachments-catalog-key"`); canonical-JSON inner; fall-back-to-empty on absent/tampered; eager-written at vault creation. The note→attachment reference graph ("used in N notes") is **not** stored here — it is derived from note bodies at runtime via the `content_nonce` reconcile (the [search index](#search-index) MYND-29 pattern), kept in RAM and rebuilt on demand. (MYND-164)
 
+### **vault.indices** &nbsp; 📦 *Product*
+
+Vault-level singleton encrypted blob ([`MYI1`](#myi1), `spec/protocol.md` §9.8) caching the [VaultIndices](#vaultindices) structured-metadata index — the wikilink graph + tag index + title resolution + the **typed [property](#property) records** (MYND-31 design; persistence landed by MYND-271). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYI1`, protocol_version, an `index_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized structured index), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but indexes *structured* metadata, not full-text terms. AEAD-encrypted under [vault-indices-key](#vault-indices-key); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth), which is what keeps it inside the "not a database" commitment (`vision.md`). Distinct blob family from `vault.search` (one magic per family; `MYI1` ≠ `MYS1`). At-rest size leaks a coarse metadata-volume signal, accepted (`threat-model.md` A5).
+
+Used in: `spec/protocol.md` §9.8; `decisions.md` 2026-06-14 (MYND-271)
+
+### **vault-indices-key** &nbsp; 🗝️ *Key/identifier*
+
+The 32-byte AEAD KEK encrypting [vault.indices](#vaultindices) (`MYI1`). Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "vault-indices-key")` helper (`spec/protocol.md` §3.4 registry entry `"myne.v0.1 vault-indices-key"`). Never persisted; re-derived on each unlock (to load / reconcile the index) and on each persist. Independent from the `itemsKey` lineage by design — like `prefs_key` / `search-index-key` / `session-state-key` it derives straight from `root_key`, so it survives the v005 epoch-rotation `itemsKey` evolution. The AAD `AAD_vault_indices_blob` (role `"vault-indices-blob"`, `spec/protocol.md` §9.8.3) binds the blob to its vault via `account_number_hash`. Distinct from `search-index-key` (one KEK role per blob family). (MYND-271)
+
+Used in: `spec/protocol.md` §3.4, §9.8
+
 ### **vault.search** &nbsp; 📦 *Product*
 
 Vault-level singleton encrypted blob caching the [search index](#search-index) (MYND-29). Magic bytes `MYS1` for v0.1. Lives at `<app_data_dir>/vault/vault.search` next to `vault.meta` and `vault.prefs`. Outer envelope is a 34-byte fixed-offset header (magic, protocol_version, an `index_format_version` byte where `vault.prefs` carries a reserved byte, nonce, ciphertext_len) followed by AEAD-wrapped plaintext under [search-index-key](#search-index-key); layout + AAD + staleness/reconcile + size cap in `spec/protocol.md` §9.6. The inner plaintext is **engine-opaque** (postcard-serialized `{note_id → content_nonce}` staleness manifest + the serialized inverted index) — distinct from `vault.prefs`'s canonical JSON, because the index is large and never field-validated. A pure **cache**: a warm unlock loads it and incrementally reconciles via the decryption-free `content_nonce` diff; on absence / AEAD-fail it [falls to rebuild](#fall-to-rebuild) (the `.myn` files are the source of truth). Flushed on graceful lock/quit + a periodic timer; idle auto-lock skips the flush (fail-closed). At-rest blob size leaks a coarse vocabulary/volume signal, accepted (`threat-model.md` A5).
@@ -1309,9 +1343,15 @@ Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/sl
 
 ### **VaultIndices** &nbsp; 📦 *Product*
 
-The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext (a benchmark-gated `MYI1` encrypted-persistence blob is a deferred follow-up). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
+The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext; persisted encrypted-at-rest as the [vault.indices](#vaultindices) / `MYI1` blob (`spec/protocol.md` §9.8 — the MYND-31 design, persistence landed by MYND-271 alongside the typed [property](#property) index). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **view type** &nbsp; 📦 *Product*
+
+The render shape of a [saved view](#saved-view) (Saved Views epic, MYND-271). The closed v0.1 set is **table / cards / list** (Obsidian-Bases' `map` is dropped, SYNC-5); v1 ships **cards** only, with table and list as post-v1 follow-ups (MYND-277 / MYND-278). Every view type renders the **same** grouped query result read-only — no editable cells, no kanban drag-columns — so the choice is purely presentational (cards add a cover [`image:`](#attachment) + groupBy headers; list reuses the note-list row). The view type is one field of the view definition stored in `vault.prefs` / `MYP1`.
+
+Used in: Saved Views (MYND-271)
 
 ### **voice note** &nbsp; 📦 *Product*
 

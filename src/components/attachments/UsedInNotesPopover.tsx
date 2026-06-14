@@ -149,6 +149,8 @@ export function UsedInNotesPopover({
               key={id}
               type="button"
               role="menuitem"
+              data-testid="attachments.used-in-notes-row"
+              data-note-id={id}
               style={ITEM_STYLE}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "var(--paper-2)";

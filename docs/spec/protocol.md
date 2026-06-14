@@ -218,6 +218,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 backup-key"` | Sealed-backup derivation root — **reserved, not used** | **Not used in v0.1** (demoted 2026-06-10; previously "active when user exports a backup"). The v0.1 backup format (§9.11) is a verbatim ciphertext copy with no outer encryption layer: a `root_key`-derived seal would be circular for fresh-machine restore (the credential wraps live inside the backup's own `vault.meta`) and would forbid exporting while locked. The row is retained, like `server-auth`, so the context string stays allocated; a future sealed-backup variant would activate it. See `decisions.md` 2026-06-10. |
 | `"myne.v0.1 prefs-key"` | KEK for `vault.prefs` blob (§9.5) | Active when `vault.prefs` is written. |
 | `"myne.v0.1 search-index-key"` | KEK for `vault.search` blob (§9.6) | Active when `vault.search` is written (MYND-29). |
+| `"myne.v0.1 vault-indices-key"` | KEK for `vault.indices` blob (§9.8) | Active when `vault.indices` is written (MYND-271; design MYND-31). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
 | `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
 | `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.13) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
@@ -958,6 +959,78 @@ Total 43 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity 
 
 **At-rest leakage.** The blob's size leaks a coarse open-tab-count signal, analogous to the `.myn`-count / `vault.search`-size leaks — accepted for v0.1 ([`../threat-model.md`](../threat-model.md) A5 / §7).
 
+### 9.8 Vault-indices blob (`vault.indices`)
+
+`vault.indices` is a vault-level singleton artifact carrying the **structured-metadata index** in encrypted form (MYND-31 design; persistence landed by MYND-271). It lives next to `vault.meta` at `<vault-root>/vault.indices` and is AEAD-encrypted under a `root_key`-derived KEK. It is the structural sibling of `vault.search` (§9.6): same outer-envelope discipline, same engine-opaque inner plaintext, same fall-to-rebuild posture — but it indexes the vault's *structured* metadata rather than full-text terms: the wikilink forward/reverse (backlink) graph, the nested `#tag` ∪ frontmatter-`tags:` index, the title→note resolution surface, and — added by MYND-271 — the **typed property index** (every note's arbitrary frontmatter keys, each coerced to one of `string` / `number` / `date` / `list` / `checkbox` per [`markdown-dialect.md`](markdown-dialect.md) §3.6.4). `vault.search` (BM25 full-text) and `vault.indices` (structured metadata) are **distinct blob families** with distinct magic and distinct KEK roles — one magic per family (§10.3); properties belong to the VaultIndices lineage, never bolted onto the search blob.
+
+The index is **plaintext-derived, RAM-resident state**: built from decrypted note content while the vault is unlocked (titles, folders, tags, wikilink edges, typed property values are all note plaintext or derived from it), queried in memory, and **zeroized on lock alongside the keys** — it is as sensitive as the open notes ([`../threat-model.md`](../threat-model.md) A6, AS3/AS4). `vault.indices` is purely a **persistence cache** of that RAM state — it lets a warm unlock reload the index without re-extracting from every note. It is never the source of truth; the `.myn` files are. A missing, stale, or unreadable `vault.indices` is always recoverable by rebuilding from the notes (§9.8.4). This rebuildable-cache property is what keeps the structured index — like the search index — within Myne's "not a database" commitment (`vision.md`; `../decisions.md` 2026-06-14 "Saved Views is a read-only derived projection over plain markdown, not a database").
+
+#### 9.8.1 Outer envelope layout
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                  Description
+------  ---------  ---------------------  -------------------------------------
+0       4 bytes    magic                  ASCII "MYI1"
+4       1 byte     protocol_version       0x01 for this specification
+5       1 byte     index_format_version   0x01 = the v0.1 inner-plaintext format
+                                          (§9.8.2). Distinct from protocol_version:
+                                          a future index schema / serialization
+                                          change bumps THIS byte so an old decoder
+                                          rejects the blob and falls to rebuild
+                                          (§9.8.4) rather than mis-parsing it.
+6       24 bytes   indices_nonce          192-bit random nonce used to encrypt the
+                                          inner plaintext under vault_indices_key.
+30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the
+                                          inner ciphertext followed by the 32-byte
+                                          CTX commitment tag T'.
+34      M bytes    ciphertext             Inner plaintext (§9.8.2), AEAD-encrypted
+                                          under vault_indices_key with indices_nonce,
+                                          followed by the 32-byte CTX commitment tag
+                                          T' (§5.1). AAD binding in §9.8.3.
+```
+
+The header is 34 bytes, identical in shape to `vault.search` (§9.6.1) / `vault.workspace` (§9.7.1): offset 5 carries `index_format_version` (the structured-index schema evolves independently of the protocol version — adding a new property type or edge field bumps this byte). The KEK is `vault_indices_key = DeriveSubkey(root_key, "vault-indices-key")` per §3.2 + §3.4; as with `prefs_key` / `search_index_key`, no `vault_indices_key_id` field appears (it is selected deterministically from `root_key`).
+
+Magic + `protocol_version` + `index_format_version` MUST all be checked **before** any decryption is attempted (the magic-byte-before-decrypt discipline of §9.2 / §9.3). A mismatch on any of the three rejects the blob and the client rebuilds (§9.8.4).
+
+#### 9.8.2 Inner plaintext (engine-opaque snapshot)
+
+The inner plaintext is an **`index_format_version`-tagged opaque payload**: this specification does NOT fix its internal structure, because the index representation is a client-implementation choice this layer must not constrain (identical posture to §9.6.2 / §9.7.2). For `index_format_version 0x01` the payload is a [postcard](https://docs.rs/postcard)-serialized snapshot of:
+
+1. a **staleness manifest** — a map `note_id → content_nonce` recording, for each indexed note, the `.myn` `content_nonce` (§9.2) observed when it was indexed (the same decryption-free staleness signal `vault.search` uses, §9.6.4); and
+2. the **serialized structured index** — the wikilink edge set (title-keyed, per-occurrence, with edge metadata), the folded tag index, the title→note resolution map, and the **typed property records** (per note: the arbitrary frontmatter `key → {type, value}` pairs typed per §3.6.4, stored as opaque pre-typed values — Rust never re-parses YAML; the typing happens TS-side, MYND-271 Build-B).
+
+All of (1)+(2) ride INSIDE the AEAD envelope by necessity: `note_id`s + `content_nonce`s are per-note correlation tags, and titles / folders / tags / wikilink targets / property keys-and-values are note plaintext or directly derived from it — all confidential vault content (AS3/AS4). None may appear in the cleartext header. Because the payload is engine-opaque, a v0.1 client that changes the index representation (a new property type, a new edge field, a different serialization) bumps `index_format_version`; older decoders reject and rebuild. As with `vault.search`, postcard (not the canonical JSON of §9.5.2) is chosen because the index is large and never cross-validated field-by-field (§9.6.2's rationale applies verbatim).
+
+#### 9.8.3 AAD construction
+
+`AAD_vault_indices_blob` mirrors `AAD_search_index_blob` / `AAD_workspace_blob` (§5.2 discipline) with role string `"vault-indices-blob"`:
+
+```
+AAD_vault_indices_blob =
+  AAD_prefix || protocol_version (1 B) || "vault-indices-blob" || account_number_hash (16 B)
+```
+
+`"vault-indices-blob"` is length-prefixed UTF-8 (2-B big-endian length + 18 ASCII bytes, total 20 bytes). `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6), binding the index blob to its specific vault. Total AAD length: `10 + 1 + 20 + 16 = 47 bytes`. As with `vault.prefs` / `vault.search` / `vault.workspace`, `items_key_id` is **not** bound — `vault_indices_key` derives directly from `root_key` via `"myne.v0.1 vault-indices-key"` (§3.4), independent of the `itemsKey` lineage (so it survives the v005 epoch-rotation `itemsKey` evolution, same rationale as prefs/search/workspace).
+
+#### 9.8.4 Staleness detection, incremental reconcile, and fall-to-rebuild
+
+`vault.indices` is a cache and MAY be stale relative to the `.myn` files. On unlock the client reconciles the loaded index against the current notes using the **`content_nonce` as a decryption-free staleness signal**, identically to `vault.search` (§9.6.4): for each on-disk note, an unchanged `content_nonce` means skip (no decrypt + no re-extract); a changed / absent one means decrypt and re-extract title/folder/tags/edges/properties; a manifest entry absent from disk means drop. The reconciled result is identical to a full rebuild of the same corpus (the load-bearing correctness property: a diff bug must never silently produce a different index than a rebuild).
+
+**Fall-to-rebuild** is the fallback when incremental reconcile is impossible or untrusted: `vault.indices` absent, magic / version mismatch, AEAD verification failure, or an unreadable manifest. The client then rebuilds the index from scratch by decrypting + re-extracting every `.myn`. The `content_nonce` is NOT a security signal — only an optimization hint; a rebuild never trusts the cache. Because rebuild always recovers the correct index, `vault.indices` carries no integrity burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more, and **loses no data** (the cache is fully derivable from the notes — the SYNC-1 "not a database" invariant in byte form). Trashed / template notes are excluded from the index TS-side (the §3.6.1 live-set rule), exactly as for the search index; the Rust index is trash-blind.
+
+#### 9.8.5 Residency, size cap, and fall-back semantic
+
+**Residency.** The decrypted index is RAM-resident only while the vault is `Slot::Unlocked`. It is zeroized on the same path as the keys at **every** slot-drop site — manual lock, idle auto-lock, vault deletion, and the credential-rotation force-relock — with titles, folders, tags, wikilink targets, and **typed property values** overwritten before the backing allocations free (the property payload is plaintext-derived, AS3/AS4, so it is wiped alongside the rest). Manual lock/quit MAY flush it to `vault.indices` first (persist-then-wipe); idle auto-lock skips the flush (fail-closed) and the next unlock rebuilds the missing delta.
+
+**Size cap.** Implementations SHOULD reject `ciphertext_len > 268435456 + 32` (256 MiB plaintext cap + 32-byte CTX tag), bounding the parser's pre-AEAD allocation — parallel to §9.2 / §9.5.4 / §9.6.5. The 256 MiB cap is well above the benchmarked 10k-note structured index (incl. typed properties) and leaves generous headroom.
+
+**Fall-back semantic.** Reading `vault.indices` returns the loaded index on success, or triggers fall-to-rebuild (§9.8.4) on any failure — the non-distinguishing-error discipline of §6.4 / §9.5.5, applied to the structured index. An attacker with disk-write access can only force a rebuild (a slower unlock); arbitrary index injection requires breaking the AEAD (§6.4). Cross-vault: a `vault.indices` from vault A fails AEAD under vault B's `vault_indices_key` (different `root_key`) and `AAD_vault_indices_blob` (different `account_number_hash`).
+
+**At-rest leakage.** The blob's size leaks a coarse signal about indexed metadata volume (note count, tag/property cardinality), analogous to the `.myn`-count / `vault.search`-size leaks — accepted for v0.1 ([`../threat-model.md`](../threat-model.md) A5 / §7).
+
 ### 9.9 Attachment blob (`MYA1`)
 
 An attachment blob holds one arbitrary file (image, SVG, PDF) as encrypted bytes, stored under `<vault-root>/attachments/<attachment-id-hex>` (§9.1). Attachments ship in v0.1 (this supersedes the earlier Phase-1.5 deferral; `decisions.md`). The blob reuses the `.myn` three-level wrapping pattern (§9.2): a per-attachment random `attachment_key` is wrapped under the vault `itemsKey`, and the file bytes are encrypted under `attachment_key`. Because the key lineage is `itemsKey → attachment_key`, an attachment blob is **independent of any single note** — a deduplicated attachment referenced by many notes has exactly one blob and one key.
@@ -1412,13 +1485,13 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Vault prefs (`vault.prefs`) | `MYP1` | `MYP5` | §9.5 | MYND-160 |
 | Search index (`vault.search`) | `MYS1` | `MYS5` | §9.6 | MYND-29 |
 | Workspace state (`vault.workspace`) | `MYW1` | `MYW5` | §9.7 | MYND-166 |
-| Vault indices (`vault.indices`) | `MYI1` (reserved) | `MYI5` | §9.8 (reserved) | MYND-31 (deferred persistence) |
+| Vault indices (`vault.indices`) | `MYI1` | `MYI5` | §9.8 | MYND-31 design / MYND-271 persistence |
 | Attachment blob | `MYA1` | `MYA5` | §9.9 | MYND-164 |
 | Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
 | Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
 | Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.13 | MYND-266 |
 
-Section number §9.8 (vault indices) is **reserved** for an in-flight feature whose blob spec lands separately; §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10 to avoid the collision. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments) use the `MY?5` v005 convention.
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary) use the `MY?5` v005 convention.
 
 ### 10.4 Migration procedure (cross-major)
 
