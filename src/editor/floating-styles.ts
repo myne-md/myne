@@ -59,6 +59,36 @@ const CSS = `
   color: var(--fg-3);
 }
 
+/* Spell correction menu (MYND-265) — mirrors the slash menu chrome. */
+.cm-spell-menu {
+  position: fixed;
+  z-index: 30;
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-3, 8px);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12));
+  padding: 6px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--fg-1);
+  min-width: 180px;
+  max-height: 288px;
+  overflow-y: auto;
+}
+.cm-spell-menu-row {
+  padding: 6px 8px;
+  border-radius: var(--radius-1, 3px);
+  cursor: pointer;
+}
+.cm-spell-menu-row:hover,
+.cm-spell-menu-row-active {
+  background-color: var(--paper-2, #f3f1eb);
+}
+.cm-spell-menu-empty {
+  color: var(--fg-3);
+  cursor: default;
+}
+
 .cm-toolbar {
   display: inline-flex;
   align-items: center;

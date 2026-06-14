@@ -22,10 +22,10 @@
 
 #![allow(dead_code)] // public surface is consumed by the Tauri search command (Task 5)
 
+use crate::text::{default_lower, split_nfc, turkish_lower};
 use rust_stemmers::{Algorithm, Stemmer};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use unicode_normalization::UnicodeNormalization;
 use whatlang::Lang;
 
 /// Encrypted persistence + load/reconcile/rebuild for the search index
@@ -104,41 +104,10 @@ pub trait SearchIndex {
         Self: Sized;
 }
 
-/// NFC-normalize `text` and split into raw tokens on any non-alphanumeric
-/// character (whitespace, punctuation), **preserving original case**. Empty
-/// tokens are dropped. Casefolding is a separate step so the caller can pick
-/// per-language lowercasing (e.g. Turkish) before stemming.
-fn split_nfc(text: &str) -> Vec<String> {
-    text.nfc()
-        .collect::<String>()
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|t| !t.is_empty())
-        .map(str::to_string)
-        .collect()
-}
-
-/// Default Unicode lowercasing (language-agnostic). The RAW index terms and
-/// the raw query form both use this — both sides must AGREE, so consistency
-/// matters more than linguistic correctness for the raw layer.
-fn default_lower(s: &str) -> String {
-    s.to_lowercase()
-}
-
-/// Turkish-aware lowercasing: `I → ı` (dotless) and `İ → i` (dotted); every
-/// other character lowercased normally. Rust's `str::to_lowercase` maps
-/// `I → i` and `İ → i̇` per default Unicode rules — wrong for Turkish. Used
-/// as the casefold step before Turkish stemming.
-fn turkish_lower(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            'I' => out.push('ı'),
-            'İ' => out.push('i'),
-            other => out.extend(other.to_lowercase()),
-        }
-    }
-    out
-}
+// Tokenization + casefolding primitives (`split_nfc`, `default_lower`,
+// `turkish_lower`) moved to the shared `crate::text` module (SYNC-2) so the
+// search index and the spell engine (MYND-262) agree on word boundaries +
+// casefold. Imported at the top of this module.
 
 /// Tokenize free text into RAW index terms: NFC + default lowercase + split.
 /// The language-agnostic raw layer used by BOTH indexing and the query's raw
@@ -886,18 +855,8 @@ mod tests {
         assert!(InvertedIndex::from_bytes(b"not json at all").is_none());
     }
 
-    // ---- Task 2: stemming + Turkish lowercasing + query multi-stem -----
-
-    #[test]
-    fn turkish_lower_handles_dotted_and_dotless_i() {
-        assert_eq!(turkish_lower("I"), "ı");
-        assert_eq!(turkish_lower("İ"), "i");
-        assert_eq!(turkish_lower("KİTAP"), "kitap");
-        assert_eq!(turkish_lower("ISIRGAN"), "ısırgan");
-        // The bug we're avoiding: default Unicode lowercasing maps I → i.
-        assert_eq!("I".to_lowercase(), "i");
-        assert_ne!(turkish_lower("I"), "I".to_lowercase());
-    }
+    // ---- Task 2: stemming + query multi-stem -----
+    // (`turkish_lower` now lives in `crate::text` and is tested there.)
 
     #[test]
     fn query_expansion_includes_raw_and_known_stems() {

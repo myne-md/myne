@@ -220,6 +220,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 search-index-key"` | KEK for `vault.search` blob (§9.6) | Active when `vault.search` is written (MYND-29). |
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
 | `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
+| `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.12) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
 | (future v005 contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
@@ -1219,6 +1220,109 @@ implementation pins `member_count` at 2²⁰ and the member table at 16 MiB). A 
 MUST reject `MYB5` and any unregistered magic; a v005 client MUST refuse `MYB1` with an
 explicit migration prompt (§10.4). No extension points, no negotiation (§10.1).
 
+### 9.12 Personal dictionary blob (`vault.dictionary`, `MYD1`)
+
+`vault.dictionary` is a vault-level singleton artifact holding the user's personal
+spell-check dictionary — the **added-words set** plus a vault-wide **ignore set**
+(MYND-266). It lives next to `vault.meta` at `<vault-root>/vault.dictionary` and is
+AEAD-encrypted under `personal_dictionary_key = DeriveSubkey(root_key,
+"personal-dictionary-key")` (§3.2 + §3.4). Both sets are **AS3-Sensitive** user
+vocabulary (names, project terms, private words); storing them as plaintext local app
+state would leak that vocabulary to a filesystem adversary (A4/A7), so they ride inside
+the AEAD envelope like every other vault blob (the `vault.prefs`/`vault.search` posture).
+
+The blob is **payload-agnostic at the protocol layer**, exactly like `vault.search`
+(§9.6.2): this spec fixes the crypto framing (magic, version, AEAD, AAD) — the
+load-bearing part — while the inner word-set serialization is the client's concern,
+tagged by a `dict_format_version` byte.
+
+#### 9.12.1 On-disk layout
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                  Description
+------  ---------  ---------------------  -------------------------------------
+0       4 bytes    magic                  ASCII "MYD1"
+4       1 byte     protocol_version       0x01 for this specification
+5       1 byte     dict_format_version    0x01 = the v0.1 inner word-set format
+                                          (§9.12.2). Distinct from protocol_version:
+                                          a future serialization bumps THIS byte so an
+                                          old decoder rejects + falls back to empty
+                                          (§9.12.4) rather than mis-parsing it.
+6       24 bytes   dict_nonce             192-bit random nonce (OS CSPRNG) for the
+                                          inner AEAD under personal_dictionary_key.
+30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the inner
+                                          ciphertext followed by the 32-byte CTX tag.
+34      M bytes    ciphertext             Inner plaintext (§9.12.2), AEAD-encrypted
+                                          under personal_dictionary_key with dict_nonce,
+                                          then the 32-byte CTX commitment tag T' (§5.1).
+                                          AAD binding in §9.12.3.
+```
+
+The 34-byte header is identical in shape to `vault.search` (§9.6.1) — offset 5 carries
+`dict_format_version` (the word-set serialization may evolve independently of the
+protocol version). No public `personal_dictionary_key_id` and no public
+`account_number_hash` byte: both bind cryptographically (key derivation + AAD) without
+consuming header bytes, exactly as for `vault.prefs`/`vault.search`. Magic +
+`protocol_version` + `dict_format_version` MUST all be checked **before** any decryption
+(the magic-byte-before-decrypt discipline of §9.2/§9.3/§9.6.1).
+
+#### 9.12.2 Inner plaintext (`dict_format_version 0x01`)
+
+A [postcard](https://docs.rs/postcard)-serialized struct of two **set-semantics string
+arrays**: `personal_words` (added words that count as correct) and `ignore_words` (the
+vault-wide ignore set). Each array is canonical: elements **NFC-normalized**,
+**lexicographically sorted**, **exact-deduped** (the `deliberate_folders` discipline,
+§9.5.2). Both rest INSIDE the AEAD envelope by necessity — the words are confidential
+vault vocabulary; none may appear in the cleartext header.
+
+Postcard (not the canonical JSON of §9.5.2) because the payload is unbounded
+user-generated content — the same rationale §9.6.2 gives for the search index; a
+sorted+deduped `Vec<String>` is deterministic, so cross-implementation golden vectors
+stay byte-stable. Case-insensitive **lookup** (does adding "Myne" suppress
+"myne"/"MYNE"?) is the client's set-management layer's job — the codec stores exact NFC
+bytes and never folds (the §9.5.2 codec-vs-set-layer separation).
+
+#### 9.12.3 AAD construction
+
+`AAD_personal_dictionary_blob` mirrors `AAD_prefs_blob` / `AAD_search_index_blob` with
+role string `"personal-dictionary-blob"`:
+
+```text
+"myne.v0.1|"                              10 bytes  (AAD prefix, §5.2)
+0x01                                       1 byte   (protocol_version)
+u16_be(24) || "personal-dictionary-blob"  26 bytes (length-prefixed role)
+account_number_hash                       16 bytes  (vault identity, §9.3 offset 6)
+```
+
+Total 53 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity —
+`personal_dictionary_key` derives directly from `root_key` via
+`"myne.v0.1 personal-dictionary-key"`, independent of the `items_key` lineage (so it
+survives a v005 epoch rotation, same rationale as prefs/search/workspace). The subkey
+role string `"personal-dictionary-key"` is DISTINCT from the AAD role string
+`"personal-dictionary-blob"` — the same key/blob domain-separation as search.
+
+#### 9.12.4 Size cap, fall-back-to-empty, and non-load-bearing class
+
+Implementations MUST reject `ciphertext_len > 4 MiB + 32`. 4 MiB is generous headroom
+over a realistic personal dictionary (hundreds of thousands of words) and bounds the
+pre-AEAD allocation footprint (the §9.5.4 / §9.6.5 DoS-allocation discipline).
+
+Read semantic is **fall-back-to-empty** on ANY failure (file absent / truncated /
+magic-or-version-or-format mismatch / AEAD verification failure / inner-parse failure) →
+both sets empty, per the §9.5.5 / §6.4 non-distinguishing-error discipline. A vault that
+never used the feature simply has **no `vault.dictionary` file** (it is written only when
+non-empty), so a pre-MYND-266 vault is byte-identical.
+
+The blob is **non-load-bearing** (the two-class prefs taxonomy, `threat-model.md` §7): a
+replayed / tampered / stale blob can at worst restore an older word set or flag/unflag
+words — it weakens no security guarantee — so it carries **no protective-envelope clamp**
+and inherits the documented best-effort local-prefs-replay limitation. Phase-2 sync
+conflict semantics are **union + add-wins** (AS6-safe, no wall-clock), like
+`deliberate_folders` (§9.5.2). A v0.1 client MUST reject `MYD5` and any unregistered
+magic; a v005 client MUST refuse `MYD1` (§10.4).
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -1255,6 +1359,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Attachment blob | `MYA1` | `MYA5` | §9.9 | MYND-164 |
 | Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
 | Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
+| Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.12 | MYND-266 |
 
 Section number §9.8 (vault indices) is **reserved** for an in-flight feature whose blob spec lands separately; §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10 to avoid the collision. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments) use the `MY?5` v005 convention.
 

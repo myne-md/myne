@@ -282,6 +282,105 @@ pub(crate) async fn set_screen_capture_protection_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `spell_enabled` toggle (MYND-267,
+/// spell-checker epic). Read-modify-write under the per-plugin write mutex; no
+/// native side-effect (like `set_deliberate_folders`). Always persists an
+/// explicit `Some(enabled)` — the default-ON policy (SYNC-15) is a host
+/// read-time concern, not a stored value. Non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_spell_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_spell_enabled_with_dir(&dir, state.inner(), enabled).await
+}
+
+/// Testable core of [`set_spell_enabled`].
+pub(crate) async fn set_spell_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.spell_enabled = Some(enabled);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "spell_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `spell_languages` set (MYND-267 /
+/// SYNC-11 union). Read-modify-write under the per-plugin write mutex; no
+/// native side-effect. The caller passes the full desired set; the codec
+/// NFC-normalizes + sorts + exact-dedupes for canonical byte-stability
+/// (folded-identity dedup is the caller's job). Non-load-bearing → no clamp.
+/// Logs the COUNT only — the specific language tags are mildly fingerprintable,
+/// so they stay off the log surface (mirrors `set_deliberate_folders`).
+#[tauri::command]
+pub async fn set_spell_languages<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    languages: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_spell_languages_with_dir(&dir, state.inner(), languages).await
+}
+
+/// Testable core of [`set_spell_languages`].
+pub(crate) async fn set_spell_languages_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    languages: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = languages.len();
+    prefs.spell_languages = languages;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(event = "prefs_written", field = "spell_languages", count);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `deliberate_folders` set
 /// (MYND-144 — the carrier for empty / deliberately-created folders in
 /// the virtual-folder model). Read-modify-write under the per-plugin
@@ -1100,6 +1199,8 @@ mod tests {
                     editor_layout: None,
                     label: None,
                     last_backup_at: None,
+                    spell_enabled: None,
+                    spell_languages: Vec::new(),
                 },
                 &[0x77; AEAD_NONCE_LEN],
             )
@@ -1493,6 +1594,64 @@ mod tests {
                 .await
                 .expect("read after system");
             assert_eq!(view.theme, None);
+        });
+    }
+
+    // ---- spell-check setters (MYND-267) -------------------------------
+
+    #[test]
+    fn set_spell_enabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-spell-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_spell_enabled_with_dir(tmp.path(), &state, true).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn spell_prefs_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
+
+            // Enable persists (disk-first) + round-trips.
+            set_spell_enabled_with_dir(tmp.path(), &state, true)
+                .await
+                .expect("write spell_enabled");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after enable");
+            assert_eq!(view.spell_enabled, Some(true));
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Languages set: codec NFC-sorts + dedupes (caller order/dupes
+            // collapse to canonical form).
+            set_spell_languages_with_dir(
+                tmp.path(),
+                &state,
+                vec!["tr".to_string(), "en-US".to_string(), "tr".to_string()],
+            )
+            .await
+            .expect("write spell_languages");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after languages");
+            assert_eq!(
+                view.spell_languages,
+                vec!["en-US".to_string(), "tr".to_string()]
+            );
+            // spell_enabled still set (independent field).
+            assert_eq!(view.spell_enabled, Some(true));
+
+            // Disable overwrites.
+            set_spell_enabled_with_dir(tmp.path(), &state, false)
+                .await
+                .expect("write disable");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after disable");
+            assert_eq!(view.spell_enabled, Some(false));
         });
     }
 

@@ -38,6 +38,17 @@ export type ThemeChoice = "light" | "dark";
 export interface PrefsView {
   screen_capture_protection: boolean;
   /**
+   * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
+   * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
+   */
+  spell_enabled: boolean | null;
+  /**
+   * Active spell-check language tags (MYND-267 / SYNC-11 union). `[]` ≡ unset →
+   * the host applies the default active set ({OS-locale-if-bundled} ∪ {en-US}).
+   * Serialized from Rust `Vec<String>` (NFC + sorted + deduped on disk).
+   */
+  spell_languages: string[];
+  /**
    * Unix epoch seconds of the vault's last backup export (MYND-58,
    * spec §9.5.2). `null` ≡ never backed up. Drives the 30-day backup
    * reminder banner. Written by an UNLOCKED export only (the documented
@@ -289,4 +300,25 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
  */
 export async function setVaultLabel(label: string | null): Promise<void> {
   await invoke<void>("plugin:prefs|vault_set_label", { label });
+}
+
+/**
+ * Set the spell-check enabled toggle (MYND-267). Persists an explicit choice;
+ * the default-ON policy (SYNC-15) is applied host-side at read time when the
+ * field is unset. Disk-first, no native side-effect; a rejected promise means
+ * the write failed and the caller's optimistic UI must revert. Non-load-bearing.
+ */
+export async function setSpellEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_spell_enabled", { enabled });
+}
+
+/**
+ * Set the active spell-check language set (MYND-267 / SYNC-11 union). The caller
+ * passes the full desired set of BCP-47 tags; the backend NFC-sorts + dedupes
+ * for canonical byte-stability. An empty array omits the field on disk (host
+ * applies the {OS-locale ∪ en-US} default at read time). Disk-first, no native
+ * side-effect; a rejected promise means the disk write failed.
+ */
+export async function setSpellLanguages(languages: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_spell_languages", { languages });
 }

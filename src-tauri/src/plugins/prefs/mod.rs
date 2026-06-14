@@ -76,6 +76,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_item_colors,
             commands::set_folder_icons,
             commands::vault_set_label,
+            commands::set_spell_enabled,
+            commands::set_spell_languages,
         ])
         .build()
 }

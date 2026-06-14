@@ -71,6 +71,7 @@ postcard = { version = "1", default-features = false, features = ["alloc"] }
 # introduced in MYND-22's foundation hardening. Sister-crate audit
 # anchor per `decisions.md` 2026-05-06 entry.
 sha2 = { version = "0.10", default-features = false }
+spellbook = "=0.4.2"
 
 # Desktop-only: collapse the parallel-instance race source at process
 # boundary (a second app launch redirects to the existing window

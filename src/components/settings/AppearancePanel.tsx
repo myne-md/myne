@@ -16,6 +16,7 @@ import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { Button } from "../primitives/Button";
 import { ControlBlock } from "./ControlBlock";
 import { DailyNotesSettings } from "./DailyNotesSettings";
+import { SpellSettings } from "./SpellSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { prefsRead, setTheme, type ThemeChoice } from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
@@ -174,6 +175,9 @@ export function AppearancePanel() {
 
       {/* Daily-notes configuration (MYND-191) — folder / date-format / template. */}
       <DailyNotesSettings />
+
+      {/* Spell-check configuration (MYND-267) — toggle + language picker. */}
+      <SpellSettings />
     </div>
   );
 }

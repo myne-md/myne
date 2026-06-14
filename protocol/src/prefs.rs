@@ -363,6 +363,28 @@ pub struct PrefsView {
     /// `screen_capture_protection`.
     #[serde(default)]
     pub last_backup_at: Option<u64>,
+
+    /// Spell-check enabled toggle (MYND-267, spell-checker epic). `None` ≡
+    /// unset → the host applies the default-ON policy (SYNC-15) at read time.
+    /// Omitted entirely from the canonical JSON when `None`, so a vault that
+    /// never touched spell-check is byte-identical to a pre-MYND-267
+    /// `vault.prefs` (existing golden vectors unaffected). **Non-load-bearing**
+    /// (a tampered / replayed value can at worst toggle squiggles) — no
+    /// protective-envelope clamp. Canonical key `spell_enabled` — sorts after
+    /// `screen_capture_protection` (`sc` < `sp`), before `spell_languages`
+    /// (`spell_e` < `spell_l`) and `theme`.
+    #[serde(default)]
+    pub spell_enabled: Option<bool>,
+
+    /// Active spell-check language BCP-47 tags (MYND-267 / SYNC-11 union). A
+    /// `set`-semantics array: NFC-normalized, lexicographically sorted,
+    /// exact-deduped, and **omitted entirely when empty** so a vault that never
+    /// chose languages is byte-identical to a pre-MYND-267 `vault.prefs`. The
+    /// host applies the default active set ({OS-locale-if-bundled} ∪ {en-US},
+    /// SYNC-15) when this is empty. **Non-load-bearing** — no clamp. Canonical
+    /// key `spell_languages` — sorts after `spell_enabled`, before `theme`.
+    #[serde(default)]
+    pub spell_languages: Vec<String>,
 }
 
 impl Default for PrefsView {
@@ -388,6 +410,8 @@ impl Default for PrefsView {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         }
     }
 }
@@ -658,6 +682,32 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         b"false"
     });
 
+    // spell_enabled (canonical key 'spell_e…' — after screen_capture_protection
+    // [sc < sp], before spell_languages + theme). Prepends a comma like theme;
+    // omitted entirely when None so an unset vault is byte-identical to a
+    // pre-MYND-267 vault.prefs (preserves existing KAT vectors).
+    if let Some(enabled) = prefs.spell_enabled {
+        out.extend_from_slice(b",\"spell_enabled\":");
+        out.extend_from_slice(if enabled { b"true" } else { b"false" });
+    }
+
+    // spell_languages (canonical key 'spell_l…' — after spell_enabled, before
+    // theme). A set-semantics array: NFC-normalized, sorted, exact-deduped
+    // (canonical_folder_list, shared with deliberate_folders); omitted entirely
+    // when empty so a vault that never chose languages is byte-identical to a
+    // pre-MYND-267 vault.prefs.
+    let spell_langs = canonical_folder_list(&prefs.spell_languages);
+    if !spell_langs.is_empty() {
+        out.extend_from_slice(b",\"spell_languages\":[");
+        for (i, lang) in spell_langs.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, lang);
+        }
+        out.push(b']');
+    }
+
     // theme (canonical key 't' — LAST, after 's'). Omitted entirely when
     // None so an unset vault (≡ system) is byte-identical to a pre-MYND-110
     // vault.prefs (preserves existing KAT vectors). When Some, a JSON string
@@ -924,6 +974,15 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // boolean, so a future field sorting between `s` and `t` cannot hide it.
     let theme = parse_optional_theme(after_key);
 
+    // ---- spell-check fields (MYND-267, canonical keys between
+    // screen_capture_protection and theme) ----
+    // Located by marker in the post-screen_capture_protection region, like
+    // `theme`. spell_enabled is tolerant (absent / unrecognized → None);
+    // spell_languages is a set-array (absent → empty, present-but-malformed →
+    // PlaintextParseFailed, matching deliberate_folders).
+    let spell_enabled = parse_optional_bool_marker(after_key, b"\"spell_enabled\":");
+    let spell_languages = parse_optional_array_marker(after_key, b"\"spell_languages\":")?;
+
     Ok(PrefsView {
         screen_capture_protection,
         folder_icons,
@@ -939,7 +998,42 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         theme,
         label,
         last_backup_at,
+        spell_enabled,
+        spell_languages,
     })
+}
+
+/// Tolerant OPTIONAL bool field located by `marker` in `region` (the
+/// `spell_enabled` field, MYND-267). Returns `None` when the key is absent or
+/// the value is not a strict `true`/`false` literal — treated as an unknown /
+/// unset field (forward-compat, spec § 9.5.2) rather than a parse failure,
+/// because `spell_enabled` is non-load-bearing (`None` ≡ host default-ON,
+/// SYNC-15). Located by `find_subslice` so a future field sorting between
+/// `screen_capture_protection` and this key cannot hide it.
+fn parse_optional_bool_marker(region: &[u8], marker: &[u8]) -> Option<bool> {
+    let idx = find_subslice(region, marker)?;
+    let after = &region[idx + marker.len()..];
+    parse_json_bool(after).map(|(v, _rest)| v)
+}
+
+/// OPTIONAL set-semantics string-array field located by `marker` in `region`
+/// (the `spell_languages` field, MYND-267). Absent → empty `Vec`;
+/// present-but-malformed → [`PrefsBlobError::PlaintextParseFailed`] (same
+/// discipline as `deliberate_folders`). Cursor-less sibling of
+/// [`parse_optional_array_field`] for the post-screen_capture_protection region
+/// (shared with `theme` + the spell fields, all located by marker there).
+fn parse_optional_array_marker(
+    region: &[u8],
+    marker: &[u8],
+) -> Result<Vec<String>, PrefsBlobError> {
+    match find_subslice(region, marker) {
+        Some(idx) => {
+            let (list, _consumed) = parse_json_string_array(&region[idx + marker.len()..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            Ok(list)
+        }
+        None => Ok(Vec::new()),
+    }
 }
 
 /// Parse an OPTIONAL canonical unsigned-integer field whose key marker is
@@ -1470,6 +1564,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -1492,6 +1588,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1634,6 +1732,8 @@ mod tests {
                 editor_layout: None,
                 label: None,
                 last_backup_at: None,
+                spell_enabled: None,
+                spell_languages: Vec::new(),
             }
         );
     }
@@ -1658,6 +1758,8 @@ mod tests {
                 editor_layout: None,
                 label: None,
                 last_backup_at: None,
+                spell_enabled: None,
+                spell_languages: Vec::new(),
             }
         );
     }
@@ -1810,6 +1912,8 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
+            spell_enabled: None,
+            spell_languages: Vec::new(),
             ..PrefsView::default()
         });
         assert_eq!(
@@ -1822,6 +1926,8 @@ mod tests {
     fn last_backup_at_round_trips_through_decode() {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
+            spell_enabled: None,
+            spell_languages: Vec::new(),
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&original);
@@ -1835,6 +1941,8 @@ mod tests {
         // survive (no silent truncation).
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
+            spell_enabled: None,
+            spell_languages: Vec::new(),
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&original);
@@ -1900,6 +2008,8 @@ mod tests {
             theme: Some(ThemeChoice::Dark),
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1976,6 +2086,68 @@ mod tests {
         assert_eq!(original, decoded);
     }
 
+    // ---- spell-check fields (MYND-267) --------------------------------
+
+    #[test]
+    fn full_blob_round_trip_with_spell_fields() {
+        // spell_enabled + spell_languages survive a full encode/decode.
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView {
+            spell_enabled: Some(true),
+            spell_languages: alloc::vec![String::from("en-US"), String::from("tr")],
+            ..PrefsView::default()
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(original, decoded);
+        assert_eq!(decoded.spell_enabled, Some(true));
+        assert_eq!(decoded.spell_languages, alloc::vec!["en-US", "tr"]);
+    }
+
+    #[test]
+    fn spell_languages_canonicalized_sorted_and_deduped() {
+        // Set-semantics like deliberate_folders: the encoder NFC-sorts +
+        // exact-dedupes, so a caller's unordered/duplicated input round-trips
+        // to the canonical form.
+        let original = PrefsView {
+            spell_languages: alloc::vec![
+                String::from("tr"),
+                String::from("en-US"),
+                String::from("tr"),
+            ],
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.spell_languages, alloc::vec!["en-US", "tr"]);
+    }
+
+    #[test]
+    fn spell_fields_omitted_when_unset_are_byte_identical() {
+        // A vault that never touched spell-check encodes with NO "spell_" key,
+        // so it is byte-identical to a pre-MYND-267 vault.prefs.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert!(
+            find_subslice(&encoded, b"spell_").is_none(),
+            "default prefs must not emit any spell_* key"
+        );
+    }
+
+    #[test]
+    fn spell_enabled_false_round_trips() {
+        let original = PrefsView {
+            spell_enabled: Some(false),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.spell_enabled, Some(false));
+    }
+
     // ---- deliberate_folders canonical array (MYND-144) -----------------
 
     #[test]
@@ -2007,6 +2179,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2036,6 +2210,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2063,6 +2239,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2089,6 +2267,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2178,6 +2358,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2232,6 +2414,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2265,6 +2449,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2330,6 +2516,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2370,6 +2558,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2396,6 +2586,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2424,6 +2616,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2520,6 +2714,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2590,6 +2786,8 @@ mod tests {
             editor_layout: Some(sample_layout()),
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2850,6 +3048,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2880,6 +3080,8 @@ mod tests {
             editor_layout: None,
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -3171,6 +3373,8 @@ mod tests {
                 editor_layout: None,
                 label: None,
                 last_backup_at: None,
+                spell_enabled: None,
+                spell_languages: Vec::new(),
             },
             &nonce_default,
         )
@@ -3194,6 +3398,8 @@ mod tests {
                 editor_layout: None,
                 label: None,
                 last_backup_at: None,
+                spell_enabled: None,
+                spell_languages: Vec::new(),
             },
             &nonce_toggled,
         )
@@ -3234,6 +3440,8 @@ mod tests {
             }),
             label: None,
             last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
         };
         let nonce_populated: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
         let canonical_populated = canonical_json_encode(&prefs_populated);
@@ -3640,6 +3848,8 @@ mod tests {
         let prefs = PrefsView {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
+            spell_enabled: None,
+            spell_languages: Vec::new(),
             ..PrefsView::default()
         };
         let canonical = canonical_json_encode(&prefs);

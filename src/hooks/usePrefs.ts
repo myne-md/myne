@@ -47,6 +47,8 @@ const DEFAULT_PREFS: PrefsView = {
   item_colors: {},
   label: null,
   last_backup_at: null,
+  spell_enabled: null,
+  spell_languages: [],
 };
 
 interface UsePrefsResult {
