@@ -138,7 +138,7 @@ The 32-byte content-addressed identifier of an [attachment](#attachment): `HMAC-
 
 ### **attachment://** &nbsp; 📋 *Protocol*
 
-The custom WebView protocol scheme that serves a decrypted [attachment](#attachment) to the editor/library. The Rust handler resolves `attachment://<id>`, decrypts the blob in memory, **re-sniffs** the content-type from the bytes and emits only an allowlisted type (`image/*` or `application/pdf`), and returns a full response — no plaintext ever written to disk, no `Range`/206 in v0.1. Unlock-gated and main-window-scoped (TB6); the WebView CSP blocks outbound network so a hostile note cannot exfiltrate a blob. (MYND-164)
+The custom WebView protocol scheme that serves a decrypted [attachment](#attachment) to the editor/library. The Rust handler resolves `attachment://<id>`, decrypts the blob in memory, **re-sniffs** the content-type from the bytes and emits only an allowlisted type (`image/*`, `application/pdf`, or `audio/wav` — voice notes, MYND-259), and returns a full response — no plaintext ever written to disk, no `Range`/206 in v0.1. Unlock-gated and main-window-scoped (TB6); the WebView CSP blocks outbound network so a hostile note cannot exfiltrate a blob. (MYND-164)
 
 ### **attachment_import** &nbsp; 📋 *Protocol*
 
@@ -1264,6 +1264,10 @@ Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/sl
 The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext (a benchmark-gated `MYI1` encrypted-persistence blob is a deferred follow-up). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **voice note** &nbsp; 📦 *Product*
+
+A note audio clip embedded inline — either a recorded microphone capture or an attached audio file. Stored as an ordinary [attachment](#attachment) (an `audio/wav` [`MYA1`](#mya1) blob — **no new on-disk format**) referenced by the form-C embed `![[att:<id>|filename]]` and played by an inline custom waveform widget. Recording captures **natively in Rust via `cpal`** (not the WebView MediaRecorder, so PCM stays Rust-side + `Zeroize`-able), encodes to WAV/PCM at the device-native rate (mono, 16-bit), buffers in RAM only (never a plaintext temp file), and auto-finalizes at the 64 MiB cap into a seamless next clip. The mic is unlock-gated, gesture-driven, and aborted on lock / auto-lock. `audio/wav` joins the [`attachment://`](#attachment) serve allowlist + the sniffer (a `RIFF`…`WAVE` arm). (MYND-259; `decisions.md` 2026-06-14)
 
 ### **Vite** &nbsp; 🛠️ *Tooling*
 
