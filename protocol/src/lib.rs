@@ -54,6 +54,7 @@ pub mod search_blob;
 pub mod subkey;
 pub mod template;
 pub mod types;
+pub mod vault_indices_blob;
 pub mod vault_meta;
 pub mod workspace_blob;
 
@@ -64,8 +65,8 @@ pub use account_number::{
 pub use aead::{
     aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
     aad_personal_dictionary_blob, aad_prefs_blob, aad_recovery_wrap, aad_search_index_blob,
-    aad_vault_items_key_wrap, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
-    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob, aead_open_ctx,
+    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use attachment_blob::{
     aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id, decode_attachment_blob,
@@ -115,6 +116,12 @@ pub use template::{render, supported_tokens, RenderContext};
 pub use types::{
     generate_root_key, parse_kdf_params, serialize_kdf_params, KdfParams, DEFAULT_V0_1_KDF_PARAMS,
     KDF_PARAMS_CANONICAL_LEN,
+};
+pub use vault_indices_blob::{
+    decode_vault_indices_blob, encode_vault_indices_blob, encode_vault_indices_blob_raw,
+    VaultIndicesBlobError, MAX_VAULT_INDICES_PLAINTEXT_LEN, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN,
+    VAULT_INDICES_BLOB_FORMAT_V1, VAULT_INDICES_BLOB_HEADER_LEN, VAULT_INDICES_BLOB_MAGIC,
+    VAULT_INDICES_BLOB_PROTOCOL_VERSION,
 };
 pub use vault_meta::{
     parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta, VaultMeta,

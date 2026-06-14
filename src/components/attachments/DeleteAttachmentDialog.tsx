@@ -126,10 +126,20 @@ export function DeleteAttachmentDialog({
         {error !== null && <div style={ERROR_STYLE}>{error}</div>}
       </div>
       <div style={FOOTER_STYLE}>
-        <Button variant="ghost" onClick={onClose} disabled={deleting}>
+        <Button
+          variant="ghost"
+          onClick={onClose}
+          disabled={deleting}
+          data-testid="delete-attachment.cancel"
+        >
           Cancel
         </Button>
-        <Button variant="danger" onClick={handleConfirm} disabled={deleting}>
+        <Button
+          variant="danger"
+          onClick={handleConfirm}
+          disabled={deleting}
+          data-testid="delete-attachment.confirm"
+        >
           {deleting ? "Deleting…" : "Delete"}
         </Button>
       </div>

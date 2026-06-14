@@ -355,6 +355,7 @@ export function SnapshotsPanel({
         style={PANEL_STYLE}
         role="dialog"
         aria-modal="true"
+        data-testid="snapshots.panel"
         aria-labelledby="snapshots-panel-title"
       >
         <div style={HEADER_STYLE}>
@@ -379,7 +380,7 @@ export function SnapshotsPanel({
                   Loading…
                 </div>
               ) : (
-                snaps.map((s) => {
+                snaps.map((s, idx) => {
                   const isSel = s.snapshot_uuid === selected;
                   return (
                     <button
@@ -387,6 +388,9 @@ export function SnapshotsPanel({
                       type="button"
                       style={isSel ? ROW_SELECTED_STYLE : ROW_STYLE}
                       aria-pressed={isSel}
+                      data-testid="snapshots.row"
+                      data-snapshot-id={s.snapshot_uuid}
+                      data-index={idx}
                       onClick={() => void selectSnapshot(s.snapshot_uuid)}
                     >
                       <span style={ROW_AGE_STYLE}>
@@ -422,12 +426,14 @@ export function SnapshotsPanel({
                     <button
                       type="button"
                       style={RESTORE_BTN_STYLE}
+                      data-testid="snapshots.restore"
+                      data-snapshot-id={selected}
                       onClick={() => setConfirmRestore(selected)}
                     >
                       Restore this snapshot
                     </button>
                   </div>
-                  <pre style={DIFF_STYLE}>
+                  <pre style={DIFF_STYLE} data-testid="snapshots.preview">
                     {diff?.map((d, idx) => (
                       <span
                         key={idx}
@@ -542,6 +548,7 @@ function RestoreConfirm({
         style={CONFIRM_CARD_STYLE}
         role="dialog"
         aria-modal="true"
+        data-testid="snapshots.restore-confirm"
         aria-labelledby="restore-confirm-title"
       >
         <h2 id="restore-confirm-title" style={CONFIRM_TITLE_STYLE}>
@@ -552,10 +559,21 @@ function RestoreConfirm({
           this.
         </p>
         <div style={CONFIRM_ROW_STYLE}>
-          <button ref={cancelRef} type="button" style={BTN_STYLE} onClick={onCancel}>
+          <button
+            ref={cancelRef}
+            type="button"
+            style={BTN_STYLE}
+            data-testid="snapshots.restore-cancel"
+            onClick={onCancel}
+          >
             Cancel
           </button>
-          <button type="button" style={RESTORE_BTN_STYLE} onClick={onConfirm}>
+          <button
+            type="button"
+            style={RESTORE_BTN_STYLE}
+            data-testid="snapshots.restore-confirm-cta"
+            onClick={onConfirm}
+          >
             Restore
           </button>
         </div>

@@ -36,6 +36,9 @@
 //! | [`SubkeyRole::SearchIndexKey`]         | `search-index-key`        |
 //! | [`SubkeyRole::AttachmentsCatalogKey`]  | `attachments-catalog-key` |
 //! | [`SubkeyRole::AttachmentsIdHmac`]      | `attachments-id-hmac`     |
+//! | [`SubkeyRole::SessionStateKey`]        | `session-state-key`       |
+//! | [`SubkeyRole::PersonalDictKey`]        | `personal-dictionary-key` |
+//! | [`SubkeyRole::VaultIndicesKey`]        | `vault-indices-key`       |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -96,6 +99,15 @@ const ROLE_STR_SESSION_STATE_KEY: &[u8] = b"session-state-key";
 /// `itemsKey`-independent and survives a v005 epoch rotation.
 const ROLE_STR_PERSONAL_DICT_KEY: &[u8] = b"personal-dictionary-key";
 
+/// Registered role string for the v0.1 vault-indices blob KEK
+/// (MYND-271; design MYND-31; encrypts the `vault.indices` structured-metadata
+/// index blob — `protocol.md` § 9.8 + § 3.4). Load-bearing: drift silently
+/// changes the KEK. `root_key`-derived (like prefs/search/workspace), so it is
+/// `itemsKey`-independent and survives a v005 epoch rotation. DISTINCT from
+/// `search-index-key` — `vault.indices` (structured metadata) and `vault.search`
+/// (BM25 full-text) are separate blob families (one magic / one KEK per family).
+const ROLE_STR_VAULT_INDICES_KEY: &[u8] = b"vault-indices-key";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -139,6 +151,13 @@ pub enum SubkeyRole {
     /// from the other `root_key`-derived blob KEKs so every blob family is
     /// cryptographically domain-separated.
     PersonalDictKey,
+    /// KEK for the v0.1 vault-indices blob (`vault.indices`, `MYI1`,
+    /// MYND-271; design MYND-31). Encrypts the serialized structured-metadata
+    /// index (wikilink graph + tag index + title resolution + typed property
+    /// records) under XChaCha20-Poly1305 (CTX commitment outer). Distinct from
+    /// `SearchIndexKey` so the structured-index and full-text-search blob
+    /// families are domain-separated (one KEK per family).
+    VaultIndicesKey,
 }
 
 impl SubkeyRole {
@@ -154,6 +173,7 @@ impl SubkeyRole {
             SubkeyRole::AttachmentsIdHmac => ROLE_STR_ATTACHMENTS_ID_HMAC,
             SubkeyRole::SessionStateKey => ROLE_STR_SESSION_STATE_KEY,
             SubkeyRole::PersonalDictKey => ROLE_STR_PERSONAL_DICT_KEY,
+            SubkeyRole::VaultIndicesKey => ROLE_STR_VAULT_INDICES_KEY,
         }
     }
 }
@@ -271,6 +291,51 @@ mod tests {
         assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::PrefsKey));
         assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
         assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SessionStateKey));
+    }
+
+    #[test]
+    fn vault_indices_key_role_string_matches_spec_registry() {
+        // MYND-271 registry entry "myne.v0.1 vault-indices-key" (§ 9.8; design
+        // MYND-31). Frozen + load-bearing: drift silently changes the
+        // vault.indices KEK.
+        assert_eq!(SubkeyRole::VaultIndicesKey.role_str(), b"vault-indices-key");
+    }
+
+    #[test]
+    fn vault_indices_key_is_distinct_from_other_root_key_blobs() {
+        // The vault-indices KEK must differ from EVERY other root_key-derived
+        // blob KEK so the blob families are domain-separated (HKDF info-string
+        // property). Most load-bearing: distinctness from search-index-key —
+        // vault.indices (structured metadata) and vault.search (BM25) are
+        // separate families, one KEK each.
+        let root = [0u8; 32];
+        let vi = derive_subkey(&root, SubkeyRole::VaultIndicesKey);
+        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
+        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::SessionStateKey));
+        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
+        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+        assert_ne!(
+            *vi,
+            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
+        );
+        assert_ne!(*vi, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
+    }
+
+    #[test]
+    fn derive_subkey_zero_root_vault_indices_key_golden() {
+        // In-crate golden mirroring the companion vector
+        // `hkdf-sha256/v0.1/zero-root-vault-indices-key`. Both must pass against
+        // identical bytes — drift in either indicates HKDF prefix / role-string
+        // corruption of the vault.indices KEK. Regenerate via
+        // `emit_subkey_vectors_for_paste` if the algorithm/prefix/role changes.
+        let derived = derive_subkey(&[0u8; 32], SubkeyRole::VaultIndicesKey);
+        let expected: [u8; 32] = [
+            0x16, 0x25, 0x47, 0x16, 0xC8, 0x7A, 0xB3, 0x17, 0x34, 0x64, 0xFF, 0x03, 0x8D, 0x61,
+            0x8D, 0xF3, 0x1C, 0xF6, 0xE1, 0xFE, 0x49, 0xCF, 0x03, 0x3C, 0xD4, 0x39, 0x0A, 0x17,
+            0x44, 0x62, 0x9A, 0x4B,
+        ];
+        assert_eq!(*derived, expected, "HKDF golden mismatch — regenerate");
     }
 
     #[test]
@@ -406,6 +471,11 @@ mod tests {
     ///   for the canonical `"myne.v0.1 session-state-key"` info assembly) —
     ///   the `vault.workspace` KEK, pinned in lockstep with the
     ///   `vault-workspace` family.
+    /// - 2 `VaultIndicesKey` (MYND-271, §9.8): all-zero root + the alpha
+    ///   pseudorandom root (the latter carries `informational_info_utf8_hex`
+    ///   for the canonical `"myne.v0.1 vault-indices-key"` info assembly) —
+    ///   the `vault.indices` KEK, pinned in lockstep with the `vault-indices`
+    ///   family; distinct from `search-index-key` (one KEK per blob family).
     ///
     /// Cross-role independence is implicit: every root appears with
     /// both roles; the integration runner asserts byte-equality for
@@ -463,6 +533,7 @@ mod tests {
                 SubkeyRole::AttachmentsIdHmac => "attachments-id-hmac",
                 SubkeyRole::SessionStateKey => "session-state-key",
                 SubkeyRole::PersonalDictKey => "personal-dictionary-key",
+                SubkeyRole::VaultIndicesKey => "vault-indices-key",
             }
         }
 
@@ -473,7 +544,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 18] = [
+        let cases: [Case<'_>; 20] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -600,6 +671,20 @@ mod tests {
                 SubkeyRole::SessionStateKey,
                 true,
             ),
+            (
+                "zero-root-vault-indices-key",
+                "All-zero root_key with the VaultIndicesKey role (MYND-271, §9.8; design MYND-31). KEK for the vault.indices structured-metadata blob; role string 'vault-indices-key' (17 ASCII bytes). Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the vault-indices lineage onto another role's info string (most importantly search-index-key, the structural sibling).",
+                &zero_root,
+                SubkeyRole::VaultIndicesKey,
+                false,
+            ),
+            (
+                "prn-alpha-vault-indices-key",
+                "Pseudorandom alpha root with the VaultIndicesKey role. The informational_info_utf8_hex field carries the canonical 27-byte HKDF info bytes ('myne.v0.1 vault-indices-key') so independent implementers can verify the seventh registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'vault-indices-key' is DISTINCT from the AAD role string 'vault-indices-blob' (aad_vault_indices_blob, ctx-aead vectors), AND distinct from search-index-key — vault.indices (structured metadata) and vault.search (BM25) are separate blob families.",
+                &alpha,
+                SubkeyRole::VaultIndicesKey,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -607,7 +692,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + vault-indices-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {

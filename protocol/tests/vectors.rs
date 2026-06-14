@@ -633,6 +633,7 @@ fn hkdf_sha256_vectors() {
             "attachments-catalog-key" => SubkeyRole::AttachmentsCatalogKey,
             "attachments-id-hmac" => SubkeyRole::AttachmentsIdHmac,
             "session-state-key" => SubkeyRole::SessionStateKey,
+            "vault-indices-key" => SubkeyRole::VaultIndicesKey,
             other => panic!(
                 "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
             ),
@@ -681,6 +682,7 @@ fn hkdf_sha256_vectors() {
         "attachments-catalog-key",
         "attachments-id-hmac",
         "session-state-key",
+        "vault-indices-key",
     ] {
         assert!(
             seen_roles.contains(required),
@@ -1386,8 +1388,8 @@ fn password_policy_vectors() {
 fn ctx_aead_vectors() {
     use protocol::{
         aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
-        aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap, aad_workspace_blob,
-        aead_open_ctx, aead_seal_ctx, KdfParams, ProtocolError,
+        aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
+        aad_workspace_blob, aead_open_ctx, aead_seal_ctx, KdfParams, ProtocolError,
     };
 
     let path = companion_vectors_root()
@@ -1645,6 +1647,14 @@ fn ctx_aead_vectors() {
                         );
                         aad_workspace_blob(&account_number_hash)
                     }
+                    "aad_vault_indices_blob" => {
+                        let account_number_hash: [u8; 16] = hex_decode_array(
+                            case["input_account_number_hash_hex"].as_str().unwrap_or_else(
+                                || panic!("[{id}] missing input_account_number_hash_hex"),
+                            ),
+                        );
+                        aad_vault_indices_blob(&account_number_hash)
+                    }
                     other => panic!(
                         "[{id}] unknown input_builder_name '{other}' — schema enforces enum; update this match arm in lockstep with the schema"
                     ),
@@ -1668,7 +1678,7 @@ fn ctx_aead_vectors() {
     // one aad_canonical_bytes pin in the cases array. Drift in either
     // the schema's input_builder_name enum or the cases.json coverage
     // surfaces here.
-    let required: [&str; 8] = [
+    let required: [&str; 9] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -1677,6 +1687,7 @@ fn ctx_aead_vectors() {
         "aad_prefs_blob",
         "aad_search_index_blob",
         "aad_workspace_blob",
+        "aad_vault_indices_blob",
     ];
     for builder in required {
         assert!(
@@ -1880,7 +1891,8 @@ fn bip39_recovery_vectors() {
 fn aad_construction_vectors() {
     use protocol::{
         aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_prefs_blob,
-        aad_recovery_wrap, aad_search_index_blob, aad_vault_items_key_wrap, aad_workspace_blob,
+        aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
+        aad_workspace_blob,
     };
 
     let path = companion_vectors_root()
@@ -1957,6 +1969,7 @@ fn aad_construction_vectors() {
             "aad_prefs_blob" => aad_prefs_blob(&account_number_hash()),
             "aad_search_index_blob" => aad_search_index_blob(&account_number_hash()),
             "aad_workspace_blob" => aad_workspace_blob(&account_number_hash()),
+            "aad_vault_indices_blob" => aad_vault_indices_blob(&account_number_hash()),
             "aad_note_content_encrypt" => aad_note_content_encrypt(&items_key_id(), &note_uuid()),
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — schema enforces enum; update this match arm in lockstep with the schema"
@@ -2011,7 +2024,7 @@ fn aad_construction_vectors() {
 
     // Structural guarantee: every pub aad_* builder must have a decomposition
     // case — drift in either the schema enum or the cases.json surfaces here.
-    let required: [&str; 8] = [
+    let required: [&str; 9] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -2019,6 +2032,7 @@ fn aad_construction_vectors() {
         "aad_prefs_blob",
         "aad_search_index_blob",
         "aad_workspace_blob",
+        "aad_vault_indices_blob",
         "aad_note_content_encrypt",
     ];
     for builder in required {
@@ -2508,6 +2522,243 @@ fn vault_workspace_vectors() {
         assert!(
             seen_parse_errors.contains(err),
             "vault-workspace missing parse_fail coverage for WorkspaceBlobError '{err}' — every structural reject must be pinned"
+        );
+    }
+}
+
+#[test]
+fn vault_indices_vectors() {
+    use protocol::{
+        decode_vault_indices_blob, derive_subkey, encode_vault_indices_blob_raw, SubkeyRole,
+        VaultIndicesBlobError,
+    };
+
+    let path = companion_vectors_root()
+        .join("vault-indices")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] vault-indices: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "vault-indices");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 12,
+        "vault-indices must carry at least 12 vectors (3 encrypt + 1 decrypt_ok + 2 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("vault-indices", cases);
+
+    // Coverage guards (vault-search / vault-workspace parity).
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let plaintext = hex_decode(
+                    case["input_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_plaintext_hex")),
+                );
+                let nonce: [u8; 24] = hex_decode_array(
+                    case["input_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_nonce_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_vault_indices_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{id}] missing expected_vault_indices_blob_hex")
+                        }),
+                );
+
+                let vault_indices_key = derive_subkey(&root_key, SubkeyRole::VaultIndicesKey);
+
+                // Defensive cross-check: the optional
+                // `informational_vault_indices_key_hex` must match the helper's
+                // own derivation. The HKDF role "vault-indices-key" is DISTINCT
+                // from the AAD role "vault-indices-blob".
+                if let Some(info_hex) = case
+                    .get("informational_vault_indices_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        vault_indices_key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_vault_indices_key_hex disagrees with derive_subkey(root_key, VaultIndicesKey)",
+                    );
+                }
+
+                let actual = encode_vault_indices_blob_raw(
+                    &vault_indices_key,
+                    &account_hash,
+                    &plaintext,
+                    &nonce,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] vault-indices encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let expected_plaintext = hex_decode(
+                    case["expected_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_plaintext_hex")),
+                );
+
+                let vault_indices_key = derive_subkey(&root_key, SubkeyRole::VaultIndicesKey);
+                let decoded = decode_vault_indices_blob(&vault_indices_key, &account_hash, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] vault-indices decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+
+                let vault_indices_key = derive_subkey(&root_key, SubkeyRole::VaultIndicesKey);
+                match decode_vault_indices_blob(&vault_indices_key, &account_hash, &blob) {
+                    Err(VaultIndicesBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected VaultIndicesBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode_vault_indices_blob returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => VaultIndicesBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => VaultIndicesBlobError::ProtocolVersionMismatch,
+                    "format_unsupported" => VaultIndicesBlobError::FormatUnsupported,
+                    "header_too_short" => VaultIndicesBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => VaultIndicesBlobError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => VaultIndicesBlobError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with VaultIndicesBlobError"
+                    ),
+                };
+
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                match decode_vault_indices_blob(&dummy_key, &dummy_hash, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_vault_indices_blob returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "vault-indices missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "format_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "vault-indices missing parse_fail coverage for VaultIndicesBlobError '{err}' — every structural reject must be pinned"
         );
     }
 }

@@ -104,6 +104,41 @@ export async function runPaletteAction(
   ).click();
 }
 
+/** Open the command palette, type `query`, and click the NOTES-section hit
+ *  row whose `data-note-id` matches `noteId` — the byTestId-only path to
+ *  navigating to a SPECIFIC search result (note rows share
+ *  `data-testid="palette.option"`; the `data-note-id` discriminator,
+ *  alongside `data-action-id` on command rows, lands the exact note).
+ *  Opens via the same Control+k chord as `runPaletteAction`. Leaves the
+ *  palette closing as the editor navigates to the target note. */
+export async function searchAndOpenNote(
+  session: Session,
+  query: string,
+  noteId: string,
+): Promise<void> {
+  const CONTROL = "\uE009"; // W3C Actions API code point for Control
+  await session.send("POST", "/actions", {
+    actions: [
+      {
+        type: "key",
+        id: "kbd",
+        actions: [
+          { type: "keyDown", value: CONTROL },
+          { type: "keyDown", value: "k" },
+          { type: "keyUp", value: "k" },
+          { type: "keyUp", value: CONTROL },
+        ],
+      },
+    ],
+  });
+  await (await session.byTestId("palette.input")).sendKeys(query);
+  await (
+    await session.waitForElement(
+      testIdSelector("palette.option", { "data-kind": "note", "data-note-id": noteId }),
+    )
+  ).click();
+}
+
 /** A fresh vault's first unlocked editor shows the importer onboarding
  *  offer (MYND-53) over a full-screen backdrop that intercepts clicks.
  *  Dismiss it the way a user would; the dismissal persists in

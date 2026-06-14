@@ -46,7 +46,7 @@ import {
 import { renameFlushHooks } from "./renameFlushHook";
 import { noteWriteBatchTransactional } from "./noteWriteBatch";
 import {
-  rebuildVaultIndices,
+  hydrateVaultIndicesOnUnlock,
   reindexNote,
   vaultIndicesRemove,
 } from "./vaultIndices";
@@ -501,10 +501,13 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
         }
         return { ...prev, cache };
       });
-      // MYND-31: rebuild-on-unlock sweep — re-index every note into the Rust
-      // VaultIndices (Build-B). Best-effort + fire-and-forget so it never
-      // blocks the sidebar boot; the index is a rebuildable cache.
-      void rebuildVaultIndices(records.map((r) => r.noteUuid));
+      // MYND-31 + MYND-271 Task 8: unlock sweep with the MYI1 fast path —
+      // hydrate the persisted vault.indices blob (the host populates unchanged
+      // notes + returns only the stale ids), then re-index just those. A cold /
+      // undecodable blob falls back to a full rebuild. Best-effort +
+      // fire-and-forget so it never blocks the sidebar boot; the index is a
+      // rebuildable cache.
+      void hydrateVaultIndicesOnUnlock(records.map((r) => r.noteUuid));
     },
     [],
   );
