@@ -79,6 +79,7 @@ import {
 import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
 import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
+import { vaultIndicesPersist } from "../notes/vaultIndices";
 import {
   SECTION_HEADING_STYLE,
   SIDEBAR_CARD_STYLE,
@@ -702,6 +703,18 @@ function EditorChrome({
       // Best-effort — a failed convenience write never blocks lock/close.
     }
   }, []);
+  // MYND-271 Task 8 — persist the VaultIndices to the encrypted vault.indices
+  // (MYI1) blob on graceful exit (same cadence as the workspace descriptor:
+  // lock / idle-lock grace / quit, never per-edit). Best-effort + must run
+  // while still unlocked (before vault_lock zeroizes the keys); the next
+  // unlock rebuilds the missing delta if this is skipped.
+  const persistVaultIndices = useCallback(async () => {
+    try {
+      await vaultIndicesPersist();
+    } catch {
+      // Best-effort — a failed index persist never blocks lock/close.
+    }
+  }, []);
 
   // MYND-166 — mirror the current layout into the backend's in-RAM staging
   // slot on every change (incl. the restored/default state on mount). The
@@ -733,6 +746,7 @@ function EditorChrome({
           event.preventDefault();
           await flushAll();
           await persistWorkspace();
+          await persistVaultIndices();
           await w.close();
         });
       } catch {
@@ -745,7 +759,7 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [flushAll, persistWorkspace]);
+  }, [flushAll, persistWorkspace, persistVaultIndices]);
 
   // MYND-121 — flush every pane on idle-lock imminent. The backend idle
   // timer emits `vault-lock-imminent` before its grace window; flush any
@@ -765,6 +779,7 @@ function EditorChrome({
             // second (convenience — droppable if the grace window expires).
             await flushAll();
             await persistWorkspace();
+            await persistVaultIndices();
           })();
         });
         if (cancelled) {
@@ -780,18 +795,19 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [flushAll, persistWorkspace]);
+  }, [flushAll, persistWorkspace, persistVaultIndices]);
 
   // Lock button flush-then-lock — `decisions.md` 2026-05-07 canonical
   // flush-on-lock, now across all panes; persist the workspace before lock.
   const handleLockFlushed = useCallback(async () => {
     await flushAll();
     await persistWorkspace();
+    await persistVaultIndices();
     await lockVault().catch(() => {
       /* lock is best-effort, parent callback still fires */
     });
     onLock?.();
-  }, [flushAll, persistWorkspace, onLock]);
+  }, [flushAll, persistWorkspace, persistVaultIndices, onLock]);
 
   const centerViewValue = useMemo(
     () => ({ view: centerView, setView: setCenterView }),

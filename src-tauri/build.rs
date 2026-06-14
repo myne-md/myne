@@ -168,6 +168,10 @@ fn main() {
                     "vault_indices_backlink_candidates",
                     "vault_indices_by_tag",
                     "vault_indices_tag_tree",
+                    "vault_indices_note_properties",
+                    "vault_indices_property_values",
+                    "vault_indices_persist",
+                    "vault_indices_hydrate",
                 ]),
             )
             .plugin(

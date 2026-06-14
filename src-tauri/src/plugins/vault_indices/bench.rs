@@ -23,13 +23,23 @@
 //! proxy, not a real-note distribution; the timings are representative of
 //! the scan/apply shapes, not of the TS-side read+parse sweep.
 
-use super::state::{NoteRecord, TagEntry, VaultIndicesState, WikilinkEdge};
+use super::persist::{decode_snapshot, encode_snapshot};
+use super::state::{NoteRecord, PropertyEntry, TagEntry, VaultIndicesState, WikilinkEdge};
+use crate::search::persist::NonceManifest;
+use protocol::AEAD_KEY_LEN;
 use std::time::Instant;
 
 /// Full-build (apply N notes) budget at 10k notes.
 const BUDGET_BUILD_MS: u128 = 2_000;
 /// Query p95 budget at 10k notes (50 ms expressed in µs).
 const BUDGET_QUERY_P95_US: u128 = 50_000;
+/// MYI1 persist (snapshot + postcard + AEAD) budget at 10k notes WITH typed
+/// properties (MYND-271 Task 8). Generous debug-build headroom; the real
+/// persist runs in `spawn_blocking` off the lock-await path.
+const BUDGET_PERSIST_MS: u128 = 2_000;
+/// MYI1 persisted-load (AEAD + postcard decode) budget at 10k notes. This is
+/// the cost the heavier typed payload adds to a warm unlock's fast path.
+const BUDGET_HYDRATE_MS: u128 = 2_000;
 /// Query executions per size; p95 over the per-execution latencies.
 const QUERY_RUNS: usize = 500;
 
@@ -77,6 +87,22 @@ fn build(n: usize) -> VaultIndicesState {
                 title_key: Some(synthetic_title(i).to_lowercase()),
                 edges,
                 tags,
+                // Two typed properties per note — the realistic Bases-style
+                // frontmatter the MYI1 payload must carry (MYND-271 Task 8).
+                properties: vec![
+                    PropertyEntry {
+                        key: "status".to_string(),
+                        r#type: "string".to_string(),
+                        value: Some(format!("state-{}", i % 5)),
+                        elements: None,
+                    },
+                    PropertyEntry {
+                        key: "priority".to_string(),
+                        r#type: "number".to_string(),
+                        value: Some(format!("{}", i % 10)),
+                        elements: None,
+                    },
+                ],
             },
         );
     }
@@ -119,18 +145,43 @@ fn index_budget_report() {
         let tree = state.tag_tree();
         let tag_tree_us = t.elapsed().as_micros();
 
+        // MYI1 persistence round-trip (MYND-271 Task 8): snapshot → postcard →
+        // AEAD (persist) and AEAD → postcard (hydrate) of the full typed index.
+        // This is the cost the heavier typed-property payload adds vs the
+        // RAM-only MVP; the manifest is synthetic (one nonce per note).
+        let key = [0x42u8; AEAD_KEY_LEN];
+        let account_hash = [0x33u8; 16];
+        let manifest: NonceManifest = (0..n)
+            .map(|i| (format!("note-{i}"), [(i % 256) as u8; 24]))
+            .collect();
+        let records = state.snapshot();
+
+        let t = Instant::now();
+        let blob = encode_snapshot(&key, &account_hash, &manifest, &records).expect("encode");
+        let persist_ms = t.elapsed().as_millis();
+
+        let t = Instant::now();
+        let decoded = decode_snapshot(&key, &account_hash, &blob).expect("decode");
+        let hydrate_ms = t.elapsed().as_millis();
+        assert_eq!(decoded.1.len(), n, "decoded record count must match");
+
         let build_pass = n != 10_000 || build_ms <= BUDGET_BUILD_MS;
         let query_pass = backlink_p95 <= BUDGET_QUERY_P95_US && by_tag_p95 <= BUDGET_QUERY_P95_US;
+        let persist_pass = n != 10_000 || persist_ms <= BUDGET_PERSIST_MS;
+        let hydrate_pass = n != 10_000 || hydrate_ms <= BUDGET_HYDRATE_MS;
         println!(
             "[vault-indices bench] n={n}: build={build_ms}ms backlink_p95={backlink_p95}us \
-             by_tag_p95={by_tag_p95}us tag_tree={tag_tree_us}us nodes={} build_pass={build_pass} \
-             query_pass={query_pass}",
-            tree.len()
+             by_tag_p95={by_tag_p95}us tag_tree={tag_tree_us}us nodes={} \
+             persist={persist_ms}ms hydrate={hydrate_ms}ms blob={}KiB build_pass={build_pass} \
+             query_pass={query_pass} persist_pass={persist_pass} hydrate_pass={hydrate_pass}",
+            tree.len(),
+            blob.len() / 1024,
         );
     }
     println!(
         "[vault-indices bench] budgets: build<={BUDGET_BUILD_MS}ms@10k, \
-         query_p95<={BUDGET_QUERY_P95_US}us@10k. If a budget is missed → promote the MYI1 \
-         persistence follow-up and/or the title-key aux index."
+         query_p95<={BUDGET_QUERY_P95_US}us@10k, persist<={BUDGET_PERSIST_MS}ms@10k, \
+         hydrate<={BUDGET_HYDRATE_MS}ms@10k (MYI1 with typed properties). A missed persist / \
+         hydrate budget → revisit the MYI1 payload (e.g. a leaner property encoding)."
     );
 }

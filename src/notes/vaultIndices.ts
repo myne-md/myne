@@ -28,6 +28,7 @@ import {
   type ResolverNote,
   type WikilinkResolution,
 } from "./resolveWikilink";
+import { extractProperties, type PropertyEntry } from "./propertyTyping";
 
 /**
  * One per-occurrence outbound wikilink edge — the TS mirror of the Rust
@@ -160,13 +161,15 @@ export function extractWikilinkEdges(
   return edges;
 }
 
-/** Upsert a note's index contribution (title + folder + wikilink edges + tags). */
+/** Upsert a note's index contribution (title + folder + wikilink edges + tags
+ *  + typed frontmatter properties). */
 export async function vaultIndicesApply(
   noteId: string,
   title: string | null,
   folder: string | null,
   wikilinks: ReadonlyArray<WikilinkEdge>,
   tags: ReadonlyArray<TagEntry>,
+  properties: ReadonlyArray<PropertyEntry>,
 ): Promise<void> {
   await invoke<void>("plugin:vault-indices|vault_indices_apply", {
     noteId,
@@ -177,6 +180,9 @@ export async function vaultIndicesApply(
     titleKey: title === null ? null : foldSegment(title),
     wikilinks,
     tags,
+    // Build-B (MYND-271): TS types every frontmatter property (§3.6.4); Rust
+    // stores these opaque pre-typed values and never parses YAML (TB9).
+    properties,
   });
   // SYNC-5: bump the index-changed nonce AFTER the slice updated (single
   // post-mutation chokepoint) so reader surfaces re-query.
@@ -220,6 +226,28 @@ export async function vaultIndicesRemove(noteId: string): Promise<void> {
   bumpIndexNonce(); // SYNC-5: chokepoint bump, after the slice updated.
 }
 
+/**
+ * Persist the live in-RAM VaultIndices to the encrypted `vault.indices`
+ * (`MYI1`) blob (Task 8 / MYND-271). Best-effort — call on graceful lock /
+ * quit (alongside the workspace persist). A failure leaves the RAM index
+ * intact; the next unlock rebuilds the missing delta.
+ */
+export async function vaultIndicesPersist(): Promise<void> {
+  await invoke<void>("plugin:vault-indices|vault_indices_persist");
+}
+
+/**
+ * Load the `vault.indices` blob on unlock (the fast path) and return the
+ * **stale** note ids (changed / new since the snapshot) for the caller to
+ * re-apply. Unchanged notes are already populated into the store by the host;
+ * deleted notes are dropped. An absent / undecodable / stale blob → every
+ * on-disk note is returned stale → a full rebuild (the cache is never
+ * authoritative, §9.8.4 / SYNC-1).
+ */
+export async function vaultIndicesHydrate(): Promise<string[]> {
+  return await invoke<string[]>("plugin:vault-indices|vault_indices_hydrate");
+}
+
 /** Derive `{title, folder}` from a parsed note's frontmatter — the same
  *  shape the sidebar derives (frontmatter `title:` string else null; no
  *  H1 fallback; `folder:` normalized), so the index's title/folder match
@@ -257,6 +285,9 @@ export async function reindexNoteFromBody(
       folder,
       extractWikilinkEdges(parsed.wikilinks),
       extractTags(parsed),
+      // §3.6.4 typed properties from the raw frontmatter (re-parsed CORE-schema
+      // TS-side; deriveTitleFolder above reads the project-default parse).
+      extractProperties(parsed.frontmatter.raw),
     );
   } catch {
     // Best-effort — self-healed by a later apply / the next reconcile.
@@ -289,6 +320,33 @@ export async function rebuildVaultIndices(
   noteIds: readonly string[],
 ): Promise<void> {
   for (const id of noteIds) {
+    await reindexNote(id);
+  }
+}
+
+/**
+ * Unlock sweep with the `MYI1` fast path (Task 8 / MYND-271). Loads the
+ * persisted `vault.indices` blob via {@link vaultIndicesHydrate} — the host
+ * populates the store with the unchanged-note records and returns only the
+ * **stale** (changed / new) ids — then re-applies just those (`reindexNote`).
+ * The unchanged notes are NOT re-read or re-parsed, which is the whole point
+ * of the persisted projection. On any hydrate failure (no blob / IPC error)
+ * it falls back to a full rebuild over `allIds` — the cache is never
+ * authoritative (§9.8.4 / SYNC-1). Best-effort; boot is never blocked.
+ */
+export async function hydrateVaultIndicesOnUnlock(
+  allIds: readonly string[],
+): Promise<void> {
+  let stale: readonly string[];
+  try {
+    // The host returns all on-disk ids as stale when the blob is absent /
+    // undecodable, so a cold vault still does a full reindex here.
+    stale = await vaultIndicesHydrate();
+  } catch {
+    // Command-level failure (slot / IO) — fall back to a full rebuild.
+    stale = allIds;
+  }
+  for (const id of stale) {
     await reindexNote(id);
   }
 }

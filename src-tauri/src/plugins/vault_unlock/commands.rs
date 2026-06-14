@@ -1463,6 +1463,7 @@ mod tests {
                 title_key: None,
                 edges: Vec::new(),
                 tags: Vec::new(),
+                properties: Vec::new(),
             },
         );
         assert_eq!(
