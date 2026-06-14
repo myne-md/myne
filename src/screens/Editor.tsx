@@ -25,6 +25,8 @@
 //     docs/design/ui_kits/desktop/Editor.jsx
 
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -123,6 +125,16 @@ import {
   workspaceWrite,
 } from "../lib/workspace-persist";
 
+// Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
+// bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
+// build chunk). (GraphView's shell is statically imported and lazies only its
+// heavy d3 canvas; TagBrowser has no comparable static host, so the whole modal
+// splits.)
+const TagBrowser = lazy(() =>
+  import("../notes/components/TagBrowser").then((m) => ({
+    default: m.TagBrowser,
+  })),
+);
 
 const STATUS_TEXT_STYLE: CSSProperties = {
   fontSize: 12,
@@ -460,6 +472,10 @@ function EditorChrome({
   );
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
   const [graphOpen, setGraphOpen] = useState<boolean>(false);
+  // Tag browser (tag-system #2 / MYND-46): modal carve-out + an optional seed
+  // tag (set by the editor `#tag` chip, #3, to open filtered to one tag).
+  const [tagsOpen, setTagsOpen] = useState<boolean>(false);
+  const [tagsSeed, setTagsSeed] = useState<string | null>(null);
   // MYND-53 — Obsidian importer: the active-import modal + the onboarding offer
   // (shown on editor mount until dismissed once; IMPORTER_OFFER_KEY).
   const [importerOpen, setImporterOpen] = useState<boolean>(false);
@@ -516,6 +532,21 @@ function EditorChrome({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  // Editor `#tag` chip click (tag-system #3 / MYND-45): the chip decoration
+  // dispatches a bubbling `myne-open-tag` event; open the tag browser seeded to
+  // that tag. A single Editor-level listener (the modal is Editor-global) — no
+  // per-pane prop threading.
+  useEffect(() => {
+    const onOpenTag = (e: Event) => {
+      const tag = (e as CustomEvent<{ tag?: string }>).detail?.tag;
+      if (typeof tag === "string" && tag !== "") {
+        setTagsSeed(tag);
+        setTagsOpen(true);
+      }
+    };
+    window.addEventListener("myne-open-tag", onOpenTag);
+    return () => window.removeEventListener("myne-open-tag", onOpenTag);
   }, []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) — reported up by
@@ -928,6 +959,10 @@ function EditorChrome({
       <BottomBar
         onOpenSettings={() => setSettingsOpen(true)}
         onShowGraph={() => setGraphOpen(true)}
+        onShowTags={() => {
+          setTagsSeed(null);
+          setTagsOpen(true);
+        }}
         onLockFlushed={handleLockFlushed}
         saveStatus={readout.status}
         onRetry={readout.retry}
@@ -1006,6 +1041,13 @@ function EditorChrome({
         }}
       />
       <GraphView open={graphOpen} onClose={() => setGraphOpen(false)} />
+      <Suspense fallback={null}>
+        <TagBrowser
+          open={tagsOpen}
+          onClose={() => setTagsOpen(false)}
+          seedTagKey={tagsSeed}
+        />
+      </Suspense>
       <ObsidianImportModal
         open={importerOpen}
         onClose={() => setImporterOpen(false)}
@@ -1078,6 +1120,11 @@ function EditorChrome({
         onShowGraph={() => {
           setPaletteOpen(false);
           setGraphOpen(true);
+        }}
+        onShowTags={() => {
+          setPaletteOpen(false);
+          setTagsSeed(null);
+          setTagsOpen(true);
         }}
         onLockFlushed={async () => {
           setPaletteOpen(false);
@@ -1323,6 +1370,7 @@ type CommandPaletteHostProps = {
   onExportNoteMarkdown: () => void;
   onExportNotePdf: () => void;
   onShowGraph: () => void;
+  onShowTags: () => void;
   onImportObsidian: () => void;
   onBackupVault: () => void;
   onExportVaultMarkdown: () => void;
@@ -1342,6 +1390,7 @@ function CommandPaletteHost({
   onExportNoteMarkdown,
   onExportNotePdf,
   onShowGraph,
+  onShowTags,
   onImportObsidian,
   onBackupVault,
   onExportVaultMarkdown,
@@ -1403,6 +1452,7 @@ function CommandPaletteHost({
       onExportNoteMarkdown,
       onExportNotePdf,
       onShowGraph,
+      onShowTags,
       onImportObsidian,
       onBackupVault,
       onExportVaultMarkdown,
@@ -1427,6 +1477,7 @@ function CommandPaletteHost({
       onExportNoteMarkdown,
       onExportNotePdf,
       onShowGraph,
+      onShowTags,
       onImportObsidian,
       onBackupVault,
       onExportVaultMarkdown,
@@ -1884,6 +1935,8 @@ interface BottomBarProps {
   /** Open the whole-vault graph (the persistent wedge-first-class affordance,
    *  SYNC-7) — parallel to the settings gear. */
   onShowGraph?: () => void;
+  /** Open the tag browser (persistent affordance, SYNC-7 refinement, MYND-46). */
+  onShowTags?: () => void;
   saveStatus: SaveStatusValue;
   onRetry: () => void;
   /** Hide the save-status badge entirely when no note is selected
@@ -1900,6 +1953,7 @@ function BottomBar({
   onLockFlushed,
   onOpenSettings,
   onShowGraph,
+  onShowTags,
   saveStatus,
   onRetry,
   hideSaveStatus = false,
@@ -1927,6 +1981,28 @@ function BottomBar({
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {!hideSaveStatus && <SaveStatusBadge status={saveStatus} onRetry={onRetry} />}
+        {onShowTags && (
+          <button
+            type="button"
+            onClick={onShowTags}
+            aria-label="Browse tags"
+            data-testid="editor.tags-cta"
+            title="Tags"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="hash" size={14} />
+          </button>
+        )}
         {onShowGraph && (
           <button
             type="button"

@@ -8,6 +8,7 @@
 // automatically. No JS-side light/dark mode tracking.
 
 import { EditorView } from "@codemirror/view";
+import { tagChipCmTheme } from "../notes/tagPillToken";
 
 export const myneTheme = EditorView.theme({
   "&": {
@@ -754,6 +755,11 @@ export const myneTheme = EditorView.theme({
     fontStyle: "italic",
     textDecoration: "none",
   },
+  // Inline #tag chip (tag-system #3 / MYND-45) — derived from the single TS-5
+  // tag-pill token (`src/notes/tagPillToken.ts`) so the editor chip and the
+  // browser's pill rows never drift. Pill shape distinguishes a tag from a
+  // wikilink chip.
+  ...tagChipCmTheme(),
   // Generic tooltip surface (Myne design system). CM6's default `.cm-tooltip`
   // is a light box that clashes with the dark editor; bring it onto the paper
   // surface. The autocomplete tooltip's 2-class rule (`.cm-tooltip-autocomplete`)

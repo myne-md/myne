@@ -1057,6 +1057,18 @@ Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships m
 
 Used in: `threat-model.md` §1 (A8), §7
 
+### **tag browser** &nbsp; 📦 *Product*
+
+The modal surface for browsing + filtering notes by tag (tag-system / MYND-46). A palette-style carve-out launched from the command palette (`tags.show`) + a BottomBar affordance: a search field + an All/Any (AND/OR) toggle, the vault's tags as clickable chips (the whole chip toggles selection into the filter), and the matching note list directly below. Filtering goes through the single `by_tag` path (subtree-inclusive, trash-excluded, AND = intersection / OR = union); results are recency-sorted. Read-only over the in-RAM [tag index](#tag-index) — selection state is ephemeral, no new at-rest artefact. Completes MYND-200's blocked interactive surface.
+
+Used in: tag-system (MYND-46), [tag index](#tag-index)
+
+### **tag chip** &nbsp; 📦 *Product*
+
+The editor decoration that renders an inline `#tag` as a styled, clickable pill (tag-system / MYND-45). Purely visual — recognize-only / byte-stable (the underlying bytes are never rewritten, `spec/markdown-dialect.md` §3.7.7); cursor-aware (it reveals the raw text when the caret is inside, so a tag can be typed or edited). Clicking a chip opens the [tag browser](#tag-browser) filtered to that tag. Per SYNC-17 the chip ships ONLY together with the tag browser — never as a standalone editor-polish change (a clickable-looking tag with nowhere to go is a dead affordance). The same pill token styles both the editor chip and the browser's tag rows.
+
+Used in: tag-system (MYND-45), `spec/markdown-dialect.md` §3.7.7
+
 ### **tag index** &nbsp; 📦 *Product*
 
 The derived index of a vault's tags — inline `#tags` ∪ frontmatter `tags:` (source-agnostic union) — part of VaultIndices (MYND-31). Tags are folded to a canonical key (`foldSegment` = NFC + Unicode lowercase, the §3.7.8 tag-identity rule) on the TS side; the index stores the exact folded tag and derives a hierarchy by splitting nested `#a/b/c` on `/` (direct + subtree counts). `by_tag` is subtree-inclusive — a parent tag includes its descendants. The Rust index is trash-blind; trashed members are excluded TS-side via the `isTrashed` live-set.

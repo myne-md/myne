@@ -53,6 +53,8 @@ export type CommandContext = {
   onExportNotePdf: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
   onShowGraph: () => void;
+  /** Open the tag browser (modal carve-out: tree + multi-select filter) (MYND-46). */
+  onShowTags: () => void;
   /** Open the Obsidian vault import flow (folder picker → progress → summary) (MYND-53). */
   onImportObsidian: () => void;
   /** Open the backup-export flow (save dialog → verified .myne-backup) (MYND-56). */

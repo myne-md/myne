@@ -203,6 +203,19 @@ const showGraphAction: CommandAction = {
   },
 };
 
+const showTagsAction: CommandAction = {
+  id: "tags.show",
+  label: "Browse tags…",
+  category: "Editor",
+  // Editor-only, like the other modal carve-outs. A navigation surface reached
+  // often, so it ALSO has a persistent BottomBar affordance (SYNC-7 refinement,
+  // tag-system #2) — the palette action is one of two entry points.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowTags();
+  },
+};
+
 const toggleLeftSidebarAction: CommandAction = {
   id: "view.toggle-notes-sidebar",
   label: "Toggle notes sidebar",
@@ -236,6 +249,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportNoteMarkdownAction,
   exportNotePdfAction,
   showGraphAction,
+  showTagsAction,
   importObsidianAction,
   backupVaultAction,
   exportVaultMarkdownAction,

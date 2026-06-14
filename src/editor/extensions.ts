@@ -50,7 +50,7 @@ import { attachmentInsertPlaceholderExtension } from "./attachments/insert-place
 import { slashMenuExtension } from "./slash/plugin";
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
-import { emojiCompletionExtension } from "./emoji-complete";
+import { completionExtension } from "./completion";
 import { clickCollapseExtension } from "./click-collapse";
 import { findExtension } from "./find/find-extension";
 import { myneKeyBindings } from "./keymap";
@@ -111,9 +111,10 @@ export function myneExtensions(): readonly Extension[] {
     // (MYND-189). Sits alongside the slash menu; both are floating menus.
     templateTokenMenuExtension(),
     selectionToolbarExtension(),
-    // Emoji `:` autocomplete (MYND-156) — inserts the unicode glyph. Built on
-    // @codemirror/autocomplete; the source awaits the lazy emoji map.
-    emojiCompletionExtension(),
+    // @codemirror/autocomplete — emoji `:` (inserts the glyph, MYND-156) + inline
+    // `#tag` (suggests existing tags, MYND-45). Both override-sources in ONE
+    // config (`completion.ts`) so they coexist.
+    completionExtension(),
     // Collapse the spurious tiny selection a plain click makes when the
     // cursor-aware reveal reflows the clicked line (e.g. an H1 re-showing `# `).
     clickCollapseExtension(),
