@@ -26,4 +26,15 @@ pub enum VaultIndicesError {
     /// injection are the only causes that should hit this in production.
     #[error("vault is not unlocked")]
     SlotNotUnlocked,
+    /// `vault.meta` was unreadable / unparseable when resolving the AAD
+    /// `account_number_hash` for the `vault.indices` blob (Task 8). DENY-list
+    /// clean (no path / bytes). Persist/hydrate are best-effort — the caller
+    /// falls back to the RAM-only index + a full rebuild on next unlock.
+    #[error("vault.meta unreadable for vault.indices persistence")]
+    InvalidVaultMeta,
+    /// An IO / encode failure while writing the `vault.indices` blob (Task 8).
+    /// DENY-list clean (no path, no `io::Error::Display`). Best-effort: the
+    /// in-RAM index is unaffected; the next unlock rebuilds the missing delta.
+    #[error("vault.indices persistence IO failed")]
+    PersistIo,
 }

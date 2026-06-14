@@ -317,6 +317,45 @@ pub fn aad_workspace_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD encryption of the v0.1 vault-indices
+/// blob (`vault.indices`, `MYI1`, MYND-271; design MYND-31). Same shape as
+/// [`aad_prefs_blob`] / [`aad_search_index_blob`] / [`aad_workspace_blob`] with
+/// a distinct role string `"vault-indices-blob"`, so the structured-metadata
+/// index blob is cryptographically domain-separated from prefs, search, and
+/// workspace — a blob of one kind can never AEAD-verify under another's
+/// key/AAD. DISTINCT from `aad_search_index_blob` (role `"search-index-blob"`):
+/// `vault.indices` (structured metadata) and `vault.search` (BM25 full-text)
+/// are separate blob families, one role each.
+///
+/// Layout (47 bytes):
+///
+/// ```text
+/// "myne.v0.1|"                      10 bytes  (AAD prefix, § 5.2)
+/// 0x01                               1 byte   (protocol_version, § 9.3)
+/// u16_be(18) || "vault-indices-blob" 20 bytes (length-prefixed role)
+/// account_number_hash               16 bytes  (vault identity binding, § 9.3 offset 6)
+/// ```
+///
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// vault-indices blob lives outside the `items_key` lineage, same rationale as
+/// `aad_prefs_blob` (the KEK derives directly from `root_key` via
+/// `"myne.v0.1 vault-indices-key"`, so it survives a v005 epoch rotation).
+pub fn aad_vault_indices_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_VAULT_INDICES_BLOB: &[u8] = b"vault-indices-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len()
+            + 1
+            + 2
+            + ROLE_STR_VAULT_INDICES_BLOB.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_VAULT_INDICES_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///
@@ -776,6 +815,62 @@ mod tests {
     }
 
     #[test]
+    fn aad_vault_indices_blob_default_matches_pinned_hex() {
+        // Spec § 5.2 + § 9.8.3: 47 bytes = prefix (10) + version (1) +
+        // u16_be(18) + "vault-indices-blob" (18) + account_number_hash (16).
+        let account_number_hash: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let aad = aad_vault_indices_blob(&account_number_hash);
+        let expected: [u8; 47] = [
+            // "myne.v0.1|" — 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version
+            0x01, // length-prefixed role string: u16_be(18) || "vault-indices-blob"
+            0x00, 0x12, // u16_be(18)
+            0x76, 0x61, 0x75, 0x6C, 0x74, 0x2D, 0x69, 0x6E, 0x64, 0x69, 0x63, 0x65, 0x73, 0x2D,
+            0x62, 0x6C, 0x6F, 0x62, // "vault-indices-blob"
+            // account_number_hash
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 47, "spec § 9.8.3 mandates 47-byte AAD");
+    }
+
+    #[test]
+    fn aad_vault_indices_blob_changes_with_account_number_hash() {
+        // Cross-vault binding: different account_number_hash ⇒ different AAD ⇒
+        // a vault.indices from vault A fails AEAD in vault B.
+        let hash_a = [0x00; 16];
+        let mut hash_b = [0x00; 16];
+        hash_b[0] = 1;
+        let aad_a = aad_vault_indices_blob(&hash_a);
+        let aad_b = aad_vault_indices_blob(&hash_b);
+        assert_ne!(aad_a, aad_b);
+        // First 31 bytes (prefix + version + length-prefixed 18-byte role)
+        // match — only the account_number_hash region (bytes 31..47) differs.
+        assert_eq!(&aad_a[..31], &aad_b[..31]);
+    }
+
+    #[test]
+    fn aad_vault_indices_blob_distinct_from_search_index_blob() {
+        // LOAD-BEARING: vault.indices (structured metadata) and vault.search
+        // (BM25 full-text) are separate blob families. The AAD role strings
+        // "vault-indices-blob" vs "search-index-blob" must differ so neither
+        // blob can ever AEAD-verify under the other's AAD — the one-AAD-per-
+        // family guarantee that mirrors one-magic-per-family (§10.3).
+        let id: [u8; 16] = [0x00; 16];
+        let indices_aad = aad_vault_indices_blob(&id);
+        let search_aad = aad_search_index_blob(&id);
+        assert_ne!(indices_aad, search_aad);
+        // Also distinct from prefs and workspace.
+        assert_ne!(indices_aad, aad_prefs_blob(&id));
+        assert_ne!(indices_aad, aad_workspace_blob(&id));
+    }
+
+    #[test]
     fn aad_vault_items_key_wrap_default_matches_pinned_hex() {
         // Hand-derived: prefix (10) + version (1) + items_key_id (16) = 27 bytes.
         let items_key_id: [u8; 16] = [
@@ -1123,13 +1218,14 @@ mod tests {
     /// Run with:
     /// `cargo test -p protocol --lib emit_ctx_aead_vectors_for_paste -- --ignored`
     ///
-    /// 13 cases pin (per MYND-68 / D3; +`aad_search_index_blob` MYND-29;
-    /// +`aad_workspace_blob` MYND-254):
-    /// - 8 `aad_canonical_bytes`: one per pub `aad_*` builder
+    /// 14 cases pin (per MYND-68 / D3; +`aad_search_index_blob` MYND-29;
+    /// +`aad_workspace_blob` MYND-254; +`aad_vault_indices_blob` MYND-271):
+    /// - 9 `aad_canonical_bytes`: one per pub `aad_*` builder
     ///   (`aad_password_wrap`, `aad_recovery_wrap`,
     ///   `aad_vault_items_key_wrap`, `aad_note_item_key_wrap`,
     ///   `aad_note_content_encrypt`, `aad_prefs_blob`,
-    ///   `aad_search_index_blob`, `aad_workspace_blob`). Pins each
+    ///   `aad_search_index_blob`, `aad_workspace_blob`,
+    ///   `aad_vault_indices_blob`). Pins each
     ///   builder's canonical AAD byte assembly independently of any AEAD
     ///   invocation — drift in §5.2 AAD construction surfaces here without
     ///   requiring a downstream AEAD test to fire.
@@ -1234,6 +1330,7 @@ mod tests {
         let aad_pb = aad_prefs_blob(&account_number_hash);
         let aad_sib = aad_search_index_blob(&account_number_hash);
         let aad_wsb = aad_workspace_blob(&account_number_hash);
+        let aad_vib = aad_vault_indices_blob(&account_number_hash);
 
         let key_hex = hex_lower(&key);
         let nonce_a_hex = hex_lower(&nonce_a);
@@ -1246,7 +1343,7 @@ mod tests {
         dump.push_str("  \"schema\": \"ctx-aead\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §5.1 + §5.2 + §6.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::aead_seal_ctx + protocol::aead_open_ctx byte mapping (XChaCha20-Poly1305 + CTX commitment outer per Chan & Rogaway 2022) AND each of the 8 pub aad_* builder functions' canonical byte assembly. 13 cases: 8 aad_canonical_bytes (one per builder) + 2 encrypt (short empty-AAD + medium content-AAD plaintext) + 1 decrypt_ok (round-trip) + 2 decrypt_aead_fail (tag-tamper + AAD-tamper). Cases generated by `cargo test -p protocol --lib emit_ctx_aead_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::aead_seal_ctx + protocol::aead_open_ctx byte mapping (XChaCha20-Poly1305 + CTX commitment outer per Chan & Rogaway 2022) AND each of the 9 pub aad_* builder functions' canonical byte assembly. 14 cases: 9 aad_canonical_bytes (one per builder) + 2 encrypt (short empty-AAD + medium content-AAD plaintext) + 1 decrypt_ok (round-trip) + 2 decrypt_aead_fail (tag-tamper + AAD-tamper). Cases generated by `cargo test -p protocol --lib emit_ctx_aead_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // Helper: emit aad_canonical_bytes case.
@@ -1392,7 +1489,18 @@ mod tests {
             true,
         );
 
-        // 9: encrypt-short-empty-aad
+        // 9: aad_vault_indices_blob
+        emit_aad(
+            &mut dump,
+            "aad-vault-indices-blob",
+            "Canonical bytes from aad_vault_indices_blob with account_number_hash = 0x12×16 (MYND-271, §9.8). Pins the 47-byte vault.indices AAD: 'myne.v0.1|' prefix (10) + version byte (1) + length-prefixed UTF-8 role 'vault-indices-blob' (2+18) + account_number_hash (16). Same shape as aad_prefs_blob / aad_search_index_blob / aad_workspace_blob but a distinct 18-byte role string — domain-separates the structured-metadata index from the other vault singletons. LOAD-BEARING: the AAD role 'vault-indices-blob' is DISTINCT from 'search-index-blob' (vault.indices vs vault.search are separate blob families) AND from the HKDF KEK role 'vault-indices-key' (hkdf-sha256 vectors); all are different load-bearing constants.",
+            "aad_vault_indices_blob",
+            &account_hash_lines,
+            &aad_vib,
+            true,
+        );
+
+        // 10: encrypt-short-empty-aad
         dump.push_str("    {\n");
         dump.push_str("      \"vector_id\": \"ctx-aead/v0.1/encrypt-short-empty-aad\",\n");
         dump.push_str(&alloc::format!(
@@ -1550,7 +1658,7 @@ mod tests {
 
     /// Vector generator for the `aad-construction` companion category.
     /// `#[ignore]`-gated — emits ready-to-copy JSON to
-    /// `/tmp/myne_aad_construction_vectors.json`. For each of the 8 pub
+    /// `/tmp/myne_aad_construction_vectors.json`. For each of the 9 pub
     /// `aad_*` builders it pins the full AAD bytes (as `ctx-aead` does)
     /// **plus** the per-call-site framing decomposition: a segment list
     /// breaking the AAD into `aad_prefix` / `protocol_version` /
@@ -1602,6 +1710,7 @@ mod tests {
         let aad_prefs = aad_prefs_blob(&account_number_hash);
         let aad_search = aad_search_index_blob(&account_number_hash);
         let aad_workspace = aad_workspace_blob(&account_number_hash);
+        let aad_indices = aad_vault_indices_blob(&account_number_hash);
         let aad_content = aad_note_content_encrypt(&items_key_id, &note_uuid);
 
         let kdf_params_json = alloc::format!(
@@ -1626,7 +1735,7 @@ mod tests {
         dump.push_str("  \"schema\": \"aad-construction\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §5.2\",\n");
-        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for every pub aad_* builder (protocol/src/aead.rs). Pins the full AAD bytes (as ctx-aead does) PLUS the structural segment breakdown — aad_prefix (myne.v0.1|) / protocol_version / u16-be length prefix / role_label / bound parameters — with byte offsets. Complements ctx-aead's aad_canonical_bytes cases (which pin only the total bytes) by making the assembly structure verifiable. 8 cases, one per builder. Cases generated by `cargo test -p protocol --lib emit_aad_construction_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for every pub aad_* builder (protocol/src/aead.rs). Pins the full AAD bytes (as ctx-aead does) PLUS the structural segment breakdown — aad_prefix (myne.v0.1|) / protocol_version / u16-be length prefix / role_label / bound parameters — with byte offsets. Complements ctx-aead's aad_canonical_bytes cases (which pin only the total bytes) by making the assembly structure verifiable. 9 cases, one per builder. Cases generated by `cargo test -p protocol --lib emit_aad_construction_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         let emit_case = |dump: &mut String,
@@ -1781,6 +1890,21 @@ mod tests {
                 ("protocol_version", 1),
                 ("role_length_be16", 2),
                 ("role_label", 14),
+                ("account_number_hash", 16),
+            ],
+            &account_hash_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_vault_indices_blob",
+            "AAD bound into the AEAD encryption of the vault.indices structured-metadata blob (§9.8, MYND-271). Same shape as aad_prefs_blob / aad_search_index_blob / aad_workspace_blob with the distinct role 'vault-indices-blob' (18 bytes) — domain-separates the structured-metadata index from vault.search (a separate blob family) and the other vault singletons so none AEAD-verifies under another's key/AAD.",
+            &aad_indices,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 18),
                 ("account_number_hash", 16),
             ],
             &account_hash_json,

@@ -167,10 +167,12 @@ fn read_header_nonce(path: &Path) -> Option<[u8; MYN_CONTENT_NONCE_LEN]> {
 
 /// Build the on-disk staleness manifest (`note_id → content_nonce`) by
 /// scanning every `.myn` header in `notes_dir` — the decryption-free
-/// staleness signal diffed against the persisted manifest. An unreadable
+/// staleness signal diffed against the persisted manifest. `pub(crate)` so the
+/// `vault-indices` plugin's MYI1 persistence (MYND-271) reuses the identical
+/// scan rather than duplicating it. An unreadable
 /// dir yields an empty manifest (treated as "no notes" — hydrate then drops
 /// everything from a loaded blob, persist writes an empty snapshot).
-fn scan_on_disk_manifest(notes_dir: &Path) -> NonceManifest {
+pub(crate) fn scan_on_disk_manifest(notes_dir: &Path) -> NonceManifest {
     let mut manifest = NonceManifest::new();
     let Ok(ids) = enumerate_notes_dir(notes_dir) else {
         return manifest;

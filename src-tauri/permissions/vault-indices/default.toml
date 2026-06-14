@@ -24,6 +24,10 @@ permissions = [
   "allow-vault-indices-backlink-candidates",
   "allow-vault-indices-by-tag",
   "allow-vault-indices-tag-tree",
+  "allow-vault-indices-note-properties",
+  "allow-vault-indices-property-values",
+  "allow-vault-indices-persist",
+  "allow-vault-indices-hydrate",
 ]
 
 [[permission]]
@@ -65,3 +69,23 @@ commands.allow = ["vault_indices_by_tag"]
 identifier = "allow-vault-indices-tag-tree"
 description = "Allow invoking vault-indices:vault_indices_tag_tree (Slot::Unlocked-gated read of the full tag tree — nodes with direct + subtree counts and a deterministic display, derived from the stored exact folded tags)."
 commands.allow = ["vault_indices_tag_tree"]
+
+[[permission]]
+identifier = "allow-vault-indices-note-properties"
+description = "Allow invoking vault-indices:vault_indices_note_properties (Slot::Unlocked-gated read of a note's typed frontmatter properties — the opaque pre-typed values TS stored on apply, §3.6.4 / MYND-271; pure accessor, type-aware filter/sort happens TS-side, no expression eval). Returns per-note property metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters."
+commands.allow = ["vault_indices_note_properties"]
+
+[[permission]]
+identifier = "allow-vault-indices-property-values"
+description = "Allow invoking vault-indices:vault_indices_property_values (Slot::Unlocked-gated vault-wide by-key property accessor — (noteId, entry) for every note carrying a key, the query engine's primitive; comparison + filtering happen TS-side, no expression eval in Rust). Returns vault-wide property metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["vault_indices_property_values"]
+
+[[permission]]
+identifier = "allow-vault-indices-persist"
+description = "Allow invoking vault-indices:vault_indices_persist (Slot::Unlocked-gated write of the encrypted vault.indices / MYI1 blob — the at-rest projection of the in-RAM index, §9.8 / MYND-271 Task 8; snapshot + freshly-scanned nonce manifest, AEAD-sealed under vault-indices-key, atomic_write). Best-effort; writes vault-internal ciphertext only. Main-window-only, same invariant as the prefs setters."
+commands.allow = ["vault_indices_persist"]
+
+[[permission]]
+identifier = "allow-vault-indices-hydrate"
+description = "Allow invoking vault-indices:vault_indices_hydrate (Slot::Unlocked-gated load of the vault.indices / MYI1 blob as the unlock fast path — populates the store with unchanged-note records, drops deleted, and returns the stale note ids for TS to re-apply, §9.8.4 Build-B reconcile; absent/undecodable/stale → full rebuild). Returns vault-wide stale-id list (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters."
+commands.allow = ["vault_indices_hydrate"]

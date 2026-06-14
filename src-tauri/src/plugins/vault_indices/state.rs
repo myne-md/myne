@@ -143,6 +143,73 @@ impl TagEntry {
     }
 }
 
+/// A coerced scalar property value (Task 7 / MYND-271) — the type tag + the
+/// canonical normalized string, both produced TS-side per `markdown-dialect.md`
+/// §3.6.4. The element shape of a `list` property. Rust stores these opaquely;
+/// it never parses YAML nor interprets the type (Build-B, TB9). serde camelCase.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyScalar {
+    /// `"string"` | `"number"` | `"date"` | `"checkbox"` — a closed TS-side
+    /// type tag (a structural literal, NOT plaintext, so not zeroized).
+    pub r#type: String,
+    /// The canonical normalized value (plaintext-derived → zeroized on clear).
+    pub value: String,
+}
+
+impl PropertyScalar {
+    fn zeroize_in_place(&mut self) {
+        self.value.zeroize();
+    }
+}
+
+/// One typed frontmatter property (Task 7 / MYND-271): an arbitrary `key` plus
+/// either a scalar (`value` set, `elements` `None`) or a `list` (`elements`
+/// set, `value` `None`). The opaque pre-typed shape TS sends on `apply`; Rust
+/// stores + returns it verbatim, with **no evaluatable-expression hook ever**
+/// (storage/accessor only — mirrors the closed-registry discipline of
+/// `protocol::template`). All string content is plaintext-derived. serde
+/// camelCase, mirroring the TS `PropertyEntry`.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyEntry {
+    /// The arbitrary frontmatter key (plaintext-derived → zeroized on clear).
+    pub key: String,
+    /// `"string"` | `"number"` | `"date"` | `"checkbox"` | `"list"`.
+    pub r#type: String,
+    /// The normalized scalar value — present for a scalar property, `None` for
+    /// a `list`. `#[serde(default)]` (NOT `skip_serializing_if`): TS sends only
+    /// the variant's field, so the absent one must default to `None` on
+    /// deserialize; `skip_serializing_if` is deliberately omitted because the
+    /// MYI1 snapshot serializes through **postcard** (a non-self-describing
+    /// positional format — a conditionally-skipped field would shift every
+    /// later field on decode). The cosmetic cost is a `value: null` in the
+    /// JSON for a list entry (and vice-versa), which the TS consumer tolerates.
+    #[serde(default)]
+    pub value: Option<String>,
+    /// The per-element coerced scalars — present for a `list`, `None` for a
+    /// scalar. `#[serde(default)]` only (see `value` for the no-`skip` postcard
+    /// rationale).
+    #[serde(default)]
+    pub elements: Option<Vec<PropertyScalar>>,
+}
+
+impl PropertyEntry {
+    fn zeroize_in_place(&mut self) {
+        // The key is a frontmatter key NAME — plaintext-derived (AS3/AS4).
+        self.key.zeroize();
+        if let Some(v) = self.value.as_mut() {
+            v.zeroize();
+        }
+        if let Some(els) = self.elements.as_mut() {
+            for e in els.iter_mut() {
+                e.zeroize_in_place();
+            }
+            els.clear();
+        }
+    }
+}
+
 /// Per-note record in the index.
 ///
 /// Holds the note's `title` + `folder` (the inputs the TS resolver —
@@ -150,7 +217,7 @@ impl TagEntry {
 /// reverse `uuid → title-key` lookup the backlink candidate query uses in
 /// Task 3), its per-occurrence outbound wikilink `edges` (Task 2), and its
 /// `tags` (Task 4). All string content is plaintext-derived.
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoteRecord {
     /// The note's `title:` (frontmatter or first-H1 derived), if any.
     pub title: Option<String>,
@@ -167,6 +234,10 @@ pub struct NoteRecord {
     /// The note's tags — inline `#tags` ∪ frontmatter `tags:`, deduped by
     /// `folded` TS-side before apply (Task 4).
     pub tags: Vec<TagEntry>,
+    /// The note's typed frontmatter properties (Task 7 / MYND-271) — every
+    /// arbitrary key coerced TS-side per §3.6.4. Opaque pre-typed values; Rust
+    /// stores + returns them without interpretation. Plaintext-derived.
+    pub properties: Vec<PropertyEntry>,
 }
 
 impl NoteRecord {
@@ -189,6 +260,10 @@ impl NoteRecord {
             tag.zeroize_in_place();
         }
         self.tags.clear();
+        for property in self.properties.iter_mut() {
+            property.zeroize_in_place();
+        }
+        self.properties.clear();
     }
 }
 
@@ -274,6 +349,67 @@ impl VaultIndicesState {
             .lock()
             .ok()
             .and_then(|idx| idx.notes.get(note_id).cloned())
+    }
+
+    /// Snapshot the whole index as a sorted `note_id → NoteRecord` map (Task 8
+    /// / MYND-271 — the MYI1 persistence projection). `BTreeMap` for a
+    /// deterministic serialization order. Empty on a poisoned lock. The caller
+    /// pairs this with a freshly-scanned `content_nonce` manifest and encrypts
+    /// it into the `vault.indices` blob.
+    pub fn snapshot(&self) -> std::collections::BTreeMap<String, NoteRecord> {
+        self.inner
+            .lock()
+            .map(|idx| {
+                idx.notes
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Replace the entire in-RAM index with `records` (Task 8 — the unlock
+    /// fast-path load from `vault.indices`). Zeroizes the prior contents first
+    /// (this only runs at unlock when the index is freshly empty, but the wipe
+    /// keeps the invariant that no stale plaintext-derived bytes linger).
+    /// No-op on a poisoned lock.
+    pub fn bulk_replace(&self, records: std::collections::BTreeMap<String, NoteRecord>) {
+        if let Ok(mut idx) = self.inner.lock() {
+            idx.zeroize_in_place();
+            idx.notes = records.into_iter().collect();
+        }
+    }
+
+    /// Clone a note's typed frontmatter properties out (Task 7 / MYND-271).
+    /// Empty when the note is absent / propertyless / on a poisoned lock. The
+    /// query-engine sub-feature consumes these for filter/sort; **all type-aware
+    /// comparison happens TS-side** — this is a pure accessor with no
+    /// evaluatable-expression hook.
+    pub fn note_properties(&self, note_id: &str) -> Vec<PropertyEntry> {
+        self.inner
+            .lock()
+            .ok()
+            .and_then(|idx| idx.notes.get(note_id).map(|r| r.properties.clone()))
+            .unwrap_or_default()
+    }
+
+    /// Vault-wide by-key accessor (Task 7 / MYND-271): `(note_id, entry)` for
+    /// every note carrying a property named `key`. The query engine's primitive
+    /// — it compares/filters the returned values TS-side (no comparison logic,
+    /// and NO expression evaluation, lives here). Empty on a poisoned lock.
+    pub fn property_values(&self, key: &str) -> Vec<(String, PropertyEntry)> {
+        let Ok(idx) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (id, record) in idx.notes.iter() {
+            for entry in &record.properties {
+                if entry.key == key {
+                    out.push((id.clone(), entry.clone()));
+                }
+            }
+        }
+        out
     }
 
     /// Clone a note's raw outbound wikilink edges out (Task 2). Empty when
@@ -698,5 +834,120 @@ mod tests {
         state.clear();
         assert_eq!(state.note_count(), 0);
         assert!(state.note_record("a").is_none());
+    }
+
+    // ---- Task 7: typed properties --------------------------------------
+
+    fn scalar(ty: &str, value: &str) -> PropertyScalar {
+        PropertyScalar {
+            r#type: ty.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    fn prop(key: &str, ty: &str, value: &str) -> PropertyEntry {
+        PropertyEntry {
+            key: key.to_string(),
+            r#type: ty.to_string(),
+            value: Some(value.to_string()),
+            elements: None,
+        }
+    }
+
+    #[test]
+    fn note_properties_round_trip_scalar_and_list() {
+        let state = VaultIndicesState::default();
+        let mut r = rec("Alpha", None);
+        r.properties = vec![
+            prop("status", "string", "in-progress"),
+            prop("rating", "number", "4"),
+            PropertyEntry {
+                key: "tags".to_string(),
+                r#type: "list".to_string(),
+                value: None,
+                elements: Some(vec![scalar("string", "a"), scalar("number", "1")]),
+            },
+        ];
+        state.apply("a", r);
+
+        let props = state.note_properties("a");
+        assert_eq!(props.len(), 3);
+        assert_eq!(props[0], prop("status", "string", "in-progress"));
+        assert_eq!(props[1], prop("rating", "number", "4"));
+        assert_eq!(props[2].r#type, "list");
+        let els = props[2].elements.as_ref().expect("list elements");
+        assert_eq!(els.len(), 2);
+        assert_eq!(els[0], scalar("string", "a"));
+        assert_eq!(els[1], scalar("number", "1"));
+    }
+
+    #[test]
+    fn note_properties_empty_when_absent_or_propertyless() {
+        let state = VaultIndicesState::default();
+        state.apply("a", rec("Alpha", None)); // no properties
+        assert!(state.note_properties("a").is_empty());
+        assert!(state.note_properties("missing").is_empty());
+    }
+
+    #[test]
+    fn property_values_collects_the_key_across_notes() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.properties = vec![
+            prop("status", "string", "todo"),
+            prop("rating", "number", "5"),
+        ];
+        let mut b = rec("Beta", None);
+        b.properties = vec![prop("status", "string", "done")];
+        let c = rec("Gamma", None); // no status
+        state.apply("a", a);
+        state.apply("b", b);
+        state.apply("c", c);
+
+        let mut got: Vec<(String, String)> = state
+            .property_values("status")
+            .into_iter()
+            .map(|(id, e)| (id, e.value.unwrap_or_default()))
+            .collect();
+        got.sort();
+        assert_eq!(
+            got,
+            vec![
+                ("a".to_string(), "todo".to_string()),
+                ("b".to_string(), "done".to_string()),
+            ]
+        );
+        assert!(state.property_values("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn apply_replace_overwrites_stale_properties() {
+        let state = VaultIndicesState::default();
+        let mut v1 = rec("Alpha", None);
+        v1.properties = vec![prop("status", "string", "todo")];
+        state.apply("a", v1);
+        // Re-apply with a different property set — the prior one must not linger.
+        let mut v2 = rec("Alpha", None);
+        v2.properties = vec![
+            prop("status", "string", "done"),
+            prop("due", "date", "2026-06-14"),
+        ];
+        state.apply("a", v2);
+
+        let props = state.note_properties("a");
+        assert_eq!(props.len(), 2);
+        assert_eq!(props[0], prop("status", "string", "done"));
+        assert_eq!(props[1], prop("due", "date", "2026-06-14"));
+    }
+
+    #[test]
+    fn clear_wipes_properties() {
+        let state = VaultIndicesState::default();
+        let mut r = rec("Alpha", None);
+        r.properties = vec![prop("status", "string", "secret-value")];
+        state.apply("a", r);
+        state.clear();
+        assert!(state.note_properties("a").is_empty());
+        assert!(state.property_values("status").is_empty());
     }
 }
