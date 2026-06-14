@@ -2,7 +2,7 @@
 //
 // AttachmentsLibrary per-item tests (MYND-164 second polish round):
 //   - Fix 2: each tile/row exposes a single ⋮ (more-vertical) menu whose items
-//     are exactly Preview · Rename · Delete — rendered via a portal.
+//     are Preview (renderable only) · Export · Rename · Delete — via a portal.
 //   - Fix 3: the standalone "insert into current note" action is fully gone
 //     (no Insert button, no arrow-right affordance on any tile).
 //   - Fix 6: only ONE "used in notes" popover is open at a time — opening a
@@ -98,7 +98,7 @@ describe("AttachmentsLibrary per-item ⋮ menu (Fix 2 + Fix 3)", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("opens a Preview · Rename · Delete menu (portal) on ⋮ click", async () => {
+  it("opens a Preview · Export · Rename · Delete menu (portal) on ⋮ click", async () => {
     mockedCatalog.mockResolvedValue([ENTRY_A]);
     renderLibrary();
     await waitFor(() => expect(screen.getByText("alpha.png")).toBeTruthy());
@@ -109,7 +109,8 @@ describe("AttachmentsLibrary per-item ⋮ menu (Fix 2 + Fix 3)", () => {
     const items = within(menu)
       .getAllByRole("menuitem")
       .map((el) => el.textContent);
-    expect(items).toEqual(["Preview", "Rename", "Delete"]);
+    // Image entry → previewable → Preview present; Export available for all.
+    expect(items).toEqual(["Preview", "Export", "Rename", "Delete"]);
   });
 
   it("Preview opens the shared lightbox with the attachment URL", async () => {
@@ -124,6 +125,7 @@ describe("AttachmentsLibrary per-item ⋮ menu (Fix 2 + Fix 3)", () => {
       url: `attachment://${ENTRY_A.id}`,
       alt: "alpha.png",
       kind: "image",
+      id: ENTRY_A.id,
     });
   });
 
@@ -216,7 +218,29 @@ describe("AttachmentsLibrary PDF tile preview → scrollable reader (MYND-164)",
       url: `attachment://${PDF_ENTRY.id}`,
       alt: "report.pdf",
       kind: "pdf",
+      id: PDF_ENTRY.id,
     });
+  });
+
+  it("omits Preview for a non-renderable (octet-stream) file, keeping Export", async () => {
+    // MYND-173: a generic file falls back to the editor file-card and is NOT
+    // previewable; the library menu drops Preview but still offers Export.
+    const generic: CatalogEntry = {
+      id: "c".repeat(64),
+      content_type: "application/octet-stream",
+      filename: "notes.docx",
+      size: 4096,
+      created_at: 1_700_000_000,
+    };
+    mockedCatalog.mockResolvedValue([generic]);
+    renderLibrary();
+    await waitFor(() => expect(screen.getByText("notes.docx")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Attachment actions"));
+    const items = within(screen.getByRole("menu"))
+      .getAllByRole("menuitem")
+      .map((el) => el.textContent);
+    expect(items).toEqual(["Export", "Rename", "Delete"]);
   });
 });
 

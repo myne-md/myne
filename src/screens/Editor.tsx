@@ -111,6 +111,7 @@ import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
+import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
 import { CenterViewProvider, type CenterView } from "./centerView";
 import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
 import { PaneTree } from "../notes/components/PaneTree";
@@ -603,6 +604,17 @@ function EditorChrome({
     }
     setCenterView("editor");
   }, [ctx.selectedId]);
+
+  // MYND-173: the generic file-card's "Reveal in library" action fires a window
+  // event (the card lives in a CM6 widget, outside React). Open the attachments
+  // library in response. Select-by-id within the library is deferred (PRD open
+  // question) — this opens the library unfocused, which is the sanctioned
+  // first-cut fallback.
+  useEffect(() => {
+    const onReveal = () => setCenterView("attachments");
+    window.addEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
+    return () => window.removeEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
+  }, []);
 
   // MYND-166 selection bridges — two one-way syncs that never loop
   // (A only fires for a note open in NO pane; B only mirrors):

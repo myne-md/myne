@@ -80,6 +80,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,
+            // MYND-173: export one attachment's decrypted bytes to a
+            // user-chosen destination (Save As). Type-agnostic — the
+            // generic file-card's Export action and the image/PDF Save-As
+            // affordance both call it. TB3 user-initiated-egress exception.
+            commands::attachment_export,
             // MYND-171: the unused-attachment query behind the "Clean
             // unused attachments" review dialog — catalog entries with zero
             // live note references, computed authoritatively (decrypts every

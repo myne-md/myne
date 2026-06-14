@@ -17,6 +17,7 @@
 
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 import { mountPdfScroller } from "./pdf-reader";
+import { exportAttachment } from "./fileCardActions";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -57,6 +58,9 @@ export interface LightboxOptions {
   /** Content kind. "image" (default — existing callers) shows an `<img>`;
    *  "pdf" mounts the scrollable multi-page reader. */
   readonly kind?: "image" | "pdf";
+  /** The attachment-id. When present, an Export (Save As) button appears in the
+   *  lightbox chrome (the vault-wide export affordance, MYND-173). */
+  readonly id?: string;
 }
 
 let activeBackdrop: HTMLDivElement | null = null;
@@ -123,6 +127,26 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     img.src = opts.url;
     img.alt = opts.alt;
     backdrop.appendChild(img);
+  }
+
+  // Vault-wide Export (Save As) affordance (MYND-173): present whenever the
+  // caller supplies the attachment-id. Pinned next to the close button. Clicking
+  // opens the native save dialog (host-side decrypt + write); the lightbox stays
+  // open behind it.
+  if (opts.id !== undefined) {
+    const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
+    exportBtn.className = "cm-attach-lightbox-export";
+    exportBtn.setAttribute("data-testid", "attachment-lightbox.export");
+    exportBtn.setAttribute("aria-label", "Export attachment");
+    exportBtn.title = "Export";
+    exportBtn.textContent = "Export";
+    const exportId = opts.id;
+    exportBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void exportAttachment(exportId, opts.alt);
+    });
+    backdrop.appendChild(exportBtn);
   }
 
   // Explicit close affordance, in addition to Esc / backdrop-click. Pinned to

@@ -251,6 +251,64 @@ const CSS = `
   outline: 2px solid rgba(255, 255, 255, 0.7);
   outline-offset: 2px;
 }
+
+/* Vault-wide Export (Save As) affordance pinned left of the close button. */
+.cm-attach-lightbox-export {
+  position: fixed;
+  top: var(--space-4, 14px);
+  right: calc(var(--space-4, 14px) + 40px);
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-2, 6px);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.cm-attach-lightbox-export:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.cm-attach-lightbox-export:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* Generic file-card overflow menu (MYND-173). Body-mounted (portaled out of
+   the editor so .cm-scroller can't clip it) + positioned with fixed coords in
+   JS, so it lives here in the global stylesheet rather than the .cm-editor
+   theme. */
+.cm-attachment-file-card-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  box-shadow: var(--shadow-2, 0 4px 12px rgba(0, 0, 0, 0.08));
+}
+.cm-attachment-file-card-menuitem {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: var(--fg-1, #1a1a17);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: var(--radius-1, 4px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cm-attachment-file-card-menuitem:hover {
+  background-color: var(--paper-2, #f3f1eb);
+}
 `;
 
 export function ensureAttachmentInsertStyles(): void {

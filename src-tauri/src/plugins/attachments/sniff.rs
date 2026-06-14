@@ -3,10 +3,18 @@
 //!
 //! A tiny, dependency-free sniffer. The v0.1 allowlist is the raster
 //! image set (PNG / JPEG / GIF / WebP), SVG, and PDF — the union of
-//! what the editor renders inline and the library can preview. Anything
-//! outside this set is rejected at the import door (`attachment_import`)
-//! and is never emitted as a served content-type by the `attachment://`
-//! handler.
+//! what the editor renders inline and the library can preview. This set
+//! governs what the `attachment://` handler is permitted to SERVE; it is
+//! never emitted for anything outside the set.
+//!
+//! Since MYND-173 the allowlist no longer gates IMPORT. `attachment_import`
+//! accepts arbitrary bytes; a type the sniffer does not recognize is
+//! stored as an opaque `application/octet-stream` attachment that renders
+//! in the editor as an export-only file-card and is never served inline.
+//! The render allowlist is therefore a *serve-time* authority, not an
+//! import gate — the XSS-defense invariant lives entirely on the serve
+//! path (re-sniff + octet-stream fallback), where a `.png`-renamed binary
+//! still cannot become a scriptable served resource.
 //!
 //! ## Why a hand-rolled sniffer (no `infer` / `tree_magic` dep)
 //!
@@ -21,9 +29,9 @@
 //! ## Two call sites, one authority
 //!
 //! - **Import** ([`super::commands::attachment_import`]): sniff the
-//!   bytes the user pasted / dropped / picked; reject if the sniff
-//!   returns [`None`] (unsupported) so a `.exe` renamed `.png` never
-//!   enters the vault.
+//!   bytes the user pasted / dropped / picked to classify renderables;
+//!   a [`None`] sniff is stored as `application/octet-stream` (an
+//!   export-only file-card), not rejected (MYND-173).
 //! - **Serve** (`attachment://` handler in `lib.rs`): re-sniff the
 //!   DECRYPTED bytes and emit ONLY the sniffed allowlisted type — never
 //!   the catalog's stored `content_type` hint, and never `text/html`

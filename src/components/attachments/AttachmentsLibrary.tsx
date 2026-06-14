@@ -41,6 +41,7 @@ import { attachmentUrl } from "../../notes/attachmentRef";
 import { referencingNotes } from "../../notes/attachmentRefs";
 import { useSelectedNote, type NoteId } from "../../notes/sidebarState";
 import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
+import { exportAttachment } from "../../editor/attachments/fileCardActions";
 import { Icon } from "../primitives/Icon";
 import { Button } from "../primitives/Button";
 import { Select, type SelectOption } from "../primitives/Select";
@@ -244,6 +245,8 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // is open" — lifted out of each tile so opening one closes any other (only
   // one popover open at a time across the whole library).
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  // Single-open ⋮ action menu — opening one row's menu closes any other.
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
   // Delete flow: the target entry + its (already-fetched) referencing notes.
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -335,7 +338,14 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       url: attachmentUrl(entry.id),
       alt: entry.filename,
       kind: kindOf(entry.content_type) === "pdf" ? "pdf" : "image",
+      id: entry.id,
     });
+  }, []);
+
+  // Export (Save As) — the shared host-side action, available for every type
+  // (the library counterpart of the editor file-card / lightbox Export; MYND-173).
+  const handleExport = useCallback((entry: CatalogEntry) => {
+    void exportAttachment(entry.id, entry.filename);
   }, []);
 
   const handleRenameCommit = useCallback(
@@ -435,8 +445,16 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     onRenameCommit: (name) => void handleRenameCommit(entry.id, name),
     onRenameCancel: () => setRenamingId(null),
     onPreview: () => handlePreview(entry),
+    onExport: () => handleExport(entry),
     onDelete: () => void openDeleteDialog(entry),
     onJump: handleJump,
+    // A non-renderable (octet-stream / "other") attachment has no inline
+    // preview — same fallback as the editor file-card; Preview is hidden.
+    previewable: kindOf(entry.content_type) !== "other",
+    actionMenuOpen: openActionMenuId === entry.id,
+    onToggleActionMenu: () =>
+      setOpenActionMenuId((cur) => (cur === entry.id ? null : entry.id)),
+    onCloseActionMenu: () => setOpenActionMenuId(null),
   });
 
   return (
@@ -657,8 +675,19 @@ interface ItemActionProps {
   onRenameCancel: () => void;
   /** Open the shared lightbox preview of this attachment (Fix 2/4). */
   onPreview: () => void;
+  /** Export (Save As) this attachment's decrypted bytes (MYND-173). */
+  onExport: () => void;
   onDelete: () => void;
   onJump: (id: NoteId) => void;
+  /** Whether this attachment can be previewed inline (image/PDF). A generic
+   *  (octet-stream) file cannot — the ⋮ menu omits Preview for it (MYND-173). */
+  previewable: boolean;
+  /** Whether THIS row's ⋮ action menu is the one open (single-open). */
+  actionMenuOpen: boolean;
+  /** Toggle this row's ⋮ action menu (closing any other). */
+  onToggleActionMenu: () => void;
+  /** Force-close this row's ⋮ action menu (outside-click / Esc / select). */
+  onCloseActionMenu: () => void;
 }
 
 /** Inline editable filename — Enter commits, Esc cancels, blur commits. */
@@ -836,14 +865,19 @@ function AttachmentActionMenu({
   );
 
   // Anchor below the trigger, right-aligned to it (clamped into the viewport).
+  // Space-aware: flip above the trigger when there isn't room below (estimated
+  // from the item count, since the menu isn't measured until after this pass).
   useLayoutEffect(() => {
     const el = anchorRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const width = 160;
     const left = Math.min(r.right - width, window.innerWidth - width - 8);
-    setCoords({ top: r.bottom + 4, left: Math.max(8, left) });
-  }, [anchorRef]);
+    const estHeight = items.length * 34 + 8;
+    const openUp = r.bottom + estHeight + 8 > window.innerHeight;
+    const top = openUp ? Math.max(8, r.top - estHeight - 4) : r.bottom + 4;
+    setCoords({ top, left: Math.max(8, left) });
+  }, [anchorRef, items.length]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -930,20 +964,38 @@ const MENU_TRIGGER_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
-/** The ⋮ button + its dropdown. Menu items: Preview · Rename · Delete. */
+/**
+ * The ⋮ button + its dropdown. Items: (Preview ·) Export · Rename · Delete —
+ * Preview is omitted for a non-`previewable` (generic / octet-stream) file,
+ * which has no inline rendering. The open state is OWNED BY THE LIBRARY and
+ * threaded via `open`/`onToggle`/`onClose`, so opening one row's menu closes
+ * any other (single-open — the `UsedInNotes` popover pattern).
+ */
 function ItemMenu({
+  open,
+  onToggle,
+  onClose,
+  previewable,
   onPreview,
+  onExport,
   onStartRename,
   onDelete,
 }: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  previewable: boolean;
   onPreview: () => void;
+  onExport: () => void;
   onStartRename: () => void;
   onDelete: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const items: ItemMenuEntry[] = [
-    { id: "preview", label: "Preview", onSelect: onPreview },
+    ...(previewable
+      ? [{ id: "preview", label: "Preview", onSelect: onPreview }]
+      : []),
+    { id: "export", label: "Export", onSelect: onExport },
     { id: "rename", label: "Rename", onSelect: onStartRename },
     { id: "delete", label: "Delete", destructive: true, onSelect: onDelete },
   ];
@@ -959,7 +1011,7 @@ function ItemMenu({
         style={MENU_TRIGGER_STYLE}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((v) => !v);
+          onToggle();
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = "var(--paper-3)";
@@ -974,7 +1026,7 @@ function ItemMenu({
         <AttachmentActionMenu
           items={items}
           anchorRef={triggerRef}
-          onClose={() => setOpen(false)}
+          onClose={onClose}
         />
       )}
     </>
@@ -1124,8 +1176,13 @@ function AttachmentTile({
   onRenameCommit,
   onRenameCancel,
   onPreview,
+  onExport,
   onDelete,
   onJump,
+  previewable,
+  actionMenuOpen,
+  onToggleActionMenu,
+  onCloseActionMenu,
 }: ItemActionProps) {
   return (
     <div style={TILE_STYLE}>
@@ -1167,7 +1224,12 @@ function AttachmentTile({
             onJump={onJump}
           />
           <ItemMenu
+            open={actionMenuOpen}
+            onToggle={onToggleActionMenu}
+            onClose={onCloseActionMenu}
+            previewable={previewable}
             onPreview={onPreview}
+            onExport={onExport}
             onStartRename={onStartRename}
             onDelete={onDelete}
           />
@@ -1225,8 +1287,13 @@ function AttachmentListRow({
   onRenameCommit,
   onRenameCancel,
   onPreview,
+  onExport,
   onDelete,
   onJump,
+  previewable,
+  actionMenuOpen,
+  onToggleActionMenu,
+  onCloseActionMenu,
 }: ItemActionProps) {
   return (
     <div style={LIST_ROW_STYLE}>
@@ -1274,7 +1341,12 @@ function AttachmentListRow({
       />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
         <ItemMenu
+          open={actionMenuOpen}
+          onToggle={onToggleActionMenu}
+          onClose={onCloseActionMenu}
+          previewable={previewable}
           onPreview={onPreview}
+          onExport={onExport}
           onStartRename={onStartRename}
           onDelete={onDelete}
         />
