@@ -251,6 +251,150 @@ const CSS = `
   outline: 2px solid rgba(255, 255, 255, 0.7);
   outline-offset: 2px;
 }
+
+/* Vault-wide Export (Save As) affordance pinned left of the close button. */
+.cm-attach-lightbox-export {
+  position: fixed;
+  top: var(--space-4, 14px);
+  right: calc(var(--space-4, 14px) + 40px);
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-2, 6px);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.cm-attach-lightbox-export:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.cm-attach-lightbox-export:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* Generic file-card overflow menu (MYND-173). Body-mounted (portaled out of
+   the editor so .cm-scroller can't clip it) + positioned with fixed coords in
+   JS, so it lives here in the global stylesheet rather than the .cm-editor
+   theme. */
+.cm-attachment-file-card-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  box-shadow: var(--shadow-2, 0 4px 12px rgba(0, 0, 0, 0.08));
+}
+.cm-attachment-file-card-menuitem {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: var(--fg-1, #1a1a17);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: var(--radius-1, 4px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cm-attachment-file-card-menuitem:hover {
+  background-color: var(--paper-2, #f3f1eb);
+}
+
+/* Voice-note recording bar (MYND-259). Body-mounted floating surface (escapes
+   the .cm-editor theme scope, like the toast/menu above). */
+.cm-voice-rec {
+  position: fixed;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-3, 8px);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.12));
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--fg-1, #1a1a17);
+  z-index: 1250;
+}
+.cm-voice-rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background-color: var(--danger, #b3261e);
+  animation: cm-voice-rec-pulse 1.2s ease-in-out infinite;
+}
+@keyframes cm-voice-rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-voice-rec-dot { animation: none; }
+}
+.cm-voice-rec-time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-2, #44423d);
+  min-width: 34px;
+}
+.cm-voice-rec-meter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+}
+/* Each bar's height is set live in JS (a rolling waveform of recent input),
+   so the meter reads as voice waves, not a left-to-right fill. */
+.cm-voice-rec-bar {
+  width: 3px;
+  height: 12%;
+  border-radius: 999px;
+  background-color: var(--accent, #2c4a7a);
+  transition: height 90ms ease-out;
+}
+.cm-voice-rec-warning {
+  font-size: 12px;
+  color: var(--warning, #8a6d1f);
+}
+.cm-voice-rec-stop,
+.cm-voice-rec-cancel {
+  appearance: none;
+  border: 1px solid var(--line-2, #c8c7c1);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: var(--radius-1, 4px);
+  cursor: pointer;
+  color: var(--fg-1, #1a1a17);
+}
+.cm-voice-rec-stop {
+  border-color: var(--danger, #b3261e);
+  background-color: var(--danger, #b3261e);
+  color: #fff;
+  font-weight: 600;
+}
+.cm-voice-rec-stop:disabled,
+.cm-voice-rec-cancel:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.cm-voice-rec-cancel:hover {
+  background-color: var(--paper-2, #f3f1eb);
+}
 `;
 
 export function ensureAttachmentInsertStyles(): void {

@@ -8,6 +8,7 @@
 // automatically. No JS-side light/dark mode tracking.
 
 import { EditorView } from "@codemirror/view";
+import { tagChipCmTheme } from "../notes/tagPillToken";
 
 export const myneTheme = EditorView.theme({
   "&": {
@@ -23,6 +24,10 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-content": {
     caretColor: "var(--accent, #2c4a7a)",
+    // Fill the scroller so the empty area below the text is part of the editable
+    // surface — clicking there reaches the editor (and lands the caret on the
+    // last line, MYND-162 feedback) instead of being dead space.
+    minHeight: "100%",
   },
   "&.cm-focused": {
     outline: "none",
@@ -315,10 +320,15 @@ export const myneTheme = EditorView.theme({
   // their own box without breaking the editor's vertical layout.
   // `padding` (not `margin`) for the same height-map reason as the math/mermaid
   // block widgets above — an outer margin here drifts every click below the table.
+  // inline-block + max-width:100% + overflow-x:auto is the proven "scroll inside
+  // the widget, never the editor" pattern (mirrors `.cm-mermaid-card`). A `block`
+  // here fills the editor width and lets a wide table overflow into the editor's
+  // own horizontal scroller (MYND-162 feedback: "only the table should scroll").
   ".cm-table-scroll": {
-    display: "block",
+    display: "inline-block",
     overflowX: "auto",
     maxWidth: "100%",
+    verticalAlign: "top",
     padding: "10px 0",
   },
   ".cm-table": {
@@ -334,15 +344,191 @@ export const myneTheme = EditorView.theme({
     padding: "6px 12px",
     textAlign: "left",
     verticalAlign: "top",
+    position: "relative", // anchors the per-cell affordances
+    // Default (empty 2×2) columns are evenly sized at this width; long content
+    // does NOT wrap — the cell widens and the whole table scrolls horizontally
+    // (`.cm-table-scroll`), Obsidian-style, instead of growing a tall wall.
+    minWidth: "6em",
+    whiteSpace: "nowrap",
   },
+  // Borders-only table (MYND-162 feedback): no header fill, no zebra striping —
+  // cells share the editor background; the header reads as distinct by its bold
+  // weight alone. A single surface colour + the cell borders, Obsidian-style.
   ".cm-table th": {
     fontWeight: "700",
-    backgroundColor: "var(--paper-3, #ece9e2)",
   },
-  // Zebra striping on alternating body rows (PRD story 8). Lighter than the
-  // header fill so the header still reads as distinct.
-  ".cm-table-row-alt td": {
-    backgroundColor: "var(--paper-2, #f3f1eb)",
+  // Rendered cell content lives in its own block span so a cell keeps the exact
+  // same box whether it shows rendered marks or the edit input (no resize on
+  // focus, MYND-162 feedback). `display: block` so the input's `width: 100%`
+  // fills the cell without the input's intrinsic size widening it.
+  ".cm-table-cell-text": {
+    display: "block",
+    minWidth: "0",
+  },
+  // An empty cell reserves a full line so it matches the height of filled cells
+  // (otherwise an empty row collapses thinner — MYND-162 feedback).
+  ".cm-table-cell-text:empty::before": {
+    content: '"\\00a0"', // non-breaking space
+  },
+  // In-place cell editor (decorations/table.ts, MYND-162). A bare field that
+  // fills its cell and inherits the cell's font / colour / left alignment, so the
+  // active cell reads as the same grid — no border or focus ring, just a caret.
+  ".cm-table-cell-input": {
+    width: "100%",
+    minWidth: "0", // never widen the cell from the input's intrinsic size
+    boxSizing: "border-box",
+    border: "none",
+    outline: "none",
+    boxShadow: "none",
+    appearance: "none",
+    WebkitAppearance: "none",
+    padding: "0",
+    margin: "0",
+    background: "transparent",
+    font: "inherit",
+    lineHeight: "inherit",
+    color: "inherit",
+    textAlign: "inherit", // matches the rendered cell (left by default)
+    caretColor: "var(--accent, #2c4a7a)",
+  },
+  // Visible text selection inside a cell editor — the editor's default
+  // `::selection` is `--paper-3`, identical to a header cell's fill, so a
+  // selection there is invisible. Use a tinted accent instead.
+  ".cm-table-cell-input::selection": {
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 28%, transparent)",
+  },
+  // While editing, the rendered text is replaced by the input and the host's
+  // min-width is pinned (in JS) to the frozen rendered width so the cell can't
+  // collapse. `min-height` keeps an EMPTY cell one line tall so the caret shows.
+  ".cm-table-cell-text.cm-table-cell-editing": {
+    minHeight: "1.5em",
+  },
+
+  // Editable-table affordances (decorations/table.ts, MYND-162). The editable
+  // table is a CSS GRID so the add-row / add-column controls are grid cells
+  // ATTACHED to the table (and scroll WITH it), Obsidian-style — not floaters at
+  // the viewport edge. `contain: inline-size` keeps the (possibly very wide) table
+  // from growing `.cm-content`, so only this box scrolls, never the editor. The
+  // left/top padding forms the reorder gutters. Every affordance reveals only when
+  // its OWN edge zone is hovered (not on whole-table hover).
+  ".cm-table-block": {
+    position: "relative",
+    display: "block",
+    maxWidth: "100%",
+  },
+  ".cm-table-editable": {
+    position: "relative",
+    display: "grid",
+    gridTemplateColumns: "auto auto",
+    gridTemplateRows: "auto auto",
+    gridTemplateAreas: '"tbl addcol" "addrow ."',
+    justifyContent: "start",
+    gap: "3px",
+    width: "100%",
+    boxSizing: "border-box",
+    contain: "inline-size",
+    overflowX: "auto",
+    overflowY: "visible",
+    padding: "16px 0 0 34px", // top = column-handle gutter, left = row-handle gutter
+  },
+  ".cm-table-editable > table": { gridArea: "tbl" },
+  // Reorder handles — bare six-dot grips in the gutter (no chip), revealed only
+  // when their own edge strip is hovered: the strip above a column / left of a row.
+  ".cm-table-handle": {
+    position: "absolute",
+    boxSizing: "border-box",
+    background: "transparent",
+    color: "var(--fg-3, #888)",
+    cursor: "grab",
+    opacity: "0",
+    transition: "opacity 0.1s ease, color 0.1s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "15px",
+    lineHeight: "1",
+    userSelect: "none",
+  },
+  ".cm-table-handle::before": { content: '"\\283f"' }, // ⠿ six-dot grip
+  ".cm-table-handle-col": { top: "-16px", left: "0", right: "0", height: "16px" },
+  ".cm-table-handle-row": { left: "-16px", top: "0", bottom: "0", width: "16px" },
+  ".cm-table-handle-col:hover, .cm-table-handle-row:hover": { opacity: "1" },
+  ".cm-table-handle:hover": { color: "var(--accent, #2c4a7a)" },
+  ".cm-table-handle:active": {
+    cursor: "grabbing",
+    color: "var(--accent, #2c4a7a)",
+    opacity: "1",
+  },
+  // Delete controls — a small × in the gutter beside each reorder handle, revealed
+  // together with it (delete-column above the column, delete-row left of the row).
+  ".cm-table-del": {
+    position: "absolute",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "15px",
+    height: "15px",
+    border: "none",
+    borderRadius: "3px",
+    background: "transparent",
+    color: "var(--fg-3, #888)",
+    cursor: "pointer",
+    fontSize: "13px",
+    lineHeight: "1",
+    padding: "0",
+    opacity: "0",
+    transition: "opacity 0.1s ease, color 0.1s ease",
+  },
+  ".cm-table-del::before": { content: '"\\00d7"' }, // ×
+  ".cm-table-del:hover": { color: "var(--extended-color-red-600, #c0392b)" },
+  ".cm-table-del-col": { top: "-16px", right: "0" },
+  ".cm-table-del-row": { left: "-31px", top: "50%", transform: "translateY(-50%)" },
+  ".cm-table-handle-col:hover ~ .cm-table-del-col, .cm-table-del-col:hover": {
+    opacity: "1",
+  },
+  ".cm-table-handle-row:hover ~ .cm-table-del-row, .cm-table-del-row:hover": {
+    opacity: "1",
+  },
+  // Add controls — grid cells attached to the table's right (full height) / bottom
+  // (full width); each reveals only when its own edge zone is hovered.
+  ".cm-table-add-col, .cm-table-add-row": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
+    border: "1px solid var(--line-1, #d8d5cc)",
+    background: "transparent",
+    color: "var(--fg-3, #888)",
+    cursor: "pointer",
+    padding: "0",
+    fontSize: "15px",
+    lineHeight: "1",
+    opacity: "0",
+    transition: "opacity 0.1s ease, background 0.1s ease, color 0.1s ease",
+  },
+  ".cm-table-add-col::before, .cm-table-add-row::before": { content: '"+"' },
+  ".cm-table-add-col": { gridArea: "addcol", width: "18px", borderRadius: "0 4px 4px 0" },
+  ".cm-table-add-row": { gridArea: "addrow", height: "18px", borderRadius: "0 0 4px 4px" },
+  // Revealed via JS (`.cm-revealed`, see revealOnHover) so it never sticks open
+  // after a widget rebuild; the accent highlight is on real `:hover`.
+  ".cm-table-add-col.cm-revealed, .cm-table-add-row.cm-revealed": {
+    opacity: "1",
+  },
+  ".cm-table-add-col:hover, .cm-table-add-row:hover": {
+    background: "var(--accent-soft, #e8edf5)",
+    color: "var(--accent, #2c4a7a)",
+  },
+  // Drag-reorder feedback (#13): the row/column being dragged is tinted so you
+  // see what you're moving; the drop target shows an insertion-edge LINE (left
+  // edge for a column, top edge for a row) marking where it will land — not a box.
+  ".cm-table-dragging": {
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 14%, transparent)",
+  },
+  ".cm-table-drop-col": {
+    boxShadow: "inset 2px 0 0 0 var(--accent, #2c4a7a)",
+  },
+  ".cm-table-drop-row": {
+    boxShadow: "inset 0 2px 0 0 var(--accent, #2c4a7a)",
   },
 
   // Fenced code-block card from decorations/fenced-code.ts (MYND-154). Built
@@ -568,6 +754,38 @@ export const myneTheme = EditorView.theme({
   ".cm-wikilink-chip-embed": {
     backgroundColor: "var(--paper-3, #ece9e2)",
     fontStyle: "italic",
+  },
+  // §5.3 broken-link styling (MYND-37/83): a wikilink whose target matches no
+  // note — faded foreground, italic, no underline. Same chip surface as the
+  // default (background/border/radius unchanged) so only the text reads "dead".
+  ".cm-wikilink-chip-broken": {
+    color: "var(--fg-3)",
+    fontStyle: "italic",
+    textDecoration: "none",
+  },
+  // Inline #tag chip (tag-system #3 / MYND-45) — derived from the single TS-5
+  // tag-pill token (`src/notes/tagPillToken.ts`) so the editor chip and the
+  // browser's pill rows never drift. Pill shape distinguishes a tag from a
+  // wikilink chip.
+  ...tagChipCmTheme(),
+  // Generic tooltip surface (Myne design system). CM6's default `.cm-tooltip`
+  // is a light box that clashes with the dark editor; bring it onto the paper
+  // surface. The autocomplete tooltip's 2-class rule (`.cm-tooltip-autocomplete`)
+  // is more specific and still wins for itself.
+  ".cm-tooltip": {
+    backgroundColor: "var(--paper, #faf8f3)",
+    border: "1px solid var(--line-2, #c8c7c1)",
+    borderRadius: "var(--radius-2, 6px)",
+    boxShadow: "var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08))",
+    color: "var(--fg-1)",
+  },
+  // §6.2 hover-tooltip R1 content — the inner text on the `.cm-tooltip` surface.
+  ".cm-wikilink-hover": {
+    padding: "4px 8px",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    color: "var(--fg-2)",
+    whiteSpace: "nowrap",
   },
 
   // Footnotes (MYND-153) — decorations/footnote.ts.
@@ -896,6 +1114,215 @@ export const myneTheme = EditorView.theme({
     color: "var(--danger, #8a2a23)",
   },
   ".cm-attachment-tombstone-label": {
+    whiteSpace: "nowrap",
+  },
+
+  // Generic file-card (MYND-173): a non-renderable attachment (.docx/.zip/…)
+  // shown as a compact, export-only card — icon + filename + "type · size" +
+  // a "⋯" overflow menu. Inline-flex like the image/PDF frame, with a hairline
+  // card surface (the generic file has nothing to render onto the surface).
+  ".cm-attachment-file-card": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "10px",
+    maxWidth: "360px",
+    padding: "8px 10px",
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    borderRadius: "var(--radius-2, 6px)",
+    verticalAlign: "top",
+    margin: "var(--space-3, 10px) 0",
+    fontFamily: "var(--font-sans)",
+    cursor: "default",
+  },
+  ".cm-attachment-file-card-icon": {
+    flexShrink: 0,
+    color: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-attachment-file-card-text": {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1px",
+    minWidth: 0, // allow the name to ellipsis instead of overflowing the card
+    flex: "1 1 auto",
+  },
+  ".cm-attachment-file-card-name": {
+    color: "var(--fg-1, #1a1a17)",
+    fontSize: "13px",
+    fontWeight: "500",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  ".cm-attachment-file-card-meta": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "11px",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  ".cm-attachment-file-card-menuwrap": {
+    position: "relative",
+    flexShrink: 0,
+  },
+  ".cm-attachment-file-card-menubtn": {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    color: "var(--fg-3, #6b6a64)",
+    cursor: "pointer",
+    fontSize: "16px",
+    lineHeight: "1",
+    padding: "2px 4px",
+    borderRadius: "var(--radius-1, 4px)",
+  },
+  ".cm-attachment-file-card-menubtn:hover": {
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    color: "var(--fg-1, #1a1a17)",
+  },
+  // NOTE: the overflow MENU + its items are body-mounted (portaled out of the
+  // editor so `.cm-scroller` can't clip them), so their styles live in the
+  // global stylesheet (`attachments/styles.ts`), not this `.cm-editor`-scoped
+  // theme. Only the in-card button (`-menubtn`) is styled here.
+
+  // Inline audio player (voice notes, MYND-259) — a sibling of the file-card,
+  // same surface tokens. Circular accent play button, a seek track (the
+  // waveform overlays this track in a later slice), and a mono time readout.
+  ".cm-attachment-audio": {
+    display: "inline-flex",
+    flexDirection: "column",
+    gap: "6px",
+    width: "360px",
+    maxWidth: "360px",
+    padding: "10px 12px",
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    borderRadius: "var(--radius-2, 6px)",
+    verticalAlign: "top",
+    margin: "var(--space-3, 10px) 0",
+    fontFamily: "var(--font-sans)",
+    cursor: "default",
+  },
+  // Filename — top-left of the card.
+  ".cm-attachment-audio-name": {
+    fontSize: "12px",
+    fontWeight: "500",
+    color: "var(--fg-1, #1a1a17)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    maxWidth: "100%",
+  },
+  // Middle row: play button + waveform + overflow, vertically centered.
+  ".cm-attachment-audio-row": {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  ".cm-attachment-audio-play": {
+    flexShrink: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "32px",
+    height: "32px",
+    padding: "0",
+    border: "none",
+    borderRadius: "999px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+    color: "var(--accent-on, #fff)",
+    cursor: "pointer",
+  },
+  ".cm-attachment-audio-play svg": {
+    width: "15px",
+    height: "15px",
+  },
+  ".cm-attachment-audio-play:hover": {
+    opacity: "0.9",
+  },
+  ".cm-attachment-audio-play:focus-visible": {
+    outline: "2px solid var(--accent, #2c4a7a)",
+    outlineOffset: "2px",
+  },
+  ".cm-attachment-audio-track": {
+    position: "relative",
+    flex: "1 1 auto",
+    minWidth: 0,
+    height: "30px",
+    borderRadius: "var(--radius-1, 4px)",
+    cursor: "pointer",
+  },
+  // Thin centered baseline (the unplayed seek rail), shown until the waveform
+  // bars decode in.
+  ".cm-attachment-audio-track::before": {
+    content: '""',
+    position: "absolute",
+    left: "0",
+    right: "0",
+    top: "50%",
+    height: "3px",
+    transform: "translateY(-50%)",
+    borderRadius: "999px",
+    backgroundColor: "var(--line-2, #c8c7c1)",
+  },
+  ".cm-attachment-audio-track:focus-visible": {
+    outline: "2px solid var(--accent, #2c4a7a)",
+    outlineOffset: "3px",
+  },
+  ".cm-attachment-audio-fill": {
+    position: "absolute",
+    left: "0",
+    top: "50%",
+    height: "3px",
+    transform: "translateY(-50%)",
+    width: "0%",
+    borderRadius: "999px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+  },
+  ".cm-attachment-audio-thumb": {
+    position: "absolute",
+    top: "50%",
+    left: "0%",
+    width: "10px",
+    height: "10px",
+    marginLeft: "-5px",
+    borderRadius: "999px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+    transform: "translateY(-50%)",
+    boxShadow: "var(--shadow-1, 0 1px 3px rgba(0,0,0,0.08))",
+  },
+  // Waveform mode: the bar grid replaces the plain rail (hide baseline + fill).
+  ".cm-attachment-audio-wave": {
+    position: "absolute",
+    inset: "0",
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+  },
+  ".cm-attachment-audio-track-wave::before": {
+    display: "none",
+  },
+  ".cm-attachment-audio-track-wave .cm-attachment-audio-fill": {
+    display: "none",
+  },
+  ".cm-attachment-audio-track-wave .cm-attachment-audio-thumb": {
+    display: "none",
+  },
+  ".cm-attachment-audio-bar": {
+    flex: "1 1 0",
+    minWidth: "2px",
+    height: "30%",
+    borderRadius: "1px",
+    backgroundColor: "var(--line-3, #a8a7a1)",
+    alignSelf: "center",
+  },
+  ".cm-attachment-audio-bar-played": {
+    backgroundColor: "var(--accent, #2c4a7a)",
+  },
+  ".cm-attachment-audio-time": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "11px",
+    color: "var(--fg-3, #6b6a64)",
     whiteSpace: "nowrap",
   },
 

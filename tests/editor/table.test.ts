@@ -22,6 +22,7 @@ import {
   splitTableRow,
   tableDecorations,
 } from "../../src/editor/decorations/table";
+import { slashCommands } from "../../src/editor/slash/commands";
 
 describe("parseDelimiterAlign", () => {
   it("maps :--- / :--: / ---: / --- to left / center / right / default", () => {
@@ -138,6 +139,238 @@ describe("GFM table widget (jsdom)", () => {
     expect(mounted.host.querySelector("table.cm-table")).toBeNull();
   });
 
+  it("renders inline marks in a blurred cell (story 3)", () => {
+    const doc = ["| a | b |", "|---|---|", "| **bold** | [x](https://e.com) |", ""].join(
+      "\n",
+    );
+    mounted = mount(doc);
+    const cells = mounted.host.querySelectorAll(".cm-table tbody td");
+    expect(cells[0]!.querySelector("strong")?.textContent).toBe("bold");
+    expect(cells[1]!.querySelector("a.cm-link")?.getAttribute("data-cm-url")).toBe(
+      "https://e.com",
+    );
+  });
+
+  it("Tab commits the cell and moves the editor to the next cell (stories 4, 7)", async () => {
+    const doc = ["| a | b |", "|---|---|", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const cell0 = mounted.host.querySelectorAll(".cm-table tbody td")[0] as HTMLElement;
+    cell0.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const input = cell0.querySelector("input") as HTMLInputElement;
+    input.value = "X";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+
+    // Commit re-serialized the table to canonical form…
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| X | 2 |", ""].join("\n"),
+    );
+    // …and after the rebuild, focus lands in the next cell (1,1).
+    await new Promise((r) => setTimeout(r, 0));
+    const nextCellEl = mounted.host.querySelectorAll(".cm-table tbody td")[1] as HTMLElement;
+    const nextInput = nextCellEl.querySelector("input") as HTMLInputElement | null;
+    expect(nextInput).not.toBeNull();
+    expect(nextInput!.value).toBe("2");
+  });
+
+  it("Tab past the last cell appends a new row and focuses its first cell (story 6)", async () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const lastCell = mounted.host.querySelectorAll(".cm-table tbody td")[1] as HTMLElement;
+    lastCell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const input = lastCell.querySelector("input") as HTMLInputElement;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| 1 | 2 |", "|  |  |", ""].join("\n"),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    const bodyRows = mounted.host.querySelectorAll(".cm-table tbody tr");
+    expect(bodyRows.length).toBe(2);
+    const newCell = bodyRows[1]!.querySelector("td") as HTMLElement;
+    expect(newCell.querySelector("input")).not.toBeNull();
+  });
+
+  it("the add-column affordance appends a column (story 9)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const btn = mounted.host.querySelector('[data-testid="table.add-column"]')!;
+    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |  |", "| --- | --- | --- |", "| 1 | 2 |  |", ""].join("\n"),
+    );
+  });
+
+  it("the add-row affordance appends a row (story 10)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const btn = mounted.host.querySelector('[data-testid="table.add-row"]')!;
+    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| 1 | 2 |", "|  |  |", ""].join("\n"),
+    );
+  });
+
+  it("the per-header delete-column affordance removes that column (story 11)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const btn = mounted.host.querySelector(
+      '[data-testid="table.delete-column"][data-col="1"]',
+    )!;
+    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a |", "| --- |", "| 1 |", ""].join("\n"),
+    );
+  });
+
+  it("the top-left corner cell carries both a column and a row reorder handle (feedback)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const corner = mounted.host.querySelector('.cm-table thead th[data-col="0"]')!;
+    expect(corner.querySelector('[data-testid="table.reorder-column"]')).not.toBeNull();
+    expect(corner.querySelector('[data-testid="table.reorder-row"]')).not.toBeNull();
+  });
+
+  it("the per-row delete-row affordance removes that body row (story 11)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", "| 3 | 4 |", ""].join("\n");
+    mounted = mount(doc);
+    const btn = mounted.host.querySelector(
+      '[data-testid="table.delete-row"][data-row="1"]',
+    )!;
+    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| 3 | 4 |", ""].join("\n"),
+    );
+  });
+
+  it("affordance buttons do not pollute cell text content", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const firstBodyCell = mounted.host.querySelector(".cm-table tbody td")!;
+    // Cell (1,0) carries a delete-row button, but its text is just the content.
+    expect(firstBodyCell.textContent).toBe("1");
+  });
+
+  it("dragging a column grip reorders the column header + body together (story 12)", () => {
+    const doc = ["| a | b | c |", "| --- | --- | --- |", "| 1 | 2 | 3 |", ""].join("\n");
+    mounted = mount(doc);
+    const grip = mounted.host.querySelector(
+      '[data-testid="table.reorder-column"][data-col="0"]',
+    )!;
+    const targetTh = mounted.host.querySelectorAll(".cm-table thead th")[2]!;
+    grip.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    targetTh.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
+    // Column 0 ("a"/"1") moves to the end.
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| b | c | a |", "| --- | --- | --- |", "| 2 | 3 | 1 |", ""].join("\n"),
+    );
+  });
+
+  it("dragging a row grip reorders whole rows (story 13)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", "| 3 | 4 |", ""].join("\n");
+    mounted = mount(doc);
+    const grip = mounted.host.querySelector(
+      '[data-testid="table.reorder-row"][data-row="1"]',
+    )!;
+    const targetRowCell = mounted.host.querySelectorAll(".cm-table tbody tr")[1]!
+      .querySelector("td")!;
+    grip.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    targetRowCell.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| 3 | 4 |", "| 1 | 2 |", ""].join("\n"),
+    );
+  });
+
+  it("/table inserts a canonical empty 2×2 grid and focuses the first cell (story 15)", async () => {
+    mounted = mount("/table");
+    const cmd = slashCommands().find((c) => c.id === "table")!;
+    expect(cmd).toBeDefined();
+    cmd.apply(mounted.view, 0, "/table".length);
+
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["|  |  |", "| --- | --- |", "|  |  |", ""].join("\n"),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    const headerCell = mounted.host.querySelector(".cm-table thead th") as HTMLElement;
+    expect(headerCell.querySelector("input")).not.toBeNull();
+  });
+
+  it("carries the E2E data-testid pass on the grid, cells, and editing input (SYNC-8)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    expect(mounted.host.querySelector('[data-testid="table.grid"]')).not.toBeNull();
+    // Header cell (0,0) and body cell (1,1) addressable by row/col.
+    expect(
+      mounted.host.querySelector('[data-testid="table.cell"][data-row="0"][data-col="0"]'),
+    ).not.toBeNull();
+    const body11 = mounted.host.querySelector(
+      '[data-testid="table.cell"][data-row="1"][data-col="1"]',
+    ) as HTMLElement;
+    expect(body11).not.toBeNull();
+    body11.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(body11.querySelector('[data-testid="table.cell-input"]')).not.toBeNull();
+  });
+
+  it("/table inserts a blank-line-separated table so two tables never merge (feedback #7)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", "/table"].join("\n");
+    mounted = mount(doc);
+    const f = doc.indexOf("/table");
+    const cmd = slashCommands().find((c) => c.id === "table")!;
+    cmd.apply(mounted.view, f, f + "/table".length);
+    // A blank line now separates table 1's last row from the inserted table,
+    // so @lezer/markdown parses them as two tables, not one merged grid.
+    expect(mounted.view.state.doc.toString()).toContain("| 1 | 2 |\n\n|  |  |");
+  });
+
+  it("registers an editable table as an atomic range so the cursor can't enter its source (feedback #9)", () => {
+    const doc = ["before", "", "| a | b |", "| --- | --- |", "| 1 | 2 |", "", "after"].join(
+      "\n",
+    );
+    mounted = mount(doc);
+    forceParsing(mounted.view, doc.length, 5000);
+
+    const covers = (pos: number): boolean => {
+      let hit = false;
+      for (const fn of mounted!.view.state.facet(EditorView.atomicRanges)) {
+        fn(mounted!.view).between(pos, pos, (from, to) => {
+          if (from <= pos && pos < to) hit = true;
+        });
+      }
+      return hit;
+    };
+
+    expect(covers(doc.indexOf("| a | b |") + 3)).toBe(true); // inside the table → atomic
+    expect(covers(2)).toBe(false); // inside "before" → freely editable
+  });
+
+  it("typing on the blank line directly below a table is not absorbed into it (feedback #4)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    forceParsing(mounted.view, doc.length, 5000);
+    const blankLine = mounted.view.state.doc.line(4).from;
+    mounted.view.dispatch({
+      changes: { from: blankLine, insert: "x" },
+      selection: { anchor: blankLine + 1 },
+      userEvent: "input.type",
+    });
+    // The guard kept a blank line between the table and the typed text, so the
+    // table stays 3 rows and "x" is a separate paragraph below it.
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| 1 | 2 |", "", "x"].join("\n"),
+    );
+  });
+
+  it("clicking an occupied cell enters edit without selecting all (feedback)", () => {
+    const doc = ["| a | b |", "| --- | --- |", "| hello | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const cell = mounted.host.querySelectorAll(".cm-table tbody td")[0] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const input = cell.querySelector("input") as HTMLInputElement;
+    expect(input.value).toBe("hello");
+    // Caret at the end, nothing selected (selectionStart === selectionEnd === len).
+    expect(input.selectionStart).toBe(5);
+    expect(input.selectionEnd).toBe(5);
+  });
+
   it("inserts cell text via textContent — no HTML injection (TB2)", () => {
     const doc = ["| a | b |", "|---|---|", "| <b>x</b> | y |", ""].join("\n");
     mounted = mount(doc);
@@ -147,36 +380,80 @@ describe("GFM table widget (jsdom)", () => {
     expect(firstCell!.textContent).toBe("<b>x</b>");
   });
 
-  it("clicking a rendered row places the cursor on THAT row's source line, not the line below (story 10)", () => {
-    // Regression: a block-replace widget is atomic, so letting CM handle the
-    // click resolved it to the block boundary (the line below the table). The
-    // widget's own mousedown handler must dispatch a selection onto the
-    // clicked row's source line instead.
-    const doc = [
-      "| a | b |", // line 1 — header
-      "|---|---|", // line 2 — delimiter
-      "| 1 | 2 |", // line 3 — body row 0
-      "| 3 | 4 |", // line 4 — body row 1
-      "", //          line 5 — after the table
-    ].join("\n");
-    mounted = mount(doc);
-
-    const bodyRows = mounted.host.querySelectorAll(".cm-table tbody tr");
-    expect(bodyRows.length).toBe(2);
-    bodyRows[1]!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-
-    const head = mounted.view.state.selection.main.head;
-    const line = mounted.view.state.doc.lineAt(head).number;
-    expect(line).toBe(4); // the clicked body row, NOT line 5 (below the table)
-  });
-
-  it("clicking the header row places the cursor on the header source line", () => {
+  it("clicking a cell in a top-level table opens an inline editor seeded with the cell source (story 1)", () => {
     const doc = ["| a | b |", "|---|---|", "| 1 | 2 |", ""].join("\n");
     mounted = mount(doc);
-    const headerRow = mounted.host.querySelector(".cm-table thead tr");
-    headerRow!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    const head = mounted.view.state.selection.main.head;
-    expect(mounted.view.state.doc.lineAt(head).number).toBe(1);
+    const before = mounted.view.state.doc.toString();
+    const cell = mounted.host.querySelectorAll(".cm-table tbody td")[0] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    const input = cell.querySelector("input") as HTMLInputElement | null;
+    expect(input).not.toBeNull();
+    expect(input!.value).toBe("1");
+    // Editing is local to the field — no doc change until commit.
+    expect(mounted.view.state.doc.toString()).toBe(before);
+  });
+
+  it("editing a cell then blurring commits canonical source (stories 2, 7)", () => {
+    const doc = ["| a | b |", "|---|---|", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const cell = mounted.host.querySelectorAll(".cm-table tbody td")[0] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const input = cell.querySelector("input") as HTMLInputElement;
+    input.value = "hello";
+    input.dispatchEvent(new FocusEvent("blur"));
+
+    // The whole table re-serializes to canonical single-space form on commit.
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| hello | 2 |", ""].join("\n"),
+    );
+  });
+
+  it("Escape reverts a cell edit with no doc change (story 8)", () => {
+    const doc = ["| a | b |", "|---|---|", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const before = mounted.view.state.doc.toString();
+    const cell = mounted.host.querySelectorAll(".cm-table tbody td")[0] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const input = cell.querySelector("input") as HTMLInputElement;
+    input.value = "changed";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+
+    expect(mounted.view.state.doc.toString()).toBe(before);
+    expect(cell.querySelector("input")).toBeNull();
+    expect(cell.textContent).toBe("1");
+  });
+
+  it("committing an unchanged value on an already-canonical table makes no doc change", () => {
+    // No-op guard: commit dispatches only when the re-serialized form differs
+    // from the current source. On a canonical table an unchanged value matches,
+    // so nothing is written and the cell is restored.
+    const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
+    mounted = mount(doc);
+    const before = mounted.view.state.doc.toString();
+    const cell = mounted.host.querySelectorAll(".cm-table tbody td")[0] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const input = cell.querySelector("input") as HTMLInputElement;
+    input.dispatchEvent(new FocusEvent("blur")); // value unchanged
+
+    expect(mounted.view.state.doc.toString()).toBe(before);
+    expect(cell.querySelector("input")).toBeNull();
+  });
+
+  it("touching a cell on a non-canonical table reformats the whole table to canonical", () => {
+    // The always-reformat contract (grill Q2/B): committing any cell normalizes
+    // the entire table — a deliberate, documented departure from MYND-139's
+    // byte-stable round-trip.
+    const doc = ["|a|b|", "|---|---|", "|1|2|", ""].join("\n");
+    mounted = mount(doc);
+    const cell = mounted.host.querySelectorAll(".cm-table tbody td")[0] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const input = cell.querySelector("input") as HTMLInputElement;
+    input.dispatchEvent(new FocusEvent("blur")); // value unchanged, table not canonical
+
+    expect(mounted.view.state.doc.toString()).toBe(
+      ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n"),
+    );
   });
 
   it("unfocused editor renders the table as a grid even with the cursor inside it (story 13)", () => {
@@ -191,10 +468,12 @@ describe("GFM table widget (jsdom)", () => {
   });
 });
 
-// Reveal decision is a pure function of (state, focused) — tested directly so
-// it doesn't depend on flaky jsdom focus events. A view is mounted only to
-// force a complete parse; the focus argument is passed explicitly.
-describe("whole-table cursor reveal (buildTableDecorations)", () => {
+// Reveal gating is a pure function of (state, focused) — tested directly so it
+// doesn't depend on flaky jsdom focus events. A view is mounted only to force a
+// complete parse; the focus argument is passed explicitly. Editable (top-level)
+// tables are never revealed; nested (blockquote / list) tables keep the
+// whole-table cursor reveal as a safe read-only fallback.
+describe("reveal gating (buildTableDecorations)", () => {
   let view: EditorView | null = null;
   let host: HTMLElement | null = null;
 
@@ -220,34 +499,31 @@ describe("whole-table cursor reveal (buildTableDecorations)", () => {
   });
 
   const TABLE = ["| a | b |", "|---|---|", "| 1 | 2 |", "| 3 | 4 |", ""].join("\n");
+  // A blockquote-nested table — editable: false, so the reveal fallback applies.
+  const QUOTED = ["> | a | b |", "> |---|---|", "> | 1 | 2 |", "", "after", ""].join("\n");
 
-  it("renders (1 block decoration) when the selection is outside the table and focused", () => {
+  it("a top-level table is never revealed — 1 block decoration with the cursor outside", () => {
     const base = parsedState(TABLE);
     const state = base.update({ selection: { anchor: base.doc.length } }).state;
     expect(buildTableDecorations(state, true).size).toBe(1);
   });
 
-  it("reveals (0 decorations) when focused and the selection head is on a table line", () => {
+  it("a top-level table is never revealed even with the cursor on a table line + focused", () => {
     const base = parsedState(TABLE);
     const state = base.update({ selection: { anchor: 3 } }).state; // header row
+    expect(buildTableDecorations(state, true).size).toBe(1);
+  });
+
+  it("a nested (blockquote) table reveals when focused and the cursor is on a table line", () => {
+    const base = parsedState(QUOTED);
+    const state = base.update({ selection: { anchor: 5 } }).state; // inside the quoted header
     expect(buildTableDecorations(state, true).size).toBe(0);
   });
 
-  it("does NOT reveal when the selection is inside the table but the editor is unfocused (story 13)", () => {
-    const base = parsedState(TABLE);
-    const state = base.update({ selection: { anchor: 3 } }).state;
+  it("a nested table does NOT reveal when the editor is unfocused (story 13)", () => {
+    const base = parsedState(QUOTED);
+    const state = base.update({ selection: { anchor: 5 } }).state;
     expect(buildTableDecorations(state, false).size).toBe(1);
-  });
-
-  it("reveals only the table the cursor is in (two tables)", () => {
-    const doc =
-      ["| a | b |", "|---|---|", "| 1 | 2 |", "", "| c | d |", "|---|---|", "| 5 | 6 |", ""].join(
-        "\n",
-      );
-    const base = parsedState(doc);
-    const state = base.update({ selection: { anchor: 3 } }).state; // first table
-    // First table revealed, second still rendered → exactly 1 block decoration.
-    expect(buildTableDecorations(state, true).size).toBe(1);
   });
 });
 
@@ -305,7 +581,7 @@ describe("findTableEntry (arrow-into-table)", () => {
   });
 });
 
-describe("byte-stable round-trip (criterion 4 guard)", () => {
+describe("cursor movement never mutates the buffer", () => {
   let view: EditorView | null = null;
   let host: HTMLElement | null = null;
   afterEach(() => {
@@ -315,9 +591,9 @@ describe("byte-stable round-trip (criterion 4 guard)", () => {
     host = null;
   });
 
-  it("render → reveal → re-render leaves an irregular-padding table byte-identical", () => {
-    // Irregular padding + ragged widths + no spaces — the renderer must never
-    // normalize or re-pad. Nothing in the table code dispatches a doc change.
+  it("moving the cursor onto / off an irregular-padding table leaves it byte-identical", () => {
+    // Top-level tables render in place and never reveal — only an explicit cell
+    // commit re-serializes. Merely moving the cursor must not normalize/re-pad.
     const doc = ["|a|b|c|", "|:--|--:|---|", "| 1 |   |3|", "|x|", ""].join("\n");
     host = document.createElement("div");
     document.body.appendChild(host);

@@ -136,7 +136,7 @@ Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generaliza
 
 ### **attachment** &nbsp; 📋 *Protocol*
 
-An arbitrary file (image, SVG, or PDF in v0.1) stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). No remote URL is ever fetched; decrypted bytes never touch disk. See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
+An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
 
 ### **attachment-id** &nbsp; 📋 *Protocol*
 
@@ -144,11 +144,19 @@ The 32-byte content-addressed identifier of an [attachment](#attachment): `HMAC-
 
 ### **attachment://** &nbsp; 📋 *Protocol*
 
-The custom WebView protocol scheme that serves a decrypted [attachment](#attachment) to the editor/library. The Rust handler resolves `attachment://<id>`, decrypts the blob in memory, **re-sniffs** the content-type from the bytes and emits only an allowlisted type (`image/*` or `application/pdf`), and returns a full response — no plaintext ever written to disk, no `Range`/206 in v0.1. Unlock-gated and main-window-scoped (TB6); the WebView CSP blocks outbound network so a hostile note cannot exfiltrate a blob. (MYND-164)
+The custom WebView protocol scheme that serves a decrypted [attachment](#attachment) to the editor/library. The Rust handler resolves `attachment://<id>`, decrypts the blob in memory, **re-sniffs** the content-type from the bytes and emits only an allowlisted type (`image/*`, `application/pdf`, or `audio/wav` — voice notes, MYND-259), and returns a full response — no plaintext ever written to disk, no `Range`/206 in v0.1. Unlock-gated and main-window-scoped (TB6); the WebView CSP blocks outbound network so a hostile note cannot exfiltrate a blob. (MYND-164)
 
 ### **attachment_import** &nbsp; 📋 *Protocol*
 
-The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap and the raster/SVG/PDF allowlist at the door with a locked reject taxonomy (oversize / unsupported / locked). Unlock-gated, main-window-scoped. (MYND-164)
+The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap. Since MYND-173 it accepts **any file type** — a file the sniffer does not recognize is stored as `application/octet-stream` (not rejected); the locked reject taxonomy is now oversize / locked (the render allowlist is a serve-time authority on [attachment://](#attachment), not an import gate). Unlock-gated, main-window-scoped. (MYND-164; `decisions.md` 2026-06-14)
+
+### **attachment_export** &nbsp; 📋 *Protocol*
+
+The Tauri command that writes one [attachment](#attachment)'s **decrypted** bytes to a user-chosen destination — the export-only "use" path for a generic file, and the vault-wide Save-As for images/PDF (MYND-173). The frontend opens the native save dialog (the established export-suite convention) and passes the path + overwrite consent; the host decrypts the [`MYA1`](#mya1) blob in Rust memory and writes the plaintext via `atomic_write_unclobbered`, so it never re-enters the WebView. A deliberate user-initiated plaintext crossing of TB3 — exactly the "attachment files" egress already named in `threat-model.md` §3 / §5; it is one-shot and not a plaintext mode. Unlock-gated. See [export](#export). (`decisions.md` 2026-06-14)
+
+### **attachment file-card** &nbsp; 📦 *Product*
+
+The editor representation of a non-renderable (generic) [attachment](#attachment) — a `.docx`, `.zip`, `.txt`, etc. stored as `application/octet-stream`. Unlike an inline image/PDF, the file's content is **never** previewed; the form-C embed `![[att:<id>|filename]]` renders as a compact atomic card showing a file-type icon, the [`vault.attachments`](#vaultattachments) filename (the single source of truth — `Rename` edits it globally via `attachment_rename`, not the per-embed alias), a "type · size" line (the type label is derived from the filename extension TS-side, since the catalog stores only `octet-stream`), and a "⋯" overflow menu: Export (→ [attachment_export](#attachment_export)), Rename, Remove from note, Reveal in library. "Using" the file means exporting it. A missing id renders the shared [deleted-attachment tombstone](#deleted-attachment-tombstone). Inline preview of other types (docx/pptx/xlsx/text) is the separate follow-up MYND-268. (MYND-173; `decisions.md` 2026-06-14)
 
 ### **auto-lock on idle** &nbsp; 📦 *Product*
 
@@ -406,6 +414,12 @@ The two on-disk wrapped copies of `root_key` in `vault.meta`. Each is 32 bytes o
 
 Used in: `spec/protocol.md` §3.1, §9.3
 
+### **export** &nbsp; 📦 *Product*
+
+A one-shot, user-initiated operation that decrypts user content and writes it as ordinary **unencrypted** files to a destination the user explicitly chose via the OS file dialog — per-note markdown, the whole-vault markdown tree, attachment files, or a rendered PDF. Export is the portability path ("you walk away with your files", `vision.md`): the markdown forms write the stored plaintext **verbatim** (frontmatter included; the only sanctioned mutation is the attachments-mode embed rewrite, `markdown-dialect.md` §6). Terminology wall: an export is never a [vault backup file](#vault-backup-file) (that stays exactly as encrypted as the vault) and never a snapshot (version history). Threat-model framing: a deliberate plaintext crossing of TB3 under user authority — the artifact is outside Myne's protection from the moment it is written (`threat-model.md` §3 TB3, §5). There is no plaintext *mode*: no watch, mirror, or export-on-save exists.
+
+Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 2026-06-11 (export suite)
+
 ### **fall-to-rebuild** &nbsp; 📋 *Protocol*
 
 The fallback path for loading the [search index](#search-index) when the cached `vault.search` blob (`spec/protocol.md` §9.6) cannot be trusted or used — blob absent, magic / version mismatch, AEAD-verification failure, or an unreadable staleness manifest. Instead of incrementally reconciling the cached index against the notes, the client **rebuilds it from scratch** by decrypting every `.myn`. Rebuild always recovers the correct index, so `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more. The complement of the **incremental reconcile** happy path (re-index only the notes whose `content_nonce` changed) — fall-to-rebuild is the always-correct safety net beneath it (`decisions.md` 2026-05-31).
@@ -585,12 +599,12 @@ Used in: `spec/protocol.md` §3.3
 
 The set of words the spell checker suppresses without treating as correct
 elsewhere (MYND-266). v0.1 has a vault-wide ignore set, persisted (folded) in the
-encrypted `vault.dictionary` blob (§9.12), plus a RAM-only "ignore this session"
+encrypted `vault.dictionary` blob (§9.13), plus a RAM-only "ignore this session"
 set that is never written. Distinct from the **Personal dictionary**: ignoring a
 word silences its squiggle; adding a word to the personal dictionary asserts it
 is correctly spelled.
 
-Used in: `spec/protocol.md` §9.12; MYND-266.
+Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **KDF (Key Derivation Function)** &nbsp; 🏗️ *Construction*
 
@@ -827,13 +841,13 @@ Reference: RFC 8018.
 
 The user's own set of words the spell checker treats as correctly spelled
 (MYND-266) — names, project terms, coined words. AS3-Sensitive vocabulary,
-stored encrypted in the per-vault `vault.dictionary` blob (`MYD1`, §9.12),
+stored encrypted in the per-vault `vault.dictionary` blob (`MYD1`, §9.13),
 hydrated into RAM on unlock and zeroized on lock. "Add to dictionary" in the
 correction menu appends to it. Matching is case-insensitive (folded); storage is
 exact NFC. Distinct from the **Ignore list** (which suppresses without asserting
 correctness) and from the bundled read-only language dictionaries.
 
-Used in: `spec/protocol.md` §9.12; MYND-266.
+Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **Phase 1, Phase 2, Phase 3, Phase 4** &nbsp; 📦 *Product*
 
@@ -925,6 +939,12 @@ Used in: `spec/protocol.md` §3.1, §7
 A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
 
 Used in: `spec/markdown-dialect.md` §3.2, §5; `decisions.md` 2026-05-30
+
+### **rename journal** &nbsp; 📋 *Protocol*
+
+The empty `.rename-journal` marker file in a vault's notes directory that makes a [wikilink](#wikilink)-rename's multi-note rewrite **all-or-nothing**. A title rename rewrites the renamed note's own `.myn` blob plus every inbound `[[…]]`-bearing note; because a single per-blob atomic write is not collectively atomic across N blobs, the writer stages every updated blob to `<uuid>.myn.tmp`, writes the (content-free) marker, then commits every rename, then clears the marker. On the next vault-open — before the resolution index rebuilds — recovery rolls **forward** (marker present ⇒ rename all staged `.tmp` into place) or **back** (marker absent ⇒ delete orphan `.tmp`), so a crash mid-commit never leaves a half-renamed vault with broken title-keyed links. The marker carries no data (no UUIDs, no titles), is not a magic-byte format, and is excluded from backups; rolled-forward blobs are still AEAD/CTX-verified on read, so it adds no tamper surface. See also [wikilink](#wikilink), [wikilink chip](#wikilink-chip).
+
+Used in: `spec/protocol.md` §9.12, §9.11.3; `decisions.md` 2026-06-13
 
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 
@@ -1064,11 +1084,27 @@ Adversary class A10. Nation-state-class adversary with zero-day capabilities, su
 
 Used in: `threat-model.md` §1 (A10)
 
+### **stray attachment file** &nbsp; 📋 *Protocol*
+
+An [`MYA1`](#mya1) blob present on disk at `attachments/<attachment-id-hex>` whose id is **absent from the [`vault.attachments`](#vaultattachments) catalog** — a crash remnant from a "clean unused attachments" sweep interrupted between its catalog rewrite and the blob unlinks (the catalog-first ordering deletes the entry first). The unlock-time reconcile unlinks stray files (canonical 64-char lowercase-hex names only), but **never** a cataloged id — including a zero-reference [unused attachment](#unused-attachment) awaiting the user's explicit sweep — and skips entirely if the catalog is present-but-undecodable (no mass-delete on corruption). Distinct from an *unused* attachment, which is cataloged and user-visible. (MYND-171; `decisions.md` 2026-06-13)
+
 ### **supply-chain compromise** &nbsp; ⚠️ *Threat*
 
 Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships malicious code. Myne's mitigations are hash-pinned lockfiles, minimal direct-dependency surface, dependency-review at update time, and `cargo-vet`/`cargo-audit` in CI. Status: Best-effort — cannot fully defend against a determined attacker in the dependency graph, but the Tauri/Cargo dependency tree is materially smaller than Electron/npm would be.
 
 Used in: `threat-model.md` §1 (A8), §7
+
+### **tag browser** &nbsp; 📦 *Product*
+
+The modal surface for browsing + filtering notes by tag (tag-system / MYND-46). A palette-style carve-out launched from the command palette (`tags.show`) + a BottomBar affordance: a search field + an All/Any (AND/OR) toggle, the vault's tags as clickable chips (the whole chip toggles selection into the filter), and the matching note list directly below. Filtering goes through the single `by_tag` path (subtree-inclusive, trash-excluded, AND = intersection / OR = union); results are recency-sorted. Read-only over the in-RAM [tag index](#tag-index) — selection state is ephemeral, no new at-rest artefact. Completes MYND-200's blocked interactive surface.
+
+Used in: tag-system (MYND-46), [tag index](#tag-index)
+
+### **tag chip** &nbsp; 📦 *Product*
+
+The editor decoration that renders an inline `#tag` as a styled, clickable pill (tag-system / MYND-45). Purely visual — recognize-only / byte-stable (the underlying bytes are never rewritten, `spec/markdown-dialect.md` §3.7.7); cursor-aware (it reveals the raw text when the caret is inside, so a tag can be typed or edited). Clicking a chip opens the [tag browser](#tag-browser) filtered to that tag. Per SYNC-17 the chip ships ONLY together with the tag browser — never as a standalone editor-polish change (a clickable-looking tag with nowhere to go is a dead affordance). The same pill token styles both the editor chip and the browser's tag rows.
+
+Used in: tag-system (MYND-45), `spec/markdown-dialect.md` §3.7.7
 
 ### **tag index** &nbsp; 📦 *Product*
 
@@ -1087,7 +1123,7 @@ AS3-Sensitive). A word is correct if valid in **any** active-language dictionary
 v0.1 bundles 23 languages (en-US + 22 verified-loadable, AGPL-compatible dicts);
 Turkish is deferred (a spellbook flag-format incompatibility).
 
-Used in: `spec/protocol.md` §9.12; MYND-261…267.
+Used in: `spec/protocol.md` §9.13; MYND-261…267.
 
 ### **Suggestion (spell-check)** &nbsp; 📦 *Product*
 
@@ -1144,6 +1180,10 @@ Used in: `spec/markdown-dialect.md` §3.6.1, `decisions.md` 2026-06-03 + 2026-05
 A line in the system where the security model changes — what is trusted on one side is not trusted on the other. Myne catalogs nine boundaries (TB1–TB9). See `threat-model.md` §3 for the full table.
 
 Used in: `threat-model.md` §3
+
+### **unused attachment** &nbsp; 📋 *Protocol*
+
+An [attachment](#attachment) referenced by **zero live notes** — either orphaned (its referencing note(s) deleted) or never inserted (imported into the library but not yet embedded). It stays in the [`vault.attachments`](#vaultattachments) catalog and visible in the library (Myne is library-first; `protocol.md` §9.10 keeps metadata after note deletion); it is **never** auto-deleted. The only thing that removes it is the explicit user-triggered "Clean unused attachments" sweep, which recomputes the zero-reference set authoritatively (scanning every note, fail-closed) and cryptographically erases the confirmed set. Distinct from a [stray attachment file](#stray-attachment-file) (catalog-less crash remnant). (MYND-171; `decisions.md` 2026-06-13)
 
 ### **UUIDv4** &nbsp; 📋 *Protocol*
 
@@ -1272,6 +1312,10 @@ Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/sl
 The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext (a benchmark-gated `MYI1` encrypted-persistence blob is a deferred follow-up). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **voice note** &nbsp; 📦 *Product*
+
+A note audio clip embedded inline — either a recorded microphone capture or an attached audio file. Stored as an ordinary [attachment](#attachment) (an `audio/wav` [`MYA1`](#mya1) blob — **no new on-disk format**) referenced by the form-C embed `![[att:<id>|filename]]` and played by an inline custom waveform widget. Recording captures **natively in Rust via `cpal`** (not the WebView MediaRecorder, so PCM stays Rust-side + `Zeroize`-able), encodes to WAV/PCM at the device-native rate (mono, 16-bit), buffers in RAM only (never a plaintext temp file), and auto-finalizes at the 64 MiB cap into a seamless next clip. The mic is unlock-gated, gesture-driven, and aborted on lock / auto-lock. `audio/wav` joins the [`attachment://`](#attachment) serve allowlist + the sniffer (a `RIFF`…`WAVE` arm). (MYND-259; `decisions.md` 2026-06-14)
 
 ### **Vite** &nbsp; 🛠️ *Tooling*
 

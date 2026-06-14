@@ -102,9 +102,9 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Attachment blob magic | `MYA1` (files `attachments/<attachment-id-hex>`; §9.9) |
 | Attachments catalog magic | `MYC1` (file `vault.attachments`; §9.10) |
 | Vault backup container magic | `MYB1` (files `*.myne-backup`; §9.11) |
-| Personal-dictionary blob magic | `MYD1` (file `vault.dictionary`; §9.12) |
-| Subkey role string (personal-dictionary KEK) | `"personal-dictionary-key"` (HKDF context `"myne.v0.1 personal-dictionary-key"`; §9.12.3) |
-| AAD role string (personal-dictionary blob) | `"personal-dictionary-blob"` (length-prefixed; §9.12.3) |
+| Personal-dictionary blob magic | `MYD1` (file `vault.dictionary`; §9.13) |
+| Subkey role string (personal-dictionary KEK) | `"personal-dictionary-key"` (HKDF context `"myne.v0.1 personal-dictionary-key"`; §9.13.3) |
+| AAD role string (personal-dictionary blob) | `"personal-dictionary-blob"` (length-prefixed; §9.13.3) |
 | Protocol identifier string | `myne-protocol-v0.1` |
 | Account-number display prefix | `MY-` + five dash-separated 4-char Crockford groups (27-char display form, `account-number.md` §3; the old `MY-XXXX-XXXX-XXXX-XXXX-X` sketch was illustrative shorthand — the last group is 4 chars, ending in the Damm-32 check char) |
 | Damm-32 quasigroup table | frozen literal, `account-number.md` §4.2 — determines which 20-char strings are valid and which check char generation emits; changing it rejects already-distributed account numbers and breaks cross-impl validity agreement |

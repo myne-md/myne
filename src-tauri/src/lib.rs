@@ -1,7 +1,9 @@
 mod atomic_write;
 mod auto_lock;
 mod backup_container;
+mod export_naming;
 mod io_failure_kind;
+mod note_txn;
 mod paths;
 mod plugins;
 mod protocol_error_kind;
@@ -53,6 +55,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(plugins::backup::init())
+        .plugin(plugins::export::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
@@ -66,6 +69,7 @@ pub fn run() {
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::workspace::init())
+        .plugin(plugins::pdf_export::init())
         // MYND-262: offline spell-check engine (spellbook). Binds spell_check +
         // add/ignore commands; SpellState is managed in setup below.
         .plugin(spell::init())
@@ -154,6 +158,10 @@ pub fn run() {
             // `plugins::attachments::reconcile`) and wiped on lock alongside
             // the search index + VaultIndices.
             app.manage(plugins::attachments::AttachmentRefsState::default());
+            // MYND-259: voice-notes active-recording session singleton (holds
+            // at most one in-progress mic capture; only Send control handles —
+            // the cpal stream lives inside the capture thread).
+            app.manage(plugins::attachments::VoiceRecordState::default());
             // MYND-29 Task 7: periodic best-effort flush of the search index
             // to its encrypted `vault.search` blob while a vault is Unlocked
             // (no-op while locked). Bounds how much a hard quit / crash loses

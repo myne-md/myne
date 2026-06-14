@@ -2,7 +2,7 @@
 //!
 //! Bridges the encrypted `vault.dictionary` blob (`protocol::dictionary_blob`,
 //! MYD1) to the live [`SpellState`]: hydrate on unlock, persist on add/ignore,
-//! zeroize on lock — the `search_sync` residency discipline (§ 9.6.5 / § 9.12).
+//! zeroize on lock — the `search_sync` residency discipline (§ 9.6.5 / § 9.13).
 //!
 //! Split like the protocol crate's `_raw`/convenience pair: the **pure cores**
 //! (`persist_payload_to_dir` / `hydrate_payload_from_dir`) take the derived KEK
@@ -10,7 +10,7 @@
 //! the thin `*_with_dir` wrappers fetch `root_key`/hash from the unlocked
 //! `VaultRuntimeState` and derive the KEK (mirrors the proven `search_sync`
 //! wrappers). Any failure on read collapses to the empty dictionary
-//! (fall-back-to-empty, § 9.12.4); a spell-IO miss never blocks unlock/lock.
+//! (fall-back-to-empty, § 9.13.4); a spell-IO miss never blocks unlock/lock.
 
 use super::dictionary::PersonalDictionaryData;
 use super::state::SpellState;
@@ -76,7 +76,7 @@ pub(crate) fn persist_payload_to_dir(
 
 /// PURE CORE — read + decrypt `vault.dictionary` under `vault_dir` into the
 /// canonical data. Absent file / AEAD-fail / malformed payload → empty (the
-/// fall-back-to-empty semantic, § 9.12.4).
+/// fall-back-to-empty semantic, § 9.13.4).
 pub(crate) fn hydrate_payload_from_dir(
     vault_dir: &Path,
     dict_key: &[u8; AEAD_KEY_LEN],

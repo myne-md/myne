@@ -4,7 +4,7 @@ import type { SyntaxNode, Tree } from "@lezer/common";
 import { parser } from "../lezer/parser";
 import type { WikilinkRef, WikilinkTargetKind } from "../types";
 
-function classifyTarget(target: string): WikilinkTargetKind {
+export function classifyTarget(target: string): WikilinkTargetKind {
   if (target.includes("/")) return "vault-path";
   if (target.endsWith(".md")) return "vault-path";
   return "title";

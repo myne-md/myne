@@ -216,8 +216,9 @@ Auto-update does **not** fire on:
 Auto-update **preserves the syntactic shape** of every wikilink it touches:
 
 - An imported title-only wikilink `[[Old Title]]` becomes `[[New Title]]` after rename — the form stays title-only; only the title text updates.
-- A Myne-authored path-form `[[notes/2025/old-path.md|Display]]` becomes `[[notes/2025/new-path.md|Display]]` — the form stays path-form; only the path updates.
-- An imported `[[Old Title|Display]]` becomes `[[New Title|Display]]` — the alias is preserved.
+- A Myne-authored path-form `[[notes/2025/old-path.md|Display]]` becomes `[[notes/2025/new-path.md|Display]]` — the form stays path-form; only the path updates (and the alias, per the mirror rule below).
+- An imported `[[Old Title|Display]]` becomes `[[New Title|Display]]` — a **genuinely-custom** alias (one that does not equal the renamed title) is preserved.
+- **Alias-mirror rule.** Myne's picker emits the canonical form with the alias defaulted to the title (`[[<path>.md|<Title>]]`, §3 / `emitNoteWikilink`), so for an auto-authored link the alias is *not* a deliberate label — it is the title in display position. An alias that **folds-equal to the renamed title** therefore tracks the new title (`[[old.md|Old Title]]` → `[[new.md|New Title]]`); only an alias that differs from the renamed title is treated as custom and preserved. Without this, every Myne-authored inbound chip would freeze at the old name on rename even though its target/path updated — the rendered chip displays the alias, not the live note title. Fold-insensitive, using the same key the link matched on.
 - An imported `[[Old Title#Heading]]` becomes `[[New Title#Heading]]` — the anchor is preserved.
 - An imported `[[Old Title^block-id]]` becomes `[[New Title^block-id]]` — the block ID is preserved.
 - An embed `![[Old Title]]` becomes `![[New Title]]` — the embed prefix is preserved.

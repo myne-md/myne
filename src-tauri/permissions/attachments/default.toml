@@ -16,16 +16,37 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + reconcile (apply / remove / referencing)."
+description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + export + reconcile (apply / remove / referencing) + unused-list."
 permissions = [
   "allow-attachment-import",
   "allow-catalog-list",
   "allow-attachment-delete",
   "allow-attachment-rename",
+  "allow-attachment-export",
   "allow-attachment-refs-apply",
   "allow-attachment-refs-remove",
   "allow-attachment-refs-referencing",
+  "allow-attachment-unused-list",
+  "allow-attachment-clean-unused",
+  "allow-voice-record-start",
+  "allow-voice-record-stop",
+  "allow-voice-record-cancel",
 ]
+
+[[permission]]
+identifier = "allow-voice-record-start"
+description = "Allow invoking attachments:voice_record_start (Slot::Unlocked-gated arm of a microphone recording session; native cpal capture into a Zeroizing RAM buffer, never a plaintext temp file; fails if a recording is already in progress; MYND-259)."
+commands.allow = ["voice_record_start"]
+
+[[permission]]
+identifier = "allow-voice-record-stop"
+description = "Allow invoking attachments:voice_record_stop (Slot::Unlocked-gated finalize of the active recording — encodes the captured PCM to WAV in Rust, encrypts + stores it as an audio/wav MYA1 attachment via the existing import core, and returns only the attachment metadata; the raw PCM never crosses IPC; MYND-259)."
+commands.allow = ["voice_record_stop"]
+
+[[permission]]
+identifier = "allow-voice-record-cancel"
+description = "Allow invoking attachments:voice_record_cancel (discard the active recording — wipes the in-RAM buffer and stores nothing; idempotent when nothing is recording; MYND-259)."
+commands.allow = ["voice_record_cancel"]
 
 [[permission]]
 identifier = "allow-attachment-import"
@@ -48,6 +69,11 @@ description = "Allow invoking attachments:attachment_rename (Slot::Unlocked-gate
 commands.allow = ["attachment_rename"]
 
 [[permission]]
+identifier = "allow-attachment-export"
+description = "Allow invoking attachments:attachment_export (Slot::Unlocked-gated export of one attachment's DECRYPTED bytes to a user-chosen destination path; the frontend opens the native Save dialog and passes the path + overwrite consent; the plaintext is decrypted in Rust RAM and written via atomic_write_unclobbered, never crossing back into the WebView. TB3 user-initiated-egress exception — the destination is plaintext by the user's own intent. Type-agnostic: the generic file-card Export action and the image/PDF Save-As affordance both use it; MYND-173)."
+commands.allow = ["attachment_export"]
+
+[[permission]]
 identifier = "allow-attachment-refs-apply"
 description = "Allow invoking attachments:attachment_refs_apply (Slot::Unlocked-gated replace-on-apply of a note's referenced attachment-ids; ids arrive already extracted TS-side via the shared extractAttachmentIds tokenizer — never parses markdown; SYNC-6 reconcile)."
 commands.allow = ["attachment_refs_apply"]
@@ -61,3 +87,13 @@ commands.allow = ["attachment_refs_remove"]
 identifier = "allow-attachment-refs-referencing"
 description = "Allow invoking attachments:attachment_refs_referencing (Slot::Unlocked-gated query of the note-ids referencing one attachment-id — the library's 'used in N notes' count + the delete-warning's note list; SYNC-6 amended exposes ids, not just a count)."
 commands.allow = ["attachment_refs_referencing"]
+
+[[permission]]
+identifier = "allow-attachment-unused-list"
+description = "Allow invoking attachments:attachment_unused_list (Slot::Unlocked-gated read of the unused-attachment set behind the 'Clean unused attachments' review dialog — catalog entries referenced by zero live notes, computed authoritatively by decrypting + scanning every note for canonical ![[att:<id>]] embeds; fail-closed on an unreadable note; read-only, no mutation; MYND-171)."
+commands.allow = ["attachment_unused_list"]
+
+[[permission]]
+identifier = "allow-attachment-clean-unused"
+description = "Allow invoking attachments:attachment_clean_unused (Slot::Unlocked-gated batched cryptographic erase of confirmed unused attachments — re-verifies each id is still referenced by zero notes via the authoritative fail-closed scan, drops survivors from the MYC1 catalog in one atomic rewrite catalog-first, then unlinks their MYA1 blobs; a re-referenced or already-gone id is skipped; returns deleted/skipped/bytes-reclaimed counts; MYND-171)."
+commands.allow = ["attachment_clean_unused"]

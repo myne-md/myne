@@ -64,25 +64,32 @@ export function parseAttachmentTarget(target: string): string | null {
 }
 
 /**
- * Extract every attachment-id referenced by a note body, by scanning for
- * form-C embeds `![[att:<id>|…]]`. This is the TS twin of the Rust host
- * `extract_att_ids` tokenizer (reconcile.rs) — keep the two in lockstep
- * (one tokenizer per SYNC-6). Returns ids in document order, de-duplicated.
+ * Extract every form-C embed `![[att:<id>|…]]` referenced by a note body.
+ * This is the TS twin of the Rust host `extract_att_ids` tokenizer
+ * (reconcile.rs) — keep the two in lockstep (one tokenizer per SYNC-6).
+ * Returns refs in document order, de-duplicated by id (the first
+ * occurrence's alias wins); a missing/empty alias yields `filename: ""`.
  */
-export function extractAttachmentIds(body: string): string[] {
-  const out: string[] = [];
+export function extractAttachmentRefs(body: string): AttachmentRef[] {
+  const out: AttachmentRef[] = [];
   const seen = new Set<string>();
   // `![[` + att:<64 hex> + optional `|alias` + `]]`
-  const re = /!\[\[att:([0-9a-f]{64})(?:\|[^\]]*)?\]\]/g;
+  const re = /!\[\[att:([0-9a-f]{64})(?:\|([^\]]*))?\]\]/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(body)) !== null) {
     const id = m[1];
     if (!seen.has(id)) {
       seen.add(id);
-      out.push(id);
+      out.push({ id, filename: m[2] ?? "" });
     }
   }
   return out;
+}
+
+/** Document-order, de-duplicated attachment-ids of a note body (the
+ *  id projection of `extractAttachmentRefs`). */
+export function extractAttachmentIds(body: string): string[] {
+  return extractAttachmentRefs(body).map((r) => r.id);
 }
 
 /**

@@ -129,23 +129,52 @@ pub fn resolve_note_title(plaintext: &[u8]) -> Option<String> {
 /// the trimmed scalar value (surrounding single/double quotes stripped), or
 /// `None` when there is no top-level `title:`, its value is empty, or it begins
 /// a block/flow scalar this scanner deliberately does not parse.
-fn fm_title(frontmatter: &[u8]) -> Option<String> {
-    for line in frontmatter.split(|b| *b == b'\n') {
+///
+/// `pub(crate)`: also the filename source of the whole-vault export engine
+/// (`plugins::export`, MYND-211) — the tree filename rule is FM `title:`
+/// ONLY (no H1 fallback; the importer inversion injects `title:` for every
+/// imported note, so the FM field is the round-trip identity).
+pub(crate) fn fm_title(frontmatter: &[u8]) -> Option<String> {
+    fm_scalar(frontmatter, b"title:")
+}
+
+/// Minimal top-level `folder:` extractor — the canonical trailing-slash
+/// Myne-managed field (`markdown-dialect.md` §3.6.2) the whole-vault export
+/// engine (`plugins::export`, MYND-211) inverts into tree directories. Same
+/// scanner discipline as [`fm_title`]: first top-level line decides, quotes
+/// stripped, block/flow scalars declined, `None` for absent/empty (= root).
+pub(crate) fn fm_folder(frontmatter: &[u8]) -> Option<String> {
+    fm_scalar(frontmatter, b"folder:")
+}
+
+/// Locate the FIRST top-level `<key>` line in a frontmatter block and
+/// return the raw value bytes after the key (untrimmed). The first
+/// matching line decides — a later duplicate never rescues an
+/// unusable first value. `pub(crate)`: the shared line-locating loop
+/// of [`fm_scalar`] here and `export_mtime::fm_rfc3339_field_in` —
+/// each caller keeps its OWN value-parsing semantics (the
+/// comment-stripping divergence between them is TS-lockstep
+/// deliberate).
+pub(crate) fn fm_raw_value<'a>(frontmatter: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
+    frontmatter.split(|b| *b == b'\n').find_map(|line| {
         // Top-level key only — a leading space/indent means a nested mapping,
-        // which `strip_prefix(b"title:")` correctly rejects.
-        let Some(rest) = line.strip_prefix(b"title:") else {
-            continue;
-        };
-        let raw = String::from_utf8_lossy(rest).trim().to_string();
-        // Block/flow-scalar indicator or empty inline value → decline; the
-        // caller falls back to the first H1.
-        if raw.is_empty() || raw.starts_with('|') || raw.starts_with('>') {
-            return None;
-        }
-        let trimmed = strip_matching_quotes(&raw).trim();
-        return (!trimmed.is_empty()).then(|| trimmed.to_string());
+        // which `strip_prefix` correctly rejects.
+        line.strip_prefix(key)
+    })
+}
+
+/// Shared body of [`fm_title`] / [`fm_folder`]: extract the first top-level
+/// `<key>` line's scalar value from a frontmatter block.
+fn fm_scalar(frontmatter: &[u8], key: &[u8]) -> Option<String> {
+    let rest = fm_raw_value(frontmatter, key)?;
+    let raw = String::from_utf8_lossy(rest).trim().to_string();
+    // Block/flow-scalar indicator or empty inline value → decline; the
+    // caller falls back to the first H1.
+    if raw.is_empty() || raw.starts_with('|') || raw.starts_with('>') {
+        return None;
     }
-    None
+    let trimmed = strip_matching_quotes(&raw).trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
 /// Strip one layer of matching surrounding single or double quotes, if present.

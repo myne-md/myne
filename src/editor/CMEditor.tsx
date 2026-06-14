@@ -16,6 +16,8 @@ import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { diffDoc } from "./doc-diff";
 import { myneExtensions } from "./extensions";
+import { reconfigureNoteSet } from "./wikilink/note-set";
+import type { ResolverNote } from "../notes/resolveWikilink";
 
 export type CMEditorProps = {
   value: string;
@@ -23,16 +25,27 @@ export type CMEditorProps = {
   onBlur?: () => void;
   /** Composed alongside `myneExtensions`. v0 baseline does not use this. */
   extensions?: readonly Extension[];
+  /** WL-5: the live resolver note-set. Pushed into the editor's note-set
+   *  compartment (re-mount-free) whenever it changes, so the wikilink chip's
+   *  broken-link resolution + hover R1 stay live on the SYNC-5 nonce (WL-6). */
+  noteSet?: readonly ResolverNote[];
+  /** Called when a resolved wikilink chip is clicked (the workspace opens the
+   *  target note). The chip emits a `myne-open-wikilink` event; this relays it. */
+  onOpenWikilink?: (noteUuid: string) => void;
   readOnly?: boolean;
   style?: CSSProperties;
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, extensions, readOnly = false, style } = props;
+  const { value, onChange, onBlur, extensions, noteSet, onOpenWikilink, readOnly = false, style } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
+  const onOpenWikilinkRef = useRef(onOpenWikilink);
+  useEffect(() => {
+    onOpenWikilinkRef.current = onOpenWikilink;
+  }, [onOpenWikilink]);
 
   // Keep callback refs current so the EditorView's update listener closes
   // over the latest props without rebuilding the view.
@@ -109,6 +122,29 @@ export function CMEditor(props: CMEditorProps) {
     if (diff === null) return;
     view.dispatch({ changes: diff });
   }, [value]);
+
+  // WL-5: push the live note-set into the view's note-set compartment whenever
+  // it changes (re-mount-free reconfigure). `useResolverNotes()` re-derives on
+  // the SYNC-5 nonce, so a note created/renamed/deleted elsewhere re-resolves
+  // every wikilink chip live (WL-6) without a remount or a note-switch.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || noteSet === undefined) return;
+    view.dispatch({ effects: reconfigureNoteSet(noteSet) });
+  }, [noteSet]);
+
+  // Relay the chip click-to-navigate event (dispatched on the editor DOM by the
+  // wikilink chip extension) to the `onOpenWikilink` callback.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (host === null) return;
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent<{ noteUuid: string }>).detail;
+      if (detail?.noteUuid) onOpenWikilinkRef.current?.(detail.noteUuid);
+    };
+    host.addEventListener("myne-open-wikilink", handler);
+    return () => host.removeEventListener("myne-open-wikilink", handler);
+  }, []);
 
   return (
     <div

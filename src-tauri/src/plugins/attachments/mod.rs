@@ -33,8 +33,10 @@
 //! ## Capability ACL
 //!
 //! `attachments:default` bundles `allow-attachment-import`,
-//! `allow-catalog-list`, `allow-attachment-delete`. Main-window-only —
-//! the import/delete writes and the catalog read are privileged
+//! `allow-catalog-list`, `allow-attachment-delete`,
+//! `allow-attachment-rename`, the reconcile trio, and
+//! `allow-attachment-unused-list` (MYND-171). Main-window-only — the
+//! import/delete/cleanup writes and the catalog/scan reads are privileged
 //! operations on vault state.
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
@@ -45,8 +47,10 @@ pub mod reconcile;
 pub mod reconcile_commands;
 pub mod scheme;
 pub mod sniff;
+pub mod voice;
 
 pub use reconcile::AttachmentRefsState;
+pub use voice::{abort_active_recording, VoiceRecordState};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{AppHandle, Manager, Runtime};
@@ -78,6 +82,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,
+            // MYND-173: export one attachment's decrypted bytes to a
+            // user-chosen destination (Save As). Type-agnostic — the
+            // generic file-card's Export action and the image/PDF Save-As
+            // affordance both call it. TB3 user-initiated-egress exception.
+            commands::attachment_export,
+            // MYND-171: the unused-attachment query behind the "Clean
+            // unused attachments" review dialog — catalog entries with zero
+            // live note references, computed authoritatively (decrypts every
+            // note), fail-closed. Read-only; no mutation.
+            commands::attachment_unused_list,
+            // MYND-171: the confirm-step batched erase — re-verifies each
+            // id is still zero-reference (TOCTOU + fail-closed), then
+            // catalog-first rewrite → blob unlinks. Irreversible.
+            commands::attachment_clean_unused,
             // MYND-169 SYNC-6: the reconcile IPC surface over the in-RAM
             // attachment reference graph (rebuild-on-unlock + live note
             // lifecycle drive `apply`/`remove`; the library queries
@@ -85,6 +103,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             reconcile_commands::attachment_refs_apply,
             reconcile_commands::attachment_refs_remove,
             reconcile_commands::attachment_refs_referencing,
+            // MYND-259 (voice notes): native mic capture → WAV → stored as an
+            // ordinary audio/wav attachment. Slot::Unlocked-gated; the in-RAM
+            // PCM never crosses IPC (stop encrypts in Rust, returns metadata).
+            voice::commands::voice_record_start,
+            voice::commands::voice_record_stop,
+            voice::commands::voice_record_cancel,
         ])
         .build()
 }

@@ -36,6 +36,14 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { parseAttachmentTarget } from "../../notes/attachmentRef";
+import { readNoteSet } from "./note-set";
+import {
+  chipTitleKey,
+  isBrokenKey,
+  presentTitleKeys,
+  resolveChipParts,
+} from "./resolve-chip";
+import { pickerActiveFromField } from "./picker";
 
 export type WikilinkParts = {
   isEmbed: boolean;
@@ -109,17 +117,24 @@ export class WikilinkChipWidget extends WidgetType {
   constructor(
     private readonly display: string,
     private readonly isEmbed: boolean,
+    private readonly broken: boolean,
   ) {
     super();
   }
   eq(other: WikilinkChipWidget): boolean {
-    return other.display === this.display && other.isEmbed === this.isEmbed;
+    return (
+      other.display === this.display &&
+      other.isEmbed === this.isEmbed &&
+      other.broken === this.broken
+    );
   }
   toDOM(): HTMLElement {
     const span = document.createElement("span");
-    span.className = this.isEmbed
-      ? "cm-wikilink-chip cm-wikilink-chip-embed"
-      : "cm-wikilink-chip";
+    const classes = ["cm-wikilink-chip"];
+    if (this.isEmbed) classes.push("cm-wikilink-chip-embed");
+    // §5.3 broken-link styling: a non-embed wikilink with no matching note.
+    if (this.broken) classes.push("cm-wikilink-chip-broken");
+    span.className = classes.join(" ");
     span.setAttribute("role", "link");
     span.textContent = this.display;
     return span;
@@ -131,19 +146,30 @@ export class WikilinkChipWidget extends WidgetType {
 
 function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<{ from: number; to: number }>): DecorationSet {
   const decorations: Array<Range<Decoration>> = [];
+  // WL-5: the live note-set the chip resolves against for §5.3 broken styling.
+  // Fold the note titles into a key set ONCE (not per chip) so each chip's
+  // broken check is an O(1) lookup, not an O(notes) resolver scan.
+  const presentKeys = presentTitleKeys(readNoteSet(state));
+  // The `[[…]]` the `[[` picker is actively authoring — left as raw text.
+  const activeFrom = state.field(pickerActiveFromField, false) ?? null;
   for (const { from, to } of ranges) {
     syntaxTree(state).iterate({
       from,
       to,
       enter: (node) => {
         if (node.name !== "Wikilink") return undefined;
+        // The link the picker is authoring stays raw/editable (no chip).
+        if (node.from === activeFrom) return false;
         const parts = parseWikilinkParts(state, node.from, node.to);
         // Form-C attachment embeds are rendered by attachment-embed.ts.
         if (isAttachmentEmbed(parts)) return false;
+        // Empty `[[]]` is plain text on disk (§10) — never a chip.
+        if ((parts.target ?? "") === "") return false;
         const display = chipDisplayText(parts);
+        const broken = isBrokenKey(chipTitleKey(parts), presentKeys);
         decorations.push(
           Decoration.replace({
-            widget: new WikilinkChipWidget(display, parts.isEmbed),
+            widget: new WikilinkChipWidget(display, parts.isEmbed, broken),
           }).range(node.from, node.to),
         );
         return false;
@@ -156,27 +182,32 @@ function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<
   return builder.finish();
 }
 
-// Cached atomic-range RangeSet keyed by the syntax tree reference. The
-// tree is reference-stable across non-doc transactions, so cursor moves
-// hit the cache instead of re-walking the full document on every
-// selection change.
+// Cached atomic-range RangeSet keyed by the syntax tree reference (+ the picker's
+// active node, which un-atomics the link being authored). The tree is
+// reference-stable across non-doc transactions, so cursor moves hit the cache
+// instead of re-walking the full document on every selection change.
 const atomicRangesCache = new WeakMap<
   ReturnType<typeof syntaxTree>,
-  ReturnType<RangeSetBuilder<Decoration>["finish"]>
+  { activeFrom: number | null; ranges: ReturnType<RangeSetBuilder<Decoration>["finish"]> }
 >();
 
 function cachedWikilinkAtomicRanges(view: EditorView) {
   const tree = syntaxTree(view.state);
+  const activeFrom = view.state.field(pickerActiveFromField, false) ?? null;
   const cached = atomicRangesCache.get(tree);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined && cached.activeFrom === activeFrom) return cached.ranges;
   const ranges: Array<Range<Decoration>> = [];
   tree.iterate({
     from: 0,
     to: view.state.doc.length,
     enter: (node) => {
       if (node.name === "Wikilink") {
-        // Attachment embeds register their own atomic range in attachment-embed.ts.
-        if (!isAttachmentEmbed(parseWikilinkParts(view.state, node.from, node.to))) {
+        // Attachment embeds register their own atomic range in attachment-embed.ts;
+        // an empty `[[]]` is plain text (§10) and the `[[` picker's active node is
+        // raw/editable — none are atomic (the cursor edits them freely).
+        if (node.from === activeFrom) return false;
+        const parts = parseWikilinkParts(view.state, node.from, node.to);
+        if (!isAttachmentEmbed(parts) && (parts.target ?? "") !== "") {
           ranges.push(Decoration.replace({}).range(node.from, node.to));
         }
         return false;
@@ -188,7 +219,7 @@ function cachedWikilinkAtomicRanges(view: EditorView) {
   ranges.sort((a, b) => a.from - b.from);
   for (const r of ranges) builder.add(r.from, r.to, r.value);
   const finished = builder.finish();
-  atomicRangesCache.set(tree, finished);
+  atomicRangesCache.set(tree, { activeFrom, ranges: finished });
   return finished;
 }
 
@@ -204,7 +235,22 @@ export function wikilinkChipExtensions(): readonly Extension[] {
           );
         }
         update(update: ViewUpdate) {
-          if (update.docChanged || update.viewportChanged) {
+          // Re-decorate on doc/viewport change, on a WL-5 note-set change (a note
+          // created/renamed/deleted elsewhere flips a chip's broken/resolved
+          // state live on the SYNC-5 nonce, WL-6), and when the picker's active
+          // node changes (so the authored link un-chips on open / re-chips on
+          // close).
+          const noteSetChanged =
+            readNoteSet(update.startState) !== readNoteSet(update.state);
+          const activeChanged =
+            update.startState.field(pickerActiveFromField, false) !==
+            update.state.field(pickerActiveFromField, false);
+          if (
+            update.docChanged ||
+            update.viewportChanged ||
+            noteSetChanged ||
+            activeChanged
+          ) {
             this.decorations = buildWikilinkChipDecorations(
               update.state,
               update.view.visibleRanges,
@@ -217,6 +263,43 @@ export function wikilinkChipExtensions(): readonly Extension[] {
     // Atomic-range registration: any range covered by the chip decoration
     // counts as one indivisible unit for cursor / selection / backspace.
     EditorView.atomicRanges.of(cachedWikilinkAtomicRanges),
+    // Click-to-navigate: clicking a RESOLVED chip resolves its target and emits
+    // a `myne-open-wikilink` DOM event (CMEditor relays it to its `onOpenWikilink`
+    // prop → the workspace opens the note). Broken chips do nothing (their target
+    // doesn't exist). `click` (not `mousedown`) so drag-selection over the chip
+    // still works (§5.2).
+    EditorView.domEventHandlers({
+      click(event, view) {
+        const target = event.target as HTMLElement | null;
+        const chipEl = target?.closest?.(".cm-wikilink-chip") as HTMLElement | null;
+        if (chipEl === null || chipEl.classList.contains("cm-wikilink-chip-broken")) {
+          return false;
+        }
+        const pos = view.posAtDOM(chipEl);
+        let noteUuid: string | null = null;
+        syntaxTree(view.state).iterate({
+          from: pos,
+          to: pos + 1,
+          enter: (node) => {
+            if (node.name !== "Wikilink") return undefined;
+            const res = resolveChipParts(
+              parseWikilinkParts(view.state, node.from, node.to),
+              readNoteSet(view.state),
+            );
+            if (res !== null && res.status === "resolved") noteUuid = res.noteUuid;
+            return false;
+          },
+        });
+        if (noteUuid === null) return false;
+        view.dom.dispatchEvent(
+          new CustomEvent("myne-open-wikilink", {
+            detail: { noteUuid },
+            bubbles: true,
+          }),
+        );
+        return true;
+      },
+    }),
   ];
 }
 
@@ -225,12 +308,15 @@ export function wikilinkChipExtensions(): readonly Extension[] {
 // a view).
 export function wikilinkAtomicRanges(state: EditorState): RangeSet<Decoration> {
   const ranges: Array<Range<Decoration>> = [];
+  const activeFrom = state.field(pickerActiveFromField, false) ?? null;
   syntaxTree(state).iterate({
     from: 0,
     to: state.doc.length,
     enter: (node) => {
       if (node.name === "Wikilink") {
-        if (!isAttachmentEmbed(parseWikilinkParts(state, node.from, node.to))) {
+        if (node.from === activeFrom) return false;
+        const parts = parseWikilinkParts(state, node.from, node.to);
+        if (!isAttachmentEmbed(parts) && (parts.target ?? "") !== "") {
           ranges.push(Decoration.replace({}).range(node.from, node.to));
         }
         return false;

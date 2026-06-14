@@ -122,4 +122,20 @@ describe("mapImportedFile — pre-existing folder: is preserved, never overwritt
     expect(r.preexistingFolder).toBeNull();
     expect(r.plaintext).toContain("folder: Projects/");
   });
+
+  it("suppresses the flag when the existing folder: equals the derived folder (SYNC-8 — quiet export re-import)", () => {
+    const body = "---\nfolder: Projects/Sub/\ntitle: note\n---\n\nbody\n";
+    const r = mapImportedFile("Projects/Sub/note.md", body);
+    expect(r.preexistingFolder).toBeNull(); // equal → no needs-attention flag
+    expect(r.plaintext).toContain("folder: Projects/Sub/"); // still preserved verbatim
+  });
+
+  it("keeps the flag when the existing folder: differs from the derived folder", () => {
+    const body = "---\nfolder: Projects/Other/\ntitle: note\n---\n\nbody\n";
+    const r = mapImportedFile("Projects/Sub/note.md", body);
+    expect(r.preexistingFolder).toEqual({
+      existing: "Projects/Other/",
+      derivedFromPath: "Projects/Sub/",
+    });
+  });
 });

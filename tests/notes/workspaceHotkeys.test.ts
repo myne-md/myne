@@ -7,6 +7,7 @@
 // itself is exercised by the `pnpm tauri dev` smoke-test.
 
 import { describe, expect, it } from "vitest";
+import { defaultKeymap } from "@codemirror/commands";
 import { myneKeyBindings } from "../../src/editor/keymap";
 
 // The chords WorkspaceHotkeys claims (CodeMirror `Mod-` notation).
@@ -52,5 +53,23 @@ describe("MYND-166 tab/pane keymap", () => {
       expect(editorKeys.has(owned)).toBe(true);
       expect(WORKSPACE_CHORDS.includes(owned)).toBe(false);
     }
+  });
+});
+
+describe("MYND-260 back/forward bracket chords", () => {
+  // Cmd/Ctrl+[ and ] are the ONE deliberate exception to the no-shadowing
+  // rule: CM's defaultKeymap binds them to indentLess/indentMore, so Editor's
+  // WorkspaceHotkeys intercepts them in the CAPTURE phase and stopPropagation()s
+  // to override the indent and navigate note history instead. They are NOT in
+  // WORKSPACE_CHORDS because that set models the bubble-phase switch.
+  it("are bound by CM defaultKeymap — the reason the capture override exists", () => {
+    const keys = new Set(defaultKeymap.map((b) => b.key));
+    expect(keys.has("Mod-[")).toBe(true);
+    expect(keys.has("Mod-]")).toBe(true);
+  });
+
+  it("are kept out of the bubble-phase workspace chord set", () => {
+    expect(WORKSPACE_CHORDS.includes("Mod-[")).toBe(false);
+    expect(WORKSPACE_CHORDS.includes("Mod-]")).toBe(false);
   });
 });

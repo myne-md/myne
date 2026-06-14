@@ -1,0 +1,38 @@
+//! Voice notes — native mic capture submodule of `attachments` (MYND-259).
+//!
+//! Voice notes are ordinary attachments: a recording is captured natively (no
+//! WebView MediaRecorder), encoded to WAV (`encoder`), and stored through the
+//! existing `attachment_import` core as an `audio/wav` `MYA1` blob — no new
+//! on-disk format. The capture pipeline is a chain of swappable stages
+//! (`capture::AudioSource` → `encoder::Encoder` → import) so the record flow is
+//! testable with a fixture source on a headless runner.
+//!
+//! The three IPC commands (`voice_record_start`/`stop`/`cancel`) are registered
+//! by the parent `attachments` plugin and gated under `attachments:default`.
+
+pub mod capture;
+pub mod commands;
+pub mod encoder;
+pub mod error;
+pub mod state;
+
+pub use state::VoiceRecordState;
+
+use tauri::{AppHandle, Manager, Runtime};
+
+/// Best-effort abort of any in-progress recording on lock / auto-lock /
+/// vault-delete teardown — the twin of [`super::zeroize_attachment_refs`].
+/// Sync + infallible: if a recording is active it is canceled (the capture
+/// thread releases the mic + wipes its `Zeroizing` buffer) WITHOUT blocking the
+/// teardown path. A missing managed state, a momentarily-held lock, or no
+/// active recording is a silent no-op — the next unlock starts fresh. Wired
+/// into every slot-drop site so the mic never outlives the unlocked session.
+pub fn abort_active_recording<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(voice) = app.try_state::<VoiceRecordState>() {
+        if let Ok(mut guard) = voice.active.try_lock() {
+            if let Some(session) = guard.take() {
+                session.abort();
+            }
+        }
+    }
+}

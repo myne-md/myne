@@ -277,13 +277,16 @@ export class Session {
 
   /** Poll an arbitrary predicate (for non-element conditions).
    *
-   *  A stale-element error thrown INSIDE the predicate counts as "not
-   *  yet", not as a failure: it means the DOM moved between a find and
-   *  the dependent read (React remounts race every handle — observed on
-   *  `waitForGone`'s mid-enumeration unmounts and on CodeMirror reads
-   *  across reload), and the next tick re-finds a fresh handle. A
-   *  predicate that keeps hitting stale exhausts the budget and fails
-   *  with this label, never silently passes. */
+   *  A poll iteration that races a DOM mutation surfaces as a
+   *  `stale element reference` from the driver — either on a handle
+   *  read (find succeeded, node detached before the read) or from
+   *  WebKitWebDriver's find itself ("Stale element found when trying
+   *  to create the node handle": the node matched, then unmounted
+   *  before the handle was minted). Inside a retry loop that is by
+   *  definition transient — the next iteration re-queries from the
+   *  document root — so it counts as a falsy poll, not a failure. A
+   *  handle that is GENUINELY stale (captured before the loop) times
+   *  out instead, with the swallowed error named in the message. */
   async waitUntil<T>(
     fn: () => Promise<T | null | undefined | false>,
     opts?: FindOptions & { label?: string },
@@ -291,17 +294,25 @@ export class Session {
     const timeout = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const interval = opts?.intervalMs ?? DEFAULT_INTERVAL_MS;
     const deadline = Date.now() + timeout;
+    let lastStale: WebDriverError | undefined;
     for (;;) {
       let result: T | null | undefined | false;
       try {
         result = await fn();
       } catch (e) {
-        if (!(e instanceof WebDriverError && e.code === "stale element reference")) throw e;
-        result = null;
+        if (e instanceof WebDriverError && e.code === "stale element reference") {
+          lastStale = e;
+          result = null;
+        } else {
+          throw e;
+        }
       }
       if (result) return result;
       if (Date.now() >= deadline) {
-        throw new Error(`waitUntil(${opts?.label ?? "predicate"}) timed out after ${timeout} ms`);
+        throw new Error(
+          `waitUntil(${opts?.label ?? "predicate"}) timed out after ${timeout} ms` +
+            (lastStale ? ` (last poll error: ${lastStale.message})` : ""),
+        );
       }
       await sleep(interval);
     }

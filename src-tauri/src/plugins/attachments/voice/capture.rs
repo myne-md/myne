@@ -1,0 +1,493 @@
+//! Microphone capture for voice notes (MYND-259).
+//!
+//! Native Rust capture via `cpal`, NOT the WebView's MediaRecorder: captured
+//! PCM stays Rust-side where it is `Zeroize`-able and never enters the JS heap,
+//! the codec is consistent across all three OS WebViews, and the unreliable
+//! WebKitGTK MediaRecorder path is avoided (`decisions.md` voice-notes entry).
+//!
+//! The capture pipeline is a chain of swappable stages so the record flow is
+//! testable on a headless runner (no mic): the [`AudioSource`] seam has a real
+//! [`CpalSource`] and a deterministic [`FixtureSource`]; the WAV [`Encoder`]
+//! (`super::encoder`) is the sibling seam for a future Opus swap.
+//!
+//! The in-progress recording is buffered in RAM only (`Zeroizing<Vec<i16>>`) —
+//! NEVER a plaintext temp `.wav` on disk, which would trip the MYND-171
+//! stray-file scan. It is bounded per-clip by the 64 MiB `MYA1` cap; at the cap
+//! the full clip is flushed (`drain_full_clips`) and capture continues
+//! seamlessly into the next clip with no dropped samples (the cpal callback
+//! keeps filling its shared buffer across the cheap split).
+
+use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use zeroize::Zeroizing;
+
+use super::encoder::WAV_HEADER_LEN;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+/// The per-clip sample ceiling, derived from the 64 MiB `MYA1` blob cap minus
+/// the WAV header, at 2 bytes/sample. At this boundary the current clip is
+/// flushed and capture continues into a new clip (seamless continuation, not a
+/// hard stop).
+pub const MAX_SAMPLES: usize = (protocol::MAX_ATTACHMENT_LEN - WAV_HEADER_LEN) / 2;
+
+/// How often the session loop drains the source and checks for a stop signal.
+const POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+/// A capture failure that is not the user's fault. Kept coarse — device error
+/// detail is neither security-sensitive nor actionable to the UI beyond the
+/// "no input device" case (which drives the disabled-record affordance).
+#[derive(Debug, Clone, Copy)]
+pub enum RecordError {
+    /// No input device is available (or mic access is unavailable).
+    NoInputDevice,
+    /// The capture device/stream could not be configured, built, or started,
+    /// or uses an unsupported sample format.
+    CaptureFailed,
+}
+
+/// Finalized mono PCM from one recording session. `samples` is `Zeroizing` so
+/// the captured plaintext audio is wiped when the session result is dropped.
+pub struct CapturedAudio {
+    pub samples: Zeroizing<Vec<i16>>,
+    pub sample_rate: u32,
+}
+
+/// How a session ends.
+#[derive(Debug, Clone, Copy)]
+pub enum StopKind {
+    /// Keep the recording → finalize + encode + import.
+    Finalize,
+    /// Discard the recording → wipe the buffer, create nothing.
+    Cancel,
+}
+
+/// The outcome the capture thread sends back when it stops.
+pub enum SessionResult {
+    Captured(CapturedAudio),
+    Canceled,
+    Error(RecordError),
+}
+
+/// A pull-based mono-i16 capture source. Not `Send` — `CpalSource` owns a cpal
+/// `Stream` which is `!Send` on macOS CoreAudio, so a source is always built
+/// and used inside the capture thread, never moved across threads.
+pub trait AudioSource {
+    /// The native capture sample rate (Hz).
+    fn sample_rate(&self) -> u32;
+    /// Drain the mono i16 samples captured since the last poll (empty if none
+    /// ready yet).
+    fn poll(&mut self) -> Vec<i16>;
+}
+
+/// Which source the capture thread builds. `Send` (unlike the source itself),
+/// so it can cross into the spawned thread which then builds the source.
+#[derive(Debug, Clone, Copy)]
+pub enum SourceFactory {
+    /// Real microphone via cpal.
+    Cpal,
+    /// Deterministic synthetic tone — for E2E on a headless runner + tests.
+    Fixture,
+}
+
+impl SourceFactory {
+    fn build(self) -> Result<Box<dyn AudioSource>, RecordError> {
+        match self {
+            SourceFactory::Cpal => Ok(Box::new(CpalSource::start()?)),
+            SourceFactory::Fixture => Ok(Box::new(FixtureSource::default())),
+        }
+    }
+}
+
+// --- fixture source (tests / E2E) ------------------------------------------
+
+/// A deterministic 440 Hz sine source. Drives the record flow with no real
+/// device so the E2E (record→save→reopen→playback) runs on a headless runner.
+pub struct FixtureSource {
+    sample_rate: u32,
+    phase: f32,
+    step: f32,
+    samples_per_poll: usize,
+}
+
+impl Default for FixtureSource {
+    fn default() -> Self {
+        let sample_rate = 48_000;
+        let freq = 440.0_f32;
+        Self {
+            sample_rate,
+            phase: 0.0,
+            step: std::f32::consts::TAU * freq / sample_rate as f32,
+            // ~10 ms of audio per poll, matching POLL_INTERVAL.
+            samples_per_poll: 480,
+        }
+    }
+}
+
+impl AudioSource for FixtureSource {
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn poll(&mut self) -> Vec<i16> {
+        let mut out = Vec::with_capacity(self.samples_per_poll);
+        for _ in 0..self.samples_per_poll {
+            let amplitude = (self.phase.sin() * 0.5 * f32::from(i16::MAX)) as i16;
+            out.push(amplitude);
+            self.phase += self.step;
+            if self.phase > std::f32::consts::TAU {
+                self.phase -= std::f32::consts::TAU;
+            }
+        }
+        out
+    }
+}
+
+// --- cpal source (real microphone) -----------------------------------------
+
+/// A real microphone source. The cpal data callback downmixes every frame to
+/// one mono i16 and pushes into a shared buffer that [`poll`](AudioSource::poll)
+/// drains. The `Stream` is held here and only ever exists inside the capture
+/// thread.
+pub struct CpalSource {
+    _stream: cpal::Stream,
+    shared: Arc<Mutex<Vec<i16>>>,
+    sample_rate: u32,
+}
+
+impl CpalSource {
+    fn start() -> Result<Self, RecordError> {
+        let host = cpal::default_host();
+        let device = host
+            .default_input_device()
+            .ok_or(RecordError::NoInputDevice)?;
+        let supported = device
+            .default_input_config()
+            .map_err(|_| RecordError::CaptureFailed)?;
+        let sample_rate = supported.sample_rate().0;
+        let channels = supported.channels();
+        let sample_format = supported.sample_format();
+        let config: cpal::StreamConfig = supported.config();
+
+        let shared: Arc<Mutex<Vec<i16>>> = Arc::new(Mutex::new(Vec::new()));
+        let err_cb = |_err| {
+            // The error type may carry platform path detail; log a static label
+            // only (DENY-list discipline — see ../../CLAUDE.md).
+            tracing::warn!(stage = "voice_capture", "cpal input stream error");
+        };
+
+        let stream = match sample_format {
+            cpal::SampleFormat::F32 => {
+                let sink = shared.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[f32], _| push_mono(&sink, data, channels, f32_to_i16),
+                    err_cb,
+                    None,
+                )
+            }
+            cpal::SampleFormat::I16 => {
+                let sink = shared.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[i16], _| push_mono(&sink, data, channels, |s| s),
+                    err_cb,
+                    None,
+                )
+            }
+            cpal::SampleFormat::U16 => {
+                let sink = shared.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[u16], _| push_mono(&sink, data, channels, u16_to_i16),
+                    err_cb,
+                    None,
+                )
+            }
+            _ => return Err(RecordError::CaptureFailed),
+        }
+        .map_err(|_| RecordError::CaptureFailed)?;
+
+        stream.play().map_err(|_| RecordError::CaptureFailed)?;
+        Ok(Self {
+            _stream: stream,
+            shared,
+            sample_rate,
+        })
+    }
+}
+
+impl AudioSource for CpalSource {
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn poll(&mut self) -> Vec<i16> {
+        match self.shared.lock() {
+            Ok(mut g) => std::mem::take(&mut *g),
+            Err(_) => Vec::new(),
+        }
+    }
+}
+
+fn f32_to_i16(s: f32) -> i16 {
+    (s.clamp(-1.0, 1.0) * f32::from(i16::MAX)) as i16
+}
+
+fn u16_to_i16(s: u16) -> i16 {
+    (i32::from(s) - 32_768) as i16
+}
+
+/// Downmix interleaved `data` (`channels` per frame) to one mono i16 per frame
+/// (average of the frame's channels) and append to `sink`.
+fn push_mono<T: Copy>(
+    sink: &Arc<Mutex<Vec<i16>>>,
+    data: &[T],
+    channels: u16,
+    to_i16: fn(T) -> i16,
+) {
+    let ch = channels.max(1) as usize;
+    let Ok(mut buf) = sink.lock() else { return };
+    for frame in data.chunks(ch) {
+        let sum: i32 = frame.iter().map(|&s| i32::from(to_i16(s))).sum();
+        let mono = (sum / frame.len() as i32) as i16;
+        buf.push(mono);
+    }
+}
+
+// --- session driver --------------------------------------------------------
+
+/// Run one capture session to completion on the calling (dedicated) thread.
+/// Builds the source, then polls it on [`POLL_INTERVAL`] — appending mono i16
+/// into a `Zeroizing` buffer bounded by [`MAX_SAMPLES`] — until a stop signal
+/// arrives. `Finalize` returns the captured audio; `Cancel` (or a dropped
+/// sender) wipes the buffer and returns `Canceled`.
+pub fn run_session(
+    factory: SourceFactory,
+    stop_rx: &Receiver<StopKind>,
+    level_sink: &(dyn Fn(f32) + Send),
+    clip_sink: &(dyn Fn(Zeroizing<Vec<i16>>, u32) + Send),
+    max_samples: usize,
+) -> SessionResult {
+    let mut source = match factory.build() {
+        Ok(s) => s,
+        Err(e) => return SessionResult::Error(e),
+    };
+    let sample_rate = source.sample_rate();
+    let mut buffer: Zeroizing<Vec<i16>> = Zeroizing::new(Vec::new());
+
+    loop {
+        match stop_rx.try_recv() {
+            Ok(StopKind::Finalize) => break,
+            Ok(StopKind::Cancel) | Err(TryRecvError::Disconnected) => {
+                // Zeroizing drops here → in-flight tail wiped.
+                return SessionResult::Canceled;
+            }
+            Err(TryRecvError::Empty) => {}
+        }
+        let chunk = source.poll();
+        // Stream the input level so the meter moves — and so macOS's
+        // denial-as-silence surfaces as a flat meter, not a silent success.
+        level_sink(peak_level(&chunk));
+        buffer.extend_from_slice(&chunk);
+        // Seamless continuation: flush every full clip at the cap. The flush is
+        // a cheap buffer swap (split_off) — the cpal callback keeps filling its
+        // shared buffer throughout, so the next poll picks up whatever arrived
+        // during the flush. NO samples are dropped at the boundary. The
+        // expensive encrypt+import runs OFF this thread, in the clip consumer.
+        for clip in drain_full_clips(&mut buffer, max_samples) {
+            clip_sink(Zeroizing::new(clip), sample_rate);
+        }
+        std::thread::sleep(POLL_INTERVAL);
+    }
+    // Final drain so the tail isn't lost between the last poll and the stop,
+    // including any full clip the tail completes.
+    let tail = source.poll();
+    buffer.extend_from_slice(&tail);
+    for clip in drain_full_clips(&mut buffer, max_samples) {
+        clip_sink(Zeroizing::new(clip), sample_rate);
+    }
+
+    // Whatever remains (< max_samples) is the final clip.
+    SessionResult::Captured(CapturedAudio {
+        samples: buffer,
+        sample_rate,
+    })
+}
+
+/// Peak input level of `chunk` in `[0, 1]` (max absolute sample / i16::MAX).
+fn peak_level(chunk: &[i16]) -> f32 {
+    chunk
+        .iter()
+        .map(|s| s.unsigned_abs())
+        .max()
+        .map_or(0.0, |m| f32::from(m) / f32::from(i16::MAX))
+}
+
+/// Below this absolute amplitude a sample counts as silence — a muted or denied
+/// mic yields ~zero samples; real audio easily exceeds it (~0.2% of full scale).
+const SILENCE_PEAK_THRESHOLD: u16 = 64;
+
+/// Whether `samples` is effectively silent (no sample reaches the threshold).
+/// Empty input is silent. Drives the save-time silence guard so a muted-mic
+/// recording is discarded with an explanation instead of stored.
+pub fn is_silent(samples: &[i16]) -> bool {
+    samples
+        .iter()
+        .all(|s| s.unsigned_abs() < SILENCE_PEAK_THRESHOLD)
+}
+
+/// Split off every full `max`-sized clip from the front of `buffer`, returning
+/// them in order and leaving the (< `max`) remainder in `buffer`. The
+/// concatenation of the returned clips followed by the remainder always equals
+/// the original `buffer` — no sample is lost or duplicated at a boundary. A
+/// non-positive `max` returns nothing (unbounded buffer).
+fn drain_full_clips(buffer: &mut Vec<i16>, max: usize) -> Vec<Vec<i16>> {
+    let mut clips = Vec::new();
+    if max == 0 {
+        return clips;
+    }
+    while buffer.len() >= max {
+        let remainder = buffer.split_off(max);
+        let clip = std::mem::replace(buffer, remainder);
+        clips.push(clip);
+    }
+    clips
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    #[test]
+    fn fixture_source_produces_nonsilent_audio() {
+        let mut src = FixtureSource::default();
+        assert_eq!(src.sample_rate(), 48_000);
+        let chunk = src.poll();
+        assert_eq!(chunk.len(), 480);
+        // A 440 Hz sine is not silent.
+        assert!(chunk.iter().any(|&s| s.abs() > 1000));
+    }
+
+    #[test]
+    fn fixture_session_finalize_captures_audio() {
+        let (tx, rx) = mpsc::channel();
+        let levels = Arc::new(Mutex::new(Vec::<f32>::new()));
+        let levels_cb = levels.clone();
+        let handle = std::thread::spawn(move || {
+            run_session(
+                SourceFactory::Fixture,
+                &rx,
+                &move |l| levels_cb.lock().unwrap().push(l),
+                &|_, _| {},
+                MAX_SAMPLES,
+            )
+        });
+        // Let a few polls accumulate, then finalize.
+        std::thread::sleep(Duration::from_millis(60));
+        tx.send(StopKind::Finalize).unwrap();
+        match handle.join().unwrap() {
+            SessionResult::Captured(audio) => {
+                assert_eq!(audio.sample_rate, 48_000);
+                assert!(!audio.samples.is_empty());
+            }
+            _ => panic!("expected Captured"),
+        }
+        // The level sink was driven with non-silent values (440 Hz tone).
+        let observed = levels.lock().unwrap();
+        assert!(observed.iter().any(|&l| l > 0.1));
+    }
+
+    #[test]
+    fn fixture_session_cancel_discards() {
+        let (tx, rx) = mpsc::channel();
+        let handle = std::thread::spawn(move || {
+            run_session(
+                SourceFactory::Fixture,
+                &rx,
+                &|_| {},
+                &|_, _| {},
+                MAX_SAMPLES,
+            )
+        });
+        std::thread::sleep(Duration::from_millis(30));
+        tx.send(StopKind::Cancel).unwrap();
+        assert!(matches!(handle.join().unwrap(), SessionResult::Canceled));
+    }
+
+    #[test]
+    fn fixture_session_continues_into_multiple_clips_at_a_small_cap() {
+        // A tiny per-clip cap forces continuation; assert clips are flushed
+        // and each is exactly the cap size (the final remainder is < cap).
+        const SMALL: usize = 200;
+        let (tx, rx) = mpsc::channel();
+        let clips = Arc::new(Mutex::new(Vec::<usize>::new()));
+        let clips_cb = clips.clone();
+        let handle = std::thread::spawn(move || {
+            run_session(
+                SourceFactory::Fixture,
+                &rx,
+                &|_| {},
+                &move |samples, _| clips_cb.lock().unwrap().push(samples.len()),
+                SMALL,
+            )
+        });
+        std::thread::sleep(Duration::from_millis(60));
+        tx.send(StopKind::Finalize).unwrap();
+        let final_clip = match handle.join().unwrap() {
+            SessionResult::Captured(a) => a.samples.len(),
+            _ => panic!("expected Captured"),
+        };
+        let emitted = clips.lock().unwrap();
+        assert!(
+            !emitted.is_empty(),
+            "small cap should force continuation clips"
+        );
+        assert!(
+            emitted.iter().all(|&n| n == SMALL),
+            "flushed clips are cap-sized"
+        );
+        assert!(final_clip < SMALL, "the final remainder is below the cap");
+    }
+
+    #[test]
+    fn peak_level_is_normalized_and_silence_is_zero() {
+        assert_eq!(peak_level(&[]), 0.0);
+        assert_eq!(peak_level(&[0, 0, 0]), 0.0);
+        assert!((peak_level(&[i16::MAX]) - 1.0).abs() < 1e-6);
+        assert!(peak_level(&[100, -16_000, 50]) > 0.4);
+    }
+
+    #[test]
+    fn is_silent_flags_muted_audio_only() {
+        assert!(is_silent(&[]));
+        assert!(is_silent(&[0, 1, -2, 3])); // dither-level noise → silent
+        assert!(!is_silent(&[0, 5_000, 0])); // a real peak → not silent
+        assert!(!is_silent(&[i16::MIN])); // i16::MIN handled via unsigned_abs
+    }
+
+    #[test]
+    fn drain_full_clips_loses_no_sample_at_a_boundary() {
+        let original: Vec<i16> = (0..25).collect();
+        let mut buf = original.clone();
+        let clips = drain_full_clips(&mut buf, 10);
+        assert_eq!(clips.len(), 2);
+        assert_eq!(clips[0], (0..10).collect::<Vec<_>>());
+        assert_eq!(clips[1], (10..20).collect::<Vec<_>>());
+        assert_eq!(buf, (20..25).collect::<Vec<_>>());
+        // Concatenation of clips + remainder reconstructs the input EXACTLY.
+        let mut reconstructed: Vec<i16> = clips.concat();
+        reconstructed.extend_from_slice(&buf);
+        assert_eq!(reconstructed, original);
+    }
+
+    #[test]
+    fn drain_full_clips_noops_below_cap_or_zero_max() {
+        let mut buf: Vec<i16> = vec![1, 2, 3];
+        assert!(drain_full_clips(&mut buf, 10).is_empty());
+        assert_eq!(buf, vec![1, 2, 3]);
+        assert!(drain_full_clips(&mut buf, 0).is_empty());
+        assert_eq!(buf, vec![1, 2, 3]);
+    }
+}

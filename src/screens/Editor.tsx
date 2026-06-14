@@ -25,6 +25,8 @@
 //     docs/design/ui_kits/desktop/Editor.jsx
 
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -47,10 +49,13 @@ import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { GraphView } from "../notes/components/GraphView";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
-import { Toast } from "../components/Toast";
+import { Toast, type ToastAction } from "../components/Toast";
+import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
 import { BackupExportModal } from "../components/backup/BackupExportModal";
+import { VaultExportModal } from "../components/export/VaultExportModal";
+import { collectFolderOptions } from "../components/export/vaultExportFlow";
 import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
@@ -62,6 +67,17 @@ import {
   resolveTodayNote,
 } from "../notes";
 import { prefsRead } from "../lib/prefs";
+import {
+  exportToastAction,
+  noteExportOptions,
+  runNoteExportFlow,
+  runNotePdfExportFlow,
+  type AttachmentPreflightChoice,
+  type ExportToast,
+  type NoteExportUiHooks,
+} from "../notes/exportFlow";
+import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
+import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
 import {
   SECTION_HEADING_STYLE,
@@ -93,7 +109,9 @@ import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
+import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
+import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
 import { CenterViewProvider, type CenterView } from "./centerView";
 import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
 import { PaneTree } from "../notes/components/PaneTree";
@@ -108,6 +126,16 @@ import {
   workspaceWrite,
 } from "../lib/workspace-persist";
 
+// Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
+// bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
+// build chunk). (GraphView's shell is statically imported and lazies only its
+// heavy d3 canvas; TagBrowser has no comparable static host, so the whole modal
+// splits.)
+const TagBrowser = lazy(() =>
+  import("../notes/components/TagBrowser").then((m) => ({
+    default: m.TagBrowser,
+  })),
+);
 
 const STATUS_TEXT_STYLE: CSSProperties = {
   fontSize: 12,
@@ -225,7 +253,7 @@ export function Editor({
 }: EditorProps) {
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<EditorToast | null>(null);
 
   const probed = useRef(false);
   useEffect(() => {
@@ -311,8 +339,8 @@ export function Editor({
           settingsOpen={settingsOpen}
           onRestoreBackup={onRestoreBackup}
           setSettingsOpen={setSettingsOpen}
-          toastMessage={toastMessage}
-          setToastMessage={setToastMessage}
+          toast={toast}
+          setToast={setToast}
         />
       </WorkspaceProvider>
       </div>
@@ -326,6 +354,14 @@ export function Editor({
  * hook, Tauri close-intercept (T28), editor-blur listener (T29), and
  * the BottomBar's save-status / Lock-flush wiring.
  */
+/** The Editor's single bottom-right toast: a message plus an optional
+ *  inline action (the export flow's "Show in folder", MYND-116 task 4 —
+ *  the soft-trash Undo precedent lives in NoteList's own toast). */
+type EditorToast = {
+  message: string;
+  action?: ToastAction;
+};
+
 type EditorChromeProps = {
   onLock?: () => void;
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
@@ -336,8 +372,8 @@ type EditorChromeProps = {
   settingsOpen: boolean;
   onRestoreBackup: () => void;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
-  toastMessage: string | null;
-  setToastMessage: Dispatch<SetStateAction<string | null>>;
+  toast: EditorToast | null;
+  setToast: Dispatch<SetStateAction<EditorToast | null>>;
 };
 
 function EditorChrome({
@@ -350,17 +386,97 @@ function EditorChrome({
   settingsOpen,
   onRestoreBackup,
   setSettingsOpen,
-  toastMessage,
-  setToastMessage,
+  toast,
+  setToast,
 }: EditorChromeProps) {
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  // Plain-message sink for the pre-existing string consumers (Settings,
+  // backup export, importer); the export flow goes through the structured
+  // `showExportToast` below so success can carry its reveal action.
+  const showToastMessage = useCallback(
+    (message: string) => setToast({ message }),
+    [setToast],
+  );
+  const showExportToast = useCallback(
+    (t: ExportToast) =>
+      setToast({
+        message: t.message,
+        action: exportToastAction(t, () => setToast(null)),
+      }),
+    [setToast],
+  );
+  // Pre-flight "Include N attachments" modal (MYND-116 task 3): the flow
+  // asks through a promise-backed hook; the payload state mounts the
+  // modal, and settling either way unmounts it. Identical from the
+  // context-menu and palette paths — both receive the same hooks.
+  const [exportPreflight, setExportPreflight] = useState<{
+    count: number;
+    resolve: (choice: AttachmentPreflightChoice | null) => void;
+  } | null>(null);
+  const confirmAttachments = useCallback(
+    (count: number) =>
+      new Promise<AttachmentPreflightChoice | null>((resolve) => {
+        setExportPreflight({ count, resolve });
+      }),
+    [],
+  );
+  // PDF pre-export exclusion notice (MYND-255 task 5) — same promise-
+  // backed pattern: the payload state mounts `NotePdfExportNotice`, and
+  // settling either way unmounts it.
+  const [pdfPreflight, setPdfPreflight] = useState<{
+    excluded: readonly ExcludedAttachment[];
+    resolve: (proceed: boolean) => void;
+  } | null>(null);
+  const confirmPdfExclusions = useCallback(
+    (excluded: readonly ExcludedAttachment[]) =>
+      new Promise<boolean>((resolve) => {
+        setPdfPreflight({ excluded, resolve });
+      }),
+    [],
+  );
+  // If the Editor unmounts mid-question (lock / force-relock), resolve
+  // any pending pre-flight with its cancel value so the awaiting flow
+  // (and, on the PDF path, its held body string) isn't stranded forever.
+  const exportPreflightRef = useRef(exportPreflight);
+  exportPreflightRef.current = exportPreflight;
+  const pdfPreflightRef = useRef(pdfPreflight);
+  pdfPreflightRef.current = pdfPreflight;
+  useEffect(
+    () => () => {
+      exportPreflightRef.current?.resolve(null);
+      pdfPreflightRef.current?.resolve(false);
+    },
+    [],
+  );
+  const exportHooks = useMemo<NoteExportUiHooks>(
+    () => ({
+      showToast: showExportToast,
+      confirmAttachments,
+      confirmPdfExclusions,
+    }),
+    [showExportToast, confirmAttachments, confirmPdfExclusions],
+  );
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   // Backup-export modal (MYND-56 task 1).
   const [backupExportOpen, setBackupExportOpen] = useState<boolean>(false);
+  // Whole-vault markdown export modal (MYND-211 task 3) — same Editor-local
+  // boolean carve-out; opened from Settings → Storage and the palette.
+  const [vaultExportOpen, setVaultExportOpen] = useState<boolean>(false);
+  // Scope-dropdown options: the sidebar's folder-tree source, derived only
+  // while the modal is open (cache identity changes on every mutation).
+  const vaultExportFolders = useMemo(
+    () =>
+      vaultExportOpen ? collectFolderOptions(ctx.cache.values()) : [],
+    [vaultExportOpen, ctx.cache],
+  );
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
   const [graphOpen, setGraphOpen] = useState<boolean>(false);
+  // Tag browser (tag-system #2 / MYND-46): modal carve-out + an optional seed
+  // tag (set by the editor `#tag` chip, #3, to open filtered to one tag).
+  const [tagsOpen, setTagsOpen] = useState<boolean>(false);
+  const [tagsSeed, setTagsSeed] = useState<string | null>(null);
   // MYND-53 — Obsidian importer: the active-import modal + the onboarding offer
   // (shown on editor mount until dismissed once; IMPORTER_OFFER_KEY).
   const [importerOpen, setImporterOpen] = useState<boolean>(false);
@@ -389,7 +505,7 @@ function EditorChrome({
     (result: ImportResult) => {
       const skipped =
         result.skippedExisting > 0 ? ` · ${result.skippedExisting} skipped` : "";
-      setToastMessage(
+      showToastMessage(
         `Imported ${result.imported} ${result.imported === 1 ? "note" : "notes"}${skipped}`,
       );
       // Repopulate the sidebar so the imported notes appear immediately.
@@ -399,7 +515,7 @@ function EditorChrome({
           /* sidebar stays as-is until the next refresh — non-fatal */
         });
     },
-    [ctx, setToastMessage],
+    [ctx, showToastMessage],
   );
 
   // Cmd/Ctrl+Shift+G toggles the whole-vault graph (MYND-198, SYNC-7) — the
@@ -417,6 +533,21 @@ function EditorChrome({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  // Editor `#tag` chip click (tag-system #3 / MYND-45): the chip decoration
+  // dispatches a bubbling `myne-open-tag` event; open the tag browser seeded to
+  // that tag. A single Editor-level listener (the modal is Editor-global) — no
+  // per-pane prop threading.
+  useEffect(() => {
+    const onOpenTag = (e: Event) => {
+      const tag = (e as CustomEvent<{ tag?: string }>).detail?.tag;
+      if (typeof tag === "string" && tag !== "") {
+        setTagsSeed(tag);
+        setTagsOpen(true);
+      }
+    };
+    window.addEventListener("myne-open-tag", onOpenTag);
+    return () => window.removeEventListener("myne-open-tag", onOpenTag);
   }, []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) — reported up by
@@ -440,6 +571,21 @@ function EditorChrome({
   const layout = useEditorLayout();
   const rowRef = useRef<HTMLDivElement | null>(null);
 
+  // MYND-192 — transient responsive auto-collapse. When the window gets too
+  // narrow to fit the center editor + sidebars, the backlinks (right) pane
+  // yields first, then the notes (left). It is a non-persisted override:
+  // effective collapse = the user's persisted choice OR a width-forced
+  // collapse, and widening restores the manual state untouched. Feed the
+  // RENDERED widths (0 for a manually-collapsed side) so a collapsed side
+  // frees room for the other.
+  const forced = useResponsiveCollapse(
+    rowRef,
+    layout.leftCollapsed ? 0 : layout.leftWidth,
+    layout.rightCollapsed ? 0 : layout.rightWidth,
+  );
+  const leftCollapsed = layout.leftCollapsed || forced.forceLeftCollapsed;
+  const rightCollapsed = layout.rightCollapsed || forced.forceRightCollapsed;
+
   // MYND-170 (SYNC-9) exclusive active-state: selecting a note in the sidebar
   // (from ANY source — row click, keyboard nav, command palette, favorites,
   // jump-from-attachment) closes the Attachments view and returns the center
@@ -458,6 +604,17 @@ function EditorChrome({
     }
     setCenterView("editor");
   }, [ctx.selectedId]);
+
+  // MYND-173: the generic file-card's "Reveal in library" action fires a window
+  // event (the card lives in a CM6 widget, outside React). Open the attachments
+  // library in response. Select-by-id within the library is deferred (PRD open
+  // question) — this opens the library unfocused, which is the sanctioned
+  // first-cut fallback.
+  useEffect(() => {
+    const onReveal = () => setCenterView("attachments");
+    window.addEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
+    return () => window.removeEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
+  }, []);
 
   // MYND-166 selection bridges — two one-way syncs that never loop
   // (A only fires for a note open in NO pane; B only mirrors):
@@ -679,7 +836,7 @@ function EditorChrome({
         }}
       >
         <SidebarBootstrap />
-        {!layout.leftCollapsed && (
+        {!leftCollapsed && (
           <SidebarPane
             side="left"
             width={layout.leftWidth}
@@ -711,6 +868,7 @@ function EditorChrome({
               />
               <NotesSidebarList
                 onNewFromTemplate={() => setNewFromTemplateOpen(true)}
+                exportHooks={exportHooks}
               />
             </div>
           </SidebarPane>
@@ -723,6 +881,10 @@ function EditorChrome({
             style={{
               flex: 1,
               minWidth: 0,
+              // Allow this column to shrink below content height so the nested
+              // AttachmentsLibrary scroll area is bounded (flexbox min-height
+              // trap — the strip is fixed, the library fills + scrolls).
+              minHeight: 0,
               display: "flex",
               flexDirection: "column",
             }}
@@ -743,11 +905,11 @@ function EditorChrome({
             node={ws.root}
             focusedPaneId={ws.focusedPaneId}
             onReadout={onReadout}
-            leftInset={layout.leftCollapsed ? LEFT_CLEARANCE : 0}
-            rightInset={layout.rightCollapsed ? RIGHT_CLEARANCE : 0}
+            leftInset={leftCollapsed ? LEFT_CLEARANCE : 0}
+            rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
           />
         )}
-        {centerView !== "attachments" && !layout.rightCollapsed && (
+        {centerView !== "attachments" && !rightCollapsed && (
           <SidebarPane
             side="right"
             width={layout.rightWidth}
@@ -766,12 +928,31 @@ function EditorChrome({
       {/* Sidebar toggles, floated into the editor's top corners (the title-bar
           row), level with the macOS traffic lights. */}
       <div
-        style={{ position: "absolute", top: 6, left: LEFT_TOGGLE_X, zIndex: 30 }}
+        style={{
+          position: "absolute",
+          top: 6,
+          left: LEFT_TOGGLE_X,
+          zIndex: 30,
+          display: "flex",
+          alignItems: "center",
+          gap: TITLE_BAR_CLUSTER_GAP,
+        }}
       >
         <TitleBarToggle
           side="left"
-          collapsed={layout.leftCollapsed}
+          collapsed={leftCollapsed}
           onToggle={layout.toggleLeftCollapsed}
+          disabled={forced.forceLeftCollapsed}
+        />
+        <TitleBarNavButton
+          direction="back"
+          onClick={ws.goBack}
+          disabled={!ws.canGoBack}
+        />
+        <TitleBarNavButton
+          direction="forward"
+          onClick={ws.goForward}
+          disabled={!ws.canGoForward}
         />
       </div>
       {centerView !== "attachments" && (
@@ -785,14 +966,19 @@ function EditorChrome({
         >
           <TitleBarToggle
             side="right"
-            collapsed={layout.rightCollapsed}
+            collapsed={rightCollapsed}
             onToggle={layout.toggleRightCollapsed}
+            disabled={forced.forceRightCollapsed}
           />
         </div>
       )}
       <BottomBar
         onOpenSettings={() => setSettingsOpen(true)}
         onShowGraph={() => setGraphOpen(true)}
+        onShowTags={() => {
+          setTagsSeed(null);
+          setTagsOpen(true);
+        }}
         onLockFlushed={handleLockFlushed}
         saveStatus={readout.status}
         onRetry={readout.retry}
@@ -802,7 +988,7 @@ function EditorChrome({
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        onShowToast={setToastMessage}
+        onShowToast={showToastMessage}
         onForceRelock={onForceRelock}
         onDeleteVaultSuccess={onDeleteVaultSuccess}
         onImportObsidian={() => {
@@ -817,11 +1003,20 @@ function EditorChrome({
           setSettingsOpen(false);
           onRestoreBackup();
         }}
+        onExportVault={() => {
+          setSettingsOpen(false);
+          setVaultExportOpen(true);
+        }}
       />
       <BackupExportModal
         open={backupExportOpen}
         onClose={() => setBackupExportOpen(false)}
-        onShowToast={setToastMessage}
+        onShowToast={showToastMessage}
+      />
+      <VaultExportModal
+        open={vaultExportOpen}
+        onClose={() => setVaultExportOpen(false)}
+        folders={vaultExportFolders}
       />
       <TemplatesManager
         open={templatesOpen}
@@ -862,6 +1057,13 @@ function EditorChrome({
         }}
       />
       <GraphView open={graphOpen} onClose={() => setGraphOpen(false)} />
+      <Suspense fallback={null}>
+        <TagBrowser
+          open={tagsOpen}
+          onClose={() => setTagsOpen(false)}
+          seedTagKey={tagsSeed}
+        />
+      </Suspense>
       <ObsidianImportModal
         open={importerOpen}
         onClose={() => setImporterOpen(false)}
@@ -886,6 +1088,10 @@ function EditorChrome({
           setPaletteOpen(false);
           setBackupExportOpen(true);
         }}
+        onExportVaultMarkdown={() => {
+          setPaletteOpen(false);
+          setVaultExportOpen(true);
+        }}
         onOpenAttachments={() => {
           setPaletteOpen(false);
           setCenterView("attachments");
@@ -906,9 +1112,35 @@ function EditorChrome({
           setPaletteOpen(false);
           setSnapshotsOpen(true);
         }}
+        onExportNoteMarkdown={() => {
+          // Same shared flow as the sidebar context-menu item (MYND-116) —
+          // zero divergence. The action is hidden when no note is selected
+          // (registry visibility), so the null check is defensive only.
+          setPaletteOpen(false);
+          const id = ctx.selectedId;
+          if (id === null) return;
+          void runNoteExportFlow(
+            noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
+          );
+        }}
+        onExportNotePdf={() => {
+          // PDF sibling (MYND-255) — same shared-flow discipline as the
+          // markdown action above.
+          setPaletteOpen(false);
+          const id = ctx.selectedId;
+          if (id === null) return;
+          void runNotePdfExportFlow(
+            noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
+          );
+        }}
         onShowGraph={() => {
           setPaletteOpen(false);
           setGraphOpen(true);
+        }}
+        onShowTags={() => {
+          setPaletteOpen(false);
+          setTagsSeed(null);
+          setTagsOpen(true);
         }}
         onLockFlushed={async () => {
           setPaletteOpen(false);
@@ -916,16 +1148,50 @@ function EditorChrome({
         }}
         onToggleLeftSidebar={() => {
           setPaletteOpen(false);
-          layout.toggleLeftCollapsed();
+          // MYND-192 — a width-forced collapse can't be toggled away (and
+          // must not persist a manual flip the narrow window imposed).
+          if (!forced.forceLeftCollapsed) layout.toggleLeftCollapsed();
         }}
         onToggleRightSidebar={() => {
           setPaletteOpen(false);
-          layout.toggleRightCollapsed();
+          if (!forced.forceRightCollapsed) layout.toggleRightCollapsed();
         }}
       />
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
       <WorkspaceHotkeys />
-      <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
+      <NoteExportModal
+        open={exportPreflight !== null}
+        attachmentCount={exportPreflight?.count ?? 0}
+        onCancel={() => {
+          exportPreflight?.resolve(null);
+          setExportPreflight(null);
+        }}
+        onConfirm={(includeAttachments) => {
+          exportPreflight?.resolve({ includeAttachments });
+          setExportPreflight(null);
+        }}
+      />
+      <NotePdfExportNotice
+        open={pdfPreflight !== null}
+        excludedAttachments={pdfPreflight?.excluded ?? []}
+        onCancel={() => {
+          pdfPreflight?.resolve(false);
+          setPdfPreflight(null);
+        }}
+        onConfirm={() => {
+          pdfPreflight?.resolve(true);
+          setPdfPreflight(null);
+        }}
+      />
+      <Toast
+        message={toast?.message ?? null}
+        action={toast?.action}
+        // Action-bearing toasts (export success "Show in folder") get the
+        // soft-trash Undo precedent's 6 s window (NoteList.tsx) — 2.5 s is
+        // not enough to read the message AND click the inline action.
+        durationMs={toast?.action !== undefined ? 6000 : 2500}
+        onDone={() => setToast(null)}
+      />
     </div>
     </CenterViewProvider>
   );
@@ -943,6 +1209,25 @@ const SIDEBAR_COLUMN_STYLE: CSSProperties = {
 
 /** Fixed width of a `TitleBarToggle` button. */
 const TITLE_BAR_TOGGLE_WIDTH = 30;
+/** Fixed width of a back / forward `TitleBarNavButton` (MYND-260). */
+const TITLE_BAR_NAV_WIDTH = 26;
+/** Gap between the left toggle and each nav button in the top-left cluster. */
+const TITLE_BAR_CLUSTER_GAP = 2;
+/** Shared chrome-button styling for the floated title-bar controls (sidebar
+ *  toggle + back/forward nav). Each button adds its own `width` and the
+ *  disabled-dependent `cursor`/`opacity`. */
+const TITLE_BAR_BUTTON_BASE: CSSProperties = {
+  display: "flex",
+  alignSelf: "center",
+  alignItems: "center",
+  justifyContent: "center",
+  height: 26,
+  flexShrink: 0,
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-3)",
+};
 
 // Sidebar toggles float in the editor's top corners (the OS title-bar row),
 // Obsidian-style — there is no separate top bar; each top pane's tab strip
@@ -953,8 +1238,12 @@ const TITLE_BAR_TOGGLE_WIDTH = 30;
 const LEFT_TOGGLE_X = IS_MAC ? TRAFFIC_LIGHT_GAP + 16 : 12;
 /** Right toggle's x offset from the right edge. */
 const RIGHT_TOGGLE_X = 8;
+/** Full width of the top-left control cluster: the sidebar toggle plus the
+ *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
+const LEFT_CONTROLS_WIDTH =
+  TITLE_BAR_TOGGLE_WIDTH + 2 * (TITLE_BAR_CLUSTER_GAP + TITLE_BAR_NAV_WIDTH);
 /** Left clearance: the top-left surface must keep its content past this. */
-const LEFT_CLEARANCE = LEFT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
+const LEFT_CLEARANCE = LEFT_TOGGLE_X + LEFT_CONTROLS_WIDTH + 8;
 /** Right clearance: the top-right surface must keep its content before this. */
 const RIGHT_CLEARANCE = RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
 
@@ -999,10 +1288,15 @@ function TitleBarToggle({
   side,
   collapsed,
   onToggle,
+  disabled = false,
 }: {
   side: "left" | "right";
   collapsed: boolean;
   onToggle: () => void;
+  /** MYND-192 — true when the sidebar is collapsed by a too-narrow window;
+   *  the toggle is inert (can't expand into space that isn't there, and
+   *  must not persist a manual flip the responsive override imposed). */
+  disabled?: boolean;
 }) {
   const icon =
     side === "left"
@@ -1019,24 +1313,58 @@ function TitleBarToggle({
     <button
       type="button"
       onClick={onToggle}
+      disabled={disabled}
       aria-label={label}
       title={label}
+      data-testid="editor.sidebar-toggle"
+      data-side={side}
+      data-collapsed={collapsed ? "true" : "false"}
       style={{
-        display: "flex",
-        alignSelf: "center",
-        alignItems: "center",
-        justifyContent: "center",
+        ...TITLE_BAR_BUTTON_BASE,
         width: TITLE_BAR_TOGGLE_WIDTH,
-        height: 26,
-        flexShrink: 0,
-        border: 0,
-        borderRadius: "var(--radius-1)",
-        background: "transparent",
-        color: "var(--fg-3)",
-        cursor: "pointer",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.4 : 1,
       }}
     >
       <Icon name={icon} size={16} />
+    </button>
+  );
+}
+
+/**
+ * Back / forward note-navigation button (MYND-260), sitting in the top-left
+ * cluster immediately right of the left sidebar toggle. Browser-style: steps
+ * the focused pane through the sequence of notes it has shown. Disabled
+ * (greyed) when there is no history in that direction — matching the
+ * `TitleBarToggle` disabled treatment.
+ */
+function TitleBarNavButton({
+  direction,
+  onClick,
+  disabled,
+}: {
+  direction: "back" | "forward";
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  const label = direction === "back" ? "Go back" : "Go forward";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      data-testid={`editor.nav-${direction}`}
+      data-disabled={disabled ? "true" : "false"}
+      style={{
+        ...TITLE_BAR_BUTTON_BASE,
+        width: TITLE_BAR_NAV_WIDTH,
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      <Icon name={direction === "back" ? "arrow-left" : "arrow-right"} size={16} />
     </button>
   );
 }
@@ -1055,9 +1383,13 @@ type CommandPaletteHostProps = {
   onManageTemplates: () => void;
   onNewNoteFromTemplate: () => void;
   onOpenSnapshots: () => void;
+  onExportNoteMarkdown: () => void;
+  onExportNotePdf: () => void;
   onShowGraph: () => void;
+  onShowTags: () => void;
   onImportObsidian: () => void;
   onBackupVault: () => void;
+  onExportVaultMarkdown: () => void;
   onLockFlushed: () => Promise<void>;
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
@@ -1071,9 +1403,13 @@ function CommandPaletteHost({
   onManageTemplates,
   onNewNoteFromTemplate,
   onOpenSnapshots,
+  onExportNoteMarkdown,
+  onExportNotePdf,
   onShowGraph,
+  onShowTags,
   onImportObsidian,
   onBackupVault,
+  onExportVaultMarkdown,
   onLockFlushed,
   onToggleLeftSidebar,
   onToggleRightSidebar,
@@ -1129,9 +1465,13 @@ function CommandPaletteHost({
       onOpenTodayNote,
       onOpenAttachments,
       onOpenSnapshots,
+      onExportNoteMarkdown,
+      onExportNotePdf,
       onShowGraph,
+      onShowTags,
       onImportObsidian,
       onBackupVault,
+      onExportVaultMarkdown,
       onToggleLeftSidebar,
       onToggleRightSidebar,
       onSelectNote: async (id) => {
@@ -1150,9 +1490,13 @@ function CommandPaletteHost({
       onOpenTodayNote,
       onOpenAttachments,
       onOpenSnapshots,
+      onExportNoteMarkdown,
+      onExportNotePdf,
       onShowGraph,
+      onShowTags,
       onImportObsidian,
       onBackupVault,
+      onExportVaultMarkdown,
       onToggleLeftSidebar,
       onToggleRightSidebar,
     ],
@@ -1270,22 +1614,26 @@ function SidebarBootstrap() {
  *   Ctrl+Tab / +Shift       next / prev tab in the focused pane
  *   Cmd/Ctrl+\ / +Shift     split the focused pane right / down
  *   Cmd/Ctrl+Alt+Arrows     move focus to the next / prev pane
+ *   Cmd/Ctrl+[ / ]          navigate back / forward through note history
  */
+// True when keystrokes are landing in a plain (non-editor) text field — a
+// sidebar rename / search box — where the window shortcuts must stand down.
+// The CM6 surface (`.cm-content`) is NOT plain: shortcuts stay live there.
+function isTypingInPlainInput(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return (
+    (tag === "input" || tag === "textarea") &&
+    !target.classList.contains("cm-content")
+  );
+}
+
 function WorkspaceHotkeys() {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target !== null) {
-        const tag = target.tagName.toLowerCase();
-        if (
-          (tag === "input" || tag === "textarea") &&
-          !target.classList.contains("cm-content")
-        ) {
-          return;
-        }
-      }
+      if (isTypingInPlainInput(e.target)) return;
       const mod = e.metaKey || e.ctrlKey;
 
       // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused pane.
@@ -1348,6 +1696,29 @@ function WorkspaceHotkeys() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [ws, ctx]);
+
+  // Cmd/Ctrl+[ and ] — back / forward through note history (MYND-260). These
+  // live in their OWN capture-phase listener rather than the bubble-phase
+  // switch above because CM's `defaultKeymap` binds `Mod-[`/`Mod-]` to
+  // indentLess/indentMore and consumes them in its own DOM handlers: a
+  // bubble-phase handler would fire too late (CM already indented). Capturing
+  // at the window first + `stopPropagation` keeps the chord from reaching CM,
+  // so it navigates instead of indenting. Skips a plain (non-editor) input so
+  // a sidebar rename field still types brackets normally.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.key !== "[" && e.key !== "]") return;
+      if (isTypingInPlainInput(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "[") ws.goBack();
+      else ws.goForward();
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [ws]);
+
   return null;
 }
 
@@ -1580,6 +1951,8 @@ interface BottomBarProps {
   /** Open the whole-vault graph (the persistent wedge-first-class affordance,
    *  SYNC-7) — parallel to the settings gear. */
   onShowGraph?: () => void;
+  /** Open the tag browser (persistent affordance, SYNC-7 refinement, MYND-46). */
+  onShowTags?: () => void;
   saveStatus: SaveStatusValue;
   onRetry: () => void;
   /** Hide the save-status badge entirely when no note is selected
@@ -1596,6 +1969,7 @@ function BottomBar({
   onLockFlushed,
   onOpenSettings,
   onShowGraph,
+  onShowTags,
   saveStatus,
   onRetry,
   hideSaveStatus = false,
@@ -1623,6 +1997,28 @@ function BottomBar({
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {!hideSaveStatus && <SaveStatusBadge status={saveStatus} onRetry={onRetry} />}
+        {onShowTags && (
+          <button
+            type="button"
+            onClick={onShowTags}
+            aria-label="Browse tags"
+            data-testid="editor.tags-cta"
+            title="Tags"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="hash" size={14} />
+          </button>
+        )}
         {onShowGraph && (
           <button
             type="button"

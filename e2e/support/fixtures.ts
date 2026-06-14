@@ -31,12 +31,48 @@ export interface SeededVault {
   phrase: string;
   /** 27-char display account number. */
   account: string;
+  /** Present only when seeded with `exportSuite: true`. */
+  exportSuite?: ExportSuite;
+}
+
+/** One attachment of the MYND-116 note-export suite. */
+export interface ExportSuiteAttachment {
+  /** 64-char lowercase-hex attachment-id (blob filename + embed target). */
+  idHex: string;
+  /** Catalog display filename — BOTH suite attachments share it, so the
+   *  export dedups the second to `"evidence (1).png"`. */
+  filename: string;
+  /** Exact plaintext file bytes (ASCII by construction). */
+  contents: string;
+  contentType: string;
+}
+
+/** Pre-baked note-export content (`--export-suite`): a note WITHOUT
+ *  attachment refs (byte-verbatim export oracle), a note WITH two
+ *  colliding-filename form-C embeds, and a note WITH one `.pdf` embed
+ *  (the MYND-255 PDF-export exclusion-notice bait) + MYA1 blobs + MYC1
+ *  catalog. The plaintexts are the generator's exact written bytes —
+ *  in-source scenario content, not credentials. */
+export interface ExportSuite {
+  plainNoteId: string;
+  plainNotePlaintext: string;
+  attachmentsNoteId: string;
+  attachmentsNotePlaintext: string;
+  /** The two image attachments, in first-appearance (= export-naming)
+   *  order — the `.pdf` bait rides `pdfAttachment` separately. */
+  attachments: ExportSuiteAttachment[];
+  /** Note WITH one form-C `.pdf` embed (MYND-255). */
+  pdfNoteId: string;
+  pdfNotePlaintext: string;
+  pdfAttachment: ExportSuiteAttachment;
 }
 
 export interface SeedOptions {
   kdf?: "weak" | "production";
   count?: number;
   password?: string;
+  /** Lay the MYND-116 note-export suite into every seeded vault. */
+  exportSuite?: boolean;
 }
 
 /** § 9.3 field offsets in vault.meta — lockstep mirror of
@@ -102,6 +138,7 @@ export function seedVaults(appDataDir: string, opts: SeedOptions = {}): SeededVa
     opts.kdf ?? "weak",
   ];
   if (opts.password) args.push("--password", opts.password);
+  if (opts.exportSuite) args.push("--export-suite");
   let stdout: string;
   try {
     stdout = execFileSync(bin, args, {

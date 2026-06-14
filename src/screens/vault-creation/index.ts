@@ -6,6 +6,7 @@
 export {
   vaultCreationReducer,
   initialState,
+  makeInitialState,
   normalizeWord,
   isSensitiveStep,
 } from "./reducer";

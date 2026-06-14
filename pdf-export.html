@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- Hidden PDF-export render page (MYND-255). Loaded ONLY by the Rust
+     `pdf-export` plugin into the invisible `pdf-export` window
+     (src-tauri/src/plugins/pdf_export/commands.rs). The page script
+     fetches the staged HTML projection, settles fonts/images, and
+     signals readiness — see src/pdf-export/main.ts. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Myne</title>
+  </head>
+
+  <body>
+    <script type="module" src="/src/pdf-export/main.ts"></script>
+  </body>
+</html>

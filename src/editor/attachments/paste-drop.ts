@@ -38,12 +38,13 @@ interface PendingFile {
   readonly mime: string;
 }
 
-/** The importable MIME prefixes/types we attempt (the host re-sniffs +
- *  enforces the real allowlist; this is just a cheap pre-filter so a plain
- *  text paste/drop is never hijacked). */
-function isImportableMime(mime: string): boolean {
-  return mime.startsWith("image/") || mime === "application/pdf";
-}
+// Since MYND-173 the host accepts ANY file bytes (a non-allowlisted type is
+// stored as an opaque, export-only attachment), so every file the user
+// explicitly pastes or drops is importable — there is no MIME pre-filter.
+// What still guards against hijacking a plain TEXT paste/drop is the
+// `kind:"file"` item check (paste) and the `files.length` check (drop): a
+// text paste carries only `kind:"string"` items and an empty `files` list,
+// and a sidebar note-reorder drag carries no files at all.
 
 /** Read a `File`/`Blob` into a plain number[] (the IPC byte shape). */
 async function readFileBytes(file: Blob): Promise<number[]> {
@@ -61,7 +62,7 @@ async function collectFromClipboard(
   for (const item of Array.from(data.items)) {
     if (item.kind !== "file") continue;
     const file = item.getAsFile();
-    if (file === null || !isImportableMime(file.type)) continue;
+    if (file === null) continue;
     const bytes = await readFileBytes(file);
     // A pasted screenshot has an empty `name`; auto-generate per decision 1.
     const filename = file.name && file.name.trim() !== ""
@@ -76,7 +77,6 @@ async function collectFromClipboard(
 async function collectFromDrop(data: DataTransfer): Promise<PendingFile[]> {
   const out: PendingFile[] = [];
   for (const file of Array.from(data.files)) {
-    if (!isImportableMime(file.type)) continue;
     const bytes = await readFileBytes(file);
     const filename = file.name && file.name.trim() !== ""
       ? file.name
@@ -167,11 +167,9 @@ export function attachmentPasteDropExtension(): Extension {
     paste: (event, view) => {
       const data = event.clipboardData;
       if (data === null) return false;
-      // Only hijack when the clipboard carries a file item (image paste).
-      // A normal text paste has no `kind:"file"` items → fall through.
-      const hasFile = Array.from(data.items).some(
-        (i) => i.kind === "file" && isImportableMime(i.type),
-      );
+      // Only hijack when the clipboard carries a file item (image/file
+      // paste). A normal text paste has no `kind:"file"` items → fall through.
+      const hasFile = Array.from(data.items).some((i) => i.kind === "file");
       if (!hasFile) return false;
       event.preventDefault();
       const insertAt = view.state.selection.main.head;
@@ -182,14 +180,10 @@ export function attachmentPasteDropExtension(): Extension {
     },
     drop: (event, view) => {
       const data = event.dataTransfer;
+      // Act only when the drop carries files; otherwise let CM handle it
+      // (e.g. dragged text). A sidebar note-reorder drag carries no files, so
+      // it is never intercepted here.
       if (data === null || data.files.length === 0) return false;
-      // Only act when at least one dropped file is importable; otherwise let
-      // CM handle it (e.g. dragged text). This also means a sidebar
-      // note-reorder drag — which carries no files — is never intercepted.
-      const hasImportable = Array.from(data.files).some((f) =>
-        isImportableMime(f.type),
-      );
-      if (!hasImportable) return false;
       event.preventDefault();
       // Insert at the drop coordinates if resolvable, else at the cursor.
       const dropPos = view.posAtCoords({ x: event.clientX, y: event.clientY });

@@ -2,17 +2,26 @@
 //! (MYND-169, sub-feature 2 — `attachments-crypto-pipeline`).
 //!
 //! A tiny, dependency-free sniffer. The v0.1 allowlist is the raster
-//! image set (PNG / JPEG / GIF / WebP), SVG, and PDF — the union of
-//! what the editor renders inline and the library can preview. Anything
-//! outside this set is rejected at the import door (`attachment_import`)
-//! and is never emitted as a served content-type by the `attachment://`
-//! handler.
+//! image set (PNG / JPEG / GIF / WebP), SVG, PDF, and WAV audio
+//! (MYND-259) — the union of what the editor renders inline and the
+//! library can preview. This set governs what the `attachment://`
+//! handler is permitted to SERVE; it is never emitted for anything
+//! outside the set.
+//!
+//! Since MYND-173 the allowlist no longer gates IMPORT. `attachment_import`
+//! accepts arbitrary bytes; a type the sniffer does not recognize is
+//! stored as an opaque `application/octet-stream` attachment that renders
+//! in the editor as an export-only file-card and is never served inline.
+//! The render allowlist is therefore a *serve-time* authority, not an
+//! import gate — the XSS-defense invariant lives entirely on the serve
+//! path (re-sniff + octet-stream fallback), where a `.png`-renamed binary
+//! still cannot become a scriptable served resource.
 //!
 //! ## Why a hand-rolled sniffer (no `infer` / `tree_magic` dep)
 //!
 //! Adding a crate is a security decision (`CLAUDE.md` "minimal
-//! direct-dependency surface"). The allowlist is six formats with
-//! short, well-known magic prefixes; a ~40-line match beats a
+//! direct-dependency surface"). The allowlist is seven formats with
+//! short, well-known magic prefixes; a ~50-line match beats a
 //! general-purpose MIME-detection crate's transitive surface. The
 //! sniffer is deliberately strict — it recognizes ONLY the allowlisted
 //! formats, returning [`None`] for everything else (no "best guess"
@@ -21,9 +30,9 @@
 //! ## Two call sites, one authority
 //!
 //! - **Import** ([`super::commands::attachment_import`]): sniff the
-//!   bytes the user pasted / dropped / picked; reject if the sniff
-//!   returns [`None`] (unsupported) so a `.exe` renamed `.png` never
-//!   enters the vault.
+//!   bytes the user pasted / dropped / picked to classify renderables;
+//!   a [`None`] sniff is stored as `application/octet-stream` (an
+//!   export-only file-card), not rejected (MYND-173).
 //! - **Serve** (`attachment://` handler in `lib.rs`): re-sniff the
 //!   DECRYPTED bytes and emit ONLY the sniffed allowlisted type — never
 //!   the catalog's stored `content_type` hint, and never `text/html`
@@ -55,6 +64,7 @@ pub const ALLOWLISTED_CONTENT_TYPES: &[&str] = &[
     "image/webp",
     "image/svg+xml",
     "application/pdf",
+    "audio/wav",
 ];
 
 /// Sniff the content type of `bytes` against the v0.1 attachment
@@ -82,6 +92,13 @@ pub fn sniff_content_type(bytes: &[u8]) -> Option<&'static str> {
     // WebP: "RIFF" .... "WEBP" (RIFF container, 4-byte size, then WEBP).
     if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
         return Some("image/webp");
+    }
+    // WAV: "RIFF" .... "WAVE" (RIFF container, 4-byte size, then WAVE).
+    // Same RIFF family as WebP, distinguished by the form-type at [8..12].
+    // Voice notes (MYND-259) record/import as WAV; the recorder emits
+    // canonical "WAVE" containers and imported audio is recognized here.
+    if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WAVE" {
+        return Some("audio/wav");
     }
     // PDF: "%PDF-"
     if bytes.starts_with(b"%PDF-") {
@@ -170,13 +187,35 @@ mod tests {
     }
 
     #[test]
-    fn riff_that_is_not_webp_rejects() {
-        // RIFF/WAVE is a RIFF container but not WebP — must reject.
+    fn sniffs_wav() {
+        // RIFF <4-byte size> WAVE — a canonical WAV container (MYND-259).
         let mut wav = Vec::new();
         wav.extend_from_slice(b"RIFF");
         wav.extend_from_slice(&[0x1A, 0x00, 0x00, 0x00]);
         wav.extend_from_slice(b"WAVEfmt ");
-        assert_eq!(sniff_content_type(&wav), None);
+        assert_eq!(sniff_content_type(&wav), Some("audio/wav"));
+    }
+
+    #[test]
+    fn riff_that_is_neither_webp_nor_wave_rejects() {
+        // A RIFF container that is neither WebP nor WAV (e.g. AVI) must
+        // reject — RIFF alone is not an allowlisted form-type.
+        let mut avi = Vec::new();
+        avi.extend_from_slice(b"RIFF");
+        avi.extend_from_slice(&[0x1A, 0x00, 0x00, 0x00]);
+        avi.extend_from_slice(b"AVI LIST");
+        assert_eq!(sniff_content_type(&avi), None);
+    }
+
+    #[test]
+    fn riff_wave_distinguished_from_webp() {
+        // The two RIFF forms must not collide: WEBP→image, WAVE→audio.
+        let mut webp = Vec::new();
+        webp.extend_from_slice(b"RIFF\x1A\x00\x00\x00WEBP");
+        assert_eq!(sniff_content_type(&webp), Some("image/webp"));
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF\x1A\x00\x00\x00WAVE");
+        assert_eq!(sniff_content_type(&wav), Some("audio/wav"));
     }
 
     #[test]
@@ -257,6 +296,7 @@ mod tests {
             b"RIFF\x00\x00\x00\x00WEBP",
             b"%PDF-1.4",
             b"<svg></svg>",
+            b"RIFF\x00\x00\x00\x00WAVE",
         ];
         for s in samples {
             let mime = sniff_content_type(s).expect("sample must sniff");

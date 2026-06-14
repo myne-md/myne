@@ -22,9 +22,32 @@
 //! a failed write never leaves a stray temp sibling. The one deliberate
 //! exception is the `StopBeforeRename` crash *simulation* (test-only,
 //! below), which leaves the temp on disk exactly as a real power loss
-//! would. Note the temp always holds **ciphertext** — callers hand
-//! `atomic_write` already-encoded blobs — so even a leftover temp never
-//! exposes plaintext.
+//! would. Note the temp holds **ciphertext** for every vault-resident
+//! caller — they hand `atomic_write` already-encoded blobs — so a
+//! leftover temp inside the vault never exposes plaintext. The
+//! user-initiated export commands (MYND-115/211/255) are the plaintext
+//! exception: their temp sibling lives at the **user-chosen export
+//! destination**, which is plaintext by the user's own intent
+//! (threat-model TB3 egress exception), never inside the vault. See
+//! `src-tauri/CLAUDE.md` "Atomic file writes" (amended 2026-06-11).
+//!
+//! ## Export-destination writes: [`atomic_write_unclobbered`]
+//!
+//! [`atomic_write`]'s fixed `<path>.tmp` temp name is safe inside the
+//! vault (the vault namespace is ours; nothing else may live there) but
+//! UNSAFE at a user-owned export destination, where (a) a pre-existing
+//! user file literally named `<target>.tmp` would be silently truncated
+//! and renamed away, and (b) within one attachments-export run a file
+//! this very run exported under the name `x.png.tmp` would be destroyed
+//! by the later `x.png` write's temp (115-F1). Export callers therefore
+//! use [`atomic_write_unclobbered`]: identical durability mechanics
+//! (temp `sync_all` → platform rename → parent sync, failure-path temp
+//! cleanup), but the temp gets a randomized
+//! `<path>.<pid>-<counter>.tmp` name opened `create_new(true)` — a
+//! collision with ANY pre-existing file (however named) retries with
+//! the next counter instead of truncating. Vault-internal callers stay
+//! on [`atomic_write`] (fixed temp name is part of the recognized-
+//! artifact vocabulary, e.g. `vault.meta.tmp` recovery detection).
 //!
 //! ## Interrupted-write recovery test seam (MYND-88)
 //!
@@ -79,6 +102,96 @@ use std::path::Path;
 ///   vault).
 pub fn atomic_write(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
     atomic_write_inner(path, bytes, replace, Fault::None)
+}
+
+/// Export-destination-safe variant of [`atomic_write`] (115-F1): same
+/// `replace` semantics and durability story, but the temp sibling gets
+/// a randomized `<path>.<pid>-<counter>.tmp` name opened with
+/// `create_new(true)`, so the write can never truncate or rename away a
+/// pre-existing file at the user-owned destination — a name collision
+/// (pathological user file shaped exactly like a candidate temp)
+/// retries with the next counter instead. Use this for every write
+/// whose parent directory the USER owns (note/attachment/PDF exports,
+/// the vault-export staging tree); vault-internal writes stay on
+/// [`atomic_write`]. See the module-level "Export-destination writes"
+/// section.
+pub fn atomic_write_unclobbered(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
+    if !replace && path.exists() {
+        return Err(std::io::ErrorKind::AlreadyExists.into());
+    }
+
+    let (tmp, mut f) = open_unclobbered_temp(path, &UNCLOBBERED_TEMP_COUNTER)?;
+
+    // Same failure-path cleanup contract as `atomic_write`: a returned
+    // error drops the partial temp on the way out (best-effort; the
+    // original error is the one surfaced). The temp is OURS to remove —
+    // `create_new(true)` proved no pre-existing file had that name.
+    if let Err(e) = f.write_all(bytes).and_then(|()| f.sync_all()) {
+        drop(f);
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    // Release the handle before the rename (Windows requirement).
+    drop(f);
+
+    if let Err(e) = finalize_atomic(&tmp, path, replace) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+
+    Ok(())
+}
+
+/// Process-global monotonic token for [`atomic_write_unclobbered`] temp
+/// names — uniqueness within the process is structural (fetch_add);
+/// cross-process uniqueness rides the pid component.
+static UNCLOBBERED_TEMP_COUNTER: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+/// Bound on candidate-name retries: every attempt consumes a fresh
+/// counter value, so a retry only ever happens when a pre-existing
+/// user file occupies a `<name>.<pid>-<n>.tmp` shape — more than a
+/// handful of those is adversarial, bail closed.
+const UNCLOBBERED_TEMP_ATTEMPTS: u32 = 16;
+
+/// Pick a randomized temp sibling of `path` and open it
+/// `create_new(true)` (atomic create-or-fail — never truncates a
+/// pre-existing file). The counter is injected so tests can drive the
+/// collision-retry branch deterministically; production passes the
+/// process-global [`UNCLOBBERED_TEMP_COUNTER`].
+fn open_unclobbered_temp(
+    path: &Path,
+    counter: &std::sync::atomic::AtomicU64,
+) -> std::io::Result<(std::path::PathBuf, std::fs::File)> {
+    for _ in 0..UNCLOBBERED_TEMP_ATTEMPTS {
+        let token = counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let tmp = unclobbered_tmp_path(path, token);
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)
+        {
+            Ok(f) => return Ok((tmp, f)),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    // No path in the message (DENY-list discipline at every layer).
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "could not allocate a collision-free temp name at the export destination",
+    ))
+}
+
+/// `<path>.<pid>-<token>.tmp` — the randomized temp-sibling name shape
+/// of [`atomic_write_unclobbered`].
+fn unclobbered_tmp_path(path: &Path, token: u64) -> std::path::PathBuf {
+    let mut name = path
+        .file_name()
+        .map(|n| n.to_os_string())
+        .unwrap_or_default();
+    name.push(format!(".{}-{}.tmp", std::process::id(), token));
+    path.with_file_name(name)
 }
 
 /// Test-only fault-injection points for the [`atomic_write`] durability +
@@ -194,7 +307,7 @@ pub(crate) fn finalize_atomic(src: &Path, dst: &Path, _replace: bool) -> std::io
 }
 
 #[cfg(windows)]
-fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io::Result<()> {
+pub(crate) fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{
         MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
@@ -443,6 +556,125 @@ mod tests {
             !tmp.exists(),
             "temp must be cleaned up after finalize failure"
         );
+        assert!(target.is_dir(), "destination directory must be untouched");
+    }
+
+    // ---- atomic_write_unclobbered (export-destination variant, 115-F1) ----
+
+    #[test]
+    fn unclobbered_creates_file_with_expected_contents_and_no_residue() {
+        let dir = ScopedTempDir::new("unclob-creates").unwrap();
+        let target = dir.path().join("exported.md");
+
+        atomic_write_unclobbered(&target, b"plain markdown", false).unwrap();
+
+        assert_eq!(read_file(&target), b"plain markdown");
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name())
+            .collect();
+        assert_eq!(entries.len(), 1, "entries: {entries:?}");
+        assert_eq!(entries[0], "exported.md");
+    }
+
+    /// The headline 115-F1 contract: a pre-existing USER file that
+    /// happens to carry the fixed-temp name `<target>.tmp` survives
+    /// byte-identical through both `replace` modes (the legacy helper
+    /// would have truncated it and renamed it over the target).
+    #[test]
+    fn unclobbered_preserves_preexisting_user_tmp_sibling() {
+        let dir = ScopedTempDir::new("unclob-user-tmp").unwrap();
+        let target = dir.path().join("exported.md");
+        let user_tmp = dir.path().join("exported.md.tmp");
+        std::fs::write(&user_tmp, b"user file, not ours").unwrap();
+
+        // replace=false, target absent: write succeeds AROUND the user
+        // file.
+        atomic_write_unclobbered(&target, b"first", false).unwrap();
+        assert_eq!(read_file(&target), b"first");
+        assert_eq!(read_file(&user_tmp), b"user file, not ours");
+
+        // replace=true over the existing target: still untouched.
+        atomic_write_unclobbered(&target, b"second", true).unwrap();
+        assert_eq!(read_file(&target), b"second");
+        assert_eq!(read_file(&user_tmp), b"user file, not ours");
+
+        // replace=false against the now-existing target: rejected before
+        // any temp is opened; the user file is still untouched.
+        let err = atomic_write_unclobbered(&target, b"third", false)
+            .expect_err("replace=false must reject an existing destination");
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(read_file(&target), b"second");
+        assert_eq!(read_file(&user_tmp), b"user file, not ours");
+    }
+
+    #[test]
+    fn unclobbered_replace_false_rejects_existing_destination() {
+        let dir = ScopedTempDir::new("unclob-exists").unwrap();
+        let target = dir.path().join("file.bin");
+        std::fs::write(&target, b"original").unwrap();
+
+        let err = atomic_write_unclobbered(&target, b"replacement", false)
+            .expect_err("replace=false must reject when destination exists");
+
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(read_file(&target), b"original");
+    }
+
+    /// Drive the collision-retry branch deterministically with an
+    /// injected counter: candidates `<pid>-0` and `<pid>-1` are occupied
+    /// by (sentinel) user files, the third attempt wins, and the
+    /// occupied files are byte-untouched — `create_new` never truncates.
+    #[test]
+    fn unclobbered_temp_collision_retries_without_touching_existing_files() {
+        let dir = ScopedTempDir::new("unclob-collide").unwrap();
+        let target = dir.path().join("photo.png");
+        let occupied_0 = unclobbered_tmp_path(&target, 0);
+        let occupied_1 = unclobbered_tmp_path(&target, 1);
+        std::fs::write(&occupied_0, b"sentinel zero").unwrap();
+        std::fs::write(&occupied_1, b"sentinel one").unwrap();
+
+        let counter = std::sync::atomic::AtomicU64::new(0);
+        let (tmp, f) = open_unclobbered_temp(&target, &counter).unwrap();
+        drop(f);
+
+        assert_eq!(tmp, unclobbered_tmp_path(&target, 2));
+        assert_eq!(read_file(&occupied_0), b"sentinel zero");
+        assert_eq!(read_file(&occupied_1), b"sentinel one");
+        std::fs::remove_file(&tmp).unwrap();
+
+        // Exhausting every candidate bails closed with AlreadyExists.
+        for n in 0..u64::from(UNCLOBBERED_TEMP_ATTEMPTS) {
+            std::fs::write(unclobbered_tmp_path(&target, n), b"x").unwrap();
+        }
+        let counter = std::sync::atomic::AtomicU64::new(0);
+        let err = open_unclobbered_temp(&target, &counter)
+            .expect_err("a fully-occupied candidate space must bail closed");
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+    }
+
+    /// Force the rename step to fail (destination is a non-empty
+    /// directory) and assert the randomized temp is cleaned up — the
+    /// failure-path contract carries over from `atomic_write`.
+    #[cfg(unix)]
+    #[test]
+    fn unclobbered_finalize_failure_removes_temp() {
+        let dir = ScopedTempDir::new("unclob-finalize-fail").unwrap();
+        let target = dir.path().join("dest");
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("inner"), b"x").unwrap();
+
+        atomic_write_unclobbered(&target, b"payload", true)
+            .expect_err("rename of a file onto a directory must fail");
+
+        let stray: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".tmp"))
+            .collect();
+        assert!(stray.is_empty(), "temp must be cleaned up: {stray:?}");
         assert!(target.is_dir(), "destination directory must be untouched");
     }
 

@@ -20,3 +20,66 @@ export const UNLOCK_NON_DISTINGUISHING_BANNER =
  *  or per-cause detail). */
 export const RECOVERY_NON_DISTINGUISHING_BANNER =
   "Phrase or vault file is invalid. Please try again.";
+
+// The normative "honest about cost" sentence (PRODUCT.md principle 3 /
+// docs/design/README.md "Lost both secrets") — the irreversible
+// consequence of losing both credentials, stated plainly. Rendered
+// verbatim by PasswordStep's helper copy AND embedded in the first-run
+// safety briefing's recovery-phrase "Why?" (MYND-114); the briefing
+// component test asserts it as a substring of that "Why?" text. Single
+// source so a revision (a product-voice decision, not a copy edit) lands
+// in one place.
+
+/** "If you lose both …" — the canonical irreversibility sentence. */
+export const LOST_BOTH_SECRETS_SENTENCE =
+  "If you lose both your password and recovery phrase, your notes are unrecoverable. We cannot help.";
+
+// Per-note export pre-flight (MYND-116). The honest-egress sentence is
+// load-bearing UI honesty (TB3 plaintext egress is stated plainly, once,
+// never as a banner); the sub-label pins the attachments-placement
+// contract of `note_export_attachments` (files land beside the note).
+// E2E asserts both by FULL-literal equality — production renders the
+// constants verbatim (`NoteExportModal`).
+
+/** The one plain egress sentence of the per-note markdown export —
+ *  shown in the pre-flight modal when the note references attachments,
+ *  and carried as the OS save dialog's title on the common no-modal
+ *  path (`runNoteExportFlow`), so it is said exactly once at the
+ *  decision point either way. */
+export const EXPORT_PLAIN_MARKDOWN_SENTENCE =
+  "The exported file is plain Markdown — it is not encrypted.";
+
+/** Whole-vault export (MYND-211): the one plain egress sentence shown in
+ *  the vault-export modal's setup phase (`VaultExportModal`) — the
+ *  whole-tree sibling of `EXPORT_PLAIN_MARKDOWN_SENTENCE`. Same honesty
+ *  discipline: stated plainly, once, never as a banner; E2E asserts it by
+ *  FULL-literal equality. */
+export const VAULT_EXPORT_PLAIN_TREE_SENTENCE =
+  "The exported files are plain Markdown — they are not encrypted.";
+
+/** Muted sub-label under the "Include N attachments" toggle. */
+export const EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL =
+  "Files are placed in the same folder as the note.";
+
+// Per-note PDF export pre-flight (MYND-255). Same honesty discipline as
+// the markdown sentences above: the egress is stated plainly, once,
+// never as a banner; the exclusion sentence pins the product decision
+// that non-image attachment embeds (PDFs, archives, anything else the
+// projection cannot inline) are NOT carried into the generated PDF
+// (a muted in-document placeholder marks each position instead). The
+// notice (`NotePdfExportNotice`) renders both verbatim; E2E asserts
+// them by FULL-literal equality.
+
+/** The one plain egress sentence of the per-note PDF export — shown in
+ *  the pre-export notice when the projection excludes attachments, and
+ *  carried as the OS save dialog's title on the common no-notice path
+ *  (`runNotePdfExportFlow`), so it is said exactly once at the decision
+ *  point either way. */
+export const EXPORT_PDF_PLAIN_SENTENCE =
+  "The exported file is a plain PDF — it is not encrypted.";
+
+/** The attachment exclusion sentence (shown only when the note embeds
+ *  attachments the projection cannot include — every non-image type,
+ *  not just PDFs). */
+export const EXPORT_PDF_EXCLUSION_SENTENCE =
+  "Attached files (PDFs and other non-image attachments) are not included in the generated PDF.";

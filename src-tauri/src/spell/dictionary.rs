@@ -1,7 +1,7 @@
 //! Host-side personal-dictionary payload + persistence (MYND-266 tasks 4-5).
 //!
 //! The `vault.dictionary` inner plaintext (the `dict_format_version 0x01` format,
-//! per `protocol::dictionary_blob` / spec § 9.12.2) is a postcard-serialized
+//! per `protocol::dictionary_blob` / spec § 9.13.2) is a postcard-serialized
 //! `{personal_words, ignore_words}` struct. The protocol crate owns the crypto
 //! framing (MYD1 magic, AEAD, AAD) and treats this payload as opaque bytes; this
 //! module owns the serialization + the canonical set discipline (NFC-normalized,
@@ -48,7 +48,7 @@ impl PersonalDictionaryData {
     }
 
     /// Deserialize from postcard bytes. Returns `None` on a malformed payload
-    /// (the caller collapses to the empty dictionary, § 9.12.4).
+    /// (the caller collapses to the empty dictionary, § 9.13.4).
     pub fn decode(bytes: &[u8]) -> Option<Self> {
         postcard::from_bytes(bytes).ok()
     }

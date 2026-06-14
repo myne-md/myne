@@ -145,6 +145,98 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
+/// One canonical form-C embed occurrence located by
+/// [`extract_att_embed_spans`]: the byte span of the WHOLE embed
+/// (`![[` … `]]`, half-open `start..end`) plus the attachment-id it
+/// references (borrowed out of the body).
+#[derive(Debug, PartialEq, Eq)]
+pub struct AttEmbedSpan<'a> {
+    /// Byte offset of the embed's leading `!`.
+    pub start: usize,
+    /// Byte offset one past the closing `]]`.
+    pub end: usize,
+    /// The 64-char lowercase-hex attachment-id (without `att:`).
+    pub id: &'a str,
+}
+
+/// The canonical form-C id length: 64 lowercase-hex chars = the 32-byte
+/// attachment-id (`protocol.md` §9.9).
+const ATT_ID_HEX_LEN: usize = 64;
+
+/// Locate every **canonical** form-C embed in `note_body`, in document
+/// order, with exact byte spans — the scanner behind the export-side
+/// embed rewrite (MYND-115 `note_export_attachments`, the §6 sanctioned
+/// export transform).
+///
+/// Unlike [`extract_att_ids`] (the deliberately tolerant reconcile
+/// lower bound), this scanner matches ONLY the canonical emitted form —
+/// the byte-twin of the TS `extractAttachmentIds` regex
+/// (`src/notes/attachmentRef.ts`):
+/// `![[att:<64 lowercase hex>]]` or `![[att:<64 lowercase hex>|<alias
+/// without ']'>]]`, no interior whitespace tolerance. Byte-surgery must
+/// never fire on a near-miss: a malformed / non-canonical `![[att:…]]`
+/// stays untouched in the exported copy (it cannot resolve against the
+/// catalog anyway — catalog keys are exactly 64 lowercase hex).
+pub fn extract_att_embed_spans(note_body: &str) -> Vec<AttEmbedSpan<'_>> {
+    let bytes = note_body.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while let Some(rel) = find_subslice(&bytes[i..], b"![[att:") {
+        let open = i + rel;
+        match parse_canonical_embed_at(note_body, open) {
+            Some(span) => {
+                i = span.end;
+                out.push(span);
+            }
+            // Not the canonical form — step past the `!` so an
+            // overlapping later candidate is still scanned.
+            None => i = open + 1,
+        }
+    }
+    out
+}
+
+/// Parse the canonical embed starting at byte `open` (which the caller
+/// guarantees begins with `![[att:`). Returns `None` on any deviation
+/// from the canonical form.
+fn parse_canonical_embed_at(note_body: &str, open: usize) -> Option<AttEmbedSpan<'_>> {
+    let bytes = note_body.as_bytes();
+    let id_start = open + b"![[att:".len();
+    let id_end = id_start + ATT_ID_HEX_LEN;
+    let id_bytes = bytes.get(id_start..id_end)?;
+    if !id_bytes
+        .iter()
+        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b))
+    {
+        return None;
+    }
+    let end = match bytes.get(id_end)? {
+        b']' => {
+            if bytes.get(id_end + 1) != Some(&b']') {
+                return None;
+            }
+            id_end + 2
+        }
+        b'|' => {
+            // Alias runs to the FIRST `]`, which must open the `]]`
+            // closer (TS twin: `(?:\|[^\]]*)?\]\]`).
+            let alias_start = id_end + 1;
+            let close_rel = bytes[alias_start..].iter().position(|b| *b == b']')?;
+            let close = alias_start + close_rel;
+            if bytes.get(close + 1) != Some(&b']') {
+                return None;
+            }
+            close + 2
+        }
+        _ => return None,
+    };
+    Some(AttEmbedSpan {
+        start: open,
+        end,
+        id: &note_body[id_start..id_end],
+    })
+}
+
 /// In-RAM bidirectional attachment reference graph. Lives only while
 /// `Slot::Unlocked`; wiped on lock. The forward map (`note → ids`) makes
 /// per-note replace-on-apply cheap; the reverse query
@@ -320,6 +412,103 @@ mod tests {
         // The id is only the hex run before `|`.
         let ids = extract_att_ids("![[att:1234|not-part-of-id.png]]");
         assert_eq!(ids.into_iter().collect::<Vec<_>>(), vec!["1234"]);
+    }
+
+    // ---- canonical span scanner (export rewrite, MYND-115) --------------
+
+    /// 64-hex test ids (catalog-key shape).
+    fn hex_id(seed: char) -> String {
+        seed.to_string().repeat(64)
+    }
+
+    #[test]
+    fn span_scanner_locates_canonical_embed_with_alias() {
+        let id = hex_id('a');
+        let body = format!("before ![[att:{id}|photo.png]] after");
+        let spans = extract_att_embed_spans(&body);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].id, id);
+        assert_eq!(
+            &body[spans[0].start..spans[0].end],
+            &format!("![[att:{id}|photo.png]]")
+        );
+    }
+
+    #[test]
+    fn span_scanner_locates_aliasless_embed() {
+        let id = hex_id('b');
+        let body = format!("![[att:{id}]]");
+        let spans = extract_att_embed_spans(&body);
+        assert_eq!(spans.len(), 1);
+        assert_eq!((spans[0].start, spans[0].end), (0, body.len()));
+    }
+
+    #[test]
+    fn span_scanner_preserves_document_order_and_keeps_duplicates() {
+        let a = hex_id('a');
+        let b = hex_id('b');
+        let body = format!("![[att:{b}|x]] mid ![[att:{a}|y]] end ![[att:{b}|z]]");
+        let spans = extract_att_embed_spans(&body);
+        let ids: Vec<&str> = spans.iter().map(|s| s.id).collect();
+        assert_eq!(ids, vec![b.as_str(), a.as_str(), b.as_str()]);
+        // Spans are monotonically increasing (document order).
+        assert!(spans.windows(2).all(|w| w[0].end <= w[1].start));
+    }
+
+    #[test]
+    fn span_scanner_rejects_non_canonical_forms() {
+        // Short id, uppercase id, interior whitespace, plain wikilink,
+        // alias containing `]`, unclosed embed — none are canonical.
+        let short = "![[att:abc123]]";
+        let upper = format!("![[att:{}]]", "A".repeat(64));
+        let spaced = format!("![[ att:{}]]", hex_id('a'));
+        let plain = "![[Some Note|alias]]";
+        let bad_alias = format!("![[att:{}|x]y]]", hex_id('a'));
+        let unclosed = format!("![[att:{}", hex_id('a'));
+        for body in [
+            short,
+            upper.as_str(),
+            spaced.as_str(),
+            plain,
+            bad_alias.as_str(),
+            unclosed.as_str(),
+        ] {
+            assert!(
+                extract_att_embed_spans(body).is_empty(),
+                "must reject non-canonical: {body:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn span_scanner_rejects_overlong_hex_run() {
+        // 65 hex chars: char 65 is neither `|` nor `]]` → not canonical.
+        let body = format!("![[att:{}a]]", hex_id('a'));
+        assert!(extract_att_embed_spans(&body).is_empty());
+    }
+
+    #[test]
+    fn span_scanner_recovers_after_a_malformed_candidate() {
+        // A malformed `![[att:` must not swallow a later valid embed.
+        let id = hex_id('c');
+        let body = format!("![[att:nothex]] then ![[att:{id}|ok.png]]");
+        let spans = extract_att_embed_spans(&body);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].id, id);
+    }
+
+    #[test]
+    fn span_scanner_agrees_with_loose_tokenizer_on_canonical_input() {
+        // Lockstep belt: on canonical embeds the strict scanner and the
+        // reconcile lower bound see the same id set.
+        let a = hex_id('a');
+        let b = hex_id('b');
+        let body = format!("![[att:{a}|1.png]] and ![[att:{b}]]");
+        let strict: BTreeSet<String> = extract_att_embed_spans(&body)
+            .iter()
+            .map(|s| s.id.to_string())
+            .collect();
+        assert_eq!(strict, extract_att_ids(&body));
     }
 
     // ---- graph ---------------------------------------------------------

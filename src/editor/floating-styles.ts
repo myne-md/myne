@@ -89,6 +89,27 @@ const CSS = `
   cursor: default;
 }
 
+/* [[ note picker (MYND-38) — two-line rows: title over vault path. Reuses the
+   slash-menu surface + selected-row highlight; only the row becomes a column. */
+.cm-wiki-picker-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.cm-wiki-picker-title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-1);
+  line-height: 1.3;
+}
+.cm-wiki-picker-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  line-height: 1.2;
+}
+
 .cm-toolbar {
   display: inline-flex;
   align-items: center;

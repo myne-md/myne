@@ -9,8 +9,10 @@
 
 pub mod attachments;
 pub mod backup;
+pub mod export;
 pub mod importer;
 pub mod notes;
+pub mod pdf_export;
 pub mod prefs;
 pub mod snapshots;
 pub mod vault_change_password;

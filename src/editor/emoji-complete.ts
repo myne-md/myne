@@ -8,11 +8,9 @@
 // the render decoration.
 
 import {
-  autocompletion,
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
-import { type Extension } from "@codemirror/state";
 import { loadEmojiMap } from "./decorations/emoji";
 
 async function emojiCompletionSource(
@@ -43,13 +41,6 @@ async function emojiCompletionSource(
   return { from: match.from, to: match.to, options, filter: false };
 }
 
-export function emojiCompletionExtension(): Extension {
-  return autocompletion({
-    override: [emojiCompletionSource],
-    activateOnTyping: true,
-    icons: false,
-  });
-}
-
-// Exported for direct unit testing of the source.
+// Exported for direct unit testing of the source + the combined autocomplete
+// config (`editor/completion.ts`).
 export { emojiCompletionSource };
