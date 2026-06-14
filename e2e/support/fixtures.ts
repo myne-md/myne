@@ -19,10 +19,19 @@
 // silently tampering the wrong field.
 
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { REPO_ROOT } from "./session";
+import { scanForPlaintext } from "./plaintext-scan";
 
 export interface SeededVault {
   vaultId: string;
@@ -168,6 +177,200 @@ export function seedVault(appDataDir: string, opts: Omit<SeedOptions, "count"> =
 
 export function vaultMetaPath(appDataDir: string, vaultId: string): string {
   return join(appDataDir, "vaults", vaultId, "vault.meta");
+}
+
+// ---- at-rest magic-byte asserters (SYNC-W2-2) -----------------------------
+//
+// Positive controls complementing PS-1's negative residue scan: after an
+// import, the per-attachment blob and the catalog must carry their
+// load-bearing major-version magic (CLAUDE.md "Cryptographically load-bearing
+// identifiers"; protocol.md §9.9 / §9.10). These helpers only READ the magic —
+// they never redefine it.
+
+/** Path to one per-attachment MYA1 blob: `vaults/<id>/attachments/<id-hex>`.
+ *  `attachmentId` is the 64-char lowercase-hex id returned by
+ *  `attachment_import` / `catalog_list` (the blob filename is the id verbatim;
+ *  `attachments/commands.rs` `blob_path = attachments_dir.join(&id_hex)`). */
+export function attachmentBlobPath(
+  appDataDir: string,
+  vaultId: string,
+  attachmentId: string,
+): string {
+  return join(appDataDir, "vaults", vaultId, "attachments", attachmentId);
+}
+
+/** Path to the MYC1 attachments catalog: `vaults/<id>/vault.attachments`. */
+export function attachmentsCatalogPath(appDataDir: string, vaultId: string): string {
+  return join(appDataDir, "vaults", vaultId, "vault.attachments");
+}
+
+/** Path to the MYS1 search index: `vaults/<id>/vault.search`
+ *  (`protocol/src/search_blob.rs`; spec § 9.6.1). */
+export function searchIndexPath(appDataDir: string, vaultId: string): string {
+  return join(appDataDir, "vaults", vaultId, "vault.search");
+}
+
+/**
+ * Assert a blob's leading 4 bytes equal `magic` (latin1). The generic shape
+ * every at-rest format check reuses — MYA1 (per-attachment blob), MYC1
+ * (attachments catalog), MYS1 (search index), MY01 (per-note snapshot) all
+ * call this with their own 4-char magic. Throws (not a soft warn) when the
+ * file is absent: a missing artefact after a write IS the regression.
+ *
+ * Lives in fixtures (not a scenario) so it stays reusable; uses the project's
+ * vitest `expect` via the caller — here it just compares + throws so it has no
+ * test-runner dependency and reads cleanly from any scenario body.
+ */
+export function assertBlobMagic(path: string, magic: string): void {
+  const bytes = readFileSync(path); // throws ENOENT if the artefact is missing
+  const head = bytes.subarray(0, 4).toString("latin1");
+  if (head !== magic) {
+    throw new Error(
+      `at-rest magic mismatch at ${path}: expected ${JSON.stringify(magic)}, got ${JSON.stringify(head)}`,
+    );
+  }
+}
+
+/** Assert the per-attachment blob at `attachments/<id-hex>` starts with MYA1. */
+export function assertAttachmentBlobMagic(
+  appDataDir: string,
+  vaultId: string,
+  attachmentId: string,
+): void {
+  assertBlobMagic(attachmentBlobPath(appDataDir, vaultId, attachmentId), "MYA1");
+}
+
+/** Assert the attachments catalog `vault.attachments` starts with MYC1. */
+export function assertCatalogMagic(appDataDir: string, vaultId: string): void {
+  assertBlobMagic(attachmentsCatalogPath(appDataDir, vaultId), "MYC1");
+}
+
+/**
+ * Assert the search index `vault.search` carries the MYS1 at-rest header:
+ * magic `MYS1` @0 (via the shared `assertBlobMagic`), `protocol_version`
+ * `0x01` @4, `index_format_version` `0x01` @5, and a header at least
+ * `SEARCH_BLOB_HEADER_LEN` (34) bytes (4 magic + 1 + 1 + 24 nonce + 4
+ * big-endian ciphertext_len). The positive control parallel to PS-1's MY01
+ * note-blob assert: a residue scan proves the index is plaintext-free, this
+ * proves a silent format/version regression hasn't shipped. Read-only — the
+ * load-bearing constants live in `protocol/src/search_blob.rs:62-77`; this
+ * only mirrors them to catch drift.
+ */
+export const SEARCH_BLOB_PROTOCOL_VERSION = 0x01;
+export const SEARCH_BLOB_INDEX_FORMAT_V1 = 0x01;
+export const SEARCH_BLOB_HEADER_LEN = 34;
+
+export function assertSearchIndexMagic(appDataDir: string, vaultId: string): void {
+  const path = searchIndexPath(appDataDir, vaultId);
+  assertBlobMagic(path, "MYS1"); // throws ENOENT if absent, mismatch if wrong magic
+  const bytes = readFileSync(path);
+  if (bytes.length < SEARCH_BLOB_HEADER_LEN) {
+    throw new Error(
+      `vault.search shorter than the MYS1 header at ${path}: ` +
+        `len ${bytes.length} < ${SEARCH_BLOB_HEADER_LEN}`,
+    );
+  }
+  if (bytes[4] !== SEARCH_BLOB_PROTOCOL_VERSION) {
+    throw new Error(
+      `vault.search protocol_version mismatch at ${path}: ` +
+        `expected ${SEARCH_BLOB_PROTOCOL_VERSION}, got ${bytes[4]}`,
+    );
+  }
+  if (bytes[5] !== SEARCH_BLOB_INDEX_FORMAT_V1) {
+    throw new Error(
+      `vault.search index_format_version mismatch at ${path}: ` +
+        `expected ${SEARCH_BLOB_INDEX_FORMAT_V1}, got ${bytes[5]}`,
+    );
+  }
+}
+
+/** Directory holding a vault's encrypted per-note snapshots:
+ *  `vaults/<id>/snapshots/` (flat, no per-note subdirs — protocol.md §9, the
+ *  `notes/` privacy posture). */
+export function snapshotsDir(appDataDir: string, vaultId: string): string {
+  return join(appDataDir, "vaults", vaultId, "snapshots");
+}
+
+/** List the snapshot blob filenames for one note, newest-first.
+ *  Snapshots are flat `snapshots/<note-uuid>__<snap-uuidv7>.myn` (protocol.md
+ *  §9.{snapshots}); the trailing UUIDv7's time component sorts naturally, so a
+ *  descending name sort is newest-first. Filters on the `<note-uuid>__` prefix
+ *  so a multi-note vault's snapshots don't cross-contaminate. Returns `[]` when
+ *  the dir is absent (a note with no snapshots yet). */
+export function snapshotBlobNames(
+  appDataDir: string,
+  vaultId: string,
+  noteUuid: string,
+): string[] {
+  const dir = snapshotsDir(appDataDir, vaultId);
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return []; // no snapshots/ dir yet
+  }
+  return names
+    .filter((n) => n.startsWith(`${noteUuid}__`) && n.endsWith(".myn"))
+    .sort()
+    .reverse();
+}
+
+/** Path to one snapshot blob by full filename
+ *  (`snapshots/<note-uuid>__<snap-uuidv7>.myn`). */
+export function snapshotBlobPath(
+  appDataDir: string,
+  vaultId: string,
+  blobName: string,
+): string {
+  return join(snapshotsDir(appDataDir, vaultId), blobName);
+}
+
+/**
+ * At-rest positive control for a note's snapshots (SYNC-W2-2, extends SYNC-21):
+ * assert at least one `snapshots/<note-uuid>__<snap-uuidv7>.myn` blob exists and
+ * EVERY such blob carries the `MY01` envelope magic (reuses `assertBlobMagic` —
+ * snapshots reuse the note's `item_key` + the §9.2 `MY01` envelope; no new
+ * magic). Throws when the note has no snapshots (a missing blob after a real
+ * capture IS the regression). Returns the blob names asserted, newest-first.
+ */
+export function assertSnapshotBlobsMagic(
+  appDataDir: string,
+  vaultId: string,
+  noteUuid: string,
+): string[] {
+  const names = snapshotBlobNames(appDataDir, vaultId, noteUuid);
+  if (names.length === 0) {
+    throw new Error(
+      `no snapshot blobs at ${snapshotsDir(appDataDir, vaultId)} for note ${noteUuid}`,
+    );
+  }
+  for (const name of names) {
+    assertBlobMagic(snapshotBlobPath(appDataDir, vaultId, name), "MY01");
+  }
+  return names;
+}
+
+/**
+ * PS-1 residue scan over a vault's `snapshots/` directory (reuses
+ * `scanForPlaintext`): every `needle` (note-content marker; the in-source
+ * scenario-constant class, not a credential) must be ABSENT in plaintext under
+ * `snapshots/`. The negative complement to `assertSnapshotBlobsMagic`'s positive
+ * MY01 control. Returns the hits (empty array = clean) so the caller asserts the
+ * shape (`toEqual([])`) — failure output reports needle INDICES, never the
+ * needle text (SYNC-13). A missing dir scans as clean (no leakage possible).
+ */
+export function scanSnapshotsForResidue(
+  appDataDir: string,
+  vaultId: string,
+  needles: string[],
+): ReturnType<typeof scanForPlaintext> {
+  const dir = snapshotsDir(appDataDir, vaultId);
+  try {
+    statSync(dir);
+  } catch {
+    return []; // no snapshots/ dir → nothing to leak
+  }
+  return scanForPlaintext(dir, needles);
 }
 
 /** XOR one byte at `offset` — the canonical at-rest tamper primitive.
