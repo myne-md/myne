@@ -222,6 +222,14 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-math-inline": { cursor: "pointer" },
 
+  // Spell-check squiggle (MYND-264, SYNC-9) — a wavy red underline driven by
+  // the `--danger` design token (no hex), tracking the glyphs via
+  // text-decoration-skip-ink. Decoration-only overlay; never mutates the buffer.
+  ".cm-spell-error": {
+    textDecoration: "underline wavy var(--danger, #8a2a23)",
+    textDecorationSkipInk: "none",
+  },
+
   // Mermaid diagrams (MYND-49) — rendered SVG sits on its OWN fixed-light card so
   // it reads in BOTH editor themes (Mermaid's palette assumes a light surface; on
   // the dark editor its edge labels were unreadable). The outer `.cm-mermaid` is a

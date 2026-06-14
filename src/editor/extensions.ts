@@ -49,6 +49,8 @@ import { selectionToolbarExtension } from "./toolbar/plugin";
 import { emojiCompletionExtension } from "./emoji-complete";
 import { clickCollapseExtension } from "./click-collapse";
 import { findExtension } from "./find/find-extension";
+import { spellDecorations } from "./decorations/spell";
+import { spellCorrectionMenu } from "./spell/correction-menu";
 import { myneKeyBindings } from "./keymap";
 import { myneTheme } from "./theme";
 
@@ -108,6 +110,14 @@ export function myneExtensions(): readonly Extension[] {
     // stock panel for the Myne-styled docked bar. Cmd/Ctrl+F is owned by the
     // window-level listener in App.tsx, NOT bound in the keymap below.
     ...findExtension(),
+    // Spell-check squiggles (MYND-264): debounced viewport scan → Rust engine
+    // IPC → wavy-underline marks on misspelled words, markdown-aware (SYNC-3),
+    // cursor-aware (SYNC-9). Default-on (SYNC-15); the `spell_enabled` pref gate
+    // (mount/unmount) lands with the MYND-267 settings wiring.
+    ...spellDecorations(),
+    // Right-click-on-squiggle correction menu (MYND-265): suggestions + add to
+    // dictionary / ignore (vault / session). Surgical byte-stable corrections.
+    ...spellCorrectionMenu(),
     keymap.of([
       ...myneKeyBindings,
       // Before defaultKeymap so Arrow Up/Down can enter a table block (which
@@ -123,5 +133,11 @@ export function myneExtensions(): readonly Extension[] {
     ]),
     myneTheme,
     EditorView.lineWrapping,
+    // Disable the WebView's native OS spellchecker on the editor content
+    // (SYNC-5, MYND-264). Myne ships its own fully-offline spell-check; leaving
+    // the native speller on would double-underline against the custom squiggle
+    // layer and, on some platforms, route note words to an OS/network spell
+    // service — a privacy regression. The custom layer is the only spell UI.
+    EditorView.contentAttributes.of({ spellcheck: "false" }),
   ];
 }
