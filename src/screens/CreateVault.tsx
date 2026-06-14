@@ -28,10 +28,11 @@ import { confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
 import { HAS_TAURI } from "../lib/app-window";
 import {
   vaultCreationReducer,
-  initialState,
+  makeInitialState,
   isSensitiveStep,
   type Step,
 } from "./vault-creation";
+import { BriefingStep } from "./vault-creation/BriefingStep";
 import { PasswordStep } from "./vault-creation/PasswordStep";
 import { EncryptingStep } from "./vault-creation/EncryptingStep";
 import { PhraseStep } from "./vault-creation/PhraseStep";
@@ -45,6 +46,16 @@ import { seedWelcomeNote } from "../notes/welcomeNote";
 import type { BeginResult } from "../types/protocol-error";
 
 interface CreateVaultProps {
+  /**
+   * First-run safety briefing (MYND-114). When true, the flow opens on
+   * `<BriefingStep>` before password setup; App.tsx sets it ONLY for the
+   * `welcome → create-vault.start` entry (`stage.briefing`). Picker /
+   * switcher "create another" entries omit it (default false) — the user
+   * has already acknowledged the recovery model once. Optional + default
+   * false so component tests that mount the flow directly land on
+   * PasswordStep, as before.
+   */
+  withBriefing?: boolean;
   onBack: () => void;
   /**
    * Auto-unlock success — `vault_unlock(password)` resolved after
@@ -68,11 +79,16 @@ interface CreateVaultProps {
 }
 
 export function CreateVault({
+  withBriefing = false,
   onBack,
   onAutoUnlockSuccess,
   onAutoUnlockFailed,
 }: CreateVaultProps) {
-  const [state, dispatch] = useReducer(vaultCreationReducer, initialState);
+  const [state, dispatch] = useReducer(
+    vaultCreationReducer,
+    withBriefing,
+    makeInitialState,
+  );
   const [autoUnlocking, setAutoUnlocking] = useState(false);
 
   const sessionTokenRef = useRef<string | null>(null);
@@ -115,6 +131,14 @@ export function CreateVault({
         accountNumber: MOCK_ACCOUNT,
         sessionToken: MOCK_TOKEN,
       });
+    // The first-run briefing is the initial step when `withBriefing` (the
+    // welcome entry); capturing it needs no dispatch. Every other target
+    // sits past the briefing gate, so step over it first (idempotent from
+    // `password` when there is no briefing). `password` itself needs no
+    // further dispatch — the ladder below matches nothing and the effect
+    // ends on the password step.
+    if (target === "briefing") return;
+    dispatch({ type: "BRIEFING_ACKED" });
     if (target === "encrypting") {
       dispatch({ type: "BEGIN_REQUESTED" });
     } else if (target === "phrase") {
@@ -360,6 +384,13 @@ export function CreateVault({
   }, [state.step]);
 
   switch (state.step) {
+    case "briefing":
+      return (
+        <BriefingStep
+          onBack={onBack}
+          onContinue={() => dispatch({ type: "BRIEFING_ACKED" })}
+        />
+      );
     case "password":
       return (
         <PasswordStep

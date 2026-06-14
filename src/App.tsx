@@ -226,6 +226,11 @@ function App() {
       case "create-vault":
         return (
           <CreateVault
+            // First-run safety briefing (MYND-114): shown only on the
+            // welcome entry (`stage.briefing`), not picker/switcher
+            // "create another" — a returning user has acknowledged the
+            // recovery model once already.
+            withBriefing={stage.briefing ?? false}
             // Back-from-create is reprobe-based (MYND-219 / SYNC-16):
             // boot routing decides the return surface — welcome at 0
             // vaults, the lone vault's unlock at 1, the picker at ≥2.
