@@ -464,7 +464,9 @@ function renderRow(
       aria-disabled={isDisabled}
       data-row-index={index}
       data-testid="palette.option"
+      data-kind={row.kind}
       data-action-id={row.kind === "action" ? row.action.id : undefined}
+      data-note-id={row.kind === "note" ? row.id : undefined}
       onMouseDown={(e) => {
         e.preventDefault();
         if (!isDisabled) void runRow(row);

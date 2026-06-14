@@ -717,6 +717,7 @@ function RenameInput({
       ref={ref}
       type="text"
       defaultValue={initial}
+      data-testid="attachments.rename-input"
       style={{
         width: "100%",
         fontFamily: "var(--font-sans)",
@@ -784,6 +785,8 @@ function UsedInNotes({
       <button
         ref={buttonRef}
         type="button"
+        data-testid="attachments.used-in-notes-trigger"
+        data-id={attachmentId}
         onClick={(e) => {
           e.stopPropagation();
           onToggle();
@@ -934,6 +937,7 @@ function AttachmentActionMenu({
           key={item.id}
           type="button"
           role="menuitem"
+          data-testid={`attachments.action-${item.id}`}
           style={{
             ...MENU_ITEM_STYLE,
             color: item.destructive ? "var(--danger)" : "var(--fg-1)",
@@ -1015,6 +1019,7 @@ function ItemMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         title="Actions"
+        data-testid="attachments.actions-trigger"
         style={MENU_TRIGGER_STYLE}
         onClick={(e) => {
           e.stopPropagation();
@@ -1192,7 +1197,7 @@ function AttachmentTile({
   onCloseActionMenu,
 }: ItemActionProps) {
   return (
-    <div style={TILE_STYLE}>
+    <div style={TILE_STYLE} data-testid="attachments.tile" data-id={entry.id}>
       <div style={THUMB_BOX_STYLE}>
         <ThumbnailWithPreview
           entry={entry}
@@ -1303,7 +1308,7 @@ function AttachmentListRow({
   onCloseActionMenu,
 }: ItemActionProps) {
   return (
-    <div style={LIST_ROW_STYLE}>
+    <div style={LIST_ROW_STYLE} data-testid="attachments.tile" data-id={entry.id}>
       <div
         style={{
           width: 28,

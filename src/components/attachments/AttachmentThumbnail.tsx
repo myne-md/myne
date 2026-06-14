@@ -200,6 +200,8 @@ export function AttachmentThumbnail({
         alt={filename}
         onError={() => setImageFailed(true)}
         style={IMG_STYLE}
+        data-testid="attachments.thumbnail"
+        data-id={id}
       />
     );
   }

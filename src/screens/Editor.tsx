@@ -1816,6 +1816,8 @@ function RightSidebar() {
             <button
               key={row.sourceUuid}
               type="button"
+              data-testid="editor.backlink-row"
+              data-source-id={row.sourceUuid}
               onClick={() => void ctx.open(row.sourceUuid)}
               style={SIDEBAR_CARD_STYLE}
             >
