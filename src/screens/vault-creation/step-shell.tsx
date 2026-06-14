@@ -48,14 +48,22 @@ export function StepLayout({
 }
 
 interface StepEyebrowProps {
-  icon: IconName;
+  /** Optional leading glyph. Omitted by steps whose tone forbids an icon
+   *  (e.g. the first-run safety briefing — an alarm glyph would read as a
+   *  warning, MYND-114). */
+  icon?: IconName;
+  /** Mount marker for E2E (curated-prop testid discipline, src/CLAUDE.md). */
+  testId?: string;
   children: ReactNode;
 }
 
-export function StepEyebrow({ icon, children }: StepEyebrowProps) {
+export function StepEyebrow({ icon, testId, children }: StepEyebrowProps) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <Icon name={icon} size={20} />
+    <div
+      data-testid={testId}
+      style={{ display: "flex", alignItems: "center", gap: 10 }}
+    >
+      {icon && <Icon name={icon} size={20} />}
       <div
         style={{
           fontSize: 12,

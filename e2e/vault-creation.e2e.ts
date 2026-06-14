@@ -50,6 +50,27 @@ async function submitPasswordStep(session: Session, password: string): Promise<v
   await session.byTestId("create.phrase-grid", { timeoutMs: 120_000 });
 }
 
+/** Traverse the first-run safety briefing (MYND-114): tick all three
+ *  acknowledgements and continue to the password step. Pre-KDF — the
+ *  briefing sits ahead of `begin`, so this spends no Argon2id. Only the
+ *  welcome (first-run) entry shows it; picker/switcher creates skip it. */
+async function acknowledgeBriefing(session: Session): Promise<void> {
+  await session.byTestId("create.briefing", { timeoutMs: 15_000 });
+  const cont = await session.byTestId("create.briefing-continue");
+  expect(await cont.enabled()).toBe(false); // gated until all three ticked
+  const acks = await session.byTestIdAll("create.briefing-ack");
+  expect(acks.length).toBe(3);
+  for (const ack of acks) {
+    await ack.click();
+  }
+  await session.waitUntil(() => cont.enabled(), {
+    label: "briefing continue enabled (3/3 acknowledged)",
+    timeoutMs: 10_000,
+  });
+  await cont.click();
+  await session.byTestId("create.password-input", { timeoutMs: 10_000 });
+}
+
 /** Scrape the 24 revealed phrase words in data-index order (single
  *  in-page pass — 1 round-trip instead of 48). The word is the LAST
  *  span of each cell (the first is the index numeral). */
@@ -89,8 +110,9 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
     // are pinned in the binary (SYNC-9: no weak-KDF shortcut exists for
     // creation, by design).
     await scenario("vc1-happy-path", {}, async (app) => {
-      // Welcome → create.
+      // Welcome → create → first-run safety briefing (MYND-114) → password.
       await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      await acknowledgeBriefing(app.session);
 
       // Password step — zxcvbn gate first (story 1): a matching but
       // weak/short password keeps Continue disabled.
@@ -247,6 +269,7 @@ describeE2E("VC-2 confirm gating + VC-3 blur cover (MYND-124 task 2)", () => {
     await scenario("vc2-vc3-confirm-and-cover", {}, async (app) => {
       // Reach the phrase step.
       await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      await acknowledgeBriefing(app.session);
       await (await app.session.byTestId("create.password-input")).sendKeys(VC1_PASSWORD);
       await (await app.session.byTestId("create.confirm-input")).sendKeys(VC1_PASSWORD);
       const submit = await app.session.byTestId("create.submit");
@@ -352,6 +375,7 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
     // Vault-count precondition: 0. One begin chains arms 1+2+3.
     await scenario("vc4-mid-flow-backs", {}, async (app) => {
       await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      await acknowledgeBriefing(app.session);
       const words = await reachPhraseStep(app.session);
       await (await app.session.byTestId("create.phrase-continue")).click();
 
@@ -430,6 +454,7 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
     // fresh begin to succeed — arm 4b).
     await scenario("vc4-clean-restart", {}, async (app) => {
       await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      await acknowledgeBriefing(app.session);
       await reachPhraseStep(app.session);
 
       // Arm 4: Back from Phrase cancels the backend session and lands
@@ -467,6 +492,11 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
         await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
         await (await app.session.byTestId("picker.create-cta")).click();
         await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+
+        // First-run-only scoping (MYND-114): the picker "create another"
+        // entry lands DIRECTLY on password — no safety briefing (a
+        // returning user has acknowledged the recovery model once).
+        expect(await app.session.byTestIdAll("create.briefing")).toHaveLength(0);
 
         // Arm 5: Back → reprobe → ≥2 vaults → picker (the pre-MYND-219
         // behavior stranded this path on Welcome).
@@ -569,6 +599,7 @@ describeE2E("VC-6 auto-unlock-failure fallback (MYND-124 task 5)", () => {
     // Vault-count precondition: 0 → 1 (the created vault).
     await scenario("vc6-auto-unlock-fallback", {}, async (app) => {
       await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      await acknowledgeBriefing(app.session);
       await createToReadyStep(app.session, VC1_PASSWORD);
 
       // At-rest fault injection BEFORE Done: delete the just-committed
@@ -671,5 +702,59 @@ describeE2E("VC-9/VC-10 create-second-vault entries (MYND-124 task 6)", () => {
         await app.session.byTestId("unlock.password-input");
       },
     );
+  });
+});
+
+describeE2E("MYND-114 first-run safety briefing (pre-vault-create contract)", () => {
+  it("gates Continue on three acknowledgements, expands Why? inline, and Back returns to Welcome", async () => {
+    // Vault-count precondition: 0. Entirely pre-KDF — the briefing sits
+    // ahead of `begin`, so this scenario spends no Argon2id.
+    await scenario("mynd114-safety-briefing", {}, async (app) => {
+      // Welcome → create: the briefing gates the flow — no password yet.
+      await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      await app.session.byTestId("create.briefing", { timeoutMs: 15_000 });
+      expect(await app.session.byTestIdAll("create.password-input")).toHaveLength(0);
+
+      // Back → Welcome: the contract is declinable, not a trap.
+      await (await app.session.byTestId("create.briefing-back")).click();
+      await app.session.byTestId("welcome.root", { timeoutMs: 15_000 });
+
+      // Re-enter: a fresh mount re-arms the gate (acknowledgements reset).
+      await (await app.session.byTestId("welcome.create-cta")).click();
+      await app.session.byTestId("create.briefing", { timeoutMs: 15_000 });
+      const cont = await app.session.byTestId("create.briefing-continue");
+      expect(await cont.enabled()).toBe(false);
+
+      // "Why?" is opt-in: collapsed by default, expands inline, re-collapses.
+      const why = (await app.session.byTestIdAll("create.briefing-why"))[1];
+      const ackId = await why.attribute("data-ack-id");
+      const whyText = testIdSelector("create.briefing-why-text", {
+        "data-ack-id": ackId!,
+      });
+      expect(await why.attribute("aria-expanded")).toBe("false");
+      expect(await app.session.findElements(whyText)).toHaveLength(0);
+      await why.click();
+      await app.session.waitForElement(whyText);
+      expect(await why.attribute("aria-expanded")).toBe("true");
+      await why.click();
+      await app.session.waitForGone(whyText);
+
+      // The gate opens only after ALL three are acknowledged — not before.
+      const acks = await app.session.byTestIdAll("create.briefing-ack");
+      expect(acks.length).toBe(3);
+      await acks[0].click();
+      expect(await cont.enabled()).toBe(false);
+      await acks[1].click();
+      expect(await cont.enabled()).toBe(false);
+      await acks[2].click();
+      await app.session.waitUntil(() => cont.enabled(), {
+        label: "briefing continue enabled (3/3 acknowledged)",
+        timeoutMs: 10_000,
+      });
+
+      // Continue → password step (the briefing is forward-only into the flow).
+      await cont.click();
+      await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+    });
   });
 });

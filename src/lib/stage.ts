@@ -146,7 +146,22 @@ export type VaultId = string;
  */
 export type Stage =
   | { name: "welcome" }
-  | { name: "create-vault" }
+  | {
+      /**
+       * Vault-creation flow. `briefing` (MYND-114) is a mount-time hint:
+       * when set, the flow opens on the first-run safety-briefing step
+       * (`<BriefingStep>`) before password setup. Set ONLY on the
+       * `welcome → create-vault.start` transition (the first-run entry);
+       * the picker / switcher "create another" entries leave it unset
+       * (falsy), since a user creating an additional vault has already
+       * acknowledged the recovery model once. Like `unlock`'s
+       * `suspicionReason` / `vaultId`, it is payload — not part of the
+       * `name` discriminator — so the `LEGAL` transition table is
+       * unaffected.
+       */
+      name: "create-vault";
+      briefing?: boolean;
+    }
   | {
       name: "unlock";
       initialStatus: StageVaultStatus;
@@ -425,7 +440,10 @@ export function transition(prev: Stage, action: Action): Stage {
     case "welcome":
       switch (action.type) {
         case "create-vault.start":
-          return { name: "create-vault" };
+          // First-run entry — open the flow on the safety briefing
+          // before password setup (MYND-114). Picker / switcher
+          // "create another" entries skip it (briefing unset).
+          return { name: "create-vault", briefing: true };
         case "welcome.restore-backup":
           return { name: "restore-backup", entry: "welcome" };
         default:
@@ -793,6 +811,11 @@ const LEGAL: Record<string, Stage["name"]> = {
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   { name: "welcome" },
   { name: "create-vault" },
+  // Coverage entry for the optional `briefing` payload field (MYND-114).
+  // Payload, not the `name` discriminator — `transition` ignores it on
+  // every (Stage × Action) pair; this entry confirms its presence does
+  // not change transition outcomes.
+  { name: "create-vault", briefing: true },
   { name: "unlock", initialStatus: { kind: "Exists" } },
   // Coverage entry for the optional `suspicionReason` payload field
   // (`decisions.md` 2026-05-08). The `transition` fn ignores the field;

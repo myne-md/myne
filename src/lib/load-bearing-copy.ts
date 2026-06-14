@@ -21,6 +21,19 @@ export const UNLOCK_NON_DISTINGUISHING_BANNER =
 export const RECOVERY_NON_DISTINGUISHING_BANNER =
   "Phrase or vault file is invalid. Please try again.";
 
+// The normative "honest about cost" sentence (PRODUCT.md principle 3 /
+// docs/design/README.md "Lost both secrets") — the irreversible
+// consequence of losing both credentials, stated plainly. Rendered
+// verbatim by PasswordStep's helper copy AND embedded in the first-run
+// safety briefing's recovery-phrase "Why?" (MYND-114); the briefing
+// component test asserts it as a substring of that "Why?" text. Single
+// source so a revision (a product-voice decision, not a copy edit) lands
+// in one place.
+
+/** "If you lose both …" — the canonical irreversibility sentence. */
+export const LOST_BOTH_SECRETS_SENTENCE =
+  "If you lose both your password and recovery phrase, your notes are unrecoverable. We cannot help.";
+
 // Per-note export pre-flight (MYND-116). The honest-egress sentence is
 // load-bearing UI honesty (TB3 plaintext egress is stated plainly, once,
 // never as a banner); the sub-label pins the attachments-placement

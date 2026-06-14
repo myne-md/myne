@@ -24,6 +24,7 @@
 
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { PasswordCreateForm } from "../../components/PasswordCreateForm";
+import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
 import type { ErrorState } from "./reducer";
 
@@ -63,8 +64,7 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
           >
             Myne does not store your password or recovery phrase.{" "}
             <strong style={{ color: "var(--fg-1)" }}>
-              If you lose both your password and recovery phrase, your notes
-              are unrecoverable. We cannot help.
+              {LOST_BOTH_SECRETS_SENTENCE}
             </strong>
           </div>
         }
