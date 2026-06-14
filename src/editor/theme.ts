@@ -1177,6 +1177,147 @@ export const myneTheme = EditorView.theme({
   // global stylesheet (`attachments/styles.ts`), not this `.cm-editor`-scoped
   // theme. Only the in-card button (`-menubtn`) is styled here.
 
+  // Inline audio player (voice notes, MYND-259) — a sibling of the file-card,
+  // same surface tokens. Circular accent play button, a seek track (the
+  // waveform overlays this track in a later slice), and a mono time readout.
+  ".cm-attachment-audio": {
+    display: "inline-flex",
+    flexDirection: "column",
+    gap: "6px",
+    width: "360px",
+    maxWidth: "360px",
+    padding: "10px 12px",
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    borderRadius: "var(--radius-2, 6px)",
+    verticalAlign: "top",
+    margin: "var(--space-3, 10px) 0",
+    fontFamily: "var(--font-sans)",
+    cursor: "default",
+  },
+  // Filename — top-left of the card.
+  ".cm-attachment-audio-name": {
+    fontSize: "12px",
+    fontWeight: "500",
+    color: "var(--fg-1, #1a1a17)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    maxWidth: "100%",
+  },
+  // Middle row: play button + waveform + overflow, vertically centered.
+  ".cm-attachment-audio-row": {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  ".cm-attachment-audio-play": {
+    flexShrink: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "32px",
+    height: "32px",
+    padding: "0",
+    border: "none",
+    borderRadius: "999px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+    color: "var(--accent-on, #fff)",
+    cursor: "pointer",
+  },
+  ".cm-attachment-audio-play svg": {
+    width: "15px",
+    height: "15px",
+  },
+  ".cm-attachment-audio-play:hover": {
+    opacity: "0.9",
+  },
+  ".cm-attachment-audio-play:focus-visible": {
+    outline: "2px solid var(--accent, #2c4a7a)",
+    outlineOffset: "2px",
+  },
+  ".cm-attachment-audio-track": {
+    position: "relative",
+    flex: "1 1 auto",
+    minWidth: 0,
+    height: "30px",
+    borderRadius: "var(--radius-1, 4px)",
+    cursor: "pointer",
+  },
+  // Thin centered baseline (the unplayed seek rail), shown until the waveform
+  // bars decode in.
+  ".cm-attachment-audio-track::before": {
+    content: '""',
+    position: "absolute",
+    left: "0",
+    right: "0",
+    top: "50%",
+    height: "3px",
+    transform: "translateY(-50%)",
+    borderRadius: "999px",
+    backgroundColor: "var(--line-2, #c8c7c1)",
+  },
+  ".cm-attachment-audio-track:focus-visible": {
+    outline: "2px solid var(--accent, #2c4a7a)",
+    outlineOffset: "3px",
+  },
+  ".cm-attachment-audio-fill": {
+    position: "absolute",
+    left: "0",
+    top: "50%",
+    height: "3px",
+    transform: "translateY(-50%)",
+    width: "0%",
+    borderRadius: "999px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+  },
+  ".cm-attachment-audio-thumb": {
+    position: "absolute",
+    top: "50%",
+    left: "0%",
+    width: "10px",
+    height: "10px",
+    marginLeft: "-5px",
+    borderRadius: "999px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+    transform: "translateY(-50%)",
+    boxShadow: "var(--shadow-1, 0 1px 3px rgba(0,0,0,0.08))",
+  },
+  // Waveform mode: the bar grid replaces the plain rail (hide baseline + fill).
+  ".cm-attachment-audio-wave": {
+    position: "absolute",
+    inset: "0",
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+  },
+  ".cm-attachment-audio-track-wave::before": {
+    display: "none",
+  },
+  ".cm-attachment-audio-track-wave .cm-attachment-audio-fill": {
+    display: "none",
+  },
+  ".cm-attachment-audio-track-wave .cm-attachment-audio-thumb": {
+    display: "none",
+  },
+  ".cm-attachment-audio-bar": {
+    flex: "1 1 0",
+    minWidth: "2px",
+    height: "30%",
+    borderRadius: "1px",
+    backgroundColor: "var(--line-3, #a8a7a1)",
+    alignSelf: "center",
+  },
+  ".cm-attachment-audio-bar-played": {
+    backgroundColor: "var(--accent, #2c4a7a)",
+  },
+  ".cm-attachment-audio-time": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "11px",
+    color: "var(--fg-3, #6b6a64)",
+    whiteSpace: "nowrap",
+  },
+
   // Autocomplete tooltip (emoji `:shortcode`, MYND-156). CM6 mounts the
   // completion tooltip inside the editor's tooltip layer, so its `.cm-tooltip*`
   // classes ARE reachable by this theme (unlike the body-mounted slash menu).

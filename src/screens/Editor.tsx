@@ -881,6 +881,10 @@ function EditorChrome({
             style={{
               flex: 1,
               minWidth: 0,
+              // Allow this column to shrink below content height so the nested
+              // AttachmentsLibrary scroll area is bounded (flexbox min-height
+              // trap — the strip is fixed, the library fills + scrolls).
+              minHeight: 0,
               display: "flex",
               flexDirection: "column",
             }}

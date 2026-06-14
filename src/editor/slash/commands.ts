@@ -6,6 +6,7 @@
 
 import type { EditorView } from "@codemirror/view";
 import { pickAndInsert } from "../attachments/picker";
+import { startVoiceRecording } from "../attachments/voiceRecord";
 import { requestTableCellFocus } from "../decorations/table";
 import { emptyTableGrid, serializeTable } from "../decorations/table-model";
 
@@ -196,6 +197,22 @@ export function slashCommands(): readonly SlashCommand[] {
           userEvent: "slash.apply",
         });
         void pickAndInsert(v, f);
+      },
+    },
+    {
+      // `/record` (MYND-259): record a voice note inline. Removes the trigger,
+      // then arms native mic capture — the floating recording bar handles
+      // Stop (insert the form-C embed at the cursor) / Cancel (discard).
+      id: "record",
+      label: "Voice note",
+      icon: "◉",
+      apply: (v, f, t) => {
+        v.dispatch({
+          changes: { from: f, to: t, insert: "" },
+          selection: { anchor: f },
+          userEvent: "slash.apply",
+        });
+        void startVoiceRecording(v);
       },
     },
     {

@@ -32,13 +32,25 @@ export function formatCreatedAt(unixSeconds: number): string {
   });
 }
 
+/**
+ * `M:SS` clock for a seconds value — the audio player's elapsed/total readout
+ * and the recording bar's elapsed timer (MYND-259). Negative/NaN clamps to 0.
+ */
+export function formatClock(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds || 0));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
 /** Broad type bucket for filtering + the type label / thumbnail choice. */
-export type AttachmentKind = "image" | "pdf" | "other";
+export type AttachmentKind = "image" | "pdf" | "audio" | "other";
 
 /** Classify a catalog content-type into a coarse filter bucket. */
 export function kindOf(contentType: string): AttachmentKind {
   if (contentType === "application/pdf") return "pdf";
   if (contentType.startsWith("image/")) return "image";
+  if (contentType.startsWith("audio/")) return "audio";
   return "other";
 }
 

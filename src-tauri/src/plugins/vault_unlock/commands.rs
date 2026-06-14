@@ -186,6 +186,9 @@ pub async fn unlock<R: Runtime>(
         crate::plugins::pdf_export::teardown_on_lock(&app);
         crate::plugins::vault_indices::zeroize_vault_indices(&app);
         crate::plugins::attachments::zeroize_attachment_refs(&app);
+        // MYND-259: abort any in-progress voice recording so the mic + RAM
+        // PCM buffer never survive the switch into another vault's session.
+        crate::plugins::attachments::abort_active_recording(&app);
         // MYND-205: the prior vault is now locked (its keys were zeroized by
         // `set_unlocked_locking_others`), so drop its cached label too — a
         // switch must stop surfacing the prior vault's real name (SYNC-3).
@@ -831,6 +834,9 @@ pub async fn lock<R: Runtime>(
     // correlation tags (AS3), wiped here so nothing survives the manual
     // lock. Rebuilt on the next unlock.
     crate::plugins::attachments::zeroize_attachment_refs(&app);
+    // MYND-259: abort any in-progress voice recording on the manual lock so the
+    // mic + RAM PCM buffer never survive it.
+    crate::plugins::attachments::abort_active_recording(&app);
 
     // ---- MYND-160 Task 11: post-zeroize native default-ON ---------------
     //

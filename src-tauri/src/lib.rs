@@ -148,6 +148,10 @@ pub fn run() {
             // `plugins::attachments::reconcile`) and wiped on lock alongside
             // the search index + VaultIndices.
             app.manage(plugins::attachments::AttachmentRefsState::default());
+            // MYND-259: voice-notes active-recording session singleton (holds
+            // at most one in-progress mic capture; only Send control handles —
+            // the cpal stream lives inside the capture thread).
+            app.manage(plugins::attachments::VoiceRecordState::default());
             // MYND-29 Task 7: periodic best-effort flush of the search index
             // to its encrypted `vault.search` blob while a vault is Unlocked
             // (no-op while locked). Bounds how much a hard quit / crash loses

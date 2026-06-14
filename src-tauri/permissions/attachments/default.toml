@@ -28,7 +28,25 @@ permissions = [
   "allow-attachment-refs-referencing",
   "allow-attachment-unused-list",
   "allow-attachment-clean-unused",
+  "allow-voice-record-start",
+  "allow-voice-record-stop",
+  "allow-voice-record-cancel",
 ]
+
+[[permission]]
+identifier = "allow-voice-record-start"
+description = "Allow invoking attachments:voice_record_start (Slot::Unlocked-gated arm of a microphone recording session; native cpal capture into a Zeroizing RAM buffer, never a plaintext temp file; fails if a recording is already in progress; MYND-259)."
+commands.allow = ["voice_record_start"]
+
+[[permission]]
+identifier = "allow-voice-record-stop"
+description = "Allow invoking attachments:voice_record_stop (Slot::Unlocked-gated finalize of the active recording — encodes the captured PCM to WAV in Rust, encrypts + stores it as an audio/wav MYA1 attachment via the existing import core, and returns only the attachment metadata; the raw PCM never crosses IPC; MYND-259)."
+commands.allow = ["voice_record_stop"]
+
+[[permission]]
+identifier = "allow-voice-record-cancel"
+description = "Allow invoking attachments:voice_record_cancel (discard the active recording — wipes the in-RAM buffer and stores nothing; idempotent when nothing is recording; MYND-259)."
+commands.allow = ["voice_record_cancel"]
 
 [[permission]]
 identifier = "allow-attachment-import"

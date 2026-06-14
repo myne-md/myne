@@ -187,6 +187,11 @@ fn main() {
                     "attachment_import",
                     "catalog_list",
                     "attachment_delete",
+                    // MYND-259 (voice notes): native mic capture →
+                    // WAV → stored as an ordinary audio/wav attachment.
+                    "voice_record_start",
+                    "voice_record_stop",
+                    "voice_record_cancel",
                 ]),
             )
             .plugin(

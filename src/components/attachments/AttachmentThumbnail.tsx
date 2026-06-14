@@ -7,9 +7,17 @@
 //     when pdf.js is unavailable / fails / rejects. The render runs fully
 //     in-memory off the decrypted `attachment://` bytes; PDF scripting stays
 //     disabled (see `editor/attachments/pdf-render.ts`).
+//   - audio/* as a styled, inline-playable tile (a centered play/pause button
+//     over a hidden `<audio>` fed from `attachment://`, MYND-259).
 //   - anything else / a failed image load → a generic file icon.
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+} from "react";
 import { Icon } from "../primitives/Icon";
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { renderPdfFirstPage } from "../../editor/attachments/pdf-render";
@@ -40,6 +48,81 @@ const IMG_STYLE: CSSProperties = {
   display: "block",
   background: "var(--paper-2)",
 };
+
+const AUDIO_WRAP_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "100%",
+  height: "100%",
+  background: "var(--paper-2)",
+};
+
+const AUDIO_BTN_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "44px",
+  height: "44px",
+  padding: 0,
+  borderRadius: "999px",
+  border: "none",
+  background: "var(--accent)",
+  color: "var(--accent-on, #fff)",
+  cursor: "pointer",
+};
+
+/**
+ * Audio tile: a centered play/pause button over a hidden `<audio>` element fed
+ * from `attachment://<id>` (decrypted in-memory, allowlist-fenced as audio/wav,
+ * MYND-259). Clicking plays inline in the library — the button stops event
+ * propagation so it never triggers the tile's jump/preview affordance.
+ */
+function AudioThumbnail({ id, filename }: { id: string; filename: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  // Pause on unmount (tile scrolled out / library closed) so audio never plays
+  // on after its tile is gone.
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => audio?.pause();
+  }, []);
+
+  const toggle = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const audio = audioRef.current;
+    if (audio === null) return;
+    if (audio.paused) {
+      void audio.play();
+      setPlaying(true);
+    } else {
+      audio.pause();
+      setPlaying(false);
+    }
+  };
+
+  return (
+    <div style={AUDIO_WRAP_STYLE} aria-label={`Audio: ${filename}`}>
+      <audio
+        ref={audioRef}
+        src={attachmentUrl(id)}
+        preload="none"
+        onEnded={() => setPlaying(false)}
+        style={{ display: "none" }}
+      />
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? "Pause" : "Play"}
+        style={AUDIO_BTN_STYLE}
+      >
+        <Icon name={playing ? "pause" : "play"} size={18} />
+      </button>
+    </div>
+  );
+}
 
 /** Generic PDF / file icon — the always-works fallback (SYNC-5). */
 function FileIcon({ size, label }: { size: number; label: string }) {
@@ -104,6 +187,10 @@ export function AttachmentThumbnail({
 
   if (kind === "pdf") {
     return <PdfThumbnail id={id} size={size} />;
+  }
+
+  if (kind === "audio") {
+    return <AudioThumbnail id={id} filename={filename} />;
   }
 
   if (kind === "image" && !imageFailed) {

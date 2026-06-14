@@ -28,10 +28,11 @@ describe("formatBytes", () => {
 });
 
 describe("kindOf", () => {
-  it("buckets content-types into image / pdf / other", () => {
+  it("buckets content-types into image / pdf / audio / other", () => {
     expect(kindOf("image/png")).toBe("image");
     expect(kindOf("image/svg+xml")).toBe("image");
     expect(kindOf("application/pdf")).toBe("pdf");
+    expect(kindOf("audio/wav")).toBe("audio");
     expect(kindOf("application/octet-stream")).toBe("other");
   });
 });

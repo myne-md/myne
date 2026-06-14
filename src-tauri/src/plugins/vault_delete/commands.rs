@@ -181,6 +181,9 @@ pub async fn vault_delete<R: Runtime>(
         // on the same delete-proceeded path so it does not outlive the
         // deleted vault.
         crate::plugins::attachments::zeroize_attachment_refs(&app);
+        // MYND-259: abort any in-progress voice recording so the mic + RAM
+        // PCM buffer do not outlive the deleted vault.
+        crate::plugins::attachments::abort_active_recording(&app);
     }
     result
 }
