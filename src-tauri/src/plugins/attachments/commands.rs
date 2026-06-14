@@ -22,16 +22,16 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::{
-    AttachmentCleanUnusedError, AttachmentDeleteError, AttachmentImportError,
-    AttachmentRenameError, AttachmentUnusedListError, CatalogListError,
+    AttachmentCleanUnusedError, AttachmentDeleteError, AttachmentExportError,
+    AttachmentImportError, AttachmentRenameError, AttachmentUnusedListError, CatalogListError,
 };
 use super::sniff::sniff_content_type;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    compute_attachment_id, decode_attachments_catalog, derive_subkey, encode_attachment_blob,
-    encode_attachments_catalog, parse_vault_meta, read_or_empty, AttachmentMeta,
-    AttachmentsCatalog, SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN,
-    MAX_ATTACHMENT_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    compute_attachment_id, decode_attachment_blob, decode_attachments_catalog, derive_subkey,
+    encode_attachment_blob, encode_attachments_catalog, parse_vault_meta, read_or_empty,
+    AttachmentMeta, AttachmentsCatalog, SubkeyRole, ATTACHMENT_ID_LEN,
+    CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -192,6 +192,14 @@ fn now_unix_secs() -> u64 {
         .unwrap_or(0)
 }
 
+/// Stored `content_type` for an import whose bytes the sniffer does not
+/// recognize (MYND-173). It is a catalog hint only — it is NOT a member
+/// of [`sniff::ALLOWLISTED_CONTENT_TYPES`], so the `attachment://` handler
+/// never emits it (it re-sniffs and only serves allowlisted types). An
+/// octet-stream attachment renders in the editor as an export-only
+/// file-card and is never served inline.
+const OCTET_STREAM: &str = "application/octet-stream";
+
 /// Derive a display filename for a byte-source import when the caller
 /// did not supply one: a fixed stem plus the extension implied by the
 /// sniffed content-type. (For path imports the final path component is
@@ -230,7 +238,8 @@ pub async fn attachment_import<R: Runtime>(
 /// Testable core of [`attachment_import`].
 ///
 /// Steps: read the source bytes (first-line `Zeroizing`-wrapped),
-/// enforce the cap, sniff the type against the allowlist, peek the slot
+/// enforce the cap, sniff the type (unrecognized ⇒ `octet-stream`,
+/// MYND-173), peek the slot
 /// for `(items_key, items_key_id, root_key)`, read the catalog, dedup on
 /// the computed id, else encode + `atomic_write` the `MYA1` blob and
 /// upsert + `atomic_write` the `MYC1` catalog. Returns the id + metadata.
@@ -273,19 +282,15 @@ pub(crate) async fn attachment_import_with_dir(
         });
     }
 
-    // (3) Content-type sniff against the allowlist. A `.png`-renamed
-    //     binary rejects here (content sniff, not extension).
-    let content_type = match sniff_content_type(&file_bytes) {
-        Some(ct) => ct,
-        None => {
-            tracing::debug!(
-                stage = "sniff",
-                error_kind = "UnsupportedType",
-                "attachment_import rejected: type not in allowlist"
-            );
-            return Err(AttachmentImportError::UnsupportedType);
-        }
-    };
+    // (3) Content-type sniff. The sniffer recognizes ONLY the render
+    //     allowlist (image/* + svg + pdf); anything else is stored as an
+    //     opaque attachment with `application/octet-stream` (MYND-173).
+    //     Accepting arbitrary bytes is safe because a non-allowlisted type
+    //     is never served inline by the `attachment://` handler nor
+    //     rendered — it surfaces in the editor as an export-only file-card,
+    //     so a `.png`-renamed binary cannot become a scriptable served
+    //     resource; the user only gets its bytes back verbatim via Export.
+    let content_type = sniff_content_type(&file_bytes).unwrap_or(OCTET_STREAM);
     tracing::debug!(stage = "sniff", content_type = content_type);
 
     // (4) Slot gate — clone `(items_key, items_key_id, root_key)` out of
@@ -1179,6 +1184,150 @@ pub(crate) fn load_catalog_for_export(
     .map_err(|e| CatalogLoadError::CatalogIo(e.kind()))
 }
 
+// ---- attachment_export --------------------------------------------------
+
+/// `Slot::Unlocked`-gated export of one attachment's decrypted bytes to a
+/// user-chosen `destination` (MYND-173). The frontend opens the native
+/// Save dialog — the established export-suite convention (`pdf_export` /
+/// `vault_export_markdown` also receive the chosen path) — and passes the
+/// path plus the overwrite consent. The plaintext is decrypted in Rust
+/// RAM and written via `atomic_write_unclobbered`; it never crosses back
+/// into the WebView. This is the TB3 user-initiated-egress exception: the
+/// destination is plaintext by the user's own intent.
+#[tauri::command]
+pub async fn attachment_export<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    id: String,
+    destination: String,
+    overwrite: bool,
+) -> Result<(), AttachmentExportError> {
+    let dir =
+        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentExportError::from)?;
+    attachment_export_with_dir(
+        &dir,
+        state.inner(),
+        &id,
+        PathBuf::from(destination),
+        overwrite,
+    )
+    .await
+}
+
+/// Testable core of [`attachment_export`]. Type-agnostic: works for any
+/// attachment (image / PDF / opaque generic) — the chip's Export action
+/// and the image/PDF Save-As affordance both call it.
+pub(crate) async fn attachment_export_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    id: &str,
+    destination: PathBuf,
+    overwrite: bool,
+) -> Result<(), AttachmentExportError> {
+    // (1) Decode the id (64 lowercase-hex → 32 bytes). A malformed id is
+    //     a bug-canary — the UI only exports ids it rendered.
+    let id_bytes = hex_decode_id(id).ok_or(AttachmentExportError::InvalidId)?;
+
+    // (1b) Destination sanity (export-suite parity, mirrors
+    //      `vault_export::validate_destination`): the parent must exist and be
+    //      a directory, and the destination must not itself be an existing
+    //      directory. Reject a malformed target cleanly rather than surfacing a
+    //      raw filesystem error deep in the write.
+    if !crate::paths::parent_dir_ok(&destination) || destination.is_dir() {
+        tracing::debug!(stage = "dest_check", error_kind = "InvalidDestination");
+        return Err(AttachmentExportError::InvalidDestination);
+    }
+
+    // (2) Slot peek: items_key + items_key_id decrypt the blob; root_key
+    //     derives the catalog KEK (for the content_type bound into the
+    //     blob AAD). All three wipe on drop.
+    let Some((items_key, items_key_id, root_key)) = state.peek_unlocked_attachment_material().await
+    else {
+        tracing::debug!(stage = "slot_check", outcome = "vault_locked");
+        return Err(AttachmentExportError::Locked);
+    };
+
+    // (3) Catalog lookup → the content_type (AAD) + existence check.
+    let catalog = load_catalog_for_export(vault_dir, &root_key).map_err(|e| match e {
+        CatalogLoadError::InvalidVaultMeta => AttachmentExportError::InvalidVaultMeta,
+        CatalogLoadError::MetaIo(k) | CatalogLoadError::CatalogIo(k) => AttachmentExportError::Io {
+            io_error_kind: crate::io_failure_kind::from_io_error_kind(k),
+        },
+    })?;
+    let Some(meta) = catalog.entries.get(id) else {
+        tracing::debug!(stage = "catalog_lookup", outcome = "not_found");
+        return Err(AttachmentExportError::NotFound);
+    };
+    let content_type = meta.content_type.clone();
+
+    // (4) Read + decode the immutable blob on a blocking thread, then
+    //     write the plaintext to the destination. The decrypted bytes are
+    //     `Zeroizing` (wiped on closure exit); the on-disk copy is the
+    //     user's deliberate egress (TB3). `atomic_write_unclobbered` keeps
+    //     a pre-existing user file shaped like its own temp sibling safe
+    //     (115-F1); `overwrite=false` rejects an existing target untouched.
+    let blob_path = vault_dir.join("attachments").join(id);
+    let join = tokio::task::spawn_blocking(move || -> Result<(), AttachmentExportError> {
+        let blob = match std::fs::read(&blob_path) {
+            Ok(b) => b,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Err(AttachmentExportError::NotFound);
+            }
+            Err(e) => return Err(AttachmentExportError::from(e)),
+        };
+        let bytes = decode_attachment_blob(
+            &blob,
+            &id_bytes,
+            content_type.as_bytes(),
+            &items_key,
+            &items_key_id,
+        )
+        .map_err(|_| AttachmentExportError::Corrupt)?;
+        match crate::atomic_write::atomic_write_unclobbered(&destination, &bytes, overwrite) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                Err(AttachmentExportError::TargetAlreadyExists)
+            }
+            Err(e) => Err(AttachmentExportError::from(e)),
+        }
+        // `bytes` (Zeroizing) + `items_key` drop here.
+    })
+    .await;
+
+    let result = match join {
+        Err(_join) => {
+            tracing::error!(stage = "spawn_blocking_join", error_kind = "JoinFailure");
+            return Err(AttachmentExportError::JoinFailure);
+        }
+        Ok(r) => r,
+    };
+    match &result {
+        Ok(()) => tracing::info!(stage = "success", event = "attachment_exported"),
+        Err(e) => tracing::warn!(
+            stage = "export",
+            error_kind = attachment_export_error_kind(e)
+        ),
+    }
+    result
+}
+
+/// Static-string label for [`AttachmentExportError`] variants — emitted
+/// via `tracing` without crossing IPC or dragging DENY-listed payloads.
+/// A new variant compile-fails this match.
+fn attachment_export_error_kind(e: &AttachmentExportError) -> &'static str {
+    match e {
+        AttachmentExportError::Locked => "Locked",
+        AttachmentExportError::InvalidId => "InvalidId",
+        AttachmentExportError::NotFound => "NotFound",
+        AttachmentExportError::Corrupt => "Corrupt",
+        AttachmentExportError::TargetAlreadyExists => "TargetAlreadyExists",
+        AttachmentExportError::InvalidDestination => "InvalidDestination",
+        AttachmentExportError::InvalidVaultMeta => "InvalidVaultMeta",
+        AttachmentExportError::Io { .. } => "Io",
+        AttachmentExportError::JoinFailure => "JoinFailure",
+    }
+}
+
 /// Read + decode the catalog, collapsing ANY failure (including IO) to
 /// the empty catalog — the read-only `catalog_list` path, where a
 /// transient IO error showing an empty library is acceptable (the next
@@ -1278,6 +1427,189 @@ mod tests {
         assert!(hex_decode_id(&"g".repeat(64)).is_none()); // non-hex
     }
 
+    // ---- attachment_export (MYND-173) ----------------------------------
+
+    #[test]
+    fn export_round_trips_imported_bytes() {
+        // Import opaque bytes, export them to a user destination, and
+        // assert the written file is byte-identical to the input.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let payload = b"opaque generic file \x00\x01\x02 contents".to_vec();
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: payload.clone(),
+                    filename: Some("report.docx".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+            assert_eq!(imported.content_type, "application/octet-stream");
+
+            let out = ScopedTempDir::new("attach-export-out").unwrap();
+            let dest = out.path().join("report.docx");
+            attachment_export_with_dir(tmp.path(), &state, &imported.id, dest.clone(), false)
+                .await
+                .expect("export succeeds");
+
+            assert_eq!(std::fs::read(&dest).unwrap(), payload);
+        });
+    }
+
+    #[test]
+    fn export_rejects_when_locked() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("attach-export-locked").unwrap();
+            seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
+            let state = VaultRuntimeState::default(); // Empty slot
+            let out = ScopedTempDir::new("attach-export-out").unwrap();
+            let result = attachment_export_with_dir(
+                tmp.path(),
+                &state,
+                &"0".repeat(64),
+                out.path().join("x.bin"),
+                false,
+            )
+            .await;
+            assert!(matches!(result, Err(AttachmentExportError::Locked)));
+            assert!(!out.path().join("x.bin").exists());
+        });
+    }
+
+    #[test]
+    fn export_unknown_id_is_not_found() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let out = ScopedTempDir::new("attach-export-out").unwrap();
+            // Valid lowercase-hex id that was never imported.
+            let result = attachment_export_with_dir(
+                tmp.path(),
+                &state,
+                &"0".repeat(64),
+                out.path().join("x.bin"),
+                false,
+            )
+            .await;
+            assert!(matches!(result, Err(AttachmentExportError::NotFound)));
+            assert!(!out.path().join("x.bin").exists());
+        });
+    }
+
+    #[test]
+    fn export_malformed_id_is_invalid() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let out = ScopedTempDir::new("attach-export-out").unwrap();
+            let result = attachment_export_with_dir(
+                tmp.path(),
+                &state,
+                "not-a-hex-id",
+                out.path().join("x.bin"),
+                false,
+            )
+            .await;
+            assert!(matches!(result, Err(AttachmentExportError::InvalidId)));
+        });
+    }
+
+    #[test]
+    fn export_existing_target_respects_overwrite_consent() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"v1 bytes".to_vec(),
+                    filename: Some("f.bin".to_string()),
+                },
+            )
+            .await
+            .expect("import");
+
+            let out = ScopedTempDir::new("attach-export-out").unwrap();
+            let dest = out.path().join("f.bin");
+            // Pre-existing file at the destination.
+            std::fs::write(&dest, b"pre-existing user file").unwrap();
+
+            // overwrite=false rejects and leaves the existing file intact.
+            let blocked =
+                attachment_export_with_dir(tmp.path(), &state, &imported.id, dest.clone(), false)
+                    .await;
+            assert!(matches!(
+                blocked,
+                Err(AttachmentExportError::TargetAlreadyExists)
+            ));
+            assert_eq!(std::fs::read(&dest).unwrap(), b"pre-existing user file");
+
+            // overwrite=true replaces it with the decrypted bytes.
+            attachment_export_with_dir(tmp.path(), &state, &imported.id, dest.clone(), true)
+                .await
+                .expect("overwrite export succeeds");
+            assert_eq!(std::fs::read(&dest).unwrap(), b"v1 bytes");
+        });
+    }
+
+    #[test]
+    fn export_rejects_invalid_destination() {
+        // A destination whose parent directory does not exist is rejected
+        // cleanly (export-suite parity) before any decrypt.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"bytes".to_vec(),
+                    filename: Some("f.bin".to_string()),
+                },
+            )
+            .await
+            .expect("import");
+            let out = ScopedTempDir::new("attach-export-out").unwrap();
+            let bad = out.path().join("no-such-dir").join("f.bin");
+            let result =
+                attachment_export_with_dir(tmp.path(), &state, &imported.id, bad, false).await;
+            assert!(matches!(
+                result,
+                Err(AttachmentExportError::InvalidDestination)
+            ));
+        });
+    }
+
+    #[test]
+    fn export_error_kind_covers_every_variant() {
+        // Drift guard mirroring import_error_kind_covers_every_variant.
+        use crate::io_failure_kind::IoFailureKind;
+        let cases = [
+            (AttachmentExportError::Locked, "Locked"),
+            (AttachmentExportError::InvalidId, "InvalidId"),
+            (AttachmentExportError::NotFound, "NotFound"),
+            (AttachmentExportError::Corrupt, "Corrupt"),
+            (
+                AttachmentExportError::TargetAlreadyExists,
+                "TargetAlreadyExists",
+            ),
+            (
+                AttachmentExportError::InvalidDestination,
+                "InvalidDestination",
+            ),
+            (AttachmentExportError::InvalidVaultMeta, "InvalidVaultMeta"),
+            (
+                AttachmentExportError::Io {
+                    io_error_kind: IoFailureKind::Other,
+                },
+                "Io",
+            ),
+            (AttachmentExportError::JoinFailure, "JoinFailure"),
+        ];
+        for (e, label) in cases {
+            assert_eq!(attachment_export_error_kind(&e), label);
+        }
+    }
+
     // ---- slot gate -----------------------------------------------------
 
     #[test]
@@ -1347,22 +1679,58 @@ mod tests {
     }
 
     #[test]
-    fn import_rejects_unsupported_type() {
+    fn import_accepts_unsupported_type_as_octet_stream() {
+        // MYND-173: a type the sniffer does not recognize is no longer
+        // rejected — it is stored as an opaque attachment with
+        // `application/octet-stream`, the real filename, and the real size.
         rt().block_on(async {
             let (tmp, state) = temp_vault().await;
-            let result = attachment_import_with_dir(
+            let imported = attachment_import_with_dir(
                 tmp.path(),
                 &state,
                 ImportSource::Bytes {
                     bytes: b"not a known file type at all".to_vec(),
-                    filename: Some("mystery.bin".to_string()),
+                    filename: Some("mystery.docx".to_string()),
                 },
             )
-            .await;
-            assert!(matches!(
-                result,
-                Err(AttachmentImportError::UnsupportedType)
-            ));
+            .await
+            .expect("opaque import succeeds");
+
+            assert!(!imported.deduplicated);
+            assert_eq!(imported.content_type, "application/octet-stream");
+            assert_eq!(imported.filename, "mystery.docx");
+            assert_eq!(imported.size, b"not a known file type at all".len() as u64);
+            assert_eq!(imported.id.len(), 64);
+
+            // Blob + catalog are on disk and the row lists with octet-stream.
+            assert!(tmp.path().join("attachments").join(&imported.id).exists());
+            let rows = catalog_list_with_dir(tmp.path(), &state)
+                .await
+                .expect("list succeeds");
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].content_type, "application/octet-stream");
+            assert_eq!(rows[0].filename, "mystery.docx");
+        });
+    }
+
+    #[test]
+    fn import_byte_source_without_filename_gets_bin_extension() {
+        // An octet-stream byte-source with no caller filename falls back to
+        // the generic `attachment.bin` auto-name (auto_filename `_` arm).
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"\x00\x01\x02 opaque blob".to_vec(),
+                    filename: None,
+                },
+            )
+            .await
+            .expect("opaque import succeeds");
+            assert_eq!(imported.content_type, "application/octet-stream");
+            assert_eq!(imported.filename, "attachment.bin");
         });
     }
 

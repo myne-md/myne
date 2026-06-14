@@ -97,6 +97,18 @@ export type AttachmentRenameError =
   | { kind: "InvalidVaultMeta" }
   | { kind: "EncodeFailed" };
 
+/** Error surface of {@link attachmentExport} — mirror of `AttachmentExportError`. */
+export type AttachmentExportError =
+  | { kind: "Locked" }
+  | { kind: "InvalidId" }
+  | { kind: "NotFound" }
+  | { kind: "Corrupt" }
+  | { kind: "TargetAlreadyExists" }
+  | { kind: "InvalidDestination" }
+  | { kind: "InvalidVaultMeta" }
+  | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
+  | { kind: "JoinFailure" };
+
 /** Error surface of {@link attachmentUnusedList} — mirror of `AttachmentUnusedListError`. */
 export type AttachmentUnusedListError =
   | { kind: "Locked" }
@@ -171,6 +183,28 @@ export async function attachmentRename(
   filename: string,
 ): Promise<void> {
   await invoke<void>("plugin:attachments|attachment_rename", { id, filename });
+}
+
+/**
+ * Export one attachment's **decrypted** bytes to a user-chosen `destination`
+ * (Slot::Unlocked-gated). The caller opens the native Save dialog (TS-side,
+ * via `@tauri-apps/plugin-dialog`) and passes the chosen path plus the
+ * `overwrite` consent. The plaintext is decrypted in Rust RAM and written to
+ * the destination; it never crosses back into the WebView. Type-agnostic —
+ * the generic file-card Export action and the image/PDF Save-As affordance
+ * both call it. Rejects with {@link AttachmentExportError}
+ * (`TargetAlreadyExists` when `overwrite` is false and the path exists).
+ */
+export async function attachmentExport(
+  id: string,
+  destination: string,
+  overwrite: boolean,
+): Promise<void> {
+  await invoke<void>("plugin:attachments|attachment_export", {
+    id,
+    destination,
+    overwrite,
+  });
 }
 
 /**

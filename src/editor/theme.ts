@@ -1109,6 +1109,74 @@ export const myneTheme = EditorView.theme({
     whiteSpace: "nowrap",
   },
 
+  // Generic file-card (MYND-173): a non-renderable attachment (.docx/.zip/…)
+  // shown as a compact, export-only card — icon + filename + "type · size" +
+  // a "⋯" overflow menu. Inline-flex like the image/PDF frame, with a hairline
+  // card surface (the generic file has nothing to render onto the surface).
+  ".cm-attachment-file-card": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "10px",
+    maxWidth: "360px",
+    padding: "8px 10px",
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    borderRadius: "var(--radius-2, 6px)",
+    verticalAlign: "top",
+    margin: "var(--space-3, 10px) 0",
+    fontFamily: "var(--font-sans)",
+    cursor: "default",
+  },
+  ".cm-attachment-file-card-icon": {
+    flexShrink: 0,
+    color: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-attachment-file-card-text": {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1px",
+    minWidth: 0, // allow the name to ellipsis instead of overflowing the card
+    flex: "1 1 auto",
+  },
+  ".cm-attachment-file-card-name": {
+    color: "var(--fg-1, #1a1a17)",
+    fontSize: "13px",
+    fontWeight: "500",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  ".cm-attachment-file-card-meta": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "11px",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  ".cm-attachment-file-card-menuwrap": {
+    position: "relative",
+    flexShrink: 0,
+  },
+  ".cm-attachment-file-card-menubtn": {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    color: "var(--fg-3, #6b6a64)",
+    cursor: "pointer",
+    fontSize: "16px",
+    lineHeight: "1",
+    padding: "2px 4px",
+    borderRadius: "var(--radius-1, 4px)",
+  },
+  ".cm-attachment-file-card-menubtn:hover": {
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    color: "var(--fg-1, #1a1a17)",
+  },
+  // NOTE: the overflow MENU + its items are body-mounted (portaled out of the
+  // editor so `.cm-scroller` can't clip them), so their styles live in the
+  // global stylesheet (`attachments/styles.ts`), not this `.cm-editor`-scoped
+  // theme. Only the in-card button (`-menubtn`) is styled here.
+
   // Autocomplete tooltip (emoji `:shortcode`, MYND-156). CM6 mounts the
   // completion tooltip inside the editor's tooltip layer, so its `.cm-tooltip*`
   // classes ARE reachable by this theme (unlike the body-mounted slash menu).

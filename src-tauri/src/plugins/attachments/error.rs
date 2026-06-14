@@ -54,11 +54,13 @@ pub enum AttachmentImportError {
         cap_bytes: usize,
     },
 
-    /// The file's magic bytes did not match the import allowlist
-    /// (PNG / JPEG / GIF / WebP / SVG / PDF). Sniffed by content, not by
-    /// extension. The sniffed-or-claimed type is intentionally NOT
-    /// echoed back (it could carry attacker-chosen bytes); the UI shows
-    /// a static "unsupported file type" message.
+    /// Reserved IPC-contract variant. Since MYND-173 the import path
+    /// accepts arbitrary bytes (a non-allowlisted type is stored as
+    /// `application/octet-stream`, not rejected), so the host no longer
+    /// constructs this. The TS error contract + its skip-reason mapping
+    /// still recognize `{"kind":"UnsupportedType"}` defensively, so the
+    /// variant is retained for wire-contract stability rather than removed.
+    #[allow(dead_code)]
     #[error("unsupported attachment type")]
     UnsupportedType,
 
@@ -97,6 +99,86 @@ pub enum AttachmentImportError {
 impl From<std::io::Error> for AttachmentImportError {
     fn from(e: std::io::Error) -> Self {
         AttachmentImportError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
+/// Failure surface for [`super::commands::attachment_export`] (MYND-173).
+///
+/// Export decrypts one attachment blob in RAM and writes the plaintext to
+/// a user-chosen destination (the TB3 user-initiated-egress exception —
+/// the destination is plaintext by the user's own intent). The closed
+/// taxonomy mirrors `pdf_export`'s single-file export surface:
+///
+/// | Variant                  | JSON                                                           |
+/// |--------------------------|----------------------------------------------------------------|
+/// | `Locked`                 | `{"kind":"Locked"}`                                            |
+/// | `InvalidId`              | `{"kind":"InvalidId"}`                                         |
+/// | `NotFound`               | `{"kind":"NotFound"}`                                          |
+/// | `Corrupt`                | `{"kind":"Corrupt"}`                                           |
+/// | `TargetAlreadyExists`    | `{"kind":"TargetAlreadyExists"}`                              |
+/// | `InvalidDestination`     | `{"kind":"InvalidDestination"}`                              |
+/// | `InvalidVaultMeta`       | `{"kind":"InvalidVaultMeta"}`                                  |
+/// | `Io { io_error_kind }`   | `{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}` |
+/// | `JoinFailure`            | `{"kind":"JoinFailure"}`                                      |
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum AttachmentExportError {
+    /// The vault was not `Slot::Unlocked` when the export ran — no keys
+    /// are available to decrypt. Frontend CTA: re-prompt for unlock.
+    #[error("vault is not unlocked")]
+    Locked,
+
+    /// The `id` was not a 64-char lowercase-hex attachment-id. Bug-canary
+    /// (the UI only exports ids it rendered from the catalog).
+    #[error("malformed attachment id")]
+    InvalidId,
+
+    /// No catalog entry / blob for this id (deleted, or never existed).
+    /// The UI re-renders as a tombstone card.
+    #[error("attachment not found")]
+    NotFound,
+
+    /// The blob failed to decrypt (AEAD / CTX commitment) — corruption or
+    /// a key mismatch. Collapsed from `protocol::AttachmentBlobError`.
+    #[error("attachment blob failed to decrypt")]
+    Corrupt,
+
+    /// A file already exists at the destination and the caller did not
+    /// consent to overwrite. Mirrors `pdf_export::TargetAlreadyExists`.
+    #[error("destination already exists")]
+    TargetAlreadyExists,
+
+    /// The destination path is unusable — its parent directory does not
+    /// exist (or is not a directory), or the destination is itself an
+    /// existing directory. Mirrors the export suite's destination guard
+    /// (`vault_export::InvalidDestination`); surfaces a clean rejection
+    /// instead of a raw filesystem error for a malformed target.
+    #[error("destination path is invalid")]
+    InvalidDestination,
+
+    /// `vault.meta` parse failure during the `account_number_hash`
+    /// extraction (the catalog AAD identity).
+    #[error("vault.meta parse failed")]
+    InvalidVaultMeta,
+
+    /// Filesystem error reading the blob / `vault.meta` / catalog, or
+    /// writing the plaintext to the destination.
+    #[error("filesystem error during attachment export")]
+    Io {
+        /// Closed-enum mapping of `std::io::Error::kind()`.
+        io_error_kind: IoFailureKind,
+    },
+
+    /// `spawn_blocking` panic / runtime shutdown during decode + write.
+    #[error("attachment export worker failed")]
+    JoinFailure,
+}
+
+impl From<std::io::Error> for AttachmentExportError {
+    fn from(e: std::io::Error) -> Self {
+        AttachmentExportError::Io {
             io_error_kind: from_io_error_kind(e.kind()),
         }
     }

@@ -16,12 +16,13 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + reconcile (apply / remove / referencing) + unused-list."
+description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + export + reconcile (apply / remove / referencing) + unused-list."
 permissions = [
   "allow-attachment-import",
   "allow-catalog-list",
   "allow-attachment-delete",
   "allow-attachment-rename",
+  "allow-attachment-export",
   "allow-attachment-refs-apply",
   "allow-attachment-refs-remove",
   "allow-attachment-refs-referencing",
@@ -48,6 +49,11 @@ commands.allow = ["attachment_delete"]
 identifier = "allow-attachment-rename"
 description = "Allow invoking attachments:attachment_rename (Slot::Unlocked-gated free-form rename of one attachment's catalog display filename; duplicates allowed since the content-addressed id is the key; only the MYC1 catalog entry's filename changes — the blob + id + on-disk filename are untouched)."
 commands.allow = ["attachment_rename"]
+
+[[permission]]
+identifier = "allow-attachment-export"
+description = "Allow invoking attachments:attachment_export (Slot::Unlocked-gated export of one attachment's DECRYPTED bytes to a user-chosen destination path; the frontend opens the native Save dialog and passes the path + overwrite consent; the plaintext is decrypted in Rust RAM and written via atomic_write_unclobbered, never crossing back into the WebView. TB3 user-initiated-egress exception — the destination is plaintext by the user's own intent. Type-agnostic: the generic file-card Export action and the image/PDF Save-As affordance both use it; MYND-173)."
+commands.allow = ["attachment_export"]
 
 [[permission]]
 identifier = "allow-attachment-refs-apply"
