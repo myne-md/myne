@@ -18,6 +18,7 @@ export const ICON_PATHS: Record<string, string> = {
   "share-2":
     '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  hash: '<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>',
   "chevron-up": '<path d="m18 15-6-6-6 6"/>',
   "chevron-down": '<path d="m6 9 6 6 6-6"/>',
   "chevrons-up-down":
