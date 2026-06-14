@@ -9,7 +9,7 @@
 
 import { useEffect, type CSSProperties } from "react";
 
-interface ToastAction {
+export interface ToastAction {
   /** Button label (e.g. "Undo"). */
   label: string;
   /** Invoked on click. The parent is responsible for dismissing the toast. */
@@ -71,7 +71,12 @@ export function Toast({ message, onDone, durationMs = 2500, action }: ToastProps
     <div role="status" aria-live="polite" data-testid="editor.toast" style={TOAST_STYLE}>
       <span>{message}</span>
       {action !== undefined && (
-        <button type="button" style={ACTION_STYLE} onClick={action.onAction}>
+        <button
+          type="button"
+          style={ACTION_STYLE}
+          onClick={action.onAction}
+          data-testid="editor.toast-action"
+        >
           {action.label}
         </button>
       )}

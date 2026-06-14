@@ -220,7 +220,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 search-index-key"` | KEK for `vault.search` blob (§9.6) | Active when `vault.search` is written (MYND-29). |
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
 | `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
-| `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.12) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
+| `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.13) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
 | (future v005 contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
@@ -1140,6 +1140,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `attachments/<attachment-id-hex>` | IN | Attachment blobs (§9.9) |
 | `vault.search` | OUT | Pure rebuildable cache; first unlock after restore rebuilds (§9.6.4) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
+| `.rename-journal` (notes dir) | OUT | Empty roll-forward marker for the transactional multi-note rename (§9.12); transient WAL sentinel, never user data |
 | `vaults/registry.json` | OUT (structurally) | Per-install plaintext cache living outside the vault root |
 | `vault.workspace` (§9.7), `vault.indices` (§9.8) | RESERVED | In-flight families (§10.3); disposition decided in the same change that lands each family's spec — landing one without amending this table is a spec bug |
 
@@ -1220,7 +1221,63 @@ implementation pins `member_count` at 2²⁰ and the member table at 16 MiB). A 
 MUST reject `MYB5` and any unregistered magic; a v005 client MUST refuse `MYB1` with an
 explicit migration prompt (§10.4). No extension points, no negotiation (§10.1).
 
-### 9.12 Personal dictionary blob (`vault.dictionary`, `MYD1`)
+### 9.12 Transactional multi-note rename (the rename journal)
+
+A title rename that auto-updates wikilinks (`markdown-dialect.md` wikilink §8) rewrites
+the renamed note's own `.myn` blob **plus** every inbound `[[…]]`-bearing note that
+resolved to it. This rewrite is **all-or-nothing**: a partial commit would leave some
+inbound `[[Old Title]]` references un-rewritten, and because resolution is title-keyed
+(§5.3 / wikilink §5.3) an un-rewritten title-only link then resolves to **no note** —
+i.e. a partial commit silently breaks links. The per-blob atomic-write discipline (each
+`.myn` written to `<uuid>.myn.tmp` → fsync → atomic `rename(2)` → parent-dir fsync) makes
+each *single* blob durable but is **not** collectively atomic across N blobs. The rename
+journal restores all-or-nothing across the whole set.
+
+**Two-phase write + roll-forward WAL.** The writer:
+
+1. **Stage.** Encode every updated blob (the renamed note + each inbound note) and write
+   each to its `<uuid>.myn.tmp`, `fsync`'d. Any failure in this phase deletes every staged
+   `.tmp` and aborts — no live `.myn` was touched, so the vault is unchanged.
+2. **Mark.** Once all stages are durable, write an **empty** `.rename-journal` marker in
+   the notes directory (`fsync` the file + the parent directory). The marker is
+   content-free — its mere existence is the commit signal.
+3. **Commit.** Atomically `rename(2)` every `<uuid>.myn.tmp` → `<uuid>.myn`.
+4. **Clear.** Delete the marker (and `fsync` the parent directory).
+
+**Recovery (on vault-open, BEFORE the index rebuild).** A client reconciles any pending
+rename before resolution runs:
+
+- **Marker present** → a commit was in progress and (by phase 1) every staged blob is
+  durable → **roll forward**: `rename(2)` every orphan `<uuid>.myn.tmp` → `<uuid>.myn`,
+  then delete the marker.
+- **Marker absent** → either a stage crashed before the marker, or a lone per-blob
+  `atomic_write` crashed before its own rename → **roll back**: delete every orphan
+  `<uuid>.myn.tmp`.
+
+Recovery is idempotent: a crash *during* recovery leaves the same marker-present /
+marker-absent state, so the next open re-drives it to the same outcome.
+
+**Single-writer invariant.** v0.1 is single-writer-per-vault (one unlocked client; the
+`tauri-plugin-single-instance` + slot CAS guards, §9 / `decisions.md` 2026-05-06). No
+`<uuid>.myn.tmp` exists except as in-flight transaction residue, so the recovery sweep
+cannot mistake a concurrent writer's staging file for abandoned residue.
+
+**Integrity and attack surface.** The marker is **not** a magic-byte blob and carries no
+data — no note UUIDs, no titles, no counts — so it adds no metadata surface beyond the
+`.tmp` staging set already inherent to *any* note write. A disk-write adversary who plants
+a marker and a forged `<uuid>.myn.tmp` cannot inject readable content: a rolled-forward
+blob is still AEAD/CTX-verified with full AAD binding on the next read (§6.4), so a forged
+blob fails to decrypt exactly as a tampered live `.myn` would. This is the same
+corruption-detection-not-tamper-resistance posture as §9.11.4 — the journal changes *when*
+blobs become live, never *whether* they are authenticated. Both the marker and the staged
+`.tmp` files are **OUT** of the backup container (§9.11.3): a backup is a point-in-time
+consistent snapshot (§9.11.5) and never captures an in-flight rename.
+
+This mechanism introduces **no new load-bearing identifier** and is **not** a major-version
+event: the staged blobs are ordinary `MY01` `.myn` files, and the marker is an empty
+sentinel with a fixed conventional name (`.rename-journal`), not a versioned format.
+
+### 9.13 Personal dictionary blob (`vault.dictionary`, `MYD1`)
 
 `vault.dictionary` is a vault-level singleton artifact holding the user's personal
 spell-check dictionary — the **added-words set** plus a vault-wide **ignore set**
@@ -1236,7 +1293,7 @@ The blob is **payload-agnostic at the protocol layer**, exactly like `vault.sear
 load-bearing part — while the inner word-set serialization is the client's concern,
 tagged by a `dict_format_version` byte.
 
-#### 9.12.1 On-disk layout
+#### 9.13.1 On-disk layout
 
 All multi-byte integers are big-endian.
 
@@ -1246,18 +1303,18 @@ Offset  Size       Field                  Description
 0       4 bytes    magic                  ASCII "MYD1"
 4       1 byte     protocol_version       0x01 for this specification
 5       1 byte     dict_format_version    0x01 = the v0.1 inner word-set format
-                                          (§9.12.2). Distinct from protocol_version:
+                                          (§9.13.2). Distinct from protocol_version:
                                           a future serialization bumps THIS byte so an
                                           old decoder rejects + falls back to empty
-                                          (§9.12.4) rather than mis-parsing it.
+                                          (§9.13.4) rather than mis-parsing it.
 6       24 bytes   dict_nonce             192-bit random nonce (OS CSPRNG) for the
                                           inner AEAD under personal_dictionary_key.
 30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the inner
                                           ciphertext followed by the 32-byte CTX tag.
-34      M bytes    ciphertext             Inner plaintext (§9.12.2), AEAD-encrypted
+34      M bytes    ciphertext             Inner plaintext (§9.13.2), AEAD-encrypted
                                           under personal_dictionary_key with dict_nonce,
                                           then the 32-byte CTX commitment tag T' (§5.1).
-                                          AAD binding in §9.12.3.
+                                          AAD binding in §9.13.3.
 ```
 
 The 34-byte header is identical in shape to `vault.search` (§9.6.1) — offset 5 carries
@@ -1268,7 +1325,7 @@ consuming header bytes, exactly as for `vault.prefs`/`vault.search`. Magic +
 `protocol_version` + `dict_format_version` MUST all be checked **before** any decryption
 (the magic-byte-before-decrypt discipline of §9.2/§9.3/§9.6.1).
 
-#### 9.12.2 Inner plaintext (`dict_format_version 0x01`)
+#### 9.13.2 Inner plaintext (`dict_format_version 0x01`)
 
 A [postcard](https://docs.rs/postcard)-serialized struct of two **set-semantics string
 arrays**: `personal_words` (added words that count as correct) and `ignore_words` (the
@@ -1284,7 +1341,7 @@ stay byte-stable. Case-insensitive **lookup** (does adding "Myne" suppress
 "myne"/"MYNE"?) is the client's set-management layer's job — the codec stores exact NFC
 bytes and never folds (the §9.5.2 codec-vs-set-layer separation).
 
-#### 9.12.3 AAD construction
+#### 9.13.3 AAD construction
 
 `AAD_personal_dictionary_blob` mirrors `AAD_prefs_blob` / `AAD_search_index_blob` with
 role string `"personal-dictionary-blob"`:
@@ -1303,7 +1360,7 @@ survives a v005 epoch rotation, same rationale as prefs/search/workspace). The s
 role string `"personal-dictionary-key"` is DISTINCT from the AAD role string
 `"personal-dictionary-blob"` — the same key/blob domain-separation as search.
 
-#### 9.12.4 Size cap, fall-back-to-empty, and non-load-bearing class
+#### 9.13.4 Size cap, fall-back-to-empty, and non-load-bearing class
 
 Implementations MUST reject `ciphertext_len > 4 MiB + 32`. 4 MiB is generous headroom
 over a realistic personal dictionary (hundreds of thousands of words) and bounds the
@@ -1359,7 +1416,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Attachment blob | `MYA1` | `MYA5` | §9.9 | MYND-164 |
 | Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
 | Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
-| Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.12 | MYND-266 |
+| Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.13 | MYND-266 |
 
 Section number §9.8 (vault indices) is **reserved** for an in-flight feature whose blob spec lands separately; §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10 to avoid the collision. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments) use the `MY?5` v005 convention.
 

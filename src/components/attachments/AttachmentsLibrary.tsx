@@ -28,22 +28,27 @@ import {
 import { createPortal } from "react-dom";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import {
+  attachmentCleanUnused,
   attachmentDelete,
   attachmentImport,
   attachmentRename,
+  attachmentUnusedList,
   catalogList,
   type CatalogEntry,
+  type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { referencingNotes } from "../../notes/attachmentRefs";
 import { useSelectedNote, type NoteId } from "../../notes/sidebarState";
 import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
+import { exportAttachment } from "../../editor/attachments/fileCardActions";
 import { Icon } from "../primitives/Icon";
 import { Button } from "../primitives/Button";
 import { Select, type SelectOption } from "../primitives/Select";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
 import { UsedInNotesPopover } from "./UsedInNotesPopover";
 import { DeleteAttachmentDialog } from "./DeleteAttachmentDialog";
+import { CleanUnusedAttachmentsDialog } from "./CleanUnusedAttachmentsDialog";
 import {
   formatBytes,
   formatCreatedAt,
@@ -60,6 +65,7 @@ const TYPE_FILTER_OPTIONS: readonly SelectOption<TypeFilter>[] = [
   { value: "all", label: "All types" },
   { value: "image", label: "Images" },
   { value: "pdf", label: "PDFs" },
+  { value: "audio", label: "Audio" },
   { value: "other", label: "Other" },
 ];
 
@@ -203,6 +209,24 @@ const CENTER_MESSAGE_STYLE: CSSProperties = {
 
 // ---- main component -------------------------------------------------------
 
+// Transient bottom-center toast for the "nothing to clean" / scan-error
+// feedback (auto-dismissed after 2.5 s, matching Toast.tsx).
+const CLEAN_NOTICE_STYLE: CSSProperties = {
+  position: "absolute",
+  bottom: "var(--space-5)",
+  left: "50%",
+  transform: "translateX(-50%)",
+  padding: "var(--space-2) var(--space-4)",
+  borderRadius: 8,
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  boxShadow: "var(--shadow-2, 0 4px 16px rgba(0,0,0,0.18))",
+  fontFamily: "var(--font-sans)",
+  fontSize: 13,
+  color: "var(--fg-1)",
+  zIndex: 10,
+};
+
 export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   const ctx = useSelectedNote();
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
@@ -222,12 +246,21 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // is open" — lifted out of each tile so opening one closes any other (only
   // one popover open at a time across the whole library).
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  // Single-open ⋮ action menu — opening one row's menu closes any other.
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
   // Delete flow: the target entry + its (already-fetched) referencing notes.
   const [deleteTarget, setDeleteTarget] = useState<{
     entry: CatalogEntry;
     noteIds: string[];
   } | null>(null);
+
+  // Clean-unused flow (MYND-171): the fetched unused set drives the review
+  // dialog; `checkingUnused` gates the CTA during the authoritative scan;
+  // `cleanNotice` is the transient "nothing to clean" / error feedback.
+  const [cleanupTarget, setCleanupTarget] = useState<CatalogEntry[] | null>(null);
+  const [checkingUnused, setCheckingUnused] = useState(false);
+  const [cleanNotice, setCleanNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -306,7 +339,14 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       url: attachmentUrl(entry.id),
       alt: entry.filename,
       kind: kindOf(entry.content_type) === "pdf" ? "pdf" : "image",
+      id: entry.id,
     });
+  }, []);
+
+  // Export (Save As) — the shared host-side action, available for every type
+  // (the library counterpart of the editor file-card / lightbox Export; MYND-173).
+  const handleExport = useCallback((entry: CatalogEntry) => {
+    void exportAttachment(entry.id, entry.filename);
   }, []);
 
   const handleRenameCommit = useCallback(
@@ -342,6 +382,43 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     );
   }, [deleteTarget]);
 
+  // Clean unused: run the authoritative scan; open the review dialog when
+  // there's something to clean, else surface a transient "nothing to clean"
+  // notice. A scan failure (e.g. an unreadable note → NoteScanFailed) surfaces
+  // a notice rather than opening a (possibly unsafe) list.
+  const handleCleanUnused = useCallback(async () => {
+    setCheckingUnused(true);
+    setCleanNotice(null);
+    try {
+      const unused = await attachmentUnusedList();
+      if (unused.length === 0) {
+        setCleanNotice("No unused attachments to clean.");
+      } else {
+        setCleanupTarget(unused);
+      }
+    } catch {
+      setCleanNotice("Couldn't check for unused attachments. Try again.");
+    } finally {
+      setCheckingUnused(false);
+    }
+  }, []);
+
+  const handleCleanConfirm = useCallback(
+    async (ids: string[]): Promise<CleanResult> => {
+      const result = await attachmentCleanUnused(ids);
+      await refresh(); // reconcile the library to disk truth
+      return result;
+    },
+    [refresh],
+  );
+
+  // Auto-dismiss the transient clean-up notice (2.5 s, matching Toast).
+  useEffect(() => {
+    if (cleanNotice === null) return;
+    const t = setTimeout(() => setCleanNotice(null), 2500);
+    return () => clearTimeout(t);
+  }, [cleanNotice]);
+
   const handleJump = useCallback(
     (id: NoteId) => {
       void ctx.open(id).catch(() => {});
@@ -369,8 +446,18 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     onRenameCommit: (name) => void handleRenameCommit(entry.id, name),
     onRenameCancel: () => setRenamingId(null),
     onPreview: () => handlePreview(entry),
+    onExport: () => handleExport(entry),
     onDelete: () => void openDeleteDialog(entry),
     onJump: handleJump,
+    // Only image/PDF open the shared lightbox preview. Audio plays inline in
+    // its own tile (its own play button), and a generic ("other") file has no
+    // inline preview — same fallback as the editor file-card; Preview hidden.
+    previewable:
+      kindOf(entry.content_type) === "image" || kindOf(entry.content_type) === "pdf",
+    actionMenuOpen: openActionMenuId === entry.id,
+    onToggleActionMenu: () =>
+      setOpenActionMenuId((cur) => (cur === entry.id ? null : entry.id)),
+    onCloseActionMenu: () => setOpenActionMenuId(null),
   });
 
   return (
@@ -378,9 +465,15 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       style={{
         flex: 1,
         minWidth: 0,
+        // Allow this flex-column item to shrink below its content height so the
+        // SCROLL_STYLE child (overflowY: auto) actually scrolls instead of the
+        // grid overflowing the pane (flexbox min-height:auto trap).
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         background: "var(--bg-1)",
+        // Anchor the transient clean-up notice (absolute, bottom-center).
+        position: "relative",
       }}
     >
       <div style={TOOLBAR_STYLE}>
@@ -428,6 +521,16 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           <ViewToggleButton view={view} onToggle={() => setView((v) => (v === "grid" ? "list" : "grid"))} />
           <Button
             variant="secondary"
+            icon="trash-2"
+            onClick={() => void handleCleanUnused()}
+            disabled={checkingUnused || importing}
+            data-testid="attachments.clean-unused-cta"
+            title="Delete attachments not used in any note"
+          >
+            {checkingUnused ? "Checking…" : "Clean unused"}
+          </Button>
+          <Button
+            variant="secondary"
             icon="download"
             onClick={() => void handleImport()}
             disabled={importing}
@@ -472,6 +575,24 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           onConfirm={handleDeleteConfirm}
           onClose={() => setDeleteTarget(null)}
         />
+      )}
+
+      {cleanupTarget !== null && (
+        <CleanUnusedAttachmentsDialog
+          attachments={cleanupTarget}
+          onConfirm={handleCleanConfirm}
+          onClose={() => setCleanupTarget(null)}
+        />
+      )}
+
+      {cleanNotice !== null && (
+        <div
+          role="status"
+          data-testid="attachments.clean-notice"
+          style={CLEAN_NOTICE_STYLE}
+        >
+          {cleanNotice}
+        </div>
       )}
     </main>
   );
@@ -561,8 +682,19 @@ interface ItemActionProps {
   onRenameCancel: () => void;
   /** Open the shared lightbox preview of this attachment (Fix 2/4). */
   onPreview: () => void;
+  /** Export (Save As) this attachment's decrypted bytes (MYND-173). */
+  onExport: () => void;
   onDelete: () => void;
   onJump: (id: NoteId) => void;
+  /** Whether this attachment can be previewed inline (image/PDF). A generic
+   *  (octet-stream) file cannot — the ⋮ menu omits Preview for it (MYND-173). */
+  previewable: boolean;
+  /** Whether THIS row's ⋮ action menu is the one open (single-open). */
+  actionMenuOpen: boolean;
+  /** Toggle this row's ⋮ action menu (closing any other). */
+  onToggleActionMenu: () => void;
+  /** Force-close this row's ⋮ action menu (outside-click / Esc / select). */
+  onCloseActionMenu: () => void;
 }
 
 /** Inline editable filename — Enter commits, Esc cancels, blur commits. */
@@ -740,14 +872,19 @@ function AttachmentActionMenu({
   );
 
   // Anchor below the trigger, right-aligned to it (clamped into the viewport).
+  // Space-aware: flip above the trigger when there isn't room below (estimated
+  // from the item count, since the menu isn't measured until after this pass).
   useLayoutEffect(() => {
     const el = anchorRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const width = 160;
     const left = Math.min(r.right - width, window.innerWidth - width - 8);
-    setCoords({ top: r.bottom + 4, left: Math.max(8, left) });
-  }, [anchorRef]);
+    const estHeight = items.length * 34 + 8;
+    const openUp = r.bottom + estHeight + 8 > window.innerHeight;
+    const top = openUp ? Math.max(8, r.top - estHeight - 4) : r.bottom + 4;
+    setCoords({ top, left: Math.max(8, left) });
+  }, [anchorRef, items.length]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -834,20 +971,38 @@ const MENU_TRIGGER_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
-/** The ⋮ button + its dropdown. Menu items: Preview · Rename · Delete. */
+/**
+ * The ⋮ button + its dropdown. Items: (Preview ·) Export · Rename · Delete —
+ * Preview is omitted for a non-`previewable` (generic / octet-stream) file,
+ * which has no inline rendering. The open state is OWNED BY THE LIBRARY and
+ * threaded via `open`/`onToggle`/`onClose`, so opening one row's menu closes
+ * any other (single-open — the `UsedInNotes` popover pattern).
+ */
 function ItemMenu({
+  open,
+  onToggle,
+  onClose,
+  previewable,
   onPreview,
+  onExport,
   onStartRename,
   onDelete,
 }: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  previewable: boolean;
   onPreview: () => void;
+  onExport: () => void;
   onStartRename: () => void;
   onDelete: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const items: ItemMenuEntry[] = [
-    { id: "preview", label: "Preview", onSelect: onPreview },
+    ...(previewable
+      ? [{ id: "preview", label: "Preview", onSelect: onPreview }]
+      : []),
+    { id: "export", label: "Export", onSelect: onExport },
     { id: "rename", label: "Rename", onSelect: onStartRename },
     { id: "delete", label: "Delete", destructive: true, onSelect: onDelete },
   ];
@@ -863,7 +1018,7 @@ function ItemMenu({
         style={MENU_TRIGGER_STYLE}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((v) => !v);
+          onToggle();
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = "var(--paper-3)";
@@ -878,7 +1033,7 @@ function ItemMenu({
         <AttachmentActionMenu
           items={items}
           anchorRef={triggerRef}
-          onClose={() => setOpen(false)}
+          onClose={onClose}
         />
       )}
     </>
@@ -1028,8 +1183,13 @@ function AttachmentTile({
   onRenameCommit,
   onRenameCancel,
   onPreview,
+  onExport,
   onDelete,
   onJump,
+  previewable,
+  actionMenuOpen,
+  onToggleActionMenu,
+  onCloseActionMenu,
 }: ItemActionProps) {
   return (
     <div style={TILE_STYLE}>
@@ -1071,7 +1231,12 @@ function AttachmentTile({
             onJump={onJump}
           />
           <ItemMenu
+            open={actionMenuOpen}
+            onToggle={onToggleActionMenu}
+            onClose={onCloseActionMenu}
+            previewable={previewable}
             onPreview={onPreview}
+            onExport={onExport}
             onStartRename={onStartRename}
             onDelete={onDelete}
           />
@@ -1129,8 +1294,13 @@ function AttachmentListRow({
   onRenameCommit,
   onRenameCancel,
   onPreview,
+  onExport,
   onDelete,
   onJump,
+  previewable,
+  actionMenuOpen,
+  onToggleActionMenu,
+  onCloseActionMenu,
 }: ItemActionProps) {
   return (
     <div style={LIST_ROW_STYLE}>
@@ -1178,7 +1348,12 @@ function AttachmentListRow({
       />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
         <ItemMenu
+          open={actionMenuOpen}
+          onToggle={onToggleActionMenu}
+          onClose={onCloseActionMenu}
+          previewable={previewable}
           onPreview={onPreview}
+          onExport={onExport}
           onStartRename={onStartRename}
           onDelete={onDelete}
         />

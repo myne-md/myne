@@ -73,6 +73,32 @@ postcard = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
 spellbook = "=0.4.2"
 
+# PDF export per-page footer stamping (MYND-255 hotfix, owner-requested):
+# post-processes the captured PDF to draw the document title (bottom-left)
+# and an "X / Y" page counter (bottom-right) on every page. WebKit print
+# engines cannot draw margin-box page counters, CSS `@page` margin boxes
+# are Chromium-only, and a hand-rolled stamper would have to parse three
+# engine dialects (classic xref + xref/object streams) — see
+# `docs/dependency-policy.md` ledger ("PDF footer stamping") for the
+# measured transitive footprint. Not crypto, not telemetry; command-path
+# only (`plugins/pdf_export/footer.rs`), never on the boot path. Default
+# features (chrono/jiff/rayon/time — date-object + parallel-parse
+# conveniences) disabled: the stamper needs parse + content append + full
+# rewrite save only. MIT.
+lopdf = { version = "0.41.0", default-features = false }
+
+# Native microphone capture for voice notes (MYND-259). Pure-Rust cross-
+# platform audio I/O over the OS backends (CoreAudio / WASAPI / ALSA); chosen
+# over WebView MediaRecorder so captured PCM stays Rust-side + Zeroize-able
+# (never the JS heap), the codec is uniform across the three OS WebViews, and
+# the unreliable WebKitGTK MediaRecorder path is avoided (`decisions.md`
+# voice-notes entry). Command-path only (`plugins/attachments/voice/`), never
+# on the boot path; v0.1 records WAV with no encoder dependency. NOTE: the
+# Linux build needs the ALSA dev headers (`libasound2-dev`) for cpal's
+# alsa-sys backend. A dependency is a security decision — record in
+# `docs/dependency-policy.md`. Apache-2.0/MIT.
+cpal = "0.15"
+
 # Desktop-only: collapse the parallel-instance race source at process
 # boundary (a second app launch redirects to the existing window
 # instead of opening a new one). Defends against the catastrophic-
@@ -103,6 +129,14 @@ windows-sys = { version = "0.60", features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_System_SystemInformation",
 ] }
+# PDF export native print-to-PDF arm, Windows (MYND-255):
+# `ICoreWebView2_7::PrintToPdf` via tauri's `with_webview` handle.
+# Transitive→direct promotions — `webview2-com 0.38.2` and
+# `windows 0.61.3` are already locked via tauri/wry on Windows; zero
+# dependency-tree expansion. Best-effort arm (no Windows lane);
+# ratified fallback is window.print() if unviable.
+webview2-com = "0.38"
+windows = "0.61"
 
 # Linux machine-level idle reader (MYND-121): the X11 ScreenSaver extension
 # (`XScreenSaverQueryInfo` equivalent) via the **pure-Rust** `x11rb` (talks
@@ -114,6 +148,50 @@ windows-sys = { version = "0.60", features = [
 # (grill/feature dependency call) — `docs/dependency-policy.md` bar applies.
 [target.'cfg(target_os = "linux")'.dependencies]
 x11rb = { version = "0.13", features = ["screensaver"] }
+# PDF export print-to-file arm (MYND-255): WebKitPrintOperation +
+# GtkPrintSettings, reached through tauri's `with_webview` handle.
+# Both crates are transitive→direct promotions — `webkit2gtk 2.0.2` and
+# `gtk 0.18.2` are already locked via tauri/wry on Linux; zero
+# dependency-tree expansion (the `windows-sys` precedent above).
+webkit2gtk = "2.0"
+gtk = "0.18"
+
+# PDF export native print-to-PDF arm, macOS (MYND-255): WKWebView
+# `printOperationWithPrintInfo:` with an NSPrintSaveJob disposition,
+# reached through tauri's `with_webview` handle. All four objc2 crates
+# are transitive→direct promotions — `objc2 0.6.4` /
+# `objc2-app-kit 0.3.2` / `objc2-foundation 0.3.2` /
+# `objc2-web-kit 0.3.2` are already locked via tauri/wry on macOS; zero
+# dependency-tree expansion (the `windows-sys` precedent above).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", default-features = false }
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSGraphics",
+    "NSGraphicsContext",
+    "NSPrintInfo",
+    "NSPrintOperation",
+    "NSResponder",
+    "NSView",
+    # `NSWindow` gates `NSView::window` + the modal-for-window print run
+    # (`runOperationModalForWindow:…` — the synchronous `runOperation`
+    # deadlocks WKWebView pagination; see plugins/pdf_export/capture.rs).
+    "NSWindow",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSDictionary",
+    "NSString",
+    "NSURL",
+] }
+objc2-web-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "WKWebView",
+    # AppKit integration: WKWebView's NSView superclass chain (we call
+    # `view.window()`) and the AppKit-typed print API. Already enabled
+    # transitively via wry — declared here so our own use is explicit.
+    "objc2-app-kit",
+] }
 
 # Dev-dependencies — evaluated under the same `docs/dependency-policy.md`
 # bar as runtime dependencies. `tracing-test` (tokio-rs org, MIT) is the

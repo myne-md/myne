@@ -9,7 +9,7 @@
 //! Word boundaries + casefold reuse the shared `crate::text` tokenizer (SYNC-2)
 //! so the spell checker and the search index agree. The personal/ignore sets
 //! are plaintext-derived RAM — hydrated on unlock, zeroized on lock alongside
-//! the keys (the `search` subsystem's residency discipline; § 9.6.5 / § 9.12).
+//! the keys (the `search` subsystem's residency discipline; § 9.6.5 / § 9.13).
 //!
 //! Decrypted note plaintext stays Rust-side: the WebView sends words (already in
 //! the editor's plaintext buffer) over IPC and gets back per-word verdicts.

@@ -10,6 +10,7 @@
 // React drops the state. Window-close = OS process exit = memory wipe.
 
 export type Step =
+  | "briefing"
   | "password"
   | "encrypting"
   | "phrase"
@@ -81,11 +82,30 @@ export const initialState: VaultCreationState = {
 };
 
 /**
+ * Initial reducer state for `<CreateVault>`'s `useReducer`. `withBriefing`
+ * (first-run welcome entry, MYND-114) opens the flow on the safety-briefing
+ * step; every other entry (picker / switcher "create another") starts on
+ * `password`, since the user has already acknowledged the recovery model
+ * once. `RESET_TO_PASSWORD` / `RESET` always return to `password`
+ * (post-briefing) — the one-time briefing is never re-shown mid-flow.
+ *
+ * The briefing step holds no reducer state: its per-statement
+ * acknowledgement checkboxes and "Why?" disclosures live in
+ * `<BriefingStep>`'s local component state (the step is never re-entered
+ * via back-navigation — "Back" from password exits the flow through the
+ * reprobe path, same as before the briefing existed).
+ */
+export function makeInitialState(withBriefing: boolean): VaultCreationState {
+  return withBriefing ? { ...initialState, step: "briefing" } : initialState;
+}
+
+/**
  * State transitions. Every dispatched action lands here exactly once;
  * the `assertNever(action)` default arm guarantees compile-time
  * exhaustiveness — adding a new action without a case is a TS error.
  *
  * Diagram (informally):
+ *   briefing    →[BRIEFING_ACKED]→ password (first-run only, MYND-114)
  *   password    →[BEGIN_REQUESTED]→ encrypting
  *   encrypting  →[BEGIN_OK]→ phrase
  *   encrypting  →[BEGIN_ERR]→ password (with inline error)
@@ -101,6 +121,7 @@ export const initialState: VaultCreationState = {
  *   session-lost →[RESET]→ password
  */
 export type Action =
+  | { type: "BRIEFING_ACKED" }
   | { type: "BEGIN_REQUESTED" }
   | {
       type: "BEGIN_OK";
@@ -164,6 +185,11 @@ export function vaultCreationReducer(
   action: Action,
 ): VaultCreationState {
   switch (action.type) {
+    case "BRIEFING_ACKED":
+      // First-run safety briefing acknowledged (MYND-114) → password
+      // setup. Idempotent from `password` (the dev `?test-step` harness
+      // dispatches it unconditionally), so it never regresses the step.
+      return { ...state, step: "password" };
     case "BEGIN_REQUESTED":
       return { ...state, step: "encrypting", error: null };
     case "BEGIN_OK":

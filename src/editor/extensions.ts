@@ -40,13 +40,17 @@ import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { myneDecorations } from "./decorations";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
+import { noteSetExtension } from "./wikilink/note-set";
+import { wikilinkHoverExtension } from "./wikilink/hover";
+import { wikilinkPickerExtension } from "./wikilink/picker";
+import { activeViewExtension } from "./active-view";
 import { attachmentCatalogExtension } from "./attachments/catalog";
 import { attachmentPasteDropExtension } from "./attachments/paste-drop";
 import { attachmentInsertPlaceholderExtension } from "./attachments/insert-placeholder";
 import { slashMenuExtension } from "./slash/plugin";
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
-import { emojiCompletionExtension } from "./emoji-complete";
+import { completionExtension } from "./completion";
 import { clickCollapseExtension } from "./click-collapse";
 import { findExtension } from "./find/find-extension";
 import { spellDecorations } from "./decorations/spell";
@@ -94,15 +98,25 @@ export function myneExtensions(): readonly Extension[] {
     // the doc, so the placeholder can't be persisted.
     attachmentInsertPlaceholderExtension(),
     ...myneDecorations(),
+    // WL-5: the live resolver note-set facet (seeded empty; the host
+    // reconfigures it from `useResolverNotes()`). MUST precede the chip + hover
+    // so the facet exists when they read it.
+    noteSetExtension(),
     ...wikilinkChipExtensions(),
+    // Hover-tooltip R1 (§6.2): resolved path / "(N matches)" / "(no match)".
+    wikilinkHoverExtension(),
     slashMenuExtension(),
+    // `[[` note picker (MYND-38) — fuzzy note search → canonical §3 emit. Reads
+    // the WL-5 note-set facet; reuses the slash-menu surface + fuzzyFilter.
+    wikilinkPickerExtension(),
     // `{{` token autocomplete — active only inside a `template: true` note
     // (MYND-189). Sits alongside the slash menu; both are floating menus.
     templateTokenMenuExtension(),
     selectionToolbarExtension(),
-    // Emoji `:` autocomplete (MYND-156) — inserts the unicode glyph. Built on
-    // @codemirror/autocomplete; the source awaits the lazy emoji map.
-    emojiCompletionExtension(),
+    // @codemirror/autocomplete — emoji `:` (inserts the glyph, MYND-156) + inline
+    // `#tag` (suggests existing tags, MYND-45). Both override-sources in ONE
+    // config (`completion.ts`) so they coexist.
+    completionExtension(),
     // Collapse the spurious tiny selection a plain click makes when the
     // cursor-aware reveal reflows the clicked line (e.g. an H1 re-showing `# `).
     clickCollapseExtension(),
@@ -139,5 +153,8 @@ export function myneExtensions(): readonly Extension[] {
     // layer and, on some platforms, route note words to an OS/network spell
     // service — a privacy regression. The custom layer is the only spell UI.
     EditorView.contentAttributes.of({ spellcheck: "false" }),
+    // Register the focused view so command-palette actions (R2 convert, MYND-84)
+    // can reach the active pane's view + WL-5 note-set.
+    activeViewExtension(),
   ];
 }

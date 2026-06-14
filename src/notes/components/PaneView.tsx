@@ -21,6 +21,8 @@ import { CMEditor } from "../../editor/CMEditor";
 import { noteRead } from "../readNote";
 import { createNote } from "../createNote";
 import { useSelectedNote, type NoteId } from "../sidebarState";
+import { useResolverNotes } from "../resolverNotes";
+import { useIndexNonce } from "../indexNonce";
 import { useWorkspace } from "../workspaceContext";
 import { useAutosave, type SaveStatus } from "../useAutosave";
 import { countBodyWords } from "../wordCount";
@@ -116,6 +118,22 @@ export function PaneView({
   const ws = useWorkspace();
   const ctx = useSelectedNote();
   const activeId = leaf.activeTab;
+  // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
+  // chips resolve (broken-link styling + hover R1). Re-feed a fresh reference on
+  // every SYNC-5 index-change nonce so a note created/renamed/loaded elsewhere
+  // re-resolves the chips live — `useResolverNotes` alone only changes on a cache
+  // ref change, which can miss the async post-unlock index populate (the "linked
+  // but looks broken on reload" case).
+  const liveNotes = useResolverNotes();
+  const indexNonce = useIndexNonce();
+  const notes = useMemo(() => liveNotes.slice(), [liveNotes, indexNonce]);
+  // Click-to-navigate target for a resolved wikilink chip → open the note.
+  const handleOpenWikilink = useCallback(
+    (noteUuid: string) => {
+      void ctx.open(noteUuid as NoteId);
+    },
+    [ctx],
+  );
 
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -351,6 +369,8 @@ export function PaneView({
           value={content}
           onChange={setContent}
           onBlur={handleBlur}
+          noteSet={notes}
+          onOpenWikilink={handleOpenWikilink}
           style={{
             width: "100%",
             minHeight: 360,
@@ -371,6 +391,8 @@ export function PaneView({
     loading,
     content,
     handleBlur,
+    notes,
+    handleOpenWikilink,
   ]);
 
   return (

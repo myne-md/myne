@@ -14,6 +14,8 @@
 // grep on `plugin:notes|note_update` outside `src/notes/`.
 
 export { createNote, noteCreate } from "./createNote";
+export { noteExportAsMarkdown, noteExportAttachments } from "./exportNote";
+export { vaultExportMarkdown, vaultExportCancel } from "./vaultExport";
 export { noteRead } from "./readNote";
 export { noteUpdate } from "./updateNote";
 export { deleteNote, noteDelete } from "./deleteNote";

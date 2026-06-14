@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `vault.dictionary` 34-byte-header encrypted personal-dictionary codec
-//! (MYND-266; `docs/spec/protocol.md` § 9.12).
+//! (MYND-266; `docs/spec/protocol.md` § 9.13).
 //!
 //! `vault.dictionary` is a vault-level singleton artifact holding the user's
 //! personal spell-check dictionary — the added-words set plus a vault-wide
@@ -18,7 +18,7 @@
 //! framing (magic, format/version, AEAD, AAD) — the load-bearing parts — while
 //! the word-set serialization is the desktop layer's concern.
 //!
-//! ## On-disk layout (spec § 9.12.1)
+//! ## On-disk layout (spec § 9.13.1)
 //!
 //! ```text
 //! Offset  Size  Field                Notes
@@ -34,10 +34,10 @@
 //! ```
 //!
 //! Total = 34 + M bytes. No public `account_number_hash` byte — it binds via
-//! the AAD (§ 9.12.3) without consuming header bytes, exactly like
+//! the AAD (§ 9.13.3) without consuming header bytes, exactly like
 //! `vault.prefs` / `vault.search`.
 //!
-//! ## Fall-back-to-empty semantic (spec § 9.12.4)
+//! ## Fall-back-to-empty semantic (spec § 9.13.4)
 //!
 //! Like `prefs.rs` / `search_blob.rs`, this module emits **honest errors** for
 //! each failure mode; the desktop caller collapses any error (absent /
@@ -79,13 +79,13 @@ pub const DICTIONARY_BLOB_HEADER_LEN: usize = 34;
 /// Upper bound on the inner plaintext (serialized word sets). 4 MiB — far
 /// above a realistic personal dictionary (hundreds of thousands of words) —
 /// that turns a hostile `ciphertext_len` into a clean error instead of an
-/// absurd allocation / panicking slice index (§ 9.12.5; approved sign-off
+/// absurd allocation / panicking slice index (§ 9.13.5; approved sign-off
 /// 2026-06-14).
 pub const MAX_DICTIONARY_PLAINTEXT_LEN: usize = 4 * 1024 * 1024;
 
 /// Failure modes of the `vault.dictionary` codec. Distinct variants for
 /// observability; the desktop caller collapses all of them to the empty
-/// dictionary (fall-back-to-empty, § 9.12.4).
+/// dictionary (fall-back-to-empty, § 9.13.4).
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum DictionaryBlobError {
     /// Input shorter than [`DICTIONARY_BLOB_HEADER_LEN`] bytes.

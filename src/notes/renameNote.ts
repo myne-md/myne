@@ -23,6 +23,21 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 /**
+ * Pure title surgery: apply the FM `title:` write + advance `updated:`,
+ * returning the renamed note's full new body **without** writing it. Shared
+ * by the legacy single-note {@link renameNote} IPC and the transactional
+ * rename-auto-update orchestrator (MYND-85), which folds this body into the
+ * all-or-nothing batch alongside the inbound rewrites instead of committing
+ * the title first.
+ */
+export function renamedTitleBody(currentBytes: string, newTitle: string): string {
+  const input = encoder.encode(currentBytes);
+  const renamed = patchTitleField(input, newTitle);
+  const stamped = patchUpdatedField(renamed, new Date().toISOString());
+  return decoder.decode(stamped);
+}
+
+/**
  * Rename a note by writing the new title to the frontmatter `title:`
  * field. Composes `patchUpdatedField` after the title surgery (rename is
  * a modification → `updated:` must advance).
@@ -35,8 +50,5 @@ export async function renameNote(
   currentBytes: string,
   newTitle: string,
 ): Promise<void> {
-  const input = encoder.encode(currentBytes);
-  const renamed = patchTitleField(input, newTitle);
-  const stamped = patchUpdatedField(renamed, new Date().toISOString());
-  await noteUpdate(noteId, decoder.decode(stamped));
+  await noteUpdate(noteId, renamedTitleBody(currentBytes, newTitle));
 }

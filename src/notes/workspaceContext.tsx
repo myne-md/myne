@@ -19,6 +19,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -26,6 +27,7 @@ import {
 } from "react";
 import type { NoteId } from "./sidebarState";
 import {
+  allOpenNotes,
   closePane as closePaneOp,
   closeTab as closeTabOp,
   collectLeaves,
@@ -45,6 +47,17 @@ import {
   type WorkspaceNode,
   type WorkspaceState,
 } from "./workspaceState";
+import {
+  clearRenameFlushHooks,
+  registerRenameFlushHooks,
+} from "./renameFlushHook";
+import {
+  canStepBack,
+  canStepForward,
+  reconcileHistories,
+  type NavIntent,
+  type PaneHistory,
+} from "./paneHistory";
 
 function newPaneId(): PaneId {
   return crypto.randomUUID();
@@ -77,6 +90,17 @@ export type WorkspaceApi = {
 
   /** Replace the whole workspace (used to restore a persisted session). */
   restore: (state: WorkspaceState) => void;
+
+  // ── back/forward history (focused pane; ephemeral, never persisted) ──
+  /** Step the focused pane back to the previously viewed note (no-op when
+   *  there is no history in that direction). */
+  goBack: () => void;
+  /** Step the focused pane forward (re-navigate after a back). */
+  goForward: () => void;
+  /** Whether the focused pane has a previous note to step back to. */
+  canGoBack: boolean;
+  /** Whether the focused pane has a note to step forward to. */
+  canGoForward: boolean;
 
   // ── pane structure ─────────────────────────────────────────────
   /** Split the focused pane into a fresh empty pane and focus it. */
@@ -234,6 +258,64 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  // WL-8 rename auto-update seam: expose the open-note set + flush-all to the
+  // rename orchestrator, which runs in `SidebarStateProvider` (mounted ABOVE
+  // this provider, so it can't read this context directly). `stateRef` keeps
+  // the registered `openNoteIds` closure reading the latest pane tree without
+  // re-registering on every state change; `flushAll` is stable.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useEffect(() => {
+    registerRenameFlushHooks({
+      openNoteIds: () => new Set(allOpenNotes(stateRef.current)),
+      flushOpenPanes: flushAll,
+    });
+    return () => clearRenameFlushHooks();
+  }, [flushAll]);
+
+  // ── Back/forward navigation history (MYND-260) ─────────────────────
+  // Per-pane, EPHEMERAL: held next to — never inside — the persisted pane
+  // tree, so a browsing trail never lands in `vault.workspace` (design grill
+  // 2026-06-01 Q1). A reconcile pass folds each pane's live `activeTab` into
+  // its history on every workspace change; the `navIntentRef` lets a
+  // back/forward step land as a cursor MOVE rather than a fresh visit.
+  const [histories, setHistories] = useState<
+    ReadonlyMap<PaneId, PaneHistory>
+  >(() => new Map());
+  const historiesRef = useRef(histories);
+  historiesRef.current = histories;
+  const navIntentRef = useRef<NavIntent>(null);
+
+  useEffect(() => {
+    const intent = navIntentRef.current;
+    navIntentRef.current = null;
+    setHistories((prev) =>
+      reconcileHistories(prev, collectLeaves(state.root), intent),
+    );
+  }, [state]);
+
+  // Step the FOCUSED pane along its history. The cursor target is re-activated
+  // through the ordinary `openInFocusedTab` transition — which re-opens a note
+  // that has since left the strip (the common sidebar-browse case) or reveals
+  // one already open — so the content + sidebar selection follow for free.
+  const stepHistory = useCallback((delta: -1 | 1) => {
+    const paneId = stateRef.current.focusedPaneId;
+    const h = historiesRef.current.get(paneId);
+    if (h === undefined) return;
+    const targetIndex = h.index + delta;
+    if (targetIndex < 0 || targetIndex >= h.entries.length) return;
+    const target = h.entries[targetIndex]!;
+    navIntentRef.current = { paneId, targetIndex };
+    setPending(null);
+    setState((s) => openInFocusedTab(s, target));
+  }, [setPending]);
+  const goBack = useCallback(() => stepHistory(-1), [stepHistory]);
+  const goForward = useCallback(() => stepHistory(1), [stepHistory]);
+
+  const focusedHistory = histories.get(state.focusedPaneId);
+  const canGoBack = canStepBack(focusedHistory);
+  const canGoForward = canStepForward(focusedHistory);
+
   const leaves = collectLeaves(state.root);
   const focused = focusedLeaf(state);
   const api = useMemo<WorkspaceApi>(
@@ -249,6 +331,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       beginNewTab,
       cancelNewTab,
       restore,
+      goBack,
+      goForward,
+      canGoBack,
+      canGoForward,
       splitFocused,
       closePane,
       focusPane,
@@ -271,6 +357,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       beginNewTab,
       cancelNewTab,
       restore,
+      goBack,
+      goForward,
+      canGoBack,
+      canGoForward,
       splitFocused,
       closePane,
       focusPane,

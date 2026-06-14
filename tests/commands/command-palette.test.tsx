@@ -82,14 +82,14 @@ describe("CommandPalette UI", () => {
       />,
     );
     expect(screen.getByRole("dialog")).toBeTruthy();
-    // The four v1 actions: "Lock vault" + "Open settings…" active, plus
-    // "Import Obsidian vault…" + "Convert wikilinks…" as disabled stubs (the
-    // latter visible because a note is selected). Note picking is no longer an
-    // action — it surfaces inline once you type (see NOTES-section tests below).
+    // "Lock vault" + "Open settings…" active, "Import Obsidian vault…" stub, and
+    // "Convert imported wikilinks in this note…" now live (MYND-84), visible
+    // because a note is selected. Note picking is no longer an action — it
+    // surfaces inline once you type (see NOTES-section tests below).
     expect(screen.getByText("Lock vault")).toBeTruthy();
     expect(screen.getByText("Open settings…")).toBeTruthy();
     expect(screen.getByText("Import Obsidian vault…")).toBeTruthy();
-    expect(screen.getByText("Convert wikilinks in this note…")).toBeTruthy();
+    expect(screen.getByText("Convert imported wikilinks in this note…")).toBeTruthy();
     expect(screen.queryByText("Switch to note…")).toBeNull();
   });
 

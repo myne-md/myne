@@ -16,6 +16,20 @@
   `corruptVaultMetaWholesale`, `deleteVaultMetaKeepArtifacts`, `denyRead`).
   Backend-only paths may be driven via `__TAURI_INTERNALS__.invoke` from the
   page seat (`pageSeatInvoke` pattern) — production IPC, still no hook.
+- **Page-seat dialog interception** is the one sanctioned stub: an OS-native
+  dialog WebDriver cannot drive (`plugin:dialog|save`) may be intercepted
+  from the page seat. `__TAURI_INTERNALS__` is immutable on the production
+  build (every IPC-path own property — `invoke`, `ipc`, `postMessage` — is
+  non-writable + non-configurable, and the window binding itself is
+  non-configurable), so the wrapper goes on the writable seam the transport
+  calls: the global `fetch` carrying Tauri's custom-protocol IPC. Intercept
+  ONLY the target command's exact IPC URL
+  (`convertFileSrc('plugin:dialog|save', 'ipc')`) with a synthetic
+  ok-Response (`content-type: application/json`, `Tauri-Response: ok`, body
+  = the known path JSON-encoded), delegate every other URL to the native
+  fetch, assert the patch took, and count the calls (`note-export.e2e.ts`
+  ne3 is the template). Production code stays untouched; everything past
+  the dialog is the real flow.
 - **Credentials never reach failure output (SYNC-13).** No `expect` whose
   failure diff prints a phrase, password, or even phrase-word LENGTHS. Shapes:
   length-only counts, emptiness booleans, in-page reductions (see

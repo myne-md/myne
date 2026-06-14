@@ -137,10 +137,14 @@ pub fn apply<R: tauri::Runtime>(app: &tauri::AppHandle<R>, enabled: bool, site: 
     apply_inner(&window, enabled, site);
 }
 
-/// Shared inner implementation called by both [`init`] (with
-/// `site = "startup_init"`) and [`apply`] (with `site = "runtime_apply"`
+/// Shared inner implementation called by [`init`] (with
+/// `site = "startup_init"`), by [`apply`] (with `site = "runtime_apply"`
 /// for prefs IPC, `site = "lock_reset"` when `vault_lock` re-applies
-/// default-ON post-zeroize).
+/// default-ON post-zeroize), and — `pub(crate)`, window-parameterized —
+/// by the pdf-export plugin's hidden render window (with
+/// `site = "pdf_export_window"`), so the Linux-unsupported warn and the
+/// success-event telemetry stay consistent across every protected
+/// surface.
 ///
 /// The `site` parameter never crosses the user's view — it lives in
 /// `tracing` event fields only — but is the single signal a support-
@@ -148,7 +152,7 @@ pub fn apply<R: tauri::Runtime>(app: &tauri::AppHandle<R>, enabled: bool, site: 
 /// event to its call path. Per the secret-handling logging discipline
 /// (`src-tauri/CLAUDE.md`), `site` is a `&'static str` constant; the
 /// caller cannot inject dynamic strings here.
-fn apply_inner<R: tauri::Runtime>(
+pub(crate) fn apply_inner<R: tauri::Runtime>(
     window: &tauri::WebviewWindow<R>,
     enabled: bool,
     site: &'static str,

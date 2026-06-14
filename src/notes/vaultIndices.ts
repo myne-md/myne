@@ -73,7 +73,7 @@ const MEDIA_EXTENSIONS = [
   ".mov",
 ];
 
-function isMediaTarget(target: string): boolean {
+export function isMediaTarget(target: string): boolean {
   const lastSegment = target.split("/").pop() ?? target;
   const lower = lastSegment.toLowerCase();
   return MEDIA_EXTENSIONS.some((ext) => lower.endsWith(ext));

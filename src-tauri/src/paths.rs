@@ -38,6 +38,17 @@ use tauri::{AppHandle, Manager, Runtime};
 /// Top-level directory holding every `<VaultId>/` vault root.
 pub(crate) const VAULTS_DIR_NAME: &str = "vaults";
 
+/// Destination-parent predicate shared by the export-suite destination
+/// checks (note / tree / PDF export): the path's parent must be
+/// non-empty and an existing directory. The OS save dialog normally
+/// guarantees this; it fails when the directory vanished between
+/// confirm and write (the backup `export_phase_one` precedent).
+pub(crate) fn parent_dir_ok(path: &Path) -> bool {
+    path.parent()
+        .filter(|p| !p.as_os_str().is_empty() && p.is_dir())
+        .is_some()
+}
+
 /// Legacy single-vault directory name (pre-`vaults/<id>/` layout). The
 /// boot migration (sub-feature task 4) renames this into `vaults/<id>/`;
 /// until then [`current_vault_root`] still accepts it so the app boots

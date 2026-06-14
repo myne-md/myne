@@ -77,6 +77,11 @@ pub async fn change_password<R: Runtime>(
         // MYND-166: wipe the staged editor-workspace descriptor on this
         // force-relock path too.
         crate::plugins::workspace::commands::clear_staged_descriptor();
+        // MYND-255: destroy the hidden pdf-export render window (a
+        // plaintext-bearing second WebView) and wipe its stashed HTML
+        // payload on the same force-relock path — locking means locked
+        // for every plaintext surface, not just "main".
+        crate::plugins::pdf_export::teardown_on_lock(&app);
     }
     result
 }

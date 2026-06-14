@@ -91,7 +91,8 @@ When you add a new Tauri command on the Rust side, manually mirror the signature
 
 `src/screens/vault-creation/` is the canonical multi-step example:
 - Reducer + Action union state machine (no zustand here yet)
-- Per-step components (PasswordStep, PhraseStep, ConfirmStep, AccountStep, ReadyStep, SessionLostStep, EncryptingStep)
+- Per-step components (BriefingStep, PasswordStep, PhraseStep, ConfirmStep, AccountStep, ReadyStep, SessionLostStep, EncryptingStep)
+- **BriefingStep is first-run-only (MYND-114):** the pre-vault-create safety briefing (3 acknowledged statements + opt-in "Why?" disclosures gating "Continue to vault creation"). It is the reducer's initial step ONLY when `CreateVault` is mounted with `withBriefing` — set by App.tsx from the `create-vault` stage's `briefing` flag, which the `welcome → create-vault.start` transition sets and the picker/switcher "create another" entries leave unset. `BRIEFING_ACKED` advances briefing → password; `RESET_TO_PASSWORD`/`RESET` always land on `password` (the one-time briefing is never re-shown mid-flow). Its acknowledgement/disclosure state is local to the component (the step is never re-entered via back-nav — "Back" exits through the reprobe path). Tone is load-bearing: honest, not alarming — no red banners, no alarm icons (PRODUCT.md).
 - Window-blur cover on PhraseStep (phrase visible → minimize covers it)
 - BIP-39 wordlist autocomplete with exact-match required on ConfirmStep
 - ReadyStep "Done" triggers auto-unlock chain (`commit` → `vault_unlock` → editor) per `decisions.md` 2026-05-02 — supersedes 2026-04-29 entry's slot-population implication. `passwordRef` lifetime extended through phrase/confirm/account/ready until auto-unlock resolves; wiped on every exit path (BEGIN_ERR / COMMIT_ERR / SESSION_LOST / RESET_TO_PASSWORD / unmount / auto-unlock resolve).

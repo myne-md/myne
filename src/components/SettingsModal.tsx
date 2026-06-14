@@ -58,6 +58,9 @@ interface SettingsModalProps {
   /** Storage → "Restore from backup…" (MYND-56): closes Settings and
    *  routes into the pre-unlock-class restore Stage flow (MYND-218). */
   onRestoreBackup?: () => void;
+  /** Storage → Export block "Export…" (MYND-211): closes Settings, opens
+   *  the whole-vault markdown export modal at the Editor level. */
+  onExportVault?: () => void;
   /**
    * Show a transient post-event toast at the parent's notification
    * surface (Editor's Toast component). Used by AccountPanel after a
@@ -202,6 +205,7 @@ export function SettingsModal({
   onClose,
   onBackupVault,
   onRestoreBackup,
+  onExportVault,
   onShowToast,
   onForceRelock,
   onDeleteVaultSuccess,
@@ -285,6 +289,7 @@ export function SettingsModal({
         onImportObsidian={onImportObsidian}
         onBackupVault={onBackupVault}
         onRestoreBackup={onRestoreBackup}
+        onExportVault={onExportVault}
       />
     ),
     about: <AboutPanel />,

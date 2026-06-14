@@ -91,7 +91,7 @@ const ROLE_STR_SESSION_STATE_KEY: &[u8] = b"session-state-key";
 
 /// Registered role string for the v0.1 personal-dictionary blob KEK
 /// (MYND-266; encrypts the `vault.dictionary` blob — `dictionary_blob.rs`,
-/// `protocol.md` § 9.12 + § 3.4). Load-bearing: drift silently changes the
+/// `protocol.md` § 9.13 + § 3.4). Load-bearing: drift silently changes the
 /// KEK. `root_key`-derived (like prefs/search/workspace), so it is
 /// `itemsKey`-independent and survives a v005 epoch rotation.
 const ROLE_STR_PERSONAL_DICT_KEY: &[u8] = b"personal-dictionary-key";
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn personal_dict_key_role_string_matches_spec_registry() {
-        // MYND-266 registry entry "myne.v0.1 personal-dictionary-key" (§ 9.12).
+        // MYND-266 registry entry "myne.v0.1 personal-dictionary-key" (§ 9.13).
         // Frozen + load-bearing: drift silently changes the vault.dictionary KEK.
         assert_eq!(
             SubkeyRole::PersonalDictKey.role_str(),

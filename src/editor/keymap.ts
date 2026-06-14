@@ -2,13 +2,14 @@
 //
 // PRD `editor-mvp-baseline` stories 41-46. Explicitly NOT bound: Cmd+1
 // through Cmd+6 (browser/OS conflict — Cmd+Shift+H is the canonical
-// heading-cycle shortcut); Cmd+Shift+L (wikilink autocomplete — ships in
-// `editor-mvp-wikilinks` PRD).
+// heading-cycle shortcut); Cmd+Shift+L opens the `[[` wikilink note picker
+// (MYND-38).
 
 import { type ChangeSpec, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
 import { toggleWrap } from "./wrap-toggle";
 import { cachedLocateFrontmatter } from "./frontmatter-cache";
+import { openWikilinkPicker } from "./wikilink/picker";
 
 function wrapCommand(open: string, close: string): Command {
   const cmd = toggleWrap(open, close);
@@ -99,4 +100,6 @@ export const myneKeyBindings: readonly KeyBinding[] = [
   { key: "Mod-Shift-7", run: toggleListPrefix("1. ") },
   { key: "Mod-Shift-8", run: toggleListPrefix("- ") },
   { key: "Mod-Shift-m", run: toggleListPrefix("- [ ] ") },
+  // Cmd/Ctrl+Shift+L (MYND-38): open the `[[` note picker at the cursor.
+  { key: "Mod-Shift-l", run: openWikilinkPicker },
 ];

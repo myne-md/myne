@@ -4,7 +4,7 @@
 //! personal/ignore sets used for fast `check`) alongside the canonical
 //! [`PersonalDictionaryData`] (the NFC-original words, the source of truth for
 //! persistence). Both are plaintext-derived: loaded on unlock, zeroized on lock
-//! (the `SearchIndexState` residency discipline, § 9.6.5 / § 9.12).
+//! (the `SearchIndexState` residency discipline, § 9.6.5 / § 9.13).
 //!
 //! One `Mutex` guards both so the engine's folded view never drifts from the
 //! persisted data. Locked WITHOUT an `.await` held (callers lock after their

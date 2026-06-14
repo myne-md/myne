@@ -3,14 +3,15 @@
 // Five actions per MYND-86 acceptance: Lock vault, Open settings, Switch to
 // note, Import Obsidian vault, Convert wikilinks in this note.
 //
-// Two of the five are intentionally `disabled` stubs in v1.0 — the
-// underlying features ship in their own future PRDs. They appear in the
-// palette so the discoverable surface is honest about what's coming; per
-// the work item: "palette never exposes actions unavailable in the
-// current state" — these stubs ARE "available in the current state"
-// (they don't depend on stage), they're just not yet built.
+// "Convert imported wikilinks in this note" went live in MYND-84 (R2, §7.1).
+// Any remaining `disabled` stub ships in its own future PRD — it appears in the
+// palette so the discoverable surface is honest about what's coming; per the
+// work item: "palette never exposes actions unavailable in the current state"
+// — such a stub IS "available in the current state" (it doesn't depend on
+// stage), it's just not yet built.
 
 import type { CommandAction } from "./registry";
+import { runWikilinkConvert } from "../editor/wikilink/convert-command";
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
@@ -43,6 +44,20 @@ const backupVaultAction: CommandAction = {
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onBackupVault();
+  },
+};
+
+const exportVaultMarkdownAction: CommandAction = {
+  id: "vault.export-markdown",
+  label: "Export vault as Markdown…",
+  category: "Vault",
+  // Editor-stage guarded, vault-level (no note selection needed): the
+  // plaintext tree export requires an unlocked vault, and the editor is the
+  // only stage that satisfies that. Opens the SAME three-phase modal as the
+  // Settings → Storage Export block (MYND-211) — zero divergence.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onExportVaultMarkdown();
   },
 };
 
@@ -112,15 +127,15 @@ const openAttachmentsAction: CommandAction = {
 
 const convertWikilinksAction: CommandAction = {
   id: "wikilinks.convert-in-this-note",
-  label: "Convert wikilinks in this note…",
+  label: "Convert imported wikilinks in this note…",
   category: "Editor",
-  disabledHint: "Ships in editor-mvp-wikilinks",
+  // R2 (MYND-84): per-note conversion of imported title-only wikilinks to the
+  // canonical §3 path form, with a mandatory diff preview. Editor-only + per-note
+  // (acts on the active buffer); the empty case shows a toast, never a modal.
   visibility: (ctx) =>
-    ctx.stageName === "editor" && ctx.selectedNoteId !== null
-      ? "disabled"
-      : "hidden",
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden",
   run: () => {
-    // No-op while disabled.
+    void runWikilinkConvert();
   },
 };
 
@@ -139,6 +154,41 @@ const openSnapshotsAction: CommandAction = {
   },
 };
 
+const exportNoteMarkdownAction: CommandAction = {
+  id: "note.export-markdown",
+  label: "Export note as Markdown…",
+  category: "Editor",
+  // Editor-only and per-note like Snapshots (MYND-97): the flow exports the
+  // SELECTED note, so it is hidden when nothing is open. Runs the exact same
+  // shared flow as the sidebar context-menu item (src/notes/exportFlow.ts) —
+  // deliberate plaintext egress (TB3); the OS save dialog is the consent.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null
+      ? "show"
+      : "hidden",
+  run: (ctx) => {
+    ctx.onExportNoteMarkdown();
+  },
+};
+
+const exportNotePdfAction: CommandAction = {
+  id: "note.export-pdf",
+  label: "Export note as PDF…",
+  category: "Editor",
+  // Sibling of note.export-markdown with the SAME visibility rules
+  // (MYND-255, SYNC-5): editor stage AND a selected note, else hidden.
+  // Runs the exact same shared flow as the sidebar context-menu item
+  // (src/notes/exportFlow.ts::runNotePdfExportFlow) — deliberate
+  // plaintext egress (TB3); the OS save dialog is the consent.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null
+      ? "show"
+      : "hidden",
+  run: (ctx) => {
+    ctx.onExportNotePdf();
+  },
+};
+
 const showGraphAction: CommandAction = {
   id: "graph.show",
   label: "Show graph view…",
@@ -150,6 +200,19 @@ const showGraphAction: CommandAction = {
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onShowGraph();
+  },
+};
+
+const showTagsAction: CommandAction = {
+  id: "tags.show",
+  label: "Browse tags…",
+  category: "Editor",
+  // Editor-only, like the other modal carve-outs. A navigation surface reached
+  // often, so it ALSO has a persistent BottomBar affordance (SYNC-7 refinement,
+  // tag-system #2) — the palette action is one of two entry points.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowTags();
   },
 };
 
@@ -183,8 +246,12 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   manageTemplatesAction,
   openAttachmentsAction,
   openSnapshotsAction,
+  exportNoteMarkdownAction,
+  exportNotePdfAction,
   showGraphAction,
+  showTagsAction,
   importObsidianAction,
   backupVaultAction,
+  exportVaultMarkdownAction,
   convertWikilinksAction,
 ]);
