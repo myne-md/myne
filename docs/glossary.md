@@ -1353,6 +1353,12 @@ The in-RAM, plaintext-derived index of a vault's wikilink graph — forward link
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
 
+### **view order** &nbsp; 📦 *Product*
+
+The user-controlled display order of [saved views](#saved-view) in the sidebar "Views" section + the views list (Saved Views epic, MYND-274 / SYNC-10). Persisted as the `view_order` field of [vault.prefs](#vaultprefs) — a **sequence** array of view ids (NFC-normalized, order preserved verbatim, NOT sorted or deduped, omitted-when-empty), exactly the [item order](#item-order) / [favorites](#favorites) discipline. A stale id (a deleted view) is ignored at render and pruned on the next write (no codec GC). The list renders `view_order`'s ids first (in order), then any saved view not yet in it. See also [saved view](#saved-view), [item order](#item-order). (MYND-274)
+
+Used in: `spec/protocol.md` §9.5.2; Saved Views (MYND-273 / MYND-274)
+
 ### **view type** &nbsp; 📦 *Product*
 
 The render shape of a [saved view](#saved-view) (Saved Views epic, MYND-271). The closed v0.1 set is **table / cards / list** (Obsidian-Bases' `map` is dropped, SYNC-5); v1 ships **cards** only, with table and list as post-v1 follow-ups (MYND-277 / MYND-278). Every view type renders the **same** grouped query result read-only — no editable cells, no kanban drag-columns — so the choice is purely presentational (cards add a cover [`image:`](#attachment) + groupBy headers; list reuses the note-list row). The view type is one field of the view definition stored in `vault.prefs` / `MYP1`.

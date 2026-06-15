@@ -44,6 +44,15 @@ import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
 import { useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
+import { ViewsSection } from "./ViewsSection";
+import { usePrefs } from "../../hooks/usePrefs";
+import {
+  deleteSavedView,
+  setViewOrder,
+  upsertSavedView,
+  type SavedView,
+} from "../../lib/prefs";
+import { moveInOrder } from "../reorderViewOrder";
 import {
   buildFavoriteRows,
   flattenVisibleRows,
@@ -425,6 +434,96 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // create / rename / delete / drag-drop). Owns the deliberate set.
   const fm = useFolderManagement(ctx);
 
+  // Saved Views (MYND-274): the sidebar "Views" section reads the saved-view
+  // list from prefs and opens a view as a workspace tab. `ws.openView` is the
+  // task-2 entry; `reload` refreshes after a create. Views are rendered in
+  // display order (view_order first, then any not-yet-ordered).
+  const ws = useWorkspace();
+  const { prefs: viewsPrefs, reload: reloadPrefs } = usePrefs();
+  const orderedViews = useMemo<SavedView[]>(() => {
+    const byId = new Map(viewsPrefs.saved_views.map((v) => [v.id, v]));
+    const ordered: SavedView[] = [];
+    for (const id of viewsPrefs.view_order) {
+      const v = byId.get(id);
+      if (v !== undefined) {
+        ordered.push(v);
+        byId.delete(id);
+      }
+    }
+    for (const v of viewsPrefs.saved_views) {
+      if (byId.has(v.id)) ordered.push(v);
+    }
+    return ordered;
+  }, [viewsPrefs.saved_views, viewsPrefs.view_order]);
+  const handleNewView = useCallback(() => {
+    void (async () => {
+      const id = crypto.randomUUID();
+      const view: SavedView = {
+        id,
+        name: "New view",
+        view_type: "cards",
+        filters: { kind: "all" },
+      };
+      try {
+        await upsertSavedView(view);
+        await reloadPrefs();
+        ws.openView(id);
+      } catch {
+        // Create failure surfaces via backend tracing; the user can retry.
+      }
+    })();
+  }, [reloadPrefs, ws]);
+  // Task 6 — view management: rename / delete / reorder, each persisted via
+  // #3's prefs API then reflected immediately by re-reading prefs. A deleted
+  // view's open tab is left as a generic view host (the "shown-missing" pinned
+  // choice — no crash; the user closes it).
+  const handleRenameView = useCallback(
+    (id: string, name: string) => {
+      const view = viewsPrefs.saved_views.find((v) => v.id === id);
+      if (view === undefined) return;
+      void (async () => {
+        try {
+          await upsertSavedView({ ...view, name });
+          await reloadPrefs();
+        } catch {
+          /* surfaced via backend tracing */
+        }
+      })();
+    },
+    [viewsPrefs.saved_views, reloadPrefs],
+  );
+  const handleDeleteView = useCallback(
+    (id: string) => {
+      void (async () => {
+        try {
+          await deleteSavedView(id);
+          await reloadPrefs();
+        } catch {
+          /* surfaced via backend tracing */
+        }
+      })();
+    },
+    [reloadPrefs],
+  );
+  const handleMoveView = useCallback(
+    (id: string, dir: -1 | 1) => {
+      const nextOrder = moveInOrder(
+        orderedViews.map((v) => v.id),
+        id,
+        dir,
+      );
+      void (async () => {
+        try {
+          await setViewOrder(nextOrder);
+          await reloadPrefs();
+        } catch {
+          /* surfaced via backend tracing */
+        }
+      })();
+    },
+    [orderedViews, reloadPrefs],
+  );
+
   // Ephemeral collapse state — folded folder keys. Default empty = all
   // expanded; reset on app restart (folder paths are AS3 → no persistence).
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
@@ -545,6 +644,14 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           exportHooks={exportHooks}
         />
       )}
+      <ViewsSection
+        views={orderedViews}
+        onOpenView={(id) => ws.openView(id)}
+        onNewView={handleNewView}
+        onRename={handleRenameView}
+        onDelete={handleDeleteView}
+        onMoveView={handleMoveView}
+      />
       <div style={FOOTER_WRAP_STYLE}>
         <AttachmentsNavEntry />
         <button

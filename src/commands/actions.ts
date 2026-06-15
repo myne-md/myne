@@ -216,6 +216,34 @@ const showTagsAction: CommandAction = {
   },
 };
 
+const importBaseViewAction: CommandAction = {
+  id: "views.import-base",
+  label: "Import .base view…",
+  category: "Vault",
+  // DISABLED until the Obsidian `.base` importer backend lands (Saved Views #6,
+  // MYND-276), per the established disabled-control discipline (cf.
+  // importObsidianAction before MYND-53). Editor-stage only (import needs an
+  // unlocked vault). #6 flips this to "show" + wires the parser dispatch + the
+  // SYNC-12 import-summary tally.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "disabled" : "hidden"),
+  run: () => {
+    // No-op: a disabled action never runs; the dispatch lands with #6.
+  },
+};
+
+const showViewsAction: CommandAction = {
+  id: "views.show",
+  label: "Browse views…",
+  category: "Editor",
+  // Editor-only, like the other navigation entries. The Saved Views surface is
+  // reached often, so it ALSO has a persistent BottomBar affordance (SYNC-7
+  // dual-entry, Saved Views #4) — the palette action is one of two entry points.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowViews();
+  },
+};
+
 const toggleLeftSidebarAction: CommandAction = {
   id: "view.toggle-notes-sidebar",
   label: "Toggle notes sidebar",
@@ -250,6 +278,8 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportNotePdfAction,
   showGraphAction,
   showTagsAction,
+  showViewsAction,
+  importBaseViewAction,
   importObsidianAction,
   backupVaultAction,
   exportVaultMarkdownAction,

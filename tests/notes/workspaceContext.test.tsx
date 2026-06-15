@@ -23,21 +23,21 @@ describe("useWorkspace — focused-pane open", () => {
     expect(result.current.leaves).toHaveLength(1);
 
     act(() => result.current.openInFocused("A"));
-    expect(result.current.focusedLeaf.tabs).toEqual(["A"]);
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["A"]);
 
     act(() => result.current.openInFocused("B")); // reuse
-    expect(result.current.focusedLeaf.tabs).toEqual(["B"]);
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["B"]);
   });
 
   it("openNewTabInFocused accumulates; reveal on duplicate", () => {
     const { result } = renderHook(() => useWorkspace(), { wrapper });
     act(() => result.current.openInFocused("A"));
     act(() => result.current.openNewTabInFocused("B"));
-    expect(result.current.focusedLeaf.tabs).toEqual(["A", "B"]);
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["A", "B"]);
 
     act(() => result.current.openNewTabInFocused("A")); // already open → reveal
-    expect(result.current.focusedLeaf.tabs).toEqual(["A", "B"]);
-    expect(result.current.focusedLeaf.activeTab).toBe("A");
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["A", "B"]);
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("A");
   });
 });
 
@@ -47,7 +47,7 @@ describe("useWorkspace — split panes", () => {
     act(() => result.current.openInFocused("A"));
     act(() => result.current.openToSide("B"));
     expect(result.current.leaves).toHaveLength(2);
-    expect(result.current.focusedLeaf.tabs).toEqual(["B"]);
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["B"]);
   });
 
   it("openToSide on an already-open note reveals, never splits", () => {
@@ -62,7 +62,7 @@ describe("useWorkspace — split panes", () => {
     act(() => result.current.openInFocused("A"));
     act(() => result.current.splitFocused("row"));
     expect(result.current.leaves).toHaveLength(2);
-    expect(result.current.focusedLeaf.tabs).toEqual([]);
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual([]);
     expect(result.current.focusedLeaf.activeTab).toBeNull();
   });
 
@@ -92,7 +92,7 @@ describe("useWorkspace — per-pane tab ops", () => {
 
     act(() => result.current.activateInPane(homeId, "A"));
     expect(result.current.focusedPaneId).toBe(homeId);
-    expect(result.current.focusedLeaf.activeTab).toBe("A");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("A");
   });
 
   it("closeTabInPane emptying a non-last pane removes it", () => {
@@ -120,23 +120,23 @@ describe("useWorkspace — back/forward history (MYND-260)", () => {
     act(() => result.current.openInFocused("A"));
     act(() => result.current.openInFocused("B"));
     act(() => result.current.openInFocused("C"));
-    expect(result.current.focusedLeaf.activeTab).toBe("C");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("C");
     expect(result.current.canGoBack).toBe(true);
     expect(result.current.canGoForward).toBe(false);
 
     act(() => result.current.goBack());
-    expect(result.current.focusedLeaf.activeTab).toBe("B");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("B");
     expect(result.current.canGoBack).toBe(true);
     expect(result.current.canGoForward).toBe(true);
 
     act(() => result.current.goBack());
-    expect(result.current.focusedLeaf.activeTab).toBe("A");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("A");
     expect(result.current.canGoBack).toBe(false);
 
     act(() => result.current.goForward());
-    expect(result.current.focusedLeaf.activeTab).toBe("B");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("B");
     act(() => result.current.goForward());
-    expect(result.current.focusedLeaf.activeTab).toBe("C");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("C");
     expect(result.current.canGoForward).toBe(false);
   });
 
@@ -145,11 +145,11 @@ describe("useWorkspace — back/forward history (MYND-260)", () => {
     // openInFocused reuses the active slot, so A leaves the strip when B opens.
     act(() => result.current.openInFocused("A"));
     act(() => result.current.openInFocused("B"));
-    expect(result.current.focusedLeaf.tabs).toEqual(["B"]);
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["B"]);
 
     act(() => result.current.goBack());
-    expect(result.current.focusedLeaf.activeTab).toBe("A");
-    expect(result.current.focusedLeaf.tabs).toEqual(["A"]);
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("A");
+    expect(result.current.focusedLeaf.tabs.map((t) => t.id)).toEqual(["A"]);
   });
 
   it("opening a fresh note after a back truncates the forward tail", () => {
@@ -160,10 +160,10 @@ describe("useWorkspace — back/forward history (MYND-260)", () => {
     expect(result.current.canGoForward).toBe(true);
 
     act(() => result.current.openInFocused("C")); // new branch drops B
-    expect(result.current.focusedLeaf.activeTab).toBe("C");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("C");
     expect(result.current.canGoForward).toBe(false);
     act(() => result.current.goBack());
-    expect(result.current.focusedLeaf.activeTab).toBe("A");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("A");
   });
 
   it("both directions are disabled before any second note opens", () => {
@@ -186,7 +186,7 @@ describe("useWorkspace — back/forward history (MYND-260)", () => {
     act(() => result.current.focusPane(homeId)); // back to home pane
     expect(result.current.canGoBack).toBe(true); // home still remembers A
     act(() => result.current.goBack());
-    expect(result.current.focusedLeaf.activeTab).toBe("A");
+    expect(result.current.focusedLeaf.activeTab?.id).toBe("A");
   });
 });
 
@@ -212,5 +212,70 @@ describe("useWorkspace — flush registry", () => {
     });
     expect(f1).toHaveBeenCalledTimes(2);
     expect(f2).toHaveBeenCalledTimes(1); // not called again
+  });
+});
+
+describe("useWorkspace — saved-view (item) tabs (MYND-274)", () => {
+  it("openView shows a view tab; a note and a view may share an id", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openView("a")); // a VIEW "a" into the empty pane
+    expect(result.current.focusedLeaf.tabs).toEqual([{ kind: "view", id: "a" }]);
+    expect(result.current.focusedLeaf.activeTab).toEqual({ kind: "view", id: "a" });
+    // A NOTE with the same id-string is a distinct item (no collision).
+    act(() => result.current.openNewTabInFocused("a"));
+    expect(result.current.focusedLeaf.tabs).toEqual([
+      { kind: "view", id: "a" },
+      { kind: "note", id: "a" },
+    ]);
+  });
+
+  it("openView reveals an already-open view (no duplicate)", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openView("books"));
+    act(() => result.current.openNewTabInFocused("n1"));
+    act(() => result.current.openView("books")); // already open → reveal
+    const views = result.current.focusedLeaf.tabs.filter((t) => t.kind === "view");
+    expect(views).toHaveLength(1);
+    expect(result.current.focusedLeaf.activeTab).toEqual({ kind: "view", id: "books" });
+  });
+
+  it("closeItemInPane closes a view tab via the strip", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openView("v1")); // [view v1]
+    act(() => result.current.openNewTabInFocused("n1")); // [view v1, note n1]
+    const pane = result.current.focusedPaneId;
+    act(() => result.current.closeItemInPane(pane, { kind: "view", id: "v1" }));
+    expect(result.current.focusedLeaf.tabs).toEqual([{ kind: "note", id: "n1" }]);
+  });
+
+  it("a view tab moves into a split alongside a note tab", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openInFocused("n1")); // pane root: [note n1]
+    const root = result.current.focusedPaneId;
+    act(() => result.current.openNewTabInFocused("v-as-note-filler"));
+    act(() => result.current.openView("v1")); // reuses active slot → [n1, view v1]
+    // Drag the view out into a column split on the same pane.
+    act(() =>
+      result.current.splitPaneWithItem(root, "column", "after", {
+        kind: "view",
+        id: "v1",
+      }),
+    );
+    expect(result.current.leaves).toHaveLength(2);
+    // The new focused leaf holds the view; the original keeps the notes.
+    expect(result.current.focusedLeaf.tabs).toEqual([{ kind: "view", id: "v1" }]);
+  });
+
+  it("flushAll does not error on a workspace containing view tabs", async () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openView("v1")); // a view tab (no autosave/flush)
+    const f = vi.fn().mockResolvedValue(undefined);
+    act(() => result.current.registerFlush("note-pane", f));
+    await act(async () => {
+      await result.current.flushAll();
+    });
+    // The registered (note) flush ran; the view tab registered none and the
+    // overall flush resolved without throwing.
+    expect(f).toHaveBeenCalledTimes(1);
   });
 });
