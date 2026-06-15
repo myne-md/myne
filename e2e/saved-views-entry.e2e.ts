@@ -25,17 +25,20 @@ import { testIdSelector, type Session } from "./support/webdriver";
  *  rather than hidden inside a string literal (e2e-invisible-U+E007 hazard). */
 const ENTER = String.fromCharCode(0xe007);
 
-/** Current view-row labels in display order. */
+/** Current view-row labels in display order. The row nests its name in a child
+ *  `<span>`, and this driver's W3C getText drops nested-child text — use
+ *  `textContent()` per the webdriver.ts guidance. */
 async function viewRowLabels(s: Session): Promise<string[]> {
   const rows = await s.byTestIdAll("views.row");
-  return Promise.all(rows.map((r) => r.text()));
+  return Promise.all(rows.map((r) => r.textContent()));
 }
 
-/** Right-click the view row whose visible label is `label`, opening its menu. */
+/** Right-click the view row whose visible label is `label`, opening its menu.
+ *  Uses `textContent()` (the label is in a nested span the W3C getText drops). */
 async function openRowMenu(s: Session, label: string): Promise<void> {
   const rows = await s.byTestIdAll("views.row");
   for (const r of rows) {
-    if ((await r.text()).includes(label)) {
+    if ((await r.textContent()).includes(label)) {
       await r.rightClick();
       return;
     }
@@ -67,15 +70,19 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
           { label: "first view row appears" },
         );
 
-        // Rename it via the row context menu (the input auto-selects on focus,
-        // so sendKeys replaces the default "New view").
+        // Rename it via the row context menu. Use replaceText (W3C backspaces
+        // over the current value, defeating React's value-tracker no-op-clear)
+        // + a SEPARATE Enter — the robust pattern (attachments-library al1);
+        // a single sendKeys relying on onFocus-select can append, not replace.
         await openRowMenu(s, "New view");
         await (
           await s.waitForElement(
             testIdSelector("notes.context-menu-item", { "data-item-id": "rename" }),
           )
         ).click();
-        await (await s.byTestId("views.rename-input")).sendKeys("Reading" + ENTER); // explicit Enter commits the rename
+        const renameInput = await s.byTestId("views.rename-input");
+        await renameInput.replaceText("Reading");
+        await renameInput.sendKeys(ENTER); // explicit Enter commits the rename
         await s.waitUntil(
           async () =>
             (await viewRowLabels(s)).some((l) => l.includes("Reading")) ? true : null,
