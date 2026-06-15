@@ -1584,6 +1584,7 @@ mod tests {
                 &protocol::PrefsView {
                     screen_capture_protection: false,
                     folder_icons: Default::default(),
+                    hidden_bar_items: Vec::new(),
                     item_colors: Default::default(),
                     theme: None,
                     deliberate_folders: Vec::new(),
@@ -1694,6 +1695,7 @@ mod tests {
             &protocol::PrefsView {
                 screen_capture_protection: false,
                 folder_icons: Default::default(),
+                hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 theme: None,
                 deliberate_folders: Vec::new(),

@@ -21,6 +21,7 @@ permissions = [
   "allow-set-deliberate-folders",
   "allow-set-auto-lock-timeout",
   "allow-set-item-order",
+  "allow-set-hidden-bar-items",
   "allow-set-favorites",
   "allow-set-editor-layout",
   "allow-set-theme",
@@ -69,6 +70,16 @@ commands.allow = ["set_auto_lock_timeout"]
 identifier = "allow-set-item-order"
 description = "Allow invoking prefs:set_item_order (Slot::Unlocked-gated setter for the item_order sequence — the unified manual sidebar order across the interleaved file-tree, a heterogeneous list of note UUIDs + folder paths; atomic-writes vault.prefs with no native side-effect, preserving element order)."
 commands.allow = ["set_item_order"]
+
+# Bottom-bar customization: a write setter for the hidden_bar_items set — the
+# BottomBar element ids the user hid via the bar's right-click menu. Inherits
+# the same main-window-only invariant as the other allow-set-* permissions —
+# v0.2 multi-window MUST NOT grant this to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-hidden-bar-items"
+description = "Allow invoking prefs:set_hidden_bar_items (Slot::Unlocked-gated setter for the hidden_bar_items set — the bottom-bar element ids the user chose to hide; codec NFC-sorts+dedupes; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_hidden_bar_items"]
 
 [[permission]]
 identifier = "allow-set-favorites"

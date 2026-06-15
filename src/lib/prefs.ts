@@ -10,6 +10,7 @@
 //   consistency per MYND-160 grill Q5.2.
 
 import { invoke } from "@tauri-apps/api/core";
+import { bumpPrefsNonce } from "../notes/prefsNonce";
 
 /**
  * Editor three-pane layout — sidebar widths (px) + collapsed flags (MYND-137).
@@ -190,6 +191,17 @@ export interface PrefsView {
    */
   folder_icons: Record<string, string>;
   /**
+   * Hidden bottom-bar item ids (bottom-bar customization) — the set of
+   * {@link BottomBar} element ids the user chose to hide via the bar's
+   * right-click menu (e.g. `"graph"`, `"tags"`, `"word-count"`). The backend
+   * encodes the array as a canonical set (NFC-normalized, sorted, deduped).
+   * Empty (the default — bar fully visible) is byte-identical to a pre-feature
+   * vault. An unknown id is ignored at render. Serialized from Rust
+   * `Vec<String>`; absent in pre-feature vaults → the Rust decoder defaults
+   * it to `[]`.
+   */
+  hidden_bar_items: string[];
+  /**
    * Per-item color label (MYND-184) — a map from a sidebar item key (a note UUID
    * **or** a canonical trailing-slash folder path, discriminated by the trailing
    * `/`) to a color-slot name. Notes and folders both take a color (folders also
@@ -276,6 +288,18 @@ export async function setAutoLockTimeout(seconds: number): Promise<void> {
  */
 export async function setItemOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_item_order", { order });
+}
+
+/**
+ * Persist the full hidden-bottom-bar-items set — the {@link BottomBar} element
+ * ids the user chose to hide via the bar's right-click menu. The backend
+ * canonicalizes it (sorted + deduped); an empty array is the default (bar fully
+ * visible). No native side-effect; a rejected promise means the disk write
+ * failed and the caller's optimistic UI must revert. The IPC payload key
+ * (`items`) matches the Rust command's `items: Vec<String>` parameter.
+ */
+export async function setHiddenBarItems(items: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_hidden_bar_items", { items });
 }
 
 /**
@@ -410,6 +434,9 @@ export async function setSpellLanguages(languages: string[]): Promise<void> {
  */
 export async function upsertSavedView(view: SavedView): Promise<void> {
   await invoke<void>("plugin:prefs|upsert_saved_view", { view });
+  // Post-mutation chokepoint: refresh every `usePrefs` consumer (e.g. the
+  // sidebar Views section) regardless of which surface saved the view.
+  bumpPrefsNonce();
 }
 
 /**
@@ -419,6 +446,7 @@ export async function upsertSavedView(view: SavedView): Promise<void> {
  */
 export async function deleteSavedView(id: string): Promise<void> {
   await invoke<void>("plugin:prefs|delete_saved_view", { id });
+  bumpPrefsNonce();
 }
 
 /**
@@ -429,4 +457,5 @@ export async function deleteSavedView(id: string): Promise<void> {
  */
 export async function setViewOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_view_order", { order });
+  bumpPrefsNonce();
 }

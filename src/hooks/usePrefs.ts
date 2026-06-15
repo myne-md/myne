@@ -24,8 +24,10 @@ import {
   PrefsView,
   prefsRead,
   setAutoLockTimeout,
+  setHiddenBarItems as persistHiddenBarItems,
   setScreenCaptureProtection,
 } from "../lib/prefs";
+import { subscribePrefsNonce } from "../notes/prefsNonce";
 
 /**
  * Default prefs returned before the first read completes AND on any
@@ -44,6 +46,7 @@ const DEFAULT_PREFS: PrefsView = {
   editor_layout: null,
   theme: null,
   folder_icons: {},
+  hidden_bar_items: [],
   item_colors: {},
   label: null,
   last_backup_at: null,
@@ -70,6 +73,14 @@ interface UsePrefsResult {
    * Same pattern as `toggleScreenCapture`.
    */
   setAutoLock: (seconds: number) => Promise<void>;
+  /**
+   * Persist the full hidden-bottom-bar-items set (bottom-bar customization).
+   * Optimistic: the cache updates immediately so the BottomBar reflects the
+   * toggle without a round-trip. On IPC rejection, the cache is re-read from
+   * disk (authoritative truth) and `onError` is called. Same pattern as
+   * {@link setAutoLock}.
+   */
+  setHiddenBarItems: (items: string[]) => Promise<void>;
   /**
    * Re-read `vault.prefs` from disk into the cache (MYND-274). Used after a
    * mutation made through a SIBLING surface (e.g. a saved-view create/delete
@@ -159,6 +170,28 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  const setHiddenBarItems = useCallback(
+    async (items: string[]) => {
+      // Optimistic via functional update (no captured-previous staleness) —
+      // same convergence discipline as `setAutoLock` / `toggleScreenCapture`.
+      setPrefs((p) => ({ ...p, hidden_bar_items: items }));
+      try {
+        await persistHiddenBarItems(items);
+      } catch {
+        // Re-read disk truth instead of rolling back to a captured value.
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+        onError?.("Couldn't save preference — try again");
+      }
+    },
+    [onError],
+  );
+
   const reload = useCallback(async () => {
     try {
       const view = await prefsRead();
@@ -168,5 +201,12 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     }
   }, []);
 
-  return { prefs, toggleScreenCapture, setAutoLock, reload };
+  // Cross-surface refresh (Saved Views #4 follow-up): a saved-view mutation made
+  // through a SIBLING surface (e.g. the Tag browser's "Save as view") bumps the
+  // prefs nonce at the IPC chokepoint. Each `usePrefs` instance subscribes and
+  // re-reads disk truth so the sidebar Views section reflects the change without
+  // a remount. Coalesced onto a microtask by the store (no render thrash).
+  useEffect(() => subscribePrefsNonce(() => void reload()), [reload]);
+
+  return { prefs, toggleScreenCapture, setAutoLock, setHiddenBarItems, reload };
 }
