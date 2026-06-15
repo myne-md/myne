@@ -26,10 +26,20 @@ import { useIndexNonce } from "../indexNonce";
 import { useWorkspace } from "../workspaceContext";
 import { useAutosave, type SaveStatus } from "../useAutosave";
 import { countBodyWords } from "../wordCount";
-import type { LeafPane, SplitDirection } from "../workspaceState";
+import {
+  itemKey,
+  parseItemKey,
+  type LeafPane,
+  type SplitDirection,
+} from "../workspaceState";
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { TabStrip, STRIP_HEIGHT } from "./TabStrip";
+import { useViewResult } from "../views/useViewResult";
+import { ViewRenderHost } from "../views/viewRenderHost";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { buildCardMenuItems } from "../views/cardMenu";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 
 export type PaneReadout = {
   status: SaveStatus;
@@ -117,7 +127,15 @@ export function PaneView({
 }: PaneViewProps) {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
-  const activeId = leaf.activeTab;
+  // This pane is the note-editor host: it tracks only a NOTE active tab. A
+  // view-kind active tab (MYND-274) maps to `null` here (no note body) until
+  // the dedicated view host lands in #4 task 2; view tabs cannot yet be opened.
+  const activeId: NoteId | null =
+    leaf.activeTab?.kind === "note" ? leaf.activeTab.id : null;
+  // A view-kind active tab renders the view host (MYND-274) instead of the
+  // note editor; `activeViewId` is non-null exactly then.
+  const activeViewId: string | null =
+    leaf.activeTab?.kind === "view" ? leaf.activeTab.id : null;
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). Re-feed a fresh reference on
   // every SYNC-5 index-change nonce so a note created/renamed/loaded elsewhere
@@ -333,11 +351,12 @@ export function PaneView({
       setDragActive(false);
       const payload = readTabDrag(e.dataTransfer);
       if (payload === null) return;
+      const item = parseItemKey(payload.tabId);
       if (zone === "center") {
-        ws.dropNoteOnPane(leaf.id, payload.noteId, leaf.tabs.length);
+        ws.dropItemOnPane(leaf.id, item, leaf.tabs.length);
       } else {
         const { direction, side } = zoneToSplit(zone);
-        ws.splitPaneWithNote(leaf.id, direction, side, payload.noteId);
+        ws.splitPaneWithItem(leaf.id, direction, side, item);
       }
     },
     [ws, leaf.id, leaf.tabs.length],
@@ -347,7 +366,9 @@ export function PaneView({
   // tab" both show the tab bar's New-tab chip + the chooser body. The tab bar
   // is ALWAYS displayed (MYND-166) — an empty/not-yet-focused pane just shows
   // it in its New-tab state.
-  const inNewTabState = pendingNewTab || activeId === null;
+  // Empty/chooser only when there is NO active tab at all — a view-active tab
+  // is NOT a new-tab state (it renders the view host below).
+  const inNewTabState = pendingNewTab || leaf.activeTab === null;
 
   const editorEl = useMemo(() => {
     if (inNewTabState) {
@@ -359,6 +380,9 @@ export function PaneView({
           onCancel={clearPending}
         />
       );
+    }
+    if (activeViewId !== null) {
+      return <ViewHost viewId={activeViewId} />;
     }
     if (loading) {
       return <PaneLoading />;
@@ -384,6 +408,7 @@ export function PaneView({
     );
   }, [
     inNewTabState,
+    activeViewId,
     onPickNote,
     onCreateNote,
     clearPending,
@@ -419,21 +444,34 @@ export function PaneView({
     >
       <TabStrip
         paneId={leaf.id}
-        tabs={leaf.tabs}
-        activeTab={inNewTabState ? null : activeId}
-        titleOf={(id) => ctx.cache.get(id)?.title ?? null}
+        tabs={leaf.tabs.map(itemKey)}
+        activeTab={
+          inNewTabState || leaf.activeTab === null
+            ? null
+            : itemKey(leaf.activeTab)
+        }
+        titleOf={(key) => {
+          const it = parseItemKey(key);
+          // View names land with #3's saved-views list; the stub labels by id.
+          return it.kind === "note"
+            ? (ctx.cache.get(it.id)?.title ?? null)
+            : it.id;
+        }}
+        iconOf={(key) =>
+          parseItemKey(key).kind === "view" ? "layout-grid" : "file-text"
+        }
         activeDirty={
           status.status === "editing" ||
           status.status === "saving" ||
           status.status === "error"
         }
         pendingNewTab={pendingNewTab}
-        onActivate={(id) => ws.activateInPane(leaf.id, id)}
-        onClose={(id) => ws.closeTabInPane(leaf.id, id)}
+        onActivate={(key) => ws.activateItemInPane(leaf.id, parseItemKey(key))}
+        onClose={(key) => ws.closeItemInPane(leaf.id, parseItemKey(key))}
         onNewTab={() => ws.beginNewTab(leaf.id)}
         onCloseNewTab={leaf.tabs.length > 0 ? clearPending : undefined}
-        onMoveTab={(_fromPaneId, id, toIndex) =>
-          ws.dropNoteOnPane(leaf.id, id, toIndex)
+        onMoveTab={(_fromPaneId, key, toIndex) =>
+          ws.dropItemOnPane(leaf.id, parseItemKey(key), toIndex)
         }
         insetLeft={insetLeft}
         insetRight={insetRight}
@@ -499,6 +537,92 @@ function PaneLoading() {
       }}
     >
       Loading…
+    </div>
+  );
+}
+
+/**
+ * Host for an open saved-view tab (MYND-275, Saved Views #5). Resolves the
+ * `viewId` to its `SavedView` def via prefs, runs the query engine over the
+ * sidebar caches (`useViewResult`), and renders via the viewType dispatch
+ * (`ViewRenderHost` → cards / table / list). No autosave / flush — views are
+ * read-only projections, not editable buffers. Keeps the `editor.view-host`
+ * testid wrapper (E2E #4 contract). While the result is loading (or the view id
+ * is stale) the wrapper holds a calm, quiet body — no spinner churn.
+ */
+function ViewHost({ viewId }: { viewId: string }) {
+  const { def, result } = useViewResult(viewId);
+  const ws = useWorkspace();
+  const sidebar = useSelectedNote();
+  const [cardMenu, setCardMenu] = useState<{
+    noteId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  // Card navigation reuses the workspace open seam — the same matrix NoteList
+  // wires for a sidebar row (toSide → split, newTab → new tab, else focused).
+  const onOpenNote = useCallback(
+    (noteId: string, intent: { newTab: boolean; toSide: boolean }) => {
+      if (intent.toSide) ws.openToSide(noteId);
+      else if (intent.newTab) ws.openNewTabInFocused(noteId);
+      else ws.openInFocused(noteId);
+    },
+    [ws],
+  );
+  const onCardContextMenu = useCallback(
+    (noteId: string, pos: { x: number; y: number }) =>
+      setCardMenu({ noteId, x: pos.x, y: pos.y }),
+    [],
+  );
+  // The non-mutating card context menu (task 8) — the CLOSED four-item set
+  // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy
+  // link. NO delete / move / trash / rename (a saved view is a read-only
+  // projection; deletion stays at the note's own location, the sidebar).
+  // Reveal selects the note in the sidebar; Copy link writes a `[[title]]`
+  // wikilink via the existing clipboard plugin (no new capability).
+  const cardMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (cardMenu === null) return [];
+    const id = cardMenu.noteId;
+    return buildCardMenuItems({
+      open: () => ws.openInFocused(id),
+      openInNewTab: () => ws.openNewTabInFocused(id),
+      revealInFolder: () => sidebar.select(id),
+      copyLink: () => {
+        const title = sidebar.cache.get(id)?.title ?? "";
+        if (title !== "") void clipboardWriteText(`[[${title}]]`);
+      },
+    });
+  }, [cardMenu, ws, sidebar]);
+  return (
+    <div data-testid="editor.view-host" data-view-id={viewId}>
+      {def !== null && result !== null ? (
+        <ViewRenderHost
+          def={def}
+          result={result}
+          onOpenNote={onOpenNote}
+          onCardContextMenu={onCardContextMenu}
+        />
+      ) : (
+        <div
+          style={{
+            maxWidth: 680,
+            margin: "12vh auto 0",
+            textAlign: "center",
+            color: "var(--fg-3)",
+            fontSize: 13,
+            fontFamily: "var(--font-sans)",
+            lineHeight: 1.6,
+          }}
+        />
+      )}
+      {cardMenu !== null && (
+        <ContextMenu
+          x={cardMenu.x}
+          y={cardMenu.y}
+          items={cardMenuItems}
+          onClose={() => setCardMenu(null)}
+        />
+      )}
     </div>
   );
 }

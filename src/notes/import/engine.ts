@@ -63,6 +63,27 @@ export interface ImportPorts {
   setDeliberateFolders(folders: readonly string[]): Promise<void>;
 }
 
+/** Tally for a `.base` saved-views import (Saved Views #6, MYND-276, SYNC-12).
+ *  An OPTIONAL sub-field of {@link ImportResult} — the vault `.md` walk leaves it
+ *  unset; the `.base` bridge populates it. Counts what crossed and what was
+ *  dropped so the trigger UI (#4) can show an honest import summary. */
+export interface BaseImportTally {
+  /** Views that mapped successfully and will be persisted. */
+  importedViews: number;
+  /** Views skipped whole — unsupported `type` (e.g. `map`) OR an entire-filter
+   *  drop (SYNC-12). */
+  skippedViews: number;
+  /** Individual filter clauses dropped (unsupported operator/function/`file.*`,
+   *  SYNC-7/9) across all imported views. */
+  droppedUnsupportedFilters: number;
+  /** Top-level `formulas` entries dropped (no formula engine, SYNC-5). */
+  droppedFormulas: number;
+  /** Top-level `summaries` entries dropped (no summary engine, SYNC-5). */
+  droppedSummaries: number;
+  /** Top-level `properties` display-config entries dropped (cosmetic, SYNC-5). */
+  droppedPropertiesDisplay: number;
+}
+
 export interface ImportResult {
   imported: number;
   skippedExisting: number;
@@ -76,6 +97,9 @@ export interface ImportResult {
   cancelled: number | null;
   /** Total `.md` files discovered (the N in "Importing X of N"). */
   total: number;
+  /** `.base` saved-views import tally — present only on a `.base` import flow
+   *  (MYND-276); the `.md` vault walk leaves it `undefined`. */
+  baseImport?: BaseImportTally;
 }
 
 export interface ImportOptions {

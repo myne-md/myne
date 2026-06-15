@@ -176,6 +176,12 @@ A subkey context string (`"myne.v0.1 backup-key"`) **reserved but not used in v0
 
 Used in: `spec/protocol.md` §3.4, §9.11; `decisions.md` 2026-06-10
 
+### **base import** &nbsp; 📦 *Product*
+
+A one-way, **accepted-lossy** adapter that reads an Obsidian *Bases* `.base` file (plain YAML describing views over the user's own notes) and maps the representable subset onto Myne's canonical [saved view](#saved-view) schema (Saved Views epic, MYND-276). It is **import-only** in v1 (export is the future MYND-279) and a derived bridge — Myne does **not** own or round-trip the `.base` format. Unsupported filter clauses (anything outside the closed [filter AST](#filter-ast) allow-list — `list.map`/arithmetic/`file.hasLink`/`file.mtime`), and the `formulas` / `summaries` / `properties`-display blocks, are **dropped and counted** (no formula/code-eval exists to honor them — the no-database/no-formula commitment of [vision](#vision)); a clause-level warning tally surfaces exactly what came across and what didn't (SYNC-12). Obsidian's recursive `file.inFolder()` matches Myne's subtree-inclusive engine leaf, so that mapping is direct. The reader reuses the vendored YAML parser + the shipped importer file seam (no new dependency / capability), parses in RAM only (PS-1), and persists into the existing `vault.prefs` (`MYP1`) `saved_views` field (no new crypto). The "Bases" / "Obsidian" names are used **nominatively** only (what the importer reads), never as a productized Myne feature name.
+
+Used in: `decisions.md` 2026-06-15; Saved Views (MYND-276)
+
 ### **bidirectional links** &nbsp; 📦 *Product*
 
 *(Aliases: backlinks, wikilinks.)*
@@ -431,6 +437,12 @@ Used in: `spec/protocol.md` §9.6.4
 The user's chosen shortcut list of notes, surfaced in a dedicated Favorites section pinned above the sidebar tree. Persisted as the `favorites` field of `vault.prefs` — a **sequence** array of note UUIDs only (display order is the payload; NFC-normalized, not sorted, not deduped, omitted-when-empty), so favoriting is cheap view-state (a prefs write, no `.myn` re-encrypt) that reverts to empty on a tampered/absent blob (`spec/protocol.md` §9.5.2, §9.5.5). A favorited note **also** keeps its normal position in the tree — favoriting is a shortcut, not a move — so it renders in two rows (disambiguated by section-qualified keys); selection is keyed by note-id (both rows highlight) and keyboard navigation visits it once. Add via a hover star, the context menu, or dragging a note into the section; remove via star/menu only. A favorite UUID with no live note is ignored at render and pruned on the next write. See also [item order](#item-order), [PrefsView](#prefsview). (MYND-183)
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-02
+
+### **filter AST** &nbsp; 📋 *Protocol*
+
+The recursive, **closed-allow-list** tree that expresses a [saved view](#saved-view)'s query (Saved Views epic, MYND-272/MYND-273). A node is a boolean combinator (`and` / `or` / `not`) over a fixed leaf set — `hasTag` and `inFolder` (both subtree-inclusive), full-text `search`, a typed `property` comparison (`== != > < >= <= contains`, date compares on frontmatter dates only), and the degenerate `all`. There is deliberately **no** arithmetic / `list.map` / formula node: the type cannot represent one, so the query layer can never evaluate arbitrary code (the "no databases / no formula" anti-feature of [vision](#vision) expressed in the type system). Serialized canonically (`#[serde(tag = "kind")]`, camelCase kinds + operator literals) inside the `saved_views` field of [vault.prefs](#vaultprefs); the query engine reads it and the renderer never re-derives it. See also [saved view](#saved-view), [property](#property). (MYND-272 / MYND-273)
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
 
 ### **folder** &nbsp; 📦 *Product*
 
@@ -1346,6 +1358,12 @@ Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/sl
 The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext; persisted encrypted-at-rest as the [vault.indices](#vaultindices) / `MYI1` blob (`spec/protocol.md` §9.8 — the MYND-31 design, persistence landed by MYND-271 alongside the typed [property](#property) index). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **view order** &nbsp; 📦 *Product*
+
+The user-controlled display order of [saved views](#saved-view) in the sidebar "Views" section + the views list (Saved Views epic, MYND-274 / SYNC-10). Persisted as the `view_order` field of [vault.prefs](#vaultprefs) — a **sequence** array of view ids (NFC-normalized, order preserved verbatim, NOT sorted or deduped, omitted-when-empty), exactly the [item order](#item-order) / [favorites](#favorites) discipline. A stale id (a deleted view) is ignored at render and pruned on the next write (no codec GC). The list renders `view_order`'s ids first (in order), then any saved view not yet in it. See also [saved view](#saved-view), [item order](#item-order). (MYND-274)
+
+Used in: `spec/protocol.md` §9.5.2; Saved Views (MYND-273 / MYND-274)
 
 ### **view type** &nbsp; 📦 *Product*
 

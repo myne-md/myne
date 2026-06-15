@@ -27,23 +27,27 @@ import {
 } from "react";
 import type { NoteId } from "./sidebarState";
 import {
-  allOpenNotes,
+  allOpenItems,
   closePane as closePaneOp,
   closeTab as closeTabOp,
   collectLeaves,
-  dropNoteOnPane as dropNoteOnPaneOp,
+  dropItemOnPane as dropItemOnPaneOp,
   emptyWorkspace,
   focusedLeaf,
+  noteItem,
   openInFocusedTab,
   openInNewTab,
   openToSide as openToSideOp,
   setActiveTab,
   setFocusedPane,
   splitPane,
-  splitPaneWithNote as splitPaneWithNoteOp,
+  splitPaneWithItem as splitPaneWithItemOp,
+  viewItem,
   type LeafPane,
   type PaneId,
   type SplitDirection,
+  type ViewId,
+  type WorkspaceItem,
   type WorkspaceNode,
   type WorkspaceState,
 } from "./workspaceState";
@@ -125,6 +129,25 @@ export type WorkspaceApi = {
     id: NoteId,
   ) => void;
 
+  // ── saved-view (item) tab ops (MYND-274) ───────────────────────
+  /** Open a saved view as a tab in the focused pane (reuse-active-slot, like
+   *  `openInFocused`); reveal if already open. */
+  openView: (viewId: ViewId) => void;
+  /** Activate any tab item (note or view) within a pane. */
+  activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
+  /** Close any tab item (note or view) within a pane. */
+  closeItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
+  /** Drop any tab item onto a pane's tab strip (tab drag): move/reorder an
+   *  already-open item, or insert + activate a fresh one. */
+  dropItemOnPane: (toPaneId: PaneId, item: WorkspaceItem, toIndex: number) => void;
+  /** Drag-to-split with any tab item (note or view). */
+  splitPaneWithItem: (
+    targetPaneId: PaneId,
+    direction: SplitDirection,
+    side: "before" | "after",
+    item: WorkspaceItem,
+  ) => void;
+
   // ── flush registry (one entry per live pane editor) ────────────
   registerFlush: (paneId: PaneId, flush: () => Promise<void>) => void;
   unregisterFlush: (paneId: PaneId) => void;
@@ -158,8 +181,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setPending(null);
       setState((s) =>
         wasPending !== null && wasPending === s.focusedPaneId
-          ? openInNewTab(s, id) // pending "new tab" → append, don't replace
-          : openInFocusedTab(s, id),
+          ? openInNewTab(s, noteItem(id)) // pending "new tab" → append, don't replace
+          : openInFocusedTab(s, noteItem(id)),
       );
     },
     [setPending],
@@ -167,14 +190,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const openNewTabInFocused = useCallback(
     (id: NoteId) => {
       setPending(null);
-      setState((s) => openInNewTab(s, id));
+      setState((s) => openInNewTab(s, noteItem(id)));
     },
     [setPending],
   );
   const openToSide = useCallback(
     (id: NoteId) => {
       setPending(null);
-      setState((s) => openToSideOp(s, id, newPaneId));
+      setState((s) => openToSideOp(s, noteItem(id), newPaneId));
     },
     [setPending],
   );
@@ -197,14 +220,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const activateInPane = useCallback(
     (paneId: PaneId, id: NoteId) => {
       setPending(null);
-      setState((s) => setFocusedPane(setActiveTab(s, paneId, id), paneId));
+      setState((s) => setFocusedPane(setActiveTab(s, paneId, noteItem(id)), paneId));
     },
     [setPending],
   );
   const closeTabInPane = useCallback(
     (paneId: PaneId, id: NoteId) => {
       setPending(null);
-      setState((s) => closeTabOp(s, paneId, id));
+      setState((s) => closeTabOp(s, paneId, noteItem(id)));
     },
     [setPending],
   );
@@ -219,7 +242,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const cancelNewTab = useCallback(() => setPending(null), [setPending]);
   const dropNoteOnPane = useCallback(
     (toPaneId: PaneId, id: NoteId, toIndex: number) => {
-      setState((s) => dropNoteOnPaneOp(s, toPaneId, id, toIndex));
+      setState((s) => dropItemOnPaneOp(s, toPaneId, noteItem(id), toIndex));
     },
     [],
   );
@@ -231,7 +254,55 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       id: NoteId,
     ) => {
       setState((s) =>
-        splitPaneWithNoteOp(s, targetPaneId, direction, side, id, newPaneId),
+        splitPaneWithItemOp(s, targetPaneId, direction, side, noteItem(id), newPaneId),
+      );
+    },
+    [],
+  );
+
+  // ── saved-view (item) tab ops (MYND-274) — operate on tagged items so a
+  //    view tab is a first-class peer of a note tab. ───────────────────────
+  const openView = useCallback(
+    (viewId: ViewId) => {
+      const wasPending = pendingRef.current;
+      setPending(null);
+      setState((s) =>
+        wasPending !== null && wasPending === s.focusedPaneId
+          ? openInNewTab(s, viewItem(viewId))
+          : openInFocusedTab(s, viewItem(viewId)),
+      );
+    },
+    [setPending],
+  );
+  const activateItemInPane = useCallback(
+    (paneId: PaneId, item: WorkspaceItem) => {
+      setPending(null);
+      setState((s) => setFocusedPane(setActiveTab(s, paneId, item), paneId));
+    },
+    [setPending],
+  );
+  const closeItemInPane = useCallback(
+    (paneId: PaneId, item: WorkspaceItem) => {
+      setPending(null);
+      setState((s) => closeTabOp(s, paneId, item));
+    },
+    [setPending],
+  );
+  const dropItemOnPane = useCallback(
+    (toPaneId: PaneId, item: WorkspaceItem, toIndex: number) => {
+      setState((s) => dropItemOnPaneOp(s, toPaneId, item, toIndex));
+    },
+    [],
+  );
+  const splitPaneWithItem = useCallback(
+    (
+      targetPaneId: PaneId,
+      direction: SplitDirection,
+      side: "before" | "after",
+      item: WorkspaceItem,
+    ) => {
+      setState((s) =>
+        splitPaneWithItemOp(s, targetPaneId, direction, side, item, newPaneId),
       );
     },
     [],
@@ -267,7 +338,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
   useEffect(() => {
     registerRenameFlushHooks({
-      openNoteIds: () => new Set(allOpenNotes(stateRef.current)),
+      openNoteIds: () =>
+        new Set(
+          allOpenItems(stateRef.current)
+            .filter((i) => i.kind === "note")
+            .map((i) => i.id),
+        ),
       flushOpenPanes: flushAll,
     });
     return () => clearRenameFlushHooks();
@@ -342,6 +418,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       closeTabInPane,
       dropNoteOnPane,
       splitPaneWithNote,
+      openView,
+      activateItemInPane,
+      closeItemInPane,
+      dropItemOnPane,
+      splitPaneWithItem,
       registerFlush,
       unregisterFlush,
       flushAll,
@@ -368,6 +449,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       closeTabInPane,
       dropNoteOnPane,
       splitPaneWithNote,
+      openView,
+      activateItemInPane,
+      closeItemInPane,
+      dropItemOnPane,
+      splitPaneWithItem,
       registerFlush,
       unregisterFlush,
       flushAll,

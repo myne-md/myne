@@ -29,6 +29,7 @@ import {
   type WikilinkResolution,
 } from "./resolveWikilink";
 import { extractProperties, type PropertyEntry } from "./propertyTyping";
+import type { StoredProperty } from "./queryEngine";
 
 /**
  * One per-occurrence outbound wikilink edge — the TS mirror of the Rust
@@ -212,6 +213,19 @@ export async function vaultIndicesAllEdges(): Promise<
  */
 export async function vaultIndicesOrphans(): Promise<string[]> {
   return await invoke<string[]>("plugin:vault-indices|vault_indices_orphans");
+}
+
+/** Every note carrying a frontmatter property named `key`, as
+ *  `[noteId, StoredProperty]` (MYND-272 / the Saved Views query engine's by-key
+ *  primitive). Mirrors the Rust `vault_indices_property_values` accessor (#1) —
+ *  the opaque pre-typed values; the engine compares them type-awarely TS-side. */
+export async function vaultIndicesPropertyValues(
+  key: string,
+): Promise<Array<[string, StoredProperty]>> {
+  return await invoke<Array<[string, StoredProperty]>>(
+    "plugin:vault-indices|vault_indices_property_values",
+    { key },
+  );
 }
 
 /** Remove a hard-deleted note from the index. Trash does NOT route here —

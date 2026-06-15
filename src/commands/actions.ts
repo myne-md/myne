@@ -216,6 +216,33 @@ const showTagsAction: CommandAction = {
   },
 };
 
+const importBaseViewAction: CommandAction = {
+  id: "views.import-base",
+  label: "Import .base view…",
+  category: "Vault",
+  // Live as of Saved Views #6 (MYND-276, task 6): the file-picker → parse → map →
+  // persist → SYNC-12 import-summary tally dispatch now lands. Editor-stage only
+  // (import needs an unlocked vault); hidden elsewhere, mirroring
+  // importObsidianAction.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onImportBaseView();
+  },
+};
+
+const showViewsAction: CommandAction = {
+  id: "views.show",
+  label: "Browse views…",
+  category: "Editor",
+  // Editor-only, like the other navigation entries. The Saved Views surface is
+  // reached often, so it ALSO has a persistent BottomBar affordance (SYNC-7
+  // dual-entry, Saved Views #4) — the palette action is one of two entry points.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowViews();
+  },
+};
+
 const toggleLeftSidebarAction: CommandAction = {
   id: "view.toggle-notes-sidebar",
   label: "Toggle notes sidebar",
@@ -250,6 +277,8 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportNotePdfAction,
   showGraphAction,
   showTagsAction,
+  showViewsAction,
+  importBaseViewAction,
   importObsidianAction,
   backupVaultAction,
   exportVaultMarkdownAction,

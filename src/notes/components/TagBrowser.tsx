@@ -31,6 +31,11 @@ import {
 } from "../tagFilter";
 import { tagTree, type TagTreeNode } from "../vaultIndices";
 import { tagPillStyle } from "../tagPillToken";
+import { upsertSavedView } from "../../lib/prefs";
+import {
+  buildViewFromTags,
+  defaultFilterViewName,
+} from "../savedViewFromFilter";
 
 const MESSAGE_STYLE: CSSProperties = {
   flex: 1,
@@ -61,6 +66,9 @@ export function TagBrowser({
   const [mode, setMode] = useState<FilterMode>(DEFAULT_FILTER_MODE);
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<TagFilterResult | null>(null);
+  // "Save current filter as view" (MYND-274 task 5): null = not saving; a
+  // string = the in-progress view-name input.
+  const [savingName, setSavingName] = useState<string | null>(null);
 
   // On open: fetch the tag list, reset ephemeral state, seed the selection.
   useEffect(() => {
@@ -76,6 +84,7 @@ export function TagBrowser({
     setMode(DEFAULT_FILTER_MODE);
     setQuery("");
     setResult(null);
+    setSavingName(null);
     return () => {
       cancelled = true;
     };
@@ -129,6 +138,24 @@ export function TagBrowser({
   const onOpenNote = (id: string) => {
     onClose();
     void ctx.open(id).catch(() => {});
+  };
+
+  // Persist the active tag filter as a saved view (MYND-274 task 5). Reads the
+  // local `selected` + `mode`, builds the canonical filter AST via the pure
+  // dispatch seam, and upserts via #3's API. Closes on success.
+  const onSaveAsView = () => {
+    const name = savingName ?? "";
+    void (async () => {
+      try {
+        await upsertSavedView(
+          buildViewFromTags(crypto.randomUUID(), [...selected], mode, name),
+        );
+        setSavingName(null);
+        onClose();
+      } catch {
+        // Save failure surfaces via backend tracing; the prompt stays open.
+      }
+    })();
   };
 
   const hasSelection = selected.size > 0;
@@ -245,6 +272,26 @@ export function TagBrowser({
                 {result ? result.count : "…"}
               </span>
               <span style={{ flex: 1 }} />
+              {savingName === null && (
+                <button
+                  type="button"
+                  data-testid="views.save-current"
+                  onClick={() =>
+                    setSavingName(defaultFilterViewName([...selected]))
+                  }
+                  style={{
+                    fontSize: 12,
+                    padding: "3px 8px",
+                    background: "transparent",
+                    color: "var(--accent)",
+                    border: 0,
+                    borderRadius: "var(--radius-1)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Save as view
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
@@ -263,6 +310,74 @@ export function TagBrowser({
             </>
           )}
         </div>
+
+        {/* "Save current filter as view" name prompt (MYND-274 task 5) */}
+        {savingName !== null && (
+          <div
+            style={{
+              flex: "0 0 auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "0 16px 8px",
+            }}
+          >
+            <input
+              type="text"
+              data-testid="views.save-name"
+              value={savingName}
+              autoFocus
+              onChange={(e) => setSavingName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onSaveAsView();
+                else if (e.key === "Escape") setSavingName(null);
+              }}
+              placeholder="View name"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontSize: 13,
+                fontFamily: "var(--font-sans)",
+                padding: "6px 10px",
+                background: "var(--bg-1)",
+                color: "var(--fg-1)",
+                border: "1px solid var(--line-1)",
+                borderRadius: "var(--radius-1)",
+                outline: "none",
+              }}
+            />
+            <button
+              type="button"
+              data-testid="views.save-confirm"
+              onClick={onSaveAsView}
+              style={{
+                fontSize: 12,
+                padding: "6px 12px",
+                background: "var(--accent)",
+                color: "var(--accent-on)",
+                border: 0,
+                borderRadius: "var(--radius-1)",
+                cursor: "pointer",
+              }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setSavingName(null)}
+              style={{
+                fontSize: 12,
+                padding: "6px 10px",
+                background: "transparent",
+                color: "var(--fg-3)",
+                border: 0,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Filtered note list (directly under the chips, single column) */}
         <div

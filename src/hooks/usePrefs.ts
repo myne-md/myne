@@ -49,6 +49,8 @@ const DEFAULT_PREFS: PrefsView = {
   last_backup_at: null,
   spell_enabled: null,
   spell_languages: [],
+  saved_views: [],
+  view_order: [],
 };
 
 interface UsePrefsResult {
@@ -68,6 +70,13 @@ interface UsePrefsResult {
    * Same pattern as `toggleScreenCapture`.
    */
   setAutoLock: (seconds: number) => Promise<void>;
+  /**
+   * Re-read `vault.prefs` from disk into the cache (MYND-274). Used after a
+   * mutation made through a SIBLING surface (e.g. a saved-view create/delete
+   * via the prefs plugin) so a consumer of this hook reflects the change. A
+   * read failure keeps the current cache (safer-state, like the initial load).
+   */
+  reload: () => Promise<void>;
 }
 
 /**
@@ -150,5 +159,14 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
-  return { prefs, toggleScreenCapture, setAutoLock };
+  const reload = useCallback(async () => {
+    try {
+      const view = await prefsRead();
+      setPrefs(view);
+    } catch {
+      // Keep the current cache (safer-state per spec § 9.5.5).
+    }
+  }, []);
+
+  return { prefs, toggleScreenCapture, setAutoLock, reload };
 }

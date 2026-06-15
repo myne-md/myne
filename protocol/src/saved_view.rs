@@ -1,0 +1,1126 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Canonical `SavedView` schema + recursive filter AST — the single
+//! contract the Saved Views epic binds to (sub-feature #3,
+//! view-model-and-storage, MYND-273). See `docs/spec/protocol.md` § 9.5.2.
+//!
+//! A saved view is **authored content** (a hand-built filter / sort /
+//! group projection over plain-markdown notes), persisted inside the
+//! existing `vault.prefs` (`MYP1`) blob as a `saved_views` field — no new
+//! magic, no new KEK role, no new load-bearing crypto (SYNC-6). This module
+//! defines the in-memory schema and its canonical-JSON codec; the
+//! `PrefsView` wiring + CRUD live in sibling slices (tasks 2–4).
+//!
+//! ## Lean schema (SYNC-5)
+//!
+//! Only the fields the query engine (#2) and the renderer (#5) actually
+//! consume are persisted: `view_type` (`table`/`cards`/`list` — `map` is
+//! deliberately NOT a variant; it needs a Maps plugin), `name`, a recursive
+//! `filters` AST, optional `sort`, `group_by`, `columns`, `card_size`,
+//! `image`, and `image_aspect_ratio`, plus a stable `id`. Obsidian-Bases
+//! `formulas` / `summaries` / `properties-display` blocks are **dropped
+//! entirely** — they are not representable here (no field carries them), so
+//! the schema can never imply an evaluator Myne does not ship
+//! (`vision.md` no-code-eval). `.base` import is therefore accepted-lossy
+//! (#6's concern).
+//!
+//! ## Filter AST (SYNC-7 / SYNC-8 / SYNC-9)
+//!
+//! The `filters` AST is a CLOSED allow-list mirroring the query engine's
+//! `FilterNode`: `and` / `or` / `not` combinators over the leaves `hasTag`,
+//! `inFolder`, `search`, a typed `property` comparison
+//! (`== != > < >= <= contains`), and the degenerate `all`. There is no
+//! arithmetic / `map` / formula node — the type cannot express one, so the
+//! storage layer can never round-trip an evaluatable expression. The serde
+//! representation (`#[serde(tag = "kind")]`, camelCase kinds) is byte-for-byte
+//! the shape the TS engine reads on the IPC path, so the renderer hands a
+//! decoded `filters` straight to the engine with no AST translation.
+//!
+//! ## Canonical JSON (§ 9.5.2)
+//!
+//! The on-disk encoding is hand-rolled canonical JSON — object keys
+//! lexicographically sorted, no insignificant whitespace, NFC strings,
+//! integers as bare decimals, **floats FORBIDDEN**. Because Obsidian's
+//! `imageAspectRatio` is a float (e.g. `1.65`), Myne carries it as a STRING
+//! (`image_aspect_ratio`) so the value round-trips from `.base` without ever
+//! introducing a float into the canonical form. Schema evolution within v0.1
+//! is additive optional fields; an unknown future key is ignored on decode
+//! (forward-compat), never a parse failure. The serde derives drive the IPC
+//! (Tauri) path; this hand-rolled codec drives the byte-stable disk path —
+//! the same dual-surface discipline as [`crate::prefs::PrefsView`].
+
+use crate::canonical_json::{push_json_string as push_string, push_json_uint as push_uint};
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use unicode_normalization::UnicodeNormalization;
+
+/// Maximum `filters` AST / JSON nesting depth accepted on decode. The input
+/// is AEAD-authenticated and bounded by the 64 KiB `MYP1` cap, but a depth
+/// guard is cheap defense-in-depth against a pathologically-nested blob
+/// exhausting the recursive parser's stack. No real view nests this deep.
+const MAX_JSON_DEPTH: usize = 64;
+
+/// View render type. `Map` is deliberately absent — a map view needs a Maps
+/// plugin and is not representable in v1 (SYNC-5). Serialized lowercase
+/// (`"table"` / `"cards"` / `"list"`) on both the IPC and canonical paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ViewType {
+    /// Read-only tabular grid.
+    Table,
+    /// Card grid (optional cover image + groupBy headers).
+    Cards,
+    /// Note-list rows.
+    List,
+}
+
+/// Sort direction. Serialized lowercase (`"asc"` / `"desc"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SortDirection {
+    /// Ascending.
+    Asc,
+    /// Descending.
+    Desc,
+}
+
+/// A within-group sort: a property `key` + a `direction`. Date sort operates
+/// on frontmatter date properties only (SYNC-9); the engine (#2) enforces
+/// that — this layer only carries the key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViewSort {
+    /// The property key to sort by.
+    pub key: String,
+    /// Ascending or descending.
+    pub direction: SortDirection,
+}
+
+/// A typed property-comparison operator — the closed allow-list (no
+/// arithmetic, no function calls). Serialized as its operator literal
+/// (`"=="`, `">"`, …) to match the query engine's `PropertyOp` on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PropertyOp {
+    /// `==`
+    #[serde(rename = "==")]
+    Eq,
+    /// `!=`
+    #[serde(rename = "!=")]
+    Ne,
+    /// `>`
+    #[serde(rename = ">")]
+    Gt,
+    /// `<`
+    #[serde(rename = "<")]
+    Lt,
+    /// `>=`
+    #[serde(rename = ">=")]
+    Ge,
+    /// `<=`
+    #[serde(rename = "<=")]
+    Le,
+    /// `contains` (list membership / string substring).
+    #[serde(rename = "contains")]
+    Contains,
+}
+
+/// The recursive filter AST — boolean combinators over a closed leaf set.
+/// Mirrors the query engine's `FilterNode`. There is deliberately no
+/// arithmetic / computed / `list.map` node: the type cannot express one
+/// (SYNC-7 anti-eval). `#[serde(tag = "kind")]` + camelCase kinds make the
+/// IPC wire shape identical to the TS union.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum FilterNode {
+    /// Intersection of the children's id-sets.
+    And {
+        /// Child nodes (AND).
+        children: Vec<FilterNode>,
+    },
+    /// Union of the children's id-sets.
+    Or {
+        /// Child nodes (OR).
+        children: Vec<FilterNode>,
+    },
+    /// Complement of the child against the live set.
+    Not {
+        /// The negated child.
+        child: Box<FilterNode>,
+    },
+    /// Notes carrying tag `tag` (subtree-inclusive, SYNC-8).
+    HasTag {
+        /// The tag.
+        tag: String,
+    },
+    /// Notes in folder `path` and all descendant folders (SYNC-8).
+    InFolder {
+        /// The folder path.
+        path: String,
+    },
+    /// Full-text search hits for `query`.
+    Search {
+        /// The query string.
+        query: String,
+    },
+    /// A typed comparison of frontmatter property `key` against `value`.
+    Property {
+        /// The property key.
+        key: String,
+        /// The comparison operator.
+        op: PropertyOp,
+        /// The query operand (typed against the stored value, SYNC-2).
+        value: String,
+    },
+    /// The degenerate all-live leaf.
+    All,
+}
+
+/// The canonical, persisted definition of one saved view. The single shape
+/// #2 (query engine), #5 (render), and #6 (`.base` import) bind to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SavedView {
+    /// Stable unique id (a UUIDv7 in practice; opaque to this codec).
+    pub id: String,
+    /// User-visible view name.
+    pub name: String,
+    /// Render type (`table` / `cards` / `list`).
+    pub view_type: ViewType,
+    /// The filter AST (an `all` leaf for an unfiltered view).
+    pub filters: FilterNode,
+    /// Optional within-group sort. Omitted when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<ViewSort>,
+    /// Optional groupBy property key. Omitted when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_by: Option<String>,
+    /// Ordered display columns (the `.base` `order` list). A SEQUENCE —
+    /// element order is the payload (preserved verbatim, not sorted/deduped).
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub columns: Vec<String>,
+    /// Optional card width in integer pixels (cards view). Omitted when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card_size: Option<u32>,
+    /// Optional cover-image property name (resolved later via `attachment://`
+    /// by #5, SYNC-11). Omitted when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    /// Optional image aspect ratio, carried as a STRING (e.g. `"1.65"`) so
+    /// the `.base` float value round-trips without a canonical-JSON float.
+    /// Omitted when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_aspect_ratio: Option<String>,
+}
+
+/// Closed failure surface for [`canonical_decode_saved_view`]. The bytes are
+/// decoded only AFTER the surrounding `vault.prefs` AEAD verified, so a
+/// failure here is structural (the `prefs_key` holder wrote malformed JSON),
+/// not adversarial — the caller collapses it to fall-back-to-defaults
+/// (§ 9.5.5).
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum SavedViewParseError {
+    /// The bytes are not well-formed canonical JSON (bad structure, a
+    /// forbidden float, trailing junk, or over-deep nesting).
+    #[error("saved view JSON is malformed")]
+    Malformed,
+    /// A required field (`id` / `name` / `view_type` / `filters`, or a
+    /// leaf's mandatory key) is absent.
+    #[error("saved view is missing a required field")]
+    MissingField,
+    /// A field is present but the wrong JSON type.
+    #[error("saved view field has the wrong JSON type")]
+    WrongType,
+    /// A value outside the closed allow-list — a `map` view type, an unknown
+    /// filter `kind` (e.g. a formula/arithmetic node), or an unknown
+    /// comparison operator. The schema cannot represent it.
+    #[error(
+        "saved view carries an unrepresentable value (map / unknown filter kind / unknown op)"
+    )]
+    Unrepresentable,
+}
+
+// ---- canonical JSON encoder -------------------------------------------------
+
+/// Encode one [`SavedView`] to canonical JSON bytes (§ 9.5.2): keys
+/// lexicographically sorted, no insignificant whitespace, NFC strings,
+/// integers bare-decimal, no floats. Deterministic for a given logical value.
+pub fn canonical_encode_saved_view(view: &SavedView) -> Vec<u8> {
+    let mut out = Vec::with_capacity(128);
+    encode_view_into(&mut out, view);
+    out
+}
+
+fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
+    // Canonical key order: card_size, columns, filters, group_by, id, image,
+    // image_aspect_ratio, name, sort, view_type.
+    out.push(b'{');
+    let mut first = true;
+    if let Some(cs) = view.card_size {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"card_size\":");
+        push_uint(out, cs);
+    }
+    if !view.columns.is_empty() {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"columns\":");
+        push_string_array(out, &view.columns);
+    }
+    sep(out, &mut first);
+    out.extend_from_slice(b"\"filters\":");
+    encode_filter_into(out, &view.filters);
+    if let Some(ref g) = view.group_by {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"group_by\":");
+        push_string(out, &nfc(g));
+    }
+    sep(out, &mut first);
+    out.extend_from_slice(b"\"id\":");
+    push_string(out, &nfc(&view.id));
+    if let Some(ref img) = view.image {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"image\":");
+        push_string(out, &nfc(img));
+    }
+    if let Some(ref ar) = view.image_aspect_ratio {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"image_aspect_ratio\":");
+        push_string(out, &nfc(ar));
+    }
+    sep(out, &mut first);
+    out.extend_from_slice(b"\"name\":");
+    push_string(out, &nfc(&view.name));
+    if let Some(ref s) = view.sort {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"sort\":");
+        encode_sort_into(out, s);
+    }
+    sep(out, &mut first);
+    out.extend_from_slice(b"\"view_type\":");
+    push_string(out, view_type_str(view.view_type));
+    out.push(b'}');
+}
+
+/// Encode a slice of [`SavedView`] to a canonical JSON ARRAY (`[…]`), the
+/// form the `saved_views` field carries inside `vault.prefs`. Elements are
+/// emitted sorted by `id` so the encoding is byte-stable regardless of caller
+/// order (the *display* order lives in the separate `view_order` sequence, so
+/// the set's array order is free to be canonical). Ids are opaque UUIDs
+/// (ASCII), so a raw byte sort is canonical. The caller omits the field
+/// entirely when the slice is empty, so this never emits `[]`.
+pub fn canonical_encode_saved_views(views: &[SavedView]) -> Vec<u8> {
+    let mut refs: Vec<&SavedView> = views.iter().collect();
+    refs.sort_by(|a, b| a.id.cmp(&b.id));
+    let mut out = Vec::with_capacity(128 * refs.len().max(1));
+    out.push(b'[');
+    for (i, v) in refs.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        encode_view_into(&mut out, v);
+    }
+    out.push(b']');
+    out
+}
+
+/// Parse a canonical JSON ARRAY of saved views starting at `bytes[0] == '['`,
+/// returning the decoded views + the number of bytes consumed (so an embedding
+/// codec — `vault.prefs` — can advance its cursor past the array). Reuses the
+/// recursive [`JsonParser`] so brace/bracket balancing + string-escaping are
+/// single-homed here, not re-implemented in the prefs substring decoder.
+pub fn parse_saved_views_array(
+    bytes: &[u8],
+) -> Result<(Vec<SavedView>, usize), SavedViewParseError> {
+    let mut p = JsonParser::new(bytes);
+    let v = p.parse_value()?;
+    let arr = match v {
+        JsonValue::Array(a) => a,
+        _ => return Err(SavedViewParseError::WrongType),
+    };
+    let mut views = Vec::with_capacity(arr.len());
+    for e in &arr {
+        views.push(saved_view_from_json(e)?);
+    }
+    Ok((views, p.i))
+}
+
+fn encode_sort_into(out: &mut Vec<u8>, sort: &ViewSort) {
+    // Canonical key order: direction < key.
+    out.extend_from_slice(b"{\"direction\":");
+    push_string(
+        out,
+        match sort.direction {
+            SortDirection::Asc => "asc",
+            SortDirection::Desc => "desc",
+        },
+    );
+    out.extend_from_slice(b",\"key\":");
+    push_string(out, &nfc(&sort.key));
+    out.push(b'}');
+}
+
+fn encode_filter_into(out: &mut Vec<u8>, node: &FilterNode) {
+    // Each variant emits its keys in lexicographic order.
+    out.push(b'{');
+    match node {
+        FilterNode::And { children } => {
+            out.extend_from_slice(b"\"children\":");
+            encode_filter_array(out, children);
+            out.extend_from_slice(b",\"kind\":\"and\"");
+        }
+        FilterNode::Or { children } => {
+            out.extend_from_slice(b"\"children\":");
+            encode_filter_array(out, children);
+            out.extend_from_slice(b",\"kind\":\"or\"");
+        }
+        FilterNode::Not { child } => {
+            out.extend_from_slice(b"\"child\":");
+            encode_filter_into(out, child);
+            out.extend_from_slice(b",\"kind\":\"not\"");
+        }
+        FilterNode::HasTag { tag } => {
+            out.extend_from_slice(b"\"kind\":\"hasTag\",\"tag\":");
+            push_string(out, &nfc(tag));
+        }
+        FilterNode::InFolder { path } => {
+            out.extend_from_slice(b"\"kind\":\"inFolder\",\"path\":");
+            push_string(out, &nfc(path));
+        }
+        FilterNode::Search { query } => {
+            out.extend_from_slice(b"\"kind\":\"search\",\"query\":");
+            push_string(out, &nfc(query));
+        }
+        FilterNode::Property { key, op, value } => {
+            out.extend_from_slice(b"\"key\":");
+            push_string(out, &nfc(key));
+            out.extend_from_slice(b",\"kind\":\"property\",\"op\":");
+            push_string(out, property_op_str(*op));
+            out.extend_from_slice(b",\"value\":");
+            push_string(out, &nfc(value));
+        }
+        FilterNode::All => {
+            out.extend_from_slice(b"\"kind\":\"all\"");
+        }
+    }
+    out.push(b'}');
+}
+
+fn encode_filter_array(out: &mut Vec<u8>, children: &[FilterNode]) {
+    out.push(b'[');
+    for (i, c) in children.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        encode_filter_into(out, c);
+    }
+    out.push(b']');
+}
+
+fn push_string_array(out: &mut Vec<u8>, items: &[String]) {
+    out.push(b'[');
+    for (i, item) in items.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        push_string(out, &nfc(item));
+    }
+    out.push(b']');
+}
+
+fn view_type_str(v: ViewType) -> &'static str {
+    match v {
+        ViewType::Table => "table",
+        ViewType::Cards => "cards",
+        ViewType::List => "list",
+    }
+}
+
+fn property_op_str(op: PropertyOp) -> &'static str {
+    match op {
+        PropertyOp::Eq => "==",
+        PropertyOp::Ne => "!=",
+        PropertyOp::Gt => ">",
+        PropertyOp::Lt => "<",
+        PropertyOp::Ge => ">=",
+        PropertyOp::Le => "<=",
+        PropertyOp::Contains => "contains",
+    }
+}
+
+fn nfc(s: &str) -> String {
+    s.nfc().collect::<String>()
+}
+
+fn sep(out: &mut Vec<u8>, first: &mut bool) {
+    if *first {
+        *first = false;
+    } else {
+        out.push(b',');
+    }
+}
+
+// ---- canonical JSON decoder -------------------------------------------------
+
+/// Decode canonical-JSON bytes (the output of [`canonical_encode_saved_view`],
+/// or a future-additive superset) into a [`SavedView`]. Unknown keys are
+/// ignored (forward-compat); a `map` view type, an unknown filter `kind`, an
+/// unknown operator, or any float is rejected. Strict on trailing bytes.
+pub fn canonical_decode_saved_view(bytes: &[u8]) -> Result<SavedView, SavedViewParseError> {
+    let mut p = JsonParser::new(bytes);
+    let v = p.parse_value()?;
+    p.skip_ws();
+    if p.i != bytes.len() {
+        return Err(SavedViewParseError::Malformed);
+    }
+    saved_view_from_json(&v)
+}
+
+/// A minimal, dependency-free JSON value tree — only what the `SavedView`
+/// schema needs. Keeps the recursive AST decode out of the substring-scanning
+/// idiom (infeasible for a recursive structure) without pulling `serde_json`
+/// into the main dependency surface.
+enum JsonValue {
+    // A boolean literal — accepted so an unknown future key may carry one, but
+    // no current schema field is a bare bool, so the value is not retained
+    // (a future bool field re-adds the payload + its `as_bool` consumer).
+    Bool,
+    Int(i64),
+    Str(String),
+    Array(Vec<JsonValue>),
+    Object(Vec<(String, JsonValue)>),
+    Null,
+}
+
+struct JsonParser<'a> {
+    b: &'a [u8],
+    i: usize,
+    depth: usize,
+}
+
+impl<'a> JsonParser<'a> {
+    fn new(b: &'a [u8]) -> Self {
+        Self { b, i: 0, depth: 0 }
+    }
+
+    fn skip_ws(&mut self) {
+        while matches!(self.b.get(self.i), Some(b' ' | b'\t' | b'\n' | b'\r')) {
+            self.i += 1;
+        }
+    }
+
+    fn parse_value(&mut self) -> Result<JsonValue, SavedViewParseError> {
+        self.skip_ws();
+        match self.b.get(self.i) {
+            Some(b'{') => self.parse_object(),
+            Some(b'[') => self.parse_array(),
+            Some(b'"') => Ok(JsonValue::Str(self.parse_string()?)),
+            Some(b't') | Some(b'f') => self.parse_bool(),
+            Some(b'n') => self.parse_null(),
+            Some(b'-') | Some(b'0'..=b'9') => self.parse_number(),
+            _ => Err(SavedViewParseError::Malformed),
+        }
+    }
+
+    fn enter(&mut self) -> Result<(), SavedViewParseError> {
+        self.depth += 1;
+        if self.depth > MAX_JSON_DEPTH {
+            return Err(SavedViewParseError::Malformed);
+        }
+        Ok(())
+    }
+
+    fn parse_object(&mut self) -> Result<JsonValue, SavedViewParseError> {
+        self.enter()?;
+        self.i += 1; // consume '{'
+        let mut out: Vec<(String, JsonValue)> = Vec::new();
+        self.skip_ws();
+        if self.b.get(self.i) == Some(&b'}') {
+            self.i += 1;
+            self.depth -= 1;
+            return Ok(JsonValue::Object(out));
+        }
+        loop {
+            self.skip_ws();
+            if self.b.get(self.i) != Some(&b'"') {
+                return Err(SavedViewParseError::Malformed);
+            }
+            let key = self.parse_string()?;
+            self.skip_ws();
+            if self.b.get(self.i) != Some(&b':') {
+                return Err(SavedViewParseError::Malformed);
+            }
+            self.i += 1;
+            let val = self.parse_value()?;
+            out.push((key, val));
+            self.skip_ws();
+            match self.b.get(self.i) {
+                Some(&b',') => self.i += 1,
+                Some(&b'}') => {
+                    self.i += 1;
+                    break;
+                }
+                _ => return Err(SavedViewParseError::Malformed),
+            }
+        }
+        self.depth -= 1;
+        Ok(JsonValue::Object(out))
+    }
+
+    fn parse_array(&mut self) -> Result<JsonValue, SavedViewParseError> {
+        self.enter()?;
+        self.i += 1; // consume '['
+        let mut out: Vec<JsonValue> = Vec::new();
+        self.skip_ws();
+        if self.b.get(self.i) == Some(&b']') {
+            self.i += 1;
+            self.depth -= 1;
+            return Ok(JsonValue::Array(out));
+        }
+        loop {
+            let val = self.parse_value()?;
+            out.push(val);
+            self.skip_ws();
+            match self.b.get(self.i) {
+                Some(&b',') => self.i += 1,
+                Some(&b']') => {
+                    self.i += 1;
+                    break;
+                }
+                _ => return Err(SavedViewParseError::Malformed),
+            }
+        }
+        self.depth -= 1;
+        Ok(JsonValue::Array(out))
+    }
+
+    fn parse_string(&mut self) -> Result<String, SavedViewParseError> {
+        self.i += 1; // consume opening '"'
+        let mut buf: Vec<u8> = Vec::new();
+        loop {
+            let c = *self.b.get(self.i).ok_or(SavedViewParseError::Malformed)?;
+            self.i += 1;
+            match c {
+                b'"' => break,
+                b'\\' => {
+                    let e = *self.b.get(self.i).ok_or(SavedViewParseError::Malformed)?;
+                    self.i += 1;
+                    match e {
+                        b'"' => buf.push(b'"'),
+                        b'\\' => buf.push(b'\\'),
+                        b'/' => buf.push(b'/'),
+                        b'b' => buf.push(0x08),
+                        b'f' => buf.push(0x0c),
+                        b'n' => buf.push(b'\n'),
+                        b'r' => buf.push(b'\r'),
+                        b't' => buf.push(b'\t'),
+                        b'u' => {
+                            let cp = self.parse_hex4()?;
+                            let ch =
+                                char::from_u32(cp as u32).ok_or(SavedViewParseError::Malformed)?;
+                            let mut tmp = [0u8; 4];
+                            buf.extend_from_slice(ch.encode_utf8(&mut tmp).as_bytes());
+                        }
+                        _ => return Err(SavedViewParseError::Malformed),
+                    }
+                }
+                _ => buf.push(c),
+            }
+        }
+        String::from_utf8(buf).map_err(|_| SavedViewParseError::Malformed)
+    }
+
+    fn parse_hex4(&mut self) -> Result<u16, SavedViewParseError> {
+        let mut v: u16 = 0;
+        for _ in 0..4 {
+            let c = *self.b.get(self.i).ok_or(SavedViewParseError::Malformed)?;
+            self.i += 1;
+            let d = match c {
+                b'0'..=b'9' => c - b'0',
+                b'a'..=b'f' => c - b'a' + 10,
+                b'A'..=b'F' => c - b'A' + 10,
+                _ => return Err(SavedViewParseError::Malformed),
+            };
+            v = v * 16 + d as u16;
+        }
+        Ok(v)
+    }
+
+    fn parse_number(&mut self) -> Result<JsonValue, SavedViewParseError> {
+        let start = self.i;
+        if self.b.get(self.i) == Some(&b'-') {
+            self.i += 1;
+        }
+        let digit_start = self.i;
+        while matches!(self.b.get(self.i), Some(b'0'..=b'9')) {
+            self.i += 1;
+        }
+        if self.i == digit_start {
+            return Err(SavedViewParseError::Malformed);
+        }
+        // Float ban (§ 9.5.2): a fractional / exponent marker rejects.
+        if matches!(self.b.get(self.i), Some(b'.') | Some(b'e') | Some(b'E')) {
+            return Err(SavedViewParseError::Malformed);
+        }
+        let s = core::str::from_utf8(&self.b[start..self.i])
+            .map_err(|_| SavedViewParseError::Malformed)?;
+        let n: i64 = s.parse().map_err(|_| SavedViewParseError::Malformed)?;
+        Ok(JsonValue::Int(n))
+    }
+
+    fn parse_bool(&mut self) -> Result<JsonValue, SavedViewParseError> {
+        if self.b[self.i..].starts_with(b"true") {
+            self.i += 4;
+            Ok(JsonValue::Bool)
+        } else if self.b[self.i..].starts_with(b"false") {
+            self.i += 5;
+            Ok(JsonValue::Bool)
+        } else {
+            Err(SavedViewParseError::Malformed)
+        }
+    }
+
+    fn parse_null(&mut self) -> Result<JsonValue, SavedViewParseError> {
+        if self.b[self.i..].starts_with(b"null") {
+            self.i += 4;
+            Ok(JsonValue::Null)
+        } else {
+            Err(SavedViewParseError::Malformed)
+        }
+    }
+}
+
+fn find<'a>(obj: &'a [(String, JsonValue)], key: &str) -> Option<&'a JsonValue> {
+    obj.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+}
+
+fn as_object(v: &JsonValue) -> Result<&[(String, JsonValue)], SavedViewParseError> {
+    match v {
+        JsonValue::Object(o) => Ok(o),
+        _ => Err(SavedViewParseError::WrongType),
+    }
+}
+
+fn as_str(v: &JsonValue) -> Result<&str, SavedViewParseError> {
+    match v {
+        JsonValue::Str(s) => Ok(s),
+        _ => Err(SavedViewParseError::WrongType),
+    }
+}
+
+fn req<'a>(
+    obj: &'a [(String, JsonValue)],
+    key: &str,
+) -> Result<&'a JsonValue, SavedViewParseError> {
+    find(obj, key).ok_or(SavedViewParseError::MissingField)
+}
+
+fn req_string(obj: &[(String, JsonValue)], key: &str) -> Result<String, SavedViewParseError> {
+    Ok(as_str(req(obj, key)?)?.to_string())
+}
+
+fn opt_string(
+    obj: &[(String, JsonValue)],
+    key: &str,
+) -> Result<Option<String>, SavedViewParseError> {
+    match find(obj, key) {
+        Some(v) => Ok(Some(as_str(v)?.to_string())),
+        None => Ok(None),
+    }
+}
+
+fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError> {
+    let obj = as_object(v)?;
+
+    let view_type = match as_str(req(obj, "view_type")?)? {
+        "table" => ViewType::Table,
+        "cards" => ViewType::Cards,
+        "list" => ViewType::List,
+        _ => return Err(SavedViewParseError::Unrepresentable), // `map` et al.
+    };
+
+    let card_size = match find(obj, "card_size") {
+        Some(JsonValue::Int(n)) if *n >= 0 && *n <= i64::from(u32::MAX) => Some(*n as u32),
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => None,
+    };
+
+    let columns = match find(obj, "columns") {
+        Some(JsonValue::Array(a)) => a
+            .iter()
+            .map(|e| as_str(e).map(String::from))
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => Vec::new(),
+    };
+
+    let sort = match find(obj, "sort") {
+        Some(v) => Some(sort_from_json(v)?),
+        None => None,
+    };
+
+    Ok(SavedView {
+        id: req_string(obj, "id")?,
+        name: req_string(obj, "name")?,
+        view_type,
+        filters: filter_from_json(req(obj, "filters")?, 0)?,
+        sort,
+        group_by: opt_string(obj, "group_by")?,
+        columns,
+        card_size,
+        image: opt_string(obj, "image")?,
+        image_aspect_ratio: opt_string(obj, "image_aspect_ratio")?,
+    })
+}
+
+fn sort_from_json(v: &JsonValue) -> Result<ViewSort, SavedViewParseError> {
+    let obj = as_object(v)?;
+    let direction = match as_str(req(obj, "direction")?)? {
+        "asc" => SortDirection::Asc,
+        "desc" => SortDirection::Desc,
+        _ => return Err(SavedViewParseError::Unrepresentable),
+    };
+    Ok(ViewSort {
+        key: req_string(obj, "key")?,
+        direction,
+    })
+}
+
+fn filter_from_json(v: &JsonValue, depth: usize) -> Result<FilterNode, SavedViewParseError> {
+    if depth > MAX_JSON_DEPTH {
+        return Err(SavedViewParseError::Malformed);
+    }
+    let obj = as_object(v)?;
+    match as_str(req(obj, "kind")?)? {
+        "all" => Ok(FilterNode::All),
+        "hasTag" => Ok(FilterNode::HasTag {
+            tag: req_string(obj, "tag")?,
+        }),
+        "inFolder" => Ok(FilterNode::InFolder {
+            path: req_string(obj, "path")?,
+        }),
+        "search" => Ok(FilterNode::Search {
+            query: req_string(obj, "query")?,
+        }),
+        "property" => Ok(FilterNode::Property {
+            key: req_string(obj, "key")?,
+            op: property_op_from_str(as_str(req(obj, "op")?)?)?,
+            value: req_string(obj, "value")?,
+        }),
+        "and" => Ok(FilterNode::And {
+            children: filter_children(obj, depth)?,
+        }),
+        "or" => Ok(FilterNode::Or {
+            children: filter_children(obj, depth)?,
+        }),
+        "not" => Ok(FilterNode::Not {
+            child: Box::new(filter_from_json(req(obj, "child")?, depth + 1)?),
+        }),
+        _ => Err(SavedViewParseError::Unrepresentable), // arithmetic / formula / map node
+    }
+}
+
+fn filter_children(
+    obj: &[(String, JsonValue)],
+    depth: usize,
+) -> Result<Vec<FilterNode>, SavedViewParseError> {
+    match req(obj, "children")? {
+        JsonValue::Array(a) => a
+            .iter()
+            .map(|c| filter_from_json(c, depth + 1))
+            .collect::<Result<Vec<_>, _>>(),
+        _ => Err(SavedViewParseError::WrongType),
+    }
+}
+
+fn property_op_from_str(s: &str) -> Result<PropertyOp, SavedViewParseError> {
+    Ok(match s {
+        "==" => PropertyOp::Eq,
+        "!=" => PropertyOp::Ne,
+        ">" => PropertyOp::Gt,
+        "<" => PropertyOp::Lt,
+        ">=" => PropertyOp::Ge,
+        "<=" => PropertyOp::Le,
+        "contains" => PropertyOp::Contains,
+        _ => return Err(SavedViewParseError::Unrepresentable),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    fn sample() -> SavedView {
+        SavedView {
+            id: "v1".into(),
+            name: "Books".into(),
+            view_type: ViewType::Cards,
+            filters: FilterNode::And {
+                children: vec![
+                    FilterNode::InFolder {
+                        path: "Books/".into(),
+                    },
+                    FilterNode::Property {
+                        key: "rating".into(),
+                        op: PropertyOp::Gt,
+                        value: "4".into(),
+                    },
+                ],
+            },
+            sort: Some(ViewSort {
+                key: "finished".into(),
+                direction: SortDirection::Desc,
+            }),
+            group_by: Some("status".into()),
+            columns: vec!["author".into(), "rating".into()],
+            card_size: Some(300),
+            image: Some("image".into()),
+            image_aspect_ratio: Some("1.65".into()),
+        }
+    }
+
+    #[test]
+    fn canonical_bytes_are_stable() {
+        let bytes = canonical_encode_saved_view(&sample());
+        let expected = concat!(
+            "{\"card_size\":300,",
+            "\"columns\":[\"author\",\"rating\"],",
+            "\"filters\":{\"children\":[",
+            "{\"kind\":\"inFolder\",\"path\":\"Books/\"},",
+            "{\"key\":\"rating\",\"kind\":\"property\",\"op\":\">\",\"value\":\"4\"}",
+            "],\"kind\":\"and\"},",
+            "\"group_by\":\"status\",",
+            "\"id\":\"v1\",",
+            "\"image\":\"image\",",
+            "\"image_aspect_ratio\":\"1.65\",",
+            "\"name\":\"Books\",",
+            "\"sort\":{\"direction\":\"desc\",\"key\":\"finished\"},",
+            "\"view_type\":\"cards\"}"
+        );
+        assert_eq!(core::str::from_utf8(&bytes).unwrap(), expected);
+    }
+
+    #[test]
+    fn no_insignificant_whitespace() {
+        let bytes = canonical_encode_saved_view(&sample());
+        // No ", " or ": " — whitespace inside string values would be allowed
+        // (none here), but structural separators carry none.
+        assert!(!bytes.windows(2).any(|w| w == b", "));
+        assert!(!bytes.windows(2).any(|w| w == b": "));
+    }
+
+    #[test]
+    fn round_trips_full_view() {
+        let v = sample();
+        let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
+        assert_eq!(decoded, v);
+    }
+
+    #[test]
+    fn round_trips_minimal_view() {
+        let v = SavedView {
+            id: "x".into(),
+            name: "All".into(),
+            view_type: ViewType::Table,
+            filters: FilterNode::All,
+            sort: None,
+            group_by: None,
+            columns: Vec::new(),
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+        };
+        let bytes = canonical_encode_saved_view(&v);
+        assert_eq!(
+            core::str::from_utf8(&bytes).unwrap(),
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"All\",\"view_type\":\"table\"}"
+        );
+        assert_eq!(canonical_decode_saved_view(&bytes).unwrap(), v);
+    }
+
+    #[test]
+    fn nested_and_or_not_round_trip() {
+        let v = SavedView {
+            id: "n".into(),
+            name: "Nested".into(),
+            view_type: ViewType::List,
+            filters: FilterNode::Or {
+                children: vec![
+                    FilterNode::Not {
+                        child: Box::new(FilterNode::HasTag {
+                            tag: "draft".into(),
+                        }),
+                    },
+                    FilterNode::And {
+                        children: vec![
+                            FilterNode::Search {
+                                query: "rust".into(),
+                            },
+                            FilterNode::Property {
+                                key: "done".into(),
+                                op: PropertyOp::Eq,
+                                value: "true".into(),
+                            },
+                        ],
+                    },
+                ],
+            },
+            sort: None,
+            group_by: None,
+            columns: Vec::new(),
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+        };
+        let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
+        assert_eq!(decoded, v);
+    }
+
+    #[test]
+    fn all_property_ops_round_trip() {
+        for op in [
+            PropertyOp::Eq,
+            PropertyOp::Ne,
+            PropertyOp::Gt,
+            PropertyOp::Lt,
+            PropertyOp::Ge,
+            PropertyOp::Le,
+            PropertyOp::Contains,
+        ] {
+            let v = SavedView {
+                id: "o".into(),
+                name: "Op".into(),
+                view_type: ViewType::Table,
+                filters: FilterNode::Property {
+                    key: "k".into(),
+                    op,
+                    value: "x".into(),
+                },
+                sort: None,
+                group_by: None,
+                columns: Vec::new(),
+                card_size: None,
+                image: None,
+                image_aspect_ratio: None,
+            };
+            assert_eq!(
+                canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap(),
+                v
+            );
+        }
+    }
+
+    #[test]
+    fn float_is_rejected() {
+        // card_size with a fractional value — the canonical encoder never
+        // emits this, but a tampered-but-AEAD-OK blob might.
+        let bad = b"{\"card_size\":1.5,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn map_view_type_not_representable() {
+        let bad =
+            b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"map\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Unrepresentable)
+        );
+    }
+
+    #[test]
+    fn unknown_filter_kind_not_representable() {
+        // A formula / arithmetic node is not in the allow-list.
+        let bad = b"{\"filters\":{\"kind\":\"multiply\",\"left\":\"a\",\"right\":\"b\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Unrepresentable)
+        );
+    }
+
+    #[test]
+    fn formulas_summaries_dropped_on_decode() {
+        // A `.base`-style blob with formulas/summaries decodes (they are
+        // unknown keys), and re-encoding omits them — the schema can't carry
+        // them, so they are not round-trippable.
+        let with_extras = b"{\"filters\":{\"kind\":\"all\"},\"formulas\":[\"a+b\"],\"id\":\"x\",\"name\":\"n\",\"summaries\":{\"x\":\"sum\"},\"view_type\":\"table\"}";
+        let decoded = canonical_decode_saved_view(with_extras).unwrap();
+        let reencoded = canonical_encode_saved_view(&decoded);
+        let s = core::str::from_utf8(&reencoded).unwrap();
+        assert!(!s.contains("formulas"));
+        assert!(!s.contains("summaries"));
+    }
+
+    #[test]
+    fn unknown_future_key_tolerated() {
+        let with_future = b"{\"filters\":{\"kind\":\"all\"},\"future_key\":\"x\",\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        let decoded = canonical_decode_saved_view(with_future).unwrap();
+        assert_eq!(decoded.id, "x");
+        assert_eq!(decoded.view_type, ViewType::Table);
+    }
+
+    #[test]
+    fn trailing_bytes_rejected() {
+        let bad =
+            b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}X";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn missing_required_field_rejected() {
+        let bad = b"{\"filters\":{\"kind\":\"all\"},\"name\":\"n\",\"view_type\":\"table\"}"; // no id
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::MissingField)
+        );
+    }
+
+    #[test]
+    fn nfc_normalizes_strings_on_encode() {
+        // "é" as U+0065 U+0301 (decomposed) normalizes to U+00E9 (composed).
+        let v = SavedView {
+            id: "x".into(),
+            name: "e\u{0301}".into(),
+            view_type: ViewType::Table,
+            filters: FilterNode::All,
+            sort: None,
+            group_by: None,
+            columns: Vec::new(),
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+        };
+        let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
+        assert_eq!(decoded.name, "\u{00e9}");
+    }
+
+    #[test]
+    fn ipc_serde_shape_matches_ts_filter_union() {
+        // The serde (IPC) wire shape must equal the TS FilterNode the engine
+        // reads: `{"kind":"property","key":..,"op":"==","value":..}`.
+        let node = FilterNode::Property {
+            key: "rating".into(),
+            op: PropertyOp::Ge,
+            value: "4".into(),
+        };
+        let json = serde_json::to_string(&node).unwrap();
+        assert!(json.contains("\"kind\":\"property\""));
+        assert!(json.contains("\"op\":\">=\""));
+        let back: FilterNode = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, node);
+
+        let tag = FilterNode::HasTag { tag: "x".into() };
+        assert_eq!(
+            serde_json::to_string(&tag).unwrap(),
+            "{\"kind\":\"hasTag\",\"tag\":\"x\"}"
+        );
+    }
+}

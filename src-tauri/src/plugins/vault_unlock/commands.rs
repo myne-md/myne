@@ -1598,6 +1598,8 @@ mod tests {
                     last_backup_at: None,
                     spell_enabled: None,
                     spell_languages: Vec::new(),
+                    saved_views: Vec::new(),
+                    view_order: Vec::new(),
                 },
             )
             .expect("encode prefs blob");
@@ -1706,6 +1708,8 @@ mod tests {
                 last_backup_at: None,
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                saved_views: Vec::new(),
+                view_order: Vec::new(),
             },
         )
         .expect("encode");
