@@ -83,7 +83,12 @@ async function readLayout(session: Session): Promise<LayoutSig> {
     const tabs: string[] = [];
     let active: string | null = null;
     for (const t of tabEls) {
-      const id = (await t.attribute("data-note-id")) ?? "";
+      // A tab carries its workspace-item key in `data-tab-id` (Saved Views #4
+      // generalized tabs to `note | view` items: `data-note-id` → `data-tab-id`,
+      // value `note:<id>` / `view:<id>`). These layout scenarios use note tabs
+      // only — strip the `note:` prefix back to the bare note-id the sig wants.
+      const raw = (await t.attribute("data-tab-id")) ?? "";
+      const id = raw.startsWith("note:") ? raw.slice("note:".length) : raw;
       tabs.push(id);
       if ((await t.attribute("data-active")) === "true") active = id;
     }

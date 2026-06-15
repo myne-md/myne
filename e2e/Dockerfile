@@ -16,9 +16,12 @@ FROM rust:1.90.0-slim
 # Tauri build sysdeps (same list as .woodpecker.yml's tauri-compile step)
 # + the E2E runtime additions: webkit2gtk-driver (WebKitWebDriver binary),
 # xvfb + xauth (headless X server for the real window).
+# libasound2-dev: ALSA dev headers required by cpal's alsa-sys backend
+# (voice-notes, MYND-259) so the production binary links on Linux.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates xz-utils pkg-config libssl-dev \
       libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
+      libasound2-dev \
       webkit2gtk-driver xvfb xauth \
     && rm -rf /var/lib/apt/lists/*
 
