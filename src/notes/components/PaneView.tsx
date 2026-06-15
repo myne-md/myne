@@ -35,6 +35,11 @@ import {
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { TabStrip, STRIP_HEIGHT } from "./TabStrip";
+import { useViewResult } from "../views/useViewResult";
+import { ViewRenderHost } from "../views/viewRenderHost";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { buildCardMenuItems } from "../views/cardMenu";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 
 export type PaneReadout = {
   status: SaveStatus;
@@ -377,7 +382,7 @@ export function PaneView({
       );
     }
     if (activeViewId !== null) {
-      return <ViewHostStub viewId={activeViewId} />;
+      return <ViewHost viewId={activeViewId} />;
     }
     if (loading) {
       return <PaneLoading />;
@@ -537,32 +542,87 @@ function PaneLoading() {
 }
 
 /**
- * Placeholder host for an open saved-view tab (MYND-274, Saved Views #4). A
- * view tab genuinely opens and occupies the pane body, but the real
- * table/cards/list render lands in #5 (table-and-cards-render) — this stub
- * proves the view-tab flow end-to-end (opens, activates, renders something,
- * closes) without that surface. No autosave / flush (views are read-only
- * projections, not editable buffers).
+ * Host for an open saved-view tab (MYND-275, Saved Views #5). Resolves the
+ * `viewId` to its `SavedView` def via prefs, runs the query engine over the
+ * sidebar caches (`useViewResult`), and renders via the viewType dispatch
+ * (`ViewRenderHost` → cards / table / list). No autosave / flush — views are
+ * read-only projections, not editable buffers. Keeps the `editor.view-host`
+ * testid wrapper (E2E #4 contract). While the result is loading (or the view id
+ * is stale) the wrapper holds a calm, quiet body — no spinner churn.
  */
-function ViewHostStub({ viewId }: { viewId: string }) {
+function ViewHost({ viewId }: { viewId: string }) {
+  const { def, result } = useViewResult(viewId);
+  const ws = useWorkspace();
+  const sidebar = useSelectedNote();
+  const [cardMenu, setCardMenu] = useState<{
+    noteId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  // Card navigation reuses the workspace open seam — the same matrix NoteList
+  // wires for a sidebar row (toSide → split, newTab → new tab, else focused).
+  const onOpenNote = useCallback(
+    (noteId: string, intent: { newTab: boolean; toSide: boolean }) => {
+      if (intent.toSide) ws.openToSide(noteId);
+      else if (intent.newTab) ws.openNewTabInFocused(noteId);
+      else ws.openInFocused(noteId);
+    },
+    [ws],
+  );
+  const onCardContextMenu = useCallback(
+    (noteId: string, pos: { x: number; y: number }) =>
+      setCardMenu({ noteId, x: pos.x, y: pos.y }),
+    [],
+  );
+  // The non-mutating card context menu (task 8) — the CLOSED four-item set
+  // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy
+  // link. NO delete / move / trash / rename (a saved view is a read-only
+  // projection; deletion stays at the note's own location, the sidebar).
+  // Reveal selects the note in the sidebar; Copy link writes a `[[title]]`
+  // wikilink via the existing clipboard plugin (no new capability).
+  const cardMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (cardMenu === null) return [];
+    const id = cardMenu.noteId;
+    return buildCardMenuItems({
+      open: () => ws.openInFocused(id),
+      openInNewTab: () => ws.openNewTabInFocused(id),
+      revealInFolder: () => sidebar.select(id),
+      copyLink: () => {
+        const title = sidebar.cache.get(id)?.title ?? "";
+        if (title !== "") void clipboardWriteText(`[[${title}]]`);
+      },
+    });
+  }, [cardMenu, ws, sidebar]);
   return (
-    <div
-      data-testid="editor.view-host"
-      data-view-id={viewId}
-      style={{
-        maxWidth: 680,
-        margin: "12vh auto 0",
-        textAlign: "center",
-        color: "var(--fg-3)",
-        fontSize: 13,
-        fontFamily: "var(--font-sans)",
-        lineHeight: 1.6,
-      }}
-    >
-      <div style={{ color: "var(--fg-2)", fontSize: 14, marginBottom: 4 }}>
-        Saved view
-      </div>
-      <div>The view renderer arrives in a later update.</div>
+    <div data-testid="editor.view-host" data-view-id={viewId}>
+      {def !== null && result !== null ? (
+        <ViewRenderHost
+          def={def}
+          result={result}
+          onOpenNote={onOpenNote}
+          onCardContextMenu={onCardContextMenu}
+        />
+      ) : (
+        <div
+          style={{
+            maxWidth: 680,
+            margin: "12vh auto 0",
+            textAlign: "center",
+            color: "var(--fg-3)",
+            fontSize: 13,
+            fontFamily: "var(--font-sans)",
+            lineHeight: 1.6,
+          }}
+        />
+      )}
+      {cardMenu !== null && (
+        <ContextMenu
+          x={cardMenu.x}
+          y={cardMenu.y}
+          items={cardMenuItems}
+          onClose={() => setCardMenu(null)}
+        />
+      )}
     </div>
   );
 }
