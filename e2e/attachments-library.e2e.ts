@@ -59,10 +59,25 @@ const IPC_TIMEOUT = 15_000;
  *  literal newline (the invisible-key hazard). */
 const ENTER = "";
 
-/** A minimal PNG (8-byte signature → sniffs image/png) tagged with a
- *  distinguishing byte so distinct tags yield distinct content-addressed ids. */
+/** A REAL, decodable 1×1 PNG (not just the signature) tagged with a trailing
+ *  distinguishing byte so distinct tags yield distinct content-addressed ids.
+ *  Must actually decode: the library thumbnail renders `<img>` and falls back to
+ *  a generic file icon on the `<img>` `onError` (an undecodable image has no
+ *  `attachments.thumbnail` element), so the signature-only stub never produced a
+ *  thumbnail. The tag byte trails IEND — PNG decoders ignore trailing bytes, so
+ *  the image still decodes 1×1 while the content hash varies per tag. */
 function pngBytes(tag: number): number[] {
-  return [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, tag];
+  return [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // signature
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR length + type
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1×1
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, // bit depth/color + CRC
+    0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, // IDAT length + type
+    0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, // zlib data
+    0x0d, 0x0a, 0x2d, 0xb4, // IDAT CRC
+    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82, // IEND
+    tag, // trailing tag — ignored by decoders, varies the content hash
+  ];
 }
 
 /** Opaque bytes the magic-byte sniffer does NOT recognize → stored as
