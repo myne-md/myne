@@ -102,6 +102,15 @@ export interface SavedView {
 export interface PrefsView {
   screen_capture_protection: boolean;
   /**
+   * Show the per-note "last edited" timestamp under each sidebar note row
+   * (sidebar-note-timestamps). `true` (the default) ≡ timestamps visible — the
+   * pre-feature behaviour. Serialized from Rust `bool` with `default = true`;
+   * the codec OMITS the field on disk when `true`, so a vault that never touched
+   * the toggle is byte-identical to a pre-feature `vault.prefs`. Only the
+   * non-default `false` is persisted; an absent key decodes back to `true`.
+   */
+  show_note_timestamps: boolean;
+  /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
    * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
    */
@@ -174,6 +183,33 @@ export interface PrefsView {
    * from Rust `Option<EditorLayout>` (null | object).
    */
   editor_layout: EditorLayout | null;
+  /**
+   * Editor content max-width preset (editor-typography) — `"narrow"` |
+   * `"normal"` | `"wide"` | `"full"`. `null` ≡ the canonical default
+   * `"normal"`. A free enum string on the wire (Rust `Option<String>`); the
+   * client validates + maps an unknown value to the default. Omitted from the
+   * encrypted blob when `null`. Non-load-bearing cosmetic.
+   */
+  editor_content_width: string | null;
+  /**
+   * Editor font-family preset (editor-typography) — `"mono"` | `"sans"`.
+   * `null` ≡ the canonical default `"mono"`. Same free-enum-string discipline
+   * as {@link PrefsView.editor_content_width}.
+   */
+  editor_font_family: string | null;
+  /**
+   * Editor line-spacing preset (editor-typography) — `"tight"` | `"normal"` |
+   * `"relaxed"`. `null` ≡ the canonical default `"normal"`. Stored as an enum
+   * string (not a float) so the codec stays float-free; the client maps the
+   * preset to a concrete line-height.
+   */
+  editor_line_spacing: string | null;
+  /**
+   * Editor base text-size preset (editor-typography) — `"sm"` | `"md"` |
+   * `"lg"` | `"xl"`. `null` ≡ the canonical default `"md"`. The client maps it
+   * to a base font-size; the headings scale relative to it.
+   */
+  editor_text_size: string | null;
   /**
    * User theme preference (MYND-110). `null` ≡ **system** (follow the OS
    * `prefers-color-scheme`) — the canonical encoding of "no explicit choice",
@@ -422,6 +458,68 @@ export async function setSpellEnabled(enabled: boolean): Promise<void> {
  */
 export async function setSpellLanguages(languages: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_spell_languages", { languages });
+}
+
+/**
+ * Set the sidebar per-note timestamp visibility (sidebar-note-timestamps). Pass
+ * `false` to hide the "last edited" line under each sidebar note row, `true` to
+ * show it (the default). Disk-first, no native side-effect; a rejected promise
+ * means the write failed and the caller's optimistic UI must revert.
+ * Non-load-bearing.
+ *
+ * Unlike the other simple setters, this bumps the prefs nonce after a
+ * successful write so that the sidebar — which reads prefs through its OWN
+ * `usePrefs` instance, separate from the Settings modal's — re-reads disk truth
+ * and reflects the toggle live (same chokepoint discipline as the saved-view
+ * setters).
+ */
+export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_show_note_timestamps", { enabled });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set (or clear) the editor base text-size preset (editor-typography) — pass
+ * `"sm"`/`"md"`/`"lg"`/`"xl"`, or `null` to clear back to the `"md"` default.
+ * Disk-first, no native side-effect; a rejected promise means the write failed
+ * and the caller's optimistic UI must revert. Bumps the prefs nonce on success
+ * so the open editor (which reads prefs through its OWN `usePrefs`, separate
+ * from the Settings modal's) re-reads disk truth and re-renders live — same
+ * chokepoint discipline as {@link setShowNoteTimestamps}. Non-load-bearing.
+ */
+export async function setEditorTextSize(value: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_text_size", { value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set (or clear) the editor line-spacing preset (editor-typography) — pass
+ * `"tight"`/`"normal"`/`"relaxed"`, or `null` to clear to the `"normal"`
+ * default. Same disk-first + nonce-bump contract as {@link setEditorTextSize}.
+ */
+export async function setEditorLineSpacing(value: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_line_spacing", { value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set (or clear) the editor content-width preset (editor-typography) — pass
+ * `"narrow"`/`"normal"`/`"wide"`/`"full"`, or `null` to clear to the
+ * `"normal"` default. Same contract as {@link setEditorTextSize}.
+ */
+export async function setEditorContentWidth(value: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_content_width", { value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set (or clear) the editor font-family preset (editor-typography) — pass
+ * `"mono"`/`"sans"`, or `null` to clear to the `"mono"` default. Same contract
+ * as {@link setEditorTextSize}.
+ */
+export async function setEditorFontFamily(value: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_font_family", { value });
+  bumpPrefsNonce();
 }
 
 /**

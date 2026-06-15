@@ -180,6 +180,15 @@ pub struct EditorLayout {
     pub right_collapsed: bool,
 }
 
+/// serde-derive default for a `bool` field whose logical default is `true`
+/// (e.g. [`PrefsView::show_note_timestamps`]). serde's bare `#[serde(default)]`
+/// uses `bool::default()` (`false`), which would diverge from the hand-rolled
+/// canonical codec's omit-when-`true` discipline — this keeps the two paths
+/// consistent.
+fn default_true() -> bool {
+    true
+}
+
 /// In-memory representation of the v0.1 `vault.prefs` plaintext.
 ///
 /// v0.1 has a single field. Future v0.1.x minor revisions append
@@ -193,6 +202,23 @@ pub struct PrefsView {
     /// (`threat-model.md` § 6 + `decisions.md` 2026-05-27 entries).
     /// Default `true` matches MYND-78's structural default-ON.
     pub screen_capture_protection: bool,
+
+    /// Show the per-note "last edited" timestamp under each note row in the
+    /// sidebar (sidebar-note-timestamps feature). Default `true` (timestamps
+    /// visible — the pre-feature behaviour). **Omitted entirely from the
+    /// canonical JSON when `true`** (the default), so a vault that never touched
+    /// this toggle is byte-identical to a pre-feature `vault.prefs` (existing
+    /// golden vectors unaffected — a migration-less additive field on `MYP1`,
+    /// the `item_colors` / `spell_enabled` precedent class). Only the non-default
+    /// `false` is persisted. **Non-load-bearing** (a tampered / replayed value
+    /// can at worst show or hide a date) — no protective-envelope clamp. NOTE the
+    /// default polarity is INVERTED vs `spell_enabled`: this is a plain `bool`
+    /// defaulting `true`, so the serde-derive path needs `default = "default_true"`
+    /// (a bare `#[serde(default)]` would yield `false`). Canonical key
+    /// `show_note_timestamps` — sorts after `screen_capture_protection`
+    /// (`scr` < `sho`), before `spell_enabled` (`sho` < `spe`).
+    #[serde(default = "default_true")]
+    pub show_note_timestamps: bool,
 
     /// Deliberately-created folder paths (canonical trailing-slash display
     /// form) that persist independently of whether any note carries them —
@@ -287,6 +313,49 @@ pub struct PrefsView {
     /// `right_width`. See [`EditorLayout`].
     #[serde(default)]
     pub editor_layout: Option<EditorLayout>,
+
+    /// Editor content max-width preset (editor-typography). `None` ≡ the
+    /// canonical default `normal`, applied host-side. A closed enum string
+    /// (`narrow`/`normal`/`wide`/`full`); stored as a free `Option<String>`
+    /// here — the enum interpretation + unknown→default fallback live on the
+    /// client (no codec-level validation, the `daily_date_format` precedent
+    /// class). Omitted entirely when `None`, so a vault that never customized
+    /// the measure is byte-identical to a pre-feature `vault.prefs`.
+    /// **Non-load-bearing** cosmetic (AS-low) — no protective-envelope clamp.
+    /// Canonical key `editor_content_width` — sorts after `deliberate_folders`
+    /// (`d` < `e`), before `editor_font_family` (`editor_c` < `editor_f`).
+    #[serde(default)]
+    pub editor_content_width: Option<alloc::string::String>,
+
+    /// Editor font-family preset (editor-typography). `None` ≡ the canonical
+    /// default `mono`. A closed enum string (`mono`/`sans`); same free-string
+    /// storage + client-side validation discipline as
+    /// [`PrefsView::editor_content_width`]. Omitted when `None`.
+    /// Non-load-bearing. Canonical key `editor_font_family` — sorts after
+    /// `editor_content_width`, before `editor_layout` (`editor_f` < `editor_l`).
+    #[serde(default)]
+    pub editor_font_family: Option<alloc::string::String>,
+
+    /// Editor line-spacing preset (editor-typography). `None` ≡ the canonical
+    /// default `normal`. A closed enum string (`tight`/`normal`/`relaxed`) —
+    /// stored as a free `Option<String>` to keep the codec float-free (spec
+    /// § 9.5.2); the client maps the preset to a concrete line-height. Same
+    /// validation discipline as [`PrefsView::editor_content_width`]. Omitted
+    /// when `None`. Non-load-bearing. Canonical key `editor_line_spacing` —
+    /// sorts after `editor_layout` (`editor_la` < `editor_li`), before
+    /// `editor_text_size` (`editor_l` < `editor_t`).
+    #[serde(default)]
+    pub editor_line_spacing: Option<alloc::string::String>,
+
+    /// Editor base text-size preset (editor-typography). `None` ≡ the canonical
+    /// default `md`. A closed enum string (`sm`/`md`/`lg`/`xl`); the client maps
+    /// it to a base font-size and the headings scale relative to it. Same
+    /// free-string storage + client-side validation discipline as
+    /// [`PrefsView::editor_content_width`]. Omitted when `None`.
+    /// Non-load-bearing. Canonical key `editor_text_size` — sorts after
+    /// `editor_line_spacing`, before `favorites` (`e` < `f`).
+    #[serde(default)]
+    pub editor_text_size: Option<alloc::string::String>,
 
     /// User theme preference (MYND-110). `None` ≡ **system** (follow the OS
     /// `prefers-color-scheme`) and is the canonical encoding of "no explicit
@@ -445,6 +514,7 @@ impl Default for PrefsView {
     fn default() -> Self {
         Self {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -457,6 +527,10 @@ impl Default for PrefsView {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -637,6 +711,22 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
+    // editor-typography string presets (canonical key 'e'). Two sort BEFORE
+    // editor_layout (`editor_c`/`editor_f` < `editor_l`), two AFTER it (below).
+    // Each omitted when None so a vault that never customized typography is
+    // byte-identical to a pre-feature vault.prefs. Free enum strings — the
+    // client validates + maps unknown→default.
+    if let Some(ref v) = prefs.editor_content_width {
+        out.extend_from_slice(b"\"editor_content_width\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+    if let Some(ref v) = prefs.editor_font_family {
+        out.extend_from_slice(b"\"editor_font_family\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+
     // editor_layout (canonical key 'e' — after 'd', before 'f'/'n'/'s').
     // A nested object; omitted entirely when None so a vault that never
     // customized the sidebar layout stays byte-identical to a pre-MYND-137
@@ -661,6 +751,20 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b",\"right_width\":");
         push_json_uint(&mut out, layout.right_width);
         out.extend_from_slice(b"},");
+    }
+
+    // editor_line_spacing + editor_text_size (canonical key 'e', AFTER
+    // editor_layout: `editor_li`/`editor_t` > `editor_la`). Both before
+    // favorites (`e` < `f`). Omitted when None; free enum strings.
+    if let Some(ref v) = prefs.editor_line_spacing {
+        out.extend_from_slice(b"\"editor_line_spacing\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+    if let Some(ref v) = prefs.editor_text_size {
+        out.extend_from_slice(b"\"editor_text_size\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
     }
 
     // favorites (canonical key 'f' — after 'e', before 'i'/'s'). Order
@@ -762,6 +866,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     } else {
         b"false"
     });
+
+    // show_note_timestamps (canonical key 'sho…' — after
+    // screen_capture_protection [scr < sho], before spell_enabled [sho < spe]).
+    // OMIT-WHEN-DEFAULT, inverted polarity vs spell_enabled: the default is
+    // `true`, so ONLY the non-default `false` is emitted (prepending a comma like
+    // spell_enabled). A vault that never touched the toggle stays byte-identical
+    // to a pre-feature vault.prefs (preserves existing KAT vectors).
+    if !prefs.show_note_timestamps {
+        out.extend_from_slice(b",\"show_note_timestamps\":false");
+    }
 
     // spell_enabled (canonical key 'spell_e…' — after screen_capture_protection
     // [sc < sp], before spell_languages + theme). Prepends a comma like theme;
@@ -955,10 +1069,21 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let daily_template = parse_optional_string_field(rest, &mut cursor, b"\"daily_template\":")?;
     let deliberate_folders =
         parse_optional_array_field(rest, &mut cursor, b"\"deliberate_folders\":")?;
+    // editor-typography string presets (canonical key 'e'). content_width +
+    // font_family sort BEFORE editor_layout; line_spacing + text_size AFTER it.
+    // All parsed from the same monotonic cursor so canonical key order holds.
+    let editor_content_width =
+        parse_optional_string_field(rest, &mut cursor, b"\"editor_content_width\":")?;
+    let editor_font_family =
+        parse_optional_string_field(rest, &mut cursor, b"\"editor_font_family\":")?;
     // editor_layout (canonical key 'e') sits between deliberate_folders (d)
     // and favorites (f); parsed from the same monotonic cursor so a later
     // field's key marker is never matched inside the nested object.
     let editor_layout = parse_optional_editor_layout(rest, &mut cursor, b"\"editor_layout\":")?;
+    let editor_line_spacing =
+        parse_optional_string_field(rest, &mut cursor, b"\"editor_line_spacing\":")?;
+    let editor_text_size =
+        parse_optional_string_field(rest, &mut cursor, b"\"editor_text_size\":")?;
     let favorites = parse_optional_array_field(rest, &mut cursor, b"\"favorites\":")?;
     // folder_icons (key 'f') + item_colors (key 'i') — the decoration string
     // maps, sitting between favorites and item_order in canonical order. Parsed
@@ -1027,6 +1152,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // PlaintextParseFailed, matching deliberate_folders).
     let spell_enabled = parse_optional_bool_marker(after_key, b"\"spell_enabled\":");
     let spell_languages = parse_optional_array_marker(after_key, b"\"spell_languages\":")?;
+    // show_note_timestamps (key 'sho…' — between screen_capture_protection and
+    // spell_enabled, located by marker in the post-SCP region like spell_enabled).
+    // INVERTED default polarity: absent ≡ the default `true` (omit-when-default),
+    // and a tolerant unrecognized value also collapses to the default (like
+    // spell_enabled / theme — this field is non-load-bearing). Only a literal
+    // `false` on disk flips it.
+    let show_note_timestamps =
+        parse_optional_bool_marker(after_key, b"\"show_note_timestamps\":").unwrap_or(true);
     // view_order (key 'v' — LAST, after theme [t < v], MYND-273). A sequence
     // array located by marker in the post-screen_capture_protection region, like
     // theme/spell. Absent → empty; present-but-malformed → PlaintextParseFailed.
@@ -1034,6 +1167,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
 
     Ok(PrefsView {
         screen_capture_protection,
+        show_note_timestamps,
         folder_icons,
         hidden_bar_items,
         item_colors,
@@ -1045,6 +1179,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         favorites,
         item_order,
         editor_layout,
+        editor_content_width,
+        editor_font_family,
+        editor_line_spacing,
+        editor_text_size,
         theme,
         label,
         last_backup_at,
@@ -1630,6 +1768,7 @@ mod tests {
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -1642,6 +1781,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -1657,6 +1800,7 @@ mod tests {
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -1669,6 +1813,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -1807,6 +1955,7 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: true,
+                show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
@@ -1819,6 +1968,10 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_content_width: None,
+                editor_font_family: None,
+                editor_line_spacing: None,
+                editor_text_size: None,
                 label: None,
                 last_backup_at: None,
                 spell_enabled: None,
@@ -1836,6 +1989,7 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: false,
+                show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
@@ -1848,6 +2002,10 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_content_width: None,
+                editor_font_family: None,
+                editor_line_spacing: None,
+                editor_text_size: None,
                 label: None,
                 last_backup_at: None,
                 spell_enabled: None,
@@ -1976,6 +2134,53 @@ mod tests {
     }
 
     #[test]
+    fn encode_omits_typography_when_none_byte_identical_to_pre_feature() {
+        // A vault that never customized editor typography encodes byte-
+        // identically to the bare pre-feature form (migration-less additive
+        // fields — existing golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#,);
+    }
+
+    #[test]
+    fn encode_places_typography_around_editor_layout() {
+        // Canonical key order: editor_content_width < editor_font_family <
+        // editor_layout < editor_line_spacing < editor_text_size (< favorites).
+        let encoded = canonical_json_encode(&PrefsView {
+            editor_content_width: Some(alloc::string::String::from("wide")),
+            editor_font_family: Some(alloc::string::String::from("sans")),
+            editor_layout: Some(sample_layout()),
+            editor_line_spacing: Some(alloc::string::String::from("relaxed")),
+            editor_text_size: Some(alloc::string::String::from("lg")),
+            ..PrefsView::default()
+        });
+        let s = core::str::from_utf8(&encoded).unwrap();
+        let cw = s.find("editor_content_width").unwrap();
+        let ff = s.find("editor_font_family").unwrap();
+        let el = s.find("editor_layout").unwrap();
+        let ls = s.find("editor_line_spacing").unwrap();
+        let ts = s.find("editor_text_size").unwrap();
+        assert!(
+            cw < ff && ff < el && el < ls && ls < ts,
+            "canonical order: {s}"
+        );
+    }
+
+    #[test]
+    fn typography_round_trips_through_decode() {
+        let original = PrefsView {
+            editor_content_width: Some(alloc::string::String::from("narrow")),
+            editor_font_family: Some(alloc::string::String::from("sans")),
+            editor_line_spacing: Some(alloc::string::String::from("tight")),
+            editor_text_size: Some(alloc::string::String::from("xl")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
     fn label_is_nfc_normalized_on_encode() {
         // "é" as NFD (e + combining acute) normalizes to NFC single codepoint.
         let nfd = alloc::string::String::from("Cafe\u{0301}");
@@ -2068,6 +2273,7 @@ mod tests {
     fn encode_emits_theme_last_dark_with_scp_false() {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2085,6 +2291,7 @@ mod tests {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2102,6 +2309,10 @@ mod tests {
                 right_collapsed: true,
             }),
             theme: Some(ThemeChoice::Dark),
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2246,6 +2457,54 @@ mod tests {
         assert_eq!(decoded.spell_enabled, Some(false));
     }
 
+    // ---- show_note_timestamps (sidebar-note-timestamps) ----------------
+
+    #[test]
+    fn encode_omits_show_note_timestamps_when_default() {
+        // Default `true` is omit-when-default → a vault that never touched the
+        // toggle is byte-identical to a pre-feature vault.prefs (no key emitted).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert!(
+            find_subslice(&encoded, b"show_note_timestamps").is_none(),
+            "default prefs must not emit the show_note_timestamps key"
+        );
+    }
+
+    #[test]
+    fn encode_emits_show_note_timestamps_false_in_canonical_order() {
+        // The non-default `false` IS emitted, immediately after the mandatory
+        // screen_capture_protection value (scr < sho < spe).
+        let prefs = PrefsView {
+            show_note_timestamps: false,
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"screen_capture_protection":true,"show_note_timestamps":false}"#
+        );
+    }
+
+    #[test]
+    fn show_note_timestamps_false_round_trips() {
+        let original = PrefsView {
+            show_note_timestamps: false,
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert!(!decoded.show_note_timestamps);
+    }
+
+    #[test]
+    fn show_note_timestamps_absent_decodes_to_true() {
+        // The inverted-default proof: a pre-feature blob (no key) decodes to the
+        // default `true` (timestamps visible), NOT bool's `false`.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(decoded.show_note_timestamps);
+    }
+
     // ---- deliberate_folders canonical array (MYND-144) -----------------
 
     #[test]
@@ -2261,6 +2520,7 @@ mod tests {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2276,6 +2536,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2294,6 +2558,7 @@ mod tests {
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2310,6 +2575,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2330,6 +2599,7 @@ mod tests {
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2342,6 +2612,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2361,6 +2635,7 @@ mod tests {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2373,6 +2648,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2452,6 +2731,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2467,6 +2747,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2507,6 +2791,7 @@ mod tests {
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2526,6 +2811,10 @@ mod tests {
                 alloc::string::String::from("n2"),
             ],
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2547,6 +2836,7 @@ mod tests {
         // which does both). The duplicate "zzz" must survive verbatim.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2564,6 +2854,10 @@ mod tests {
                 alloc::string::String::from("zzz"),
             ],
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2616,6 +2910,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: alloc::vec![
                 alloc::string::String::from("graph"),
@@ -2637,6 +2932,10 @@ mod tests {
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
             ],
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2670,6 +2969,7 @@ mod tests {
         // (graph/word-count out of order + a duplicate collapse to a clean set).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: map_of(&[("Projects/", "book")]),
             hidden_bar_items: alloc::vec![
                 alloc::string::String::from("word-count"),
@@ -2686,6 +2986,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2723,6 +3027,7 @@ mod tests {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2735,6 +3040,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2754,6 +3063,7 @@ mod tests {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2766,6 +3076,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2787,6 +3101,7 @@ mod tests {
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2799,6 +3114,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2888,6 +3207,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2900,6 +3220,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -2963,6 +3287,7 @@ mod tests {
         // right_width.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -2975,6 +3300,10 @@ mod tests {
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             editor_layout: Some(sample_layout()),
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -3228,6 +3557,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -3240,6 +3570,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -3263,6 +3597,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -3275,6 +3610,10 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,
@@ -3559,6 +3898,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: true,
+                show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
@@ -3571,6 +3911,10 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_content_width: None,
+                editor_font_family: None,
+                editor_line_spacing: None,
+                editor_text_size: None,
                 label: None,
                 last_backup_at: None,
                 spell_enabled: None,
@@ -3587,6 +3931,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: false,
+                show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
@@ -3599,6 +3944,10 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_content_width: None,
+                editor_font_family: None,
+                editor_line_spacing: None,
+                editor_text_size: None,
                 label: None,
                 last_backup_at: None,
                 spell_enabled: None,
@@ -3617,6 +3966,7 @@ mod tests {
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
             screen_capture_protection: true,
+            show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
@@ -3644,6 +3994,10 @@ mod tests {
                 left_collapsed: false,
                 right_collapsed: true,
             }),
+            editor_content_width: None,
+            editor_font_family: None,
+            editor_line_spacing: None,
+            editor_text_size: None,
             label: None,
             last_backup_at: None,
             spell_enabled: None,

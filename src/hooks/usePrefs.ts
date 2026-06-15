@@ -24,6 +24,10 @@ import {
   PrefsView,
   prefsRead,
   setAutoLockTimeout,
+  setEditorContentWidth,
+  setEditorFontFamily,
+  setEditorLineSpacing,
+  setEditorTextSize,
   setHiddenBarItems as persistHiddenBarItems,
   setScreenCaptureProtection,
 } from "../lib/prefs";
@@ -36,6 +40,7 @@ import { subscribePrefsNonce } from "../notes/prefsNonce";
  */
 const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
+  show_note_timestamps: true,
   deliberate_folders: [],
   auto_lock_seconds: null,
   daily_date_format: null,
@@ -44,6 +49,10 @@ const DEFAULT_PREFS: PrefsView = {
   favorites: [],
   item_order: [],
   editor_layout: null,
+  editor_content_width: null,
+  editor_font_family: null,
+  editor_line_spacing: null,
+  editor_text_size: null,
   theme: null,
   folder_icons: {},
   hidden_bar_items: [],
@@ -81,6 +90,16 @@ interface UsePrefsResult {
    * {@link setAutoLock}.
    */
   setHiddenBarItems: (items: string[]) => Promise<void>;
+  /**
+   * Editor-typography preset setters (editor-typography). Each takes the chosen
+   * preset string, or `null` to clear back to that field's canonical default.
+   * Optimistic (cache updates immediately so the open editor re-renders live)
+   * with the same disk-re-read-on-error convergence as {@link setAutoLock}.
+   */
+  setEditorTextSize: (value: string | null) => Promise<void>;
+  setEditorLineSpacing: (value: string | null) => Promise<void>;
+  setEditorContentWidth: (value: string | null) => Promise<void>;
+  setEditorFontFamily: (value: string | null) => Promise<void>;
   /**
    * Re-read `vault.prefs` from disk into the cache (MYND-274). Used after a
    * mutation made through a SIBLING surface (e.g. a saved-view create/delete
@@ -192,6 +211,50 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // Shared optimistic-then-reread-on-error core for the editor-typography
+  // setters: patch the cache immediately (so the open editor re-renders live),
+  // persist, and on failure re-read disk truth — same convergence discipline as
+  // the spelled-out setters above, factored out for the four near-identical
+  // typography fields.
+  const writeTypographyPref = useCallback(
+    async (patch: Partial<PrefsView>, persist: () => Promise<void>) => {
+      setPrefs((p) => ({ ...p, ...patch }));
+      try {
+        await persist();
+      } catch {
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed — keep the optimistic value; backend tracing
+          // logged the original failure. User can retry.
+        }
+        onError?.("Couldn't save preference — try again");
+      }
+    },
+    [onError],
+  );
+
+  const setEditorTextSizePref = useCallback(
+    (value: string | null) =>
+      writeTypographyPref({ editor_text_size: value }, () => setEditorTextSize(value)),
+    [writeTypographyPref],
+  );
+  const setEditorLineSpacingPref = useCallback(
+    (value: string | null) =>
+      writeTypographyPref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
+    [writeTypographyPref],
+  );
+  const setEditorContentWidthPref = useCallback(
+    (value: string | null) =>
+      writeTypographyPref({ editor_content_width: value }, () => setEditorContentWidth(value)),
+    [writeTypographyPref],
+  );
+  const setEditorFontFamilyPref = useCallback(
+    (value: string | null) =>
+      writeTypographyPref({ editor_font_family: value }, () => setEditorFontFamily(value)),
+    [writeTypographyPref],
+  );
+
   const reload = useCallback(async () => {
     try {
       const view = await prefsRead();
@@ -208,5 +271,15 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   // a remount. Coalesced onto a microtask by the store (no render thrash).
   useEffect(() => subscribePrefsNonce(() => void reload()), [reload]);
 
-  return { prefs, toggleScreenCapture, setAutoLock, setHiddenBarItems, reload };
+  return {
+    prefs,
+    toggleScreenCapture,
+    setAutoLock,
+    setHiddenBarItems,
+    setEditorTextSize: setEditorTextSizePref,
+    setEditorLineSpacing: setEditorLineSpacingPref,
+    setEditorContentWidth: setEditorContentWidthPref,
+    setEditorFontFamily: setEditorFontFamilyPref,
+    reload,
+  };
 }
