@@ -24,6 +24,7 @@ import { useSelectedNote, type NoteId } from "../sidebarState";
 import { useResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
 import { useWorkspace } from "../workspaceContext";
+import { usePrefs } from "../../hooks/usePrefs";
 import { useAutosave, type SaveStatus } from "../useAutosave";
 import { countBodyWords } from "../wordCount";
 import {
@@ -34,9 +35,14 @@ import {
 } from "../workspaceState";
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
+import { GraphPane } from "./GraphView";
 import { TabStrip, STRIP_HEIGHT } from "./TabStrip";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
+import { resolveCoverAttachmentId } from "../views/cardsView";
+import { setNoteCover } from "../setNoteCover";
+import { upsertSavedView } from "../../lib/prefs";
+import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
@@ -127,6 +133,7 @@ export function PaneView({
 }: PaneViewProps) {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
+  const { prefs } = usePrefs();
   // This pane is the note-editor host: it tracks only a NOTE active tab. A
   // view-kind active tab (MYND-274) maps to `null` here (no note body) until
   // the dedicated view host lands in #4 task 2; view tabs cannot yet be opened.
@@ -136,6 +143,9 @@ export function PaneView({
   // note editor; `activeViewId` is non-null exactly then.
   const activeViewId: string | null =
     leaf.activeTab?.kind === "view" ? leaf.activeTab.id : null;
+  // A graph-kind active tab renders the whole-vault graph pane (MYND-198) in
+  // place of the note editor — a first-class tab, no longer a modal carve-out.
+  const isGraph = leaf.activeTab?.kind === "graph";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). Re-feed a fresh reference on
   // every SYNC-5 index-change nonce so a note created/renamed/loaded elsewhere
@@ -384,6 +394,9 @@ export function PaneView({
     if (activeViewId !== null) {
       return <ViewHost viewId={activeViewId} />;
     }
+    if (isGraph) {
+      return <GraphPane />;
+    }
     if (loading) {
       return <PaneLoading />;
     }
@@ -409,6 +422,7 @@ export function PaneView({
   }, [
     inNewTabState,
     activeViewId,
+    isGraph,
     onPickNote,
     onCreateNote,
     clearPending,
@@ -452,14 +466,22 @@ export function PaneView({
         }
         titleOf={(key) => {
           const it = parseItemKey(key);
-          // View names land with #3's saved-views list; the stub labels by id.
-          return it.kind === "note"
-            ? (ctx.cache.get(it.id)?.title ?? null)
-            : it.id;
+          if (it.kind === "note") return ctx.cache.get(it.id)?.title ?? null;
+          // Graph tab: the whole-vault graph is a singleton with a fixed label.
+          if (it.kind === "graph") return "Graph";
+          // View tab: label by the saved view's name (MYND-274), not its raw id.
+          // A blank name shows "Untitled view" (the sidebar's label rule); an
+          // unknown id (a stale tab for a deleted view) falls back to null.
+          const view = prefs.saved_views.find((v) => v.id === it.id);
+          if (view === undefined) return null;
+          return view.name.trim() === "" ? "Untitled view" : view.name;
         }}
-        iconOf={(key) =>
-          parseItemKey(key).kind === "view" ? "layout-grid" : "file-text"
-        }
+        iconOf={(key) => {
+          const kind = parseItemKey(key).kind;
+          if (kind === "view") return "layout-grid";
+          if (kind === "graph") return "share-2";
+          return "file-text";
+        }}
         activeDirty={
           status.status === "editing" ||
           status.status === "saving" ||
@@ -574,6 +596,49 @@ function ViewHost({ viewId }: { viewId: string }) {
       setCardMenu({ noteId, x: pos.x, y: pos.y }),
     [],
   );
+  // Cover-image picker (Saved Views follow-on): a card's "Set cover" affordance
+  // opens this picker for that note; the choice is written to the note's cover
+  // frontmatter property. The property NAME is the view's `image` setting,
+  // defaulting to `cover` on first use (and recorded onto the view so the cards
+  // render reads it back).
+  const [coverNoteId, setCoverNoteId] = useState<string | null>(null);
+  const onSetCover = useCallback((noteId: string) => setCoverNoteId(noteId), []);
+  const coverPropertyKey = def?.image ?? "cover";
+  // Whether the picker's target note already has a resolvable cover (enables the
+  // picker's "Remove cover" action). Scans the open view's result for that row.
+  const coverTargetHasCover = useMemo(() => {
+    if (coverNoteId === null || def?.image === undefined || result === null) {
+      return false;
+    }
+    for (const group of result.groups) {
+      for (const r of group.rows) {
+        if (r.noteId === coverNoteId) {
+          return resolveCoverAttachmentId(r.values[def.image]) !== null;
+        }
+      }
+    }
+    return false;
+  }, [coverNoteId, def, result]);
+  const applyCover = useCallback(
+    (choice: CoverChoice | null) => {
+      const noteId = coverNoteId;
+      setCoverNoteId(null);
+      if (noteId === null) return;
+      void (async () => {
+        try {
+          await setNoteCover(noteId, coverPropertyKey, choice);
+          // First cover on a view with no image property → adopt `cover` as the
+          // view's cover property so the card render picks it up.
+          if (choice !== null && def !== null && def.image === undefined) {
+            await upsertSavedView({ ...def, image: coverPropertyKey });
+          }
+        } catch {
+          /* surfaced via backend tracing */
+        }
+      })();
+    },
+    [coverNoteId, coverPropertyKey, def],
+  );
   // The non-mutating card context menu (task 8) — the CLOSED four-item set
   // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy
   // link. NO delete / move / trash / rename (a saved view is a read-only
@@ -601,6 +666,7 @@ function ViewHost({ viewId }: { viewId: string }) {
           result={result}
           onOpenNote={onOpenNote}
           onCardContextMenu={onCardContextMenu}
+          onSetCover={onSetCover}
         />
       ) : (
         <div
@@ -623,6 +689,13 @@ function ViewHost({ viewId }: { viewId: string }) {
           onClose={() => setCardMenu(null)}
         />
       )}
+      <CoverPicker
+        open={coverNoteId !== null}
+        hasCover={coverTargetHasCover}
+        onClose={() => setCoverNoteId(null)}
+        onPick={(choice) => applyCover(choice)}
+        onRemove={() => applyCover(null)}
+      />
     </div>
   );
 }

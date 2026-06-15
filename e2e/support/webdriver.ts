@@ -133,6 +133,30 @@ export class Element {
     });
   }
 
+  /** Move the pointer over this element (no buttons) via the W3C Actions API —
+   *  synthesizes `pointermove`/`mouseenter`, driving hover-gated affordances
+   *  (e.g. a card's "Set cover" button shown only on hover). */
+  async hover(): Promise<void> {
+    await this.session.send("POST", "/actions", {
+      actions: [
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: { [ELEMENT_KEY]: this.elementId },
+              x: 0,
+              y: 0,
+            },
+          ],
+        },
+      ],
+    });
+  }
+
   /** Click while holding ONE modifier key, via the W3C Actions API with
    *  the key + pointer input sources run in lockstep (the modifier is DOWN
    *  across the pointer move/down/up ticks, then released). Drives the

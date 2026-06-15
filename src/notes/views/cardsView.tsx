@@ -31,6 +31,7 @@ import {
 } from "../attachmentRef";
 import { PropertyValue, hasDisplayableValue } from "./propertyFormat";
 import { VirtualList } from "../components/VirtualList";
+import { Icon } from "../../components/primitives/Icon";
 
 /** Exact empty-state copy from the design canon ("Cards view — render" frame).
  *  The single literal so an E2E full-text assertion has one source. */
@@ -66,10 +67,12 @@ export function resolveCoverAttachmentId(
 const NO_VALUE_LABEL = "No value";
 
 /** Default card column width (px) when the view sets no `card_size`. */
-const DEFAULT_CARD_WIDTH = 220;
-/** Sane clamp so a hand-edited `card_size` can't break the gallery layout. */
-const MIN_CARD_WIDTH = 120;
-const MAX_CARD_WIDTH = 600;
+export const DEFAULT_CARD_WIDTH = 220;
+/** Sane clamp so a hand-edited `card_size` can't break the gallery layout.
+ *  Exported so the view-settings UI drives its slider from the same canon
+ *  `resolveCardWidth` clamps against (no drift between control and render). */
+export const MIN_CARD_WIDTH = 120;
+export const MAX_CARD_WIDTH = 600;
 /** Default cover aspect ratio (≈16:9) when the view sets no
  *  `image_aspect_ratio`. */
 const DEFAULT_ASPECT_RATIO = "1.78";
@@ -297,16 +300,122 @@ export type CardContextMenuHandler = (
   pos: { x: number; y: number },
 ) => void;
 
+/** Set (or change) a card's cover image — the host opens the cover picker for
+ *  `noteId`. Absent → no cover affordance is rendered (read-only host). */
+export type SetCoverHandler = (noteId: string) => void;
+
+const COVER_BUTTON_STYLE: CSSProperties = {
+  position: "absolute",
+  top: "var(--space-2)",
+  right: "var(--space-2)",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  padding: "3px 8px",
+  fontFamily: "var(--font-sans)",
+  fontSize: 11,
+  color: "var(--fg-1)",
+  background: "var(--bg-1)",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-1)",
+  boxShadow: "var(--shadow-1, 0 1px 4px rgba(0,0,0,0.15))",
+  cursor: "pointer",
+  zIndex: 1,
+};
+
+/**
+ * One card. Extracted as a component (not an inline render fn) so each card owns
+ * its hover state for the "Set cover" affordance — shown on hover when the host
+ * passes `onSetCover` (the affordance's click stops propagation so it never opens
+ * the note). Read-only hosts pass no handler → no affordance, no hover cost.
+ */
+function CardArticle({
+  row,
+  coverId,
+  interactive,
+  imageStyle,
+  columns,
+  onClick,
+  onAuxClick,
+  onContextMenu,
+  onSetCover,
+}: {
+  row: ViewRow;
+  coverId: string | null;
+  interactive: boolean;
+  imageStyle: CSSProperties;
+  columns: readonly string[];
+  onClick?: (e: ReactMouseEvent) => void;
+  onAuxClick?: (e: ReactMouseEvent) => void;
+  onContextMenu?: (e: ReactMouseEvent) => void;
+  onSetCover?: SetCoverHandler;
+}) {
+  const [hovering, setHovering] = useState(false);
+  const showCoverButton = onSetCover !== undefined && hovering;
+  const baseStyle = interactive ? CARD_INTERACTIVE_STYLE : CARD_STYLE;
+
+  return (
+    <article
+      data-testid="view.card"
+      data-note-id={row.noteId}
+      style={onSetCover !== undefined ? { ...baseStyle, position: "relative" } : baseStyle}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? -1 : undefined}
+      onClick={onClick}
+      onAuxClick={onAuxClick}
+      onContextMenu={onContextMenu}
+      onMouseEnter={onSetCover !== undefined ? () => setHovering(true) : undefined}
+      onMouseLeave={onSetCover !== undefined ? () => setHovering(false) : undefined}
+    >
+      {showCoverButton && (
+        <button
+          type="button"
+          data-testid="view.card-set-cover"
+          style={COVER_BUTTON_STYLE}
+          title={coverId !== null ? "Change cover image" : "Set cover image"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetCover?.(row.noteId);
+          }}
+        >
+          <Icon name="image" size={12} />
+          {coverId !== null ? "Change cover" : "Set cover"}
+        </button>
+      )}
+      {coverId !== null && (
+        <img
+          data-testid="view.card-image"
+          src={attachmentUrl(coverId)}
+          alt=""
+          style={imageStyle}
+        />
+      )}
+      <div style={CARD_TITLE_STYLE}>{row.title ?? UNTITLED_LABEL}</div>
+      {columns.map((col) => {
+        const prop = row.values[col];
+        if (!hasDisplayableValue(prop)) return null; // skip empty
+        return (
+          <div key={col} style={CARD_PROP_STYLE}>
+            <PropertyValue prop={prop} />
+          </div>
+        );
+      })}
+    </article>
+  );
+}
+
 export function CardsView({
   def,
   result,
   onOpenNote,
   onCardContextMenu,
+  onSetCover,
 }: {
   def: SavedView;
   result: ViewResult;
   onOpenNote?: OpenNoteHandler;
   onCardContextMenu?: CardContextMenuHandler;
+  onSetCover?: SetCoverHandler;
 }) {
   // Card navigation (task 7) — mirrors the NoteRow click matrix exactly. The
   // render stays read-only (no edit affordance); these only OPEN the note.
@@ -409,38 +518,20 @@ export function CardsView({
         ? resolveCoverAttachmentId(row.values[def.image])
         : null;
     return (
-      <article
+      <CardArticle
         key={row.noteId}
-        data-testid="view.card"
-        data-note-id={row.noteId}
-        style={onOpenNote ? CARD_INTERACTIVE_STYLE : CARD_STYLE}
-        role={onOpenNote ? "button" : undefined}
-        tabIndex={onOpenNote ? -1 : undefined}
+        row={row}
+        coverId={coverId}
+        interactive={onOpenNote !== undefined}
+        imageStyle={imageStyle}
+        columns={columns}
         onClick={onOpenNote ? handleCardClick(row.noteId) : undefined}
         onAuxClick={onOpenNote ? handleCardAux(row.noteId) : undefined}
         onContextMenu={
           onCardContextMenu ? handleCardContextMenu(row.noteId) : undefined
         }
-      >
-        {coverId !== null && (
-          <img
-            data-testid="view.card-image"
-            src={attachmentUrl(coverId)}
-            alt=""
-            style={imageStyle}
-          />
-        )}
-        <div style={CARD_TITLE_STYLE}>{row.title ?? UNTITLED_LABEL}</div>
-        {columns.map((col) => {
-          const prop = row.values[col];
-          if (!hasDisplayableValue(prop)) return null; // skip empty
-          return (
-            <div key={col} style={CARD_PROP_STYLE}>
-              <PropertyValue prop={prop} />
-            </div>
-          );
-        })}
-      </article>
+        onSetCover={onSetCover}
+      />
     );
   };
 
