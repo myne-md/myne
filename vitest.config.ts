@@ -15,5 +15,22 @@ export default defineConfig({
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     environment: "node",
     globals: false,
+    // Coverage targets the application code under `src/`; the `tests/`
+    // unit suite is what drives the measurement. E2E + capture configs
+    // live elsewhere and are not part of this report. `all: true` reports
+    // untested `src/` files as 0% so the denominator is honest.
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.d.ts",
+        "src/**/__mocks__/**",
+        "src/main.tsx",
+        "src/vite-env.d.ts",
+      ],
+      all: true,
+    },
   },
 });
