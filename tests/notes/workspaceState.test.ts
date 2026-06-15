@@ -15,6 +15,8 @@ import {
   findItemPane,
   findLeaf,
   focusedLeaf,
+  GRAPH_TAB_ID,
+  graphItem,
   itemKey,
   type LeafPane,
   moveTab,
@@ -22,6 +24,7 @@ import {
   openInFocusedTab,
   openInNewTab,
   openToSide,
+  parseItemKey,
   reveal,
   setActiveTab,
   setFocusedPane,
@@ -466,6 +469,47 @@ describe("heterogeneous note|view items", () => {
     ws = moveTab(ws, "root", "root", v("v1"), 0); // reorder the view to the front
     expect(focusedLeaf(ws).tabs).toEqual([v("v1"), n("a")]);
     ws = closeTab(ws, "root", v("v1"));
+    expect(focusedLeaf(ws).tabs).toEqual([n("a")]);
+    assertNoDuplicates(ws);
+  });
+});
+
+describe("graph tab (MYND-198 — whole-vault graph as a tab)", () => {
+  it("graphItem / itemKey / parseItemKey round-trip", () => {
+    const g = graphItem();
+    expect(g).toEqual({ kind: "graph", id: GRAPH_TAB_ID });
+    expect(itemKey(g)).toBe(`graph:${GRAPH_TAB_ID}`);
+    expect(parseItemKey(itemKey(g))).toEqual(g);
+  });
+
+  it("opens as a first-class tab alongside notes and views", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = openInNewTab(ws, graphItem()); // [note:a, graph]
+    expect(focusedLeaf(ws).tabs).toEqual([n("a"), graphItem()]);
+    expect(activeItem(ws)).toEqual(graphItem());
+    expect(findItemPane(ws, graphItem())).toBe("root");
+    assertNoDuplicates(ws);
+  });
+
+  it("is a singleton — re-opening the graph reveals the existing tab", () => {
+    const id = counter();
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, graphItem()); // root: [graph]
+    ws = openToSide(ws, n("a"), id); // p1: [note:a], focused
+    expect(ws.focusedPaneId).not.toBe("root");
+    ws = openInFocusedTab(ws, graphItem()); // already open in root → reveal
+    expect(ws.focusedPaneId).toBe("root");
+    expect(activeItem(ws)).toEqual(graphItem());
+    expect(collectLeaves(ws.root)).toHaveLength(2); // no 2nd graph, no new pane
+    assertNoDuplicates(ws);
+  });
+
+  it("closes like any other tab", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = openInNewTab(ws, graphItem());
+    ws = closeTab(ws, "root", graphItem());
     expect(focusedLeaf(ws).tabs).toEqual([n("a")]);
     assertNoDuplicates(ws);
   });

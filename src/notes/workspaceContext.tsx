@@ -34,6 +34,7 @@ import {
   dropItemOnPane as dropItemOnPaneOp,
   emptyWorkspace,
   focusedLeaf,
+  graphItem,
   noteItem,
   openInFocusedTab,
   openInNewTab,
@@ -133,6 +134,10 @@ export type WorkspaceApi = {
   /** Open a saved view as a tab in the focused pane (reuse-active-slot, like
    *  `openInFocused`); reveal if already open. */
   openView: (viewId: ViewId) => void;
+  /** Open the whole-vault graph as a tab in the focused pane (reuse-active-slot,
+   *  like `openInFocused`). The graph is a singleton, so re-opening it reveals
+   *  the existing tab (global duplicate-forbid) instead of making a second. */
+  openGraph: () => void;
   /** Activate any tab item (note or view) within a pane. */
   activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
   /** Close any tab item (note or view) within a pane. */
@@ -274,6 +279,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [setPending],
   );
+  const openGraph = useCallback(() => {
+    const wasPending = pendingRef.current;
+    setPending(null);
+    setState((s) =>
+      wasPending !== null && wasPending === s.focusedPaneId
+        ? openInNewTab(s, graphItem())
+        : openInFocusedTab(s, graphItem()),
+    );
+  }, [setPending]);
   const activateItemInPane = useCallback(
     (paneId: PaneId, item: WorkspaceItem) => {
       setPending(null);
@@ -419,6 +433,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       dropNoteOnPane,
       splitPaneWithNote,
       openView,
+      openGraph,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,
@@ -450,6 +465,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       dropNoteOnPane,
       splitPaneWithNote,
       openView,
+      openGraph,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,

@@ -279,3 +279,46 @@ describe("useWorkspace — saved-view (item) tabs (MYND-274)", () => {
     expect(f).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("useWorkspace — graph tab (MYND-198)", () => {
+  it("openGraph reuses the active slot in the focused pane", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openGraph()); // into the empty focused pane
+    expect(result.current.focusedLeaf.tabs).toEqual([{ kind: "graph", id: "graph" }]);
+    expect(result.current.focusedLeaf.activeTab).toEqual({ kind: "graph", id: "graph" });
+  });
+
+  it("openGraph appends into a pending new tab instead of reusing", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openInFocused("A")); // [note A]
+    const pane = result.current.focusedPaneId;
+    act(() => result.current.beginNewTab(pane)); // pending "new tab"
+    act(() => result.current.openGraph()); // appends, does NOT replace note A
+    expect(result.current.focusedLeaf.tabs).toEqual([
+      { kind: "note", id: "A" },
+      { kind: "graph", id: "graph" },
+    ]);
+  });
+
+  it("openGraph is a singleton — reveals the existing graph tab", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openGraph()); // root: [graph]
+    act(() => result.current.openToSide("A")); // side pane focused
+    expect(result.current.leaves).toHaveLength(2);
+    act(() => result.current.openGraph()); // already open → reveal, no 2nd tab
+    const graphs = result.current.leaves
+      .flatMap((l) => l.tabs)
+      .filter((t) => t.kind === "graph");
+    expect(graphs).toHaveLength(1);
+    expect(result.current.focusedLeaf.activeTab).toEqual({ kind: "graph", id: "graph" });
+  });
+
+  it("closeItemInPane closes the graph tab via the strip", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openGraph());
+    act(() => result.current.openNewTabInFocused("n1")); // [graph, note n1]
+    const pane = result.current.focusedPaneId;
+    act(() => result.current.closeItemInPane(pane, { kind: "graph", id: "graph" }));
+    expect(result.current.focusedLeaf.tabs).toEqual([{ kind: "note", id: "n1" }]);
+  });
+});
