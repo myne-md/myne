@@ -105,7 +105,9 @@ describeE2E("attachment cleanup (MYND-171)", () => {
         // ---- confirm the erase, wait for the summary ----
         await (await s.byTestId("clean-unused.confirm")).click();
         const summary = await s.byTestId("clean-unused.summary");
-        expect(await summary.getText()).toContain("Removed 1");
+        // `textContent()` (not the nonexistent `getText`, and not `text()` which
+        // drops nested-child copy in this driver) — the summary nests its count.
+        expect(await summary.textContent()).toContain("Removed 1");
         await (await s.byTestId("clean-unused.close")).click();
         await s.waitForGone(testIdSelector("clean-unused.summary"));
 
