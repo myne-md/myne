@@ -162,7 +162,7 @@ describeE2E("SP-3 add-to-dictionary clears the squiggle (MYND-265/266)", () => {
 
 describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  // Drives the REAL Settings → Appearance spell controls: the enable toggle
+  // Drives the REAL Settings → Editor spell controls: the enable toggle
   // gates the squiggle layer live AND across a WebView reload (the `spell_enabled`
   // pref rides MYP1, re-read on editor entry — the prefs.e2e.ts theme template),
   // and the language picker reads back the persisted active set.
@@ -185,10 +185,10 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
         // Default-on (SYNC-15): the squiggle is present out of the box.
         await squiggleFor(s, WORD);
 
-        // Settings → Appearance → toggle spell-check OFF. The control
+        // Settings → Editor → toggle spell-check OFF. The control
         // live-updates the open editor (setSpellConfig window event), so the
         // squiggle clears without a reload.
-        await openSettings(s, "appearance");
+        await openSettings(s, "editor");
         const toggle = await s.byTestId("settings.spell-check");
         if ((await toggle.attribute("aria-checked")) !== "true") {
           throw new Error("spell toggle did not start On (default-on, SYNC-15)");
@@ -204,7 +204,7 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
         await squiggleGoneFor(s, WORD);
 
         // The toggle itself reads back Off (mount effect reads the pref).
-        await openSettings(s, "appearance");
+        await openSettings(s, "editor");
         await s.waitUntil(
           async () =>
             (await (await s.byTestId("settings.spell-check")).attribute("aria-checked")) ===
@@ -215,15 +215,17 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
         // Toggle back ON → the squiggle layer remounts and re-flags WORD.
         await (await s.byTestId("settings.spell-check")).click(); // → On
 
-        // The language picker (enabled again) reads back the active set: the
-        // bundled en-US row is present and checked (v1 bundles en-US only;
-        // single-language so the unchecked-persist edge isn't exercised).
-        const enUsCheckbox = await s.waitForElement(
-          '[data-testid="settings.spell-language-select"] label[data-lang="en-US"] input',
+        // The language control (enabled again) reads back the active set: it is
+        // now a searchable multi-select dropdown whose trigger summarises the
+        // selected languages by label, so the persisted en-US shows as
+        // "English (US)" without opening the menu (v1 default = en-US only).
+        await s.waitUntil(
+          async () =>
+            (
+              await (await s.byTestId("settings.spell-language-select")).textContent()
+            ).includes("English (US)") || null,
+          { label: "en-US language reads back as active" },
         );
-        await s.waitUntil(async () => (await enUsCheckbox.property<boolean>("checked")) || null, {
-          label: "en-US language reads back as active",
-        });
         await closeSettings(s);
         await squiggleFor(s, WORD);
 

@@ -49,12 +49,13 @@ src/
 │   ├── PasswordCreateForm.tsx  ← 2-input form (new + confirm) used by vault-creation + vault-recover (renamed from PasswordForm.tsx)
 │   ├── PasswordInput.tsx       ← single-field primitive: Input + eye toggle + optional zxcvbn meter slot; exports MIN_PASSWORD_LEN/MIN_ZXCVBN_SCORE + usePasswordStrength hook
 │   ├── PasswordStrength.tsx
-│   ├── SettingsModal.tsx       ← Settings shell modal (5-panel rail; carve-out per decisions.md 2026-05-08)
+│   ├── SettingsModal.tsx       ← Settings shell modal (6-panel rail; carve-out per decisions.md 2026-05-08, taxonomy superseded — Editor panel added)
 │   ├── TemplatesManager.tsx    ← Note-template management modal (MYND-189; modal carve-out, opened by the "Manage templates…" palette action)
 │   ├── settings/               ← per-panel content components rendered by SettingsModal
 │   │   ├── AboutPanel.tsx
 │   │   ├── AccountPanel.tsx
-│   │   ├── AppearancePanel.tsx
+│   │   ├── AppearancePanel.tsx  ← purely-visual controls (theme / custom theme)
+│   │   ├── EditorPanel.tsx      ← note-authoring behaviour (spell-check + daily-notes); composes SpellSettings + DailyNotesSettings
 │   │   ├── PrivacyPanel.tsx
 │   │   └── StoragePanel.tsx
 │   ├── Spinner.tsx
@@ -126,7 +127,7 @@ The `unlock` variant carries an optional `suspicionReason` payload — `"vault-m
 
 The Settings UI is **not** a Stage variant. It mounts as a modal overlay inside `Editor.tsx` driven by Editor-local React state (`settingsOpen` boolean), per the desktop modal carve-out in `design-notes.md` 2026-05-08. Entry points: gear button in BottomBar's right cluster + `Cmd+,` / `Ctrl+,` keyboard shortcut. Both toggle `settingsOpen`; `<SettingsModal open onClose>` only renders when true.
 
-`SettingsModal.tsx` owns the 5-panel rail (Account → Privacy → Appearance → Storage → About — fixed taxonomy locked by `decisions.md` 2026-05-08). Panel content components live in `src/components/settings/`. Rail navigation: ↑/↓ arrows cycle (with focus management via per-panel refs); click sets selection. Default panel: Account.
+`SettingsModal.tsx` owns the 6-panel rail (Account → Privacy → Editor → Appearance → Storage → About). The taxonomy was first locked at 5 panels by `decisions.md` 2026-05-08; the **Editor** panel was added by a superseding `decisions.md` entry, which also scoped Appearance down to purely-visual controls (spell-check + daily-notes moved from Appearance to Editor — they are note-authoring behaviour, not appearance). Panel content components live in `src/components/settings/`; the Editor panel (`EditorPanel.tsx`) is a thin composition of `SpellSettings` + `DailyNotesSettings`. Rail navigation: ↑/↓ arrows cycle (with focus management via per-panel refs); click sets selection. Default panel: Account.
 
 **In-flight gating (Q9 of the grill):** Settings's only Argon2id-bound IPC today is `vault_change_password`. During the ~1-3s window, AccountPanel calls `onInFlightChange(true)` which gates the parent's Esc / backdrop / × dismissal handlers (the user must wait for the backend response). The Editor's BottomBar Lock button stays enabled — firing `vault_lock` during in-flight is the canonical graceful-cancel path; backend returns `VaultLockedDuringChange` which routes through `setStageWithSuspicion()` → Unlock screen with informational `SuspicionBanner`.
 

@@ -29,12 +29,23 @@ import { Icon } from "./primitives/Icon";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import { AppearancePanel } from "./settings/AppearancePanel";
+import { EditorPanel } from "./settings/EditorPanel";
 import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 
-/** Five-panel taxonomy locked by `decisions.md` 2026-05-08. */
-type PanelId = "account" | "privacy" | "appearance" | "storage" | "about";
+/**
+ * Six-panel taxonomy. The Editor panel was added (and Appearance scoped down
+ * to purely-visual controls) by the `decisions.md` entry superseding the
+ * 2026-05-08 5-panel lock.
+ */
+type PanelId =
+  | "account"
+  | "privacy"
+  | "editor"
+  | "appearance"
+  | "storage"
+  | "about";
 
 interface PanelMeta {
   id: PanelId;
@@ -44,6 +55,7 @@ interface PanelMeta {
 const PANELS: readonly PanelMeta[] = [
   { id: "account", label: "Account" },
   { id: "privacy", label: "Privacy" },
+  { id: "editor", label: "Editor" },
   { id: "appearance", label: "Appearance" },
   { id: "storage", label: "Storage" },
   { id: "about", label: "About" },
@@ -216,6 +228,7 @@ export function SettingsModal({
   const itemRefs = useRef<Record<PanelId, HTMLButtonElement | null>>({
     account: null,
     privacy: null,
+    editor: null,
     appearance: null,
     storage: null,
     about: null,
@@ -283,6 +296,7 @@ export function SettingsModal({
       />
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
+    editor: <EditorPanel />,
     appearance: <AppearancePanel />,
     storage: (
       <StoragePanel

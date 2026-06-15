@@ -6,13 +6,16 @@
 // empty. The daily-template designation is a `vault.prefs` pointer the user
 // controls — distinct from the template document itself.
 //
-// Placement: rendered inside the Appearance panel (the taxonomy is locked to 5
-// panels; daily-notes config is preferences-adjacent). Disk-first + no in-flight
-// gating, matching the theme control alongside it.
+// Placement: rendered inside the Editor panel (`EditorPanel.tsx`) — note-
+// authoring behaviour, not visual appearance. Moved out of Appearance by the
+// `design-notes.md` taxonomy entry superseding the 2026-05-08 5-panel lock.
+// Disk-first + no in-flight gating, matching the other Editor-panel controls.
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { ControlBlock } from "./ControlBlock";
 import { Input } from "../primitives/Input";
+import { SearchableSelect } from "../primitives/SearchableSelect";
+import type { SelectOption } from "../primitives/Select";
 import {
   prefsRead,
   setDailyDateFormat,
@@ -25,17 +28,9 @@ import {
   DEFAULT_DAILY_FOLDER,
 } from "../../notes";
 
-const SELECT_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "8px 10px",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  alignSelf: "flex-start",
-  minWidth: 220,
-};
+// The "blank" sentinel option value — distinct from any note UUID; maps to a
+// null `daily_template` pref (an empty note titled with the date).
+const BLANK_TEMPLATE = "";
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -102,7 +97,7 @@ export function DailyNotesSettings() {
   }
 
   async function chooseTemplate(value: string) {
-    const next = value === "" ? null : value;
+    const next = value === BLANK_TEMPLATE ? null : value;
     setError(null);
     setTemplateId(next);
     try {
@@ -111,6 +106,11 @@ export function DailyNotesSettings() {
       setError("Couldn't save the daily template. Please try again.");
     }
   }
+
+  const templateOptions: SelectOption<string>[] = [
+    { value: BLANK_TEMPLATE, label: "Blank (no template)" },
+    ...templates.map((rec) => ({ value: rec.noteUuid, label: templateName(rec) })),
+  ];
 
   return (
     <>
@@ -146,19 +146,15 @@ export function DailyNotesSettings() {
         helper="Pick a template to start each daily note from, or leave blank for an empty note titled with the date."
         control={
           <div>
-            <select
-              value={templateId ?? ""}
-              onChange={(e) => void chooseTemplate(e.target.value)}
-              style={SELECT_STYLE}
+            <SearchableSelect
+              options={templateOptions}
+              selected={[templateId ?? BLANK_TEMPLATE]}
+              onChange={(next) => void chooseTemplate(next[0] ?? BLANK_TEMPLATE)}
               aria-label="Daily note template"
-            >
-              <option value="">Blank (no template)</option>
-              {templates.map((rec) => (
-                <option key={rec.noteUuid} value={rec.noteUuid}>
-                  {templateName(rec)}
-                </option>
-              ))}
-            </select>
+              testId="settings.daily-template-select"
+              searchPlaceholder="Search templates…"
+              emptyText="No templates match."
+            />
             {error && (
               <p role="alert" style={ERROR_STYLE}>
                 {error}
