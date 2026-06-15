@@ -14,16 +14,17 @@
 // inside — the persisted pane tree and folds each pane's live `activeTab`
 // into it via {@link reconcileHistories}.
 
-import type { NoteId } from "./sidebarState";
-import type { LeafPane, PaneId } from "./workspaceState";
+import type { LeafPane, PaneId, WorkspaceItem } from "./workspaceState";
+import { sameItem } from "./workspaceState";
 
 /**
- * One pane's navigation history. `entries[index]` is the note currently
- * shown; `index` is `-1` only when `entries` is empty (a pane that has never
- * shown a note).
+ * One pane's navigation history. `entries[index]` is the item (note or view)
+ * currently shown; `index` is `-1` only when `entries` is empty (a pane that
+ * has never shown an item). View tabs are recorded as ordinary visits
+ * alongside notes (MYND-274 — history treats a view tab like any other).
  */
 export type PaneHistory = {
-  entries: NoteId[];
+  entries: WorkspaceItem[];
   index: number;
 };
 
@@ -50,14 +51,14 @@ export function canStepForward(h: PaneHistory | undefined): boolean {
 }
 
 /**
- * Record a visit to `noteId`: a no-op when it is already the current entry
- * (re-asserting the same note never grows history); otherwise the forward
- * tail is dropped and `noteId` appended as the new current entry.
+ * Record a visit to `item`: a no-op when it is already the current entry
+ * (re-asserting the same item never grows history); otherwise the forward
+ * tail is dropped and `item` appended as the new current entry.
  */
-export function recordVisit(h: PaneHistory, noteId: NoteId): PaneHistory {
-  if (h.index >= 0 && h.entries[h.index] === noteId) return h;
+export function recordVisit(h: PaneHistory, item: WorkspaceItem): PaneHistory {
+  if (h.index >= 0 && sameItem(h.entries[h.index]!, item)) return h;
   const entries = h.entries.slice(0, h.index + 1);
-  entries.push(noteId);
+  entries.push(item);
   return { entries, index: entries.length - 1 };
 }
 
@@ -91,14 +92,14 @@ export function reconcileHistories(
         intent.paneId === leaf.id &&
         intent.targetIndex >= 0 &&
         intent.targetIndex < cur.entries.length &&
-        cur.entries[intent.targetIndex] === active;
+        sameItem(cur.entries[intent.targetIndex]!, active);
 
       if (moving) {
         updated =
           cur.index === intent!.targetIndex
             ? cur
             : { entries: cur.entries, index: intent!.targetIndex };
-      } else if (cur.index >= 0 && cur.entries[cur.index] === active) {
+      } else if (cur.index >= 0 && sameItem(cur.entries[cur.index]!, active)) {
         updated = cur; // already the current entry — nothing to do
       } else {
         updated = recordVisit(cur, active);

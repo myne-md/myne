@@ -25,7 +25,7 @@ import {
   type ReactNode,
 } from "react";
 import { Icon } from "../../components/primitives/Icon";
-import type { NoteId } from "../sidebarState";
+import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
@@ -72,24 +72,28 @@ const TITLE_MAX = 160;
 export type TabStripProps = {
   /** The pane this strip belongs to (carried in drag payloads). */
   paneId: string;
-  tabs: readonly NoteId[];
-  activeTab: NoteId | null;
-  /** Display title for a note id; `null` → rendered as italic "Untitled". */
-  titleOf: (id: NoteId) => string | null;
+  /** Opaque per-tab handles (workspace `itemKey`s, MYND-274) — a note or a
+   *  view tab; this component treats them as strings and never parses them. */
+  tabs: readonly string[];
+  activeTab: string | null;
+  /** Display title for a tab handle; `null` → rendered as italic "Untitled". */
+  titleOf: (id: string) => string | null;
+  /** Leading icon for a tab handle (note vs view, MYND-274). Default file-text. */
+  iconOf?: (id: string) => IconName;
   /** Whether the ACTIVE tab currently has unsaved edits (drives its dot). */
   activeDirty?: boolean;
   /** A transient empty "New tab" is open (the chooser). Renders an active
    *  pseudo-tab after the real tabs; the real tabs render inactive. */
   pendingNewTab?: boolean;
-  onActivate: (id: NoteId) => void;
-  onClose: (id: NoteId) => void;
+  onActivate: (id: string) => void;
+  onClose: (id: string) => void;
   onNewTab: () => void;
   /** Close the transient "New tab" (return to the previously-active tab). */
   onCloseNewTab?: () => void;
   /** Drop handler — `fromPaneId` is the drag source (`null` when the drag
    *  came from the sidebar), `toIndex` the insert slot in THIS strip.
    *  Reorder (same pane), move (cross pane), or open (sidebar-origin). */
-  onMoveTab: (fromPaneId: string | null, noteId: NoteId, toIndex: number) => void;
+  onMoveTab: (fromPaneId: string | null, tabId: string, toIndex: number) => void;
   /** Extra left padding (px) when this strip sits at the window's top-left
    *  corner with no left sidebar — clears the traffic lights + left toggle. */
   insetLeft?: number;
@@ -103,6 +107,7 @@ export function TabStrip({
   tabs,
   activeTab,
   titleOf,
+  iconOf,
   activeDirty = false,
   pendingNewTab = false,
   onActivate,
@@ -121,7 +126,7 @@ export function TabStrip({
     const parsed = readTabDrag(e.dataTransfer);
     if (parsed === null) return;
     const tabEls = Array.from(
-      e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"][data-note-id]'),
+      e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"][data-tab-id]'),
     );
     let toIndex = tabEls.length;
     for (let i = 0; i < tabEls.length; i++) {
@@ -135,11 +140,11 @@ export function TabStrip({
     // shift the target left by one to land where the cursor points.
     if (parsed.fromPaneId === paneId) {
       const orig = tabEls.findIndex(
-        (el) => el.getAttribute("data-note-id") === parsed.noteId,
+        (el) => el.getAttribute("data-tab-id") === parsed.tabId,
       );
       if (orig >= 0 && orig < toIndex) toIndex -= 1;
     }
-    onMoveTab(parsed.fromPaneId, parsed.noteId, toIndex);
+    onMoveTab(parsed.fromPaneId, parsed.tabId, toIndex);
   };
 
   return (
@@ -167,6 +172,7 @@ export function TabStrip({
             id={id}
             paneId={paneId}
             title={titleOf(id)}
+            icon={iconOf?.(id) ?? "file-text"}
             active={id === activeTab}
             dirty={id === activeTab && activeDirty}
             onActivate={onActivate}
@@ -217,22 +223,23 @@ function tabLabel(title: string | null): { text: string; italic: boolean } {
 }
 
 type TabProps = {
-  id: NoteId;
+  id: string;
   paneId: string;
   title: string | null;
+  icon: IconName;
   active: boolean;
   dirty: boolean;
-  onActivate: (id: NoteId) => void;
-  onClose: (id: NoteId) => void;
+  onActivate: (id: string) => void;
+  onClose: (id: string) => void;
 };
 
-function Tab({ id, paneId, title, active, dirty, onActivate, onClose }: TabProps) {
+function Tab({ id, paneId, title, icon, active, dirty, onActivate, onClose }: TabProps) {
   const [hovering, setHovering] = useState(false);
   const { text, italic } = tabLabel(title);
   const showClose = hovering || active;
 
   const handleDragStart = (e: ReactDragEvent<HTMLDivElement>) => {
-    writeTabDrag(e.dataTransfer, { noteId: id, fromPaneId: paneId });
+    writeTabDrag(e.dataTransfer, { tabId: id, fromPaneId: paneId });
     e.dataTransfer.effectAllowed = "move";
   };
 
@@ -282,7 +289,7 @@ function Tab({ id, paneId, title, active, dirty, onActivate, onClose }: TabProps
       role="tab"
       aria-selected={active}
       data-testid="editor.tab"
-      data-note-id={id}
+      data-tab-id={id}
       data-active={active}
       title={text}
       draggable
@@ -313,7 +320,7 @@ function Tab({ id, paneId, title, active, dirty, onActivate, onClose }: TabProps
             }}
           />
         ) : (
-          <Icon name="file-text" size={13} />
+          <Icon name={icon} size={13} />
         )}
       </span>
       <span
@@ -457,10 +464,10 @@ function OverflowMenu({
   onPick,
   onClose,
 }: {
-  tabs: readonly NoteId[];
-  activeTab: NoteId | null;
-  titleOf: (id: NoteId) => string | null;
-  onPick: (id: NoteId) => void;
+  tabs: readonly string[];
+  activeTab: string | null;
+  titleOf: (id: string) => string | null;
+  onPick: (id: string) => void;
   onClose: () => void;
 }) {
   return (
