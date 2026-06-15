@@ -103,3 +103,53 @@ describeE2E("tb1 browse + AND/OR filter (MYND-46)", () => {
     );
   });
 });
+
+describeE2E("tb2 save current filter as view → appears in the sidebar (Saved Views #4)", () => {
+  // Vault-count precondition: 1 (weak KDF). Regression lock for the cross-surface
+  // prefs refresh: saving a view from the Tag browser must surface it in the
+  // sidebar "Views" section WITHOUT an app restart (the prefs nonce bumped at the
+  // upsert chokepoint re-reads the sidebar's own `usePrefs`). Before the fix, the
+  // row only appeared after a remount.
+  it("saves a tag filter as a view and shows it in the sidebar without a restart", async () => {
+    const A_MARK = " #alpha";
+    let password = "";
+    await scenario(
+      "tb2-save-as-view",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // One tagged note so the browser has a chip to filter on.
+        await createNote(s, "Alpha Note");
+        await typeIntoEditor(s, A_MARK);
+        await waitForSaved(s);
+
+        // The sidebar Views section starts empty (no saved views yet).
+        await s.byTestId("views.empty");
+
+        // Open the browser, select #alpha → the "Save as view" affordance shows.
+        await (await s.byTestId("editor.tags-cta")).click();
+        await s.byTestId("tags.modal");
+        await (
+          await s.waitForElement(
+            testIdSelector("tags.chip", { "data-tag-key": "alpha" }),
+          )
+        ).click();
+
+        // Save the current filter (the name defaults to the selected tag).
+        await (await s.byTestId("views.save-current")).click();
+        await (await s.byTestId("views.save-confirm")).click();
+
+        // Modal closes; the saved view appears in the sidebar with NO restart —
+        // this is the bug the prefs-nonce chokepoint fixes.
+        await s.waitForGone(testIdSelector("tags.modal"));
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
+          { label: "saved view appears in the sidebar" },
+        );
+      },
+    );
+  });
+});

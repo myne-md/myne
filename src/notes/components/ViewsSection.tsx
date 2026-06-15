@@ -13,6 +13,8 @@
 // later follow-on; the leading "+ New view" creates a blank view (task 3/5).
 
 import {
+  useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -22,6 +24,10 @@ import { IconButton } from "../../components/primitives/IconButton";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import type { SavedView } from "../../lib/prefs";
+import {
+  consumeRevealViews,
+  useRevealViewsNonce,
+} from "../views/revealViewsSignal";
 
 const HEADER_ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -184,6 +190,8 @@ export function ViewsSection({
   views,
   onOpenView,
   onNewView,
+  onEditFilter,
+  onViewSettings,
   onRename,
   onDelete,
   onMoveView,
@@ -191,6 +199,10 @@ export function ViewsSection({
   views: readonly SavedView[];
   onOpenView: (id: string) => void;
   onNewView: () => void;
+  onEditFilter: (id: string) => void;
+  /** Open the cards display-settings modal (cover image / aspect / card size).
+   *  Only offered for `view_type === "cards"` views. */
+  onViewSettings: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onMoveView: (id: string, dir: -1 | 1) => void;
@@ -201,13 +213,48 @@ export function ViewsSection({
   );
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
+  // Reveal-on-request (SYNC-7): the BottomBar `editor.views-cta` + `views.show`
+  // palette action fire `requestRevealViews()`. Whether this section was already
+  // mounted (nonce bump) or just got mounted because the click first expanded a
+  // collapsed sidebar (pending flag consumed on mount), make the click land
+  // somewhere visible — expand the section, scroll it into view, and flash a
+  // brief highlight. `consumeRevealViews()` guards against an ordinary mount /
+  // sidebar open, which leaves nothing pending and so stays inert.
+  const nonce = useRevealViewsNonce();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [highlight, setHighlight] = useState(false);
+  useEffect(() => {
+    if (!consumeRevealViews()) return;
+    setCollapsed(false);
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    setHighlight(true);
+    const timer = setTimeout(() => setHighlight(false), 1100);
+    return () => clearTimeout(timer);
+  }, [nonce]);
+
   const openMenu = (e: ReactMouseEvent, id: string) => {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, id });
   };
 
+  // The settings item is cards-only (table/list renderers have no cover concept).
+  const menuView = menu ? views.find((v) => v.id === menu.id) : undefined;
   const menuItems: ContextMenuItem[] = menu
     ? [
+        {
+          id: "edit-filter",
+          label: "Edit filter…",
+          onSelect: () => onEditFilter(menu.id),
+        },
+        ...(menuView?.view_type === "cards"
+          ? [
+              {
+                id: "view-settings",
+                label: "View settings…",
+                onSelect: () => onViewSettings(menu.id),
+              },
+            ]
+          : []),
         {
           id: "rename",
           label: "Rename",
@@ -242,7 +289,20 @@ export function ViewsSection({
   };
 
   return (
-    <div style={{ flexShrink: 0 }} data-testid="views.section">
+    <div
+      ref={rootRef}
+      style={{
+        flexShrink: 0,
+        borderRadius: "var(--radius-1)",
+        // Quiet flash so the reveal click always reads as "something happened",
+        // even when the section was already on-screen. Fades out via transition.
+        background: highlight ? "var(--paper-3)" : "transparent",
+        boxShadow: highlight ? "inset 0 0 0 1px var(--accent)" : "none",
+        transition: "background 220ms ease, box-shadow 220ms ease",
+      }}
+      data-testid="views.section"
+      data-revealed={highlight ? "true" : undefined}
+    >
       <div style={HEADER_ROW_STYLE}>
         <div style={HEADER_LEAD_STYLE}>
           <button

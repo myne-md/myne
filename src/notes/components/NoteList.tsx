@@ -28,7 +28,7 @@ import {
 } from "../sidebarState";
 import { TrashPanel } from "./TrashPanel";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
-import { deriveFolderTree } from "../folderTree";
+import { deriveFolderTree, type FolderNode } from "../folderTree";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import {
   noteExportOptions,
@@ -45,6 +45,14 @@ import { VirtualList } from "./VirtualList";
 import { useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
 import { ViewsSection } from "./ViewsSection";
+import { FilterBuilder, type FolderOption } from "./FilterBuilder";
+import { ViewSettings, type ViewDisplayPatch } from "./ViewSettings";
+import { useViewResult } from "../views/useViewResult";
+import {
+  draftToFilterNode,
+  filterNodeToDraft,
+  type FilterDraft,
+} from "../filterDraft";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
   deleteSavedView,
@@ -417,6 +425,15 @@ interface NoteListProps {
   exportHooks?: NoteExportUiHooks;
 }
 
+/** Filter-builder open state (MYND-282): creating a new view, or editing an
+ *  existing one (carrying the parsed draft — `null` when its filter is outside
+ *  the builder's representable set, so it opens read-only). */
+type BuilderState =
+  | { mode: "new" }
+  | { mode: "edit"; view: SavedView; draft: FilterDraft | null };
+
+const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
+
 export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {}) {
   const ctx = useSelectedNote();
   // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
@@ -436,10 +453,15 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
 
   // Saved Views (MYND-274): the sidebar "Views" section reads the saved-view
   // list from prefs and opens a view as a workspace tab. `ws.openView` is the
-  // task-2 entry; `reload` refreshes after a create. Views are rendered in
-  // display order (view_order first, then any not-yet-ordered).
+  // task-2 entry. Views are rendered in display order (view_order first, then
+  // any not-yet-ordered).
   const ws = useWorkspace();
-  const { prefs: viewsPrefs, reload: reloadPrefs } = usePrefs();
+  // The saved-view list. Refresh is handled centrally: the saved-view prefs
+  // writers bump the prefs nonce at the IPC chokepoint and `usePrefs` re-reads
+  // on that bump — so the mutations below don't reload explicitly (no per-write
+  // double read, and a save from a sibling surface like the Tag browser lands
+  // here too).
+  const { prefs: viewsPrefs } = usePrefs();
   const orderedViews = useMemo<SavedView[]>(() => {
     const byId = new Map(viewsPrefs.saved_views.map((v) => [v.id, v]));
     const ordered: SavedView[] = [];
@@ -455,24 +477,89 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     }
     return ordered;
   }, [viewsPrefs.saved_views, viewsPrefs.view_order]);
-  const handleNewView = useCallback(() => {
-    void (async () => {
-      const id = crypto.randomUUID();
-      const view: SavedView = {
-        id,
-        name: "New view",
-        view_type: "cards",
-        filters: { kind: "all" },
-      };
-      try {
-        await upsertSavedView(view);
-        await reloadPrefs();
-        ws.openView(id);
-      } catch {
-        // Create failure surfaces via backend tracing; the user can retry.
+  // Filter builder (MYND-282): "+ New view" no longer creates a blank view
+  // immediately — it opens the builder empty. "Edit filter…" (ViewsSection
+  // context menu) reopens it seeded with an existing view's filter, parsed back
+  // into the draft. Saving with no conditions yields an all-pages view (the prior
+  // behavior as the empty case); any conditions compose a `FilterNode` via the
+  // pure `filterDraft` core. An unrepresentable filter (`draft === null`) opens
+  // read-only (fail-safe) rather than silently dropping conditions.
+  const [builder, setBuilder] = useState<BuilderState | null>(null);
+  const handleNewView = useCallback(() => setBuilder({ mode: "new" }), []);
+  const handleEditFilter = useCallback(
+    (id: string) => {
+      const view = viewsPrefs.saved_views.find((v) => v.id === id);
+      if (view === undefined) return;
+      setBuilder({ mode: "edit", view, draft: filterNodeToDraft(view.filters) });
+    },
+    [viewsPrefs.saved_views],
+  );
+  const handleSaveFilter = useCallback(
+    (draft: FilterDraft) => {
+      const current = builder;
+      setBuilder(null);
+      const filters = draftToFilterNode(draft);
+      void (async () => {
+        try {
+          if (current?.mode === "edit") {
+            await upsertSavedView({ ...current.view, filters });
+          } else {
+            const id = crypto.randomUUID();
+            await upsertSavedView({ id, name: "New view", view_type: "cards", filters });
+            ws.openView(id);
+          }
+        } catch {
+          // Save failure surfaces via backend tracing; the user can retry.
+        }
+      })();
+    },
+    [builder, ws],
+  );
+  // View display settings (cards cover image / aspect ratio / card size). A
+  // sibling of the filter builder: a separate modal opened from the ViewsSection
+  // context menu ("View settings…", cards-only). Kept off `BuilderState` (which
+  // is `FilterDraft`-typed) — it edits the cards-render fields, not the filter.
+  const [viewSettings, setViewSettings] = useState<SavedView | null>(null);
+  const handleViewSettings = useCallback(
+    (id: string) => {
+      const view = viewsPrefs.saved_views.find((v) => v.id === id);
+      if (view === undefined) return;
+      setViewSettings(view);
+    },
+    [viewsPrefs.saved_views],
+  );
+  const handleSaveViewSettings = useCallback(
+    (patch: ViewDisplayPatch) => {
+      const current = viewSettings;
+      setViewSettings(null);
+      if (current === null) return;
+      // Spread merges the patch onto the view; a field cleared to `undefined`
+      // overrides the stored value and drops off the wire (JSON omits undefined),
+      // matching the Rust `skip_serializing_if = "None"` on these fields.
+      void (async () => {
+        try {
+          await upsertSavedView({ ...current, ...patch });
+        } catch {
+          /* surfaced via backend tracing */
+        }
+      })();
+    },
+    [viewSettings],
+  );
+  // Property-name suggestions for the cover-image field: the frontmatter keys
+  // present in the open settings view's current result (no new IPC — same
+  // projection the cards render). `""` id → the hook yields no result (inert).
+  const settingsViewResult = useViewResult(viewSettings?.id ?? "");
+  const viewPropertySuggestions = useMemo<string[]>(() => {
+    const keys = new Set<string>();
+    for (const group of settingsViewResult.result?.groups ?? []) {
+      for (const row of group.rows) {
+        for (const key of Object.keys(row.values)) keys.add(key);
       }
-    })();
-  }, [reloadPrefs, ws]);
+    }
+    return [...keys].sort();
+  }, [settingsViewResult.result]);
+
   // Task 6 — view management: rename / delete / reorder, each persisted via
   // #3's prefs API then reflected immediately by re-reading prefs. A deleted
   // view's open tab is left as a generic view host (the "shown-missing" pinned
@@ -484,26 +571,24 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       void (async () => {
         try {
           await upsertSavedView({ ...view, name });
-          await reloadPrefs();
         } catch {
           /* surfaced via backend tracing */
         }
       })();
     },
-    [viewsPrefs.saved_views, reloadPrefs],
+    [viewsPrefs.saved_views],
   );
   const handleDeleteView = useCallback(
     (id: string) => {
       void (async () => {
         try {
           await deleteSavedView(id);
-          await reloadPrefs();
         } catch {
           /* surfaced via backend tracing */
         }
       })();
     },
-    [reloadPrefs],
+    [],
   );
   const handleMoveView = useCallback(
     (id: string, dir: -1 | 1) => {
@@ -515,13 +600,12 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       void (async () => {
         try {
           await setViewOrder(nextOrder);
-          await reloadPrefs();
         } catch {
           /* surfaced via backend tracing */
         }
       })();
     },
-    [orderedViews, reloadPrefs],
+    [orderedViews],
   );
 
   // Ephemeral collapse state — folded folder keys. Default empty = all
@@ -557,6 +641,20 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;
+  // Flat folder choices for the filter builder's folder-condition picker, in
+  // tree order, indented by depth (the canonical path is the stored value; the
+  // engine folds it via `folderKey`).
+  const folderOptions = useMemo<FolderOption[]>(() => {
+    const out: FolderOption[] = [];
+    const walk = (nodes: readonly FolderNode[]) => {
+      for (const n of nodes) {
+        out.push({ path: n.path, label: `${" ".repeat(n.depth - 1)}${n.name}` });
+        walk(n.children);
+      }
+    };
+    walk(tree.roots);
+    return out;
+  }, [tree]);
   // Unified manual order (item_order) interleaves folders + loose notes per
   // container (MYND-183); flatten owns all display ordering.
   const rows = useMemo(
@@ -648,10 +746,41 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         views={orderedViews}
         onOpenView={(id) => ws.openView(id)}
         onNewView={handleNewView}
+        onEditFilter={handleEditFilter}
+        onViewSettings={handleViewSettings}
         onRename={handleRenameView}
         onDelete={handleDeleteView}
         onMoveView={handleMoveView}
       />
+      {viewSettings !== null && viewSettings.view_type === "cards" && (
+        <ViewSettings
+          title={
+            viewSettings.name.trim() === ""
+              ? "View settings"
+              : viewSettings.name
+          }
+          initial={{
+            image: viewSettings.image,
+            image_aspect_ratio: viewSettings.image_aspect_ratio,
+            card_size: viewSettings.card_size,
+          }}
+          propertySuggestions={viewPropertySuggestions}
+          onCancel={() => setViewSettings(null)}
+          onSave={handleSaveViewSettings}
+        />
+      )}
+      {builder !== null && (
+        <FilterBuilder
+          title={builder.mode === "edit" ? "Edit filter" : "New view"}
+          initialDraft={
+            builder.mode === "edit" ? (builder.draft ?? EMPTY_DRAFT) : EMPTY_DRAFT
+          }
+          representable={builder.mode === "new" || builder.draft !== null}
+          folderOptions={folderOptions}
+          onCancel={() => setBuilder(null)}
+          onSave={handleSaveFilter}
+        />
+      )}
       <div style={FOOTER_WRAP_STYLE}>
         <AttachmentsNavEntry />
         <button
