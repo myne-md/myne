@@ -34,6 +34,7 @@ import {
   useState,
   type CSSProperties,
   type Dispatch,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type RefObject,
   type SetStateAction,
@@ -46,7 +47,6 @@ import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
-import { GraphView } from "../notes/components/GraphView";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast, type ToastAction } from "../components/Toast";
@@ -96,6 +96,7 @@ import {
   type BacklinkRow,
 } from "../notes/backlinkRows";
 import { useIndexNonce } from "../notes/indexNonce";
+import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
 import { backlinks } from "../notes/vaultIndices";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
@@ -114,6 +115,11 @@ import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
+import { usePrefs } from "../hooks/usePrefs";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "../notes/components/ContextMenu";
 import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { useResponsiveCollapse } from "./responsiveCollapse";
@@ -135,8 +141,8 @@ import {
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
 // bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
-// build chunk). (GraphView's shell is statically imported and lazies only its
-// heavy d3 canvas; TagBrowser has no comparable static host, so the whole modal
+// build chunk). (GraphPane's shell is statically imported by PaneView and lazies
+// only its heavy d3 canvas; TagBrowser has no comparable static host, so the whole modal
 // splits.)
 const TagBrowser = lazy(() =>
   import("../notes/components/TagBrowser").then((m) => ({
@@ -148,6 +154,24 @@ const STATUS_TEXT_STYLE: CSSProperties = {
   fontSize: 12,
   color: "var(--fg-3)",
 };
+
+/**
+ * The toggleable BottomBar element ids + their menu labels (bottom-bar
+ * customization). Single source of truth: the BottomBar gates each element's
+ * render on `!hiddenItems.includes(id)`, and the right-click menu in
+ * `EditorChrome` maps over this list to build its checkable items. Ids are a
+ * closed, non-secret UI vocabulary persisted in `vault.prefs.hidden_bar_items`.
+ */
+const BAR_ITEMS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: "sync-status", label: "Sync status" },
+  { id: "save-status", label: "Save status" },
+  { id: "tags", label: "Tags" },
+  { id: "views", label: "Views" },
+  { id: "graph", label: "Graph" },
+  { id: "settings", label: "Settings" },
+  { id: "lock", label: "Lock" },
+  { id: "word-count", label: "Word count" },
+];
 
 /**
  * Device-local dismissal flag for the Obsidian-import onboarding offer (MYND-53,
@@ -479,7 +503,6 @@ function EditorChrome({
     [vaultExportOpen, ctx.cache],
   );
   const [snapshotsOpen, setSnapshotsOpen] = useState<boolean>(false);
-  const [graphOpen, setGraphOpen] = useState<boolean>(false);
   // Tag browser (tag-system #2 / MYND-46): modal carve-out + an optional seed
   // tag (set by the editor `#tag` chip, #3, to open filtered to one tag).
   const [tagsOpen, setTagsOpen] = useState<boolean>(false);
@@ -525,8 +548,9 @@ function EditorChrome({
     [ctx, showToastMessage],
   );
 
-  // Cmd/Ctrl+Shift+G toggles the whole-vault graph (MYND-198, SYNC-7) — the
+  // Cmd/Ctrl+Shift+G opens the whole-vault graph tab (MYND-198, SYNC-7) — the
   // third entry point alongside the command-palette action + BottomBar button.
+  // The graph is a singleton tab, so re-firing reveals the existing tab.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -535,12 +559,12 @@ function EditorChrome({
         (e.key === "G" || e.key === "g")
       ) {
         e.preventDefault();
-        setGraphOpen((g) => !g);
+        ws.openGraph();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [ws]);
   // Editor `#tag` chip click (tag-system #3 / MYND-45): the chip decoration
   // dispatches a bubbling `myne-open-tag` event; open the tag browser seeded to
   // that tag. A single Editor-level listener (the modal is Editor-global) — no
@@ -578,6 +602,14 @@ function EditorChrome({
   const layout = useEditorLayout();
   const rowRef = useRef<HTMLDivElement | null>(null);
 
+  // Bottom-bar customization: persisted set of hidden BottomBar element ids +
+  // its right-click menu anchor. `usePrefs` reads the set reactively (and
+  // re-reads on the cross-surface prefs nonce); `setHiddenBarItems` persists
+  // optimistically. `barMenu` holds the click coords while the menu is open.
+  const { prefs: barPrefs, setHiddenBarItems } = usePrefs();
+  const hiddenBarItems = barPrefs.hidden_bar_items;
+  const [barMenu, setBarMenu] = useState<{ x: number; y: number } | null>(null);
+
   // MYND-192 — transient responsive auto-collapse. When the window gets too
   // narrow to fit the center editor + sidebars, the backlinks (right) pane
   // yields first, then the notes (left). It is a non-persisted override:
@@ -594,14 +626,19 @@ function EditorChrome({
   const rightCollapsed = layout.rightCollapsed || forced.forceRightCollapsed;
 
   // Reveal the Saved Views surface (MYND-274) — the "Views" section lives in the
-  // left (notes) sidebar, so revealing it ensures that sidebar is expanded. The
-  // dedicated scroll-to-section refinement lands with the section itself (task
-  // 3). A width-forced collapse can't be toggled away (MYND-192). Shared by the
-  // palette `views.show` action + the BottomBar `editor.views-cta` (SYNC-7).
+  // left (notes) sidebar, so revealing it ensures that sidebar is expanded, then
+  // nudges the section to scroll into view + briefly highlight so the click
+  // always lands somewhere visible (even when the sidebar was already open). A
+  // width-forced collapse can't be toggled away (MYND-192) and the section would
+  // be unmounted, so there is nothing to reveal — bail without firing the signal.
+  // Shared by the palette `views.show` action + the BottomBar `editor.views-cta`
+  // (SYNC-7).
   const revealViews = useCallback(() => {
-    if (layout.leftCollapsed && !forced.forceLeftCollapsed) {
+    if (forced.forceLeftCollapsed) return;
+    if (layout.leftCollapsed) {
       layout.toggleLeftCollapsed();
     }
+    requestRevealViews();
   }, [layout, forced.forceLeftCollapsed]);
 
   // Import a `.base` saved-views file (Saved Views #6, MYND-276, task 6): pick a
@@ -1048,7 +1085,7 @@ function EditorChrome({
       )}
       <BottomBar
         onOpenSettings={() => setSettingsOpen(true)}
-        onShowGraph={() => setGraphOpen(true)}
+        onShowGraph={() => ws.openGraph()}
         onShowTags={() => {
           setTagsSeed(null);
           setTagsOpen(true);
@@ -1059,7 +1096,33 @@ function EditorChrome({
         onRetry={readout.retry}
         hideSaveStatus={ws.focusedLeaf.activeTab === null}
         wordCount={readout.wordCount}
+        hiddenItems={hiddenBarItems}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setBarMenu({ x: e.clientX, y: e.clientY });
+        }}
       />
+      {barMenu && (
+        <ContextMenu
+          x={barMenu.x}
+          y={barMenu.y}
+          onClose={() => setBarMenu(null)}
+          items={BAR_ITEMS.map(
+            (it): ContextMenuItem => ({
+              id: it.id,
+              label: it.label,
+              checked: !hiddenBarItems.includes(it.id),
+              closeOnSelect: false,
+              onSelect: () =>
+                void setHiddenBarItems(
+                  hiddenBarItems.includes(it.id)
+                    ? hiddenBarItems.filter((x) => x !== it.id)
+                    : [...hiddenBarItems, it.id],
+                ),
+            }),
+          )}
+        />
+      )}
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -1131,7 +1194,6 @@ function EditorChrome({
             });
         }}
       />
-      <GraphView open={graphOpen} onClose={() => setGraphOpen(false)} />
       <Suspense fallback={null}>
         <TagBrowser
           open={tagsOpen}
@@ -1214,7 +1276,7 @@ function EditorChrome({
         }}
         onShowGraph={() => {
           setPaletteOpen(false);
-          setGraphOpen(true);
+          ws.openGraph();
         }}
         onShowTags={() => {
           setPaletteOpen(false);
@@ -2060,6 +2122,14 @@ interface BottomBarProps {
    *  hides the counter entirely — same rationale as `hideSaveStatus`:
    *  with no note selected the value would be a meaningless 0. */
   wordCount?: number | null;
+  /** Bottom-bar customization: the set of element ids the user has hidden via
+   *  the bar's right-click menu. Each element renders only when its id is NOT
+   *  in this set (AND its pre-existing condition holds). */
+  hiddenItems: string[];
+  /** Right-click handler that opens the visibility menu (wired by
+   *  `EditorChrome`). Set on the bar root so even a fully-hidden bar stays
+   *  right-clickable — the only restore path. */
+  onContextMenu?: (e: ReactMouseEvent) => void;
 }
 
 function BottomBar({
@@ -2072,15 +2142,20 @@ function BottomBar({
   onRetry,
   hideSaveStatus = false,
   wordCount = null,
+  hiddenItems,
+  onContextMenu,
 }: BottomBarProps) {
   const handleLockClick = () => {
     void onLockFlushed().catch(() => {
       /* lock flush failures already routed through saveStatus */
     });
   };
+  const isHidden = (id: string) => hiddenItems.includes(id);
 
   return (
     <div
+      data-testid="editor.bottom-bar"
+      onContextMenu={onContextMenu}
       style={{
         height: 28,
         width: "100%",
@@ -2091,11 +2166,15 @@ function BottomBar({
         padding: "0 12px",
       }}
     >
-      <span style={STATUS_TEXT_STYLE}>Local-only · not synced</span>
+      {!isHidden("sync-status") && (
+        <span style={STATUS_TEXT_STYLE}>Local-only · not synced</span>
+      )}
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {!hideSaveStatus && <SaveStatusBadge status={saveStatus} onRetry={onRetry} />}
-        {onShowTags && (
+        {!hideSaveStatus && !isHidden("save-status") && (
+          <SaveStatusBadge status={saveStatus} onRetry={onRetry} />
+        )}
+        {onShowTags && !isHidden("tags") && (
           <button
             type="button"
             onClick={onShowTags}
@@ -2117,7 +2196,7 @@ function BottomBar({
             <Icon name="hash" size={14} />
           </button>
         )}
-        {onShowViews && (
+        {onShowViews && !isHidden("views") && (
           <button
             type="button"
             onClick={onShowViews}
@@ -2139,9 +2218,10 @@ function BottomBar({
             <Icon name="layout-grid" size={14} />
           </button>
         )}
-        {onShowGraph && (
+        {onShowGraph && !isHidden("graph") && (
           <button
             type="button"
+            data-testid="editor.graph-button"
             onClick={onShowGraph}
             aria-label="Show graph view"
             title="Graph (⌘⇧G)"
@@ -2160,50 +2240,54 @@ function BottomBar({
             <Icon name="share-2" size={14} />
           </button>
         )}
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          aria-label="Open settings"
-          data-testid="editor.settings-cta"
-          title="Settings (⌘,)"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "4px 8px",
-            background: "transparent",
-            border: 0,
-            borderRadius: "var(--radius-1)",
-            color: "var(--fg-3)",
-            cursor: "pointer",
-          }}
-        >
-          <Icon name="settings" size={12} />
-        </button>
-        <button
-          type="button"
-          onClick={handleLockClick}
-          aria-label="Lock vault"
-          data-testid="editor.lock-cta"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "4px 8px",
-            background: "transparent",
-            border: 0,
-            borderRadius: "var(--radius-1)",
-            color: "var(--fg-3)",
-            fontFamily: "var(--font-sans)",
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          <Icon name="lock" size={12} />
-          <span>Lock</span>
-        </button>
-        {wordCount !== null && (
+        {!isHidden("settings") && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="Open settings"
+            data-testid="editor.settings-cta"
+            title="Settings (⌘,)"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="settings" size={12} />
+          </button>
+        )}
+        {!isHidden("lock") && (
+          <button
+            type="button"
+            onClick={handleLockClick}
+            aria-label="Lock vault"
+            data-testid="editor.lock-cta"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="lock" size={12} />
+            <span>Lock</span>
+          </button>
+        )}
+        {wordCount !== null && !isHidden("word-count") && (
           <span
             style={{
               ...STATUS_TEXT_STYLE,

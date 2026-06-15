@@ -311,9 +311,25 @@ pub struct PrefsView {
     /// `deliberate_folders` discipline); a stale/unknown-icon entry is ignored
     /// at render and pruned on the next write (no codec-level GC).
     /// **Non-load-bearing** (cosmetic, AS-low) — no protective-envelope clamp.
-    /// Canonical key 'f' — sorts after `favorites`, before `item_colors`.
+    /// Canonical key 'f' — sorts after `favorites`, before `hidden_bar_items`.
     #[serde(default)]
     pub folder_icons: BTreeMap<String, String>,
+
+    /// Hidden bottom-bar item ids (MYND bottom-bar customization) — the
+    /// **set** of `BottomBar` element ids the user chose to hide via the
+    /// bar's right-click menu (e.g. `graph`, `tags`, `word-count`). A
+    /// `set`-semantics array: NFC-normalized, lexicographically sorted,
+    /// exact-deduped, and **omitted entirely when empty** so a vault whose
+    /// bar is fully visible (the default) is byte-identical to a pre-feature
+    /// `vault.prefs` (existing golden vectors unaffected — migration-less
+    /// additive field on `MYP1`, the `spell_languages` precedent class). An
+    /// unknown id is ignored at render and pruned on the next write (no
+    /// codec-level GC). **Non-load-bearing** (a tampered / replayed value can
+    /// at worst hide or reveal a bar affordance) — no protective-envelope
+    /// clamp. Canonical key 'h' — sorts after `folder_icons` (`f` < `h`),
+    /// before `item_colors` (`h` < `i`).
+    #[serde(default)]
+    pub hidden_bar_items: Vec<String>,
 
     /// Per-item color label (MYND-184) — a map from a sidebar item key to a
     /// color-slot name. Keys are heterogeneous: a note UUID **or** a canonical
@@ -326,7 +342,7 @@ pub struct PrefsView {
     /// pre-MYND-184 `vault.prefs`. A note-keyed entry is UUID-stable across note
     /// rename/move; a folder-keyed entry rides the folder prefix-rewrite + prune
     /// (client-side). **Non-load-bearing** (cosmetic, AS-low).
-    /// Canonical key 'i' — sorts after `folder_icons`, before `item_order`.
+    /// Canonical key 'i' — sorts after `hidden_bar_items`, before `item_order`.
     #[serde(default)]
     pub item_colors: BTreeMap<String, String>,
 
@@ -430,6 +446,7 @@ impl Default for PrefsView {
         Self {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             favorites: Vec::new(),
@@ -668,7 +685,25 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // item_colors (canonical key 'i' — after 'folder_icons', before 'item_order'
+    // hidden_bar_items (canonical key 'h' — after 'folder_icons' [f < h], before
+    // 'item_colors' [h < i]). A set-semantics array: NFC-normalized, sorted,
+    // exact-deduped (canonical_folder_list, shared with deliberate_folders /
+    // spell_languages); omitted entirely when empty so a vault whose bottom bar
+    // is fully visible (the default) is byte-identical to a pre-feature
+    // vault.prefs.
+    let hidden_bar = canonical_folder_list(&prefs.hidden_bar_items);
+    if !hidden_bar.is_empty() {
+        out.extend_from_slice(b"\"hidden_bar_items\":[");
+        for (i, id) in hidden_bar.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, id);
+        }
+        out.extend_from_slice(b"],");
+    }
+
+    // item_colors (canonical key 'i' — after 'hidden_bar_items', before 'item_order'
     // ['item_c' < 'item_o']). A nested string→string object whose keys are
     // heterogeneous note UUIDs OR folder paths (color labels for notes + folders);
     // omitted entirely when empty so a vault with no color stays byte-identical to
@@ -930,6 +965,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // from the same monotonic cursor so a later field's key marker is never
     // matched inside a prior field's object/array content.
     let folder_icons = parse_optional_string_map_field(rest, &mut cursor, b"\"folder_icons\":")?;
+    // hidden_bar_items (key 'h') sits between folder_icons (f) and item_colors (i)
+    // in canonical order. A set-semantics array parsed from the same monotonic
+    // cursor so a later field's key marker is never matched inside its content
+    // (`h` < `s`, so the cursor-based helper — not the post-SCP `_marker`
+    // variant — is correct here).
+    let hidden_bar_items = parse_optional_array_field(rest, &mut cursor, b"\"hidden_bar_items\":")?;
     let item_colors = parse_optional_string_map_field(rest, &mut cursor, b"\"item_colors\":")?;
     let item_order = parse_optional_array_field(rest, &mut cursor, b"\"item_order\":")?;
     // label (key 'l') — the per-vault display name (MYND-205), sitting between
@@ -994,6 +1035,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     Ok(PrefsView {
         screen_capture_protection,
         folder_icons,
+        hidden_bar_items,
         item_colors,
         deliberate_folders,
         auto_lock_seconds,
@@ -1589,6 +1631,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -1615,6 +1658,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -1674,6 +1718,7 @@ mod tests {
         // within each object are emitted in lexicographic order.
         let prefs = PrefsView {
             folder_icons: map_of(&[("Projects/Myne/", "book"), ("Archive/2025/", "archive")]),
+            hidden_bar_items: Vec::new(),
             item_colors: map_of(&[
                 ("Projects/Myne/", "slate"),
                 ("0190a000-0000-7000-8000-000000000001", "moss"),
@@ -1700,6 +1745,7 @@ mod tests {
     fn decoration_maps_round_trip_through_blob() {
         let original = PrefsView {
             folder_icons: map_of(&[("Archive/2025/", "archive"), ("Projects/Myne/", "book")]),
+            hidden_bar_items: Vec::new(),
             item_colors: map_of(&[
                 ("0190a000-0000-7000-8000-000000000001", "moss"),
                 ("Projects/Myne/", "slate"),
@@ -1733,6 +1779,7 @@ mod tests {
         // emitted in NFC (U+00E9) — byte-stability discipline.
         let prefs = PrefsView {
             folder_icons: map_of(&[("Cafe\u{301}/", "book")]),
+            hidden_bar_items: Vec::new(),
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&prefs);
@@ -1761,6 +1808,7 @@ mod tests {
             PrefsView {
                 screen_capture_protection: true,
                 folder_icons: Default::default(),
+                hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
@@ -1789,6 +1837,7 @@ mod tests {
             PrefsView {
                 screen_capture_protection: false,
                 folder_icons: Default::default(),
+                hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
@@ -2020,6 +2069,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: Some(ThemeChoice::Dark),
             ..PrefsView::default()
@@ -2036,6 +2086,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(300),
@@ -2211,6 +2262,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2243,6 +2295,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2278,6 +2331,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2308,6 +2362,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2398,6 +2453,7 @@ mod tests {
         let original = PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2452,6 +2508,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
@@ -2491,6 +2548,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             deliberate_folders: Vec::new(),
@@ -2559,6 +2617,10 @@ mod tests {
         let original = PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: alloc::vec![
+                alloc::string::String::from("graph"),
+                alloc::string::String::from("word-count"),
+            ],
             item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
@@ -2591,6 +2653,59 @@ mod tests {
         assert_eq!(original.item_order, decoded.item_order);
         assert_eq!(decoded.auto_lock_seconds, Some(900));
         assert!(!decoded.screen_capture_protection);
+        // hidden_bar_items is a set field — round-trips canonicalized (sorted).
+        assert_eq!(
+            decoded.hidden_bar_items,
+            alloc::vec![
+                alloc::string::String::from("graph"),
+                alloc::string::String::from("word-count"),
+            ],
+        );
+    }
+
+    #[test]
+    fn encode_places_hidden_bar_items_between_folder_icons_and_item_colors() {
+        // Canonical key order: folder_icons (f) < hidden_bar_items (h) <
+        // item_colors (i). The set-array is sorted + exact-deduped on encode
+        // (graph/word-count out of order + a duplicate collapse to a clean set).
+        let prefs = PrefsView {
+            screen_capture_protection: true,
+            folder_icons: map_of(&[("Projects/", "book")]),
+            hidden_bar_items: alloc::vec![
+                alloc::string::String::from("word-count"),
+                alloc::string::String::from("graph"),
+                alloc::string::String::from("graph"),
+            ],
+            item_colors: map_of(&[("Projects/", "red")]),
+            theme: None,
+            item_order: Vec::new(),
+            favorites: Vec::new(),
+            deliberate_folders: Vec::new(),
+            auto_lock_seconds: None,
+            daily_date_format: None,
+            daily_folder: None,
+            daily_template: None,
+            editor_layout: None,
+            label: None,
+            last_backup_at: None,
+            spell_enabled: None,
+            spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"folder_icons":{"Projects/":"book"},"hidden_bar_items":["graph","word-count"],"item_colors":{"Projects/":"red"},"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn encode_omits_hidden_bar_items_when_empty() {
+        // Empty (the default — bar fully visible) → byte-identical to a
+        // pre-feature vault.prefs (preserves existing KAT vectors + vaults).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
     }
 
     // ---- auto_lock_seconds canonical field (MYND-121) -----------------
@@ -2609,6 +2724,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2639,6 +2755,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2671,6 +2788,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2771,6 +2889,7 @@ mod tests {
         let original = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -2845,6 +2964,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
@@ -3109,6 +3229,7 @@ mod tests {
         let original = PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -3143,6 +3264,7 @@ mod tests {
         let original = PrefsView {
             screen_capture_protection: false,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             item_order: Vec::new(),
@@ -3438,6 +3560,7 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: true,
                 folder_icons: Default::default(),
+                hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
@@ -3465,6 +3588,7 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: false,
                 folder_icons: Default::default(),
+                hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
@@ -3494,6 +3618,7 @@ mod tests {
         let prefs_populated = PrefsView {
             screen_capture_protection: true,
             folder_icons: Default::default(),
+            hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![

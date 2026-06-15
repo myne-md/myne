@@ -489,6 +489,57 @@ pub(crate) async fn set_item_order_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `hidden_bar_items` set — the bottom-bar
+/// element ids the user chose to hide via the bar's right-click menu (bottom-bar
+/// customization). Read-modify-write under the per-plugin write mutex; **no
+/// native side-effect** (same shape as `set_item_order`). The caller passes the
+/// full desired set; the codec canonicalizes it (sorted + exact-deduped) on
+/// encode (`protocol::PrefsView::hidden_bar_items`). An empty set is the default
+/// (bar fully visible) and encodes to byte-identical-to-pre-feature.
+#[tauri::command]
+pub async fn set_hidden_bar_items<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_hidden_bar_items_with_dir(&dir, state.inner(), items).await
+}
+
+/// Testable core of [`set_hidden_bar_items`].
+pub(crate) async fn set_hidden_bar_items_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = items.len();
+    prefs.hidden_bar_items = items;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — the ids are a non-secret closed UI vocabulary, but stay
+    // consistent with the other prefs setters' count-only discipline.
+    tracing::info!(event = "prefs_written", field = "hidden_bar_items", count,);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated save/edit (upsert-by-id) of one saved view (MYND-273,
 /// Saved Views epic). Read-modify-write under the per-plugin write mutex; **no
 /// native side-effect** (same shape as `set_item_order`). "Save" and "edit" are
@@ -1346,6 +1397,7 @@ mod tests {
                 &PrefsView {
                     screen_capture_protection: false,
                     folder_icons: Default::default(),
+                    hidden_bar_items: Vec::new(),
                     item_colors: Default::default(),
                     theme: None,
                     deliberate_folders: Vec::new(),
@@ -1704,6 +1756,51 @@ mod tests {
 
     fn alloc_vec(items: impl IntoIterator<Item = &'static str>) -> Vec<String> {
         items.into_iter().map(String::from).collect()
+    }
+
+    // ---- hidden_bar_items setter (bottom-bar customization) -----------
+
+    #[test]
+    fn set_hidden_bar_items_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-hidden-bar-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_hidden_bar_items_with_dir(tmp.path(), &state, alloc_vec(["graph"])).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn hidden_bar_items_round_trips_as_canonicalized_set() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
+
+            // hidden_bar_items is a SET — the codec sorts + dedupes on encode,
+            // so an out-of-order, duplicated input reads back canonicalized.
+            set_hidden_bar_items_with_dir(
+                tmp.path(),
+                &state,
+                alloc_vec(["word-count", "graph", "graph"]),
+            )
+            .await
+            .expect("write hidden_bar_items");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after hidden_bar_items write");
+            assert_eq!(view.hidden_bar_items, alloc_vec(["graph", "word-count"]));
+            assert!(view.screen_capture_protection);
+
+            // Clearing round-trips back to empty (bar fully visible default).
+            set_hidden_bar_items_with_dir(tmp.path(), &state, Vec::new())
+                .await
+                .expect("clear hidden_bar_items");
+            let cleared = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert!(cleared.hidden_bar_items.is_empty());
+        });
     }
 
     // ---- saved-view CRUD (MYND-273) -----------------------------------

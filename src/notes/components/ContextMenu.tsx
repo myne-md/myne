@@ -29,7 +29,19 @@ export type ContextMenuItem = {
   label: string;
   /** Optional `var(--*)` color override for destructive items. */
   destructive?: boolean;
-  /** Called when the item is selected. ContextMenu closes regardless. */
+  /**
+   * When defined, the item renders as a checkable toggle with a leading
+   * `✓` (checked) or blank gutter (unchecked) — used by the bottom-bar
+   * visibility menu. `undefined` renders a plain action item (no gutter).
+   */
+  checked?: boolean;
+  /**
+   * Whether selecting the item dismisses the menu. Defaults to `true`
+   * (the action-item contract). Pass `false` for a checkable toggle so the
+   * menu stays open and the user can flip several items in one pass.
+   */
+  closeOnSelect?: boolean;
+  /** Called when the item is selected. */
   onSelect: () => void;
 };
 
@@ -120,7 +132,9 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const handleSelect = useCallback(
     (item: ContextMenuItem) => {
       item.onSelect();
-      onClose();
+      // A checkable toggle (closeOnSelect === false) keeps the menu open so
+      // the user can flip several items in one pass; an action item dismisses.
+      if (item.closeOnSelect !== false) onClose();
     },
     [onClose],
   );
@@ -146,15 +160,29 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
           <button
             key={item.id}
             type="button"
-            role="menuitem"
+            role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
+            aria-checked={item.checked === undefined ? undefined : item.checked}
             data-testid="notes.context-menu-item"
             data-item-id={item.id}
+            data-checked={item.checked === undefined ? undefined : String(item.checked)}
             style={style}
             onMouseEnter={() => setHoverId(item.id)}
             onMouseLeave={() => setHoverId((h) => (h === item.id ? null : h))}
             onClick={() => handleSelect(item)}
           >
-            {item.label}
+            {item.checked === undefined ? (
+              item.label
+            ) : (
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  aria-hidden="true"
+                  style={{ width: 12, flexShrink: 0, textAlign: "center" }}
+                >
+                  {item.checked ? "✓" : ""}
+                </span>
+                {item.label}
+              </span>
+            )}
           </button>
         );
       })}

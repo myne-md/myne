@@ -67,6 +67,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_deliberate_folders,
             commands::set_auto_lock_timeout,
             commands::set_item_order,
+            commands::set_hidden_bar_items,
             commands::set_favorites,
             commands::set_editor_layout,
             commands::set_theme,
