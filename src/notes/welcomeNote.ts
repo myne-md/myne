@@ -68,7 +68,10 @@ export async function seedWelcomeNote(): Promise<void> {
     // One pane, the Welcome note as its single active+focused tab — the
     // same shape the restore path produces, so it opens with no Editor.tsx
     // changes.
-    const ws = openInFocusedTab(emptyWorkspace(crypto.randomUUID()), noteId);
+    const ws = openInFocusedTab(emptyWorkspace(crypto.randomUUID()), {
+      kind: "note",
+      id: noteId,
+    });
     await workspaceWrite(serializeWorkspace(ws));
   } catch {
     // Onboarding nicety, not load-bearing — swallow any IPC/encode failure.

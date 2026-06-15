@@ -29,7 +29,9 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onExportNoteMarkdown: vi.fn(),
     onExportNotePdf: vi.fn(),
     onImportObsidian: vi.fn(),
+    onImportBaseView: vi.fn(),
     onExportVaultMarkdown: vi.fn(),
+    onShowViews: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -60,8 +62,34 @@ describe("Command palette action registry", () => {
       "vault.lock",
       "view.toggle-backlinks-sidebar",
       "view.toggle-notes-sidebar",
+      "views.import-base",
+      "views.show",
       "wikilinks.convert-in-this-note",
     ]);
+  });
+
+  it("views.import-base is editor-only and dispatches to onImportBaseView (MYND-276 #6)", () => {
+    expect(
+      find("views.import-base").visibility(makeContext({ stageName: "editor" })),
+    ).toBe("show");
+    expect(
+      find("views.import-base").visibility(makeContext({ stageName: "welcome" })),
+    ).toBe("hidden");
+    const onImportBaseView = vi.fn();
+    void find("views.import-base").run(makeContext({ onImportBaseView }));
+    expect(onImportBaseView).toHaveBeenCalledTimes(1);
+  });
+
+  it("views.show is editor-only and dispatches to onShowViews (MYND-274)", () => {
+    expect(find("views.show").visibility(makeContext({ stageName: "editor" }))).toBe(
+      "show",
+    );
+    expect(
+      find("views.show").visibility(makeContext({ stageName: "welcome" })),
+    ).toBe("hidden");
+    const onShowViews = vi.fn();
+    void find("views.show").run(makeContext({ onShowViews }));
+    expect(onShowViews).toHaveBeenCalledTimes(1);
   });
 });
 

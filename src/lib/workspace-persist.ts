@@ -11,6 +11,9 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   collectLeaves,
   findLeaf,
+  itemKey,
+  sameItem,
+  type WorkspaceItem,
   type WorkspaceNode,
   type WorkspaceState,
 } from "../notes/workspaceState";
@@ -58,42 +61,95 @@ export function deserializeWorkspace(json: string): WorkspaceState | null {
   const obj = parsed as Record<string, unknown>;
   const focusedPaneId = obj.focusedPaneId;
   if (typeof focusedPaneId !== "string") return null;
-  if (!isWorkspaceNode(obj.root)) return null;
-  const state: WorkspaceState = { root: obj.root, focusedPaneId };
+  // Normalize (not just validate): migrate legacy bare-string tabs to note
+  // items, and DROP well-formed unknown-kind tabs (forward-compat) — a junk tab
+  // still rejects the whole blob (the original strictness for corruption).
+  const root = normalizeNode(obj.root);
+  if (root === null) return null;
+  const state: WorkspaceState = { root, focusedPaneId };
   // focusedPaneId must reference an existing leaf; otherwise reject.
   if (findLeaf(state.root, focusedPaneId) === null) return null;
-  // Reject duplicate note ids across panes (the global invariant).
+  // Reject duplicate items across panes (the global (kind,id) invariant).
   const seen = new Set<string>();
   for (const leaf of collectLeaves(state.root)) {
     for (const t of leaf.tabs) {
-      if (seen.has(t)) return null;
-      seen.add(t);
+      const k = itemKey(t);
+      if (seen.has(k)) return null;
+      seen.add(k);
     }
   }
   return state;
 }
 
-/** Recursive structural validator for an untrusted `WorkspaceNode`. */
-function isWorkspaceNode(n: unknown): n is WorkspaceNode {
-  if (typeof n !== "object" || n === null) return false;
+/** One parsed tab: a valid item, a well-formed-but-unknown-kind tab to DROP
+ *  (forward-compat), or genuinely malformed input that rejects the blob. */
+type ParsedItem = { item: WorkspaceItem } | "drop" | "invalid";
+
+/** Parse one untrusted tab entry. A bare string is a legacy note id (MYND-166
+ *  format, pre-MYND-274); `{kind:"note"|"view", id}` is a current item; a
+ *  well-formed `{kind:<other>, id}` is a future kind to drop; anything else is
+ *  invalid. */
+function parseItem(t: unknown): ParsedItem {
+  if (typeof t === "string") return { item: { kind: "note", id: t } };
+  if (typeof t !== "object" || t === null) return "invalid";
+  const o = t as Record<string, unknown>;
+  if (typeof o.id !== "string") return "invalid";
+  if (o.kind === "note" || o.kind === "view") {
+    return { item: { kind: o.kind, id: o.id } };
+  }
+  if (typeof o.kind === "string") return "drop"; // unknown future kind
+  return "invalid";
+}
+
+/**
+ * Recursive normalizer for an untrusted `WorkspaceNode`. Returns a cleaned node
+ * (legacy tabs migrated, unknown-kind tabs dropped) or `null` on structural
+ * malformation. A leaf whose `activeTab` was dropped/absent falls back to its
+ * first surviving tab (or `null` when tabless).
+ */
+function normalizeNode(n: unknown): WorkspaceNode | null {
+  if (typeof n !== "object" || n === null) return null;
   const node = n as Record<string, unknown>;
   if (node.kind === "leaf") {
-    if (typeof node.id !== "string") return false;
-    if (!Array.isArray(node.tabs) || !node.tabs.every((t) => typeof t === "string")) {
-      return false;
+    if (typeof node.id !== "string") return null;
+    if (!Array.isArray(node.tabs)) return null;
+    const tabs: WorkspaceItem[] = [];
+    for (const t of node.tabs) {
+      const parsed = parseItem(t);
+      if (parsed === "invalid") return null;
+      if (parsed === "drop") continue;
+      tabs.push(parsed.item);
     }
-    if (node.activeTab !== null && typeof node.activeTab !== "string") return false;
-    // activeTab, when set, must be one of the tabs.
-    if (node.activeTab !== null && !(node.tabs as string[]).includes(node.activeTab as string)) {
-      return false;
+    let activeTab: WorkspaceItem | null = null;
+    const rawActive = node.activeTab;
+    if (rawActive !== null && rawActive !== undefined) {
+      const parsed = parseItem(rawActive);
+      if (parsed === "invalid") return null;
+      if (parsed === "drop") {
+        // The active tab was a dropped unknown-kind item → fall back to the
+        // first surviving tab (graceful forward-compat), or null if tabless.
+        activeTab = tabs.length > 0 ? tabs[0]! : null;
+      } else if (tabs.some((x) => sameItem(x, parsed.item))) {
+        activeTab = parsed.item;
+      } else {
+        // A well-formed activeTab absent from the surviving tabs is corruption
+        // — reject the whole blob (the original strictness).
+        return null;
+      }
     }
-    return true;
+    return { kind: "leaf", id: node.id, tabs, activeTab };
   }
   if (node.kind === "split") {
-    if (typeof node.id !== "string") return false;
-    if (node.direction !== "row" && node.direction !== "column") return false;
-    if (!Array.isArray(node.children) || node.children.length < 2) return false;
-    return node.children.every(isWorkspaceNode);
+    if (typeof node.id !== "string") return null;
+    if (node.direction !== "row" && node.direction !== "column") return null;
+    if (!Array.isArray(node.children) || node.children.length < 2) return null;
+    const children: WorkspaceNode[] = [];
+    for (const c of node.children) {
+      const cn = normalizeNode(c);
+      if (cn === null) return null;
+      children.push(cn);
+    }
+    return { kind: "split", id: node.id, direction: node.direction, children };
   }
-  return false;
+  return null;
 }

@@ -53,6 +53,12 @@ import { Toast, type ToastAction } from "../components/Toast";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import {
+  importBaseFilePath,
+  BaseImportPersistError,
+} from "../notes/import/base/importBase";
+import { BaseParseError } from "../notes/import/base/parseBase";
 import { BackupExportModal } from "../components/backup/BackupExportModal";
 import { VaultExportModal } from "../components/export/VaultExportModal";
 import { collectFolderOptions } from "../components/export/vaultExportFlow";
@@ -118,7 +124,7 @@ import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
 import { PaneTree } from "../notes/components/PaneTree";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
 import type { PaneReadout } from "../notes/components/PaneView";
-import { findNotePane } from "../notes/workspaceState";
+import { findItemPane, sameItem } from "../notes/workspaceState";
 import {
   deserializeWorkspace,
   serializeWorkspace,
@@ -587,6 +593,54 @@ function EditorChrome({
   const leftCollapsed = layout.leftCollapsed || forced.forceLeftCollapsed;
   const rightCollapsed = layout.rightCollapsed || forced.forceRightCollapsed;
 
+  // Reveal the Saved Views surface (MYND-274) — the "Views" section lives in the
+  // left (notes) sidebar, so revealing it ensures that sidebar is expanded. The
+  // dedicated scroll-to-section refinement lands with the section itself (task
+  // 3). A width-forced collapse can't be toggled away (MYND-192). Shared by the
+  // palette `views.show` action + the BottomBar `editor.views-cta` (SYNC-7).
+  const revealViews = useCallback(() => {
+    if (layout.leftCollapsed && !forced.forceLeftCollapsed) {
+      layout.toggleLeftCollapsed();
+    }
+  }, [layout, forced.forceLeftCollapsed]);
+
+  // Import a `.base` saved-views file (Saved Views #6, MYND-276, task 6): pick a
+  // single `.base` file (no new capability — dialog:allow-open already granted),
+  // run the shipped import entry point (read → parse → map → persist into
+  // vault.prefs), and surface a concise SYNC-12 summary toast. The picked path's
+  // parent directory is the root passed to the root-confined importer read seam.
+  const importBaseView = useCallback(async () => {
+    const picked = await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Obsidian Base", extensions: ["base"] }],
+    });
+    if (picked === null) return; // cancelled — no toast
+    try {
+      // The root-confining directory split lives in importBase (sealed seam).
+      const tally = await importBaseFilePath(picked);
+      let message = `Imported ${tally.importedViews} view(s)`;
+      if (tally.skippedViews > 0) {
+        message += ` · ${tally.skippedViews} skipped`;
+      }
+      if (tally.droppedUnsupportedFilters > 0) {
+        message += ` · ${tally.droppedUnsupportedFilters} filters dropped`;
+      }
+      setToast({ message });
+    } catch (e) {
+      if (e instanceof BaseParseError) {
+        setToast({ message: "Not a valid .base file." });
+      } else if (e instanceof BaseImportPersistError) {
+        // Count-only (SYNC-12) — never surface the failed view's name in copy.
+        setToast({
+          message: `Import stopped after ${e.persistedCount} view(s).`,
+        });
+      } else {
+        setToast({ message: "Import failed." });
+      }
+    }
+  }, [setToast]);
+
   // MYND-170 (SYNC-9) exclusive active-state: selecting a note in the sidebar
   // (from ANY source — row click, keyboard nav, command palette, favorites,
   // jump-from-attachment) closes the Attachments view and returns the center
@@ -629,9 +683,9 @@ function EditorChrome({
   const selectedId = ctx.selectedId;
   useEffect(() => {
     if (selectedId === null) return;
-    const where = findNotePane(
+    const where = findItemPane(
       { root: ws.root, focusedPaneId: ws.focusedPaneId },
-      selectedId,
+      { kind: "note", id: selectedId },
     );
     if (where === null) openInFocused(selectedId);
     // `ws.root` is read at fire time; the effect triggers only on a real
@@ -640,10 +694,14 @@ function EditorChrome({
   }, [selectedId, openInFocused]);
 
   const focusedActive = ws.focusedLeaf.activeTab;
+  // The sidebar highlight / backlinks track the focused pane's active NOTE; a
+  // view-kind active tab (MYND-274) clears the note selection.
+  const focusedActiveNoteId =
+    focusedActive?.kind === "note" ? focusedActive.id : null;
   const select = ctx.select;
   useEffect(() => {
-    select(focusedActive);
-  }, [focusedActive, select]);
+    select(focusedActiveNoteId);
+  }, [focusedActiveNoteId, select]);
 
   // MYND-121 — report window-level activity to the backend auto-lock idle
   // timer. The Editor is mounted iff the vault is Unlocked, so the heartbeat
@@ -995,6 +1053,7 @@ function EditorChrome({
           setTagsSeed(null);
           setTagsOpen(true);
         }}
+        onShowViews={revealViews}
         onLockFlushed={handleLockFlushed}
         saveStatus={readout.status}
         onRetry={readout.retry}
@@ -1100,6 +1159,10 @@ function EditorChrome({
           setPaletteOpen(false);
           setImporterOpen(true);
         }}
+        onImportBaseView={() => {
+          setPaletteOpen(false);
+          void importBaseView();
+        }}
         onBackupVault={() => {
           setPaletteOpen(false);
           setBackupExportOpen(true);
@@ -1157,6 +1220,10 @@ function EditorChrome({
           setPaletteOpen(false);
           setTagsSeed(null);
           setTagsOpen(true);
+        }}
+        onShowViews={() => {
+          setPaletteOpen(false);
+          revealViews();
         }}
         onLockFlushed={async () => {
           setPaletteOpen(false);
@@ -1403,7 +1470,9 @@ type CommandPaletteHostProps = {
   onExportNotePdf: () => void;
   onShowGraph: () => void;
   onShowTags: () => void;
+  onShowViews: () => void;
   onImportObsidian: () => void;
+  onImportBaseView: () => void;
   onBackupVault: () => void;
   onExportVaultMarkdown: () => void;
   onLockFlushed: () => Promise<void>;
@@ -1423,7 +1492,9 @@ function CommandPaletteHost({
   onExportNotePdf,
   onShowGraph,
   onShowTags,
+  onShowViews,
   onImportObsidian,
+  onImportBaseView,
   onBackupVault,
   onExportVaultMarkdown,
   onLockFlushed,
@@ -1485,7 +1556,9 @@ function CommandPaletteHost({
       onExportNotePdf,
       onShowGraph,
       onShowTags,
+      onShowViews,
       onImportObsidian,
+      onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
       onToggleLeftSidebar,
@@ -1510,7 +1583,9 @@ function CommandPaletteHost({
       onExportNotePdf,
       onShowGraph,
       onShowTags,
+      onShowViews,
       onImportObsidian,
+      onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
       onToggleLeftSidebar,
@@ -1658,12 +1733,14 @@ function WorkspaceHotkeys() {
         if (tabs.length === 0) return;
         e.preventDefault();
         const cur = ws.focusedLeaf.activeTab;
-        const i = cur === null ? -1 : tabs.indexOf(cur);
+        const i = cur === null ? -1 : tabs.findIndex((t) => sameItem(t, cur));
         const len = tabs.length;
         const next = e.shiftKey
           ? tabs[(i - 1 + len) % len]!
           : tabs[(i + 1) % len]!;
-        ws.activateInPane(ws.focusedPaneId, next);
+        // Task-1 boundary: panes hold only note tabs until #4 task 2 — the
+        // context's activate API is note-id-keyed for now.
+        if (next.kind === "note") ws.activateInPane(ws.focusedPaneId, next.id);
         return;
       }
 
@@ -1698,7 +1775,7 @@ function WorkspaceHotkeys() {
           const a = ws.focusedLeaf.activeTab;
           if (a === null) return;
           e.preventDefault();
-          ws.closeTabInPane(ws.focusedPaneId, a);
+          if (a.kind === "note") ws.closeTabInPane(ws.focusedPaneId, a.id);
           return;
         }
         case "\\":
@@ -1971,6 +2048,8 @@ interface BottomBarProps {
   onShowGraph?: () => void;
   /** Open the tag browser (persistent affordance, SYNC-7 refinement, MYND-46). */
   onShowTags?: () => void;
+  /** Reveal the Saved Views surface (persistent affordance, SYNC-7, MYND-274). */
+  onShowViews?: () => void;
   saveStatus: SaveStatusValue;
   onRetry: () => void;
   /** Hide the save-status badge entirely when no note is selected
@@ -1988,6 +2067,7 @@ function BottomBar({
   onOpenSettings,
   onShowGraph,
   onShowTags,
+  onShowViews,
   saveStatus,
   onRetry,
   hideSaveStatus = false,
@@ -2035,6 +2115,28 @@ function BottomBar({
             }}
           >
             <Icon name="hash" size={14} />
+          </button>
+        )}
+        {onShowViews && (
+          <button
+            type="button"
+            onClick={onShowViews}
+            aria-label="Browse views"
+            data-testid="editor.views-cta"
+            title="Views"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="layout-grid" size={14} />
           </button>
         )}
         {onShowGraph && (

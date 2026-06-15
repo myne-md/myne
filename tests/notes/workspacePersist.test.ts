@@ -10,16 +10,18 @@ import {
 } from "../../src/lib/workspace-persist";
 import {
   emptyWorkspace,
+  noteItem,
   openInNewTab,
   openToSide,
+  viewItem,
   type WorkspaceState,
 } from "../../src/notes/workspaceState";
 
 function sampleSplit(): WorkspaceState {
   let ws = emptyWorkspace("p-root");
-  ws = openInNewTab(ws, "a");
-  ws = openInNewTab(ws, "b");
-  ws = openToSide(ws, "c", (() => {
+  ws = openInNewTab(ws, noteItem("a"));
+  ws = openInNewTab(ws, noteItem("b"));
+  ws = openToSide(ws, noteItem("c"), (() => {
     let n = 0;
     return () => `p-side-${++n}`;
   })());
@@ -110,6 +112,93 @@ describe("workspace descriptor (de)serialization", () => {
             children: [{ kind: "leaf", id: "p1", tabs: [], activeTab: null }],
           },
           focusedPaneId: "p1",
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  // ── MYND-274: heterogeneous note|view tabs + forward-compat tolerance ──
+
+  it("round-trips a mixed note + view workspace", () => {
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, noteItem("a"));
+    ws = openInNewTab(ws, viewItem("books"));
+    const restored = deserializeWorkspace(serializeWorkspace(ws));
+    expect(restored).toEqual(ws);
+  });
+
+  it("migrates a legacy bare-string tab to a note item", () => {
+    // Pre-MYND-274 descriptors stored tabs as bare note-id strings.
+    const restored = deserializeWorkspace(
+      JSON.stringify({
+        root: { kind: "leaf", id: "p", tabs: ["a", "b"], activeTab: "a" },
+        focusedPaneId: "p",
+      }),
+    );
+    expect(restored).not.toBeNull();
+    const leaf = restored!.root;
+    if (leaf.kind === "leaf") {
+      expect(leaf.tabs).toEqual([noteItem("a"), noteItem("b")]);
+      expect(leaf.activeTab).toEqual(noteItem("a"));
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+
+  it("drops a well-formed unknown-kind tab (forward-compat), keeping the rest", () => {
+    const restored = deserializeWorkspace(
+      JSON.stringify({
+        root: {
+          kind: "leaf",
+          id: "p",
+          tabs: [
+            { kind: "note", id: "a" },
+            { kind: "kanban", id: "future" }, // a future kind this client can't show
+            { kind: "view", id: "v1" },
+          ],
+          activeTab: { kind: "note", id: "a" },
+        },
+        focusedPaneId: "p",
+      }),
+    );
+    expect(restored).not.toBeNull();
+    if (restored!.root.kind === "leaf") {
+      expect(restored!.root.tabs).toEqual([noteItem("a"), viewItem("v1")]);
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+
+  it("falls back to the first tab when the active tab was a dropped unknown kind", () => {
+    const restored = deserializeWorkspace(
+      JSON.stringify({
+        root: {
+          kind: "leaf",
+          id: "p",
+          tabs: [
+            { kind: "kanban", id: "future" },
+            { kind: "note", id: "a" },
+          ],
+          activeTab: { kind: "kanban", id: "future" }, // dropped
+        },
+        focusedPaneId: "p",
+      }),
+    );
+    expect(restored).not.toBeNull();
+    if (restored!.root.kind === "leaf") {
+      expect(restored!.root.tabs).toEqual([noteItem("a")]);
+      expect(restored!.root.activeTab).toEqual(noteItem("a"));
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+
+  it("rejects a structurally-malformed tab (not a string or {kind,id})", () => {
+    expect(
+      deserializeWorkspace(
+        JSON.stringify({
+          root: { kind: "leaf", id: "p", tabs: [42], activeTab: null },
+          focusedPaneId: "p",
         }),
       ),
     ).toBeNull();

@@ -36,8 +36,10 @@ export type PropertyEntry = { key: string } & TypedProperty;
 
 // RFC 3339 full-date (`YYYY-MM-DD`) and date-time, whole-string-anchored. YAML
 // 1.2 core has no native timestamp, so dates arrive as strings; Myne recognizes
-// them here (§3.6.4 step 3). `.test` on a trimmed string.
-const RFC3339_FULL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+// them here (§3.6.4 step 3). `.test` on a trimmed string. `RFC3339_FULL_DATE` is
+// exported so the query engine reuses the one full-date shape (the §3.6.4 type
+// authority owns it — siblings consume, never redeclare).
+export const RFC3339_FULL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const RFC3339_DATE_TIME =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 

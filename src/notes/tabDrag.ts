@@ -11,12 +11,13 @@
 // row (folder-move) OR on a pane (open as tab / split) — the drop target
 // decides which payload it reads.
 
-import type { NoteId } from "./sidebarState";
-
 export const TAB_DRAG_MIME = "application/x-myne-tab";
 
 export type TabDragPayload = {
-  noteId: NoteId;
+  /** The dragged tab's opaque handle — a workspace `itemKey` (`"note:<id>"` /
+   *  `"view:<id>"`, MYND-274). A sidebar-note drag produces the note handle;
+   *  the consumer parses it back to a `WorkspaceItem` via `parseItemKey`. */
+  tabId: string;
   /** Source pane id, or `null` when the drag originates in the sidebar. */
   fromPaneId: string | null;
 };
@@ -30,8 +31,8 @@ export function readTabDrag(dt: DataTransfer): TabDragPayload | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as TabDragPayload;
-    if (typeof parsed.noteId !== "string") return null;
-    return parsed;
+    if (typeof parsed.tabId !== "string") return null;
+    return { tabId: parsed.tabId, fromPaneId: parsed.fromPaneId ?? null };
   } catch {
     return null;
   }

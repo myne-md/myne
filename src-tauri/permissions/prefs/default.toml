@@ -32,6 +32,9 @@ permissions = [
   "allow-vault-set-label",
   "allow-set-spell-enabled",
   "allow-set-spell-languages",
+  "allow-upsert-saved-view",
+  "allow-delete-saved-view",
+  "allow-set-view-order",
 ]
 
 [[permission]]
@@ -149,3 +152,24 @@ commands.allow = ["set_spell_enabled"]
 identifier = "allow-set-spell-languages"
 description = "Allow invoking prefs:set_spell_languages (Slot::Unlocked-gated setter for the spell_languages set — the active spell-check language tags, SYNC-11 union; codec NFC-sorts+dedupes; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_spell_languages"]
+
+# MYND-273 Saved Views: save/edit (upsert-by-id) of one saved-view definition.
+# Inherits the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant this to any non-main window
+# (a view's name/filter/property is AS3-Sensitive). Atomic-writes vault.prefs
+# with no native side-effect; the 64 KiB MYP1 cap fails the encode (no write)
+# before touching disk; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-upsert-saved-view"
+description = "Allow invoking prefs:upsert_saved_view (Slot::Unlocked-gated save/edit of one SavedView — replaces by id else appends; atomic-writes vault.prefs with no native side-effect; over the 64 KiB MYP1 cap fails PrefsEncodeFailed before any write, leaving on-disk prefs intact; logs view count only, never a name/filter/property)."
+commands.allow = ["upsert_saved_view"]
+
+[[permission]]
+identifier = "allow-delete-saved-view"
+description = "Allow invoking prefs:delete_saved_view (Slot::Unlocked-gated delete of one SavedView by id — removes it from saved_views and prunes the id from view_order; atomic-writes vault.prefs with no native side-effect; deleting an absent id is an idempotent no-op; logs view count only)."
+commands.allow = ["delete_saved_view"]
+
+[[permission]]
+identifier = "allow-set-view-order"
+description = "Allow invoking prefs:set_view_order (Slot::Unlocked-gated setter for the view_order sequence — the saved-view display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of stale ids)."
+commands.allow = ["set_view_order"]
