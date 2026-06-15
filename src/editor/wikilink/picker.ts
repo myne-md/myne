@@ -200,7 +200,11 @@ class WikilinkPickerView implements PluginValue {
         selectedRow = el;
       }
       el.setAttribute("role", "menuitem");
-      el.addEventListener("mouseenter", () => {
+      // `mousemove`, NOT `mouseenter`: keyboard nav rebuilds the rows on every
+      // press, so a synthetic enter under a stationary pointer would yank the
+      // highlight back to the mouse and fight the arrow keys. See the slash
+      // menu (`editor/slash/plugin.ts`) for the full rationale.
+      el.addEventListener("mousemove", () => {
         if (this.state === null || this.state.selectedIndex === i) return;
         this.state.selectedIndex = i;
         this.container

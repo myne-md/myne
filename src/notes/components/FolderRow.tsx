@@ -72,26 +72,55 @@ const renameInputStyle: CSSProperties = {
   outline: "none",
 };
 
+// Single right-pointing chevron that rotates 90° to point down when the folder
+// is expanded — the disclosure motion. The rotation lives on an HTML <span>
+// wrapper (not the <svg>) so transform-origin is a reliable 50% 50% — applying
+// `transform` directly to an SVG element makes the rotation pivot ambiguous
+// across engines. Token-bound transition; reduced-motion is honored globally
+// (tokens.css zeroes transition-duration).
 function Chevron({ collapsed }: { collapsed: boolean }) {
   return (
-    <svg
-      width={12}
-      height={12}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.25}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ color: "var(--fg-3)", flexShrink: 0 }}
-      aria-hidden="true"
+    <span
+      style={{
+        display: "inline-flex",
+        flexShrink: 0,
+        transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
+        transformOrigin: "50% 50%",
+        transition: "transform var(--duration-base) var(--ease-standard)",
+      }}
     >
-      <path d={collapsed ? "m9 18 6-6-6-6" : "m6 9 6 6 6-6"} />
-    </svg>
+      <svg
+        width={12}
+        height={12}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.25}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ color: "var(--fg-3)", display: "block" }}
+        aria-hidden="true"
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </span>
   );
 }
 
-function FolderIcon({ open }: { open: boolean }) {
+const folderGlyphSvgStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  color: "var(--fg-3)",
+  transition: "opacity var(--duration-base) var(--ease-standard)",
+};
+
+function FolderIconGlyph({
+  open,
+  style,
+}: {
+  open: boolean;
+  style: CSSProperties;
+}) {
   return (
     <svg
       width={15}
@@ -102,7 +131,7 @@ function FolderIcon({ open }: { open: boolean }) {
       strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ color: "var(--fg-3)", flexShrink: 0 }}
+      style={style}
       aria-hidden="true"
     >
       {open ? (
@@ -111,6 +140,26 @@ function FolderIcon({ open }: { open: boolean }) {
         <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
       )}
     </svg>
+  );
+}
+
+// Open/closed folder glyphs stacked and cross-faded on `open` so the icon
+// transitions smoothly rather than snapping (an SVG path swap can't tween).
+function FolderIcon({ open }: { open: boolean }) {
+  return (
+    <span
+      style={{ position: "relative", width: 15, height: 15, flexShrink: 0 }}
+      aria-hidden="true"
+    >
+      <FolderIconGlyph
+        open={false}
+        style={{ ...folderGlyphSvgStyle, opacity: open ? 0 : 1 }}
+      />
+      <FolderIconGlyph
+        open={true}
+        style={{ ...folderGlyphSvgStyle, opacity: open ? 1 : 0 }}
+      />
+    </span>
   );
 }
 
