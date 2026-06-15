@@ -29,6 +29,7 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onExportNoteMarkdown: vi.fn(),
     onExportNotePdf: vi.fn(),
     onImportObsidian: vi.fn(),
+    onImportBaseView: vi.fn(),
     onExportVaultMarkdown: vi.fn(),
     onShowViews: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
@@ -67,13 +68,16 @@ describe("Command palette action registry", () => {
     ]);
   });
 
-  it("views.import-base is DISABLED in editor (pending #6) and hidden elsewhere", () => {
+  it("views.import-base is editor-only and dispatches to onImportBaseView (MYND-276 #6)", () => {
     expect(
       find("views.import-base").visibility(makeContext({ stageName: "editor" })),
-    ).toBe("disabled");
+    ).toBe("show");
     expect(
       find("views.import-base").visibility(makeContext({ stageName: "welcome" })),
     ).toBe("hidden");
+    const onImportBaseView = vi.fn();
+    void find("views.import-base").run(makeContext({ onImportBaseView }));
+    expect(onImportBaseView).toHaveBeenCalledTimes(1);
   });
 
   it("views.show is editor-only and dispatches to onShowViews (MYND-274)", () => {

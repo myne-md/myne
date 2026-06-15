@@ -220,14 +220,13 @@ const importBaseViewAction: CommandAction = {
   id: "views.import-base",
   label: "Import .base view…",
   category: "Vault",
-  // DISABLED until the Obsidian `.base` importer backend lands (Saved Views #6,
-  // MYND-276), per the established disabled-control discipline (cf.
-  // importObsidianAction before MYND-53). Editor-stage only (import needs an
-  // unlocked vault). #6 flips this to "show" + wires the parser dispatch + the
-  // SYNC-12 import-summary tally.
-  visibility: (ctx) => (ctx.stageName === "editor" ? "disabled" : "hidden"),
-  run: () => {
-    // No-op: a disabled action never runs; the dispatch lands with #6.
+  // Live as of Saved Views #6 (MYND-276, task 6): the file-picker → parse → map →
+  // persist → SYNC-12 import-summary tally dispatch now lands. Editor-stage only
+  // (import needs an unlocked vault); hidden elsewhere, mirroring
+  // importObsidianAction.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onImportBaseView();
   },
 };
 

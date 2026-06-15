@@ -59,6 +59,8 @@ export type CommandContext = {
   onShowViews: () => void;
   /** Open the Obsidian vault import flow (folder picker → progress → summary) (MYND-53). */
   onImportObsidian: () => void;
+  /** Open the `.base` saved-views import flow (file picker → parse/map/persist → summary toast) (Saved Views #6, MYND-276). */
+  onImportBaseView: () => void;
   /** Open the backup-export flow (save dialog → verified .myne-backup) (MYND-56). */
   onBackupVault: () => void;
   /** Open the whole-vault markdown export modal (three-phase, MYND-211). */
