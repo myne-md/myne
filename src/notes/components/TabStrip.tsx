@@ -153,6 +153,14 @@ export function TabStrip({
         ...stripStyle,
         paddingLeft: STRIP_BASE_PADDING_LEFT + insetLeft,
         paddingRight: insetRight,
+        // The insets clear the floated window controls (traffic lights /
+        // sidebar toggles / back-forward nav) when a side has no sidebar, so
+        // they flip with the sidebar's collapsed state. Transition them on the
+        // SAME curve as the sidebar's width collapse (SidebarPane) so the tab
+        // strip glides in sync instead of snapping the first tab across the
+        // floated controls for a frame. Reduced-motion zeroes this globally.
+        transition:
+          "padding-left var(--duration-base) var(--ease-standard), padding-right var(--duration-base) var(--ease-standard)",
       }}
       role="tablist"
       aria-label="Open notes"

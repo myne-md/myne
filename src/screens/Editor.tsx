@@ -947,18 +947,20 @@ function EditorChrome({
         }}
       >
         <SidebarBootstrap />
-        {!leftCollapsed && (
-          <SidebarPane
-            side="left"
-            width={layout.leftWidth}
-            collapsed={false}
-            min={LEFT_BOUNDS.min}
-            max={LEFT_BOUNDS.max}
-            containerRef={rowRef}
-            onResize={layout.setLeftWidth}
-            onToggleCollapse={layout.toggleLeftCollapsed}
-            resizeLabel="Resize notes sidebar"
-          >
+        {/* Always mounted (even when collapsed) so the width collapse/expand
+            animates instead of popping — SidebarPane drives the width 0↔open
+            transition and marks the pane `inert` while collapsed. */}
+        <SidebarPane
+          side="left"
+          width={layout.leftWidth}
+          collapsed={leftCollapsed}
+          min={LEFT_BOUNDS.min}
+          max={LEFT_BOUNDS.max}
+          containerRef={rowRef}
+          onResize={layout.setLeftWidth}
+          onToggleCollapse={layout.toggleLeftCollapsed}
+          resizeLabel="Resize notes sidebar"
+        >
             <div style={SIDEBAR_COLUMN_STYLE}>
               {/* Traffic-light + left-toggle clearance row. The floated toggle
                   and macOS traffic lights sit over this; the vault switcher
@@ -982,8 +984,7 @@ function EditorChrome({
                 exportHooks={exportHooks}
               />
             </div>
-          </SidebarPane>
-        )}
+        </SidebarPane>
         {centerView === "attachments" ? (
           // Attachments is a full-center view with no tab strip; give it a
           // matching drag-region clearance row so its toolbar clears the
@@ -1020,11 +1021,11 @@ function EditorChrome({
             rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
           />
         )}
-        {centerView !== "attachments" && !rightCollapsed && (
+        {centerView !== "attachments" && (
           <SidebarPane
             side="right"
             width={layout.rightWidth}
-            collapsed={false}
+            collapsed={rightCollapsed}
             min={RIGHT_BOUNDS.min}
             max={RIGHT_BOUNDS.max}
             containerRef={rowRef}
@@ -2036,28 +2037,73 @@ function SidebarPane({
   resizeLabel: string;
   children: ReactNode;
 }) {
-  if (collapsed) return null;
+  // Collapse/expand is animated by transitioning the pane width between 0 and
+  // its open width. The transition stays ARMED at all times EXCEPT during an
+  // active resize: a drag changes `width` every pointermove, and an active
+  // width transition there would make the pane lag behind the cursor. Arming
+  // it permanently (rather than only just-after a collapse flip) is what makes
+  // the toggle animate reliably — the transition is already on the element
+  // when the width change commits, instead of racing an effect that turns it
+  // on after the browser has already painted the new width.
+  // Reduced-motion is honoured globally (tokens.css zeroes transition-duration).
+  const [resizing, setResizing] = useState(false);
+  const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A resize fires onResize rapidly; keep `resizing` true until a short idle
+  // gap signals the drag/keyboard-repeat has stopped, then re-arm the
+  // transition. Toggling collapse never calls onResize, so it always animates.
+  const markResizing = () => {
+    setResizing(true);
+    if (resizeTimer.current !== null) clearTimeout(resizeTimer.current);
+    resizeTimer.current = setTimeout(() => setResizing(false), 140);
+  };
+  useEffect(
+    () => () => {
+      if (resizeTimer.current !== null) clearTimeout(resizeTimer.current);
+    },
+    [],
+  );
+
   return (
     <div
       style={{
         position: "relative",
-        width,
+        width: collapsed ? 0 : width,
         flexShrink: 0,
         display: "flex",
+        // Pin the inner content to the inner edge so collapsing clips it
+        // toward the screen edge (left sidebar clips right→, right sidebar
+        // clips ←left), matching the side the sidebar lives on.
+        justifyContent: side === "right" ? "flex-end" : "flex-start",
+        overflow: "hidden",
         minHeight: 0,
+        transition: resizing
+          ? "none"
+          : "width var(--duration-base) var(--ease-standard)",
       }}
     >
-      {children}
-      <ResizeHandle
-        side={side}
-        width={width}
-        min={min}
-        max={max}
-        containerRef={containerRef}
-        onResize={onResize}
-        onToggleCollapse={onToggleCollapse}
-        label={resizeLabel}
-      />
+      {/* Fixed-width inner wrapper: keeps the children at their open width so
+          they don't reflow/squish while the outer pane animates to 0. */}
+      <div
+        inert={collapsed ? true : undefined}
+        style={{ width, flexShrink: 0, display: "flex", minHeight: 0 }}
+      >
+        {children}
+      </div>
+      {!collapsed && (
+        <ResizeHandle
+          side={side}
+          width={width}
+          min={min}
+          max={max}
+          containerRef={containerRef}
+          onResize={(raw, cw) => {
+            markResizing();
+            onResize(raw, cw);
+          }}
+          onToggleCollapse={onToggleCollapse}
+          label={resizeLabel}
+        />
+      )}
     </div>
   );
 }
