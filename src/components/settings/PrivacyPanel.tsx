@@ -17,6 +17,7 @@ import type { CSSProperties } from "react";
 import { usePrefs } from "../../hooks/usePrefs";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
+import { Switch } from "../primitives/Switch";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
@@ -30,40 +31,6 @@ const TOGGLE_ROW_STYLE: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: "var(--space-3)",
-};
-
-const TOGGLE_TRACK_BASE_STYLE: CSSProperties = {
-  position: "relative",
-  width: 36,
-  height: 20,
-  background: "var(--paper-3)",
-  border: "1px solid var(--line-2)",
-  borderRadius: 10,
-  padding: 0,
-  flexShrink: 0,
-};
-
-const TOGGLE_TRACK_ON_OVERRIDE: CSSProperties = {
-  background: "var(--accent)",
-  border: "1px solid var(--accent-press)",
-};
-
-const TOGGLE_KNOB_OFF_STYLE: CSSProperties = {
-  position: "absolute",
-  left: 1,
-  top: 1,
-  width: 16,
-  height: 16,
-  background: "var(--paper)",
-  border: "1px solid var(--line-3)",
-  borderRadius: "50%",
-};
-
-const TOGGLE_KNOB_ON_STYLE: CSSProperties = {
-  ...TOGGLE_KNOB_OFF_STYLE,
-  left: 18,
-  background: "var(--accent-on)",
-  border: "none",
 };
 
 // MYND-160 grill Q2.1 disclosure: when the user toggles off, the
@@ -104,33 +71,16 @@ function ToggleRow({
   checked,
   onToggle,
 }: ToggleRowProps) {
-  const interactive = onToggle !== undefined;
-  const trackStyle: CSSProperties = {
-    ...TOGGLE_TRACK_BASE_STYLE,
-    ...(checked ? TOGGLE_TRACK_ON_OVERRIDE : {}),
-    cursor: interactive ? "pointer" : "not-allowed",
-    opacity: interactive ? 1 : 0.5,
-  };
   return (
     <div style={BLOCK_STYLE}>
       <div style={TOGGLE_ROW_STYLE}>
         <span style={LABEL_STYLE}>{label}</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          aria-disabled={!interactive}
-          aria-label={ariaLabel}
-          aria-describedby={ariaDescribedBy}
-          onClick={onToggle ? () => onToggle(!checked) : undefined}
-          disabled={!interactive}
-          style={trackStyle}
-        >
-          <span
-            aria-hidden="true"
-            style={checked ? TOGGLE_KNOB_ON_STYLE : TOGGLE_KNOB_OFF_STYLE}
-          />
-        </button>
+        <Switch
+          checked={checked}
+          onChange={onToggle}
+          ariaLabel={ariaLabel}
+          ariaDescribedBy={ariaDescribedBy}
+        />
       </div>
       <p id={ariaDescribedBy} style={HELPER_STYLE}>
         {helper}
