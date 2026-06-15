@@ -19,6 +19,10 @@ dist/
 dist-ssr/
 *.local
 
+# Coverage reports (Vitest v8 → ./coverage; cargo-llvm-cov → /target/llvm-cov,
+# already covered by /target/ below).
+coverage/
+
 # Cargo workspace build output. The workspace at the repo root produces
 # artifacts in `/target/`; `src-tauri/.gitignore` still covers the legacy
 # nested `src-tauri/target/` so neither path is ever committed.
