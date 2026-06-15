@@ -20,6 +20,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, seedVaults } from "./support/fixtures";
 import {
   closeSettings,
+  createNote,
   dismissImporterOffer,
   openSettings,
   selectPickerRow,
@@ -143,6 +144,63 @@ describeE2E("pf1 theme + auto-lock round-trip (MYND-225)", () => {
   });
 });
 
+describeE2E("pf4 sidebar note-timestamp visibility round-trip (sidebar-note-timestamps)", () => {
+  // Precondition: exactly 1 vault (weak KDF).
+  it("hiding the sidebar timestamp via Settings drops the subtitle and survives a reload", async () => {
+    let password = "";
+    await scenario(
+      "pf4-note-timestamps-roundtrip",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // A note row is the carrier of the per-note timestamp subtitle.
+        await createNote(s, "Tarih Notu");
+        // Default ON → the subtitle line is present under the title.
+        await s.byTestId("notes.row-subtitle");
+
+        // Appearance → toggle "Show edit times" OFF. The setter bumps the prefs
+        // nonce so the sidebar (its own usePrefs instance) re-reads live.
+        await openSettings(s, "appearance");
+        const toggle = await s.byTestId("settings.note-timestamps-toggle");
+        if ((await toggle.attribute("aria-checked")) !== "true") {
+          throw new Error("note-timestamps toggle did not start ON (default true)");
+        }
+        await toggle.click();
+        await s.waitUntil(
+          async () => (await toggle.attribute("aria-checked")) === "false" || null,
+          { label: "note-timestamps toggle flips OFF" },
+        );
+        await closeSettings(s);
+
+        // The row stays, but its subtitle is gone — the note didn't vanish.
+        await s.byTestId("notes.row");
+        await s.waitForGone(testIdSelector("notes.row-subtitle"));
+
+        // Reload. Slot stays Unlocked → straight back to the editor; prefs
+        // re-read from the MYP1 blob, so the subtitle stays hidden (persisted).
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+        await dismissImporterOffer(s);
+        await s.byTestId("notes.row");
+        await s.waitForGone(testIdSelector("notes.row-subtitle"));
+
+        // The toggle itself reads back OFF from disk (mount effect — poll).
+        await openSettings(s, "appearance");
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("settings.note-timestamps-toggle")).attribute(
+              "aria-checked",
+            )) === "false" || null,
+          { label: "note-timestamps toggle reads back OFF" },
+        );
+      },
+    );
+  });
+});
+
 describeE2E("pf2 vault label + RAM cache round-trip (MYND-225)", () => {
   // Precondition: exactly 1 vault (weak KDF).
   it("a saved label shows on the switcher row and survives lock → unlock", async () => {
@@ -238,6 +296,79 @@ describeE2E("pf3 per-vault isolation (MYND-225)", () => {
         await unlockToEditor(s, a.password);
         await expectThemeAttr(s, "dark");
         await expectSwitcherRowLabel(s, a.vaultId, "Kasa-Bir");
+      },
+    );
+  });
+});
+
+describeE2E("pf5 editor typography round-trip (editor-typography)", () => {
+  // Precondition: exactly 1 vault (weak KDF).
+  it("typography presets set via Settings apply to the editor live and survive a reload", async () => {
+    let password = "";
+    await scenario(
+      "pf5-editor-typography-roundtrip",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // An open note is the carrier of the editor content frame (the wrapper
+        // that receives the typography CSS vars + content max-width).
+        await createNote(s, "Tipografi Notu");
+        await s.byTestId("editor.content-frame");
+
+        // Pick a NON-default preset on each control (a default would clear to
+        // null and not prove the read-back). Segments carry
+        // `${testId}-${value}` (Segmented primitive).
+        await openSettings(s, "editor");
+        await (await s.byTestId("settings.editor-text-size-lg")).click();
+        await (await s.byTestId("settings.editor-line-spacing-relaxed")).click();
+        await (await s.byTestId("settings.editor-content-width-wide")).click();
+        await (await s.byTestId("settings.editor-font-family-sans")).click();
+        await closeSettings(s);
+
+        // Live application: each setter bumps the prefs nonce → the editor's own
+        // usePrefs re-reads and restyles the content frame (no remount). Assert
+        // the inline style carries every chosen preset's CSS value.
+        const frameStyle = async (): Promise<string> =>
+          (await (await s.byTestId("editor.content-frame")).attribute("style")) ?? "";
+        await s.waitUntil(
+          async () => {
+            const css = await frameStyle();
+            return (
+              (css.includes("16px") &&
+                css.includes("1.95") &&
+                css.includes("820px") &&
+                css.includes("var(--font-sans)")) ||
+              null
+            );
+          },
+          { label: "editor content frame applies the typography presets live" },
+        );
+
+        // Reload. Slot stays Unlocked → boots straight back into the editor;
+        // prefs re-read from the MYP1 blob on entry.
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+
+        // The controls themselves read back the persisted presets (mount effect
+        // loads the stored value — poll, don't snapshot the pre-effect default).
+        await openSettings(s, "editor");
+        const readsBack = async (testId: string): Promise<boolean | null> =>
+          (await (await s.byTestId(testId)).attribute("aria-checked")) === "true" || null;
+        await s.waitUntil(() => readsBack("settings.editor-text-size-lg"), {
+          label: "text-size reads back lg",
+        });
+        await s.waitUntil(() => readsBack("settings.editor-line-spacing-relaxed"), {
+          label: "line-spacing reads back relaxed",
+        });
+        await s.waitUntil(() => readsBack("settings.editor-content-width-wide"), {
+          label: "content-width reads back wide",
+        });
+        await s.waitUntil(() => readsBack("settings.editor-font-family-sans"), {
+          label: "font-family reads back sans",
+        });
       },
     );
   });

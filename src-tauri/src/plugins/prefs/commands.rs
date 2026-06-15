@@ -332,6 +332,57 @@ pub(crate) async fn set_spell_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `show_note_timestamps` toggle
+/// (sidebar-note-timestamps feature). Read-modify-write under the per-plugin
+/// write mutex; no native side-effect (like `set_spell_enabled`). The field is a
+/// plain `bool` (default `true`), so this stores the value directly (no `Some`
+/// wrap); the codec omits it on disk when `true`, so toggling back ON re-encodes
+/// byte-identical to a pre-feature vault.prefs. Non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_show_note_timestamps<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_show_note_timestamps_with_dir(&dir, state.inner(), enabled).await
+}
+
+/// Testable core of [`set_show_note_timestamps`].
+pub(crate) async fn set_show_note_timestamps_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.show_note_timestamps = enabled;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "show_note_timestamps",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `spell_languages` set (MYND-267 /
 /// SYNC-11 union). Read-modify-write under the per-plugin write mutex; no
 /// native side-effect. The caller passes the full desired set; the codec
@@ -843,6 +894,108 @@ pub(crate) async fn set_daily_template_with_dir(
     // correlation tag; see ../../CLAUDE.md "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "daily_template", cleared);
     Ok(())
+}
+
+/// Shared read-modify-write core for the four editor-typography string presets
+/// (editor-typography: `editor_text_size` / `editor_line_spacing` /
+/// `editor_content_width` / `editor_font_family`). Each is a free
+/// `Option<String>` enum where `None` clears to the canonical default (omitted
+/// on disk, byte-identical to an untouched vault) and `Some(v)` stores the
+/// chosen preset — the enum interpretation + unknown→default fallback live on
+/// the client (the `set_theme` precedent class). Disk-first; no native
+/// side-effect; non-load-bearing (no protective-envelope clamp).
+async fn set_typography_field_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    field_label: &'static str,
+    mutate: impl FnOnce(&mut PrefsView),
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    mutate(&mut prefs);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Field name only — never the value (a typography preset is not secret, but
+    // the field-name-only discipline is uniform across prefs setters).
+    tracing::info!(event = "prefs_written", field = field_label);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `editor_text_size` preset
+/// (editor-typography) — `sm`/`md`/`lg`/`xl`, or `None` to clear to the `md`
+/// default. Read-modify-write under the write mutex; no native side-effect.
+#[tauri::command]
+pub async fn set_editor_text_size<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(&dir, state.inner(), "editor_text_size", |p| {
+        p.editor_text_size = value;
+    })
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `editor_line_spacing` preset
+/// (editor-typography) — `tight`/`normal`/`relaxed`, or `None` to clear.
+#[tauri::command]
+pub async fn set_editor_line_spacing<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(&dir, state.inner(), "editor_line_spacing", |p| {
+        p.editor_line_spacing = value;
+    })
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `editor_content_width` preset
+/// (editor-typography) — `narrow`/`normal`/`wide`/`full`, or `None` to clear.
+#[tauri::command]
+pub async fn set_editor_content_width<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(&dir, state.inner(), "editor_content_width", |p| {
+        p.editor_content_width = value;
+    })
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `editor_font_family` preset
+/// (editor-typography) — `mono`/`sans`, or `None` to clear to the `mono` default.
+#[tauri::command]
+pub async fn set_editor_font_family<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(&dir, state.inner(), "editor_font_family", |p| {
+        p.editor_font_family = value;
+    })
+    .await
 }
 
 /// Slot::Unlocked-gated setter for the `favorites` sequence — the user's
@@ -1396,6 +1549,7 @@ mod tests {
                 &account_hash,
                 &PrefsView {
                     screen_capture_protection: false,
+                    show_note_timestamps: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),
                     item_colors: Default::default(),
@@ -1408,6 +1562,10 @@ mod tests {
                     favorites: Vec::new(),
                     item_order: Vec::new(),
                     editor_layout: None,
+                    editor_content_width: None,
+                    editor_font_family: None,
+                    editor_line_spacing: None,
+                    editor_text_size: None,
                     label: None,
                     last_backup_at: None,
                     spell_enabled: None,
@@ -2002,6 +2160,61 @@ mod tests {
         });
     }
 
+    // ---- editor-typography setters ------------------------------------
+
+    #[test]
+    fn set_editor_text_size_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-typo-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_typography_field_with_dir(tmp.path(), &state, "editor_text_size", |p| {
+                    p.editor_text_size = Some(String::from("lg"));
+                })
+                .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn typography_presets_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
+
+            set_typography_field_with_dir(tmp.path(), &state, "editor_text_size", |p| {
+                p.editor_text_size = Some(String::from("lg"));
+            })
+            .await
+            .expect("write text size");
+            set_typography_field_with_dir(tmp.path(), &state, "editor_font_family", |p| {
+                p.editor_font_family = Some(String::from("sans"));
+            })
+            .await
+            .expect("write font family");
+            assert!(tmp.path().join("vault.prefs").exists());
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after typography write");
+            assert_eq!(view.editor_text_size.as_deref(), Some("lg"));
+            assert_eq!(view.editor_font_family.as_deref(), Some("sans"));
+            // Pre-existing defaults untouched.
+            assert!(view.screen_capture_protection);
+
+            // None clears the field back to the default (omitted on disk).
+            set_typography_field_with_dir(tmp.path(), &state, "editor_text_size", |p| {
+                p.editor_text_size = None;
+            })
+            .await
+            .expect("clear text size");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert_eq!(view.editor_text_size, None);
+            assert_eq!(view.editor_font_family.as_deref(), Some("sans"));
+        });
+    }
+
     // ---- spell-check setters (MYND-267) -------------------------------
 
     #[test]
@@ -2057,6 +2270,51 @@ mod tests {
                 .await
                 .expect("read after disable");
             assert_eq!(view.spell_enabled, Some(false));
+        });
+    }
+
+    // ---- show_note_timestamps setter (sidebar-note-timestamps) --------
+
+    #[test]
+    fn set_show_note_timestamps_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-timestamps-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_show_note_timestamps_with_dir(tmp.path(), &state, false).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn show_note_timestamps_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
+
+            // Default (no write yet) reads back as `true` (visible).
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read default");
+            assert!(view.show_note_timestamps);
+
+            // Turn OFF persists (disk-first) + round-trips.
+            set_show_note_timestamps_with_dir(tmp.path(), &state, false)
+                .await
+                .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after off");
+            assert!(!view.show_note_timestamps);
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Turn back ON overwrites (re-encodes byte-identical to pre-feature).
+            set_show_note_timestamps_with_dir(tmp.path(), &state, true)
+                .await
+                .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after on");
+            assert!(view.show_note_timestamps);
         });
     }
 

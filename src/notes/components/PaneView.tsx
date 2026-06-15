@@ -25,6 +25,7 @@ import { useResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
+import { typographyStyle } from "../../editor/typography";
 import { useAutosave, type SaveStatus } from "../useAutosave";
 import { countBodyWords } from "../wordCount";
 import {
@@ -401,7 +402,16 @@ export function PaneView({
       return <PaneLoading />;
     }
     return (
-      <div style={{ maxWidth: 680, margin: "0 auto" }}>
+      // Editor-typography: the content max-width + the three CSS custom
+      // properties (`--editor-text-size` / `--editor-line-spacing` /
+      // `--editor-font-family`) come from `typographyStyle(prefs)`. The vars
+      // inherit into the child `.cm-editor`, which reads them via
+      // `var(--editor-*)` in `theme.ts` — so a preset change re-renders this
+      // wrapper and updates the editor live (no CodeMirror remount).
+      <div
+        data-testid="editor.content-frame"
+        style={{ ...typographyStyle(prefs), margin: "0 auto" }}
+      >
         <CMEditor
           value={content}
           onChange={setContent}
@@ -412,14 +422,12 @@ export function PaneView({
             width: "100%",
             minHeight: 360,
             color: "var(--fg-1)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 14,
-            lineHeight: 1.7,
           }}
         />
       </div>
     );
   }, [
+    prefs,
     inNewTabState,
     activeViewId,
     isGraph,

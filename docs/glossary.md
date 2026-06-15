@@ -408,6 +408,12 @@ The EdDSA signature scheme over the twisted Edwards form of Curve25519 (RFC 8032
 Used in: `threat-model.md` §3 TB7
 Reference: RFC 8032.
 
+### **editor typography** &nbsp; 📦 *Product*
+
+The user-tunable presets for the editor's reading surface: **text size** (`sm`/`md`/`lg`/`xl`), **line spacing** (`tight`/`normal`/`relaxed`), **content width** (`narrow`/`normal`/`wide`/`full`), and **font** (`mono`/`sans`). Each is a closed enum stored as a free string in the four `editor_*` fields of the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2); the client is the single authority mapping a preset to a concrete CSS value and mapping a `null`/unknown value to that field's canonical default (`md` / `normal` / `normal` / `mono`). Cosmetic and **non-load-bearing** (AS-low) — a tampered value can at worst change how the text renders. Applied live in the editor via CSS custom properties (no remount); the heading sizes are `em`-relative so they scale with the base text size. Configured in Settings → Editor. See also [vault.prefs](#vaultprefs).
+
+Used in: `spec/protocol.md` §9.5.2
+
 ### **enc_item_key** &nbsp; 🗝️ *Key/identifier*
 
 The on-disk wrapped form of a per-note `item_key`. Layout per `spec/protocol.md` §9.2: 32 bytes of XChaCha20-Poly1305 ciphertext over the random `item_key`, followed by the 32-byte CTX commitment tag. Encrypted under the singleton `itemsKey` with `item_key_nonce`.

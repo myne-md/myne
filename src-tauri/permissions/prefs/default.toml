@@ -28,11 +28,16 @@ permissions = [
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
+  "allow-set-editor-text-size",
+  "allow-set-editor-line-spacing",
+  "allow-set-editor-content-width",
+  "allow-set-editor-font-family",
   "allow-set-item-colors",
   "allow-set-folder-icons",
   "allow-vault-set-label",
   "allow-set-spell-enabled",
   "allow-set-spell-languages",
+  "allow-set-show-note-timestamps",
   "allow-upsert-saved-view",
   "allow-delete-saved-view",
   "allow-set-view-order",
@@ -128,6 +133,32 @@ commands.allow = ["set_daily_template"]
 # as the other allow-set-* permissions — v0.2 multi-window MUST NOT grant
 # these to any non-main window. Both atomic-write vault.prefs with no native
 # side-effect; non-load-bearing (cosmetic, AS-low).
+# editor-typography: four write setters for the editor text-size / line-spacing
+# / content-width / font-family presets. Each inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
+# grant these to any non-main window. All atomic-write vault.prefs with no native
+# side-effect; non-load-bearing cosmetic (no clamp; the client validates the
+# preset enum and maps unknown→default).
+[[permission]]
+identifier = "allow-set-editor-text-size"
+description = "Allow invoking prefs:set_editor_text_size (Slot::Unlocked-gated setter for the editor_text_size preset — sm/md/lg/xl base text size, Option<String> where None clears to the md default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_text_size"]
+
+[[permission]]
+identifier = "allow-set-editor-line-spacing"
+description = "Allow invoking prefs:set_editor_line_spacing (Slot::Unlocked-gated setter for the editor_line_spacing preset — tight/normal/relaxed, Option<String> where None clears to the normal default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_line_spacing"]
+
+[[permission]]
+identifier = "allow-set-editor-content-width"
+description = "Allow invoking prefs:set_editor_content_width (Slot::Unlocked-gated setter for the editor_content_width preset — narrow/normal/wide/full, Option<String> where None clears to the normal default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_content_width"]
+
+[[permission]]
+identifier = "allow-set-editor-font-family"
+description = "Allow invoking prefs:set_editor_font_family (Slot::Unlocked-gated setter for the editor_font_family preset — mono/sans, Option<String> where None clears to the mono default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_font_family"]
+
 [[permission]]
 identifier = "allow-set-item-colors"
 description = "Allow invoking prefs:set_item_colors (Slot::Unlocked-gated setter for the item_colors map — per-item color labels keyed by note UUID or canonical folder path; atomic-writes vault.prefs with no native side-effect)."
@@ -163,6 +194,17 @@ commands.allow = ["set_spell_enabled"]
 identifier = "allow-set-spell-languages"
 description = "Allow invoking prefs:set_spell_languages (Slot::Unlocked-gated setter for the spell_languages set — the active spell-check language tags, SYNC-11 union; codec NFC-sorts+dedupes; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_spell_languages"]
+
+# sidebar-note-timestamps: a write setter for the show_note_timestamps toggle —
+# the per-note "last edited" date under each sidebar note row. Inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp). The field
+# is a plain bool defaulting true; the codec omits it on disk when true.
+[[permission]]
+identifier = "allow-set-show-note-timestamps"
+description = "Allow invoking prefs:set_show_note_timestamps (Slot::Unlocked-gated setter for the show_note_timestamps bool — show/hide the per-note last-edited date in the sidebar; default true is omitted on disk; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_show_note_timestamps"]
 
 # MYND-273 Saved Views: save/edit (upsert-by-id) of one saved-view definition.
 # Inherits the same main-window-only invariant as the other allow-set-*

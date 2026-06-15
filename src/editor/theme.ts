@@ -14,9 +14,14 @@ export const myneTheme = EditorView.theme({
   "&": {
     backgroundColor: "transparent",
     color: "var(--fg-1)",
-    fontFamily: "var(--font-mono)",
-    fontSize: "14px",
-    lineHeight: "1.7",
+    // Editor-typography presets (set live as CSS custom properties on the
+    // editor's content wrapper in PaneView from `usePrefs`). The fallbacks are
+    // the canonical defaults, so an editor mounted outside that wrapper (or a
+    // pre-feature vault) renders exactly as before. Heading sizes below are
+    // `em`-relative, so they scale with `--editor-text-size`.
+    fontFamily: "var(--editor-font-family, var(--font-mono))",
+    fontSize: "var(--editor-text-size, 14px)",
+    lineHeight: "var(--editor-line-spacing, 1.7)",
   },
   ".cm-scroller": {
     fontFamily: "inherit",
@@ -47,7 +52,7 @@ export const myneTheme = EditorView.theme({
   // Headings — apply via `Decoration.line` from heading.ts.
   ".cm-h1": {
     fontFamily: "var(--font-display, var(--font-sans))",
-    fontSize: "28px",
+    fontSize: "2em",
     fontWeight: "700",
     lineHeight: "1.25",
     letterSpacing: "-0.015em",
@@ -58,31 +63,31 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-h2": {
     fontFamily: "var(--font-display, var(--font-sans))",
-    fontSize: "22px",
+    fontSize: "1.571em",
     fontWeight: "700",
     lineHeight: "1.3",
   },
   ".cm-h3": {
     fontFamily: "var(--font-display, var(--font-sans))",
-    fontSize: "18px",
+    fontSize: "1.286em",
     fontWeight: "600",
     lineHeight: "1.35",
   },
   ".cm-h4": {
     fontFamily: "var(--font-display, var(--font-sans))",
-    fontSize: "16px",
+    fontSize: "1.143em",
     fontWeight: "600",
     lineHeight: "1.4",
   },
   ".cm-h5": {
     fontFamily: "var(--font-display, var(--font-sans))",
-    fontSize: "14px",
+    fontSize: "1em",
     fontWeight: "600",
     lineHeight: "1.4",
   },
   ".cm-h6": {
     fontFamily: "var(--font-display, var(--font-sans))",
-    fontSize: "13px",
+    fontSize: "0.929em",
     fontWeight: "600",
     lineHeight: "1.4",
     color: "var(--fg-2)",
