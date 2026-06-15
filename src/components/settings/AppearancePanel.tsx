@@ -3,6 +3,11 @@
 // picker (enables with MYND-112). Disabled-control discipline per
 // `decisions.md` 2026-05-08 — real labels, no "Coming soon" copy.
 //
+// Scope: purely VISUAL controls. The non-visual editor-behaviour controls
+// (spell-check, daily-notes) that previously lived here moved to the new
+// Editor panel (`EditorPanel.tsx`) — see the taxonomy entry in
+// `docs/decisions.md` superseding the 2026-05-08 5-panel lock.
+//
 // Theme model (MYND-110): the choice persists in the encrypted vault.prefs
 // blob (`theme: Option<ThemeChoice>`, None ≡ system). Selecting a segment is
 // **disk-first** — `setTheme` persists, then `applyTheme` flips `<html
@@ -15,8 +20,6 @@
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { Button } from "../primitives/Button";
 import { ControlBlock } from "./ControlBlock";
-import { DailyNotesSettings } from "./DailyNotesSettings";
-import { SpellSettings } from "./SpellSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { prefsRead, setTheme, type ThemeChoice } from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
@@ -172,12 +175,6 @@ export function AppearancePanel() {
           </div>
         }
       />
-
-      {/* Daily-notes configuration (MYND-191) — folder / date-format / template. */}
-      <DailyNotesSettings />
-
-      {/* Spell-check configuration (MYND-267) — toggle + language picker. */}
-      <SpellSettings />
     </div>
   );
 }

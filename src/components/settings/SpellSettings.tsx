@@ -4,13 +4,17 @@
 // Each control persists **disk-first** via the MYND-262/266 prefs setters; no
 // in-flight gating (matches the theme / daily-notes controls alongside).
 //
-// Placement: inside the Appearance panel (the 5-panel taxonomy is locked;
-// spell-check is preferences-adjacent — the DailyNotesSettings precedent). v1
-// bundles 23 languages (TR deferred, SYNC-12); the picker lists exactly the
-// manifest, so adding a bundled language surfaces here with no edit.
+// Placement: inside the Editor panel (`EditorPanel.tsx`) — note-authoring
+// behaviour, not visual appearance. Moved out of Appearance by the
+// `docs/decisions.md` taxonomy entry superseding the 2026-05-08 5-panel lock
+// (the DailyNotesSettings precedent moved alongside it). v1 bundles 23
+// languages (TR deferred, SYNC-12); the picker lists exactly the manifest, so
+// adding a bundled language surfaces here with no edit.
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { ControlBlock } from "./ControlBlock";
+import { SearchableSelect } from "../primitives/SearchableSelect";
+import type { SelectOption } from "../primitives/Select";
 import { BLOCK_STYLE, LABEL_STYLE, HELPER_STYLE } from "./panel-styles";
 import {
   prefsRead,
@@ -34,22 +38,6 @@ const TOGGLE_STYLE: CSSProperties = {
   color: "var(--fg-1)",
   cursor: "pointer",
   alignSelf: "flex-start",
-};
-
-const PICKER_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-1)",
-  alignSelf: "flex-start",
-};
-
-const ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  color: "var(--fg-1)",
 };
 
 const ERROR_STYLE: CSSProperties = {
@@ -92,6 +80,13 @@ function langLabel(tag: string): string {
   return LANG_LABELS[tag] ?? tag;
 }
 
+/** The bundled languages as dropdown options, sorted by their display label so
+ *  the searchable list reads alphabetically (en-US stays the manifest default
+ *  for selection, but order here is purely presentational). */
+const LANG_OPTIONS: readonly SelectOption<string>[] = [...BUNDLED_SPELL_LANGUAGES]
+  .map((tag) => ({ value: tag, label: langLabel(tag) }))
+  .sort((a, b) => a.label.localeCompare(b.label));
+
 export function SpellSettings() {
   const [enabled, setEnabled] = useState(true);
   const [active, setActive] = useState<string[]>([]);
@@ -133,14 +128,13 @@ export function SpellSettings() {
     }
   }
 
-  async function toggleLanguage(tag: string, on: boolean) {
-    const next = on ? [...new Set([...active, tag])] : active.filter((t) => t !== tag);
+  async function setLanguages(next: string[]) {
     const prev = active;
     setActive(next); // optimistic
     try {
       await setSpellLanguages(next);
       setSpellConfig(enabled, next); // live-update the open editor
-      // Drop the dict of a just-removed language; an added one lazy-loads on the
+      // Drop the dicts of just-removed languages; added ones lazy-load on the
       // next scan. Only when enabled (disabled → already freed in toggleEnabled).
       if (enabled) void setActiveSpellLanguages(next);
       setError(null);
@@ -174,24 +168,18 @@ export function SpellSettings() {
         <span style={LABEL_STYLE} id="spell-langs-label">
           Languages
         </span>
-        <div
-          role="group"
-          aria-labelledby="spell-langs-label"
-          data-testid="settings.spell-language-select"
-          style={PICKER_STYLE}
-        >
-          {BUNDLED_SPELL_LANGUAGES.map((tag) => (
-            <label key={tag} style={ROW_STYLE} data-lang={tag}>
-              <input
-                type="checkbox"
-                checked={active.includes(tag)}
-                disabled={!enabled}
-                onChange={(e) => void toggleLanguage(tag, e.target.checked)}
-              />
-              {langLabel(tag)}
-            </label>
-          ))}
-        </div>
+        <SearchableSelect
+          multiple
+          options={LANG_OPTIONS}
+          selected={active}
+          onChange={(next) => void setLanguages(next)}
+          disabled={!enabled}
+          aria-label="Spell-check languages"
+          testId="settings.spell-language-select"
+          placeholder="Select languages…"
+          searchPlaceholder="Search languages…"
+          emptyText="No languages match."
+        />
         <p style={HELPER_STYLE}>
           A word is correct if it’s valid in any selected language — handy for
           mixing English terms into other-language notes.

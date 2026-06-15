@@ -97,14 +97,19 @@ describeE2E("pf1 theme + auto-lock round-trip (MYND-225)", () => {
         await expectThemeAttr(s, "dark");
 
         // Privacy → Auto-lock 15 min (default is 300; a non-default
-        // value is what proves the read-back).
+        // value is what proves the read-back). The control is now a searchable
+        // dropdown: open the trigger, click the 900s option, then confirm the
+        // trigger summarises the choice by its label.
         await (await s.byTestId("settings.tab-privacy")).click();
+        await (await s.byTestId("settings.auto-lock-select")).click();
         await (
-          await s.waitForElement('[data-testid="settings.auto-lock-select"] option[value="900"]')
+          await s.waitForElement(
+            '[data-testid="settings.auto-lock-select-option"][data-value="900"]',
+          )
         ).click();
-        // A native <select> mutates synchronously on option click — a
-        // single read suffices (the post-reload read below is the poll).
-        if ((await (await s.byTestId("settings.auto-lock-select")).property<string>("value")) !== "900") {
+        if (
+          !(await (await s.byTestId("settings.auto-lock-select")).textContent()).includes("15 min")
+        ) {
           throw new Error("auto-lock select did not register the option click");
         }
         await closeSettings(s);
@@ -128,9 +133,10 @@ describeE2E("pf1 theme + auto-lock round-trip (MYND-225)", () => {
         await (await s.byTestId("settings.tab-privacy")).click();
         await s.waitUntil(
           async () =>
-            (await (await s.byTestId("settings.auto-lock-select")).property<string>("value")) ===
-              "900" || null,
-          { label: "auto-lock select reads back 900" },
+            (await (await s.byTestId("settings.auto-lock-select")).textContent()).includes(
+              "15 min",
+            ) || null,
+          { label: "auto-lock select reads back 15 min (900s)" },
         );
       },
     );

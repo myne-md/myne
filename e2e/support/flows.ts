@@ -153,7 +153,7 @@ export async function dismissImporterOffer(session: Session): Promise<void> {
  *  opens on Account). */
 export async function openSettings(
   session: Session,
-  tab?: "account" | "privacy" | "appearance" | "storage" | "about",
+  tab?: "account" | "privacy" | "editor" | "appearance" | "storage" | "about",
 ): Promise<void> {
   await (await session.byTestId("editor.settings-cta")).click();
   await session.byTestId("settings.modal");

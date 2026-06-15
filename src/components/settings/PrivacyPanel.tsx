@@ -15,6 +15,8 @@
 
 import type { CSSProperties } from "react";
 import { usePrefs } from "../../hooks/usePrefs";
+import { SearchableSelect } from "../primitives/SearchableSelect";
+import type { SelectOption } from "../primitives/Select";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
@@ -153,17 +155,10 @@ const AUTO_LOCK_OPTIONS: ReadonlyArray<{ secs: number; label: string }> = [
   { secs: 3600, label: "1 hour" },
 ];
 
-const SELECT_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "4px 8px",
-  background: "var(--paper)",
-  color: "var(--fg-1)",
-  border: "1px solid var(--line-2)",
-  borderRadius: 3,
-  cursor: "pointer",
-  flexShrink: 0,
-};
+// The same offered durations as SearchableSelect options (value = the seconds
+// as a string; the row maps back to a number on change).
+const AUTO_LOCK_SELECT_OPTIONS: readonly SelectOption<string>[] =
+  AUTO_LOCK_OPTIONS.map((o) => ({ value: String(o.secs), label: o.label }));
 
 /**
  * Resolve the value the selector displays: the stored timeout when it matches
@@ -191,20 +186,18 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
         <span style={LABEL_STYLE} id="auto-lock-label">
           Auto-lock
         </span>
-        <select
-          aria-labelledby="auto-lock-label"
-          aria-describedby="auto-lock-helper"
-          data-testid="settings.auto-lock-select"
-          value={seconds}
-          onChange={(e) => onChange(Number(e.target.value))}
-          style={SELECT_STYLE}
-        >
-          {AUTO_LOCK_OPTIONS.map((o) => (
-            <option key={o.secs} value={o.secs}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <SearchableSelect
+          options={AUTO_LOCK_SELECT_OPTIONS}
+          selected={[String(seconds)]}
+          onChange={(next) => {
+            const secs = Number(next[0]);
+            if (!Number.isNaN(secs)) onChange(secs);
+          }}
+          aria-label="Auto-lock"
+          testId="settings.auto-lock-select"
+          searchPlaceholder="Search durations…"
+          emptyText="No durations match."
+        />
       </div>
       <p id="auto-lock-helper" style={HELPER_STYLE}>
         Lock the vault after this much inactivity.

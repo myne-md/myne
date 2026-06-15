@@ -59,13 +59,17 @@ describeE2E("al1 idle auto-lock returns to the same vault (MYND-229)", () => {
 
         // Privacy → Auto-lock 1 min (60s) — the smallest offered option,
         // so the chain fires as soon as the harness can plausibly wait it
-        // out. The write lands on disk and updates the cached timer live;
-        // a single read confirms the native <select> registered the click.
+        // out. The write lands on disk and updates the cached timer live.
+        // The control is now a searchable dropdown: open the trigger, click
+        // the 60s option, then confirm the trigger label registered the choice.
         await openSettings(s, "privacy");
+        await (await s.byTestId("settings.auto-lock-select")).click();
         await (
-          await s.waitForElement('[data-testid="settings.auto-lock-select"] option[value="60"]')
+          await s.waitForElement(
+            '[data-testid="settings.auto-lock-select-option"][data-value="60"]',
+          )
         ).click();
-        if ((await (await s.byTestId("settings.auto-lock-select")).property<string>("value")) !== "60") {
+        if (!(await (await s.byTestId("settings.auto-lock-select")).textContent()).includes("1 min")) {
           throw new Error("auto-lock select did not register the 1-min option");
         }
         await closeSettings(s);
