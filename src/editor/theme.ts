@@ -35,8 +35,13 @@ export const myneTheme = EditorView.theme({
   "&.cm-focused .cm-cursor": {
     borderLeftColor: "var(--accent, #2c4a7a)",
   },
+  // Text selection (double-click word, drag, Cmd/Ctrl+A). A neutral
+  // `--paper-3` fill is invisible in dark mode — there it sits one step off
+  // the editor paper (#232220 vs #1a1a17) and the highlight vanishes. Use the
+  // same tinted accent as `.cm-table-cell-input::selection` below; the accent
+  // token flips per theme, so the wash stays visible in both light and dark.
   "&.cm-focused .cm-selectionBackground, ::selection": {
-    backgroundColor: "var(--paper-3, #ece9e2)",
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 28%, transparent)",
   },
 
   // Headings — apply via `Decoration.line` from heading.ts.
@@ -184,6 +189,25 @@ export const myneTheme = EditorView.theme({
     borderRadius: "var(--radius-1, 3px)",
     padding: "1px 3px",
     color: "var(--fg-1)",
+  },
+  // Multi-color highlight (decisions.md 2026-06-15): `<mark class="hl-…">`
+  // overrides ONLY the wash; radius/padding/ink inherit the base rule above.
+  // Class set is closed at the sanitizer (HIGHLIGHT_CLASSES); `hl-yellow` is the
+  // default amber alias. An unknown/stripped class falls back to the base mark.
+  ".cm-embedded-html mark.hl-yellow": {
+    backgroundColor: "var(--highlight, #f3e7c4)",
+  },
+  ".cm-embedded-html mark.hl-green": {
+    backgroundColor: "var(--highlight-green, #d8e9cf)",
+  },
+  ".cm-embedded-html mark.hl-blue": {
+    backgroundColor: "var(--highlight-blue, #d3e2ee)",
+  },
+  ".cm-embedded-html mark.hl-pink": {
+    backgroundColor: "var(--highlight-pink, #efd8e2)",
+  },
+  ".cm-embedded-html mark.hl-purple": {
+    backgroundColor: "var(--highlight-purple, #e2d8ee)",
   },
   ".cm-embedded-html kbd": {
     fontFamily: "var(--font-mono)",
@@ -450,7 +474,7 @@ export const myneTheme = EditorView.theme({
     userSelect: "none",
   },
   ".cm-table-handle::before": { content: '"\\283f"' }, // ⠿ six-dot grip
-  ".cm-table-handle-col": { top: "-16px", left: "0", right: "0", height: "16px" },
+  ".cm-table-handle-col": { top: "-16px", left: "0", right: "0", height: "16px", justifyContent: "flex-start", paddingLeft: "2px" },
   ".cm-table-handle-row": { left: "-16px", top: "0", bottom: "0", width: "16px" },
   ".cm-table-handle-col:hover, .cm-table-handle-row:hover": { opacity: "1" },
   ".cm-table-handle:hover": { color: "var(--accent, #2c4a7a)" },

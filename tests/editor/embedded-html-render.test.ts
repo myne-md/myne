@@ -5,9 +5,13 @@
 // literal; raw revealed on-cursor; byte-stable. The conformance harness stubs
 // the sanitizer loader (never-resolve), so this test dispatches a real purifier.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import DOMPurify from "dompurify";
 import { setPurifier } from "../../src/editor/decorations/embedded-html";
+import {
+  type Purifier,
+  registerHighlightClassHook,
+} from "../../src/editor/html/sanitize";
 import {
   type Mounted,
   focusAt,
@@ -17,6 +21,14 @@ import {
   roundTripBytes,
   teardown,
 } from "./_conformance";
+
+// This harness injects the raw DOMPurify default (bypassing `loadPurifier`,
+// which the conformance harness stubs to never-resolve), so the highlight-class
+// hook isn't registered automatically — apply it here to the same instance so
+// `<mark class="hl-*">` survives sanitization exactly as it does in production.
+beforeAll(() => {
+  registerHighlightClassHook(DOMPurify as unknown as Purifier);
+});
 
 let m: Mounted | null = null;
 afterEach(() => {
@@ -46,6 +58,20 @@ describe("inline embedded HTML", () => {
     m = withPurifier('<mark>hi</mark> <abbr title="HyperText">A</abbr>\n');
     expect(query(m, ".cm-embedded-html mark")).not.toBeNull();
     expect(query(m, ".cm-embedded-html abbr")).not.toBeNull();
+  });
+
+  it("renders a colored <mark class='hl-green'> keeping the class", () => {
+    m = withPurifier('<mark class="hl-green">pop</mark>\n');
+    const mark = query(m, ".cm-embedded-html mark");
+    expect(mark).not.toBeNull();
+    expect(mark!.classList.contains("hl-green")).toBe(true);
+  });
+
+  it("drops an unknown highlight class, rendering a plain <mark>", () => {
+    m = withPurifier('<mark class="hl-orange">pop</mark>\n');
+    const mark = query(m, ".cm-embedded-html mark");
+    expect(mark).not.toBeNull();
+    expect(mark!.getAttribute("class")).toBeNull();
   });
 
   it("strips an on* handler from the rendered HTML", () => {

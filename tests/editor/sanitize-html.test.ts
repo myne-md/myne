@@ -68,3 +68,40 @@ describe("sanitizeEmbeddedHtml — XSS boundary (strips)", () => {
     expect(out).toBe("<kbd>K</kbd>");
   });
 });
+
+describe("sanitizeEmbeddedHtml — multi-color highlight class (decisions.md 2026-06-15)", () => {
+  it("keeps each allowlisted hl-* token on <mark>", async () => {
+    for (const cls of ["hl-yellow", "hl-green", "hl-blue", "hl-pink", "hl-purple"]) {
+      const out = await sanitizeEmbeddedHtml(`<mark class="${cls}">x</mark>`);
+      expect(out).toBe(`<mark class="${cls}">x</mark>`);
+    }
+  });
+
+  it("strips an unknown highlight token (not in the closed set)", async () => {
+    const out = await sanitizeEmbeddedHtml('<mark class="hl-orange">x</mark>');
+    expect(out).toBe("<mark>x</mark>");
+  });
+
+  it("strips a multi-class value even if it contains an allowlisted token", async () => {
+    const out = await sanitizeEmbeddedHtml('<mark class="hl-green extra">x</mark>');
+    expect(out).toBe("<mark>x</mark>");
+  });
+
+  it("strips an hl-* class off a non-<mark> tag", async () => {
+    const out = await sanitizeEmbeddedHtml('<kbd class="hl-green">K</kbd>');
+    expect(out).toBe("<kbd>K</kbd>");
+  });
+
+  it("still strips style/id off a <mark> carrying a valid hl-* class", async () => {
+    const out = await sanitizeEmbeddedHtml(
+      '<mark class="hl-blue" style="x" id="z">x</mark>',
+    );
+    expect(out).toBe('<mark class="hl-blue">x</mark>');
+  });
+
+  it("applies the constraint identically on repeat calls (hook registered once)", async () => {
+    await sanitizeEmbeddedHtml('<mark class="hl-green">a</mark>');
+    const out = await sanitizeEmbeddedHtml('<mark class="hl-evil">b</mark>');
+    expect(out).toBe("<mark>b</mark>");
+  });
+});

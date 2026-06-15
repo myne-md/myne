@@ -122,6 +122,14 @@
      light mode (dark ink reads on it), a dark amber in dark mode (light ink
      reads on it). Single-sourced like the other dark values below. */
   --highlight:     #f3e7c4;
+  /* Multi-color highlight palette (`<mark class="hl-…">`; decisions.md
+     2026-06-15). `--highlight` IS the yellow/default (`hl-yellow` + `==text==`).
+     Four sibling washes follow the same per-theme flip discipline: low-sat paper
+     washes here, dark twins below. Closed vocabulary — see sanitize.ts. */
+  --highlight-green:  #d8e9cf;
+  --highlight-blue:   #d3e2ee;
+  --highlight-pink:   #efd8e2;
+  --highlight-purple: #e2d8ee;
 
   /* -- Color -- Label slots (MYND-184; sidebar color labels) ---------- */
   /* Six muted, hue-named DECORATIVE slots for note/folder color dots — NOT a
@@ -217,6 +225,10 @@
   --_success-dark:      #8cc1a4;
   --_success-soft-dark: #1a2620;
   --_highlight-dark:    #4f4422;
+  --_highlight-green-dark:  #2c3d28;
+  --_highlight-blue-dark:   #24384a;
+  --_highlight-pink-dark:   #46283a;
+  --_highlight-purple-dark: #392a4c;
 
   /* Label slots — dark-surface values (MYND-184). Mirrors colors_and_type.css. */
   --_label-clay-dark:   #d99683;
@@ -286,6 +298,10 @@
   --info:         var(--accent);
   --info-soft:    var(--accent-soft);
   --highlight:    var(--_highlight-dark);
+  --highlight-green:  var(--_highlight-green-dark);
+  --highlight-blue:   var(--_highlight-blue-dark);
+  --highlight-pink:   var(--_highlight-pink-dark);
+  --highlight-purple: var(--_highlight-purple-dark);
 
   --label-clay:   var(--_label-clay-dark);
   --label-ochre:  var(--_label-ochre-dark);
@@ -341,6 +357,10 @@
     --info:         var(--accent);
     --info-soft:    var(--accent-soft);
     --highlight:    var(--_highlight-dark);
+    --highlight-green:  var(--_highlight-green-dark);
+    --highlight-blue:   var(--_highlight-blue-dark);
+    --highlight-pink:   var(--_highlight-pink-dark);
+    --highlight-purple: var(--_highlight-purple-dark);
 
     --label-clay:   var(--_label-clay-dark);
     --label-ochre:  var(--_label-ochre-dark);

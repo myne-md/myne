@@ -160,6 +160,39 @@ const CSS = `
   background-color: var(--paper-2, #f3f1eb);
 }
 
+/* Highlight color control (decisions.md 2026-06-15): "H" swatch + caret that
+   opens a row of 5 color squares. Reuses the heading-dropdown chrome. */
+.cm-toolbar-highlight-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.cm-toolbar-highlight-caret {
+  width: 16px;
+  font-size: 10px;
+  color: var(--fg-3, #6b6a64);
+}
+.cm-toolbar-highlight-dropdown {
+  display: flex;
+  gap: 4px;
+  background-color: var(--paper, #faf8f3);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
+  padding: 6px;
+}
+.cm-toolbar-highlight-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line-1, #e3e2dd);
+  border-radius: var(--radius-1, 3px);
+  cursor: pointer;
+  padding: 0;
+}
+.cm-toolbar-highlight-swatch:hover {
+  border-color: var(--line-3, #a3a29c);
+}
+
 .cm-url-overlay {
   display: inline-flex;
   align-items: center;

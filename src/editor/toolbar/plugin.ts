@@ -26,9 +26,20 @@ const TOOLBAR_BUTTONS = [
   { id: "italic", label: "I", weight: "600", italic: true, action: toggleAction("*", "*") },
   { id: "strike", label: "S", weight: "600", strike: true, action: toggleAction("~~", "~~") },
   { id: "code", label: "<>", weight: "600", mono: true, action: toggleAction("`", "`") },
-  // Highlight (MYND-156): wraps the selection in `==…==`. Rendered as a small
-  // highlight swatch so it reads distinctly from the heading "H▾" button.
-  { id: "highlight", label: "H", weight: "600", highlight: true, action: toggleAction("==", "==") },
+] as const;
+
+// Multi-color highlight palette (decisions.md 2026-06-15). Yellow is the
+// DEFAULT: it emits `==…==` (byte-identical to the pre-color behaviour, MYND-156)
+// and is what a plain click on the "H" button applies. The other four wrap the
+// selection in `<mark class="hl-…">…</mark>` — standard, portable embedded HTML
+// constrained to this closed `hl-*` set at the sanitizer (see sanitize.ts
+// HIGHLIGHT_CLASSES). The `cssVar` paints each swatch's preview square.
+const HIGHLIGHT_SWATCHES = [
+  { id: "hl-yellow", label: "Sarı", cssVar: "--highlight", open: "==", close: "==" },
+  { id: "hl-green", label: "Yeşil", cssVar: "--highlight-green", open: '<mark class="hl-green">', close: "</mark>" },
+  { id: "hl-blue", label: "Mavi", cssVar: "--highlight-blue", open: '<mark class="hl-blue">', close: "</mark>" },
+  { id: "hl-pink", label: "Pembe", cssVar: "--highlight-pink", open: '<mark class="hl-pink">', close: "</mark>" },
+  { id: "hl-purple", label: "Mor", cssVar: "--highlight-purple", open: '<mark class="hl-purple">', close: "</mark>" },
 ] as const;
 
 function toggleAction(open: string, close: string) {
@@ -55,7 +66,9 @@ function applyHeadingLevel(view: EditorView, level: number): void {
 class ToolbarView implements PluginValue {
   private container: HTMLDivElement | null = null;
   private mode: Mode = "toolbar";
-  private dropdownOpen = false;
+  // Which toolbar dropdown is open, if any. Only one at a time — heading and
+  // highlight share this single-slot discriminator so opening one closes the other.
+  private openDropdown: "heading" | "highlight" | null = null;
   private urlOverlayOpen = false;
   private savedSelection: { from: number; to: number } | null = null;
   private rafHandle: number | null = null;
@@ -125,7 +138,7 @@ class ToolbarView implements PluginValue {
       this.container.remove();
       this.container = null;
     }
-    this.dropdownOpen = false;
+    this.openDropdown = null;
     this.urlOverlayOpen = false;
     this.savedSelection = null;
   }
@@ -199,17 +212,7 @@ class ToolbarView implements PluginValue {
       const el = document.createElement("button");
       el.type = "button";
       el.className = "cm-toolbar-button";
-      if ("highlight" in btn && btn.highlight) {
-        const swatch = document.createElement("span");
-        swatch.textContent = btn.label;
-        swatch.style.backgroundColor = "var(--highlight, #f3e7c4)";
-        swatch.style.padding = "0 3px";
-        swatch.style.borderRadius = "2px";
-        swatch.style.color = "var(--fg-1)";
-        el.appendChild(swatch);
-      } else {
-        el.textContent = btn.label;
-      }
+      el.textContent = btn.label;
       el.style.fontWeight = btn.weight;
       if ("italic" in btn && btn.italic) el.style.fontStyle = "italic";
       if ("strike" in btn && btn.strike) el.style.textDecoration = "line-through";
@@ -220,6 +223,10 @@ class ToolbarView implements PluginValue {
       });
       container.appendChild(el);
     }
+    // Highlight (MYND-156 + multi-color, decisions.md 2026-06-15): an "H" swatch
+    // whose plain click applies the DEFAULT yellow (`==…==`), plus a caret that
+    // opens a 5-color swatch row. Mirrors the heading dropdown structure below.
+    this.renderHighlightControl(container);
     // Link button.
     const link = document.createElement("button");
     link.type = "button";
@@ -242,11 +249,11 @@ class ToolbarView implements PluginValue {
     headingBtn.textContent = "H▾";
     headingBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      this.dropdownOpen = !this.dropdownOpen;
+      this.openDropdown = this.openDropdown === "heading" ? null : "heading";
       this.scheduleRender();
     });
     headingWrap.appendChild(headingBtn);
-    if (this.dropdownOpen) {
+    if (this.openDropdown === "heading") {
       const drop = document.createElement("div");
       drop.className = "cm-toolbar-heading-dropdown";
       drop.style.position = "absolute";
@@ -267,7 +274,7 @@ class ToolbarView implements PluginValue {
         el.textContent = item.label;
         el.addEventListener("mousedown", (e) => {
           e.preventDefault();
-          this.dropdownOpen = false;
+          this.openDropdown = null;
           applyHeadingLevel(this.view, item.level);
         });
         drop.appendChild(el);
@@ -275,6 +282,71 @@ class ToolbarView implements PluginValue {
       headingWrap.appendChild(drop);
     }
     container.appendChild(headingWrap);
+  }
+
+  /** Highlight control: an "H" swatch button (plain click = default yellow,
+   *  byte-identical to `==…==`) plus a caret that opens a 5-color swatch row.
+   *  Non-yellow swatches wrap the selection in `<mark class="hl-…">…</mark>`. */
+  private renderHighlightControl(container: HTMLDivElement): void {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-toolbar-highlight-wrap";
+    wrap.style.position = "relative";
+
+    // Main button: applies the default yellow highlight on a plain click.
+    const mainBtn = document.createElement("button");
+    mainBtn.type = "button";
+    mainBtn.className = "cm-toolbar-button";
+    mainBtn.setAttribute("data-testid", "toolbar.highlight");
+    const swatch = document.createElement("span");
+    swatch.textContent = "H";
+    swatch.style.backgroundColor = "var(--highlight, #f3e7c4)";
+    swatch.style.padding = "0 3px";
+    swatch.style.borderRadius = "2px";
+    swatch.style.color = "var(--fg-1)";
+    mainBtn.appendChild(swatch);
+    mainBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      this.openDropdown = null;
+      toggleAction("==", "==")(this.view);
+    });
+    wrap.appendChild(mainBtn);
+
+    // Caret: opens/closes the color swatch row.
+    const caret = document.createElement("button");
+    caret.type = "button";
+    caret.className = "cm-toolbar-button cm-toolbar-highlight-caret";
+    caret.textContent = "▾";
+    caret.setAttribute("data-testid", "toolbar.highlight-caret");
+    caret.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      this.openDropdown = this.openDropdown === "highlight" ? null : "highlight";
+      this.scheduleRender();
+    });
+    wrap.appendChild(caret);
+
+    if (this.openDropdown === "highlight") {
+      const drop = document.createElement("div");
+      drop.className = "cm-toolbar-highlight-dropdown";
+      drop.style.position = "absolute";
+      drop.style.top = "32px";
+      drop.style.left = "0";
+      for (const sw of HIGHLIGHT_SWATCHES) {
+        const square = document.createElement("button");
+        square.type = "button";
+        square.className = "cm-toolbar-highlight-swatch";
+        square.title = sw.label;
+        square.setAttribute("data-testid", `toolbar.highlight-${sw.id}`);
+        square.style.backgroundColor = `var(${sw.cssVar})`;
+        square.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          this.openDropdown = null;
+          toggleAction(sw.open, sw.close)(this.view);
+        });
+        drop.appendChild(square);
+      }
+      wrap.appendChild(drop);
+    }
+    container.appendChild(wrap);
   }
 
   private renderUrlOverlay(container: HTMLDivElement): void {

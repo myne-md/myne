@@ -63,7 +63,11 @@ export const PRINT_CSS = `/* Note print stylesheet. Light palette only. */
   --warning-soft: #f5efde;  /* --warning-soft (warning callout tint) */
   --success:      #2f6048;  /* --success (success callout bar) */
   --success-soft: #e3eee8;  /* --success-soft (success callout tint) */
-  --highlight:    #f3e7c4;  /* --highlight (==highlight== / <mark> wash) */
+  --highlight:    #f3e7c4;  /* --highlight (==highlight== / <mark> / hl-yellow wash) */
+  --highlight-green:  #d8e9cf;  /* <mark class="hl-green">  wash (print: light only) */
+  --highlight-blue:   #d3e2ee;  /* <mark class="hl-blue">   wash */
+  --highlight-pink:   #efd8e2;  /* <mark class="hl-pink">   wash */
+  --highlight-purple: #e2d8ee;  /* <mark class="hl-purple"> wash */
   --radius-1: 3px;          /* --radius-1 (inline code chips) */
   --radius-2: 6px;          /* --radius-2 (callouts, code cards, images) */
 
@@ -168,7 +172,9 @@ strong { font-weight: 600; color: var(--fg-1); }
 em { font-style: italic; }
 del { text-decoration: line-through; color: var(--fg-3); }
 
-/* ==highlight== wash; sanitized embedded <mark> gets the same treatment. */
+/* ==highlight== wash; sanitized embedded <mark> gets the same treatment.
+   A bare <mark> and <mark class="hl-yellow"> are the default amber; the four
+   sibling colors override only the background (decisions.md 2026-06-15). */
 .highlight,
 mark {
   background: var(--highlight);
@@ -176,6 +182,10 @@ mark {
   padding: 0 2px;
   border-radius: 2px;
 }
+mark.hl-green  { background: var(--highlight-green); }
+mark.hl-blue   { background: var(--highlight-blue); }
+mark.hl-pink   { background: var(--highlight-pink); }
+mark.hl-purple { background: var(--highlight-purple); }
 
 hr {
   border: none;

@@ -9,23 +9,64 @@
 // DOMPurify is LAZY-LOADED via dynamic `import()` (code-split out of the cold
 // editor bundle, SYNC-4) — a note with no embedded HTML pays zero bytes.
 
+/** Hook payload subset (DOMPurify's `uponSanitizeAttribute` data arg). */
+interface SanitizeAttrData {
+  attrName: string;
+  attrValue: string;
+  keepAttr: boolean;
+}
+
 /** Minimal surface this module uses from DOMPurify. Exported so the embedded-HTML
  *  decoration shares one definition rather than re-declaring it. */
 export interface Purifier {
   sanitize(dirty: string, cfg?: Record<string, unknown>): string;
+  addHook(
+    entryPoint: "uponSanitizeAttribute",
+    hookFn: (node: Element, data: SanitizeAttrData) => void,
+  ): void;
 }
 
+// The closed multi-color-highlight class vocabulary (decisions.md 2026-06-15).
+// `class` survives the sanitizer ONLY as exactly ONE of these tokens, and ONLY
+// on a `<mark>` — enforced by the `uponSanitizeAttribute` hook below. `hl-yellow`
+// is the default amber (== `--highlight`); the rest are sibling washes.
+export const HIGHLIGHT_CLASSES = [
+  "hl-yellow",
+  "hl-green",
+  "hl-blue",
+  "hl-pink",
+  "hl-purple",
+] as const;
+const HL_SET: ReadonlySet<string> = new Set(HIGHLIGHT_CLASSES);
+
 // Ultra-tight config (the XSS boundary). Only the elements tests.md uses; only
-// `title` (for <abbr>). Everything off-list → escaped to text (KEEP_CONTENT).
-// DOMPurify always strips `on*` handlers and non-allowed attributes, so no
-// `src`/`href`/`style`/`class`/`id` survives, and no remote resource can load.
+// `title` (for <abbr>) plus `class` (constrained by the hook below to a single
+// `hl-*` token on <mark> — nothing else). Everything off-list → escaped to text
+// (KEEP_CONTENT). DOMPurify always strips `on*` handlers and non-allowed
+// attributes, so no `src`/`href`/`style`/`id` survives, and `class` survives
+// ONLY as one allowlisted highlight token on <mark>; no remote resource loads.
 const SANITIZE_CONFIG: Readonly<Record<string, unknown>> = {
   ALLOWED_TAGS: ["p", "kbd", "mark", "sub", "sup", "abbr", "details", "summary"],
-  ALLOWED_ATTR: ["title"],
+  ALLOWED_ATTR: ["title", "class"],
   KEEP_CONTENT: true,
   ALLOW_DATA_ATTR: false,
   ALLOW_ARIA_ATTR: false,
 };
+
+/** Register the highlight-class constraint hook on a purifier instance, once.
+ *  DOMPurify has no native class allowlist, so `class` is widened in
+ *  `ALLOWED_ATTR` and then narrowed here: keep it only when the element is a
+ *  `<mark>` AND the value is exactly one allowlisted `hl-*` token. Drops
+ *  multi-class, unknown tokens, and `class` on any other tag. Idempotent —
+ *  registering twice would double-drop, which is harmless, but `loadPurifier`
+ *  guards so it runs exactly once. */
+export function registerHighlightClassHook(purifier: Purifier): void {
+  purifier.addHook("uponSanitizeAttribute", (node, data) => {
+    if (data.attrName !== "class") return;
+    const ok = node.nodeName === "MARK" && HL_SET.has(data.attrValue.trim());
+    if (!ok) data.keepAttr = false;
+  });
+}
 
 type Loader = () => Promise<Purifier>;
 let load: Loader = async () => {
@@ -46,9 +87,19 @@ export function setSanitizerLoader(loader: Loader): () => void {
 }
 
 /** Lazy-load DOMPurify once (cached promise) — shared by the inline + block
- *  embedded-HTML decorations and the mermaid SVG sanitizer (SYNC-5 reuse). */
+ *  embedded-HTML decorations and the export emitter (SYNC-5 reuse). The
+ *  highlight-class hook is registered on first load, so every consumer of this
+ *  instance honours the `<mark class="hl-*">` constraint identically. */
 export function loadPurifier(): Promise<Purifier> {
-  if (purifierPromise === null) purifierPromise = load();
+  if (purifierPromise === null) {
+    purifierPromise = load().then((purifier) => {
+      // Guard: test fakes may omit `addHook`; the real DOMPurify default has it.
+      if (typeof purifier.addHook === "function") {
+        registerHighlightClassHook(purifier);
+      }
+      return purifier;
+    });
+  }
   return purifierPromise;
 }
 
