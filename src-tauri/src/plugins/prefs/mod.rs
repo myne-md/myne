@@ -78,6 +78,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::vault_set_label,
             commands::set_spell_enabled,
             commands::set_spell_languages,
+            commands::upsert_saved_view,
+            commands::delete_saved_view,
+            commands::set_view_order,
         ])
         .build()
 }

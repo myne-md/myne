@@ -35,6 +35,69 @@ export interface EditorLayout {
 export type ThemeChoice = "light" | "dark";
 
 /** Mirrors `protocol::PrefsView` (Rust side). */
+/** View render type (MYND-273, Saved Views). `map` is deliberately absent —
+ *  it needs a Maps plugin and is not representable in v1. Mirrors Rust
+ *  `ViewType` (serde lowercase). */
+export type ViewType = "table" | "cards" | "list";
+
+/** Sort direction. Mirrors Rust `SortDirection` (serde lowercase). */
+export type SortDirection = "asc" | "desc";
+
+/** A typed property-comparison operator — the closed allow-list (no arithmetic,
+ *  no function calls). Mirrors Rust `PropertyOp` (operator-literal serde
+ *  renames) and the query engine's `PropertyOp`. */
+export type PropertyOp = "==" | "!=" | ">" | "<" | ">=" | "<=" | "contains";
+
+/** A within-group sort: a property key + a direction. Mirrors Rust `ViewSort`. */
+export interface ViewSort {
+  key: string;
+  direction: SortDirection;
+}
+
+/** The recursive filter AST — boolean combinators over a closed leaf set
+ *  (MYND-273). Byte-for-byte the shape the query engine's `FilterNode` reads, so
+ *  a persisted `filters` is handed straight to the engine with no translation.
+ *  There is deliberately no arithmetic / `map` / formula node (SYNC-7 anti-eval).
+ *  Mirrors Rust `FilterNode` (`#[serde(tag = "kind")]`, camelCase kinds). */
+export type FilterNode =
+  | { kind: "and"; children: FilterNode[] }
+  | { kind: "or"; children: FilterNode[] }
+  | { kind: "not"; child: FilterNode }
+  | { kind: "hasTag"; tag: string }
+  | { kind: "inFolder"; path: string }
+  | { kind: "search"; query: string }
+  | { kind: "property"; key: string; op: PropertyOp; value: string }
+  | { kind: "all" };
+
+/** The canonical, persisted definition of one saved view (MYND-273) — the single
+ *  shape the query engine (#2), the renderer (#5), and the `.base` importer (#6)
+ *  bind to. Mirrors Rust `SavedView`. The optional fields are omitted on the wire
+ *  when unset (Rust `skip_serializing_if`), so they read back as `undefined`. */
+export interface SavedView {
+  /** Stable unique id (a UUIDv7 in practice). */
+  id: string;
+  /** User-visible view name. */
+  name: string;
+  /** Render type (`table` / `cards` / `list`). */
+  view_type: ViewType;
+  /** The filter AST (an `{ kind: "all" }` leaf for an unfiltered view). */
+  filters: FilterNode;
+  /** Optional within-group sort. */
+  sort?: ViewSort;
+  /** Optional groupBy property key. */
+  group_by?: string;
+  /** Ordered display columns (the `.base` `order` list); a sequence. */
+  columns?: string[];
+  /** Optional card width in integer pixels (cards view). */
+  card_size?: number;
+  /** Optional cover-image frontmatter property name (resolved via `attachment://`
+   *  by #5, SYNC-11) — NOT pixels. */
+  image?: string;
+  /** Optional image aspect ratio, a STRING (e.g. `"1.65"`) so the `.base` float
+   *  round-trips without a canonical-JSON float. #5 parses it for CSS. */
+  image_aspect_ratio?: string;
+}
+
 export interface PrefsView {
   screen_capture_protection: boolean;
   /**
@@ -143,6 +206,20 @@ export interface PrefsView {
    * `Option<String>` (null | string).
    */
   label: string | null;
+  /**
+   * Saved-view definitions (MYND-273) — authored filter/sort/group projections.
+   * Authored content (survives an index rebuild + vault restore), persisted in
+   * `vault.prefs` (SYNC-6). The backend encodes the array sorted by view id;
+   * display order is the separate {@link PrefsView.view_order} sequence. Absent
+   * in vaults with no views → the Rust decoder defaults it to `[]`.
+   */
+  saved_views: SavedView[];
+  /**
+   * Saved-view display order (MYND-273) — view ids in views-list / sidebar order
+   * (SYNC-10). A sequence: the backend preserves element order verbatim (not
+   * sorted/deduped; stale ids are the caller's to prune). Absent → `[]`.
+   */
+  view_order: string[];
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */
@@ -321,4 +398,35 @@ export async function setSpellEnabled(enabled: boolean): Promise<void> {
  */
 export async function setSpellLanguages(languages: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_spell_languages", { languages });
+}
+
+/**
+ * Save or edit one saved view (MYND-273) — an upsert by `id` (replaces an
+ * existing view with the same id, else appends; no duplicate). The caller passes
+ * the full {@link SavedView}. The backend atomic-writes vault.prefs with no
+ * native side-effect; an over-the-64-KiB-cap save rejects (`PrefsEncodeFailed`)
+ * BEFORE any write, leaving the prior views intact. A rejected promise means the
+ * write failed and the caller's optimistic UI must revert.
+ */
+export async function upsertSavedView(view: SavedView): Promise<void> {
+  await invoke<void>("plugin:prefs|upsert_saved_view", { view });
+}
+
+/**
+ * Delete the saved view with `id` (MYND-273). Removes it from `saved_views` and
+ * prunes the id from `view_order`. Deleting an absent id is an idempotent no-op
+ * success. Disk-first, no native side-effect.
+ */
+export async function deleteSavedView(id: string): Promise<void> {
+  await invoke<void>("plugin:prefs|delete_saved_view", { id });
+}
+
+/**
+ * Persist the full saved-view display order (MYND-273) — view ids in display
+ * order, shown in the views list / sidebar Views section. Same order-preserving,
+ * no-native-side-effect contract as {@link setItemOrder}; stale-id pruning is the
+ * caller's job (no backend GC). A rejected promise means the write failed.
+ */
+export async function setViewOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_view_order", { order });
 }

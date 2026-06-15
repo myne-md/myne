@@ -49,6 +49,8 @@ const DEFAULT_PREFS: PrefsView = {
   last_backup_at: null,
   spell_enabled: null,
   spell_languages: [],
+  saved_views: [],
+  view_order: [],
 };
 
 interface UsePrefsResult {

@@ -432,6 +432,12 @@ The user's chosen shortcut list of notes, surfaced in a dedicated Favorites sect
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-02
 
+### **filter AST** &nbsp; 📋 *Protocol*
+
+The recursive, **closed-allow-list** tree that expresses a [saved view](#saved-view)'s query (Saved Views epic, MYND-272/MYND-273). A node is a boolean combinator (`and` / `or` / `not`) over a fixed leaf set — `hasTag` and `inFolder` (both subtree-inclusive), full-text `search`, a typed `property` comparison (`== != > < >= <= contains`, date compares on frontmatter dates only), and the degenerate `all`. There is deliberately **no** arithmetic / `list.map` / formula node: the type cannot represent one, so the query layer can never evaluate arbitrary code (the "no databases / no formula" anti-feature of [vision](#vision) expressed in the type system). Serialized canonically (`#[serde(tag = "kind")]`, camelCase kinds + operator literals) inside the `saved_views` field of [vault.prefs](#vaultprefs); the query engine reads it and the renderer never re-derives it. See also [saved view](#saved-view), [property](#property). (MYND-272 / MYND-273)
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
+
 ### **folder** &nbsp; 📦 *Product*
 
 A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Folders and folderless notes share a single interleaved tree at every level, ordered by [item order](#item-order) (MYND-183) — a folderless note is not bucketed into a separate section but renders at the root level alongside top-level folders. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [item order](#item-order).
