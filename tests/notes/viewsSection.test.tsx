@@ -91,6 +91,7 @@ describe("ViewsSection", () => {
 describe("ViewsSection — management (MYND-274 task 6)", () => {
   function renderManaged(
     over: Partial<{
+      onViewSettings: (id: string) => void;
       onRename: (id: string, name: string) => void;
       onDelete: (id: string) => void;
       onMoveView: (id: string, dir: -1 | 1) => void;
@@ -99,6 +100,8 @@ describe("ViewsSection — management (MYND-274 task 6)", () => {
     const handlers = {
       onOpenView: vi.fn(),
       onNewView: vi.fn(),
+      onEditFilter: vi.fn(),
+      onViewSettings: vi.fn(),
       onRename: vi.fn(),
       onDelete: vi.fn(),
       onMoveView: vi.fn(),
@@ -120,13 +123,59 @@ describe("ViewsSection — management (MYND-274 task 6)", () => {
     fireEvent.contextMenu(row);
   }
 
-  it("right-click opens a menu with rename / move / delete", () => {
+  it("right-click opens a menu with edit / settings / rename / move / delete", () => {
     renderManaged();
     openRowMenu("v1");
     const ids = screen
       .getAllByTestId("notes.context-menu-item")
       .map((el) => el.getAttribute("data-item-id"));
-    expect(ids).toEqual(["rename", "move-up", "move-down", "delete"]);
+    // "view-settings" is offered for cards views (the test fixtures are cards).
+    expect(ids).toEqual([
+      "edit-filter",
+      "view-settings",
+      "rename",
+      "move-up",
+      "move-down",
+      "delete",
+    ]);
+  });
+
+  it("View settings… dispatches onViewSettings with the row id", () => {
+    const onViewSettings = vi.fn();
+    renderManaged({ onViewSettings });
+    openRowMenu("v2");
+    fireEvent.click(
+      screen
+        .getAllByTestId("notes.context-menu-item")
+        .find((el) => el.getAttribute("data-item-id") === "view-settings")!,
+    );
+    expect(onViewSettings).toHaveBeenCalledWith("v2");
+  });
+
+  it("omits View settings… for non-cards views", () => {
+    const listView: SavedView = {
+      id: "vl",
+      name: "Table",
+      view_type: "table",
+      filters: { kind: "all" },
+    };
+    render(
+      <ViewsSection
+        views={[listView]}
+        onOpenView={vi.fn()}
+        onNewView={vi.fn()}
+        onEditFilter={vi.fn()}
+        onViewSettings={vi.fn()}
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
+        onMoveView={vi.fn()}
+      />,
+    );
+    openRowMenu("vl");
+    const ids = screen
+      .getAllByTestId("notes.context-menu-item")
+      .map((el) => el.getAttribute("data-item-id"));
+    expect(ids).not.toContain("view-settings");
   });
 
   it("delete dispatches onDelete with the row id", () => {

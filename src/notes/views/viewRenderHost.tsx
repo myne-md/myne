@@ -15,6 +15,7 @@ import {
   CardsView,
   type CardContextMenuHandler,
   type OpenNoteHandler,
+  type SetCoverHandler,
 } from "./cardsView";
 
 const FALLBACK_STYLE: CSSProperties = {
@@ -32,11 +33,13 @@ export function ViewRenderHost({
   result,
   onOpenNote,
   onCardContextMenu,
+  onSetCover,
 }: {
   def: SavedView;
   result: ViewResult;
   onOpenNote?: OpenNoteHandler;
   onCardContextMenu?: CardContextMenuHandler;
+  onSetCover?: SetCoverHandler;
 }) {
   switch (def.view_type) {
     case "cards":
@@ -46,6 +49,7 @@ export function ViewRenderHost({
           result={result}
           onOpenNote={onOpenNote}
           onCardContextMenu={onCardContextMenu}
+          onSetCover={onSetCover}
         />
       );
     case "table":

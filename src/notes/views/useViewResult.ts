@@ -21,17 +21,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SavedView } from "../../lib/prefs";
 import { usePrefs } from "../../hooks/usePrefs";
 import { useIndexNonce } from "../indexNonce";
-import { deriveFolderTree } from "../folderTree";
-import { liveCache, sortBatchIds, useSelectedNote } from "../sidebarState";
-import { searchNotes } from "../searchNotes";
-import { byTag, vaultIndicesPropertyValues } from "../vaultIndices";
-import {
-  folderSubtreeNoteIds,
-  runView,
-  stabilizeViewResult,
-  type RunViewContext,
-  type ViewResult,
-} from "../queryEngine";
+import { useRunViewContext } from "./useRunViewContext";
+import { runView, stabilizeViewResult, type ViewResult } from "../queryEngine";
 
 export type UseViewResult = {
   def: SavedView | null;
@@ -39,9 +30,9 @@ export type UseViewResult = {
 };
 
 export function useViewResult(viewId: string): UseViewResult {
-  const { cache } = useSelectedNote();
   const { prefs } = usePrefs();
   const indexNonce = useIndexNonce();
+  const ctx = useRunViewContext();
 
   // Resolve the def from the persisted saved-views list. `null` when the id is
   // unknown (a stale tab pointing at a deleted view) → the host renders empty.
@@ -49,48 +40,6 @@ export function useViewResult(viewId: string): UseViewResult {
     () => prefs.saved_views.find((v) => v.id === viewId) ?? null,
     [prefs.saved_views, viewId],
   );
-
-  // The live (non-trashed, non-template) working set — the single trash/template
-  // gate the engine intersects every leaf with.
-  const live = useMemo(() => liveCache(cache), [cache]);
-
-  // The folder tree (each live note's `folder:` ∪ deliberate_folders) backs the
-  // subtree-inclusive `inFolder` resolver — same derivation the sidebar uses.
-  const tree = useMemo(
-    () =>
-      deriveFolderTree(
-        [...live.values()].map((r) => ({
-          noteUuid: r.noteUuid,
-          folder: r.folder,
-        })),
-        prefs.deliberate_folders,
-      ),
-    [live, prefs.deliberate_folders],
-  );
-
-  const ctx = useMemo<RunViewContext>(() => {
-    const liveIds = new Set(live.keys());
-    return {
-      liveIds,
-      resolvers: {
-        hasTag: (tag) => byTag(tag, liveIds),
-        inFolder: async (path) => folderSubtreeNoteIds(tree, path),
-        search: async (query) => {
-          const hits = await searchNotes(query);
-          return hits.map((h) => h.note_id);
-        },
-        propertyValues: (key) => vaultIndicesPropertyValues(key),
-      },
-      rowFor: (id) => {
-        const record = live.get(id);
-        return {
-          title: record?.title ?? null,
-          folder: record?.folder ?? null,
-        };
-      },
-      recencyFallback: (ids) => sortBatchIds(ids, live),
-    };
-  }, [live, tree]);
 
   const [result, setResult] = useState<ViewResult | null>(null);
   // Hold the previous result so a value-equal re-run bails the render.
