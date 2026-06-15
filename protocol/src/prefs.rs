@@ -84,6 +84,7 @@ use crate::aead::{
     aad_prefs_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
     CTX_COMMITMENT_TAG_LEN,
 };
+use crate::canonical_json::{push_json_string, push_json_uint, push_json_uint64};
 use crate::error::ProtocolError;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -385,6 +386,37 @@ pub struct PrefsView {
     /// key `spell_languages` — sorts after `spell_enabled`, before `theme`.
     #[serde(default)]
     pub spell_languages: Vec<String>,
+
+    /// Saved-view definitions (MYND-273, Saved Views epic) — authored content
+    /// (a hand-built filter / sort / group projection), persisted as a nested
+    /// array of canonical [`crate::saved_view::SavedView`] objects. **Authored,
+    /// not derived**: it must survive a property-index rebuild and a vault
+    /// restore, which is why it lives here in `vault.prefs` (a backup + sync
+    /// member) rather than in the rebuildable `MYI1` index (SYNC-6). Default
+    /// empty; **omitted entirely from the canonical JSON when empty**, so a
+    /// vault with no views is byte-identical to a pre-MYND-273 `vault.prefs`
+    /// (existing golden vectors unaffected — migration-less additive field on
+    /// `MYP1`, the `item_colors` precedent class). The array is encoded sorted
+    /// by view id (set-canonical; display order is the separate
+    /// [`PrefsView::view_order`] sequence). AS3-Sensitive (a view's name /
+    /// filter / referenced property) — rides the existing prefs AEAD envelope;
+    /// **non-load-bearing** (no protective-envelope clamp). The 64 KiB `MYP1`
+    /// cap (§ 9.5.4) bounds total view count. Canonical key `saved_views` —
+    /// sorts before `screen_capture_protection` (`sav` < `scr`).
+    #[serde(default)]
+    pub saved_views: Vec<crate::saved_view::SavedView>,
+
+    /// Saved-view display order (MYND-273) — an ordered list of view ids in the
+    /// views-list / sidebar Views section order (SYNC-10). A **sequence** (order
+    /// is the payload): preserved verbatim — NFC-normalized, NOT sorted, NOT
+    /// deduped — exactly like [`PrefsView::item_order`] / [`PrefsView::favorites`].
+    /// A stale id (a deleted view) is ignored at render and pruned on the next
+    /// write (no codec-level GC). Default empty; **omitted entirely when empty**,
+    /// so a vault that never reordered its views is byte-identical to a
+    /// pre-MYND-273 `vault.prefs`. Canonical key `view_order` — sorts after
+    /// `theme` (`t` < `v`), i.e. LAST.
+    #[serde(default)]
+    pub view_order: Vec<String>,
 }
 
 impl Default for PrefsView {
@@ -412,6 +444,8 @@ impl Default for PrefsView {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         }
     }
 }
@@ -675,6 +709,18 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // saved_views (canonical key 'sav' — after last_backup_at, before
+    // screen_capture_protection ['sav' < 'scr']). A nested array of canonical
+    // SavedView objects, sorted by id (MYND-273); omitted entirely when empty so
+    // a vault with no views is byte-identical to a pre-MYND-273 vault.prefs.
+    if !prefs.saved_views.is_empty() {
+        out.extend_from_slice(b"\"saved_views\":");
+        out.extend_from_slice(&crate::saved_view::canonical_encode_saved_views(
+            &prefs.saved_views,
+        ));
+        out.push(b',');
+    }
+
     out.extend_from_slice(b"\"screen_capture_protection\":");
     out.extend_from_slice(if prefs.screen_capture_protection {
         b"true"
@@ -720,6 +766,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         };
         out.extend_from_slice(value);
         out.push(b'"');
+    }
+
+    // view_order (canonical key 'v' — LAST, after theme ['t' < 'v']). The
+    // saved-view display sequence (MYND-273); same order-preserving discipline
+    // as item_order / favorites. Leading comma; omitted entirely when empty so a
+    // vault that never reordered its views is byte-identical to a pre-MYND-273
+    // vault.prefs.
+    if !prefs.view_order.is_empty() {
+        out.extend_from_slice(b",\"view_order\":");
+        push_ordered_string_array(&mut out, &prefs.view_order);
     }
 
     out.push(b'}');
@@ -792,67 +848,9 @@ fn push_canonical_string_map(out: &mut Vec<u8>, map: &BTreeMap<String, String>) 
     out.push(b'}');
 }
 
-/// Append `s` as a JSON string literal (with surrounding quotes), escaping `"`,
-/// `\`, and C0 control chars per RFC 8259. `/` is left unescaped (canonical).
-/// Non-control characters pass through as UTF-8.
-fn push_json_string(out: &mut Vec<u8>, s: &str) {
-    out.push(b'"');
-    for ch in s.chars() {
-        match ch {
-            '"' => out.extend_from_slice(b"\\\""),
-            '\\' => out.extend_from_slice(b"\\\\"),
-            '\u{08}' => out.extend_from_slice(b"\\b"),
-            '\u{0c}' => out.extend_from_slice(b"\\f"),
-            '\n' => out.extend_from_slice(b"\\n"),
-            '\r' => out.extend_from_slice(b"\\r"),
-            '\t' => out.extend_from_slice(b"\\t"),
-            c if (c as u32) < 0x20 => {
-                let code = c as u32;
-                out.extend_from_slice(b"\\u00");
-                out.push(hex_nibble((code >> 4) as u8));
-                out.push(hex_nibble((code & 0xF) as u8));
-            }
-            c => {
-                let mut buf = [0u8; 4];
-                out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
-            }
-        }
-    }
-    out.push(b'"');
-}
-
-fn hex_nibble(n: u8) -> u8 {
-    match n {
-        0..=9 => b'0' + n,
-        _ => b'a' + (n - 10),
-    }
-}
-
-/// Append `n` as a canonical decimal integer — the `u64` sibling of
-/// [`push_json_uint`] for epoch-seconds fields (`last_backup_at`).
-/// `u64::MAX` is 20 digits.
-fn push_json_uint64(out: &mut Vec<u8>, n: u64) {
-    let mut buf = [0u8; 20];
-    let mut i = buf.len();
-    let mut v = n;
-    loop {
-        i -= 1;
-        buf[i] = b'0' + (v % 10) as u8;
-        v /= 10;
-        if v == 0 {
-            break;
-        }
-    }
-    out.extend_from_slice(&buf[i..]);
-}
-
-/// Append `n` as a canonical decimal integer (no leading zeros, no
-/// trailing `.0` — spec § 9.5.2). `n == 0` emits `"0"`. Delegates to
-/// [`push_json_uint64`] so the hand-rolled digit loop stays single-homed
-/// (one audit surface for the canonical-decimal contract).
-fn push_json_uint(out: &mut Vec<u8>, n: u32) {
-    push_json_uint64(out, u64::from(n));
-}
+// The canonical JSON string-escaper + decimal-integer encoders moved to the
+// shared `crate::canonical_json` module (single-homed for cross-implementation
+// byte-stability across the prefs + saved_view codecs). Imported at the top.
 
 /// Parse the v0.1 canonical-JSON `vault.prefs` plaintext.
 ///
@@ -945,6 +943,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // spec § 9.5.2 float ban (screen_capture_protection is mandatory and
     // canonically later, so a comma always follows a well-formed value).
     let last_backup_at = parse_optional_uint64_field(rest, &mut cursor, b"\"last_backup_at\":")?;
+    // saved_views (key 'sav' — after last_backup_at, before
+    // screen_capture_protection ['sav' < 'scr'], MYND-273). A nested array of
+    // canonical SavedView objects; parsed from the same monotonic cursor so the
+    // following screen_capture_protection find is never fooled by a view name /
+    // filter value that literally contains the marker text.
+    let saved_views = parse_optional_saved_views_field(rest, &mut cursor, b"\"saved_views\":")?;
 
     // ---- screen_capture_protection (required) ----
     let region = &rest[cursor..];
@@ -982,6 +986,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // PlaintextParseFailed, matching deliberate_folders).
     let spell_enabled = parse_optional_bool_marker(after_key, b"\"spell_enabled\":");
     let spell_languages = parse_optional_array_marker(after_key, b"\"spell_languages\":")?;
+    // view_order (key 'v' — LAST, after theme [t < v], MYND-273). A sequence
+    // array located by marker in the post-screen_capture_protection region, like
+    // theme/spell. Absent → empty; present-but-malformed → PlaintextParseFailed.
+    let view_order = parse_optional_array_marker(after_key, b"\"view_order\":")?;
 
     Ok(PrefsView {
         screen_capture_protection,
@@ -1000,7 +1008,36 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         last_backup_at,
         spell_enabled,
         spell_languages,
+        saved_views,
+        view_order,
     })
+}
+
+/// Parse the OPTIONAL `saved_views` nested-array-of-objects field (MYND-273),
+/// searching `rest` from `*cursor` onward. On a hit, decodes the canonical
+/// `SavedView` array via [`crate::saved_view::parse_saved_views_array`] and
+/// advances `*cursor` past the closing `]`; on a miss returns an empty `Vec`
+/// and leaves `*cursor` unchanged. A malformed array (a `SavedView` that fails
+/// to decode, or a non-array value) collapses to
+/// [`PrefsBlobError::PlaintextParseFailed`] (the caller falls back to defaults
+/// per § 9.5.5). The monotonic cursor keeps the canonical key-order discipline:
+/// the following `screen_capture_protection` find never matches inside a view's
+/// content.
+fn parse_optional_saved_views_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Vec<crate::saved_view::SavedView>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (views, consumed) = crate::saved_view::parse_saved_views_array(&rest[val_start..])
+                .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = val_start + consumed;
+            Ok(views)
+        }
+        None => Ok(Vec::new()),
+    }
 }
 
 /// Tolerant OPTIONAL bool field located by `marker` in `region` (the
@@ -1566,6 +1603,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -1590,6 +1629,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -1734,6 +1775,8 @@ mod tests {
                 last_backup_at: None,
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                saved_views: Vec::new(),
+                view_order: Vec::new(),
             }
         );
     }
@@ -1760,6 +1803,8 @@ mod tests {
                 last_backup_at: None,
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                saved_views: Vec::new(),
+                view_order: Vec::new(),
             }
         );
     }
@@ -2010,6 +2055,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2181,6 +2228,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2212,6 +2261,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2241,6 +2292,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2269,6 +2322,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2360,6 +2415,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2416,6 +2473,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2451,6 +2510,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2518,6 +2579,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2560,6 +2623,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2588,6 +2653,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2618,6 +2685,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -2716,6 +2785,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -2788,6 +2859,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
         assert_eq!(
@@ -3050,6 +3123,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let blob =
             encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
@@ -3082,6 +3157,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -3375,6 +3452,8 @@ mod tests {
                 last_backup_at: None,
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                saved_views: Vec::new(),
+                view_order: Vec::new(),
             },
             &nonce_default,
         )
@@ -3400,6 +3479,8 @@ mod tests {
                 last_backup_at: None,
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                saved_views: Vec::new(),
+                view_order: Vec::new(),
             },
             &nonce_toggled,
         )
@@ -3442,6 +3523,8 @@ mod tests {
             last_backup_at: None,
             spell_enabled: None,
             spell_languages: Vec::new(),
+            saved_views: Vec::new(),
+            view_order: Vec::new(),
         };
         let nonce_populated: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
         let canonical_populated = canonical_json_encode(&prefs_populated);
@@ -3818,6 +3901,108 @@ mod tests {
         dump.push_str("---end label + tolerance prefs vectors---\n");
         std::fs::write("/tmp/myne_vault_prefs_label_vectors.txt", dump.as_bytes())
             .expect("write label prefs vectors dump");
+    }
+
+    /// Generator for the MYND-273 `saved_views` + `view_order` vector cases
+    /// (appended to the companion repo's `vault-prefs` family; per-feature
+    /// generator, keeps the originals byte-stable):
+    ///
+    /// `cargo test -p protocol --lib emit_saved_views_prefs_vector -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying a single
+    /// saved view (a card view over `Books/` with a typed `rating > 4` filter,
+    /// a sort, columns, and image fields) plus a `view_order`, pinning the
+    /// canonical key positions `saved_views` (before `screen_capture_protection`)
+    /// and `view_order` (last, after `theme`) and the saved-view sub-object's own
+    /// lexicographic key + filter-AST encoding.
+    #[test]
+    #[ignore]
+    fn emit_saved_views_prefs_vector() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        // 0xF0 is the next free nonce in the family registry (…0xDD, 0xEE taken).
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF0; AEAD_NONCE_LEN];
+
+        let view = crate::saved_view::SavedView {
+            id: String::from("0190a000-0000-7000-8000-000000000005"),
+            name: String::from("Books"),
+            view_type: crate::saved_view::ViewType::Cards,
+            filters: crate::saved_view::FilterNode::And {
+                children: alloc::vec![
+                    crate::saved_view::FilterNode::InFolder {
+                        path: String::from("Books/"),
+                    },
+                    crate::saved_view::FilterNode::Property {
+                        key: String::from("rating"),
+                        op: crate::saved_view::PropertyOp::Gt,
+                        value: String::from("4"),
+                    },
+                ],
+            },
+            sort: Some(crate::saved_view::ViewSort {
+                key: String::from("finished"),
+                direction: crate::saved_view::SortDirection::Desc,
+            }),
+            group_by: Some(String::from("status")),
+            columns: alloc::vec![String::from("author"), String::from("rating")],
+            card_size: Some(300),
+            image: Some(String::from("image")),
+            image_aspect_ratio: Some(String::from("1.65")),
+        };
+        let prefs = PrefsView {
+            saved_views: alloc::vec![view],
+            view_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000005")],
+            ..PrefsView::default()
+        };
+
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"saved_views":[{"card_size":300,"columns":["author","rating"],"filters":{"children":[{"kind":"inFolder","path":"Books/"},{"key":"rating","kind":"property","op":">","value":"4"}],"kind":"and"},"group_by":"status","id":"0190a000-0000-7000-8000-000000000005","image":"image","image_aspect_ratio":"1.65","name":"Books","sort":{"direction":"desc","key":"finished"},"view_type":"cards"}],"screen_capture_protection":true,"view_order":["0190a000-0000-7000-8000-000000000005"]}"#.as_slice(),
+            "canonical plaintext must place saved_views before screen_capture_protection and view_order last, with the saved-view sub-object + filter AST in lexicographic key order",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode saved_views");
+        // Round-trip self-validation.
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode"),
+            prefs,
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin saved_views prefs vector (MYND-273)---\n\n");
+        dump.push_str("# case: encrypt-saved-views\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("---end saved_views prefs vector---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_saved_views_vector.txt",
+            dump.as_bytes(),
+        )
+        .expect("write saved_views prefs vector dump");
     }
 
     /// Generator for the MYND-58 `last_backup_at` vector cases (appended to
@@ -4200,5 +4385,117 @@ mod tests {
         let hash = fixed_account_number_hash();
         let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
         assert_eq!(decode_prefs_blob(&prefs_key, &hash, &blob).unwrap(), prefs);
+    }
+
+    // ---- saved_views + view_order (MYND-273) -------------------------------
+
+    fn sample_view(id: &str, name: &str) -> crate::saved_view::SavedView {
+        use crate::saved_view::{FilterNode, SavedView, ViewType};
+        SavedView {
+            id: String::from(id),
+            name: String::from(name),
+            view_type: ViewType::Cards,
+            filters: FilterNode::InFolder {
+                path: String::from("Books/"),
+            },
+            sort: None,
+            group_by: None,
+            columns: alloc::vec![String::from("author")],
+            card_size: Some(300),
+            image: Some(String::from("image")),
+            image_aspect_ratio: Some(String::from("1.65")),
+        }
+    }
+
+    #[test]
+    fn saved_views_and_view_order_round_trip_through_blob() {
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let original = PrefsView {
+            saved_views: alloc::vec![sample_view("v2", "Books"), sample_view("v1", "Films")],
+            view_order: alloc::vec![String::from("v2"), String::from("v1")],
+            ..PrefsView::default()
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &hash, &original, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        // saved_views decode in canonical (id-sorted) order; view_order verbatim.
+        assert_eq!(decoded.saved_views.len(), 2);
+        assert_eq!(decoded.saved_views[0].id, "v1");
+        assert_eq!(decoded.saved_views[1].id, "v2");
+        assert_eq!(decoded.view_order, alloc::vec!["v2", "v1"]);
+        assert_eq!(decoded.saved_views[1].name, "Books");
+    }
+
+    #[test]
+    fn empty_saved_views_and_view_order_are_byte_identical_to_pre_feature() {
+        // A vault with no views emits NO "saved_views"/"view_order" key, so it
+        // is byte-identical to a pre-MYND-273 vault.prefs (existing golden
+        // vectors unaffected — migration-less additive fields).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert!(find_subslice(&encoded, b"saved_views").is_none());
+        assert!(find_subslice(&encoded, b"view_order").is_none());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn view_order_preserves_sequence_not_sorted_or_deduped() {
+        // Sequence semantics (like item_order/favorites): order verbatim, dupes
+        // kept — the codec performs no GC.
+        let original = PrefsView {
+            view_order: alloc::vec![String::from("v3"), String::from("v1"), String::from("v3"),],
+            ..PrefsView::default()
+        };
+        let decoded = canonical_json_decode(&canonical_json_encode(&original)).expect("decode");
+        assert_eq!(decoded.view_order, alloc::vec!["v3", "v1", "v3"]);
+    }
+
+    #[test]
+    fn saved_views_encoded_sorted_by_id() {
+        // The set's array order is canonical (id-sorted) regardless of caller
+        // order; the display order lives in view_order.
+        let original = PrefsView {
+            saved_views: alloc::vec![sample_view("zzz", "Z"), sample_view("aaa", "A")],
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let s = core::str::from_utf8(&encoded).unwrap();
+        let pos_a = s.find("\"id\":\"aaa\"").unwrap();
+        let pos_z = s.find("\"id\":\"zzz\"").unwrap();
+        assert!(pos_a < pos_z, "saved_views must be encoded sorted by id");
+    }
+
+    #[test]
+    fn saved_views_canonical_key_position() {
+        // saved_views sorts before screen_capture_protection; view_order is last.
+        let original = PrefsView {
+            saved_views: alloc::vec![sample_view("v1", "A")],
+            view_order: alloc::vec![String::from("v1")],
+            ..PrefsView::default()
+        };
+        let s = String::from_utf8(canonical_json_encode(&original)).unwrap();
+        let sv = s.find("\"saved_views\":").unwrap();
+        let scp = s.find("\"screen_capture_protection\":").unwrap();
+        let vo = s.find("\"view_order\":").unwrap();
+        assert!(sv < scp, "saved_views before screen_capture_protection");
+        assert!(scp < vo, "view_order last");
+    }
+
+    #[test]
+    fn malformed_saved_view_collapses_to_parse_failed() {
+        // A structurally-bad saved view (a `map` viewType) makes the whole prefs
+        // plaintext fail to parse — the caller falls back to defaults (§9.5.5).
+        let bad = br#"{"saved_views":[{"filters":{"kind":"all"},"id":"x","name":"n","view_type":"map"}],"screen_capture_protection":true}"#;
+        assert_eq!(
+            canonical_json_decode(bad),
+            Err(PrefsBlobError::PlaintextParseFailed)
+        );
+    }
+
+    #[test]
+    fn default_prefs_has_empty_saved_views() {
+        // §9.5.5 fall-back-to-defaults yields an empty saved-views set.
+        assert!(PrefsView::default().saved_views.is_empty());
+        assert!(PrefsView::default().view_order.is_empty());
     }
 }

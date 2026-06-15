@@ -44,12 +44,14 @@ pub mod aead;
 pub mod attachment_blob;
 pub mod attachments_catalog;
 pub mod blob;
+pub(crate) mod canonical_json;
 pub mod dictionary_blob;
 pub mod error;
 pub mod kdf;
 pub mod password_policy;
 pub mod phrase;
 pub mod prefs;
+pub mod saved_view;
 pub mod search_blob;
 pub mod subkey;
 pub mod template;
@@ -104,6 +106,11 @@ pub use prefs::{
     decode_prefs_blob, encode_prefs_blob, encode_prefs_blob_raw, EditorLayout, PrefsBlobError,
     PrefsView, ThemeChoice, MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN,
     PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC, PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
+};
+pub use saved_view::{
+    canonical_decode_saved_view, canonical_encode_saved_view, canonical_encode_saved_views,
+    parse_saved_views_array, FilterNode, PropertyOp, SavedView, SavedViewParseError, SortDirection,
+    ViewSort, ViewType,
 };
 pub use search_blob::{
     decode_search_index_blob, encode_search_index_blob, encode_search_index_blob_raw,

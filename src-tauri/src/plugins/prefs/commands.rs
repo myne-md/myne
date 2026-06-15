@@ -15,7 +15,7 @@ use super::error::{PrefsReadError, PrefsWriteError};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
     decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, EditorLayout,
-    PrefsBlobError, PrefsView, SubkeyRole, ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
+    PrefsBlobError, PrefsView, SavedView, SubkeyRole, ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -486,6 +486,165 @@ pub(crate) async fn set_item_order_with_dir(
     // correlation tag, folder paths are AS3 Sensitive; see ../../CLAUDE.md
     // "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "item_order", count,);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated save/edit (upsert-by-id) of one saved view (MYND-273,
+/// Saved Views epic). Read-modify-write under the per-plugin write mutex; **no
+/// native side-effect** (same shape as `set_item_order`). "Save" and "edit" are
+/// one operation: the view REPLACES any existing entry with the same `id`, else
+/// it is appended (so editing never creates a duplicate). The 64 KiB §9.5.4
+/// prefs cap is enforced by `encode_prefs_blob` BEFORE the atomic write, so an
+/// over-cap save fails `PrefsEncodeFailed` and leaves the on-disk prefs
+/// untouched (story 13). Logs the view COUNT only — a view's name / filter /
+/// referenced property is AS3-Sensitive and never reaches the log surface (see
+/// ../../CLAUDE.md "Secret-handling logging discipline").
+#[tauri::command]
+pub async fn upsert_saved_view<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    view: SavedView,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    upsert_saved_view_with_dir(&dir, state.inner(), view).await
+}
+
+/// Testable core of [`upsert_saved_view`].
+pub(crate) async fn upsert_saved_view_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    view: SavedView,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    // Upsert by id: replace in place, else append. No duplicate ids.
+    match prefs.saved_views.iter_mut().find(|v| v.id == view.id) {
+        Some(existing) => *existing = view,
+        None => prefs.saved_views.push(view),
+    }
+    let count = prefs.saved_views.len();
+
+    // The 64 KiB §9.5.4 cap is enforced inside the encode — an over-cap encode
+    // fails HERE, before the atomic write, leaving the prior on-disk prefs intact.
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — never a view name / filter / property (AS3-Sensitive).
+    tracing::info!(event = "prefs_written", field = "saved_views", count);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated delete of one saved view by `id` (MYND-273). Removes the
+/// view from `saved_views` AND prunes that id from `view_order` (so a deleted
+/// view leaves no dangling display-order entry). Read-modify-write under the
+/// per-plugin write mutex; no native side-effect. Deleting an absent id is a
+/// no-op success (idempotent). Logs the post-delete view COUNT only.
+#[tauri::command]
+pub async fn delete_saved_view<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    id: String,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    delete_saved_view_with_dir(&dir, state.inner(), id).await
+}
+
+/// Testable core of [`delete_saved_view`].
+pub(crate) async fn delete_saved_view_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    id: String,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.saved_views.retain(|v| v.id != id);
+    // Prune the id from the display order too (no dangling entry).
+    prefs.view_order.retain(|vid| *vid != id);
+    let count = prefs.saved_views.len();
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — never the view id (AS3-Sensitive correlation surface).
+    tracing::info!(event = "prefs_written", field = "saved_views", count);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `view_order` sequence (MYND-273) — the
+/// saved-view display order (SYNC-10). Read-modify-write under the per-plugin
+/// write mutex; **no native side-effect**. The caller passes the full desired
+/// sequence; the codec preserves element order VERBATIM (the sequence is the
+/// payload — same discipline as `set_item_order`). Stale-id pruning is the
+/// caller's job; the codec performs no GC (mirroring `favorites`). Logs the
+/// COUNT only.
+#[tauri::command]
+pub async fn set_view_order<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_view_order_with_dir(&dir, state.inner(), order).await
+}
+
+/// Testable core of [`set_view_order`].
+pub(crate) async fn set_view_order_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = order.len();
+    prefs.view_order = order;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — never the view ids (AS3-Sensitive correlation surface).
+    tracing::info!(event = "prefs_written", field = "view_order", count);
     Ok(())
 }
 
@@ -1201,6 +1360,8 @@ mod tests {
                     last_backup_at: None,
                     spell_enabled: None,
                     spell_languages: Vec::new(),
+                    saved_views: Vec::new(),
+                    view_order: Vec::new(),
                 },
                 &[0x77; AEAD_NONCE_LEN],
             )
@@ -1543,6 +1704,153 @@ mod tests {
 
     fn alloc_vec(items: impl IntoIterator<Item = &'static str>) -> Vec<String> {
         items.into_iter().map(String::from).collect()
+    }
+
+    // ---- saved-view CRUD (MYND-273) -----------------------------------
+
+    fn test_view(id: &str, name: &str) -> SavedView {
+        use protocol::{FilterNode, ViewType};
+        SavedView {
+            id: String::from(id),
+            name: String::from(name),
+            view_type: ViewType::Cards,
+            filters: FilterNode::InFolder {
+                path: String::from("Books/"),
+            },
+            sort: None,
+            group_by: None,
+            columns: alloc_vec(["author"]),
+            card_size: Some(300),
+            image: Some(String::from("image")),
+            image_aspect_ratio: Some(String::from("1.65")),
+        }
+    }
+
+    #[test]
+    fn upsert_saved_view_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-sv-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "A")).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn upsert_saved_view_round_trips_and_edits_by_id() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
+
+            // Save v1 → read returns it.
+            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "Books"))
+                .await
+                .expect("save v1");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.saved_views.len(), 1);
+            assert_eq!(view.saved_views[0].name, "Books");
+
+            // Edit v1 (same id, new name) → still one view, updated (no duplicate).
+            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "Reading"))
+                .await
+                .expect("edit v1");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.saved_views.len(), 1);
+            assert_eq!(view.saved_views[0].name, "Reading");
+
+            // Save a second view → two distinct entries.
+            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v2", "Films"))
+                .await
+                .expect("save v2");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.saved_views.len(), 2);
+            // The pre-existing screen_capture default is untouched.
+            assert!(view.screen_capture_protection);
+        });
+    }
+
+    #[test]
+    fn upsert_over_cap_fails_and_leaves_prior_prefs_intact() {
+        // Story 13: a save whose encoded prefs exceeds the 64 KiB §9.5.4 cap
+        // fails PrefsEncodeFailed BEFORE the atomic write — the prior on-disk
+        // view set is untouched.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
+            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "Small"))
+                .await
+                .expect("save small");
+
+            // A view with a >64 KiB name blows the cap on encode.
+            let mut huge = test_view("v2", "");
+            huge.name = "x".repeat(70 * 1024);
+            let result = upsert_saved_view_with_dir(tmp.path(), &state, huge).await;
+            assert!(matches!(result, Err(PrefsWriteError::PrefsEncodeFailed)));
+
+            // Prior prefs intact: still exactly the one small view.
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.saved_views.len(), 1);
+            assert_eq!(view.saved_views[0].id, "v1");
+        });
+    }
+
+    #[test]
+    fn delete_and_set_view_order_reject_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-sv-del-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            assert!(matches!(
+                delete_saved_view_with_dir(tmp.path(), &state, String::from("v1")).await,
+                Err(PrefsWriteError::SlotNotUnlocked)
+            ));
+            assert!(matches!(
+                set_view_order_with_dir(tmp.path(), &state, alloc_vec(["v1"])).await,
+                Err(PrefsWriteError::SlotNotUnlocked)
+            ));
+        });
+    }
+
+    #[test]
+    fn delete_saved_view_removes_and_prunes_view_order() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
+            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "A"))
+                .await
+                .expect("save v1");
+            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v2", "B"))
+                .await
+                .expect("save v2");
+            set_view_order_with_dir(tmp.path(), &state, alloc_vec(["v2", "v1"]))
+                .await
+                .expect("order");
+
+            // Delete v1 → gone from saved_views AND pruned from view_order.
+            delete_saved_view_with_dir(tmp.path(), &state, String::from("v1"))
+                .await
+                .expect("delete v1");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.saved_views.len(), 1);
+            assert_eq!(view.saved_views[0].id, "v2");
+            assert_eq!(view.view_order, alloc_vec(["v2"]));
+
+            // Deleting an absent id is an idempotent no-op success.
+            delete_saved_view_with_dir(tmp.path(), &state, String::from("ghost"))
+                .await
+                .expect("delete absent is ok");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.saved_views.len(), 1);
+        });
+    }
+
+    #[test]
+    fn set_view_order_preserves_sequence_verbatim_no_gc() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x47).await;
+            // A reorder over ids that don't (yet) exist is tolerated — no codec GC.
+            set_view_order_with_dir(tmp.path(), &state, alloc_vec(["v3", "v1", "v3"]))
+                .await
+                .expect("set order");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.view_order, alloc_vec(["v3", "v1", "v3"]));
+        });
     }
 
     // ---- theme setter (MYND-110) --------------------------------------
