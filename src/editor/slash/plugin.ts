@@ -180,9 +180,18 @@ class SlashMenuView implements PluginValue {
         selectedRow = row;
       }
       row.setAttribute("role", "menuitem");
-      // Hover sets the highlight (parity with keyboard nav). Update classes
-      // in place rather than re-rendering to avoid teardown mid-pointer-move.
-      row.addEventListener("mouseenter", () => {
+      // Hover sets the highlight (parity with keyboard nav). Bound to
+      // `mousemove`, NOT `mouseenter`: keyboard nav rebuilds the rows
+      // (`replaceChildren`) and `scrollIntoView`s the selection on every press.
+      // When the pointer happens to rest over the menu, the browser fires a
+      // synthetic `mouseenter`/`mouseover` on whichever fresh row now sits under
+      // the (stationary) cursor — which would yank the highlight back to the
+      // mouse and fight the arrow keys (the "ArrowDown jumps back to the top"
+      // bug). `mousemove` only fires on real pointer motion, so a stationary
+      // mouse never hijacks keyboard navigation; genuine hover still works.
+      // Update classes in place rather than re-rendering to avoid teardown
+      // mid-pointer-move.
+      row.addEventListener("mousemove", () => {
         if (this.state === null || this.state.selectedIndex === i) return;
         this.state.selectedIndex = i;
         this.container

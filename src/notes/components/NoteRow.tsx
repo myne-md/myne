@@ -59,6 +59,11 @@ export type NoteRowProps = {
   /** Color-label slot (MYND-184) — renders a small leading dot before the
    *  title. Undefined when the note has no color. */
   colorSlot?: string;
+  /** Whether to render the relative-time subtitle line (sidebar-note-timestamps).
+   *  Defaults to `true` (the pre-feature behaviour). When `false` the subtitle
+   *  `<div>` is omitted entirely and the title vertically centers in the row's
+   *  fixed `minHeight`. Driven by `PrefsView.show_note_timestamps`. */
+  showTimestamps?: boolean;
 };
 
 // ─── Token-bound style constants ──────────────────────────────────
@@ -81,6 +86,15 @@ const rowBaseStyle: CSSProperties = {
   // Subtle hover via inline `:hover` not possible without a stylesheet —
   // we toggle via state below (`hovering`) so design-token bg shifts
   // are explicit.
+};
+
+/** Compact override applied when the timestamp subtitle is hidden
+ *  (sidebar-note-timestamps OFF): a single-line title needs far less vertical
+ *  room than the title+subtitle stack, so the row tightens to roughly the
+ *  FolderRow height (30px) instead of dwelling at the two-line `minHeight`. */
+const rowCompactStyle: CSSProperties = {
+  padding: "4px 14px",
+  minHeight: 30,
 };
 
 /** Inner column (title + subtitle), so the star affordance can sit to the
@@ -212,6 +226,7 @@ export function NoteRow(props: NoteRowProps) {
     favorited = false,
     onToggleFavorite,
     colorSlot,
+    showTimestamps = true,
   } = props;
 
   const [hovering, setHovering] = useState(false);
@@ -272,6 +287,7 @@ export function NoteRow(props: NoteRowProps) {
 
   const composedRowStyle: CSSProperties = {
     ...rowBaseStyle,
+    ...(showTimestamps ? {} : rowCompactStyle),
     ...(selected ? rowSelectedStyle : hovering ? rowHoverStyle : {}),
   };
 
@@ -300,7 +316,11 @@ export function NoteRow(props: NoteRowProps) {
         ) : (
           <TitleLine record={record} colorSlot={colorSlot} />
         )}
-        <div style={subtitleStyle}>{subtitleText}</div>
+        {showTimestamps && (
+          <div style={subtitleStyle} data-testid="notes.row-subtitle">
+            {subtitleText}
+          </div>
+        )}
       </div>
       {showStar &&
         (onToggleFavorite !== undefined ? (

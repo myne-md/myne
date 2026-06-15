@@ -23,7 +23,14 @@
 // Penpot canon: `flow--vault-switcher (MYND-205)`, page "4c - Navigation &
 // Sidebar". Tokens-only (no raw hex, no Tailwind) per `src/CLAUDE.md`.
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Icon } from "./primitives/Icon";
 import { listVaults, orderByLastUnlock } from "../lib/vault-list";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
@@ -107,13 +114,12 @@ const CHIP_GLYPH_STYLE: CSSProperties = {
 // ── Dropdown menu ────────────────────────────────────────────────────────
 
 const MENU_STYLE: CSSProperties = {
-  position: "absolute",
   // Opens downward — the account chip is the sticky sidebar header (top of the
   // left sidebar), so the dropdown drops below it (`docs/design/README.md`
   // "the sidebar header … is sticky"; Penpot `flow--vault-switcher`, page
-  // "4c - Navigation & Sidebar").
-  top: "calc(100% + 6px)",
-  left: 0,
+  // "4c - Navigation & Sidebar"). `fixed` (anchored via menuPos) instead of
+  // `absolute` so the sidebar pane's `overflow: hidden` can't clip it.
+  position: "fixed",
   minWidth: 260,
   background: "var(--paper)",
   border: "1px solid var(--line-1)",
@@ -249,6 +255,23 @@ export function VaultSwitcher({
   switching,
 }: VaultSwitcherProps) {
   const [open, setOpen] = useState(false);
+  // Open/close is animated (fade + slide), so the menu must outlive `open` by
+  // one transition on close. `mounted` keeps the menu in the DOM while the
+  // closing transition plays; `visible` is the animation target (true = shown,
+  // false = the hidden/translated end-state the transition eases to/from).
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The dropdown is `position: fixed` (anchored under the chip via
+  // getBoundingClientRect), not `absolute` — the left SidebarPane now clips
+  // its content with `overflow: hidden` (for the collapse/expand animation),
+  // which would otherwise crop the menu (and its shadow) since the sidebar can
+  // be as narrow as 200px while the menu is ≥260px. Fixed positioning escapes
+  // that clip, matching ContextMenu/DecorationPopover.
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({
+    left: 0,
+    top: 0,
+  });
   const [vaults, setVaults] = useState<VaultSummary[] | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   // The row the user just selected to switch to — drives the "switching…"
@@ -298,6 +321,56 @@ export function VaultSwitcher({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("click", onClick);
       window.clearTimeout(id);
+    };
+  }, [open]);
+
+  // Anchor the fixed-position menu under the chip. Measured before paint
+  // (useLayoutEffect) when opening, so the menu never flashes at the wrong
+  // spot. The wrapper is always mounted, so its rect is the chip's box even
+  // before the menu itself mounts.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const node = containerRef.current;
+    if (node === null) return;
+    const rect = node.getBoundingClientRect();
+    setMenuPos({ left: rect.left, top: rect.bottom + 6 });
+  }, [open]);
+
+  // Drive the open/close transition off `open` (user intent).
+  //   open  → mount with the hidden start-state, then flip `visible` after a
+  //           DOUBLE rAF. One frame isn't enough: React commits `mounted` and
+  //           the rAF can run in the same frame, so the browser never paints
+  //           the `opacity:0` start-state and skips the transition. The second
+  //           rAF guarantees the start-state is painted before `visible` flips.
+  //   close → flip `visible` off (plays the exit transition), then unmount
+  //           once it finishes (--duration-base). Reduced-motion zeroes the
+  //           duration globally, so the timeout just unmounts a hair later.
+  useEffect(() => {
+    if (open) {
+      if (closeTimer.current !== null) {
+        clearTimeout(closeTimer.current);
+        closeTimer.current = null;
+      }
+      setMounted(true);
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => setVisible(true));
+      });
+      return () => {
+        cancelAnimationFrame(raf1);
+        cancelAnimationFrame(raf2);
+      };
+    }
+    setVisible(false);
+    closeTimer.current = setTimeout(() => {
+      setMounted(false);
+      closeTimer.current = null;
+    }, 180);
+    return () => {
+      if (closeTimer.current !== null) {
+        clearTimeout(closeTimer.current);
+        closeTimer.current = null;
+      }
     };
   }, [open]);
 
@@ -359,8 +432,25 @@ export function VaultSwitcher({
         </span>
       </button>
 
-      {open && vaults !== null && (
-        <div role="menu" style={MENU_STYLE}>
+      {mounted && vaults !== null && (
+        <div
+          role="menu"
+          style={{
+            ...MENU_STYLE,
+            left: menuPos.left,
+            top: menuPos.top,
+            // Fade + slide-down from the chip. Symmetric: the same transition
+            // runs on close (visible → false) before the deferred unmount.
+            transformOrigin: "top left",
+            opacity: visible ? 1 : 0,
+            transform: visible ? "translateY(0)" : "translateY(-4px)",
+            transition:
+              "opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard)",
+            // While closing (visible=false but still mounted) the menu is
+            // invisible but present — don't let it swallow clicks.
+            pointerEvents: visible ? "auto" : "none",
+          }}
+        >
           {ordered.map((v, i) => {
             const isActive = v.id === activeId;
             const isFallback = v.label == null;

@@ -17,14 +17,37 @@
 // live. System maps to `null` (clears the field → the CSS `@media
 // prefers-color-scheme` follows the OS live).
 
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Button } from "../primitives/Button";
 import { ControlBlock } from "./ControlBlock";
-import { PANEL_ROOT_STYLE } from "./panel-styles";
-import { prefsRead, setTheme, type ThemeChoice } from "../../lib/prefs";
+import { Switch } from "../primitives/Switch";
+import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
+import {
+  prefsRead,
+  setShowNoteTimestamps,
+  setTheme,
+  type ThemeChoice,
+} from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
 
+// Label + switch on one row, helper below — mirrors PrivacyPanel's toggle shape.
+const TOGGLE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+};
+
 const SEGMENTED_STYLE: CSSProperties = {
+  position: "relative",
   display: "inline-flex",
   flexDirection: "row",
   border: "1px solid var(--line-2)",
@@ -33,7 +56,25 @@ const SEGMENTED_STYLE: CSSProperties = {
   alignSelf: "flex-start",
 };
 
+// The selection fill is a single sliding pill behind the segments — it
+// translates/resizes to the active segment instead of each segment toggling its
+// own background, so the selection appears to glide between options. Dividers
+// and labels sit above it (higher z-index) so they stay crisp as it passes.
+const SEGMENT_THUMB_STYLE: CSSProperties = {
+  position: "absolute",
+  top: 0,
+  bottom: 0,
+  left: 0,
+  background: "var(--paper-3)",
+  zIndex: 0,
+  pointerEvents: "none",
+  transition:
+    "transform var(--duration-base) var(--ease-standard), width var(--duration-base) var(--ease-standard)",
+};
+
 const SEGMENT_BASE_STYLE: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
   border: 0,
   background: "transparent",
   padding: "6px 16px",
@@ -43,16 +84,17 @@ const SEGMENT_BASE_STYLE: CSSProperties = {
   color: "var(--fg-2)",
   cursor: "pointer",
   minWidth: 80,
-  transition: "background var(--duration-fast) var(--ease-standard)",
+  transition: "color var(--duration-fast) var(--ease-standard)",
 };
 
 const SEGMENT_SELECTED_STYLE: CSSProperties = {
   ...SEGMENT_BASE_STYLE,
-  background: "var(--paper-3)",
   color: "var(--fg-1)",
 };
 
 const SEGMENT_DIVIDER_STYLE: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
   width: 1,
   background: "var(--line-2)",
   alignSelf: "stretch",
@@ -93,12 +135,34 @@ export function AppearancePanel() {
   // "Light". The stored value loads on mount.
   const [selected, setSelected] = useState<ThemeOption["value"]>("system");
   const [error, setError] = useState<string | null>(null);
+  // Sidebar per-note timestamp visibility (sidebar-note-timestamps). Default
+  // `true` (visible) until the stored value loads — matches PrefsView::default.
+  const [showTimestamps, setShowTimestamps] = useState(true);
+  const [tsError, setTsError] = useState<string | null>(null);
+
+  // Sliding-pill geometry: measured from the active segment's box so the fill
+  // can glide to it (segments have unequal widths — "System" is wider than
+  // "Light"). Measured in useLayoutEffect (pre-paint) so the initial position
+  // lands with no first-render flash; re-measured whenever the selection moves.
+  const segmentRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [thumb, setThumb] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
+
+  useLayoutEffect(() => {
+    const el = segmentRefs.current[THEMES.findIndex((t) => t.value === selected)];
+    if (el) setThumb({ left: el.offsetLeft, width: el.offsetWidth });
+  }, [selected]);
 
   useEffect(() => {
     let cancelled = false;
     void prefsRead()
       .then((prefs) => {
-        if (!cancelled) setSelected(segmentFor(prefs.theme));
+        if (!cancelled) {
+          setSelected(segmentFor(prefs.theme));
+          setShowTimestamps(prefs.show_note_timestamps);
+        }
       })
       .catch(() => {
         // Keep the "system" default if the read fails — it is the safest
@@ -124,6 +188,20 @@ export function AppearancePanel() {
     }
   }
 
+  async function toggleTimestamps(next: boolean) {
+    setTsError(null);
+    // Optimistic: flip the switch immediately, then persist. The setter bumps
+    // the prefs nonce so the sidebar (its own usePrefs instance) reflects this
+    // live. On failure, revert so the switch doesn't show a "saved" illusion.
+    setShowTimestamps(next);
+    try {
+      await setShowNoteTimestamps(next);
+    } catch {
+      setShowTimestamps(!next);
+      setTsError("Couldn't save preference. Please try again.");
+    }
+  }
+
   return (
     <div style={PANEL_ROOT_STYLE}>
       <ControlBlock
@@ -132,12 +210,23 @@ export function AppearancePanel() {
         control={
           <div>
             <div role="radiogroup" aria-label="Theme" style={SEGMENTED_STYLE}>
+              <span
+                aria-hidden="true"
+                style={{
+                  ...SEGMENT_THUMB_STYLE,
+                  width: thumb.width,
+                  transform: `translateX(${thumb.left}px)`,
+                }}
+              />
               {THEMES.map((t, idx) => (
                 <Fragment key={t.value}>
                   {idx > 0 && (
                     <span aria-hidden="true" style={SEGMENT_DIVIDER_STYLE} />
                   )}
                   <button
+                    ref={(el) => {
+                      segmentRefs.current[idx] = el;
+                    }}
                     type="button"
                     role="radio"
                     aria-checked={t.value === selected}
@@ -163,6 +252,27 @@ export function AppearancePanel() {
           </div>
         }
       />
+
+      <div style={BLOCK_STYLE}>
+        <div style={TOGGLE_ROW_STYLE}>
+          <span style={LABEL_STYLE}>Show edit times</span>
+          <Switch
+            checked={showTimestamps}
+            onChange={(next) => void toggleTimestamps(next)}
+            ariaLabel="Show edit times in sidebar"
+            ariaDescribedBy="note-timestamps-helper"
+            testId="settings.note-timestamps-toggle"
+          />
+        </div>
+        <p id="note-timestamps-helper" style={HELPER_STYLE}>
+          Display each note's last-edited time beneath its title in the sidebar.
+        </p>
+        {tsError && (
+          <p role="alert" style={ERROR_STYLE}>
+            {tsError}
+          </p>
+        )}
+      </div>
 
       <ControlBlock
         label="Custom theme"

@@ -457,6 +457,24 @@ textarea,
   animation: myne-spinner-rotate 800ms linear infinite;
 }
 
+/* -- Sidebar tree disclosure ------------------------------------------------
+   Enter/exit motion for folder-tree rows revealed/hidden by expand/collapse
+   (FolderRow + child note rows). Transform + opacity only — no layout/height
+   change — so the hand-rolled VirtualList's height cache is untouched. The
+   reduced-motion media query above zeroes animation-duration; NoteList also
+   skips the deferred-removal path under reduced motion so collapse is instant
+   rather than leaving faded-out rows lingering. */
+
+@keyframes myne-tree-row-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes myne-tree-row-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+
 /* -- Focus ring -------------------------------------------------------------
    Global :focus-visible visualization for all interactive elements. Keyboard
    focus shows the --ring shadow; mouse focus does not (per :focus-visible

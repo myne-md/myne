@@ -64,6 +64,14 @@ export type VirtualListProps<T> = {
   /** Render this many extra rows above + below the visible window so
    *  fast scrolls don't flash empty space. Default 5. */
   buffer?: number;
+  /** Opaque token: when it changes, the measured-height cache is dropped so
+   *  every row re-measures from the (current) estimate. Pass a value that
+   *  encodes any GLOBAL change to row geometry that ResizeObserver can't catch
+   *  for OFF-SCREEN rows — e.g. the sidebar-note-timestamps toggle, which
+   *  shrinks every note row 52→30px. Without this, off-screen rows keep their
+   *  stale cached height until scrolled back into view, so the cumulative
+   *  offsets jump mid-scroll (visible render glitches). */
+  heightResetToken?: unknown;
 };
 
 const DEFAULT_ESTIMATED_HEIGHT = 52;
@@ -76,11 +84,23 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     keyOf = (_item: T, index: number) => String(index),
     estimatedRowHeight = DEFAULT_ESTIMATED_HEIGHT,
     buffer = DEFAULT_BUFFER,
+    heightResetToken,
   } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const heightsRef = useRef<Map<string, number>>(new Map());
   const rowNodesRef = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Drop the measured-height cache when the geometry token flips. Done during
+  // render (before the cumulativeOffsets memo reads the map) so off-screen rows
+  // fall back to the current estimate instead of a stale measurement — the
+  // visible rows then re-measure via ResizeObserver. Mutating a ref-held cache
+  // during render is the sanctioned "derived cache reset on prop change" shape.
+  const prevResetTokenRef = useRef(heightResetToken);
+  if (prevResetTokenRef.current !== heightResetToken) {
+    prevResetTokenRef.current = heightResetToken;
+    heightsRef.current.clear();
+  }
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -137,7 +157,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
       offsets[i + 1] = (offsets[i] ?? 0) + h;
     }
     return offsets;
-  }, [items, keyOf, estimatedRowHeight]);
+  }, [items, keyOf, estimatedRowHeight, heightResetToken]);
 
   const totalHeight = cumulativeOffsets[cumulativeOffsets.length - 1] ?? 0;
 

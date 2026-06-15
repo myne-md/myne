@@ -359,6 +359,18 @@ const LIST_OUTER_STYLE: CSSProperties = {
  *  folder-row indent). */
 const NOTE_INDENT_PER_LEVEL = 18;
 
+// Folder disclosure animation (expand/collapse). Each revealed/hidden
+// descendant row plays a staggered enter/exit keyframe. `BASE_MS` mirrors
+// `--duration-base` (tokens.css); the JS deferral timer must outlast the
+// slowest row (base + the capped stagger) so the fold/cleanup fires only after
+// the motion is done. Stagger is capped so a folder with many children doesn't
+// drag the cleanup out indefinitely.
+const TREE_ANIM_BASE_MS = 180;
+const TREE_ANIM_STAGGER_MS = 18;
+const TREE_ANIM_MAX_STAGGER = 8;
+const TREE_ANIM_TOTAL_MS =
+  TREE_ANIM_BASE_MS + TREE_ANIM_MAX_STAGGER * TREE_ANIM_STAGGER_MS + 60;
+
 const NEW_FOLDER_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -611,13 +623,90 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // Ephemeral collapse state — folded folder keys. Default empty = all
   // expanded; reset on app restart (folder paths are AS3 → no persistence).
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // Mirror the latest committed value so `toggleFolder` can read it
+  // synchronously (decide expand-vs-collapse) without a stale closure.
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
+  // Active disclosure animation, if any. `nonce` guards against a stale timer
+  // clearing a newer animation. `mode` picks the enter vs exit keyframe applied
+  // to the toggled folder's descendant rows.
+  const [treeAnim, setTreeAnim] = useState<{
+    folderKey: string;
+    mode: "in" | "out";
+    nonce: number;
+  } | null>(null);
+  const treeAnimNonce = useRef(0);
+  const treeAnimTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Folder key of a collapse whose fold is deferred until its exit animation
+  // ends. If a new toggle interrupts it, we flush this fold immediately so the
+  // interrupted folder doesn't get stuck visually-open.
+  const pendingCollapse = useRef<string | null>(null);
+  useEffect(
+    () => () => {
+      if (treeAnimTimer.current) clearTimeout(treeAnimTimer.current);
+    },
+    [],
+  );
   const toggleFolder = useCallback((key: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    const collapsing = !collapsedRef.current.has(key);
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    if (treeAnimTimer.current) {
+      clearTimeout(treeAnimTimer.current);
+      treeAnimTimer.current = null;
+    }
+    // Flush any interrupted deferred collapse before starting a new operation.
+    if (pendingCollapse.current !== null && pendingCollapse.current !== key) {
+      const stuck = pendingCollapse.current;
+      setCollapsed((prev) => {
+        const next = new Set(prev);
+        next.add(stuck);
+        return next;
+      });
+    }
+    pendingCollapse.current = null;
+    // Reduced motion (or any non-animated path): flip immediately.
+    if (reduce) {
+      setTreeAnim(null);
+      setCollapsed((prev) => {
+        const next = new Set(prev);
+        if (collapsing) next.add(key);
+        else next.delete(key);
+        return next;
+      });
+      return;
+    }
+    treeAnimNonce.current += 1;
+    const nonce = treeAnimNonce.current;
+    if (collapsing) {
+      // Defer the actual fold until the exit animation finishes — the
+      // descendant rows stay in `rows` and play `myne-tree-row-out` meanwhile.
+      pendingCollapse.current = key;
+      setTreeAnim({ folderKey: key, mode: "out", nonce });
+      treeAnimTimer.current = setTimeout(() => {
+        pendingCollapse.current = null;
+        setCollapsed((prev) => {
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
+        setTreeAnim((a) => (a?.nonce === nonce ? null : a));
+        treeAnimTimer.current = null;
+      }, TREE_ANIM_TOTAL_MS);
+    } else {
+      // Expand now — the descendant rows mount and play `myne-tree-row-in`.
+      setCollapsed((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+      setTreeAnim({ folderKey: key, mode: "in", nonce });
+      treeAnimTimer.current = setTimeout(() => {
+        setTreeAnim((a) => (a?.nonce === nonce ? null : a));
+        treeAnimTimer.current = null;
+      }, TREE_ANIM_TOTAL_MS);
+    }
   }, []);
 
   // The folder tree is a derived view of each note's `folder:` field unioned
@@ -661,6 +750,35 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     () => flattenVisibleRows(tree, live, collapsed, fm.itemOrder),
     [tree, live, collapsed, fm.itemOrder],
   );
+  // Per-row disclosure-animation lookup: when `treeAnim` is active, the toggled
+  // folder's contiguous descendant rows (depth > the folder's, until the depth
+  // returns to its level) get a staggered enter/exit animation style. Keyed by
+  // VirtualList row key so `renderItem` can apply it without prop-drilling.
+  const treeAnimRows = useMemo(() => {
+    const map = new Map<string, CSSProperties>();
+    if (treeAnim === null) return map;
+    const anchor = rows.findIndex((r) => r.key === `f-${treeAnim.folderKey}`);
+    if (anchor < 0) return map;
+    const folderDepth = rows[anchor]!.depth;
+    const name =
+      treeAnim.mode === "in" ? "myne-tree-row-in" : "myne-tree-row-out";
+    const easing = treeAnim.mode === "in" ? "var(--ease-out)" : "var(--ease-standard)";
+    let i = 0;
+    for (let r = anchor + 1; r < rows.length; r++) {
+      if (rows[r]!.depth <= folderDepth) break;
+      const delay = Math.min(i, TREE_ANIM_MAX_STAGGER) * TREE_ANIM_STAGGER_MS;
+      map.set(rows[r]!.key, {
+        animationName: name,
+        animationDuration: "var(--duration-base)",
+        animationTimingFunction: easing,
+        animationDelay: `${delay}ms`,
+        animationFillMode: "both",
+        willChange: "transform, opacity",
+      });
+      i++;
+    }
+    return map;
+  }, [treeAnim, rows]);
   // Favorites section rows (MYND-183) — note rows keyed `fav-<id>`, rendered
   // above the tree. Stale-UUID GC (render half) is in `buildFavoriteRows`; a
   // trashed favorite is absent from `live` so it is hidden until restore.
@@ -735,11 +853,13 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           rows={rows}
           favRows={favRows}
           navIds={navIds}
+          treeAnimRows={treeAnimRows}
           onToggleFolder={toggleFolder}
           onCreate={handleCreate}
           fm={fm}
           onNewFromTemplate={onNewFromTemplate}
           exportHooks={exportHooks}
+          showTimestamps={viewsPrefs.show_note_timestamps}
         />
       )}
       <ViewsSection
@@ -862,20 +982,30 @@ function PopulatedList({
   rows,
   favRows,
   navIds,
+  treeAnimRows,
   onToggleFolder,
   onCreate,
   fm,
   onNewFromTemplate,
   exportHooks,
+  showTimestamps,
 }: {
   rows: VisibleRow[];
   favRows: VisibleRow[];
   navIds: NoteId[];
+  /** Per-row folder disclosure-animation styles, keyed by VirtualList row key
+   *  (empty when no expand/collapse is animating). Computed in the parent so it
+   *  shares `treeAnim` state with the toggle handler. */
+  treeAnimRows: ReadonlyMap<string, CSSProperties>;
   onToggleFolder: (key: string) => void;
   onCreate: () => void;
   fm: FolderManagement;
   onNewFromTemplate?: () => void;
   exportHooks?: NoteExportUiHooks;
+  /** Sidebar per-note timestamp visibility (sidebar-note-timestamps), read from
+   *  `PrefsView.show_note_timestamps` in the parent. Threaded into every
+   *  `<NoteRow>` (tree + Favorites) via `renderNoteRow`. */
+  showTimestamps: boolean;
 }) {
   const ctx = useSelectedNote();
   // SYNC-9 exclusive active-state (MYND-164): opening a note from the sidebar
@@ -977,9 +1107,18 @@ function PopulatedList({
         favorited={favorited}
         onToggleFavorite={fm.toggleFavorite}
         colorSlot={fm.itemColors[id]}
+        showTimestamps={showTimestamps}
       />
     ),
-    [ctx, openNote, handleContextMenu, fm.toggleFavorite, noteHighlightActive, fm.itemColors],
+    [
+      ctx,
+      openNote,
+      handleContextMenu,
+      fm.toggleFavorite,
+      noteHighlightActive,
+      fm.itemColors,
+      showTimestamps,
+    ],
   );
 
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -1304,43 +1443,49 @@ function PopulatedList({
         <VirtualList
           items={rows}
           keyOf={(row) => row.key}
-          estimatedRowHeight={44}
+          estimatedRowHeight={showTimestamps ? 44 : 30}
+          heightResetToken={showTimestamps}
           renderItem={(row) => {
+            const animStyle = treeAnimRows.get(row.key);
             if (row.kind === "folder") {
               return (
-                <FolderRow
-                  node={row.node}
-                  depth={row.depth}
-                  collapsed={row.collapsed}
-                  empty={row.empty}
-                  dropTarget={fm.dropTargetKey === row.node.key}
-                  renaming={fm.renamingFolderKey === row.node.key}
-                  dragKind={fm.dragKind}
-                  reorderPlace={
-                    fm.folderReorderTarget?.key === row.node.key
-                      ? fm.folderReorderTarget.place
-                      : null
-                  }
-                  onToggle={onToggleFolder}
-                  onContextMenu={fm.openMenu}
-                  colorSlot={fm.itemColors[row.node.path]}
-                  iconName={fm.folderIcons[row.node.path]}
-                  onDragTarget={fm.setDropTargetKey}
-                  onDropNote={(folderPath) => void fm.onFolderDropNote(folderPath)}
-                  onDragStartFolder={fm.onFolderDragStart}
-                  onFolderReorderOver={(node, place) =>
-                    fm.updateFolderReorderTarget(node.key, place)
-                  }
-                  onFolderReorderLeave={fm.clearFolderReorderTarget}
-                  onFolderReorderDrop={(node, place) =>
-                    void fm.onFolderReorder(node, place)
-                  }
-                  onDragEnd={fm.onDragEndCleanup}
-                  onCommitRename={(node, newName) =>
-                    void fm.commitRenameFolder(node, newName)
-                  }
-                  onCancelRename={fm.cancelRenameFolder}
-                />
+                <div style={animStyle}>
+                  <FolderRow
+                    node={row.node}
+                    depth={row.depth}
+                    collapsed={row.collapsed}
+                    empty={row.empty}
+                    dropTarget={fm.dropTargetKey === row.node.key}
+                    renaming={fm.renamingFolderKey === row.node.key}
+                    dragKind={fm.dragKind}
+                    reorderPlace={
+                      fm.folderReorderTarget?.key === row.node.key
+                        ? fm.folderReorderTarget.place
+                        : null
+                    }
+                    onToggle={onToggleFolder}
+                    onContextMenu={fm.openMenu}
+                    colorSlot={fm.itemColors[row.node.path]}
+                    iconName={fm.folderIcons[row.node.path]}
+                    onDragTarget={fm.setDropTargetKey}
+                    onDropNote={(folderPath) =>
+                      void fm.onFolderDropNote(folderPath)
+                    }
+                    onDragStartFolder={fm.onFolderDragStart}
+                    onFolderReorderOver={(node, place) =>
+                      fm.updateFolderReorderTarget(node.key, place)
+                    }
+                    onFolderReorderLeave={fm.clearFolderReorderTarget}
+                    onFolderReorderDrop={(node, place) =>
+                      void fm.onFolderReorder(node, place)
+                    }
+                    onDragEnd={fm.onDragEndCleanup}
+                    onCommitRename={(node, newName) =>
+                      void fm.commitRenameFolder(node, newName)
+                    }
+                    onCancelRename={fm.cancelRenameFolder}
+                  />
+                </div>
               );
             }
             const record = ctx.cache.get(row.id);
@@ -1349,36 +1494,38 @@ function PopulatedList({
             const reorderPlace =
               fm.reorderTarget?.id === id ? fm.reorderTarget.place : null;
             return (
-              <div
-                style={{
-                  position: "relative",
-                  paddingLeft: row.depth * NOTE_INDENT_PER_LEVEL,
-                }}
-                draggable={ctx.renamingId === null}
-                onDragStart={(e) => fm.onNoteDragStart(e, id)}
-                onDragEnd={fm.onDragEndCleanup}
-                onDragOver={(e) => {
-                  // Accept both kinds: a note reorders here; a folder reorders
-                  // past this loose note (same-container). MYND-183 Task 6b.
-                  if (fm.dragKind === null) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  fm.updateReorderTarget(id, dragEdge(e));
-                }}
-                onDragLeave={() => fm.clearReorderTarget(id)}
-                onDrop={(e) => {
-                  if (fm.dragKind === null) return;
-                  e.preventDefault();
-                  void fm.onNoteReorder(id, dragEdge(e));
-                }}
-              >
-                {reorderPlace && (
-                  <div
-                    style={insertionLineStyle(reorderPlace)}
-                    aria-hidden="true"
-                  />
-                )}
-                {renderNoteRow(record, id, favSet.has(id))}
+              <div style={animStyle}>
+                <div
+                  style={{
+                    position: "relative",
+                    paddingLeft: row.depth * NOTE_INDENT_PER_LEVEL,
+                  }}
+                  draggable={ctx.renamingId === null}
+                  onDragStart={(e) => fm.onNoteDragStart(e, id)}
+                  onDragEnd={fm.onDragEndCleanup}
+                  onDragOver={(e) => {
+                    // Accept both kinds: a note reorders here; a folder reorders
+                    // past this loose note (same-container). MYND-183 Task 6b.
+                    if (fm.dragKind === null) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    fm.updateReorderTarget(id, dragEdge(e));
+                  }}
+                  onDragLeave={() => fm.clearReorderTarget(id)}
+                  onDrop={(e) => {
+                    if (fm.dragKind === null) return;
+                    e.preventDefault();
+                    void fm.onNoteReorder(id, dragEdge(e));
+                  }}
+                >
+                  {reorderPlace && (
+                    <div
+                      style={insertionLineStyle(reorderPlace)}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {renderNoteRow(record, id, favSet.has(id))}
+                </div>
               </div>
             );
           }}
