@@ -26,6 +26,7 @@ export {
   formatYamlScalar,
   patchFirstH1Line,
   patchFolderField,
+  patchFrontmatterField,
   patchSourceRanges,
   patchTemplateField,
   patchTitleField,

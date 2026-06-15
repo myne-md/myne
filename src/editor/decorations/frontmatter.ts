@@ -16,6 +16,7 @@
 // on the `Text` ref and skips on non-doc transactions.
 
 import {
+  EditorSelection,
   type Extension,
   type Range,
   RangeSetBuilder,
@@ -307,20 +308,55 @@ class PropertiesWidget extends WidgetType {
       changes: { from: range.bodyEnd, insert: insertion },
       userEvent: "frontmatter.add-property",
     });
+    // Land focus on the new property's key input so the user can name it
+    // immediately. Without this, the widget DOM is rebuilt (eq() is false —
+    // the property count changed) and the focused button is destroyed; WKWebView
+    // then falls focus back to the first focusable element in the container —
+    // the title field — lighting up its :focus background. Defer to the next
+    // frame so CM6 has finished writing the rebuilt widget DOM.
+    requestAnimationFrame(() => {
+      const keyInputs = view.dom.querySelectorAll<HTMLInputElement>(
+        ".cm-fm-properties-key",
+      );
+      for (const input of keyInputs) {
+        if (input.value === key) {
+          input.focus();
+          input.select();
+          break;
+        }
+      }
+    });
   }
 }
 
 function buildFrontmatterDecorations(
   state: { doc: Parameters<typeof cachedLocateFrontmatter>[0] },
 ): DecorationSet {
-  const range = cachedLocateFrontmatter(state.doc);
+  const doc = state.doc;
+  const range = cachedLocateFrontmatter(doc);
   if (range === null) return Decoration.none;
-  const props = parseSimpleProperties(state.doc.toString(), range);
+  const props = parseSimpleProperties(doc.toString(), range);
+  // A note that is ONLY frontmatter (the block reaches the end of the doc)
+  // would otherwise have its closing `---\n` line break consumed by the
+  // block-replace decoration — that swallows the empty body line below it, so
+  // there is NO editable line and the user can't click to start writing (the
+  // frontmatter-only-note bug). Stop the decoration one char short of that
+  // trailing newline, leaving the final empty line as a live caret target.
+  // (The no-trailing-newline variant `---\n…\n---` has no line to expose; the
+  // emptyBodyClickHandler below creates one on demand.)
+  let blockEnd = range.blockEnd;
+  if (
+    blockEnd === doc.length &&
+    doc.length > 0 &&
+    doc.sliceString(doc.length - 1, doc.length) === "\n"
+  ) {
+    blockEnd -= 1;
+  }
   const decorations: Array<Range<Decoration>> = [
     Decoration.replace({
       widget: new PropertiesWidget(props),
       block: true,
-    }).range(range.blockStart, range.blockEnd),
+    }).range(range.blockStart, blockEnd),
   ];
   const builder = new RangeSetBuilder<Decoration>();
   for (const d of decorations) builder.add(d.from, d.to, d.value);
@@ -340,6 +376,49 @@ const frontmatterField = StateField.define<DecorationSet>({
   },
 });
 
+/**
+ * Click-to-write affordance for a note that is ONLY frontmatter AND has no
+ * trailing newline after the closing `---` (the `---\n…\n---` shape). There,
+ * the block widget consumes the entire document and there is no body line for
+ * the decoration-shrink in `buildFrontmatterDecorations` to expose — clicking
+ * the empty area below the Properties widget would otherwise do nothing. On
+ * such a click, insert a single newline at the document end (creating the body
+ * line) and drop the caret onto it, so the user can immediately start typing.
+ *
+ * Scoped tightly: it only fires when the frontmatter block runs to the very end
+ * of a doc that does NOT end in a newline, and only for clicks below the widget
+ * — never on the widget's own inputs / "+ Add property" button, and never in a
+ * note that already has a body.
+ */
+function emptyBodyClickHandler(): Extension {
+  return EditorView.domEventHandlers({
+    mousedown(event, view) {
+      if (event.button !== 0) return false;
+      const doc = view.state.doc;
+      const range = cachedLocateFrontmatter(doc);
+      if (range === null) return false;
+      if (range.blockEnd !== doc.length) return false;
+      if (
+        doc.length === 0 ||
+        doc.sliceString(doc.length - 1, doc.length) === "\n"
+      ) {
+        return false;
+      }
+      const widget = view.dom.querySelector(".cm-fm-properties");
+      if (!(widget instanceof HTMLElement)) return false;
+      if (event.clientY <= widget.getBoundingClientRect().bottom) return false;
+      event.preventDefault();
+      view.dispatch({
+        changes: { from: doc.length, insert: "\n" },
+        selection: EditorSelection.cursor(doc.length + 1),
+        userEvent: "input",
+      });
+      view.focus();
+      return true;
+    },
+  });
+}
+
 export function frontmatterDecorations(): Extension {
-  return frontmatterField;
+  return [frontmatterField, emptyBodyClickHandler()];
 }

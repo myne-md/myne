@@ -974,3 +974,164 @@ function isCanonicalTemplateFlag(valuePortion: string): boolean {
   const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
   return raw.trim() === TEMPLATE_FLAG_VALUE;
 }
+
+// === patchFrontmatterField — generic keyed scalar surgery ===
+//
+// The key-parameterised generalisation of the per-field families above
+// (`folder:` / `trashed:` / `title:`). Where those target a fixed Myne-managed
+// canonical field, this writes an ARBITRARY user-authored scalar property — the
+// write target for a saved view's cover image (the property NAME comes from the
+// view's `image` setting, default `cover`), set without opening the note.
+//
+// `cover` (or whatever the view points at) is NOT a Myne-managed canonical field
+// (markdown-dialect.md §3.6.1 is unchanged); it is an ordinary property, so this
+// helper carries no value-strict contract — it just round-trips a string through
+// `formatYamlScalar`. Same A/B/C/D states as `patchFolderField`. `value === null`
+// deletes the field (with empty-block collapse).
+
+// Build the `^(<indent><key><sep>)(value)$` matcher for an arbitrary property
+// name. The key is a YAML property name (identifier-ish), but regex
+// metacharacters are escaped defensively so a stray char can't widen the match.
+function fmKeyRe(key: string): RegExp {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^([ \\t]*${escaped}[ \\t]*:[ \\t]*)(.*)$`);
+}
+
+function applyStateAField(source: string, key: string, value: string): string {
+  return (
+    FRONTMATTER_OPENER +
+    key + ": " + formatYamlScalar(value) + NEWLINE +
+    FRONTMATTER_DELIMITER + NEWLINE +
+    NEWLINE +
+    source
+  );
+}
+
+function applyStateBField(
+  source: string,
+  bodyEnd: number,
+  key: string,
+  value: string,
+): string {
+  const insert = key + ": " + formatYamlScalar(value) + NEWLINE;
+  return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
+}
+
+function applyStateCField(
+  source: string,
+  bodyStart: number,
+  bodyEnd: number,
+  key: string,
+  value: string,
+): string | null {
+  const keyRe = fmKeyRe(key);
+  const fmBody = source.substring(bodyStart, bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = keyRe.exec(lines[i] ?? "");
+    if (m === null) continue;
+    const prefix = m[1] ?? "";
+    const valuePortion = m[2] ?? "";
+    const trimmedValue = valuePortion.trim();
+
+    // Block-scalar (|, >) → collapse to canonical single-line form.
+    if (/^[|>]/.test(trimmedValue)) {
+      lines[i] = prefix + formatYamlScalar(value);
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
+      lines.splice(i + 1, j - (i + 1));
+      return lines.join(NEWLINE);
+    }
+
+    // Existing quoted scalar (single or double) → preserve quote style.
+    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
+    if (quotedM !== null) {
+      const quote = quotedM[1] ?? '"';
+      const trailing = quotedM[3] ?? "";
+      const escaped =
+        quote === '"'
+          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          : value.replace(/'/g, "''");
+      lines[i] = prefix + quote + escaped + quote + trailing;
+      return lines.join(NEWLINE);
+    }
+
+    // Existing unquoted + trailing comment → preserve the comment.
+    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+    if (commentM !== null) {
+      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
+      return lines.join(NEWLINE);
+    }
+
+    // Existing plain unquoted scalar.
+    lines[i] = prefix + formatYamlScalar(value);
+    return lines.join(NEWLINE);
+  }
+
+  return null;
+}
+
+function deleteField(source: string, key: string): string {
+  const fm = locateFrontmatter(source);
+  if (fm === null) return source;
+
+  const keyRe = fmKeyRe(key);
+  const fmBody = source.substring(fm.bodyStart, fm.bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+  const idx = lines.findIndex((l) => keyRe.test(l));
+  if (idx === -1) return source;
+
+  const remaining = lines.slice(0, idx).concat(lines.slice(idx + 1));
+  const hasResidual = remaining.some((l) => l.trim() !== "");
+
+  if (!hasResidual) {
+    let removalEnd = fm.blockEnd;
+    if (source.charAt(removalEnd) === NEWLINE) removalEnd += NEWLINE.length;
+    return source.substring(removalEnd);
+  }
+
+  const newBody = remaining.join(NEWLINE);
+  return (
+    source.substring(0, fm.bodyStart) + newBody + source.substring(fm.bodyEnd)
+  );
+}
+
+/**
+ * Set, insert, or delete an arbitrary frontmatter scalar property `key`.
+ * `value === null` deletes the field (states A/B/C set; state D delete with
+ * empty-block collapse — same shape as `patchFolderField`). Used by
+ * `setNoteCover` to write a saved view's cover-image reference without opening
+ * the note.
+ */
+export function patchFrontmatterField(
+  bytes: Uint8Array,
+  key: string,
+  value: string | null,
+): Uint8Array {
+  const source = utf8Decoder.decode(bytes);
+
+  if (value === null) {
+    return utf8Encoder.encode(deleteField(source, key));
+  }
+
+  const fm = locateFrontmatter(source);
+  if (fm === null) {
+    return utf8Encoder.encode(applyStateAField(source, key, value));
+  }
+
+  const stateCResult = applyStateCField(
+    source,
+    fm.bodyStart,
+    fm.bodyEnd,
+    key,
+    value,
+  );
+  if (stateCResult !== null) {
+    const before = source.substring(0, fm.bodyStart);
+    const after = source.substring(fm.bodyEnd);
+    return utf8Encoder.encode(before + stateCResult + after);
+  }
+
+  return utf8Encoder.encode(applyStateBField(source, fm.bodyEnd, key, value));
+}
