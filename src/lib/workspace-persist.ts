@@ -11,6 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   collectLeaves,
   findLeaf,
+  GRAPH_TAB_ID,
   itemKey,
   sameItem,
   type WorkspaceItem,
@@ -86,7 +87,7 @@ export function deserializeWorkspace(json: string): WorkspaceState | null {
 type ParsedItem = { item: WorkspaceItem } | "drop" | "invalid";
 
 /** Parse one untrusted tab entry. A bare string is a legacy note id (MYND-166
- *  format, pre-MYND-274); `{kind:"note"|"view", id}` is a current item; a
+ *  format, pre-MYND-274); `{kind:"note"|"view"|"graph", id}` is a current item; a
  *  well-formed `{kind:<other>, id}` is a future kind to drop; anything else is
  *  invalid. */
 function parseItem(t: unknown): ParsedItem {
@@ -96,6 +97,11 @@ function parseItem(t: unknown): ParsedItem {
   if (typeof o.id !== "string") return "invalid";
   if (o.kind === "note" || o.kind === "view") {
     return { item: { kind: o.kind, id: o.id } };
+  }
+  // The whole-vault graph (MYND-198) is a singleton tab; its id is the fixed
+  // sentinel, so any persisted id normalizes to a canonical graph item.
+  if (o.kind === "graph") {
+    return { item: { kind: "graph", id: GRAPH_TAB_ID } };
   }
   if (typeof o.kind === "string") return "drop"; // unknown future kind
   return "invalid";

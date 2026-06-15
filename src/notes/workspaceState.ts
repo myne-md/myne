@@ -38,14 +38,20 @@ export type PaneId = string;
  *  tag, not the id, discriminates a view tab from a note tab. */
 export type ViewId = string;
 
+/** The whole-vault graph is a singleton tab: there is exactly one graph per
+ *  workspace, so its id is a fixed sentinel (the global duplicate-forbid
+ *  invariant then makes "open graph" idempotent — a reveal, never a 2nd tab). */
+export const GRAPH_TAB_ID = "graph";
+
 /**
- * A tab item: either a note or a saved view (MYND-274 / SYNC-10). The `kind`
- * tag discriminates; the id alone does not (a note and a view may share an
- * id-string). Identity across the workspace is `(kind, id)`.
+ * A tab item: a note, a saved view (MYND-274 / SYNC-10), or the whole-vault
+ * graph. The `kind` tag discriminates; the id alone does not (a note and a view
+ * may share an id-string). Identity across the workspace is `(kind, id)`.
  */
 export type WorkspaceItem =
   | { kind: "note"; id: NoteId }
-  | { kind: "view"; id: ViewId };
+  | { kind: "view"; id: ViewId }
+  | { kind: "graph"; id: typeof GRAPH_TAB_ID };
 
 /** Stable string key for an item — `"note:<id>"` / `"view:<id>"`. Used for
  *  set/equality comparisons over the heterogeneous tab strip. */
@@ -68,11 +74,18 @@ export function viewItem(id: ViewId): WorkspaceItem {
   return { kind: "view", id };
 }
 
-/** Inverse of [`itemKey`]: parse a `"note:<id>"` / `"view:<id>"` handle back to
- *  an item. An unrecognized prefix is treated as a note id (the legacy/default
- *  kind), so a bare or note-prefixed handle always yields a note item. */
+/** The whole-vault graph tab item (singleton — see [`GRAPH_TAB_ID`]). */
+export function graphItem(): WorkspaceItem {
+  return { kind: "graph", id: GRAPH_TAB_ID };
+}
+
+/** Inverse of [`itemKey`]: parse a `"note:<id>"` / `"view:<id>"` / `"graph:<id>"`
+ *  handle back to an item. An unrecognized prefix is treated as a note id (the
+ *  legacy/default kind), so a bare or note-prefixed handle always yields a note
+ *  item. */
 export function parseItemKey(key: string): WorkspaceItem {
   if (key.startsWith("view:")) return { kind: "view", id: key.slice(5) };
+  if (key.startsWith("graph:")) return { kind: "graph", id: GRAPH_TAB_ID };
   if (key.startsWith("note:")) return { kind: "note", id: key.slice(5) };
   return { kind: "note", id: key };
 }

@@ -10,6 +10,7 @@ import {
 } from "../../src/lib/workspace-persist";
 import {
   emptyWorkspace,
+  graphItem,
   noteItem,
   openInNewTab,
   openToSide,
@@ -188,6 +189,19 @@ describe("workspace descriptor (de)serialization", () => {
     if (restored!.root.kind === "leaf") {
       expect(restored!.root.tabs).toEqual([noteItem("a")]);
       expect(restored!.root.activeTab).toEqual(noteItem("a"));
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+
+  it("round-trips a graph tab (MYND-198 — a known kind, not dropped)", () => {
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, noteItem("a"));
+    ws = openInNewTab(ws, graphItem());
+    const restored = deserializeWorkspace(serializeWorkspace(ws));
+    expect(restored).toEqual(ws);
+    if (restored!.root.kind === "leaf") {
+      expect(restored!.root.tabs).toEqual([noteItem("a"), graphItem()]);
     } else {
       throw new Error("expected a leaf root");
     }

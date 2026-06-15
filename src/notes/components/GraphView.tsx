@@ -1,13 +1,11 @@
-// Whole-vault graph view (knowledge-graph-ux #4 / MYND-198). A full-window
-// modal carve-out (ModalShell + an Editor-local boolean), per the design canon
-// (README.md:131 "a separate panel that replaces the editor, not a fourth
-// pane") and src/CLAUDE.md (large surface = modal-class, NOT a Stage variant).
-// Launched from a command-palette action AND a persistent BottomBar affordance
-// (SYNC-7 — graph is wedge-first-class, not palette-only).
+// Whole-vault graph view (knowledge-graph-ux #4 / MYND-198). Renders as a
+// first-class workspace TAB (a `{kind:"graph"}` WorkspaceItem) — the editor's
+// pane body, alongside note and saved-view tabs — not a modal carve-out. Opened
+// via `ws.openGraph()` from a command-palette action, a persistent BottomBar
+// affordance (SYNC-7 — graph is wedge-first-class), and the ⌘⇧G shortcut.
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { ModalShell } from "../../components/primitives/ModalShell";
 import {
   isolatedModel,
   loadNeighborhood,
@@ -25,6 +23,7 @@ import {
   vaultIndicesOrphans,
   type TagTreeNode,
 } from "../vaultIndices";
+import { useWorkspace } from "../workspaceContext";
 
 // Lazy-loaded so the d3-force + canvas-renderer chunk stays OUT of the initial
 // bundle (vision.md "separate, lazy-loaded"; SYNC-8 TB9 posture). The app's
@@ -49,15 +48,10 @@ const MESSAGE_STYLE = {
   textAlign: "center" as const,
 };
 
-export function GraphView({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function GraphPane() {
   const notes = useResolverNotes();
   const ctx = useSelectedNote();
+  const ws = useWorkspace();
   const indexNonce = useIndexNonce();
   const [filter, setFilter] = useState<Filter>({ kind: "all" });
   const [model, setModel] = useState<GraphModel | null>(null);
@@ -66,9 +60,8 @@ export function GraphView({
   const [buildNonce, setBuildNonce] = useState(0);
   const [buildTrigger, setBuildTrigger] = useState(0);
 
-  // Tag list for the filter (fetched on open).
+  // Tag list for the filter (fetched on mount).
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     void tagTree().then(
       (t) => {
@@ -79,13 +72,12 @@ export function GraphView({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, []);
 
   // Build the model for the current filter. DELIBERATELY does NOT depend on
   // indexNonce (SYNC-14: the frozen graph does NOT auto-rejumble on a vault
   // change — the user refreshes explicitly). `buildTrigger` forces a rebuild.
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     setModel(null);
     setOverCap(false);
@@ -119,20 +111,16 @@ export function GraphView({
     return () => {
       cancelled = true;
     };
-  }, [open, filter, notes, buildTrigger]);
-
-  if (!open) return null;
+  }, [filter, notes, buildTrigger]);
 
   // SYNC-14: stale when the index changed since the layout was built. The
   // expensive re-layout is gated to an explicit refresh, never the nonce.
   const stale = indexNonce !== buildNonce;
+  // A node opens its note in a NEW tab so the graph tab stays put (the
+  // persistent-explorer UX) — the graph remains a peer tab to navigate from.
   const onOpenNode = (id: string) => {
-    onClose();
-    void ctx.open(id).catch(() => {});
+    ws.openNewTabInFocused(id);
   };
-
-  const width = Math.max(640, window.innerWidth - 96);
-  const height = Math.max(480, window.innerHeight - 96);
 
   let content: ReactNode;
   if (overCap) {
@@ -171,13 +159,14 @@ export function GraphView({
   }
 
   return (
-    <ModalShell
-      open={open}
-      title="Graph"
-      labelId="graph-view-title"
-      onClose={onClose}
-      width={width}
-      height={height}
+    <div
+      data-testid="editor.graph-pane"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        minHeight: 0,
+      }}
     >
       <div
         style={{
@@ -278,7 +267,7 @@ export function GraphView({
         )}
       </div>
       {content}
-    </ModalShell>
+    </div>
   );
 }
 
