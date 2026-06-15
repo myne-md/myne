@@ -176,6 +176,12 @@ A subkey context string (`"myne.v0.1 backup-key"`) **reserved but not used in v0
 
 Used in: `spec/protocol.md` §3.4, §9.11; `decisions.md` 2026-06-10
 
+### **base import** &nbsp; 📦 *Product*
+
+A one-way, **accepted-lossy** adapter that reads an Obsidian *Bases* `.base` file (plain YAML describing views over the user's own notes) and maps the representable subset onto Myne's canonical [saved view](#saved-view) schema (Saved Views epic, MYND-276). It is **import-only** in v1 (export is the future MYND-279) and a derived bridge — Myne does **not** own or round-trip the `.base` format. Unsupported filter clauses (anything outside the closed [filter AST](#filter-ast) allow-list — `list.map`/arithmetic/`file.hasLink`/`file.mtime`), and the `formulas` / `summaries` / `properties`-display blocks, are **dropped and counted** (no formula/code-eval exists to honor them — the no-database/no-formula commitment of [vision](#vision)); a clause-level warning tally surfaces exactly what came across and what didn't (SYNC-12). Obsidian's recursive `file.inFolder()` matches Myne's subtree-inclusive engine leaf, so that mapping is direct. The reader reuses the vendored YAML parser + the shipped importer file seam (no new dependency / capability), parses in RAM only (PS-1), and persists into the existing `vault.prefs` (`MYP1`) `saved_views` field (no new crypto). The "Bases" / "Obsidian" names are used **nominatively** only (what the importer reads), never as a productized Myne feature name.
+
+Used in: `decisions.md` 2026-06-15; Saved Views (MYND-276)
+
 ### **bidirectional links** &nbsp; 📦 *Product*
 
 *(Aliases: backlinks, wikilinks.)*

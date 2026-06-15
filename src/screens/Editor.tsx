@@ -53,6 +53,12 @@ import { Toast, type ToastAction } from "../components/Toast";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import {
+  importBaseFilePath,
+  BaseImportPersistError,
+} from "../notes/import/base/importBase";
+import { BaseParseError } from "../notes/import/base/parseBase";
 import { BackupExportModal } from "../components/backup/BackupExportModal";
 import { VaultExportModal } from "../components/export/VaultExportModal";
 import { collectFolderOptions } from "../components/export/vaultExportFlow";
@@ -598,6 +604,43 @@ function EditorChrome({
     }
   }, [layout, forced.forceLeftCollapsed]);
 
+  // Import a `.base` saved-views file (Saved Views #6, MYND-276, task 6): pick a
+  // single `.base` file (no new capability — dialog:allow-open already granted),
+  // run the shipped import entry point (read → parse → map → persist into
+  // vault.prefs), and surface a concise SYNC-12 summary toast. The picked path's
+  // parent directory is the root passed to the root-confined importer read seam.
+  const importBaseView = useCallback(async () => {
+    const picked = await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Obsidian Base", extensions: ["base"] }],
+    });
+    if (picked === null) return; // cancelled — no toast
+    try {
+      // The root-confining directory split lives in importBase (sealed seam).
+      const tally = await importBaseFilePath(picked);
+      let message = `Imported ${tally.importedViews} view(s)`;
+      if (tally.skippedViews > 0) {
+        message += ` · ${tally.skippedViews} skipped`;
+      }
+      if (tally.droppedUnsupportedFilters > 0) {
+        message += ` · ${tally.droppedUnsupportedFilters} filters dropped`;
+      }
+      setToast({ message });
+    } catch (e) {
+      if (e instanceof BaseParseError) {
+        setToast({ message: "Not a valid .base file." });
+      } else if (e instanceof BaseImportPersistError) {
+        // Count-only (SYNC-12) — never surface the failed view's name in copy.
+        setToast({
+          message: `Import stopped after ${e.persistedCount} view(s).`,
+        });
+      } else {
+        setToast({ message: "Import failed." });
+      }
+    }
+  }, [setToast]);
+
   // MYND-170 (SYNC-9) exclusive active-state: selecting a note in the sidebar
   // (from ANY source — row click, keyboard nav, command palette, favorites,
   // jump-from-attachment) closes the Attachments view and returns the center
@@ -1116,6 +1159,10 @@ function EditorChrome({
           setPaletteOpen(false);
           setImporterOpen(true);
         }}
+        onImportBaseView={() => {
+          setPaletteOpen(false);
+          void importBaseView();
+        }}
         onBackupVault={() => {
           setPaletteOpen(false);
           setBackupExportOpen(true);
@@ -1425,6 +1472,7 @@ type CommandPaletteHostProps = {
   onShowTags: () => void;
   onShowViews: () => void;
   onImportObsidian: () => void;
+  onImportBaseView: () => void;
   onBackupVault: () => void;
   onExportVaultMarkdown: () => void;
   onLockFlushed: () => Promise<void>;
@@ -1446,6 +1494,7 @@ function CommandPaletteHost({
   onShowTags,
   onShowViews,
   onImportObsidian,
+  onImportBaseView,
   onBackupVault,
   onExportVaultMarkdown,
   onLockFlushed,
@@ -1509,6 +1558,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
       onToggleLeftSidebar,
@@ -1535,6 +1585,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
       onToggleLeftSidebar,
