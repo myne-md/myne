@@ -81,12 +81,16 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
           )
         ).click();
         const renameInput = await s.byTestId("views.rename-input");
-        await renameInput.replaceText("Reading");
+        // Lowercase rename target: WebKitWebDriver's Send Keys does NOT apply the
+        // shift modifier, so an uppercase char arrives lowercased — assert a value
+        // the driver types faithfully (a real user's keyboard has Shift; this is a
+        // driver-only limitation, not a product one).
+        await renameInput.replaceText("reading");
         await renameInput.sendKeys(ENTER); // explicit Enter commits the rename
         await s.waitUntil(
           async () =>
-            (await viewRowLabels(s)).some((l) => l.includes("Reading")) ? true : null,
-          { label: "row renamed to Reading" },
+            (await viewRowLabels(s)).some((l) => l.includes("reading")) ? true : null,
+          { label: "row renamed to reading" },
         );
 
         // Create a second view → two rows.
