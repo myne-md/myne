@@ -15,6 +15,7 @@ pub mod notes;
 pub mod pdf_export;
 pub mod prefs;
 pub mod snapshots;
+pub mod themes;
 pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;

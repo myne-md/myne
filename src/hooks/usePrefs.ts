@@ -43,6 +43,7 @@ const DEFAULT_PREFS: PrefsView = {
   show_note_timestamps: true,
   deliberate_folders: [],
   auto_lock_seconds: null,
+  custom_theme: null,
   daily_date_format: null,
   daily_folder: null,
   daily_template: null,

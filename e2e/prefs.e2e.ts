@@ -144,6 +144,47 @@ describeE2E("pf1 theme + auto-lock round-trip (MYND-225)", () => {
   });
 });
 
+describeE2E("pf1b AMOLED theme round-trip", () => {
+  // Precondition: exactly 1 vault (weak KDF). AMOLED is the third explicit
+  // theme choice — a pure-black variant of Dark; like Dark it sets an explicit
+  // `<html data-theme>` (here "amoled") and must survive a reload from the
+  // MYP1 blob.
+  it("an AMOLED theme choice set via Settings survives a reload", async () => {
+    let password = "";
+    await scenario(
+      "pf1b-amoled-roundtrip",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // Appearance → AMOLED. Disk-first write, then `applyTheme` flips
+        // the attribute to "amoled" — observable immediately.
+        await openSettings(s, "appearance");
+        await (await s.byTestId("settings.theme-amoled")).click();
+        await expectThemeAttr(s, "amoled");
+        await closeSettings(s);
+
+        // Reload. Slot stays Unlocked → boots straight back into the editor;
+        // prefs re-read from the MYP1 blob on entry (theme="amoled" parsed back).
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+        await expectThemeAttr(s, "amoled");
+
+        // The segment itself reads back the persisted value (mount effect — poll).
+        await openSettings(s, "appearance");
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("settings.theme-amoled")).attribute("aria-checked")) ===
+              "true" || null,
+          { label: "theme segment reads back amoled" },
+        );
+      },
+    );
+  });
+});
+
 describeE2E("pf4 sidebar note-timestamp visibility round-trip (sidebar-note-timestamps)", () => {
   // Precondition: exactly 1 vault (weak KDF).
   it("hiding the sidebar timestamp via Settings drops the subtitle and survives a reload", async () => {

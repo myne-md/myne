@@ -21,6 +21,7 @@
     "vault-delete:default",
     "vault-repair:default",
     "prefs:default",
+    "themes:default",
     "notes:default",
     "snapshots:default",
     "vault-indices:default",

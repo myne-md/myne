@@ -25,17 +25,18 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Button } from "../primitives/Button";
 import { ControlBlock } from "./ControlBlock";
 import { Switch } from "../primitives/Switch";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 import {
   prefsRead,
+  setCustomTheme,
   setShowNoteTimestamps,
   setTheme,
   type ThemeChoice,
 } from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
+import { CustomThemesSection } from "./CustomThemesSection";
 
 // Label + switch on one row, helper below — mirrors PrivacyPanel's toggle shape.
 const TOGGLE_ROW_STYLE: CSSProperties = {
@@ -109,17 +110,18 @@ const ERROR_STYLE: CSSProperties = {
 
 // `value: "system"` maps to a `null` theme on the wire (clears the field).
 interface ThemeOption {
-  value: "light" | "dark" | "system";
+  value: "light" | "dark" | "amoled" | "system";
   label: string;
 }
 
 const THEMES: readonly ThemeOption[] = [
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
+  { value: "amoled", label: "AMOLED" },
   { value: "system", label: "System" },
 ];
 
-/** Map the stored `theme` (light | dark | null) to the selected segment. */
+/** Map the stored `theme` (light | dark | amoled | null) to the selected segment. */
 function segmentFor(theme: ThemeChoice | null): ThemeOption["value"] {
   return theme ?? "system";
 }
@@ -135,6 +137,10 @@ export function AppearancePanel() {
   // "Light". The stored value loads on mount.
   const [selected, setSelected] = useState<ThemeOption["value"]>("system");
   const [error, setError] = useState<string | null>(null);
+  // The active custom-theme name (null ≡ none). Lifted here so picking a
+  // built-in theme below clears it, and the Custom themes subsection can mark
+  // the matching row "Applied". custom_theme takes precedence over `theme`.
+  const [activeCustom, setActiveCustom] = useState<string | null>(null);
   // Sidebar per-note timestamp visibility (sidebar-note-timestamps). Default
   // `true` (visible) until the stored value loads — matches PrefsView::default.
   const [showTimestamps, setShowTimestamps] = useState(true);
@@ -162,6 +168,7 @@ export function AppearancePanel() {
         if (!cancelled) {
           setSelected(segmentFor(prefs.theme));
           setShowTimestamps(prefs.show_note_timestamps);
+          setActiveCustom(prefs.custom_theme);
         }
       })
       .catch(() => {
@@ -181,8 +188,12 @@ export function AppearancePanel() {
       // Disk-first: persist before applying so a write failure never shows a
       // "saved" illusion (the live theme + segment stay where they were).
       await setTheme(theme);
+      // Picking a built-in theme turns OFF any active custom theme — clear the
+      // selection so it doesn't keep overriding (custom_theme has precedence).
+      await setCustomTheme(null);
       setSelected(value);
-      applyTheme(theme);
+      setActiveCustom(null);
+      applyTheme(theme); // also clears any applied custom CSS vars
     } catch {
       setError("Couldn't save theme. Please try again.");
     }
@@ -274,16 +285,9 @@ export function AppearancePanel() {
         )}
       </div>
 
-      <ControlBlock
-        label="Custom theme"
-        helper="Load a custom theme from a .css file. Validation runs locally; never uploaded."
-        control={
-          <div>
-            <Button variant="secondary" disabled>
-              Choose theme file…
-            </Button>
-          </div>
-        }
+      <CustomThemesSection
+        activeCustom={activeCustom}
+        onActiveCustomChange={setActiveCustom}
       />
     </div>
   );

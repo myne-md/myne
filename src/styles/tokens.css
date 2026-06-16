@@ -254,6 +254,71 @@
   --_shadow-1-dark: 0 1px 0 rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.5);
   --_shadow-2-dark: 0 2px 4px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5);
   --_shadow-3-dark: 0 8px 16px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6);
+
+  /* -- AMOLED palette source values -----------------------------------
+     A pure-black variant of the dark palette for OLED hardware (true
+     pixel-off on the page background). Same single-source discipline as
+     the dark set above: the :root[data-theme="amoled"] application block
+     only repeats `--token: var(--_token-amoled)` assignments. The neutral
+     base goes to #000000 with subtly RAISED recessed surfaces so cards /
+     sidebars stay distinguishable against the black page; ink, accent,
+     state, highlight, label + syntax hues are inherited verbatim from the
+     dark ramp (they retain AA on black, which is strictly darker than the
+     dark --paper-2 they were tuned against). The *-soft fills are nudged
+     one notch darker since soft washes read brighter on true black. */
+  --_paper-amoled:    #000000;
+  --_paper-2-amoled:  #0c0c0b;
+  --_paper-3-amoled:  #161614;
+  --_line-1-amoled:   #1f1e1c;
+  --_line-2-amoled:   #2c2b28;
+  --_line-3-amoled:   #44423d;
+
+  --_ink-3-amoled:    var(--_ink-3-dark);
+  --_ink-2-amoled:    var(--_ink-2-dark);
+  --_ink-1-amoled:    var(--_ink-1-dark);
+  --_ink-0-amoled:    var(--_ink-0-dark);
+
+  --_accent-amoled:        var(--_accent-dark);
+  --_accent-hover-amoled:  var(--_accent-hover-dark);
+  --_accent-press-amoled:  var(--_accent-press-dark);
+  --_accent-soft-amoled:   #161d28;
+  --_accent-on-amoled:     var(--_accent-on-dark);
+
+  --_danger-amoled:       var(--_danger-dark);
+  --_danger-soft-amoled:  #241715;
+  --_warning-amoled:      var(--_warning-dark);
+  --_warning-soft-amoled: #221c10;
+  --_success-amoled:      var(--_success-dark);
+  --_success-soft-amoled: #121c16;
+  --_highlight-amoled:    #423818;
+  --_highlight-green-amoled:  #22311e;
+  --_highlight-blue-amoled:   #1b2d3d;
+  --_highlight-pink-amoled:   #3a1e2e;
+  --_highlight-purple-amoled: #2e2040;
+
+  --_label-clay-amoled:   var(--_label-clay-dark);
+  --_label-ochre-amoled:  var(--_label-ochre-dark);
+  --_label-moss-amoled:   var(--_label-moss-dark);
+  --_label-slate-amoled:  var(--_label-slate-dark);
+  --_label-plum-amoled:   var(--_label-plum-dark);
+  --_label-stone-amoled:  var(--_label-stone-dark);
+
+  --_syntax-keyword-amoled:  var(--_syntax-keyword-dark);
+  --_syntax-string-amoled:   var(--_syntax-string-dark);
+  --_syntax-comment-amoled:  var(--_syntax-comment-dark);
+  --_syntax-number-amoled:   var(--_syntax-number-dark);
+  --_syntax-variable-amoled: var(--_syntax-variable-dark);
+  --_syntax-property-amoled: var(--_syntax-property-dark);
+  --_syntax-function-amoled: var(--_syntax-function-dark);
+  --_syntax-type-amoled:     var(--_syntax-type-dark);
+  --_syntax-operator-amoled: var(--_syntax-operator-dark);
+  --_syntax-tag-amoled:      var(--_syntax-tag-dark);
+  --_syntax-meta-amoled:     var(--_syntax-meta-dark);
+  --_syntax-invalid-amoled:  var(--_syntax-invalid-dark);
+
+  --_shadow-1-amoled: var(--_shadow-1-dark);
+  --_shadow-2-amoled: var(--_shadow-2-dark);
+  --_shadow-3-amoled: var(--_shadow-3-dark);
 }
 
 /* =========================================================================
@@ -328,8 +393,70 @@
   --shadow-3: var(--_shadow-3-dark);
 }
 
+/* AMOLED — explicit pure-black choice (overrides the OS). Like Dark, an
+   explicit attribute; never reached by the prefers-color-scheme:dark @media
+   below, so OS-dark in System mode resolves to the regular Dark palette, and
+   AMOLED only comes from an explicit user choice. */
+:root[data-theme="amoled"] {
+  --paper:    var(--_paper-amoled);
+  --paper-2:  var(--_paper-2-amoled);
+  --paper-3:  var(--_paper-3-amoled);
+  --line-1:   var(--_line-1-amoled);
+  --line-2:   var(--_line-2-amoled);
+  --line-3:   var(--_line-3-amoled);
+
+  --ink-3:    var(--_ink-3-amoled);
+  --ink-2:    var(--_ink-2-amoled);
+  --ink-1:    var(--_ink-1-amoled);
+  --ink-0:    var(--_ink-0-amoled);
+
+  --accent:        var(--_accent-amoled);
+  --accent-hover:  var(--_accent-hover-amoled);
+  --accent-press:  var(--_accent-press-amoled);
+  --accent-soft:   var(--_accent-soft-amoled);
+  --accent-on:     var(--_accent-on-amoled);
+
+  --danger:       var(--_danger-amoled);
+  --danger-soft:  var(--_danger-soft-amoled);
+  --warning:      var(--_warning-amoled);
+  --warning-soft: var(--_warning-soft-amoled);
+  --success:      var(--_success-amoled);
+  --success-soft: var(--_success-soft-amoled);
+  --info:         var(--accent);
+  --info-soft:    var(--accent-soft);
+  --highlight:    var(--_highlight-amoled);
+  --highlight-green:  var(--_highlight-green-amoled);
+  --highlight-blue:   var(--_highlight-blue-amoled);
+  --highlight-pink:   var(--_highlight-pink-amoled);
+  --highlight-purple: var(--_highlight-purple-amoled);
+
+  --label-clay:   var(--_label-clay-amoled);
+  --label-ochre:  var(--_label-ochre-amoled);
+  --label-moss:   var(--_label-moss-amoled);
+  --label-slate:  var(--_label-slate-amoled);
+  --label-plum:   var(--_label-plum-amoled);
+  --label-stone:  var(--_label-stone-amoled);
+
+  --syntax-keyword:  var(--_syntax-keyword-amoled);
+  --syntax-string:   var(--_syntax-string-amoled);
+  --syntax-comment:  var(--_syntax-comment-amoled);
+  --syntax-number:   var(--_syntax-number-amoled);
+  --syntax-variable: var(--_syntax-variable-amoled);
+  --syntax-property: var(--_syntax-property-amoled);
+  --syntax-function: var(--_syntax-function-amoled);
+  --syntax-type:     var(--_syntax-type-amoled);
+  --syntax-operator: var(--_syntax-operator-amoled);
+  --syntax-tag:      var(--_syntax-tag-amoled);
+  --syntax-meta:     var(--_syntax-meta-amoled);
+  --syntax-invalid:  var(--_syntax-invalid-amoled);
+
+  --shadow-1: var(--_shadow-1-amoled);
+  --shadow-2: var(--_shadow-2-amoled);
+  --shadow-3: var(--_shadow-3-amoled);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]):not([data-theme="amoled"]) {
     --paper:    var(--_paper-dark);
     --paper-2:  var(--_paper-2-dark);
     --paper-3:  var(--_paper-3-dark);
