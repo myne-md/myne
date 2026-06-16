@@ -459,21 +459,13 @@ textarea,
 
 /* -- Sidebar tree disclosure ------------------------------------------------
    Enter/exit motion for folder-tree rows revealed/hidden by expand/collapse
-   (FolderRow + child note rows). Transform + opacity only — no layout/height
-   change — so the hand-rolled VirtualList's height cache is untouched. The
-   reduced-motion media query above zeroes animation-duration; NoteList also
-   skips the deferred-removal path under reduced motion so collapse is instant
-   rather than leaving faded-out rows lingering. */
-
-@keyframes myne-tree-row-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes myne-tree-row-out {
-  from { opacity: 1; transform: translateY(0); }
-  to   { opacity: 0; transform: translateY(-6px); }
-}
+   lives in `NoteList`'s `DisclosureWrapper` as an inline `grid-template-rows`
+   (1fr↔0fr) + opacity transition — each row's HEIGHT collapses alongside the
+   fade, so the hand-rolled VirtualList's per-row ResizeObserver reflows the
+   spacers every frame and the fold glides shut instead of snapping once the
+   rows are removed. The reduced-motion media query above zeroes
+   transition-duration; NoteList also skips the deferred-removal path under
+   reduced motion so collapse is instant rather than leaving rows lingering. */
 
 /* -- Focus ring -------------------------------------------------------------
    Global :focus-visible visualization for all interactive elements. Keyboard
