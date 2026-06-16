@@ -15,6 +15,16 @@
 
 #![no_std]
 #![forbid(unsafe_code)]
+// Coverage hygiene: when measured under `cargo +nightly llvm-cov`
+// (cargo-llvm-cov sets `cfg(coverage_nightly)`), enable the
+// `coverage_attribute` feature so the inline `#[cfg(test)] mod tests`
+// blocks can opt out of coverage via `#[coverage(off)]`. Unit-test code —
+// including the `#[ignore]`d vector-emitter helpers — is not product code,
+// so counting it deflates the figure (mirrors the frontend, whose tests
+// live outside `src/` and never enter the denominator). On the pinned
+// stable toolchain `cfg(coverage_nightly)` is false, so this is inert and
+// `cargo test`/`build`/`clippy` are unaffected.
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 extern crate alloc;
 

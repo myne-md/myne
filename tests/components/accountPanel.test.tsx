@@ -1,0 +1,372 @@
+// @vitest-environment jsdom
+//
+// Component tests for `src/components/settings/AccountPanel.tsx`. Drives the
+// three sub-views (idle / change-password / delete-vault) and the vault-label
+// rename control, asserting the real handler wiring: callback fan-out on
+// success, error-banner mapping, force-relock dispatch for the suspicion
+// variants, and the disk-targeted vault-delete path. The two heavy child forms
+// (PasswordChangeForm with its async zxcvbn meter; DeleteVaultConfirmForm) are
+// stubbed to plain buttons so each test can fire their `onSubmit`/`onCancel`
+// props deterministically — the unit under test is AccountPanel's orchestration,
+// not the forms (which have their own tests).
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+
+// ── Mock the IPC-boundary lib wrappers + path helpers ──────────────────────
+const changePassword = vi.fn();
+const deleteVault = vi.fn();
+const prefsRead = vi.fn();
+const setVaultLabel = vi.fn();
+const listVaults = vi.fn();
+
+vi.mock("../../src/lib/vault-change-password", () => ({
+  changePassword: (...a: unknown[]) => changePassword(...a),
+}));
+vi.mock("../../src/lib/vault-delete", async () => {
+  const actual = await vi.importActual<typeof import("../../src/lib/vault-delete")>(
+    "../../src/lib/vault-delete",
+  );
+  return { ...actual, deleteVault: (...a: unknown[]) => deleteVault(...a) };
+});
+vi.mock("../../src/lib/prefs", () => ({
+  prefsRead: (...a: unknown[]) => prefsRead(...a),
+  setVaultLabel: (...a: unknown[]) => setVaultLabel(...a),
+}));
+vi.mock("../../src/lib/vault-list", () => ({
+  listVaults: (...a: unknown[]) => listVaults(...a),
+  orderByLastUnlock: (v: unknown[]) => v,
+}));
+vi.mock("@tauri-apps/api/path", () => ({
+  appDataDir: () => Promise.resolve("/data"),
+  join: (...parts: string[]) => Promise.resolve(parts.join("/")),
+}));
+
+// ── Stub the two child forms so we can drive their callbacks directly ──────
+vi.mock("../../src/components/PasswordChangeForm", () => ({
+  PasswordChangeForm: (props: {
+    onSubmit: (a: string, b: string) => void;
+    onCancel: () => void;
+    inFlight?: boolean;
+    error?: unknown;
+  }) => (
+    <div data-testid="pcf">
+      <span data-testid="pcf.inflight">{String(props.inFlight)}</span>
+      {props.error != null && <div data-testid="pcf.error">{props.error}</div>}
+      <button data-testid="pcf.submit" onClick={() => props.onSubmit("cur", "new")}>
+        submit
+      </button>
+      <button data-testid="pcf.cancel" onClick={props.onCancel}>
+        cancel
+      </button>
+    </div>
+  ),
+}));
+vi.mock("../../src/components/DeleteVaultConfirmForm", () => ({
+  DeleteVaultConfirmForm: (props: {
+    onSubmit: () => void;
+    onCancel: () => void;
+    onContinueAfterPartial: () => void;
+    inFlight?: boolean;
+    partialFailContext: { kind: string; remainingCount?: number } | null;
+  }) => (
+    <div data-testid="dvcf">
+      <span data-testid="dvcf.inflight">{String(props.inFlight)}</span>
+      {props.partialFailContext != null && (
+        <div data-testid="dvcf.partial">{props.partialFailContext.kind}</div>
+      )}
+      <button data-testid="dvcf.submit" onClick={props.onSubmit}>
+        submit
+      </button>
+      <button data-testid="dvcf.cancel" onClick={props.onCancel}>
+        cancel
+      </button>
+      <button data-testid="dvcf.continue" onClick={props.onContinueAfterPartial}>
+        continue
+      </button>
+    </div>
+  ),
+}));
+
+import { AccountPanel } from "../../src/components/settings/AccountPanel";
+
+const PREFS = { label: "" };
+
+beforeEach(() => {
+  changePassword.mockReset().mockResolvedValue(undefined);
+  deleteVault.mockReset().mockResolvedValue(undefined);
+  setVaultLabel.mockReset().mockResolvedValue(undefined);
+  prefsRead.mockReset().mockResolvedValue({ ...PREFS });
+  listVaults.mockReset().mockResolvedValue({ ok: [{ id: "v-active" }] });
+});
+
+afterEach(cleanup);
+
+function renderPanel(overrides: Partial<Parameters<typeof AccountPanel>[0]> = {}) {
+  const props = {
+    onChangePasswordSuccess: vi.fn(),
+    onDeleteVaultSuccess: vi.fn(),
+    onInFlightChange: vi.fn(),
+    onForceRelock: vi.fn(),
+    ...overrides,
+  };
+  render(<AccountPanel {...props} />);
+  return props;
+}
+
+describe("AccountPanel — idle view", () => {
+  it("renders the Argon2id readout + change-password CTA + danger zone", async () => {
+    renderPanel();
+    expect(screen.getByText("256 MiB")).toBeTruthy();
+    expect(screen.getByTestId("settings.change-password-cta")).toBeTruthy();
+    expect(screen.getByText("Delete vault…")).toBeTruthy();
+    // The label loads from prefs on mount.
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+  });
+
+  it("CTA switches to the change-password sub-view; Cancel returns to idle", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    expect(screen.getByTestId("pcf")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("pcf.cancel"));
+    expect(screen.queryByTestId("pcf")).toBeNull();
+    expect(screen.getByTestId("settings.change-password-cta")).toBeTruthy();
+  });
+});
+
+describe("AccountPanel — change password", () => {
+  it("success calls changePassword + onChangePasswordSuccess, returns to idle", async () => {
+    const props = renderPanel();
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    expect(changePassword).toHaveBeenCalledWith("cur", "new");
+    await waitFor(() =>
+      expect(props.onChangePasswordSuccess).toHaveBeenCalledTimes(1),
+    );
+    // Back to idle (form unmounted).
+    expect(screen.queryByTestId("pcf")).toBeNull();
+  });
+
+  it("maps a banner error variant to copy without firing success", async () => {
+    changePassword.mockRejectedValueOnce({ kind: "InvalidCredentialOrVault" });
+    const props = renderPanel();
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("pcf.error").textContent).toBe(
+        "Wrong current password or vault file is corrupted.",
+      ),
+    );
+    expect(props.onChangePasswordSuccess).not.toHaveBeenCalled();
+    // Stays on the form (banner shown).
+    expect(screen.getByTestId("pcf")).toBeTruthy();
+  });
+
+  it("WeakNewPassword maps to its own banner copy", async () => {
+    changePassword.mockRejectedValueOnce({ kind: "WeakNewPassword" });
+    renderPanel();
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("pcf.error").textContent).toBe(
+        "New password must be at least 12 characters.",
+      ),
+    );
+  });
+
+  it("InvalidVaultMeta routes to onForceRelock(Corrupted) with no banner", async () => {
+    changePassword.mockRejectedValueOnce({ kind: "InvalidVaultMeta" });
+    const onForceRelock = vi.fn();
+    renderPanel({ onForceRelock });
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    await waitFor(() =>
+      expect(onForceRelock).toHaveBeenCalledWith({ kind: "Corrupted" }),
+    );
+    expect(screen.queryByTestId("pcf.error")).toBeNull();
+  });
+
+  it("VaultMetaChangedExternally force-relocks with the suspicion reason", async () => {
+    changePassword.mockRejectedValueOnce({ kind: "VaultMetaChangedExternally" });
+    const onForceRelock = vi.fn();
+    renderPanel({ onForceRelock });
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    await waitFor(() =>
+      expect(onForceRelock).toHaveBeenCalledWith(
+        { kind: "Exists" },
+        "vault-meta-changed-externally",
+      ),
+    );
+  });
+
+  it("VaultLockedDuringChange force-relocks with its informational reason", async () => {
+    changePassword.mockRejectedValueOnce({ kind: "VaultLockedDuringChange" });
+    const onForceRelock = vi.fn();
+    renderPanel({ onForceRelock });
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    await waitFor(() =>
+      expect(onForceRelock).toHaveBeenCalledWith(
+        { kind: "Exists" },
+        "vault-locked-during-change",
+      ),
+    );
+  });
+
+  it("raises onInFlightChange(true) while the IPC is pending", async () => {
+    let resolveIpc: () => void = () => {};
+    changePassword.mockReturnValueOnce(
+      new Promise<void>((res) => {
+        resolveIpc = res;
+      }),
+    );
+    const onInFlightChange = vi.fn();
+    renderPanel({ onInFlightChange });
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    onInFlightChange.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    // The pending submit raised the in-flight flag.
+    expect(onInFlightChange).toHaveBeenCalledWith(true);
+    await act(async () => {
+      resolveIpc();
+    });
+    await waitFor(() => expect(onInFlightChange).toHaveBeenCalledWith(false));
+  });
+});
+
+describe("AccountPanel — delete vault", () => {
+  it("Delete vault… opens the confirm sub-view; Cancel returns to idle", () => {
+    renderPanel();
+    fireEvent.click(screen.getByText("Delete vault…"));
+    expect(screen.getByTestId("dvcf")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("dvcf.cancel"));
+    expect(screen.queryByTestId("dvcf")).toBeNull();
+  });
+
+  it("success targets the resolved active vault id + fires onDeleteVaultSuccess", async () => {
+    const props = renderPanel();
+    // Let the on-mount listVaults() resolve so activeVaultId settles.
+    await waitFor(() => expect(listVaults).toHaveBeenCalled());
+    fireEvent.click(screen.getByText("Delete vault…"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("dvcf.submit"));
+    });
+    expect(deleteVault).toHaveBeenCalledWith("v-active");
+    await waitFor(() =>
+      expect(props.onDeleteVaultSuccess).toHaveBeenCalledTimes(1),
+    );
+  });
+
+  it("PartialDelete reject switches the form to post-fail mode", async () => {
+    deleteVault.mockRejectedValueOnce({
+      kind: "PartialDelete",
+      detail: { remaining_count: 3 },
+    });
+    const props = renderPanel();
+    fireEvent.click(screen.getByText("Delete vault…"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("dvcf.submit"));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("dvcf.partial").textContent).toBe(
+        "partial-delete",
+      ),
+    );
+    // Not yet a success — the user must click Continue.
+    expect(props.onDeleteVaultSuccess).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("dvcf.continue"));
+    expect(props.onDeleteVaultSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it("bug-canary reject (VaultNotUnlocked) shows no post-fail banner, no success", async () => {
+    deleteVault.mockRejectedValueOnce({ kind: "VaultNotUnlocked" });
+    const props = renderPanel();
+    fireEvent.click(screen.getByText("Delete vault…"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("dvcf.submit"));
+    });
+    // Stays on the idle confirm form; never a partial banner, never success.
+    await waitFor(() => expect(deleteVault).toHaveBeenCalled());
+    expect(screen.queryByTestId("dvcf.partial")).toBeNull();
+    expect(props.onDeleteVaultSuccess).not.toHaveBeenCalled();
+  });
+});
+
+describe("AccountPanel — vault label rename", () => {
+  it("Save is disabled until the draft differs from the saved label", async () => {
+    prefsRead.mockResolvedValue({ label: "Work" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Work"),
+    );
+    const save = screen.getByTestId("settings.label-save") as HTMLButtonElement;
+    // No diff yet → disabled.
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "Home" },
+    });
+    expect(save.disabled).toBe(false);
+  });
+
+  it("Save persists the trimmed draft and re-disables on success", async () => {
+    renderPanel();
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "  My Vault  " },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings.label-save"));
+    });
+    expect(setVaultLabel).toHaveBeenCalledWith("My Vault");
+    const save = screen.getByTestId("settings.label-save") as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(true));
+  });
+
+  it("an empty draft clears the label (null) on save", async () => {
+    prefsRead.mockResolvedValue({ label: "Existing" });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.label-input") as HTMLInputElement).value,
+      ).toBe("Existing"),
+    );
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings.label-save"));
+    });
+    expect(setVaultLabel).toHaveBeenCalledWith(null);
+  });
+
+  it("Enter in the input triggers the save", async () => {
+    renderPanel();
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    fireEvent.change(screen.getByTestId("settings.label-input"), {
+      target: { value: "Renamed" },
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByTestId("settings.label-input"), {
+        key: "Enter",
+      });
+    });
+    expect(setVaultLabel).toHaveBeenCalledWith("Renamed");
+  });
+});

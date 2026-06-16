@@ -234,6 +234,7 @@ pub fn decode_dictionary_blob(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

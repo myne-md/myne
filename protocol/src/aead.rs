@@ -590,6 +590,7 @@ fn ctx_canonical_hash(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::types::DEFAULT_V0_1_KDF_PARAMS;

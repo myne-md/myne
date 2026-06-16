@@ -79,6 +79,7 @@ pub enum ProtocolError {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use alloc::string::{String, ToString};

@@ -218,6 +218,7 @@ fn collect_words(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use bip39::{Language, Mnemonic};

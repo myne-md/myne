@@ -515,6 +515,7 @@ pub(crate) fn decode_attachment_blob_with_cause(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use alloc::vec;

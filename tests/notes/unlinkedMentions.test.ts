@@ -5,8 +5,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   foldedTitleMatches,
+  mentionCandidateSignature,
   passesMentionFloor,
 } from "../../src/notes/unlinkedMentions";
+import type { NoteSearchResult } from "../../src/types/note-search-result";
+
+const hit = (note_id: string): NoteSearchResult => ({
+  note_id,
+  title: note_id,
+  score: 1,
+  matched_in: { title: false, body: true },
+});
 
 describe("foldedTitleMatches", () => {
   it("matches a whole-word title (fold-insensitive)", () => {
@@ -62,5 +71,34 @@ describe("passesMentionFloor", () => {
 
   it("still suppresses a genuinely common word once the corpus is large enough", () => {
     expect(passesMentionFloor("Note", 6, 20)).toBe(false); // N≥20, 0.30 > 0.15
+  });
+
+  it("passes exactly AT the df ceiling (boundary is strictly greater-than)", () => {
+    // df = 3/20 = 0.15 — equal to the ceiling, NOT greater, so it passes.
+    expect(passesMentionFloor("Apollo", 3, 20)).toBe(true);
+    // df = 4/20 = 0.20 > 0.15 — suppressed.
+    expect(passesMentionFloor("Apollo", 4, 20)).toBe(false);
+  });
+});
+
+describe("mentionCandidateSignature (SYNC-14 candidate-change key)", () => {
+  it("is order-independent (recall order can't flip the signal)", () => {
+    expect(mentionCandidateSignature([hit("b"), hit("a"), hit("c")])).toBe(
+      mentionCandidateSignature([hit("a"), hit("c"), hit("b")]),
+    );
+  });
+
+  it("joins sorted note ids with commas", () => {
+    expect(mentionCandidateSignature([hit("z"), hit("a")])).toBe("a,z");
+  });
+
+  it("is empty for an empty candidate set", () => {
+    expect(mentionCandidateSignature([])).toBe("");
+  });
+
+  it("changes when the candidate set changes", () => {
+    expect(mentionCandidateSignature([hit("a")])).not.toBe(
+      mentionCandidateSignature([hit("a"), hit("b")]),
+    );
   });
 });

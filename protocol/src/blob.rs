@@ -681,6 +681,7 @@ pub(crate) fn decode_note_with_cause(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use alloc::vec;

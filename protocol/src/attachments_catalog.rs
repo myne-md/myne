@@ -733,6 +733,7 @@ pub fn read_or_empty(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::subkey::{derive_subkey, SubkeyRole};
@@ -1043,6 +1044,343 @@ mod tests {
         assert_eq!(&aad[11..13], &[0x00, 0x13]); // u16 BE 19
         assert_eq!(&aad[13..32], b"attachments-catalog");
         assert_eq!(&aad[32..48], &fixed_account_hash());
+    }
+
+    // ---- push_json_string escape branches (encode side) ----
+
+    #[test]
+    fn encode_escapes_all_json_special_chars_in_filename() {
+        // Drive every push_json_string escape branch through a real encode:
+        // quote, backslash, \b, \f, \n, \r, \t, and a generic control char
+        // ( → ""). The decoder must reverse them exactly.
+        let mut entries = BTreeMap::new();
+        entries.insert(
+            "cc33".to_string(),
+            AttachmentMeta {
+                content_type: "text/plain".to_string(),
+                created_at: 7,
+                filename: "q\"\\\u{08}\u{0c}\n\r\t\u{01}.txt".to_string(),
+                size: 1,
+            },
+        );
+        let catalog = AttachmentsCatalog { entries };
+        let bytes = canonical_json_encode(&catalog);
+        let s = String::from_utf8(bytes.clone()).unwrap();
+        // The named escapes are emitted as two-char sequences.
+        assert!(s.contains(r#"\""#));
+        assert!(s.contains(r"\\"));
+        assert!(s.contains(r"\b"));
+        assert!(s.contains(r"\f"));
+        assert!(s.contains(r"\n"));
+        assert!(s.contains(r"\r"));
+        assert!(s.contains(r"\t"));
+        // The generic control char uses the \u00XX form with lowercase hex.
+        assert!(s.contains("\\u0001"));
+        // Round-trip: decode recovers the exact filename.
+        let decoded = canonical_json_decode(&bytes).expect("decode escapes");
+        assert_eq!(
+            decoded.entries["cc33"].filename,
+            "q\"\\\u{08}\u{0c}\n\r\t\u{01}.txt"
+        );
+    }
+
+    #[test]
+    fn encode_control_char_uses_lowercase_hex_nibble() {
+        //  exercises hex_nibble's a..f arm (nibble 0xf → 'f').
+        let mut entries = BTreeMap::new();
+        entries.insert(
+            "dd44".to_string(),
+            AttachmentMeta {
+                content_type: "t".to_string(),
+                created_at: 0,
+                filename: "\u{1f}".to_string(),
+                size: 0,
+            },
+        );
+        let bytes = canonical_json_encode(&AttachmentsCatalog { entries });
+        let s = String::from_utf8(bytes).unwrap();
+        assert!(s.contains("\\u001f"));
+    }
+
+    // ---- parse_string escape branches (decode side) ----
+
+    #[test]
+    fn decode_parses_every_string_escape() {
+        // Hand-built canonical plaintext exercising each parse_string escape
+        // arm: \" \\ \/ \b \f \n \r \t and A ('A'). `/` is decoded but
+        // the canonical encoder never emits it escaped.
+        let pt = br#"{"aa":{"content_type":"\"\\\/\b\f\n\r\tA","created_at":1,"filename":"f","size":2}}"#;
+        let decoded = canonical_json_decode(pt).expect("decode all escapes");
+        assert_eq!(
+            decoded.entries["aa"].content_type,
+            "\"\\/\u{08}\u{0c}\n\r\tA"
+        );
+    }
+
+    #[test]
+    fn decode_rejects_unknown_escape() {
+        // `\x` is not a valid JSON escape — parse_string's catch-all rejects.
+        let bad = br#"{"aa":{"content_type":"\x","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_truncated_unicode_escape() {
+        // `\u00` has only 2 of the required 4 hex digits before the closing
+        // quote — parse_hex4's slice access returns None.
+        let bad = br#"{"aa":{"content_type":"\u00","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_non_hex_unicode_escape() {
+        // `\uZZZZ` reaches parse_hex4 with non-hex digits → None.
+        let bad = br#"{"aa":{"content_type":"\uZZZZ","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_surrogate_code_point() {
+        // \ud800 is a lone high surrogate — char::from_u32 returns None, so
+        // parse_string rejects (no UTF-16 surrogate-pair handling in v0.1).
+        let bad = br#"{"aa":{"content_type":"\ud800","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_uppercase_hex_in_unicode_escape() {
+        // parse_hex4 accepts A-F as well as a-f; é → 'é'.
+        let pt = br#"{"aa":{"content_type":"\u00E9","created_at":1,"filename":"f","size":2}}"#;
+        let decoded = canonical_json_decode(pt).expect("decode uppercase hex");
+        assert_eq!(decoded.entries["aa"].content_type, "\u{00e9}");
+    }
+
+    #[test]
+    fn decode_rejects_unterminated_string() {
+        // Opening quote with no closing quote before EOF → parse_string's
+        // `get(pos)?` returns None.
+        let bad = br#"{"aa":{"content_type":"unterminated"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    // ---- parse_uint edge cases ----
+
+    #[test]
+    fn decode_rejects_empty_integer_run() {
+        // A `created_at` whose value position has no digit at all (a string
+        // where a uint is expected) → parse_uint consumes 0 bytes → None.
+        let bad = br#"{"aa":{"content_type":"t","created_at":"x","filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_u64_overflow_integer() {
+        // 21 nines overflows u64 (max is 20 digits) → checked_mul/add → None.
+        let bad = br#"{"aa":{"content_type":"t","created_at":999999999999999999999,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_accepts_single_zero_integer() {
+        // `0` is canonical (consumed==1, leading-zero guard only fires for
+        // multi-digit). created_at:0 must round-trip.
+        let pt = br#"{"aa":{"content_type":"t","created_at":0,"filename":"f","size":0}}"#;
+        let decoded = canonical_json_decode(pt).expect("decode zero");
+        assert_eq!(decoded.entries["aa"].created_at, 0);
+        assert_eq!(decoded.entries["aa"].size, 0);
+    }
+
+    #[test]
+    fn decode_accepts_u64_max_size() {
+        // The 20-digit u64::MAX must parse without overflow.
+        let pt = br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","size":18446744073709551615}}"#;
+        let decoded = canonical_json_decode(pt).expect("decode u64 max");
+        assert_eq!(decoded.entries["aa"].size, u64::MAX);
+    }
+
+    // ---- skip_value branches (forward-compat unknown fields) ----
+
+    #[test]
+    fn decode_skips_unknown_string_field() {
+        let pt =
+            br#"{"aa":{"content_type":"t","created_at":1,"extra":"hi","filename":"f","size":2}}"#;
+        let d = canonical_json_decode(pt).expect("skip string");
+        assert_eq!(d.entries["aa"].size, 2);
+    }
+
+    #[test]
+    fn decode_skips_unknown_integer_field() {
+        let pt =
+            br#"{"aa":{"content_type":"t","created_at":1,"extra":42,"filename":"f","size":2}}"#;
+        let d = canonical_json_decode(pt).expect("skip int");
+        assert_eq!(d.entries["aa"].size, 2);
+    }
+
+    #[test]
+    fn decode_skips_unknown_bool_and_null_fields() {
+        // true, false, and null all reach distinct skip_value arms.
+        let pt = br#"{"aa":{"a":true,"b":false,"c":null,"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        let d = canonical_json_decode(pt).expect("skip bool/null");
+        assert_eq!(d.entries["aa"].size, 2);
+    }
+
+    #[test]
+    fn decode_skips_unknown_nested_object_field() {
+        // A nested object (incl. the empty-object fast path inside it would
+        // need its own case; here a one-key object) is skipped recursively.
+        let pt = br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","meta":{"k":"v"},"size":2}}"#;
+        let d = canonical_json_decode(pt).expect("skip object");
+        assert_eq!(d.entries["aa"].size, 2);
+    }
+
+    #[test]
+    fn decode_skips_unknown_empty_object_field() {
+        // The `{}` fast path in skip_value's object arm.
+        let pt =
+            br#"{"aa":{"content_type":"t","created_at":1,"extra":{},"filename":"f","size":2}}"#;
+        let d = canonical_json_decode(pt).expect("skip empty object");
+        assert_eq!(d.entries["aa"].size, 2);
+    }
+
+    #[test]
+    fn decode_skips_unknown_array_field() {
+        let pt = br#"{"aa":{"arr":[1,"two",true],"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        let d = canonical_json_decode(pt).expect("skip array");
+        assert_eq!(d.entries["aa"].size, 2);
+    }
+
+    #[test]
+    fn decode_skips_unknown_empty_array_field() {
+        // The `[]` fast path in skip_value's array arm.
+        let pt = br#"{"aa":{"arr":[],"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        let d = canonical_json_decode(pt).expect("skip empty array");
+        assert_eq!(d.entries["aa"].size, 2);
+    }
+
+    #[test]
+    fn decode_rejects_malformed_skip_value_literal() {
+        // `truu` is not `true` — skip_value's `t` arm's exact-match filter
+        // rejects, so the whole catalog fails to parse.
+        let bad = br#"{"aa":{"x":truu,"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_unknown_value_kind_in_skip() {
+        // A value starting with `@` matches no skip_value arm → None.
+        let bad = br#"{"aa":{"x":@,"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_bad_array_terminator_in_skip() {
+        // Unknown array field whose elements are not comma/bracket-separated.
+        let bad =
+            br#"{"aa":{"arr":[1 2],"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_bad_object_terminator_in_skip() {
+        // Unknown object field whose members are not comma/brace-separated.
+        let bad = br#"{"aa":{"o":{"k":"v" "x":"y"},"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    // ---- structural rejects in the catalog/entry/meta parsers ----
+
+    #[test]
+    fn decode_rejects_duplicate_top_level_key() {
+        // Two entries with the same id — parse_catalog rejects (BTreeMap
+        // would silently overwrite; data-integrity guard).
+        let bad = br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","size":2},"aa":{"content_type":"t","created_at":1,"filename":"f","size":3}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_bad_entry_separator() {
+        // After a complete entry, neither `,` nor `}` follows.
+        let bad = br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","size":2}x}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_empty_meta_object() {
+        // `{}` for a meta object cannot satisfy the required-fields contract.
+        let bad = br#"{"aa":{}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_bad_meta_field_separator() {
+        // Inside the meta object, a field is followed by neither `,` nor `}`.
+        let bad = br#"{"aa":{"content_type":"t"x"created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_missing_colon_after_entry_id() {
+        // `parse_entry` expects `:` after the id string.
+        let bad = br#"{"aa"{"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        assert!(canonical_json_decode(bad).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_empty_input() {
+        // No opening brace at all.
+        assert!(canonical_json_decode(b"").is_err());
+    }
+
+    // ---- ProtocolError → CatalogBlobError mapping ----
+
+    #[test]
+    fn non_aead_protocol_errors_map_to_cannot_decrypt() {
+        // The From impl maps every non-AeadFailure ProtocolError variant to
+        // CannotDecrypt (the catch-all arm, line 192). Spot-check a few.
+        for e in [
+            ProtocolError::InvalidPassword,
+            ProtocolError::PasswordTooShort,
+            ProtocolError::KdfFailure,
+            ProtocolError::InvalidVaultMeta,
+            ProtocolError::AccountNumberInvalid,
+            ProtocolError::Csprng,
+            ProtocolError::PlaintextTooLarge,
+        ] {
+            assert_eq!(CatalogBlobError::from(e), CatalogBlobError::CannotDecrypt);
+        }
+        // The AeadFailure arm also maps to CannotDecrypt (already exercised
+        // indirectly, asserted here for completeness).
+        assert_eq!(
+            CatalogBlobError::from(ProtocolError::AeadFailure),
+            CatalogBlobError::CannotDecrypt
+        );
+    }
+
+    // ---- encode getrandom convenience wrapper + cap ----
+
+    #[test]
+    fn encode_convenience_wrapper_round_trips() {
+        // encode_attachments_catalog pulls its own nonce from getrandom;
+        // exercise that path (distinct from the _raw fixture-nonce path).
+        let key = catalog_key();
+        let catalog = sample_catalog();
+        let blob = encode_attachments_catalog(&key, &fixed_account_hash(), &catalog)
+            .expect("encode via getrandom");
+        let decoded =
+            decode_attachments_catalog(&key, &fixed_account_hash(), &blob).expect("decode");
+        assert_eq!(decoded, catalog);
+    }
+
+    #[test]
+    fn encode_two_calls_use_distinct_nonces() {
+        // Two convenience encodes of the same catalog must differ (random
+        // nonce), proving the getrandom path actually varies the nonce.
+        let key = catalog_key();
+        let catalog = sample_catalog();
+        let a = encode_attachments_catalog(&key, &fixed_account_hash(), &catalog).unwrap();
+        let b = encode_attachments_catalog(&key, &fixed_account_hash(), &catalog).unwrap();
+        // Nonce lives at offset 6..30.
+        assert_ne!(a[6..30], b[6..30]);
     }
 
     // ---- KAT vector regenerator (companion repo) ----------------------

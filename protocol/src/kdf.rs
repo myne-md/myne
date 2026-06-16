@@ -199,6 +199,7 @@ fn argon2id_derive(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::phrase::recovery_phrase_from_fixed_entropy_for_test;

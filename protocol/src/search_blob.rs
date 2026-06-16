@@ -227,6 +227,7 @@ pub fn decode_search_index_blob(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

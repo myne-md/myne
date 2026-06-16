@@ -236,6 +236,7 @@ pub fn decode_vault_indices_blob(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::subkey::{derive_subkey, SubkeyRole};
