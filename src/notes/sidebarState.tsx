@@ -25,6 +25,7 @@ import {
 } from "react";
 import { createNote } from "./createNote";
 import { deleteNote } from "./deleteNote";
+import { duplicateNote } from "./duplicateNote";
 import { emptyTrash, type EmptyTrashResult } from "./emptyTrash";
 import {
   bulkTrashNotes,
@@ -433,6 +434,13 @@ export type UseSelectedNoteReturn = {
   ) => Promise<void>;
   /** Create-from-scratch flow — calls `createNote` + auto-select + auto-rename. */
   createAndStartRename: (folder?: string | null) => Promise<NoteId>;
+  /**
+   * Duplicate `sourceId` in place (MYND-332) — clones the `.myn` via
+   * `duplicateNote`, registers + caches the copy, and selects it (the Editor
+   * bridge opens the selection). No rename: the copy already carries its
+   * "(kopya)" title. Returns the new copy's id.
+   */
+  duplicateAndOpen: (sourceId: NoteId) => Promise<NoteId>;
   /** Delete a note with optimistic remove + rollback on IPC failure. */
   deleteWithRollback: (id: NoteId) => Promise<void>;
   /** Move a note to the trash (optimistic `trashed:` set + rollback). MYND-133. */
@@ -593,6 +601,28 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
+  const duplicateAndOpen = useCallback(
+    async (sourceId: NoteId): Promise<NoteId> => {
+      // Clone first — a read/write failure rejects here, before any optimistic
+      // cache mutation, so a failed duplicate leaves the tree untouched (no
+      // rollback needed). Same ordering as `createAndStartRename`.
+      const newId = await duplicateNote(sourceId);
+      // MYND-31: register the copy in the index (live).
+      void reindexNote(newId);
+      setState((prev) => {
+        const seeded = applyOptimisticCreate(prev, newId);
+        // Select (no rename) → the Editor selection-bridge opens the copy in
+        // the focused pane. The copy already carries its "(kopya)" title.
+        return { ...seeded, selectedId: newId };
+      });
+      // Unlike a blank new note, the copy carries create-time frontmatter
+      // (title + any folder:); settle the real title slice into the cache.
+      await refreshOne(newId);
+      return newId;
+    },
+    [refreshOne],
+  );
+
   const deleteWithRollback = useCallback(async (id: NoteId) => {
     let snapshot: DeleteSnapshot = { record: null, wasSelected: false };
     setState((prev) => {
@@ -742,6 +772,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       cancelRename,
       commitRename,
       createAndStartRename,
+      duplicateAndOpen,
       deleteWithRollback,
       trashWithRollback,
       restoreWithRollback,
@@ -759,6 +790,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       cancelRename,
       commitRename,
       createAndStartRename,
+      duplicateAndOpen,
       deleteWithRollback,
       trashWithRollback,
       restoreWithRollback,
