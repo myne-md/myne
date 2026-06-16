@@ -3,7 +3,7 @@
 // round-trip through the REAL editor UI:
 //
 //   ws1 — a multi-tab / split-pane layout built by driving note rows
-//         (plain click = reuse the focused tab; Ctrl-click = new tab;
+//         (plain click = reuse the focused tab; middle-click = new tab;
 //         Alt-click = open to the side / split) is persisted on the Lock
 //         CTA and RESTORED on the re-unlocked editor, with at-rest asserts
 //         on the MYW1 blob (magic + version bytes + no plaintext note-id /
@@ -44,10 +44,9 @@ import {
 } from "./support/flows";
 import { type Element, type Session, testIdSelector } from "./support/webdriver";
 
-// W3C key values for the open-modifier clicks (escape form — never a
-// literal, per the invisible-key hazard). E2E runs on Linux, where Control
-// is the new-tab modifier; Alt opens to the side.
-const CONTROL = "\uE009";
+// W3C key value for the open-to-side modifier click (escape form — never a
+// literal, per the invisible-key hazard). Alt opens to the side; the new-tab
+// affordance moved to a middle-click (MYND-367 freed Cmd/Ctrl for multi-select).
 const ALT = "\uE00A";
 
 // Distinct note titles — single lowercase-alnum tokens (the residue
@@ -181,7 +180,7 @@ describeE2E("ws1 layout restore + at-rest (MYND-257)", () => {
         const [n0, n1, n2] = await noteRowIds(s, 3);
 
         await (await row(s, n0)).click(); // openInFocused → pane-0 = [n0]
-        await (await row(s, n1)).modifierClick(CONTROL); // new tab → [n0, n1]
+        await (await row(s, n1)).middleClick(); // new tab → [n0, n1] (MYND-367)
         await (await row(s, n2)).modifierClick(ALT); // open to side → split
 
         const built: LayoutSig = {
@@ -262,7 +261,7 @@ describeE2E("ws2 per-vault layout isolation (MYND-257)", () => {
         for (const t of WS2_B_TITLES) await createNote(s, t);
         const [b0, b1] = await noteRowIds(s, 2);
         await (await row(s, b0)).click();
-        await (await row(s, b1)).modifierClick(CONTROL); // new tab
+        await (await row(s, b1)).middleClick(); // new tab (MYND-367)
         const layoutB: LayoutSig = {
           panes: [{ tabs: [b0, b1], active: b1 }],
           focusedIndex: 0,

@@ -62,6 +62,10 @@ import {
 
 const DRAG_MIME = "application/x-myne-note";
 const FOLDER_DRAG_MIME = "application/x-myne-folder";
+/** Carries the full id array when a MULTI-selection is dragged (MYND-367). The
+ *  single-id `DRAG_MIME` is still written for backward compat (favorites / pane
+ *  drop paths read the grabbed id); folder-drop fans out over this when set. */
+const DRAG_MIME_MULTI = "application/x-myne-note-multi";
 
 /** Where a reorder drop lands relative to the hovered row. */
 export type ReorderPlace = "above" | "below";
@@ -227,6 +231,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   // stable while still reading current subtree state (delete-emptiness etc.).
   const treeRef = useRef<FolderTree>(EMPTY_TREE);
   const draggedRef = useRef<NoteId | null>(null);
+  // The full id payload when a multi-selection is being dragged (MYND-367);
+  // empty for a single-note drag. Folder-drop fans out over this.
+  const draggedIdsRef = useRef<NoteId[]>([]);
   // Folded key of the folder being dragged (folder-reorder drags only).
   const draggedFolderRef = useRef<string | null>(null);
 
@@ -475,21 +482,34 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   // Refs carry the dragged identity (note id / folded folder key); the dropped
   // payload is read from the ref, not from dataTransfer (single-app drag).
 
-  const onNoteDragStart = useCallback((e: DragEvent, id: NoteId) => {
-    draggedRef.current = id;
-    draggedFolderRef.current = null;
-    e.dataTransfer.setData(DRAG_MIME, id);
-    // Also carry the workspace tab-open payload (MYND-166) so the SAME drag
-    // can drop on a folder row (folder-move, reads DRAG_MIME) OR on a pane /
-    // tab strip (open as tab / split, reads TAB_DRAG_MIME). `fromPaneId: null`
-    // marks the sidebar origin — the note may not be open in any pane yet.
-    writeTabDrag(e.dataTransfer, {
-      tabId: itemKey(noteItem(id)),
-      fromPaneId: null,
-    });
-    e.dataTransfer.effectAllowed = "move";
-    setDragKind("note");
-  }, []);
+  const onNoteDragStart = useCallback(
+    (e: DragEvent, id: NoteId) => {
+      draggedRef.current = id;
+      draggedFolderRef.current = null;
+      // Multi-drag (MYND-367): when the grabbed row is part of a >1 selection,
+      // the drag carries the WHOLE set so a folder drop moves all of them. A
+      // drag started on a row OUTSIDE the selection is a plain single-note drag
+      // (and does not disturb the selection).
+      const set = ctx.selectedIds;
+      const ids = set.size > 1 && set.has(id) ? [...set] : [id];
+      draggedIdsRef.current = ids;
+      e.dataTransfer.setData(DRAG_MIME, id);
+      if (ids.length > 1) {
+        e.dataTransfer.setData(DRAG_MIME_MULTI, JSON.stringify(ids));
+      }
+      // Also carry the workspace tab-open payload (MYND-166) so the SAME drag
+      // can drop on a folder row (folder-move, reads DRAG_MIME) OR on a pane /
+      // tab strip (open as tab / split, reads TAB_DRAG_MIME). `fromPaneId: null`
+      // marks the sidebar origin — the note may not be open in any pane yet.
+      writeTabDrag(e.dataTransfer, {
+        tabId: itemKey(noteItem(id)),
+        fromPaneId: null,
+      });
+      e.dataTransfer.effectAllowed = "move";
+      setDragKind("note");
+    },
+    [ctx.selectedIds],
+  );
 
   const onFolderDragStart = useCallback((e: DragEvent, node: FolderNode) => {
     draggedFolderRef.current = node.key;
@@ -503,6 +523,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   // outside any target, and Esc-cancelled drags).
   const onDragEndCleanup = useCallback(() => {
     draggedRef.current = null;
+    draggedIdsRef.current = [];
     draggedFolderRef.current = null;
     setDragKind(null);
     setReorderTarget(null);
@@ -554,13 +575,27 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
 
   const onFolderDropNote = useCallback(
     async (folderPath: string) => {
-      const id = draggedRef.current;
+      // Fan out over the multi-drag payload when present (MYND-367); otherwise
+      // the single grabbed note. Reading the ref (not dataTransfer) keeps this
+      // a single-app drag, consistent with the reorder paths.
+      const ids =
+        draggedIdsRef.current.length > 0
+          ? draggedIdsRef.current
+          : draggedRef.current !== null
+            ? [draggedRef.current]
+            : [];
       draggedRef.current = null;
+      draggedIdsRef.current = [];
       setDropTargetKey(null);
       setDragKind(null);
-      if (id === null) return;
-      await moveNote(id, folderPath);
-      await ctx.refreshOne(id);
+      if (ids.length === 0) return;
+      if (ids.length === 1) {
+        await moveNote(ids[0]!, folderPath);
+        await ctx.refreshOne(ids[0]!);
+        return;
+      }
+      await ctx.bulkMoveWithSync(ids, folderPath);
+      ctx.clearMultiSelection();
     },
     [ctx],
   );

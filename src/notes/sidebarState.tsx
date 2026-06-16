@@ -27,6 +27,7 @@ import { createNote } from "./createNote";
 import { deleteNote } from "./deleteNote";
 import { duplicateNote } from "./duplicateNote";
 import { emptyTrash, type EmptyTrashResult } from "./emptyTrash";
+import { bulkMoveNotes, type BulkMoveResult } from "./moveNote";
 import {
   bulkTrashNotes,
   restoreNote,
@@ -56,6 +57,19 @@ export type NoteId = string;
 
 export type SidebarState = {
   selectedId: NoteId | null;
+  /**
+   * Multi-selection set (MYND-367) — the ids cmd/ctrl-click and shift-click
+   * have gathered for a bulk operation. STRICTLY independent of `selectedId`:
+   * a selection-set change must never flow through `selectedId` because that
+   * drives Editor.tsx's open-bridge (a `selectedId` write opens the note in the
+   * focused pane). Toggle / range gestures leave `selectedId` untouched so the
+   * editor keeps showing the open note; a plain click collapses the set and
+   * single-selects. Empty in the common single-selection case.
+   */
+  selectedIds: ReadonlySet<NoteId>;
+  /** Range-selection pivot for shift-click (MYND-367) — the last toggled row,
+   *  so successive shift-clicks extend from a stable origin. */
+  anchorId: NoteId | null;
   renamingId: NoteId | null;
   cache: Map<NoteId, TitleRecord>;
   /**
@@ -72,6 +86,8 @@ export type SidebarState = {
 
 export const EMPTY_SIDEBAR_STATE: SidebarState = {
   selectedId: null,
+  selectedIds: new Set(),
+  anchorId: null,
   renamingId: null,
   cache: new Map(),
   contentReloadNonce: 0,
@@ -337,6 +353,77 @@ export function rollbackOptimisticTrashedFlag(
   return { ...state, cache };
 }
 
+// ============================================================
+// Multi-selection set transitions (MYND-367) — pure, testable without a
+// renderer. None of these touch `selectedId`: the set is the bulk-operation
+// surface, `selectedId` is the open-bridge surface, and they are deliberately
+// orthogonal (see `SidebarState.selectedIds`).
+// ============================================================
+
+/**
+ * Toggle `id`'s membership in the multi-selection set and make it the range
+ * anchor. Returns a fresh `Set` (React shallow-equality) and leaves
+ * `selectedId` untouched — cmd/ctrl-click adds/removes without opening.
+ */
+export function toggleInSelection(
+  state: SidebarState,
+  id: NoteId,
+): SidebarState {
+  const selectedIds = new Set(state.selectedIds);
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  return { ...state, selectedIds, anchorId: id };
+}
+
+/**
+ * Replace the selection set with the contiguous range over `orderedIds` from
+ * the current anchor (`anchorId ?? selectedId ?? targetId`) to `targetId`,
+ * inclusive and direction-agnostic. The anchor is left untouched so successive
+ * shift-clicks pivot on the same origin. If `targetId` isn't in `orderedIds`
+ * the state is returned unchanged; if the anchor isn't found the result
+ * degrades to a single-`targetId` selection. `selectedId` untouched.
+ */
+export function selectRange(
+  state: SidebarState,
+  orderedIds: readonly NoteId[],
+  targetId: NoteId,
+): SidebarState {
+  const ti = orderedIds.indexOf(targetId);
+  if (ti < 0) return state;
+  const anchor = state.anchorId ?? state.selectedId ?? targetId;
+  const ai = orderedIds.indexOf(anchor);
+  const selectedIds = new Set<NoteId>();
+  if (ai < 0) {
+    selectedIds.add(targetId);
+  } else {
+    const lo = Math.min(ai, ti);
+    const hi = Math.max(ai, ti);
+    for (let i = lo; i <= hi; i++) selectedIds.add(orderedIds[i]!);
+  }
+  return { ...state, selectedIds };
+}
+
+/**
+ * Replace the selection set wholesale; the anchor becomes the last id in
+ * iteration order (or `null` when empty). `selectedId` untouched.
+ */
+export function replaceSelection(
+  state: SidebarState,
+  ids: Iterable<NoteId>,
+): SidebarState {
+  const selectedIds = new Set(ids);
+  let last: NoteId | null = null;
+  for (const id of selectedIds) last = id;
+  return { ...state, selectedIds, anchorId: last };
+}
+
+/** Clear the multi-selection set + anchor. No-op (same reference) when already
+ *  empty. `selectedId` untouched. */
+export function clearMultiSelection(state: SidebarState): SidebarState {
+  if (state.selectedIds.size === 0 && state.anchorId === null) return state;
+  return { ...state, selectedIds: new Set(), anchorId: null };
+}
+
 /**
  * UUIDv7 first-48-bit unix-ms decoder. Per `protocol.md` §9.1 the
  * file name IS the UUIDv7; the leak of "approximate creation time"
@@ -407,6 +494,11 @@ export function sortBatchIds(
 
 export type UseSelectedNoteReturn = {
   selectedId: NoteId | null;
+  /** Multi-selection set for bulk operations (MYND-367). See
+   *  [`SidebarState.selectedIds`] — orthogonal to `selectedId`. */
+  selectedIds: ReadonlySet<NoteId>;
+  /** Range-selection pivot (MYND-367). */
+  anchorId: NoteId | null;
   renamingId: NoteId | null;
   cache: ReadonlyMap<NoteId, TitleRecord>;
   /** Re-sync signal for the open note's body — see [`SidebarState.contentReloadNonce`]. */
@@ -420,6 +512,14 @@ export type UseSelectedNoteReturn = {
   reloadOpenNote: () => void;
   /** Update selection. Does NOT load editor content; caller orchestrates. */
   select: (id: NoteId | null) => void;
+  /** Toggle `id` in the multi-selection set (cmd/ctrl-click). Does NOT open. */
+  toggleInSelection: (id: NoteId) => void;
+  /** Range-select from the anchor to `targetId` over `orderedIds` (shift-click). */
+  selectRange: (orderedIds: readonly NoteId[], targetId: NoteId) => void;
+  /** Clear the multi-selection set + anchor. */
+  clearMultiSelection: () => void;
+  /** Replace the multi-selection set wholesale. */
+  replaceSelection: (ids: Iterable<NoteId>) => void;
   /** Select + emit a load-body intent (caller wires the editor). */
   open: (id: NoteId) => Promise<string>;
   /** Enter inline-rename mode for `id`. Caller renders the input. */
@@ -451,6 +551,12 @@ export type UseSelectedNoteReturn = {
   emptyTrashWithSync: (ids: readonly NoteId[]) => Promise<EmptyTrashResult>;
   /** Soft-trash every id at once (e.g. a non-empty folder delete); optimistic + rollback. */
   bulkTrashWithSync: (ids: readonly NoteId[]) => Promise<BulkTrashResult>;
+  /** Move every id to `folder` (or root) at once (MYND-367 bulk move); best-effort
+   *  via `bulkMoveNotes`, then surgical refresh of the movers. */
+  bulkMoveWithSync: (
+    ids: readonly NoteId[],
+    folder: string | null,
+  ) => Promise<BulkMoveResult>;
   /** Surgical refresh: re-fetch a single note's title slice. */
   refreshOne: (id: NoteId) => Promise<void>;
   /** Initial-boot full refresh: load `note_list` + chunked title batch. */
@@ -474,6 +580,25 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
 
   const select = useCallback((id: NoteId | null) => {
     setState((prev) => ({ ...prev, selectedId: id }));
+  }, []);
+
+  // Multi-selection set actions (MYND-367) — thin wrappers over the pure
+  // helpers. Named `*Action` here to avoid shadowing the module-level helpers;
+  // re-exposed under the helper names in the context value.
+  const toggleInSelectionAction = useCallback((id: NoteId) => {
+    setState((prev) => toggleInSelection(prev, id));
+  }, []);
+  const selectRangeAction = useCallback(
+    (orderedIds: readonly NoteId[], targetId: NoteId) => {
+      setState((prev) => selectRange(prev, orderedIds, targetId));
+    },
+    [],
+  );
+  const clearMultiSelectionAction = useCallback(() => {
+    setState((prev) => clearMultiSelection(prev));
+  }, []);
+  const replaceSelectionAction = useCallback((ids: Iterable<NoteId>) => {
+    setState((prev) => replaceSelection(prev, ids));
   }, []);
 
   const open = useCallback(
@@ -748,6 +873,24 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
+  // Move every id to `folder` (or root) at once (MYND-367 bulk move). Best-
+  // effort via `bulkMoveNotes` (folder-move is not correctness-critical, Q4) —
+  // no optimistic pre-write is needed (a move only relocates rows within the
+  // tree, it doesn't make them vanish like trash), so we just refresh the
+  // movers to their canonical post-move slice. Twin of `bulkTrashWithSync`.
+  const bulkMoveWithSync = useCallback(
+    async (
+      ids: readonly NoteId[],
+      folder: string | null,
+    ): Promise<BulkMoveResult> => {
+      if (ids.length === 0) return { moved: [], failed: [] };
+      const result = await bulkMoveNotes([...ids], folder);
+      await Promise.allSettled(result.moved.map((id) => refreshOne(id)));
+      return result;
+    },
+    [refreshOne],
+  );
+
   // MYND-97: re-read the open note's body after an out-of-band mutation
   // (snapshot restore overwrites the `.myn` via the backend, not the editor's
   // autosave). Mirrors the re-sync `commitRename` performs after a rename.
@@ -762,11 +905,17 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
   const value = useMemo<UseSelectedNoteReturn>(
     () => ({
       selectedId: state.selectedId,
+      selectedIds: state.selectedIds,
+      anchorId: state.anchorId,
       renamingId: state.renamingId,
       cache: state.cache,
       contentReloadNonce: state.contentReloadNonce,
       reloadOpenNote,
       select,
+      toggleInSelection: toggleInSelectionAction,
+      selectRange: selectRangeAction,
+      clearMultiSelection: clearMultiSelectionAction,
+      replaceSelection: replaceSelectionAction,
       open,
       startRename,
       cancelRename,
@@ -778,6 +927,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       restoreWithRollback,
       emptyTrashWithSync,
       bulkTrashWithSync,
+      bulkMoveWithSync,
       refreshOne,
       refreshAll,
     }),
@@ -785,6 +935,10 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       state,
       reloadOpenNote,
       select,
+      toggleInSelectionAction,
+      selectRangeAction,
+      clearMultiSelectionAction,
+      replaceSelectionAction,
       open,
       startRename,
       cancelRename,
@@ -796,6 +950,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       restoreWithRollback,
       emptyTrashWithSync,
       bulkTrashWithSync,
+      bulkMoveWithSync,
       refreshOne,
       refreshAll,
     ],

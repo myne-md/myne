@@ -164,6 +164,32 @@ export class Element {
    *  ("") or Meta ("") → open in a new tab; Alt ("") →
    *  open to the side / split. Pass `key` as a `\uE0xx` escape, never a
    *  literal (the invisible-key hazard — see the U+E007 memory). */
+  // NOTE (MYND-367): Cmd/Ctrl-click on a note row now TOGGLES the multi-
+  // selection (no longer "open in a new tab"); Alt still opens to the side.
+  // The new-tab affordance moved to `middleClick` (and the row context menu).
+  async middleClick(): Promise<void> {
+    await this.session.send("POST", "/actions", {
+      actions: [
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: { [ELEMENT_KEY]: this.elementId },
+              x: 0,
+              y: 0,
+            },
+            { type: "pointerDown", button: 1 },
+            { type: "pointerUp", button: 1 },
+          ],
+        },
+      ],
+    });
+  }
+
   async modifierClick(key: string): Promise<void> {
     await this.session.send("POST", "/actions", {
       actions: [

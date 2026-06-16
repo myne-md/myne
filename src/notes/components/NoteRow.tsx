@@ -36,10 +36,19 @@ export type NoteRowProps = {
   record: TitleRecord;
   selected: boolean;
   renaming: boolean;
-  /** Click handler → caller dispatches selection + open. `opts.newTab`
-   *  is set on Cmd/Ctrl-click or middle-click (open in a new tab);
-   *  `opts.toSide` on Alt-click (split to the side) — MYND-166. */
-  onSelect: (id: string, opts?: { newTab?: boolean; toSide?: boolean }) => void;
+  /** Click handler → caller dispatches the row's activation intent.
+   *  The modifier matrix (MYND-166 + MYND-367 multi-select):
+   *  - plain click → `{}` (open in the focused pane; collapses any set)
+   *  - Cmd/Ctrl-click → `{ toggle: true }` (toggle multi-selection; no open)
+   *  - Shift-click → `{ range: true }` (range-select from anchor; no open)
+   *  - Alt-click → `{ toSide: true }` (split to the side)
+   *  - middle-click → `{ newTab: true }` (open in a new tab)
+   *  Cmd/Ctrl no longer means "new tab" — that demoted to middle-click + the
+   *  "Open in new tab" context-menu item so cmd-click is free for multi-select. */
+  onSelect: (
+    id: string,
+    opts?: { newTab?: boolean; toSide?: boolean; toggle?: boolean; range?: boolean },
+  ) => void;
   /** Double-click on title → enter inline-rename mode. */
   onStartRename: (id: string) => void;
   /** Right-click → caller surfaces context menu. */
@@ -59,6 +68,11 @@ export type NoteRowProps = {
   /** Color-label slot (MYND-184) — renders a small leading dot before the
    *  title. Undefined when the note has no color. */
   colorSlot?: string;
+  /** Whether this row is part of the active multi-selection (MYND-367) — paints
+   *  the same accent-soft fill as `selected` so the whole set reads as picked,
+   *  and exposes `data-multiselected` for E2E. Orthogonal to `selected` (the
+   *  single open-in-pane note). */
+  multiSelected?: boolean;
   /** Whether to render the relative-time subtitle line (sidebar-note-timestamps).
    *  Defaults to `true` (the pre-feature behaviour). When `false` the subtitle
    *  `<div>` is omitted entirely and the title vertically centers in the row's
@@ -227,6 +241,7 @@ export function NoteRow(props: NoteRowProps) {
     onToggleFavorite,
     colorSlot,
     showTimestamps = true,
+    multiSelected = false,
   } = props;
 
   const [hovering, setHovering] = useState(false);
@@ -247,12 +262,19 @@ export function NoteRow(props: NoteRowProps) {
 
   const handleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
-      // Alt-click → split to the side; Cmd/Ctrl-click → new tab; plain
-      // click → reuse the focused tab.
-      onSelect(record.noteUuid, {
-        newTab: e.metaKey || e.ctrlKey,
-        toSide: e.altKey,
-      });
+      // Modifier matrix (MYND-166 + MYND-367). Shift / Cmd-Ctrl are
+      // multi-select gestures that must NOT open the note; Alt splits; plain
+      // opens in the focused pane. Shift takes precedence over Cmd/Ctrl so a
+      // Shift+Cmd chord ranges (the conventional list behavior).
+      if (e.shiftKey) {
+        e.preventDefault();
+        onSelect(record.noteUuid, { range: true });
+      } else if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        onSelect(record.noteUuid, { toggle: true });
+      } else {
+        onSelect(record.noteUuid, { toSide: e.altKey });
+      }
     },
     [onSelect, record.noteUuid],
   );
@@ -285,10 +307,13 @@ export function NoteRow(props: NoteRowProps) {
     [onContextMenu, record.noteUuid],
   );
 
+  // A multi-selected row paints the same accent-soft fill as the open row, so
+  // the whole gathered set reads as picked (MYND-367).
+  const highlighted = selected || multiSelected;
   const composedRowStyle: CSSProperties = {
     ...rowBaseStyle,
     ...(showTimestamps ? {} : rowCompactStyle),
-    ...(selected ? rowSelectedStyle : hovering ? rowHoverStyle : {}),
+    ...(highlighted ? rowSelectedStyle : hovering ? rowHoverStyle : {}),
   };
 
   return (
@@ -302,8 +327,9 @@ export function NoteRow(props: NoteRowProps) {
       onMouseLeave={() => setHovering(false)}
       data-testid="notes.row"
       data-note-id={record.noteUuid}
+      data-multiselected={multiSelected ? "true" : undefined}
       role="button"
-      aria-selected={selected}
+      aria-selected={highlighted}
       tabIndex={-1}
     >
       <div style={rowContentStyle}>
