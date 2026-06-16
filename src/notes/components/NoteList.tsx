@@ -11,11 +11,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type MouseEvent,
+  type ReactNode,
 } from "react";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
@@ -752,29 +754,20 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   );
   // Per-row disclosure-animation lookup: when `treeAnim` is active, the toggled
   // folder's contiguous descendant rows (depth > the folder's, until the depth
-  // returns to its level) get a staggered enter/exit animation style. Keyed by
-  // VirtualList row key so `renderItem` can apply it without prop-drilling.
+  // returns to its level) get a staggered enter/exit treatment. Keyed by
+  // VirtualList row key so `renderItem` can hand each row's `mode` + `delay` to
+  // its `DisclosureWrapper` without prop-drilling.
   const treeAnimRows = useMemo(() => {
-    const map = new Map<string, CSSProperties>();
+    const map = new Map<string, { mode: "in" | "out"; delay: number }>();
     if (treeAnim === null) return map;
     const anchor = rows.findIndex((r) => r.key === `f-${treeAnim.folderKey}`);
     if (anchor < 0) return map;
     const folderDepth = rows[anchor]!.depth;
-    const name =
-      treeAnim.mode === "in" ? "myne-tree-row-in" : "myne-tree-row-out";
-    const easing = treeAnim.mode === "in" ? "var(--ease-out)" : "var(--ease-standard)";
     let i = 0;
     for (let r = anchor + 1; r < rows.length; r++) {
       if (rows[r]!.depth <= folderDepth) break;
       const delay = Math.min(i, TREE_ANIM_MAX_STAGGER) * TREE_ANIM_STAGGER_MS;
-      map.set(rows[r]!.key, {
-        animationName: name,
-        animationDuration: "var(--duration-base)",
-        animationTimingFunction: easing,
-        animationDelay: `${delay}ms`,
-        animationFillMode: "both",
-        willChange: "transform, opacity",
-      });
+      map.set(rows[r]!.key, { mode: treeAnim.mode, delay });
       i++;
     }
     return map;
@@ -976,6 +969,66 @@ function EmptyState({
   );
 }
 
+/**
+ * Wraps a folder-tree row during an expand/collapse so the row's HEIGHT
+ * collapses (`grid-template-rows` 1fr↔0fr) alongside the opacity fade. The
+ * VirtualList's per-row ResizeObserver picks up the shrinking height each frame
+ * and reflows its spacers, so the fold reads as a smooth glide instead of the
+ * rows fading in place and the list snapping shut once they're finally removed.
+ *
+ * Idle (`anim === null`): a plain 1fr grid with no transition and overflow
+ * visible — structurally identical to the animating state so the row never
+ * remounts (a remount would flash at the end of an expand) and the rename
+ * input's focus ring isn't clipped. Entering/exiting flips `open` on the frame
+ * AFTER the resting "from" state paints, giving the browser a value to
+ * transition from. `overflow: hidden` is applied only while animating (a
+ * collapse/expand never coincides with a rename). Reduced motion zeroes
+ * transition-duration globally (tokens.css) and NoteList skips the deferred
+ * path, so this resolves instantly there.
+ */
+function DisclosureWrapper({
+  anim,
+  delay,
+  children,
+}: {
+  anim: "in" | "out" | null;
+  delay: number;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(anim !== "in");
+  useLayoutEffect(() => {
+    if (anim === null) {
+      setOpen(true);
+      return;
+    }
+    // Paint the resting "from" state (in → closed, out → open), then flip to the
+    // target on the next frame so the property change actually transitions.
+    setOpen(anim === "out");
+    const frame = requestAnimationFrame(() => setOpen(anim !== "out"));
+    return () => cancelAnimationFrame(frame);
+  }, [anim]);
+
+  const animating = anim !== null;
+  const easing = anim === "in" ? "var(--ease-out)" : "var(--ease-standard)";
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateRows: open ? "1fr" : "0fr",
+        opacity: open ? 1 : 0,
+        transition: animating
+          ? `grid-template-rows var(--duration-base) ${easing} ${delay}ms, opacity var(--duration-base) ${easing} ${delay}ms`
+          : undefined,
+        willChange: animating ? "grid-template-rows, opacity" : undefined,
+      }}
+    >
+      <div style={{ minHeight: 0, overflow: animating ? "hidden" : "visible" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 type ContextMenuState = { id: NoteId; x: number; y: number } | null;
 
 function PopulatedList({
@@ -993,10 +1046,11 @@ function PopulatedList({
   rows: VisibleRow[];
   favRows: VisibleRow[];
   navIds: NoteId[];
-  /** Per-row folder disclosure-animation styles, keyed by VirtualList row key
-   *  (empty when no expand/collapse is animating). Computed in the parent so it
-   *  shares `treeAnim` state with the toggle handler. */
-  treeAnimRows: ReadonlyMap<string, CSSProperties>;
+  /** Per-row folder disclosure-animation descriptors, keyed by VirtualList row
+   *  key (empty when no expand/collapse is animating). Computed in the parent so
+   *  it shares `treeAnim` state with the toggle handler; each entry's `mode` +
+   *  `delay` drive that row's `DisclosureWrapper`. */
+  treeAnimRows: ReadonlyMap<string, { mode: "in" | "out"; delay: number }>;
   onToggleFolder: (key: string) => void;
   onCreate: () => void;
   fm: FolderManagement;
@@ -1446,10 +1500,13 @@ function PopulatedList({
           estimatedRowHeight={showTimestamps ? 44 : 30}
           heightResetToken={showTimestamps}
           renderItem={(row) => {
-            const animStyle = treeAnimRows.get(row.key);
+            const anim = treeAnimRows.get(row.key);
             if (row.kind === "folder") {
               return (
-                <div style={animStyle}>
+                <DisclosureWrapper
+                  anim={anim?.mode ?? null}
+                  delay={anim?.delay ?? 0}
+                >
                   <FolderRow
                     node={row.node}
                     depth={row.depth}
@@ -1485,7 +1542,7 @@ function PopulatedList({
                     }
                     onCancelRename={fm.cancelRenameFolder}
                   />
-                </div>
+                </DisclosureWrapper>
               );
             }
             const record = ctx.cache.get(row.id);
@@ -1494,7 +1551,10 @@ function PopulatedList({
             const reorderPlace =
               fm.reorderTarget?.id === id ? fm.reorderTarget.place : null;
             return (
-              <div style={animStyle}>
+              <DisclosureWrapper
+                anim={anim?.mode ?? null}
+                delay={anim?.delay ?? 0}
+              >
                 <div
                   style={{
                     position: "relative",
@@ -1526,7 +1586,7 @@ function PopulatedList({
                   )}
                   {renderNoteRow(record, id, favSet.has(id))}
                 </div>
-              </div>
+              </DisclosureWrapper>
             );
           }}
         />
