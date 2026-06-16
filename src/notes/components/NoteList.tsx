@@ -1244,6 +1244,13 @@ function PopulatedList({
         onSelect: () => ctx.startRename(menu.id),
       },
       {
+        // Clone the note in place (MYND-332) — new id + "(kopya)" title;
+        // the copy opens in the focused pane.
+        id: "duplicate",
+        label: "Duplicate",
+        onSelect: () => void ctx.duplicateAndOpen(menu.id),
+      },
+      {
         id: "favorite",
         label: favSet.has(menu.id)
           ? "Remove from favorites"
