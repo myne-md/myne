@@ -111,6 +111,22 @@ fn main() {
                 ]),
             )
             .plugin(
+                "themes",
+                // custom-themes epic (MYND-297): the custom-theme file commands
+                // over app_config_dir/themes/. The InlinedPlugin mirror is
+                // load-bearing per the `vault-creation` note above (without it
+                // the `themes:` permissions flatten into `__app-acl__` and never
+                // match the `plugin:themes|<cmd>` authorize form); keep it
+                // lock-stepped with `permissions/themes/default.toml`.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "list_custom_themes",
+                    "read_custom_theme",
+                    "delete_custom_theme",
+                    "import_custom_theme",
+                    "ensure_themes_dir",
+                ]),
+            )
+            .plugin(
                 "notes",
                 // The `commands.allow` entries in
                 // `permissions/notes/default.toml` declare all four —

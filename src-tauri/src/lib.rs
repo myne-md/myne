@@ -63,6 +63,7 @@ pub fn run() {
         .plugin(plugins::vault_delete::init())
         .plugin(plugins::vault_repair::init())
         .plugin(plugins::prefs::init())
+        .plugin(plugins::themes::init())
         .plugin(plugins::notes::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::vault_indices::init())

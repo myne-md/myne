@@ -11,25 +11,34 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 
 const prefsRead = vi.fn();
 const setTheme = vi.fn();
+const setCustomTheme = vi.fn();
 const setShowNoteTimestamps = vi.fn();
 const applyTheme = vi.fn();
 
 vi.mock("../../src/lib/prefs", () => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
   setTheme: (...a: unknown[]) => setTheme(...a),
+  setCustomTheme: (...a: unknown[]) => setCustomTheme(...a),
   setShowNoteTimestamps: (...a: unknown[]) => setShowNoteTimestamps(...a),
 }));
 vi.mock("../../src/lib/theme", () => ({
   applyTheme: (...a: unknown[]) => applyTheme(...a),
 }));
+// The Custom themes subsection has its own test (customThemesSection.test.tsx);
+// stub it here so AppearancePanel's own logic (theme segmented + timestamps) is
+// tested in isolation, without the section's IPC/dialog/opener imports.
+vi.mock("../../src/components/settings/CustomThemesSection", () => ({
+  CustomThemesSection: () => null,
+}));
 
 import { AppearancePanel } from "../../src/components/settings/AppearancePanel";
 
-const BASE = { theme: null, show_note_timestamps: true };
+const BASE = { theme: null, custom_theme: null, show_note_timestamps: true };
 
 beforeEach(() => {
   prefsRead.mockReset().mockResolvedValue({ ...BASE });
   setTheme.mockReset().mockResolvedValue(undefined);
+  setCustomTheme.mockReset().mockResolvedValue(undefined);
   setShowNoteTimestamps.mockReset().mockResolvedValue(undefined);
   applyTheme.mockReset();
 });
@@ -66,6 +75,31 @@ describe("AppearancePanel — theme segmented control", () => {
     await waitFor(() =>
       expect(
         screen.getByTestId("settings.theme-dark").getAttribute("aria-checked"),
+      ).toBe("true"),
+    );
+  });
+
+  it("seeds the stored theme (amoled) as the selected segment", async () => {
+    prefsRead.mockResolvedValue({ ...BASE, theme: "amoled" });
+    render(<AppearancePanel />);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("settings.theme-amoled").getAttribute("aria-checked"),
+      ).toBe("true"),
+    );
+  });
+
+  it("choosing AMOLED persists then applies it (disk-first order)", async () => {
+    render(<AppearancePanel />);
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings.theme-amoled"));
+    });
+    expect(setTheme).toHaveBeenCalledWith("amoled");
+    expect(applyTheme).toHaveBeenCalledWith("amoled");
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("settings.theme-amoled").getAttribute("aria-checked"),
       ).toBe("true"),
     );
   });

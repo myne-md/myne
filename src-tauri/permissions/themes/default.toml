@@ -1,0 +1,48 @@
+# Permissions for the in-app `themes` Tauri plugin (custom-themes epic,
+# MYND-297). Picked up under the `themes:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these as
+# `themes:default` (or the individual `themes:allow-*` permissions).
+#
+# Theme files are device-local plaintext app-config (not vault content, not
+# Slot-gated). These three commands are read/list/delete over
+# `app_config_dir/themes/`; each runs the `is_valid_theme_name` path-traversal
+# guard before any path join (TB6). The `default` bundle is the only one
+# consumed in v0.1; like the other write-capable plugins, v0.2 multi-window MUST
+# NOT grant `allow-delete-custom-theme` to any non-main window.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the themes plugin — list + read + delete custom theme files."
+permissions = [
+  "allow-list-custom-themes",
+  "allow-read-custom-theme",
+  "allow-delete-custom-theme",
+  "allow-import-custom-theme",
+  "allow-ensure-themes-dir",
+]
+
+[[permission]]
+identifier = "allow-list-custom-themes"
+description = "Allow invoking themes:list_custom_themes (lists validated custom themes in app_config_dir/themes/ as ThemeInfo rows with preview swatches; invalid files surface greyed with their error; an absent directory yields an empty list; no native side-effect)."
+commands.allow = ["list_custom_themes"]
+
+[[permission]]
+identifier = "allow-read-custom-theme"
+description = "Allow invoking themes:read_custom_theme (reads + validates one theme file by name, returning its CSS-variable palette map; rejects an unsafe name via is_valid_theme_name before any path join; NotFound when absent)."
+commands.allow = ["read_custom_theme"]
+
+[[permission]]
+identifier = "allow-delete-custom-theme"
+description = "Allow invoking themes:delete_custom_theme (deletes one theme file by name; rejects an unsafe name via is_valid_theme_name before any path join; idempotent — deleting an absent theme is a no-op success)."
+commands.allow = ["delete_custom_theme"]
+
+[[permission]]
+identifier = "allow-import-custom-theme"
+description = "Allow invoking themes:import_custom_theme (reads a user-picked .json file, validates it, derives a safe name from its file-stem, and places it in app_config_dir/themes/; rejects an unsafe name or invalid content before writing; no native side-effect)."
+commands.allow = ["import_custom_theme"]
+
+[[permission]]
+identifier = "allow-ensure-themes-dir"
+description = "Allow invoking themes:ensure_themes_dir (creates app_config_dir/themes/ if missing and returns its path for the picker's Open-themes-folder reveal; no native side-effect)."
+commands.allow = ["ensure_themes_dir"]

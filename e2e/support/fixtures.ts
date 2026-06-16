@@ -29,7 +29,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { REPO_ROOT } from "./session";
 import { scanForPlaintext } from "./plaintext-scan";
 
@@ -173,6 +173,24 @@ export function seedVaults(appDataDir: string, opts: SeedOptions = {}): SeededVa
 /** Single-vault convenience. */
 export function seedVault(appDataDir: string, opts: Omit<SeedOptions, "count"> = {}): SeededVault {
   return seedVaults(appDataDir, { ...opts, count: 1 })[0];
+}
+
+/**
+ * Seed a custom theme into the session's `app_config_dir/themes/` (custom-themes
+ * epic, MYND-112). Theme files are device-local plaintext app-config, NOT vault
+ * content — they live under the config dir, not `appDataDir`. The harness sets
+ * `XDG_DATA_HOME=<dataHome>` + `XDG_CONFIG_HOME=<dataHome>/.config` (session.ts),
+ * and `appDataDir = <dataHome>/md.myne.desktop`, so the config themes dir is
+ * `<dataHome>/.config/md.myne.desktop/themes/`. Copies the named fixture from
+ * `e2e/fixtures/themes/<fixtureName>.json` verbatim (the file-stem becomes the
+ * theme's name in the picker).
+ */
+export function seedCustomTheme(appDataDir: string, fixtureName: string): void {
+  const dataHome = dirname(appDataDir);
+  const themesDir = join(dataHome, ".config", "md.myne.desktop", "themes");
+  mkdirSync(themesDir, { recursive: true });
+  const src = join(REPO_ROOT, "e2e", "fixtures", "themes", `${fixtureName}.json`);
+  writeFileSync(join(themesDir, `${fixtureName}.json`), readFileSync(src));
 }
 
 export function vaultMetaPath(appDataDir: string, vaultId: string): string {

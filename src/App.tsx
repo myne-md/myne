@@ -21,7 +21,8 @@ import { probeSlotKind } from "./lib/vault-slot-kind";
 import { switchVault } from "./lib/vault-switch";
 import { openInNoteFind } from "./editor/find/find-session";
 import { prefsRead } from "./lib/prefs";
-import { applyTheme } from "./lib/theme";
+import { applyTheme, applyCustomTheme } from "./lib/theme";
+import { readCustomTheme } from "./lib/themes";
 
 // Synthetic key for the single-entry boot `SlotMap` (MYND-204 SYNC-4).
 // `initialStageFromProbe` routes on the slot KIND only — it scans
@@ -181,7 +182,21 @@ function App() {
     }
     let cancelled = false;
     void prefsRead()
-      .then((prefs) => {
+      .then(async (prefs) => {
+        if (cancelled) return;
+        // A selected custom theme takes precedence over the built-in
+        // Light/Dark/System choice (MYND-297). Read + apply its palette via the
+        // CSSOM; on any failure (missing / renamed / invalid file) fall back to
+        // the built-in theme rather than leaving the UI un-themed.
+        if (prefs.custom_theme) {
+          try {
+            const palette = await readCustomTheme(prefs.custom_theme);
+            if (!cancelled) applyCustomTheme(palette);
+            return;
+          } catch {
+            // fall through to the built-in theme
+          }
+        }
         if (!cancelled) applyTheme(prefs.theme);
       })
       .catch(() => {

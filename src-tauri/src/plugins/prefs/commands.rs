@@ -1170,13 +1170,15 @@ pub(crate) async fn set_editor_layout_with_dir(
 
 /// Static label for the theme preference, for non-secret structured
 /// logging. `theme` is an AS3-low cosmetic UI preference (light / dark /
-/// system), so the value itself is safe to emit (unlike the DENY-listed
-/// secret material in ../../CLAUDE.md "Secret-handling logging discipline").
+/// amoled / system), so the value itself is safe to emit (unlike the
+/// DENY-listed secret material in ../../CLAUDE.md "Secret-handling logging
+/// discipline").
 fn theme_label(theme: Option<ThemeChoice>) -> &'static str {
     match theme {
         None => "system",
         Some(ThemeChoice::Light) => "light",
         Some(ThemeChoice::Dark) => "dark",
+        Some(ThemeChoice::Amoled) => "amoled",
     }
 }
 
@@ -1235,6 +1237,66 @@ pub(crate) async fn set_theme_with_dir(
         event = "prefs_written",
         field = "theme",
         value = theme_label(theme),
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `custom_theme` field (custom-themes
+/// epic, MYND-297) — the active custom-theme name (the file-stem of a theme
+/// under `app_config_dir/themes/`). `Some(name)` selects a custom theme (takes
+/// precedence over `theme` host-side); `None` clears it (the client falls back
+/// to the built-in `theme`). Read-modify-write under the per-plugin write
+/// mutex; **no native side-effect**, disk-first (same shape as [`set_theme`]).
+/// `custom_theme` is a **non-load-bearing** cosmetic preference — no
+/// protective-envelope clamp (a tampered/replayed value at worst selects a
+/// different or absent palette; the apply layer validates the file + falls back
+/// to a built-in theme on any failure). The name is `is_valid_theme_name`-
+/// constrained at the themes-plugin file boundary (MYND-297 read/delete); this
+/// setter stores the string verbatim.
+#[tauri::command]
+pub async fn set_custom_theme<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    custom_theme: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_custom_theme_with_dir(&dir, state.inner(), custom_theme).await
+}
+
+/// Testable core of [`set_custom_theme`].
+pub(crate) async fn set_custom_theme_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    custom_theme: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let is_set = custom_theme.is_some();
+    prefs.custom_theme = custom_theme;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // The custom-theme NAME is user-authored cosmetic data; emit only whether a
+    // custom theme is now selected or cleared, never the name itself.
+    tracing::info!(
+        event = "prefs_written",
+        field = "custom_theme",
+        set = is_set
     );
     Ok(())
 }
@@ -1556,6 +1618,7 @@ mod tests {
                     theme: None,
                     deliberate_folders: Vec::new(),
                     auto_lock_seconds: None,
+                    custom_theme: None,
                     daily_date_format: None,
                     daily_folder: None,
                     daily_template: None,
@@ -2157,6 +2220,55 @@ mod tests {
                 .await
                 .expect("read after system");
             assert_eq!(view.theme, None);
+        });
+    }
+
+    #[test]
+    fn set_custom_theme_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-custom-theme-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_custom_theme_with_dir(tmp.path(), &state, Some(String::from("solarized")))
+                    .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn custom_theme_round_trips_and_coexists_with_theme() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            // Select a custom theme (disk-first) + round-trip.
+            set_custom_theme_with_dir(tmp.path(), &state, Some(String::from("solarized-dark")))
+                .await
+                .expect("write custom_theme");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after custom_theme write");
+            assert_eq!(view.custom_theme.as_deref(), Some("solarized-dark"));
+
+            // A built-in theme can be set alongside it; both persist (precedence
+            // — custom_theme winning — is resolved client-side).
+            set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Dark))
+                .await
+                .expect("write theme");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after theme write");
+            assert_eq!(view.custom_theme.as_deref(), Some("solarized-dark"));
+            assert_eq!(view.theme, Some(ThemeChoice::Dark));
+
+            // Clearing custom_theme (None) drops the field back to "no custom".
+            set_custom_theme_with_dir(tmp.path(), &state, None)
+                .await
+                .expect("clear custom_theme");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert_eq!(view.custom_theme, None);
+            assert_eq!(view.theme, Some(ThemeChoice::Dark));
         });
     }
 

@@ -25,6 +25,7 @@ permissions = [
   "allow-set-favorites",
   "allow-set-editor-layout",
   "allow-set-theme",
+  "allow-set-custom-theme",
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
@@ -106,6 +107,17 @@ commands.allow = ["set_editor_layout"]
 identifier = "allow-set-theme"
 description = "Allow invoking prefs:set_theme (Slot::Unlocked-gated setter for the theme field — the user's Light/Dark/System choice; Option<ThemeChoice> where None ≡ system clears the field; atomic-writes vault.prefs with no native side-effect, no protective-envelope clamp since theme is non-load-bearing)."
 commands.allow = ["set_theme"]
+
+# custom-themes epic (MYND-297): a write setter for the custom_theme field —
+# the active custom-theme name. Inherits the same main-window-only invariant as
+# the other allow-set-* permissions — v0.2 multi-window MUST NOT grant this to
+# any non-main window. Atomic-writes vault.prefs with no native side-effect;
+# non-load-bearing cosmetic (no clamp; the apply layer validates the file and
+# falls back to a built-in theme on any failure).
+[[permission]]
+identifier = "allow-set-custom-theme"
+description = "Allow invoking prefs:set_custom_theme (Slot::Unlocked-gated setter for the custom_theme field — the active custom-theme name; Option<String> where None clears it and the client falls back to the built-in theme; atomic-writes vault.prefs with no native side-effect; logs set/cleared only, never the name)."
+commands.allow = ["set_custom_theme"]
 
 # MYND-191 daily-notes: three write setters, so they inherit the same
 # main-window-only invariant as the other allow-set-* permissions — v0.2

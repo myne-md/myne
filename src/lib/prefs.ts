@@ -33,7 +33,7 @@ export interface EditorLayout {
  * `prefers-color-scheme`); the field is omitted from the encrypted blob in
  * that case, byte-identical to a pre-MYND-110 vault.
  */
-export type ThemeChoice = "light" | "dark";
+export type ThemeChoice = "light" | "dark" | "amoled";
 
 /** Mirrors `protocol::PrefsView` (Rust side). */
 /** View render type (MYND-273, Saved Views). `map` is deliberately absent —
@@ -141,6 +141,14 @@ export interface PrefsView {
    * default for the timer. Serialized from Rust `Option<u32>` (null | number).
    */
   auto_lock_seconds: number | null;
+  /**
+   * Active custom-theme name (custom-themes epic, MYND-297) — the file-stem of a
+   * user-authored theme under `app_config_dir/themes/`. A non-`null` value takes
+   * **precedence** over {@link PrefsView.theme}: when set, the client applies the
+   * custom palette and ignores the built-in Light/Dark/System choice. `null` ≡ no
+   * custom theme selected (use `theme`). Serialized from Rust `Option<String>`.
+   */
+  custom_theme: string | null;
   /**
    * Daily-notes date-format string (MYND-191) — e.g. `YYYY-MM-DD`. `null` ≡ the
    * canonical default `YYYY-MM-DD`, applied host-side (blank-when-default).
@@ -372,6 +380,19 @@ export async function setEditorLayout(layout: EditorLayout): Promise<void> {
  */
 export async function setTheme(theme: ThemeChoice | null): Promise<void> {
   await invoke<void>("plugin:prefs|set_theme", { theme });
+}
+
+/**
+ * Persist the active custom-theme selection (custom-themes epic, MYND-297). Pass
+ * a theme name to select a user-authored custom theme (takes precedence over the
+ * built-in `theme`), or `null` to clear it (fall back to `theme`). The backend
+ * atomic-writes vault.prefs disk-first with no native side-effect; a rejected
+ * promise means the disk write failed, so the caller must not treat the new
+ * selection as persisted (re-read disk truth). `custom_theme` is a
+ * non-load-bearing cosmetic preference — no clamp, no in-flight gating.
+ */
+export async function setCustomTheme(customTheme: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_custom_theme", { customTheme });
 }
 
 /**

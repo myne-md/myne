@@ -135,8 +135,8 @@ pub const MAX_PREFS_PLAINTEXT_LEN: usize = 64 * 1024;
 /// **non-load-bearing** cosmetic preference (a tampered / replayed
 /// `vault.prefs` can at worst surface the wrong color), so unlike
 /// `auto_lock_seconds` it carries no protective-envelope clamp. Serialized
-/// lowercase (`"light"` / `"dark"`) on both the canonical-JSON disk path
-/// and the IPC `serde` path.
+/// lowercase (`"light"` / `"dark"` / `"amoled"`) on both the canonical-JSON
+/// disk path and the IPC `serde` path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ThemeChoice {
@@ -146,6 +146,11 @@ pub enum ThemeChoice {
     /// Explicit dark theme — the client sets `<html data-theme="dark">`,
     /// overriding the OS preference.
     Dark,
+    /// Explicit AMOLED (pure-black) dark theme — the client sets
+    /// `<html data-theme="amoled">`, overriding the OS preference. A
+    /// pure-black variant of [`ThemeChoice::Dark`] for OLED hardware; never
+    /// selected implicitly by System mode (OS-dark resolves to `Dark`).
+    Amoled,
 }
 
 /// Editor three-pane layout state — sidebar widths + collapsed flags
@@ -243,6 +248,22 @@ pub struct PrefsView {
     /// the decoder rejects a fractional value.
     #[serde(default)]
     pub auto_lock_seconds: Option<u32>,
+
+    /// Active **custom theme** selection (custom-themes epic, MYND-297) — the
+    /// file-stem name of a user-authored theme under `app_config_dir/themes/`.
+    /// `Some(name)` takes **precedence** over [`PrefsView::theme`] (the built-in
+    /// Light/Dark/System choice): when set, the host applies the custom palette
+    /// and ignores `theme`. Omitted entirely from the canonical JSON when `None`,
+    /// so a vault with no custom theme is byte-identical to a pre-MYND-297
+    /// `vault.prefs`. Canonical key `custom_theme` — the only 'c' key, sorts
+    /// between `auto_lock_seconds` (a) and the `daily_*` block (d). A
+    /// **non-load-bearing** cosmetic preference (AS-low): a tampered/replayed
+    /// value can at worst select a different or absent palette (the host
+    /// validates the file + falls back to a built-in theme on any failure), so
+    /// no protective-envelope clamp. The name is `is_valid_theme_name`-constrained
+    /// host-side; this codec stores it as a free NFC string.
+    #[serde(default)]
+    pub custom_theme: Option<alloc::string::String>,
 
     /// Daily-notes date-format string (MYND-191) — e.g. `YYYY-MM-DD`. `None` ≡
     /// the canonical default `YYYY-MM-DD`, which the host applies at read time
@@ -523,6 +544,7 @@ impl Default for PrefsView {
             item_order: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -675,6 +697,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if let Some(secs) = prefs.auto_lock_seconds {
         out.extend_from_slice(b"\"auto_lock_seconds\":");
         push_json_uint(&mut out, secs);
+        out.push(b',');
+    }
+
+    // custom_theme (canonical key 'c' — after auto_lock_seconds 'a', before the
+    // daily_* block 'd'; the only 'c' key). The active custom-theme name; takes
+    // precedence over `theme` host-side. Omitted when None so a vault with no
+    // custom theme is byte-identical to a pre-MYND-297 vault.prefs.
+    if let Some(ref name) = prefs.custom_theme {
+        out.extend_from_slice(b"\"custom_theme\":");
+        push_json_string(&mut out, &name.nfc().collect::<String>());
         out.push(b',');
     }
 
@@ -906,12 +938,13 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     // theme (canonical key 't' — LAST, after 's'). Omitted entirely when
     // None so an unset vault (≡ system) is byte-identical to a pre-MYND-110
     // vault.prefs (preserves existing KAT vectors). When Some, a JSON string
-    // value "light"/"dark".
+    // value "light"/"dark"/"amoled".
     if let Some(theme) = prefs.theme {
         out.extend_from_slice(b",\"theme\":\"");
         let value: &[u8] = match theme {
             ThemeChoice::Light => b"light",
             ThemeChoice::Dark => b"dark",
+            ThemeChoice::Amoled => b"amoled",
         };
         out.extend_from_slice(value);
         out.push(b'"');
@@ -1060,6 +1093,9 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // already prevents a marker from appearing inside a string value, but the
     // cursor keeps the canonical key-order discipline visible + robust).
     let mut cursor = 0usize;
+    // custom_theme (canonical key 'c' — before the daily_* block 'd'). The active
+    // custom-theme name; takes precedence over `theme` host-side. Optional.
+    let custom_theme = parse_optional_string_field(rest, &mut cursor, b"\"custom_theme\":")?;
     // daily-notes string fields (MYND-191), canonical key order:
     // daily_date_format (dai…) < daily_folder < daily_template, all before
     // deliberate_folders (del…). Optional → None when the key is absent.
@@ -1173,6 +1209,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         item_colors,
         deliberate_folders,
         auto_lock_seconds,
+        custom_theme,
         daily_date_format,
         daily_folder,
         daily_template,
@@ -1327,11 +1364,11 @@ fn parse_optional_string_field(
 /// Parse the OPTIONAL `theme` field from `region` (the bytes from
 /// screen_capture_protection's value to the end of the object). Tolerant:
 /// returns `None` when the key is absent OR when the value is a JSON string
-/// other than `"light"` / `"dark"`. An unrecognized value is treated as an
-/// unknown field (forward-compat, spec § 9.5.2) rather than a parse
-/// failure, because `theme` is a non-load-bearing cosmetic preference and
-/// `None` ≡ follow-the-OS. Located by `find_subslice` on the key marker so
-/// a future field sorting between `screen_capture_protection` and `theme`
+/// other than `"light"` / `"dark"` / `"amoled"`. An unrecognized value is
+/// treated as an unknown field (forward-compat, spec § 9.5.2) rather than a
+/// parse failure, because `theme` is a non-load-bearing cosmetic preference
+/// and `None` ≡ follow-the-OS. Located by `find_subslice` on the key marker
+/// so a future field sorting between `screen_capture_protection` and `theme`
 /// does not hide it.
 fn parse_optional_theme(region: &[u8]) -> Option<ThemeChoice> {
     let marker = b"\"theme\":";
@@ -1341,6 +1378,7 @@ fn parse_optional_theme(region: &[u8]) -> Option<ThemeChoice> {
     match value.as_str() {
         "light" => Some(ThemeChoice::Light),
         "dark" => Some(ThemeChoice::Dark),
+        "amoled" => Some(ThemeChoice::Amoled),
         _ => None,
     }
 }
@@ -1778,6 +1816,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -1810,6 +1849,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -1965,6 +2005,7 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
@@ -1999,6 +2040,7 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
@@ -2298,6 +2340,7 @@ mod tests {
             item_colors: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(300),
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2334,6 +2377,27 @@ mod tests {
             canonical_json_decode(br#"{"screen_capture_protection":true,"theme":"dark"}"#).unwrap();
         assert_eq!(parsed.theme, Some(ThemeChoice::Dark));
         assert!(parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn decode_round_trips_theme_amoled() {
+        let parsed =
+            canonical_json_decode(br#"{"screen_capture_protection":true,"theme":"amoled"}"#)
+                .unwrap();
+        assert_eq!(parsed.theme, Some(ThemeChoice::Amoled));
+        assert!(parsed.screen_capture_protection);
+    }
+
+    #[test]
+    fn encode_emits_amoled_theme_value() {
+        let prefs = PrefsView {
+            theme: Some(ThemeChoice::Amoled),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        // The `theme` key is canonically LAST among the cosmetic fields and
+        // serializes the lowercase variant string.
+        assert!(find_subslice(&encoded, br#""theme":"amoled""#).is_some());
     }
 
     #[test]
@@ -2378,6 +2442,23 @@ mod tests {
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
         assert_eq!(original, decoded);
         assert_eq!(decoded.theme, Some(ThemeChoice::Dark));
+    }
+
+    #[test]
+    fn full_blob_round_trip_with_theme_amoled() {
+        let root_key = fixed_root_key();
+        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let original = PrefsView {
+            theme: Some(ThemeChoice::Amoled),
+            ..PrefsView::default()
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
+        assert_eq!(original, decoded);
+        assert_eq!(decoded.theme, Some(ThemeChoice::Amoled));
     }
 
     #[test]
@@ -2533,6 +2614,7 @@ mod tests {
                 alloc::string::String::from("Archive/"),
             ],
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2572,6 +2654,7 @@ mod tests {
                 alloc::string::String::from("b/"),
             ],
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2609,6 +2692,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2645,6 +2729,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2744,6 +2829,7 @@ mod tests {
                 alloc::string::String::from("Archive/2025/"),
             ],
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2799,6 +2885,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2844,6 +2931,7 @@ mod tests {
             theme: None,
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2921,6 +3009,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(900),
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -2983,6 +3072,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3037,6 +3127,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(300),
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3073,6 +3164,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(900),
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3111,6 +3203,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(0),
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3217,6 +3310,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(1800),
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3295,6 +3389,7 @@ mod tests {
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3567,6 +3662,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3607,6 +3703,7 @@ mod tests {
             favorites: Vec::new(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -3908,6 +4005,7 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
@@ -3941,6 +4039,7 @@ mod tests {
                 favorites: Vec::new(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
+                custom_theme: None,
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
@@ -3977,6 +4076,7 @@ mod tests {
                 alloc::string::String::from("Projects/Myne/"),
             ],
             auto_lock_seconds: Some(300),
+            custom_theme: None,
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
@@ -4381,6 +4481,96 @@ mod tests {
         dump.push_str("---end label + tolerance prefs vectors---\n");
         std::fs::write("/tmp/myne_vault_prefs_label_vectors.txt", dump.as_bytes())
             .expect("write label prefs vectors dump");
+    }
+
+    /// Generator for the AMOLED `theme` vector case (appended to the companion
+    /// repo's `vault-prefs` family; per-feature generator, keeps the originals
+    /// byte-stable):
+    ///
+    /// `cargo test -p protocol --lib emit_amoled_theme_prefs_vector -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
+    /// third explicit theme value (`ThemeChoice::Amoled` → canonical
+    /// `"theme":"amoled"`). Pins the lowercase variant string the serializer
+    /// emits and the round-trip back through the decoder, the cross-impl
+    /// contract for the AMOLED theme. Nonce `0xA0` is the next free entry in
+    /// the family's nonce registry (0x77–0xEE taken by the sibling generators).
+    #[test]
+    #[ignore]
+    fn emit_amoled_theme_prefs_vector() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_amoled: [u8; AEAD_NONCE_LEN] = [0xA0; AEAD_NONCE_LEN];
+        let prefs_amoled = PrefsView {
+            theme: Some(ThemeChoice::Amoled),
+            ..PrefsView::default()
+        };
+        let canonical_amoled = canonical_json_encode(&prefs_amoled);
+        assert_eq!(
+            canonical_amoled.as_slice(),
+            br#"{"screen_capture_protection":true,"theme":"amoled"}"#.as_slice(),
+            "canonical plaintext must emit the lowercase amoled variant, theme last",
+        );
+        let blob_amoled =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_amoled, &nonce_amoled)
+                .expect("encode amoled");
+        let decoded_amoled =
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_amoled).expect("decode amoled");
+        assert_eq!(decoded_amoled, prefs_amoled);
+        assert_eq!(decoded_amoled.theme, Some(ThemeChoice::Amoled));
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin amoled theme prefs vectors---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-themed-amoled\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_amoled)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical_amoled).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!(
+            "prefs_nonce_hex: {}\n",
+            hex_lower(&nonce_amoled)
+        ));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob_amoled)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-themed-amoled (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!(
+            "input_blob_hex: {}\n",
+            hex_lower(&blob_amoled)
+        ));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_amoled)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"screen_capture_protection\": true, \"theme\": \"amoled\" }\n\n",
+        );
+
+        dump.push_str("---end amoled theme prefs vectors---\n");
+        std::fs::write("/tmp/myne_vault_prefs_amoled_vectors.txt", dump.as_bytes())
+            .expect("write amoled prefs vectors dump");
     }
 
     /// Generator for the MYND-273 `saved_views` + `view_order` vector cases
@@ -4865,6 +5055,48 @@ mod tests {
         let hash = fixed_account_number_hash();
         let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
         assert_eq!(decode_prefs_blob(&prefs_key, &hash, &blob).unwrap(), prefs);
+    }
+
+    // ---- custom_theme (custom-themes epic, MYND-297) -----------------------
+
+    #[test]
+    fn custom_theme_round_trips_and_positions_a_before_c_before_t() {
+        // Round-trip alongside auto_lock_seconds (before, 'a') + theme (after, 't')
+        // to pin custom_theme's canonical position ('c') across the codec.
+        let prefs = PrefsView {
+            custom_theme: Some("solarized-dark".into()),
+            auto_lock_seconds: Some(300),
+            theme: Some(ThemeChoice::Dark),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, prefs);
+        assert_eq!(decoded.custom_theme.as_deref(), Some("solarized-dark"));
+
+        let json = canonical_json_encode(&prefs);
+        let s = core::str::from_utf8(&json).unwrap();
+        let al = s.find("auto_lock_seconds").unwrap();
+        let ct = s.find("custom_theme").unwrap();
+        let th = s.find("\"theme\"").unwrap();
+        assert!(al < ct && ct < th, "canonical order must be a < c < t: {s}");
+    }
+
+    #[test]
+    fn custom_theme_omitted_when_none_is_byte_identical() {
+        // A vault with no custom theme must not emit the key at all, so it stays
+        // byte-identical to a pre-MYND-297 vault.prefs.
+        let prefs = PrefsView {
+            theme: Some(ThemeChoice::Light),
+            ..PrefsView::default()
+        };
+        let json = canonical_json_encode(&prefs);
+        assert!(
+            find_subslice(&json, b"custom_theme").is_none(),
+            "absent custom_theme must not appear in canonical JSON"
+        );
     }
 
     // ---- saved_views + view_order (MYND-273) -------------------------------
