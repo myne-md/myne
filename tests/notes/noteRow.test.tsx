@@ -124,42 +124,61 @@ describe("NoteRow — selection + aria", () => {
       "abc",
     );
   });
+
+  it("multiSelected → data-multiselected + aria-selected (MYND-367)", () => {
+    renderRow({ multiSelected: true });
+    const row = screen.getByTestId("notes.row");
+    expect(row.getAttribute("data-multiselected")).toBe("true");
+    expect(row.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("not multiSelected → no data-multiselected attribute", () => {
+    renderRow();
+    expect(
+      screen.getByTestId("notes.row").getAttribute("data-multiselected"),
+    ).toBeNull();
+  });
 });
 
 describe("NoteRow — click matrix", () => {
-  it("plain click → onSelect with no flags", () => {
+  it("plain click → onSelect with no flags (open in focused pane)", () => {
     const onSelect = vi.fn();
     renderRow({ onSelect });
     fireEvent.click(screen.getByTestId("notes.row"));
-    expect(onSelect).toHaveBeenCalledWith("note-1", {
-      newTab: false,
-      toSide: false,
-    });
+    expect(onSelect).toHaveBeenCalledWith("note-1", { toSide: false });
   });
 
-  it("Cmd / Ctrl click → newTab", () => {
+  it("Cmd / Ctrl click → toggle multi-selection (MYND-367; no longer newTab)", () => {
     const onSelect = vi.fn();
     renderRow({ onSelect });
     fireEvent.click(screen.getByTestId("notes.row"), { metaKey: true });
-    expect(onSelect).toHaveBeenLastCalledWith("note-1", {
-      newTab: true,
-      toSide: false,
-    });
+    expect(onSelect).toHaveBeenLastCalledWith("note-1", { toggle: true });
     fireEvent.click(screen.getByTestId("notes.row"), { ctrlKey: true });
-    expect(onSelect).toHaveBeenLastCalledWith("note-1", {
-      newTab: true,
-      toSide: false,
+    expect(onSelect).toHaveBeenLastCalledWith("note-1", { toggle: true });
+  });
+
+  it("Shift click → range-select (MYND-367)", () => {
+    const onSelect = vi.fn();
+    renderRow({ onSelect });
+    fireEvent.click(screen.getByTestId("notes.row"), { shiftKey: true });
+    expect(onSelect).toHaveBeenCalledWith("note-1", { range: true });
+  });
+
+  it("Shift takes precedence over Cmd/Ctrl → range", () => {
+    const onSelect = vi.fn();
+    renderRow({ onSelect });
+    fireEvent.click(screen.getByTestId("notes.row"), {
+      shiftKey: true,
+      metaKey: true,
     });
+    expect(onSelect).toHaveBeenCalledWith("note-1", { range: true });
   });
 
   it("Alt click → toSide", () => {
     const onSelect = vi.fn();
     renderRow({ onSelect });
     fireEvent.click(screen.getByTestId("notes.row"), { altKey: true });
-    expect(onSelect).toHaveBeenCalledWith("note-1", {
-      newTab: false,
-      toSide: true,
-    });
+    expect(onSelect).toHaveBeenCalledWith("note-1", { toSide: true });
   });
 
   it("middle click (aux button 1) → newTab", () => {

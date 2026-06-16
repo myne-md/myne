@@ -36,6 +36,10 @@ import { testIdSelector, type Session } from "./support/webdriver";
 // createNote / typeIntoEditor / waitForSaved / editorText moved to
 // support/flows.ts (shared with the PS-1 plaintext-residue suite).
 
+// W3C code point for Control (the Linux multi-select modifier, MYND-367) —
+// escape form, never a literal (the invisible-key hazard).
+const CONTROL = "";
+
 /** Right-click an element and pick a context-menu item by its
  *  `data-item-id`. */
 async function contextMenuPick(
@@ -219,6 +223,78 @@ describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", ()
         await (await s.byTestId("notes.trash-open")).click();
         await s.byTestId("trash.panel");
         expect((await s.byTestIdAll("trash.restore")).length).toBe(1);
+      },
+    );
+  });
+});
+
+describeE2E("ms1 multi-select bulk move (MYND-367)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("cmd-click gathers a multi-selection; the bulk context menu moves it all into a folder", async () => {
+    let password = "";
+    await scenario(
+      "ms1-multi-select-bulk-move",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // An (empty) destination folder + two root notes to gather.
+        await (await s.byTestId("notes.new-folder")).click();
+        await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv");
+        await s.byTestId("notes.folder-row");
+        await createNote(s, "Multi Alfa");
+        await createNote(s, "Multi Beta");
+
+        const ids = await s.waitUntil(
+          async () => {
+            const rows = await s.byTestIdAll("notes.row");
+            return rows.length === 2 ? rows : null;
+          },
+          { label: "two root notes exist" },
+        );
+        const [aId, bId] = await Promise.all(
+          ids.map(async (r) => (await r.attribute("data-note-id")) ?? ""),
+        );
+
+        // Plain-click A (opens + single-selects), then Cmd/Ctrl-click B to
+        // gather both into the multi-selection (MYND-367: the open note is
+        // folded into the set, so the operation covers {A, B}).
+        await (
+          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": aId }))
+        ).click();
+        await (
+          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": bId }))
+        ).modifierClick(CONTROL);
+        await s.waitUntil(
+          async () =>
+            (await s.findElements(testIdSelector("notes.row", { "data-multiselected": "true" })))
+              .length === 2 || null,
+          { label: "both rows show as multi-selected" },
+        );
+
+        // Bulk "Move N notes to…" → pick the folder (path is the item id).
+        await (
+          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": bId }))
+        ).rightClick();
+        await (
+          await s.waitForElement(
+            testIdSelector("notes.context-menu-item", { "data-item-id": "bulk-move" }),
+          )
+        ).click();
+        await (
+          await s.waitForElement(
+            testIdSelector("notes.context-menu-item", { "data-item-id": "Arsiv/" }),
+          )
+        ).click();
+
+        // Both notes are now children of the folder: collapsing the (now
+        // non-empty) folder hides exactly them, leaving the folder row.
+        await s.waitForGone(testIdSelector("notes.row", { "data-multiselected": "true" }));
+        await (await s.byTestId("notes.folder-row")).click(); // collapse
+        await s.waitForGone(testIdSelector("notes.row"));
+        expect((await s.byTestIdAll("notes.folder-row")).length).toBe(1);
       },
     );
   });

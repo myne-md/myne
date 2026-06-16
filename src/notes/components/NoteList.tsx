@@ -141,8 +141,25 @@ export function makeKeyboardNavHandler(opts: {
   select: (id: NoteId | null) => void;
   open: (id: NoteId) => Promise<unknown>;
   pageSize?: number;
+  /** Collapse the multi-selection (MYND-367) — cursor-moving keys and Escape
+   *  drop the set, mirroring Finder. Optional so isolated callers can omit it. */
+  clearMultiSelection?: () => void;
 }): (e: KeyboardEvent) => void {
-  const { sortedIds, selectedId, renamingId, select, open, pageSize = 10 } = opts;
+  const {
+    sortedIds,
+    selectedId,
+    renamingId,
+    select,
+    open,
+    pageSize = 10,
+    clearMultiSelection,
+  } = opts;
+  // Cursor-moving keys collapse any multi-selection before they move the
+  // single cursor — arrow-nav after a multi-select returns to single mode.
+  const moveSelect = (id: NoteId | null): void => {
+    clearMultiSelection?.();
+    select(id);
+  };
 
   const isEditableTarget = (target: EventTarget | null): boolean => {
     const el = target as HTMLElement | null;
@@ -163,23 +180,23 @@ export function makeKeyboardNavHandler(opts: {
       case "ArrowDown": {
         e.preventDefault();
         const next = idx < 0 ? 0 : Math.min(idx + 1, sortedIds.length - 1);
-        select(sortedIds[next] ?? null);
+        moveSelect(sortedIds[next] ?? null);
         return;
       }
       case "ArrowUp": {
         e.preventDefault();
         const next = idx <= 0 ? 0 : idx - 1;
-        select(sortedIds[next] ?? null);
+        moveSelect(sortedIds[next] ?? null);
         return;
       }
       case "Home": {
         e.preventDefault();
-        select(sortedIds[0] ?? null);
+        moveSelect(sortedIds[0] ?? null);
         return;
       }
       case "End": {
         e.preventDefault();
-        select(sortedIds[sortedIds.length - 1] ?? null);
+        moveSelect(sortedIds[sortedIds.length - 1] ?? null);
         return;
       }
       case "PageDown": {
@@ -188,13 +205,13 @@ export function makeKeyboardNavHandler(opts: {
           idx < 0 ? pageSize - 1 : idx + pageSize,
           sortedIds.length - 1,
         );
-        select(sortedIds[target] ?? null);
+        moveSelect(sortedIds[target] ?? null);
         return;
       }
       case "PageUp": {
         e.preventDefault();
         const target = idx < 0 ? 0 : Math.max(idx - pageSize, 0);
-        select(sortedIds[target] ?? null);
+        moveSelect(sortedIds[target] ?? null);
         return;
       }
       case "Enter": {
@@ -202,6 +219,12 @@ export function makeKeyboardNavHandler(opts: {
           e.preventDefault();
           void open(selectedId);
         }
+        return;
+      }
+      case "Escape": {
+        // Drop a multi-selection (MYND-367); leave `selectedId` so the editor
+        // keeps the open note. No-op when nothing is multi-selected.
+        clearMultiSelection?.();
         return;
       }
       default:
@@ -816,6 +839,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       renamingId: ctx.renamingId,
       select: ctx.select,
       open: openNote,
+      clearMultiSelection: ctx.clearMultiSelection,
     });
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -847,6 +871,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           favRows={favRows}
           navIds={navIds}
           treeAnimRows={treeAnimRows}
+          folderOptions={folderOptions}
           onToggleFolder={toggleFolder}
           onCreate={handleCreate}
           fm={fm}
@@ -1036,6 +1061,7 @@ function PopulatedList({
   favRows,
   navIds,
   treeAnimRows,
+  folderOptions,
   onToggleFolder,
   onCreate,
   fm,
@@ -1046,6 +1072,9 @@ function PopulatedList({
   rows: VisibleRow[];
   favRows: VisibleRow[];
   navIds: NoteId[];
+  /** Flat folder choices (tree order, depth-indented label) for the bulk
+   *  "Move N notes to…" target submenu (MYND-367). Reuses the parent's memo. */
+  folderOptions: FolderOption[];
   /** Per-row folder disclosure-animation descriptors, keyed by VirtualList row
    *  key (empty when no expand/collapse is animating). Computed in the parent so
    *  it shares `treeAnim` state with the toggle handler; each entry's `mode` +
@@ -1096,7 +1125,56 @@ function PopulatedList({
   // just isn't *shown* as active here. Exactly one of {a note, Attachments} is
   // highlighted at any time.
   const noteHighlightActive = view !== "attachments";
+  // Row activation intent router (MYND-166 open modifiers + MYND-367 multi-
+  // select). Toggle / range gestures only mutate the selection SET (they never
+  // open — see `SidebarState.selectedIds`); every open action first collapses
+  // the set back to a single selection so the editor and the highlight agree.
+  const activateRow = useCallback(
+    (
+      id: NoteId,
+      opts?: {
+        newTab?: boolean;
+        toSide?: boolean;
+        toggle?: boolean;
+        range?: boolean;
+      },
+    ) => {
+      if (opts?.range) {
+        // Range pivots on anchorId ?? selectedId ?? target, so a plain-click
+        // selection is already included as the anchor (no seeding needed).
+        ctx.selectRange(navIds, id);
+        return;
+      }
+      if (opts?.toggle) {
+        // Seed the set with the currently-open note when starting a fresh
+        // multi-selection (Finder intuition: click A, cmd-click B → {A, B}).
+        // selectedId is the open-bridge surface; fold it into the bulk set so
+        // the open note isn't silently excluded from the operation.
+        if (
+          ctx.selectedIds.size === 0 &&
+          ctx.selectedId !== null &&
+          ctx.selectedId !== id
+        ) {
+          ctx.replaceSelection([ctx.selectedId, id]);
+        } else {
+          ctx.toggleInSelection(id);
+        }
+        return;
+      }
+      ctx.clearMultiSelection();
+      openNote(id, opts);
+    },
+    [ctx, navIds, openNote],
+  );
   const [menu, setMenu] = useState<ContextMenuState>(null);
+  // Bulk "Move N notes to…" target submenu anchor (MYND-367) — opened from the
+  // bulk context menu, lists folder options + Vault root.
+  const [moveTarget, setMoveTarget] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  // Undo target for a bulk trash (MYND-367) — the ids just moved to Trash, so
+  // "Undo" can restore the whole set (parity with the single-note undo toast).
+  const [bulkUndo, setBulkUndo] = useState<readonly NoteId[] | null>(null);
   // Undo-toast target: the id of the note just moved to the trash. "Undo"
   // restores it (MYND-133). Replaced when another note is trashed.
   const [undoToast, setUndoToast] = useState<NoteId | null>(null);
@@ -1111,6 +1189,26 @@ function PopulatedList({
     e.preventDefault();
     setBgMenu({ x: e.clientX, y: e.clientY });
   }, []);
+  // Click on the empty sidebar background → drop the multi-selection (MYND-367).
+  // A click that landed on a note/folder row or inside an open menu is handled
+  // by that surface (a row's own activation already collapses or extends the
+  // set), so skip those — only a genuine empty-space click clears.
+  const handleBackgroundClick = useCallback(
+    (e: MouseEvent) => {
+      if (ctx.selectedIds.size === 0) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el !== null &&
+        el.closest(
+          '[data-testid="notes.row"],[data-testid="notes.folder-row"],[role="menu"]',
+        ) !== null
+      ) {
+        return;
+      }
+      ctx.clearMultiSelection();
+    },
+    [ctx],
+  );
   const closeBgMenu = useCallback(() => setBgMenu(null), []);
   // Decoration picker (MYND-184 color labels / MYND-185 folder icons) — an
   // anchored popover opened from a flat "Color…" / "Customize…" context-menu
@@ -1150,8 +1248,9 @@ function PopulatedList({
       <NoteRow
         record={record}
         selected={noteHighlightActive && ctx.selectedId === id}
+        multiSelected={noteHighlightActive && ctx.selectedIds.has(id)}
         renaming={ctx.renamingId === id}
-        onSelect={(noteId, opts) => openNote(noteId, opts)}
+        onSelect={(noteId, opts) => activateRow(noteId, opts)}
         onStartRename={ctx.startRename}
         onContextMenu={handleContextMenu}
         onCommitRename={async (noteId, newTitle) => {
@@ -1166,7 +1265,7 @@ function PopulatedList({
     ),
     [
       ctx,
-      openNote,
+      activateRow,
       handleContextMenu,
       fm.toggleFavorite,
       noteHighlightActive,
@@ -1225,8 +1324,112 @@ function PopulatedList({
     });
   }, [undoToast, ctx]);
 
+  // Bulk move (MYND-367): move the whole multi-selection to `folder` (or root)
+  // best-effort, then collapse the set. Reads `selectedIds` at call time (not
+  // inside the async closure) so a concurrent clear can't shrink the payload.
+  const runBulkMove = useCallback(
+    async (folder: string | null) => {
+      const ids = [...ctx.selectedIds];
+      setMoveTarget(null);
+      setMenu(null);
+      if (ids.length === 0) return;
+      try {
+        await ctx.bulkMoveWithSync(ids, folder);
+      } catch (err) {
+        // bulkMoveNotes never rejects (best-effort); guard defensively anyway.
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[NoteList] bulkMoveWithSync failed:", err);
+        }
+      }
+      ctx.clearMultiSelection();
+    },
+    [ctx],
+  );
+
+  // Bulk trash (MYND-367): soft-trash the whole multi-selection (reversible via
+  // the undo toast), then collapse the set. If the OPEN note is among the
+  // victims, move the editor to the first surviving nav row (or clear).
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...ctx.selectedIds];
+    setMenu(null);
+    if (ids.length === 0) return;
+    const victims = new Set(ids);
+    const openIsVictim =
+      ctx.selectedId !== null && victims.has(ctx.selectedId);
+    const survivor = openIsVictim
+      ? (navIds.find((nid) => !victims.has(nid)) ?? null)
+      : null;
+    try {
+      await ctx.bulkTrashWithSync(ids);
+      setBulkUndo(ids);
+      if (openIsVictim) {
+        if (survivor !== null) {
+          void ctx.open(survivor).catch(() => {
+            /* editor body load failure surfaces via its own UX */
+          });
+        } else {
+          ctx.select(null);
+        }
+      }
+    } catch (err) {
+      setTrashError("Couldn't move the notes to Trash.");
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[NoteList] bulkTrashWithSync failed:", err);
+      }
+    }
+    ctx.clearMultiSelection();
+  }, [ctx, navIds]);
+
+  // "Undo" on the bulk-trash toast → restore every just-trashed note.
+  const handleUndoBulk = useCallback(() => {
+    const ids = bulkUndo;
+    setBulkUndo(null);
+    if (ids === null) return;
+    void Promise.allSettled(
+      ids.map((id) => ctx.restoreWithRollback(id)),
+    ).catch(() => {});
+  }, [bulkUndo, ctx]);
+
+  // Bulk "Move N notes to…" submenu: Vault root + every folder (depth-indented).
+  // Folder path is the item id → addressable by `data-item-id` in E2E.
+  const moveMenuItems: ContextMenuItem[] = useMemo(
+    () => [
+      {
+        id: "__vault_root__",
+        label: "Vault root",
+        onSelect: () => void runBulkMove(null),
+      },
+      ...folderOptions.map((o) => ({
+        id: o.path,
+        label: o.label,
+        onSelect: () => void runBulkMove(o.path),
+      })),
+    ],
+    [folderOptions, runBulkMove],
+  );
+
   const menuItems: ContextMenuItem[] = useMemo(() => {
     if (menu === null) return [];
+    // Bulk mode: the right-clicked row is part of a multi-selection of >1 — the
+    // menu acts on the whole set, not the single row under the cursor (MYND-367).
+    const selCount = ctx.selectedIds.size;
+    if (selCount > 1 && ctx.selectedIds.has(menu.id)) {
+      return [
+        {
+          id: "bulk-move",
+          label: `Move ${selCount} notes to…`,
+          onSelect: () => setMoveTarget({ x: menu.x, y: menu.y }),
+        },
+        {
+          id: "bulk-delete",
+          label: `Delete ${selCount} notes`,
+          destructive: true,
+          onSelect: () => void handleBulkDelete(),
+        },
+      ];
+    }
     return [
       {
         id: "open-in-new-tab",
@@ -1303,7 +1506,7 @@ function PopulatedList({
         onSelect: () => void handleTrash(menu.id),
       },
     ];
-  }, [menu, ctx, handleTrash, fm, favSet, openNote, exportHooks]);
+  }, [menu, ctx, handleTrash, handleBulkDelete, fm, favSet, openNote, exportHooks]);
 
   // Folder context-menu items (right-click a folder row).
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -1355,7 +1558,6 @@ function PopulatedList({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "Delete" && e.key !== "Backspace") return;
-      if (ctx.selectedId === null) return;
       if (ctx.renamingId !== null) return; // don't trigger mid-rename
       // Skip when the event originated in an editable target — text
       // input, textarea, or contenteditable. Otherwise typing inside
@@ -1366,15 +1568,27 @@ function PopulatedList({
         if (tag === "INPUT" || tag === "TEXTAREA") return;
         if (target.isContentEditable) return;
       }
+      // A multi-selection takes priority — Delete trashes the whole set
+      // (MYND-367). Otherwise fall back to the single open note.
+      if (ctx.selectedIds.size > 0) {
+        e.preventDefault();
+        void handleBulkDelete();
+        return;
+      }
+      if (ctx.selectedId === null) return;
       e.preventDefault();
       void handleTrash(ctx.selectedId);
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [ctx.selectedId, ctx.renamingId, handleTrash]);
+  }, [ctx.selectedId, ctx.selectedIds, ctx.renamingId, handleTrash, handleBulkDelete]);
 
   return (
-    <div style={LIST_OUTER_STYLE} onContextMenu={handleBackgroundContextMenu}>
+    <div
+      style={LIST_OUTER_STYLE}
+      onContextMenu={handleBackgroundContextMenu}
+      onClick={handleBackgroundClick}
+    >
       {favRows.length > 0 && (
         <div
           style={{
@@ -1651,6 +1865,14 @@ function PopulatedList({
           onClose={closeMenu}
         />
       )}
+      {moveTarget !== null && (
+        <ContextMenu
+          x={moveTarget.x}
+          y={moveTarget.y}
+          items={moveMenuItems}
+          onClose={() => setMoveTarget(null)}
+        />
+      )}
       {fm.menu !== null && (
         <ContextMenu
           x={fm.menu.x}
@@ -1690,6 +1912,16 @@ function PopulatedList({
         onDone={() => setUndoToast(null)}
         durationMs={6000}
         action={{ label: "Undo", onAction: handleUndoTrash }}
+      />
+      <Toast
+        message={
+          bulkUndo === null
+            ? null
+            : `${bulkUndo.length} note${bulkUndo.length === 1 ? "" : "s"} moved to Trash`
+        }
+        onDone={() => setBulkUndo(null)}
+        durationMs={6000}
+        action={{ label: "Undo", onAction: handleUndoBulk }}
       />
       <Toast message={trashError} onDone={() => setTrashError(null)} />
     </div>
