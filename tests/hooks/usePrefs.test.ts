@@ -18,6 +18,7 @@ const setEditorTextSize = vi.fn();
 const setEditorLineSpacing = vi.fn();
 const setEditorContentWidth = vi.fn();
 const setEditorFontFamily = vi.fn();
+const setKeymapBinding = vi.fn();
 
 vi.mock("../../src/lib/prefs", () => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
@@ -28,6 +29,7 @@ vi.mock("../../src/lib/prefs", () => ({
   setEditorLineSpacing: (...a: unknown[]) => setEditorLineSpacing(...a),
   setEditorContentWidth: (...a: unknown[]) => setEditorContentWidth(...a),
   setEditorFontFamily: (...a: unknown[]) => setEditorFontFamily(...a),
+  setKeymapBinding: (...a: unknown[]) => setKeymapBinding(...a),
 }));
 
 import { usePrefs } from "../../src/hooks/usePrefs";
@@ -58,6 +60,7 @@ function view(over: Record<string, unknown> = {}) {
     folder_icons: {},
     hidden_bar_items: [],
     item_colors: {},
+    keymap: {},
     label: null,
     last_backup_at: null,
     spell_enabled: null,
@@ -78,6 +81,7 @@ beforeEach(() => {
     setEditorLineSpacing,
     setEditorContentWidth,
     setEditorFontFamily,
+    setKeymapBinding,
   ]) {
     s.mockReset().mockResolvedValue(undefined);
   }
@@ -156,6 +160,34 @@ describe("optimistic write success", () => {
     expect(setEditorFontFamily).toHaveBeenCalledWith(null);
     expect(result.current.prefs.editor_font_family).toBeNull();
   });
+
+  it("setKeymapBinding patches one command's entry optimistically (3-state)", async () => {
+    const { result } = renderHook(() => usePrefs());
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+
+    // Override: assigns the entry.
+    await act(async () => {
+      await result.current.setKeymapBinding("graph.show", ["Mod-Shift-g"]);
+    });
+    expect(setKeymapBinding).toHaveBeenCalledWith("graph.show", ["Mod-Shift-g"]);
+    expect(result.current.prefs.keymap["graph.show"]).toEqual(["Mod-Shift-g"]);
+
+    // Explicit-unbind: an empty array entry (distinct from absent).
+    await act(async () => {
+      await result.current.setKeymapBinding("vault.lock", []);
+    });
+    expect(result.current.prefs.keymap["vault.lock"]).toEqual([]);
+    // The earlier override is untouched (per-command patch, not a full replace).
+    expect(result.current.prefs.keymap["graph.show"]).toEqual(["Mod-Shift-g"]);
+
+    // Remove: null drops just that entry.
+    await act(async () => {
+      await result.current.setKeymapBinding("graph.show", null);
+    });
+    expect(setKeymapBinding).toHaveBeenLastCalledWith("graph.show", null);
+    expect("graph.show" in result.current.prefs.keymap).toBe(false);
+    expect(result.current.prefs.keymap["vault.lock"]).toEqual([]);
+  });
 });
 
 describe("optimistic write failure → re-read disk truth + onError", () => {
@@ -196,6 +228,26 @@ describe("optimistic write failure → re-read disk truth + onError", () => {
     // Re-read failed too → optimistic value is retained so the user can retry.
     expect(result.current.prefs.auto_lock_seconds).toBe(120);
     expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it("setKeymapBinding re-reads disk truth on persist failure", async () => {
+    const onError = vi.fn();
+    // Disk truth has no overrides.
+    prefsRead.mockResolvedValueOnce(view({ keymap: {} }));
+    const { result } = renderHook(() => usePrefs(onError));
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+
+    // Optimistic assign; persist rejects; post-error re-read returns disk truth
+    // (empty keymap). UI converges back to {} (not the optimistic override).
+    setKeymapBinding.mockRejectedValueOnce(new Error("Io"));
+    prefsRead.mockResolvedValueOnce(view({ keymap: {} }));
+
+    await act(async () => {
+      await result.current.setKeymapBinding("graph.show", ["Mod-Shift-g"]);
+    });
+
+    expect("graph.show" in result.current.prefs.keymap).toBe(false);
+    expect(onError).toHaveBeenCalledWith("Couldn't save preference — try again");
   });
 
   it("does NOT call onError on the happy path", async () => {

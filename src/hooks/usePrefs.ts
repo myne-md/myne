@@ -29,6 +29,7 @@ import {
   setEditorLineSpacing,
   setEditorTextSize,
   setHiddenBarItems as persistHiddenBarItems,
+  setKeymapBinding as persistKeymapBinding,
   setScreenCaptureProtection,
 } from "../lib/prefs";
 import { subscribePrefsNonce } from "../notes/prefsNonce";
@@ -58,6 +59,7 @@ const DEFAULT_PREFS: PrefsView = {
   folder_icons: {},
   hidden_bar_items: [],
   item_colors: {},
+  keymap: {},
   label: null,
   last_backup_at: null,
   spell_enabled: null,
@@ -101,6 +103,15 @@ interface UsePrefsResult {
   setEditorLineSpacing: (value: string | null) => Promise<void>;
   setEditorContentWidth: (value: string | null) => Promise<void>;
   setEditorFontFamily: (value: string | null) => Promise<void>;
+  /**
+   * Set / unbind / remove one command's keymap override (hotkeys epic, MYND-304).
+   * `chords` is a non-empty array (override), an empty array (`[]`, explicit
+   * unbind), or `null` (remove → revert to the in-code default). Optimistic: the
+   * cache's `keymap` updates immediately; on IPC rejection the cache re-reads disk
+   * truth and `onError` fires. The setter also bumps the prefs nonce on success so
+   * the live keybinding engine (its own `usePrefs`) reflects the change.
+   */
+  setKeymapBinding: (commandId: string, chords: string[] | null) => Promise<void>;
   /**
    * Re-read `vault.prefs` from disk into the cache (MYND-274). Used after a
    * mutation made through a SIBLING surface (e.g. a saved-view create/delete
@@ -256,6 +267,37 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [writeTypographyPref],
   );
 
+  const setKeymapBindingPref = useCallback(
+    async (commandId: string, chords: string[] | null) => {
+      // Optimistic via functional update: patch only the one command's entry on
+      // the cached keymap (3-state — null removes, else assign). Same
+      // convergence discipline as `setHiddenBarItems`. The backend canonicalizes
+      // (NFC + sort + dedupe); the nonce bump on success re-reads disk truth so
+      // the cache converges to the canonical form.
+      setPrefs((p) => {
+        const next = { ...p.keymap };
+        if (chords === null) {
+          delete next[commandId];
+        } else {
+          next[commandId] = chords;
+        }
+        return { ...p, keymap: next };
+      });
+      try {
+        await persistKeymapBinding(commandId, chords);
+      } catch {
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend tracing
+          // logged the original failure. User can retry.
+        }
+        onError?.("Couldn't save preference — try again");
+      }
+    },
+    [onError],
+  );
+
   const reload = useCallback(async () => {
     try {
       const view = await prefsRead();
@@ -281,6 +323,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setEditorLineSpacing: setEditorLineSpacingPref,
     setEditorContentWidth: setEditorContentWidthPref,
     setEditorFontFamily: setEditorFontFamilyPref,
+    setKeymapBinding: setKeymapBindingPref,
     reload,
   };
 }

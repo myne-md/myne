@@ -436,6 +436,32 @@ pub struct PrefsView {
     #[serde(default)]
     pub item_colors: BTreeMap<String, String>,
 
+    /// User keybinding **overrides** (hotkeys epic, MYND-304/366) — a map from a
+    /// command id (an existing frozen `COMMAND_ACTIONS` id, e.g. `graph.show`) to
+    /// the set of canonical chord strings the user bound to it. **Overrides only,
+    /// not the full keymap**: defaults live in code, so an entry exists here only
+    /// when the user changed a command's binding. Three states drive resolution
+    /// host-side (`effective = override ?? default`): key **absent** ≡ use the code
+    /// default; a **non-empty** array ≡ override to those chords; an **empty** array
+    /// (`[]`) ≡ the user explicitly removed all bindings (no shortcut) — a distinct,
+    /// meaningful state that is NOT omitted. The whole field is omitted only when the
+    /// MAP is empty, so a vault that never rebound a shortcut is byte-identical to a
+    /// pre-MYND-304 `vault.prefs` (existing golden vectors unaffected — migration-less
+    /// additive field on `MYP1`, the `item_colors` precedent class). A `BTreeMap` so
+    /// the canonical encoder emits keys in lexicographic order for free; keys + chord
+    /// values are NFC-normalized at encode time, and each command's chord array is
+    /// `set`-canonical (sorted + exact-deduped) since binding order does not affect
+    /// dispatch. Each chord is a Myne-canonical, CodeMirror-compatible string
+    /// (`Mod-Shift-g`, logical key, unresolved cross-platform `Mod`; spec § 9.5.2 +
+    /// the chord-grammar definition). An unknown command id or unparseable chord is
+    /// ignored host-side (fall back to default), never a codec parse failure.
+    /// **Non-load-bearing** (a tampered / replayed value can at worst rebind or drop a
+    /// shortcut; every command stays reachable via the palette) — no protective-envelope
+    /// clamp. Canonical key 'k' — sorts after `item_order` (`i` < `k`), before `label`
+    /// (`k` < `l`).
+    #[serde(default)]
+    pub keymap: BTreeMap<String, Vec<String>>,
+
     /// Human-readable per-vault label (MYND-205) — the name the in-app vault
     /// switcher shows for this vault. `None` ≡ no label set → the switcher
     /// shows a neutral fallback (`Vault N`). A **non-load-bearing** cosmetic
@@ -539,6 +565,7 @@ impl Default for PrefsView {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             favorites: Vec::new(),
             item_order: Vec::new(),
@@ -859,6 +886,20 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // keymap (canonical key 'k' — after 'item_order' [i < k], before 'label'
+    // [k < l]). User keybinding overrides (MYND-304): a nested string→array-of-
+    // strings object (command id → set of canonical chords). Keys + chords are
+    // NFC-normalized and each command's chord array is sorted + exact-deduped
+    // (set-canonical). An empty chord array (`[]`, explicit-unbind) is preserved
+    // verbatim; the whole field is omitted only when the MAP is empty so a vault
+    // that never rebound a shortcut is byte-identical to a pre-MYND-304
+    // vault.prefs (existing golden vectors unaffected).
+    if !prefs.keymap.is_empty() {
+        out.extend_from_slice(b"\"keymap\":");
+        push_canonical_keymap(&mut out, &prefs.keymap);
+        out.push(b',');
+    }
+
     // label (canonical key 'l' — after 'item_order' [i < l], before
     // 'screen_capture_protection' [l < s]). The per-vault display name (MYND-205);
     // omitted entirely when None so a vault that never set a label is
@@ -1030,6 +1071,34 @@ fn push_canonical_string_map(out: &mut Vec<u8>, map: &BTreeMap<String, String>) 
     out.push(b'}');
 }
 
+/// Append a canonical JSON object of string→string-array members (surrounding
+/// `{` / `}`, comma-joined `"key":["c1","c2"]` members) for the `keymap`
+/// override map (MYND-304). Keys are NFC-normalized and emitted in lexicographic
+/// KEY order (collecting into a fresh [`BTreeMap`] re-sorts by the normalized key
+/// and collapses any post-NFC duplicate keys last-wins). Each value array is
+/// `set`-canonical — its chord strings are NFC-normalized, sorted, and
+/// exact-deduped (binding order does not affect dispatch), via the shared
+/// [`canonical_folder_list`]. An EMPTY chord array is preserved as `[]`
+/// (the explicit-unbind state, distinct from an absent key) — it is NOT dropped.
+/// The caller omits the field entirely when the map is empty, so this never
+/// emits `{}`.
+fn push_canonical_keymap(out: &mut Vec<u8>, map: &BTreeMap<String, Vec<String>>) {
+    let normalized: BTreeMap<String, Vec<String>> = map
+        .iter()
+        .map(|(k, chords)| (k.nfc().collect::<String>(), canonical_folder_list(chords)))
+        .collect();
+    out.push(b'{');
+    for (i, (k, chords)) in normalized.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        push_json_string(out, k);
+        out.push(b':');
+        push_ordered_string_array(out, chords);
+    }
+    out.push(b'}');
+}
+
 // The canonical JSON string-escaper + decimal-integer encoders moved to the
 // shared `crate::canonical_json` module (single-homed for cross-implementation
 // byte-stability across the prefs + saved_view codecs). Imported at the top.
@@ -1134,6 +1203,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let hidden_bar_items = parse_optional_array_field(rest, &mut cursor, b"\"hidden_bar_items\":")?;
     let item_colors = parse_optional_string_map_field(rest, &mut cursor, b"\"item_colors\":")?;
     let item_order = parse_optional_array_field(rest, &mut cursor, b"\"item_order\":")?;
+    // keymap (key 'k') — user keybinding overrides (MYND-304), sitting between
+    // item_order (i) and label (l) in canonical order. A nested string→array-of-
+    // strings object parsed from the same monotonic cursor so a later field's key
+    // marker is never matched inside a chord value. Absent → empty map;
+    // present-but-malformed → PlaintextParseFailed (matching the string-map fields).
+    let keymap = parse_optional_string_array_map_field(rest, &mut cursor, b"\"keymap\":")?;
     // label (key 'l') — the per-vault display name (MYND-205), sitting between
     // item_order (i) and screen_capture_protection (s) in canonical order.
     // Parsed from the same monotonic cursor so a later field's key marker is
@@ -1215,6 +1290,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         daily_template,
         favorites,
         item_order,
+        keymap,
         editor_layout,
         editor_content_width,
         editor_font_family,
@@ -1540,6 +1616,69 @@ fn parse_json_string_map(bytes: &[u8]) -> Option<(BTreeMap<String, String>, usiz
     }
 }
 
+/// Parse the OPTIONAL `keymap` field (MYND-304) from the monotonic cursor.
+/// Absent → empty map; present-but-malformed → [`PrefsBlobError::PlaintextParseFailed`].
+/// Mirrors [`parse_optional_string_map_field`] but each value is a JSON string
+/// ARRAY (the command's chord set) rather than a string.
+fn parse_optional_string_array_map_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<BTreeMap<String, Vec<String>>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let obj_start = *cursor + rel_idx + marker.len();
+            let (map, consumed) = parse_json_string_array_map(&rest[obj_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = obj_start + consumed;
+            Ok(map)
+        }
+        None => Ok(BTreeMap::new()),
+    }
+}
+
+/// Parse a JSON object of string→string-array members starting at `bytes[0] == '{'`.
+/// Returns the decoded map + bytes consumed (through the closing `}`), or `None`
+/// on any malformation. Mirrors [`parse_json_string_map`] but each value is a
+/// `parse_json_string_array` (the `keymap` chord set, MYND-304); an empty array
+/// `[]` is a valid value (the explicit-unbind state). Duplicate keys collapse
+/// last-wins via `BTreeMap::insert` (canonical input never produces them).
+fn parse_json_string_array_map(bytes: &[u8]) -> Option<(BTreeMap<String, Vec<String>>, usize)> {
+    if bytes.first() != Some(&b'{') {
+        return None;
+    }
+    let mut i = 1;
+    let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    if bytes.get(i) == Some(&b'}') {
+        return Some((out, i + 1));
+    }
+    loop {
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (key, consumed) = parse_json_string(&bytes[i..])?;
+        i += consumed;
+        if bytes.get(i) != Some(&b':') {
+            return None;
+        }
+        i += 1;
+        if bytes.get(i) != Some(&b'[') {
+            return None;
+        }
+        let (value, consumed) = parse_json_string_array(&bytes[i..])?;
+        i += consumed;
+        out.insert(key, value);
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b'}') => return Some((out, i + 1)),
+            _ => return None,
+        }
+    }
+}
+
 /// Parse a leading run of ASCII decimal digits into a `u32`, returning
 /// `(value, digits_consumed)`. Rejects an empty run (no digit present)
 /// and overflow. It consumes ONLY digit bytes, so a fractional literal
@@ -1811,6 +1950,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -1844,6 +1984,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2000,6 +2141,7 @@ mod tests {
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
+                keymap: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -2035,6 +2177,7 @@ mod tests {
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
+                keymap: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -2161,6 +2304,114 @@ mod tests {
             encoded.as_slice(),
             br#"{"item_order":["n1"],"label":"Work","screen_capture_protection":true}"#,
         );
+    }
+
+    // ---- keymap (MYND-304 / 366) -------------------------------------------
+
+    fn keymap_of(pairs: &[(&str, &[&str])]) -> BTreeMap<String, Vec<String>> {
+        pairs
+            .iter()
+            .map(|(k, chords)| {
+                (
+                    alloc::string::String::from(*k),
+                    chords
+                        .iter()
+                        .map(|c| alloc::string::String::from(*c))
+                        .collect::<Vec<String>>(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn encode_places_keymap_between_item_order_and_label() {
+        // Canonical key order: item_order (i) < keymap (k) < label (l).
+        let encoded = canonical_json_encode(&PrefsView {
+            item_order: alloc::vec![alloc::string::String::from("n1")],
+            keymap: keymap_of(&[("graph.show", &["Mod-Shift-g"])]),
+            label: Some(alloc::string::String::from("Work")),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"item_order":["n1"],"keymap":{"graph.show":["Mod-Shift-g"]},"label":"Work","screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn keymap_omitted_when_empty() {
+        // An empty keymap produces NO key, so a vault that never rebound a
+        // shortcut is byte-identical to a pre-MYND-304 vault.prefs.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert!(find_subslice(&encoded, b"keymap").is_none());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn keymap_round_trips_with_multi_binding_and_unbind() {
+        // Three states in one value: an override (multi-binding), an
+        // explicit-unbind (`[]`), and an absent command (not in the map).
+        let original = PrefsView {
+            keymap: keymap_of(&[
+                ("app.command-palette", &["Mod-k", "Mod-p"]),
+                ("vault.lock", &[]),
+            ]),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.keymap, original.keymap);
+        // The empty array is preserved verbatim (explicit-unbind, NOT dropped).
+        assert_eq!(
+            decoded.keymap.get("vault.lock"),
+            Some(&Vec::<String>::new())
+        );
+        assert!(!decoded.keymap.contains_key("never.bound"));
+    }
+
+    #[test]
+    fn keymap_chord_array_is_set_canonical() {
+        // Chord arrays are NFC + sorted + exact-deduped (binding order does not
+        // affect dispatch), and keys are emitted in lexicographic order.
+        let encoded = canonical_json_encode(&PrefsView {
+            keymap: keymap_of(&[
+                ("z.cmd", &["Mod-z"]),
+                ("a.cmd", &["Mod-z", "Mod-a", "Mod-z"]),
+            ]),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"keymap":{"a.cmd":["Mod-a","Mod-z"],"z.cmd":["Mod-z"]},"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn keymap_empty_array_round_trips_distinct_from_absent() {
+        let encoded = canonical_json_encode(&PrefsView {
+            keymap: keymap_of(&[("vault.lock", &[])]),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"keymap":{"vault.lock":[]},"screen_capture_protection":true}"#,
+        );
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(
+            decoded.keymap.get("vault.lock"),
+            Some(&Vec::<String>::new())
+        );
+    }
+
+    #[test]
+    fn keymap_malformed_value_rejected() {
+        // A value that is not a JSON array (a bare string) is a structural
+        // malformation → PlaintextParseFailed (the chord set must be an array).
+        let plaintext = br#"{"keymap":{"a.cmd":"Mod-a"},"screen_capture_protection":true}"#;
+        assert!(matches!(
+            canonical_json_decode(plaintext),
+            Err(PrefsBlobError::PlaintextParseFailed)
+        ));
     }
 
     #[test]
@@ -2338,6 +2589,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(300),
             custom_theme: None,
@@ -2606,6 +2858,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2645,6 +2898,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2687,6 +2941,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2724,6 +2979,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2821,6 +3077,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -2882,6 +3139,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
@@ -2928,6 +3186,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
@@ -3006,6 +3265,7 @@ mod tests {
                 alloc::string::String::from("word-count"),
             ],
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(900),
@@ -3067,6 +3327,7 @@ mod tests {
                 alloc::string::String::from("graph"),
             ],
             item_colors: map_of(&[("Projects/", "red")]),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -3122,6 +3383,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -3159,6 +3421,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -3198,6 +3461,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -3305,6 +3569,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -3386,6 +3651,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: None,
@@ -3657,6 +3923,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -3698,6 +3965,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
@@ -4000,6 +4268,7 @@ mod tests {
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
+                keymap: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -4034,6 +4303,7 @@ mod tests {
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
+                keymap: Default::default(),
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
@@ -4070,6 +4340,7 @@ mod tests {
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: Default::default(),
+            keymap: Default::default(),
             theme: None,
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("Archive/2025/"),
@@ -4768,6 +5039,184 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write last_backup_at prefs vectors dump");
+    }
+
+    /// Generator for the MYND-304 `keymap` vector cases (hotkeys epic;
+    /// appended to the companion repo's `vault-prefs` family; per-feature-
+    /// generator pattern of [`emit_label_and_tolerance_prefs_vectors`], keeping
+    /// the original generators byte-stable). Emits a JSON **array fragment** of
+    /// 3 case objects at `/tmp/myne_vault_prefs_keymap_vectors.json`, spliced by
+    /// hand into the existing `cases` array.
+    ///
+    /// `cargo test -p protocol --lib emit_keymap_prefs_vectors -- --ignored`
+    ///
+    /// - `encrypt-keymap`: `item_order` + `keymap` + `label` set so the canonical
+    ///   bytes pin the key order item_order (i) < keymap (k) < label (l) < scp (s),
+    ///   the inner string→array object (command id → chord set), the set-canonical
+    ///   chord array (sorted + deduped), and the explicit-unbind state (`[]`,
+    ///   distinct from an absent command, preserved verbatim).
+    /// - `decrypt-keymap`: round-trip of the blob above.
+    /// - `parse-fail-keymap-value-not-array`: a validly-sealed envelope whose inner
+    ///   plaintext gives a `keymap` value as a bare string instead of an array;
+    ///   AEAD passes, the canonical-JSON parse rejects (`plaintext_parse_failed`).
+    ///   Sealed manually (the typed encoder can only emit canonical v0.1 plaintexts).
+    #[test]
+    #[ignore]
+    fn emit_keymap_prefs_vectors() {
+        extern crate std;
+        use crate::aead::{aad_prefs_blob, aead_seal_ctx, CTX_COMMITMENT_TAG_LEN};
+
+        // Same fixed vault-A inputs as the sibling generators; nonces 0xF4 / 0xF5
+        // are the next free entries in the family's nonce registry (0x77, 0x88,
+        // 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xF1, 0xF2, 0xF3 are taken).
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        // --- encrypt-keymap + decrypt-keymap -------------------------------
+        let nonce_keymap: [u8; AEAD_NONCE_LEN] = [0xF4; AEAD_NONCE_LEN];
+        let mut keymap = BTreeMap::new();
+        keymap.insert(
+            String::from("app.command-palette"),
+            alloc::vec![String::from("Mod-k"), String::from("Mod-p")],
+        );
+        keymap.insert(String::from("vault.lock"), Vec::new()); // explicit-unbind
+        let prefs_keymap = PrefsView {
+            item_order: alloc::vec![String::from("n1")],
+            keymap: keymap.clone(),
+            label: Some(String::from("Work")),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs_keymap);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"item_order":["n1"],"keymap":{"app.command-palette":["Mod-k","Mod-p"],"vault.lock":[]},"label":"Work","screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin i<k<l<s, set-canonical chords, and the []-unbind state",
+        );
+        let blob_keymap =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_keymap, &nonce_keymap)
+                .expect("encode keymap");
+        let decoded =
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_keymap).expect("decode");
+        assert_eq!(decoded, prefs_keymap, "keymap blob must round-trip exactly");
+        assert_eq!(
+            decoded.keymap.get("vault.lock"),
+            Some(&Vec::<String>::new()),
+            "explicit-unbind []  must survive round-trip",
+        );
+
+        // --- parse-fail-keymap-value-not-array -----------------------------
+        let nonce_bad: [u8; AEAD_NONCE_LEN] = [0xF5; AEAD_NONCE_LEN];
+        // keymap value is a bare string, not an array → structural parse reject.
+        let bad_plaintext: &[u8] =
+            br#"{"keymap":{"a.cmd":"Mod-a"},"screen_capture_protection":true}"#;
+        let aad = aad_prefs_blob(&account_hash_a);
+        let sealed =
+            aead_seal_ctx(&prefs_key_a, &nonce_bad, bad_plaintext, &aad).expect("seal bad");
+        debug_assert_eq!(sealed.len(), bad_plaintext.len() + CTX_COMMITMENT_TAG_LEN);
+        let mut blob_bad = Vec::with_capacity(PREFS_BLOB_HEADER_LEN + sealed.len());
+        blob_bad.extend_from_slice(&PREFS_BLOB_MAGIC);
+        blob_bad.push(PREFS_BLOB_PROTOCOL_VERSION);
+        blob_bad.push(PREFS_BLOB_RESERVED);
+        blob_bad.extend_from_slice(&nonce_bad);
+        blob_bad.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        blob_bad.extend_from_slice(&sealed);
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_bad).as_ref(),
+            Err(&PrefsBlobError::PlaintextParseFailed),
+            "a non-array keymap value must reject at the canonical-JSON parse stage",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/3: encrypt-keymap
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-keymap\",\n");
+        dump.push_str("      \"description\": \"MYND-304 keymap overrides. PrefsView carries item_order + keymap (a string->array object: command id -> chord set) + label, pinning the canonical key order item_order (i) < keymap (k) < label (l) < screen_capture_protection (s), the inner lexicographic key order (app.command-palette < vault.lock), the set-canonical chord array (sorted Mod-k < Mod-p), and the explicit-unbind state (vault.lock -> [], preserved verbatim and distinct from an absent command). Same vault-A inputs as the sibling cases; prefs_nonce=0xF4x24. Generated by emit_keymap_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_keymap)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_keymap)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/3: decrypt-keymap
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-keymap\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-keymap: the blob decodes back to a PrefsView carrying item_order + the keymap override map + label under the same root_key + account_number_hash. Verifies decoders surface the MYND-304 keymap from its canonical position between item_order and label, parse the inner string->array object, and preserve the []-unbind entry verbatim.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_keymap)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"item_order\": [\"n1\"],\n");
+        dump.push_str("        \"keymap\": { \"app.command-palette\": [\"Mod-k\", \"Mod-p\"], \"vault.lock\": [] },\n");
+        dump.push_str("        \"label\": \"Work\"\n");
+        dump.push_str("      }\n");
+        dump.push_str("    },\n");
+
+        // case 3/3: parse-fail-keymap-value-not-array
+        dump.push_str("    {\n");
+        dump.push_str(
+            "      \"vector_id\": \"vault-prefs/v0.1/parse-fail-keymap-value-not-array\",\n",
+        );
+        dump.push_str("      \"description\": \"A structurally valid envelope sealed under the REAL prefs_key + AAD whose inner plaintext gives a keymap value as a bare string (a.cmd -> \\\"Mod-a\\\") instead of an array. AEAD verification succeeds; the reject fires at the canonical-JSON parse stage (the chord set MUST be an array). Distinguishable plaintext_parse_failed, not a CannotDecrypt. Sealed manually (the typed encoder can only emit canonical v0.1 plaintexts); prefs_nonce=0xF5x24.\",\n");
+        dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_bad)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("      \"expected_error\": \"plaintext_parse_failed\",\n");
+        dump.push_str("      \"informational_tamper_description\": \"validly-sealed inner plaintext with a non-array keymap value (nonce 0xf5x24)\"\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write("/tmp/myne_vault_prefs_keymap_vectors.json", dump.as_bytes())
+            .expect("write vault-prefs keymap vectors dump");
     }
 
     /// Generator for the MYND-227 structural `parse_fail` vector cases
