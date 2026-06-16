@@ -138,6 +138,7 @@ pub fn parse_kdf_params(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 
@@ -276,5 +277,30 @@ mod tests {
                 "mutation at offset {offset} must produce different bytes"
             );
         }
+    }
+
+    #[test]
+    fn generate_root_key_returns_32_bytes() {
+        // The CSPRNG path must yield a full-width 32-byte key.
+        let key = generate_root_key().expect("CSPRNG must be available in tests");
+        assert_eq!(key.len(), 32);
+    }
+
+    #[test]
+    fn generate_root_key_is_not_all_zero() {
+        // A 32-byte all-zero output would indicate getrandom never wrote into
+        // the buffer (the `[0u8; 32]` init). The probability of a genuine
+        // all-zero draw is 2^-256, so this reliably catches a no-op CSPRNG.
+        let key = generate_root_key().expect("CSPRNG");
+        assert_ne!(*key, [0u8; 32]);
+    }
+
+    #[test]
+    fn generate_root_key_varies_between_calls() {
+        // Two independent draws must differ — proves the bytes come from the
+        // CSPRNG and are not a fixed buffer. Collision probability is 2^-256.
+        let a = generate_root_key().expect("CSPRNG");
+        let b = generate_root_key().expect("CSPRNG");
+        assert_ne!(*a, *b);
     }
 }

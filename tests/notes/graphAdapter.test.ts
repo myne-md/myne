@@ -14,6 +14,8 @@ import {
   buildGraphModel,
   inducedNeighborhood,
   isolatedModel,
+  loadNeighborhood,
+  loadSubgraphForNotes,
   loadWholeVaultGraph,
   subgraphModel,
   type GraphModel,
@@ -86,6 +88,38 @@ describe("buildGraphModel", () => {
   it("drops self-loops", () => {
     const g = buildGraphModel([["a", [edge("Alpha")]]], notes);
     expect(g.edges).toEqual([]);
+  });
+
+  it("skips a dumped source that is not in the live note-set (trashed)", () => {
+    // "z" was dumped (still in the Rust index) but isn't a live note — its
+    // outbound edges must contribute nothing (T3 trash exclusion at build).
+    const g = buildGraphModel(
+      [
+        ["z", [edge("Alpha")]], // z not live → skipped entirely
+        ["b", [edge("Alpha")]], // b live → b→a edge
+      ],
+      notes,
+    );
+    expect(g.edges).toEqual([{ source: "b", target: "a", weight: 1 }]);
+  });
+});
+
+describe("inducedNeighborhood direction=both", () => {
+  it("reaches both predecessors and successors in one hop", () => {
+    // p → seed → s : `both` from seed reaches p (in) and s (out).
+    const g = model(["p", "seed", "s", "x"], [
+      ["p", "seed"],
+      ["seed", "s"],
+    ]);
+    const n = inducedNeighborhood(g, "seed", 1, "both");
+    expect(n.nodes.map((x) => x.id).sort()).toEqual(["p", "s", "seed"]);
+  });
+
+  it("stops early when the frontier empties before reaching depth", () => {
+    const g = model(["a", "b"], [["a", "b"]]);
+    // depth 2 requested but b has no further out-edges → no over-reach/crash.
+    const n = inducedNeighborhood(g, "a", 2, "out");
+    expect(n.nodes.map((x) => x.id).sort()).toEqual(["a", "b"]);
   });
 });
 
@@ -169,5 +203,69 @@ describe("loadWholeVaultGraph (route-by-count, SYNC-11)", () => {
     const result = await loadWholeVaultGraph(notes, 10);
     expect(invokeMock).toHaveBeenCalledTimes(1);
     expect(result?.edges).toEqual([{ source: "a", target: "b", weight: 1 }]);
+  });
+});
+
+describe("loadSubgraphForNotes (per-note forward, within-subset only)", () => {
+  const notes = [note("a", "Alpha"), note("b", "Beta"), note("c", "Gamma")];
+
+  it("keeps only edges whose target is inside the subset", async () => {
+    // forward(a) → Beta (in subset) + Gamma (NOT in subset, dropped).
+    // forward(b) → Alpha (in subset).
+    invokeMock.mockImplementation((cmd: string, args: { noteId: string }) => {
+      if (cmd === "plugin:vault-indices|vault_indices_forward") {
+        if (args.noteId === "a") return Promise.resolve([edge("Beta"), edge("Gamma")]);
+        if (args.noteId === "b") return Promise.resolve([edge("Alpha")]);
+      }
+      return Promise.resolve([]);
+    });
+    const g = await loadSubgraphForNotes(["a", "b"], notes);
+    expect(g.nodes.map((n) => n.id).sort()).toEqual(["a", "b"]);
+    const pairs = g.edges.map((e) => `${e.source}->${e.target}`).sort();
+    // a→b kept; a→c dropped (c not in subset); b→a kept.
+    expect(pairs).toEqual(["a->b", "b->a"]);
+  });
+
+  it("collapses duplicate occurrences into one weighted edge", async () => {
+    invokeMock.mockImplementation((cmd: string, args: { noteId: string }) => {
+      if (cmd === "plugin:vault-indices|vault_indices_forward" && args.noteId === "a") {
+        return Promise.resolve([edge("Beta"), edge("Beta")]);
+      }
+      return Promise.resolve([]);
+    });
+    const g = await loadSubgraphForNotes(["a", "b"], notes);
+    expect(g.edges).toEqual([{ source: "a", target: "b", weight: 2 }]);
+  });
+});
+
+describe("loadNeighborhood (BFS via forward+backlinks, induced)", () => {
+  const notes = [note("seed", "Seed"), note("out1", "Out1"), note("in1", "In1")];
+
+  it("direction=out follows forward() only", async () => {
+    invokeMock.mockImplementation((cmd: string, args: { noteId: string }) => {
+      if (cmd === "plugin:vault-indices|vault_indices_forward") {
+        return Promise.resolve(args.noteId === "seed" ? [edge("Out1")] : []);
+      }
+      return Promise.resolve([]);
+    });
+    const g = await loadNeighborhood("seed", 1, "out", notes);
+    expect(g.nodes.map((n) => n.id).sort()).toEqual(["out1", "seed"]);
+  });
+
+  it("direction=both merges a forward successor and a backlink predecessor", async () => {
+    invokeMock.mockImplementation((cmd: string, args: Record<string, unknown>) => {
+      if (cmd === "plugin:vault-indices|vault_indices_forward") {
+        return Promise.resolve(args.noteId === "seed" ? [edge("Out1")] : []);
+      }
+      if (cmd === "plugin:vault-indices|vault_indices_backlink_candidates") {
+        // in1 → Seed: a candidate that resolves to seed when queried for seed.
+        return args.titleKey === foldSegment("Seed")
+          ? Promise.resolve([{ source: "in1", edge: edge("Seed") }])
+          : Promise.resolve([]);
+      }
+      return Promise.resolve([]);
+    });
+    const g = await loadNeighborhood("seed", 1, "both", notes);
+    expect(g.nodes.map((n) => n.id).sort()).toEqual(["in1", "out1", "seed"]);
   });
 });

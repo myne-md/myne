@@ -90,7 +90,7 @@ export function removeFileCard(
 ): void {
   const span = attachmentEmbedRangeAt(view.state, view.posAtDOM(cardEl), id);
   if (span === null) return;
-  view.dispatch({ ...span, userEvent: "delete.attachment-embed" });
+  view.dispatch({ changes: span, userEvent: "delete.attachment-embed" });
 }
 
 /** Fire the reveal-in-library event; `Editor.tsx` (a `window` listener) opens

@@ -215,6 +215,7 @@ pub(crate) fn derive_with_context(root_key: &[u8; 32], info: &[u8]) -> Zeroizing
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

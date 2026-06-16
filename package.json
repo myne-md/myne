@@ -13,8 +13,9 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "capture:userguide": "vitest run --config vitest.capture.config.ts",
-    "coverage:rust": "cargo llvm-cov -p protocol --html",
-    "coverage:rust:all": "pnpm build && cargo llvm-cov --workspace --html"
+    "coverage:rust": "cargo +nightly llvm-cov -p protocol --tests --html",
+    "coverage:rust:summary": "cargo +nightly llvm-cov -p protocol --tests --summary-only",
+    "coverage:rust:all": "pnpm build && cargo +nightly llvm-cov --workspace --tests --html"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

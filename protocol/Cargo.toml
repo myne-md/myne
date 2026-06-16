@@ -24,3 +24,10 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+[lints.rust]
+# `cargo-llvm-cov` sets these cfgs when instrumenting; `coverage_nightly`
+# gates the `#[coverage(off)]` opt-out on the inline `#[cfg(test)]` modules
+# (see lib.rs). Register them so they are not flagged as unexpected cfgs
+# under `clippy -D warnings`.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }

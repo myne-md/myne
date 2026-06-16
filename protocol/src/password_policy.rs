@@ -72,6 +72,7 @@ pub fn validate_min_length(password: &str) -> Result<(), ProtocolError> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

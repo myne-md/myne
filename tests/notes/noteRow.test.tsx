@@ -1,0 +1,296 @@
+// @vitest-environment jsdom
+//
+// `<NoteRow>` render + interaction tests. The row branches on: title present /
+// null (Untitled italic) / load error (warning dot), the relative-time subtitle
+// (shown vs hidden + UUIDv7-derived fallback date), selection + hover styling,
+// the favorites star (filled badge vs interactive hollow toggle vs hidden during
+// rename), and the click matrix (plain / Cmd / Ctrl / Alt / middle / dbl-click /
+// right-click). Inline-rename mode swaps the title for an auto-focused input with
+// Enter/Esc/blur commit semantics. Pure component — no IPC.
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { NoteRow, type NoteRowProps } from "../../src/notes/components/NoteRow";
+import type { TitleRecord } from "../../src/notes/loadNoteBatch";
+
+afterEach(cleanup);
+
+function rec(over: Partial<TitleRecord> = {}): TitleRecord {
+  return {
+    noteUuid: "note-1",
+    title: "Hello",
+    folder: null,
+    updatedAt: new Date("2026-06-16T12:00:00.000Z"),
+    trashed: null,
+    template: false,
+    ...over,
+  };
+}
+
+function renderRow(over: Partial<NoteRowProps> = {}) {
+  const props: NoteRowProps = {
+    record: rec(),
+    selected: false,
+    renaming: false,
+    onSelect: vi.fn(),
+    onStartRename: vi.fn(),
+    onContextMenu: vi.fn(),
+    onCommitRename: vi.fn(),
+    onCancelRename: vi.fn(),
+    ...over,
+  };
+  return { props, ...render(<NoteRow {...props} />) };
+}
+
+describe("NoteRow — title rendering branches", () => {
+  it("renders a real title", () => {
+    renderRow({ record: rec({ title: "My Note" }) });
+    expect(screen.getByTestId("notes.row").textContent).toContain("My Note");
+  });
+
+  it("null title → italic 'Untitled' placeholder", () => {
+    renderRow({ record: rec({ title: null }) });
+    const row = screen.getByTestId("notes.row");
+    expect(row.textContent).toContain("Untitled");
+    // The italic style marks the placeholder branch.
+    const titleDiv = row.querySelector("div > div");
+    expect(titleDiv).toBeTruthy();
+  });
+
+  it("load error → 'Untitled' + warning indicator + hover title", () => {
+    const { container } = renderRow({
+      record: rec({ title: null, error: "CannotDecrypt" }),
+    });
+    expect(screen.getByTestId("notes.row").textContent).toContain("Untitled");
+    // The error branch renders a leading warning dot (aria-hidden span) + a
+    // "Couldn't load this note" title attribute. Both distinguish it from the
+    // plain null-title placeholder.
+    expect(
+      container.querySelector('[title="Couldn\'t load this note"]'),
+    ).toBeTruthy();
+  });
+
+  it("renders the color dot when a colorSlot is provided", () => {
+    const { container } = renderRow({ colorSlot: "rose" });
+    expect(container.querySelector('[data-color-slot="rose"]')).toBeTruthy();
+  });
+
+  it("renders no color dot when colorSlot is omitted", () => {
+    const { container } = renderRow();
+    expect(container.querySelector("[data-color-slot]")).toBeNull();
+  });
+});
+
+describe("NoteRow — subtitle / timestamps", () => {
+  it("renders the relative-time subtitle from updatedAt by default", () => {
+    renderRow({ record: rec({ updatedAt: new Date() }) });
+    const sub = screen.getByTestId("notes.row-subtitle");
+    expect(sub.textContent).toBe("just now");
+  });
+
+  it("omits the subtitle div entirely when showTimestamps is false", () => {
+    renderRow({ record: rec(), showTimestamps: false });
+    expect(screen.queryByTestId("notes.row-subtitle")).toBeNull();
+  });
+
+  it("falls back to the UUIDv7-derived date when updatedAt is null", () => {
+    // A valid UUIDv7 whose first 48 bits decode to a real ms timestamp.
+    const uuidv7 = "01890000-0000-7000-8000-000000000000";
+    renderRow({
+      record: rec({ noteUuid: uuidv7, updatedAt: null }),
+    });
+    // A non-empty subtitle proves the UUIDv7 fallback produced a date (an
+    // absolute yyyy-mm-dd for this old timestamp).
+    expect(screen.getByTestId("notes.row-subtitle").textContent).not.toBe("");
+  });
+
+  it("empty subtitle when updatedAt is null and the id is not UUIDv7-shaped", () => {
+    renderRow({ record: rec({ noteUuid: "not-a-uuid", updatedAt: null }) });
+    expect(screen.getByTestId("notes.row-subtitle").textContent).toBe("");
+  });
+});
+
+describe("NoteRow — selection + aria", () => {
+  it("reflects selection via aria-selected", () => {
+    renderRow({ selected: true });
+    expect(screen.getByTestId("notes.row").getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
+
+  it("carries the note id on the row", () => {
+    renderRow({ record: rec({ noteUuid: "abc" }) });
+    expect(screen.getByTestId("notes.row").getAttribute("data-note-id")).toBe(
+      "abc",
+    );
+  });
+});
+
+describe("NoteRow — click matrix", () => {
+  it("plain click → onSelect with no flags", () => {
+    const onSelect = vi.fn();
+    renderRow({ onSelect });
+    fireEvent.click(screen.getByTestId("notes.row"));
+    expect(onSelect).toHaveBeenCalledWith("note-1", {
+      newTab: false,
+      toSide: false,
+    });
+  });
+
+  it("Cmd / Ctrl click → newTab", () => {
+    const onSelect = vi.fn();
+    renderRow({ onSelect });
+    fireEvent.click(screen.getByTestId("notes.row"), { metaKey: true });
+    expect(onSelect).toHaveBeenLastCalledWith("note-1", {
+      newTab: true,
+      toSide: false,
+    });
+    fireEvent.click(screen.getByTestId("notes.row"), { ctrlKey: true });
+    expect(onSelect).toHaveBeenLastCalledWith("note-1", {
+      newTab: true,
+      toSide: false,
+    });
+  });
+
+  it("Alt click → toSide", () => {
+    const onSelect = vi.fn();
+    renderRow({ onSelect });
+    fireEvent.click(screen.getByTestId("notes.row"), { altKey: true });
+    expect(onSelect).toHaveBeenCalledWith("note-1", {
+      newTab: false,
+      toSide: true,
+    });
+  });
+
+  it("middle click (aux button 1) → newTab", () => {
+    const onSelect = vi.fn();
+    renderRow({ onSelect });
+    fireEvent(
+      screen.getByTestId("notes.row"),
+      new MouseEvent("auxclick", { button: 1, bubbles: true, cancelable: true }),
+    );
+    expect(onSelect).toHaveBeenCalledWith("note-1", { newTab: true });
+  });
+
+  it("aux click on a non-middle button is ignored", () => {
+    const onSelect = vi.fn();
+    renderRow({ onSelect });
+    fireEvent(
+      screen.getByTestId("notes.row"),
+      new MouseEvent("auxclick", { button: 2, bubbles: true, cancelable: true }),
+    );
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("double-click → onStartRename", () => {
+    const onStartRename = vi.fn();
+    renderRow({ onStartRename });
+    fireEvent.doubleClick(screen.getByTestId("notes.row"));
+    expect(onStartRename).toHaveBeenCalledWith("note-1");
+  });
+
+  it("right-click → onContextMenu with the cursor position", () => {
+    const onContextMenu = vi.fn();
+    renderRow({ onContextMenu });
+    fireEvent.contextMenu(screen.getByTestId("notes.row"), {
+      clientX: 40,
+      clientY: 80,
+    });
+    expect(onContextMenu).toHaveBeenCalledWith("note-1", { x: 40, y: 80 });
+  });
+});
+
+describe("NoteRow — favorites star", () => {
+  it("favorited + toggle wired → filled interactive button labelled 'Remove'", () => {
+    const onToggleFavorite = vi.fn();
+    renderRow({ favorited: true, onToggleFavorite });
+    const btn = screen.getByRole("button", { name: "Remove from favorites" });
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(onToggleFavorite).toHaveBeenCalledWith("note-1");
+  });
+
+  it("star click stops propagation (does not trigger row onSelect)", () => {
+    const onSelect = vi.fn();
+    const onToggleFavorite = vi.fn();
+    renderRow({ favorited: true, onToggleFavorite, onSelect });
+    fireEvent.click(screen.getByRole("button", { name: "Remove from favorites" }));
+    expect(onToggleFavorite).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("favorited without a toggle handler → non-interactive badge (no toggle button)", () => {
+    renderRow({ favorited: true });
+    // The interactive star button is keyed by its favorites aria-label; the
+    // render-only badge is an aria-hidden span, so no such button exists.
+    expect(screen.queryByLabelText(/favorites/i)).toBeNull();
+  });
+
+  it("not favorited + toggle wired → star hidden until hover, 'Add' on hover", () => {
+    const onToggleFavorite = vi.fn();
+    renderRow({ favorited: false, onToggleFavorite });
+    // No hover → no star button.
+    expect(screen.queryByLabelText(/favorites/i)).toBeNull();
+    fireEvent.mouseEnter(screen.getByTestId("notes.row"));
+    expect(screen.getByLabelText("Add to favorites")).toBeTruthy();
+    fireEvent.mouseLeave(screen.getByTestId("notes.row"));
+    expect(screen.queryByLabelText(/favorites/i)).toBeNull();
+  });
+
+  it("renaming hides the star even when favorited", () => {
+    renderRow({ favorited: true, onToggleFavorite: vi.fn(), renaming: true });
+    expect(screen.queryByLabelText(/favorites/i)).toBeNull();
+  });
+});
+
+describe("NoteRow — inline rename mode", () => {
+  it("replaces the title with an auto-focused, all-selected input", () => {
+    renderRow({ record: rec({ title: "Original" }), renaming: true });
+    const input = screen.getByTestId("notes.rename-input") as HTMLInputElement;
+    expect(input.value).toBe("Original");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("Enter commits the whitespace-trimmed value", () => {
+    const onCommitRename = vi.fn();
+    renderRow({ renaming: true, onCommitRename });
+    const input = screen.getByTestId("notes.rename-input");
+    fireEvent.change(input, { target: { value: "  new title  " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onCommitRename).toHaveBeenCalledWith("note-1", "new title");
+  });
+
+  it("Enter on an empty/whitespace value cancels instead of committing", () => {
+    const onCommitRename = vi.fn();
+    const onCancelRename = vi.fn();
+    renderRow({ renaming: true, onCommitRename, onCancelRename });
+    const input = screen.getByTestId("notes.rename-input");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onCommitRename).not.toHaveBeenCalled();
+    expect(onCancelRename).toHaveBeenCalledTimes(1);
+  });
+
+  it("Escape cancels", () => {
+    const onCancelRename = vi.fn();
+    const onCommitRename = vi.fn();
+    renderRow({ renaming: true, onCancelRename, onCommitRename });
+    fireEvent.keyDown(screen.getByTestId("notes.rename-input"), {
+      key: "Escape",
+    });
+    expect(onCancelRename).toHaveBeenCalledTimes(1);
+    expect(onCommitRename).not.toHaveBeenCalled();
+  });
+
+  it("blur commits, and commit is idempotent (Enter then blur fires once)", () => {
+    const onCommitRename = vi.fn();
+    renderRow({ renaming: true, onCommitRename });
+    const input = screen.getByTestId("notes.rename-input");
+    fireEvent.change(input, { target: { value: "Renamed" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.blur(input);
+    // committedRef guards against the double-fire.
+    expect(onCommitRename).toHaveBeenCalledTimes(1);
+    expect(onCommitRename).toHaveBeenCalledWith("note-1", "Renamed");
+  });
+});

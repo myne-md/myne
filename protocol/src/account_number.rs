@@ -385,6 +385,7 @@ fn sha256_first_16(canonical: &[u8; CANONICAL_LEN]) -> [u8; ACCOUNT_NUMBER_HASH_
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

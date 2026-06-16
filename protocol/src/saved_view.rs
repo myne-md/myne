@@ -848,6 +848,7 @@ fn property_op_from_str(s: &str) -> Result<PropertyOp, SavedViewParseError> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use alloc::vec;
@@ -1122,5 +1123,498 @@ mod tests {
             serde_json::to_string(&tag).unwrap(),
             "{\"kind\":\"hasTag\",\"tag\":\"x\"}"
         );
+    }
+
+    // ---- parse_saved_views_array (the prefs-embedding entry point) ----
+
+    #[test]
+    fn parse_saved_views_array_round_trips_and_reports_consumed_len() {
+        let a = sample();
+        let b = SavedView {
+            id: "v0".into(), // sorts before "v1"
+            name: "Other".into(),
+            view_type: ViewType::List,
+            filters: FilterNode::All,
+            sort: None,
+            group_by: None,
+            columns: Vec::new(),
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+        };
+        let bytes = canonical_encode_saved_views(&[a.clone(), b.clone()]);
+        let (views, consumed) = parse_saved_views_array(&bytes).unwrap();
+        // Encoded sorted by id: v0 before v1.
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].id, "v0");
+        assert_eq!(views[1], a);
+        // The cursor consumed exactly the array bytes (prefs decoder relies
+        // on this to advance past the embedded array).
+        assert_eq!(consumed, bytes.len());
+    }
+
+    #[test]
+    fn parse_saved_views_array_rejects_non_array_top_level() {
+        // A top-level object where an array is required → WrongType (line 340).
+        let bad =
+            b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            parse_saved_views_array(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn parse_saved_views_array_consumes_only_the_array_when_trailing_present() {
+        // The array entry point is NOT strict-on-trailing (the prefs decoder
+        // continues past it), so trailing bytes are left for the caller and
+        // reflected in `consumed`.
+        let bytes = canonical_encode_saved_views(&[sample()]);
+        let mut with_trailing = bytes.clone();
+        with_trailing.extend_from_slice(b",\"x\"");
+        let (views, consumed) = parse_saved_views_array(&with_trailing).unwrap();
+        assert_eq!(views.len(), 1);
+        assert_eq!(consumed, bytes.len());
+    }
+
+    // ---- whitespace tolerance on decode (skip_ws) ----
+
+    #[test]
+    fn decode_tolerates_insignificant_whitespace() {
+        // The decoder accepts pretty-printed JSON (skip_ws across object,
+        // array, and value positions) even though the encoder never emits it.
+        let pretty = b"  {\n  \"filters\" : { \"kind\" : \"all\" } ,\n  \"id\" : \"x\" ,\n  \"name\" : \"n\" ,\n  \"view_type\" : \"table\"\n}  ";
+        let decoded = canonical_decode_saved_view(pretty).expect("decode with whitespace");
+        assert_eq!(decoded.id, "x");
+        assert_eq!(decoded.view_type, ViewType::Table);
+    }
+
+    #[test]
+    fn decode_tolerates_whitespace_in_arrays() {
+        // skip_ws inside parse_array's element/terminator scan.
+        let pretty =
+            b"{\"columns\":[ \"a\" , \"b\" ],\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        let decoded = canonical_decode_saved_view(pretty).expect("decode array ws");
+        assert_eq!(decoded.columns, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    // ---- string-escape decode branches (parse_string / parse_hex4) ----
+
+    #[test]
+    fn decode_parses_all_string_escapes() {
+        // \" \\ \/ \b \f \n \r \t plus a \u escape — every parse_string arm.
+        let bad = br#"{"filters":{"kind":"all"},"id":"x","name":"\"\\\/\b\f\n\r\tA","view_type":"table"}"#;
+        let decoded = canonical_decode_saved_view(bad).expect("decode escapes");
+        assert_eq!(decoded.name, "\"\\/\u{08}\u{0c}\n\r\tA");
+    }
+
+    #[test]
+    fn decode_parses_uppercase_unicode_escape() {
+        // parse_hex4 accepts A-F (line 642). é → 'é'.
+        let pt = br#"{"filters":{"kind":"all"},"id":"x","name":"\u00E9","view_type":"table"}"#;
+        let decoded = canonical_decode_saved_view(pt).expect("decode uppercase hex");
+        assert_eq!(decoded.name, "\u{00e9}");
+    }
+
+    #[test]
+    fn decode_rejects_unknown_string_escape() {
+        let bad = br#"{"filters":{"kind":"all"},"id":"x","name":"\q","view_type":"table"}"#;
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_non_hex_unicode_escape() {
+        // parse_hex4's non-hex arm (line 643).
+        let bad = br#"{"filters":{"kind":"all"},"id":"x","name":"\uZZZZ","view_type":"table"}"#;
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_surrogate_unicode_escape() {
+        // \ud800 is a lone surrogate → char::from_u32 None (line 621).
+        let bad = br#"{"filters":{"kind":"all"},"id":"x","name":"\ud800","view_type":"table"}"#;
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_unterminated_string() {
+        // EOF inside a string → parse_string's `ok_or` (line 602).
+        let bad = br#"{"filters":{"kind":"all"},"id":"x","name":"unterminated"#;
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    // ---- number-parse branches (parse_number) ----
+
+    #[test]
+    fn decode_rejects_lone_minus_sign() {
+        // `-` with no digits → digit_start == i (line 659).
+        let bad = b"{\"card_size\":-,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_exponent_notation() {
+        // `1e3` carries an exponent marker → float ban (line 663).
+        let bad = b"{\"card_size\":1e3,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_negative_card_size() {
+        // A negative integer parses as JsonValue::Int(-1) but card_size's
+        // range check (n >= 0) rejects it as WrongType (line 745).
+        let bad = b"{\"card_size\":-1,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_card_size_above_u32_max() {
+        // i64 value above u32::MAX fails the upper range bound (line 744).
+        let bad = b"{\"card_size\":4294967296,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_accepts_negative_integer_in_unknown_field() {
+        // A negative integer in an ignored future field parses (exercises the
+        // `-` branch of parse_number) and is then dropped.
+        let pt = b"{\"filters\":{\"kind\":\"all\"},\"future\":-42,\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        let decoded = canonical_decode_saved_view(pt).expect("decode negative unknown");
+        assert_eq!(decoded.id, "x");
+    }
+
+    // ---- bool / null literal branches ----
+
+    #[test]
+    fn decode_tolerates_bool_and_null_in_unknown_fields() {
+        // true / false / null all reach parse_bool / parse_null and are
+        // accepted-but-dropped as unknown future keys.
+        let pt = b"{\"a\":true,\"b\":false,\"c\":null,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        let decoded = canonical_decode_saved_view(pt).expect("decode bool/null");
+        assert_eq!(decoded.id, "x");
+    }
+
+    #[test]
+    fn decode_rejects_malformed_bool_literal() {
+        // `tru` is not `true` → parse_bool's else arm (line 680).
+        let bad = b"{\"a\":tru,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_malformed_null_literal() {
+        // `nul` is not `null` → parse_null's else arm (line 689).
+        let bad = b"{\"a\":nul,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_bare_garbage_value() {
+        // A value starting with an unrecognized byte → parse_value's catch-all
+        // (line 522).
+        let bad = b"{\"a\":@,\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    // ---- structural-separator rejects ----
+
+    #[test]
+    fn decode_rejects_missing_colon_after_key() {
+        let bad = b"{\"id\" \"x\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_non_string_object_key() {
+        // An object key that isn't a string (line 547).
+        let bad = b"{1:\"x\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_bad_object_terminator() {
+        // After a member, neither `,` nor `}` (line 564).
+        let bad = b"{\"id\":\"x\" \"name\":\"n\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_bad_array_terminator() {
+        // Inside columns, elements not comma/bracket-separated (line 591).
+        let bad =
+            b"{\"columns\":[\"a\" \"b\"],\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    #[test]
+    fn decode_accepts_empty_array_columns() {
+        // The `[]` fast path in parse_array (line 577) — an empty columns
+        // array decodes to an empty Vec.
+        let pt =
+            b"{\"columns\":[],\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        let decoded = canonical_decode_saved_view(pt).expect("decode empty array");
+        assert!(decoded.columns.is_empty());
+    }
+
+    #[test]
+    fn decode_rejects_empty_input() {
+        // No value at all → parse_value sees None (line 522).
+        assert_eq!(
+            canonical_decode_saved_view(b""),
+            Err(SavedViewParseError::Malformed)
+        );
+    }
+
+    // ---- typed-decode WrongType / Unrepresentable / MissingField paths ----
+
+    #[test]
+    fn decode_rejects_non_object_top_level() {
+        // A top-level array where a view object is required → as_object
+        // WrongType (line 701).
+        assert_eq!(
+            canonical_decode_saved_view(b"[]"),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_non_string_name() {
+        // `name` present but an integer → as_str WrongType (line 708).
+        let bad =
+            b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":5,\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_columns_not_array() {
+        // `columns` present but a string → WrongType (line 754).
+        let bad =
+            b"{\"columns\":\"nope\",\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_columns_with_non_string_element() {
+        // A non-string column element → as_str WrongType inside the map.
+        let bad =
+            b"{\"columns\":[1],\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_unknown_sort_direction() {
+        // sort.direction outside {asc,desc} → Unrepresentable (line 782).
+        let bad = b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"sort\":{\"direction\":\"sideways\",\"key\":\"k\"},\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Unrepresentable)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_sort_missing_key() {
+        // sort object without `key` → MissingField via req_string.
+        let bad = b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"sort\":{\"direction\":\"asc\"},\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::MissingField)
+        );
+    }
+
+    #[test]
+    fn sort_round_trips_through_encode_decode() {
+        // Drive encode_sort_into (line 355) + sort_from_json together.
+        let v = SavedView {
+            id: "s".into(),
+            name: "Sorted".into(),
+            view_type: ViewType::Table,
+            filters: FilterNode::All,
+            sort: Some(ViewSort {
+                key: "created".into(),
+                direction: SortDirection::Asc,
+            }),
+            group_by: None,
+            columns: Vec::new(),
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+        };
+        let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
+        assert_eq!(decoded.sort, v.sort);
+    }
+
+    #[test]
+    fn decode_rejects_unknown_property_op() {
+        // A property leaf with an operator outside the allow-list →
+        // Unrepresentable via property_op_from_str (line 846).
+        let bad = b"{\"filters\":{\"key\":\"k\",\"kind\":\"property\",\"op\":\"~=\",\"value\":\"v\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::Unrepresentable)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_filter_children_not_array() {
+        // `and` whose `children` is not an array → filter_children WrongType
+        // (line 833).
+        let bad = b"{\"filters\":{\"children\":\"nope\",\"kind\":\"and\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_property_missing_op() {
+        // property leaf missing `op` → MissingField.
+        let bad = b"{\"filters\":{\"key\":\"k\",\"kind\":\"property\",\"value\":\"v\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::MissingField)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_filter_node_not_object() {
+        // A filter node that is a string, not an object → as_object WrongType.
+        let bad = b"{\"filters\":\"all\",\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn decode_rejects_filter_missing_kind() {
+        // A filter object with no `kind` → MissingField via req.
+        let bad =
+            b"{\"filters\":{\"tag\":\"x\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}";
+        assert_eq!(
+            canonical_decode_saved_view(bad),
+            Err(SavedViewParseError::MissingField)
+        );
+    }
+
+    // ---- recursion-depth guard ----
+
+    #[test]
+    fn decode_rejects_overdeep_filter_nesting() {
+        // Build a `not` chain deeper than MAX_JSON_DEPTH. The JSON-tree depth
+        // guard (parse_object enter) fires first — either way the result is a
+        // rejected, not a stack overflow.
+        let mut inner = String::from("{\"kind\":\"all\"}");
+        for _ in 0..(MAX_JSON_DEPTH + 5) {
+            inner = alloc::format!("{{\"child\":{inner},\"kind\":\"not\"}}");
+        }
+        let blob = alloc::format!(
+            "{{\"filters\":{inner},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}}"
+        );
+        assert!(canonical_decode_saved_view(blob.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn decode_accepts_moderately_nested_filter() {
+        // A `not` nesting well under the depth cap must still decode — guards
+        // against an off-by-one that would reject legal views.
+        let mut node = FilterNode::All;
+        for _ in 0..8 {
+            node = FilterNode::Not {
+                child: Box::new(node),
+            };
+        }
+        let v = SavedView {
+            id: "deep".into(),
+            name: "Deep".into(),
+            view_type: ViewType::Table,
+            filters: node.clone(),
+            sort: None,
+            group_by: None,
+            columns: Vec::new(),
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+        };
+        let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
+        assert_eq!(decoded.filters, node);
+    }
+
+    // ---- multi-view array encode is sorted + byte-stable ----
+
+    #[test]
+    fn encode_saved_views_array_is_sorted_by_id() {
+        let mk = |id: &str| SavedView {
+            id: id.into(),
+            name: "n".into(),
+            view_type: ViewType::Table,
+            filters: FilterNode::All,
+            sort: None,
+            group_by: None,
+            columns: Vec::new(),
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+        };
+        let forward = canonical_encode_saved_views(&[mk("a"), mk("b"), mk("c")]);
+        let shuffled = canonical_encode_saved_views(&[mk("c"), mk("a"), mk("b")]);
+        // Insertion order does not affect the canonical bytes.
+        assert_eq!(forward, shuffled);
+        // First id in the array is the lexicographically smallest.
+        let s = core::str::from_utf8(&forward).unwrap();
+        assert!(s.find("\"id\":\"a\"").unwrap() < s.find("\"id\":\"b\"").unwrap());
     }
 }

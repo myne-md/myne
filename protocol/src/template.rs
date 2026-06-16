@@ -140,6 +140,7 @@ pub fn render(template: &str, ctx: &RenderContext) -> String {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use alloc::string::ToString;

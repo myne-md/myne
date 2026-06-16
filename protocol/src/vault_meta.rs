@@ -277,6 +277,7 @@ pub fn rewrite_vault_meta_password_side(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::aead::aead_open_ctx;
