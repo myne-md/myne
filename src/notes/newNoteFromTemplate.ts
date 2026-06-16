@@ -108,7 +108,10 @@ async function createNoteFromBody(
   name: string,
   folder: string | null,
 ): Promise<string> {
-  let bytes = encoder.encode(body);
+  // Wide annotation: TS 6.0's typed-array buffer generic otherwise rejects
+  // reassigning the bare-`Uint8Array` patch returns onto the `<ArrayBuffer>`
+  // that `encoder.encode()` infers.
+  let bytes: Uint8Array = encoder.encode(body);
   bytes = patchTitleField(bytes, name);
   const normalizedFolder = normalizeFolderPath(folder);
   if (normalizedFolder !== null) {

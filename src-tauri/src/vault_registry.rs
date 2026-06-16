@@ -159,7 +159,7 @@ pub(crate) fn discover_vaults(base: &Path) -> Vec<DiscoveredVault> {
 
     // Deterministic ordering by opaque id. Last-unlock ordering (the
     // user-meaningful one) is the registry/picker's concern, not discovery's.
-    found.sort_by(|a, b| a.id.cmp(&b.id));
+    found.sort_by_key(|a| a.id);
     found
 }
 
