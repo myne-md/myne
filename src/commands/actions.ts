@@ -113,6 +113,19 @@ const openTodayNoteAction: CommandAction = {
   },
 };
 
+const randomNoteAction: CommandAction = {
+  id: "notes.random",
+  label: "Open random note",
+  category: "Editor",
+  // Editor-only like "Open today's note" (MYND-323): serendipitous review opens
+  // a random live, non-template note. The empty-vault case shows a toast at run
+  // time (never a modal), so visibility stays a simple stage guard.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onOpenRandomNote();
+  },
+};
+
 const openAttachmentsAction: CommandAction = {
   id: "attachments.open",
   label: "Open attachments…",
@@ -270,6 +283,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   toggleRightSidebarAction,
   newNoteFromTemplateAction,
   openTodayNoteAction,
+  randomNoteAction,
   manageTemplatesAction,
   openAttachmentsAction,
   openSnapshotsAction,

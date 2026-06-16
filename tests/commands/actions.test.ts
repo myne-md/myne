@@ -25,6 +25,7 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onManageTemplates: vi.fn(),
     onNewNoteFromTemplate: vi.fn(),
     onOpenTodayNote: vi.fn(),
+    onOpenRandomNote: vi.fn(),
     onOpenAttachments: vi.fn(),
     onExportNoteMarkdown: vi.fn(),
     onExportNotePdf: vi.fn(),
@@ -52,6 +53,7 @@ describe("Command palette action registry", () => {
       "graph.show",
       "note.export-markdown",
       "note.export-pdf",
+      "notes.random",
       "snapshots.open",
       "tags.show",
       "templates.manage",
@@ -261,6 +263,19 @@ describe("Command palette action run() side effects", () => {
     );
     action.run(makeContext({ onOpenAttachments }));
     expect(onOpenAttachments).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Open random note\" is SHOWN in editor + HIDDEN elsewhere, and calls onOpenRandomNote (MYND-323)", () => {
+    const onOpenRandomNote = vi.fn();
+    const action = find("notes.random");
+    expect(action.visibility(makeContext({ stageName: "editor" }))).toBe("show");
+    for (const stage of ["welcome", "create-vault", "unlock", "recover"] as const) {
+      expect(action.visibility(makeContext({ stageName: stage }))).toBe(
+        "hidden",
+      );
+    }
+    action.run(makeContext({ onOpenRandomNote }));
+    expect(onOpenRandomNote).toHaveBeenCalledTimes(1);
   });
 
   it("\"Export note as Markdown…\" calls onExportNoteMarkdown — the shared-flow callback (MYND-116)", () => {

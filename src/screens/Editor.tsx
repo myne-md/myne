@@ -73,6 +73,7 @@ import {
   resolveTodayNote,
 } from "../notes";
 import { prefsRead } from "../lib/prefs";
+import { showAttachmentToast } from "../editor/attachments/toast";
 import {
   exportToastAction,
   noteExportOptions,
@@ -1604,6 +1605,34 @@ function CommandPaletteHost({
       }
     }
   }, [ctx]);
+  // "Open random note" (MYND-323): serendipitous review. Picks uniformly from the
+  // live, non-template notes (mirrors sidebar visibility — trashed/templates are
+  // excluded). With ≥2 eligible notes the current one is dropped so the pick
+  // always moves; the empty case shows a toast, never a modal.
+  const onOpenRandomNote = useCallback(async () => {
+    try {
+      const ids = await noteList();
+      const records = await loadNoteBatch(ids);
+      let candidates = records
+        .filter((r) => r.trashed === null && r.template !== true)
+        .map((r) => r.noteUuid);
+      if (candidates.length === 0) {
+        showAttachmentToast("No notes to open.");
+        return;
+      }
+      if (candidates.length > 1 && ctx.selectedId !== null) {
+        const without = candidates.filter((id) => id !== ctx.selectedId);
+        if (without.length > 0) candidates = without;
+      }
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      await ctx.open(pick as NoteId);
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[Editor] open random note failed:", err);
+      }
+    }
+  }, [ctx]);
   const commandCtx: CommandContext = useMemo(
     () => ({
       stageName: "editor",
@@ -1613,6 +1642,7 @@ function CommandPaletteHost({
       onManageTemplates,
       onNewNoteFromTemplate,
       onOpenTodayNote,
+      onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,
       onExportNoteMarkdown,
@@ -1640,6 +1670,7 @@ function CommandPaletteHost({
       onManageTemplates,
       onNewNoteFromTemplate,
       onOpenTodayNote,
+      onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,
       onExportNoteMarkdown,

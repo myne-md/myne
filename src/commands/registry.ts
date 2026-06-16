@@ -43,6 +43,8 @@ export type CommandContext = {
   onNewNoteFromTemplate: () => void;
   /** Open (or idempotently create) today's daily note (MYND-191). */
   onOpenTodayNote: () => void;
+  /** Pick a random non-trashed, non-template note from the vault and open it (MYND-323). */
+  onOpenRandomNote: () => void;
   /** Open the attachments library (full-pane center-pane view, MYND-170). */
   onOpenAttachments: () => void;
   /** Open the snapshots / file-recovery panel for the selected note (MYND-97). */

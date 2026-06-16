@@ -151,6 +151,42 @@ describeE2E("nc3 soft-trash lifecycle (MYND-223 / MYND-133)", () => {
   });
 });
 
+describeE2E("dn1 duplicate note via context menu (MYND-332)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("context-menu Duplicate clones the note with a '(kopya)' title", async () => {
+    let password = "";
+    await scenario(
+      "dn1-duplicate-note",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Kaynak Not");
+
+        // One note in the live tree to start with.
+        expect((await s.byTestIdAll("notes.row")).length).toBe(1);
+
+        // Duplicate via the row's real right-click context menu.
+        await contextMenuPick(s, await s.byTestId("notes.row"), "duplicate");
+
+        // A second row appears; one of the two carries the "(kopya)" title.
+        // The optimistic copy briefly shows "Untitled" until refreshOne
+        // settles the real frontmatter title in — so poll for both.
+        await s.waitUntil(
+          async () => {
+            const rows = await s.byTestIdAll("notes.row");
+            if (rows.length !== 2) return null;
+            const texts = await Promise.all(rows.map((r) => r.textContent()));
+            return texts.some((t) => t.includes("(kopya)")) || null;
+          },
+          { label: "duplicate row shows the (kopya) title" },
+        );
+      },
+    );
+  });
+});
+
 describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("deleting a non-empty folder moves its notes to the Trash after a confirm", async () => {
