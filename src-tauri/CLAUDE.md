@@ -4,7 +4,7 @@
 
 ## Stack
 
-- Tauri 2, Rust 1.90.0 (pinned in `rust-toolchain.toml` at workspace root)
+- Tauri 2, Rust 1.96.0 (pinned in `rust-toolchain.toml` at workspace root)
 - Crate name `myne_desktop_lib` — **`_lib` suffix is required** to avoid Windows lib-vs-bin collision (rust-lang/cargo#8519). Don't rename.
 - `src-tauri/src/main.rs` calls into `myne_desktop_lib`. Most logic should live in the lib, not the bin.
 

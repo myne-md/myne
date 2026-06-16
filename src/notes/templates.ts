@@ -41,7 +41,10 @@ export async function createTemplate(
   name: string,
   body: string,
 ): Promise<string> {
-  let bytes = encoder.encode(body);
+  // Annotated wide (`Uint8Array<ArrayBufferLike>`) so the `patchTitleField`
+  // return (bare `Uint8Array`) reassigns cleanly under TS 6.0's stricter
+  // typed-array buffer generic — `encoder.encode()` narrows to `<ArrayBuffer>`.
+  let bytes: Uint8Array = encoder.encode(body);
   // State A/B compose to canonical `---\ntitle: <name>\ntemplate: true\n---\n\n<body>`.
   bytes = patchTitleField(bytes, name);
   bytes = patchTemplateField(bytes, TEMPLATE_FLAG_VALUE);

@@ -524,11 +524,16 @@ pub(crate) async fn commit_with_vault_path(
         return Err(AppError::VaultArtifactsPresent);
     }
 
-    let outcome: Result<(), (AppError, VaultCreationSession)> =
+    // The `VaultCreationSession` is returned by value in the Err arm so the
+    // outer code can re-insert it under the same token for non-destructive
+    // retry (see below). Box the tuple to keep the Err variant small —
+    // clippy::result_large_err (new in Rust 1.96) otherwise flags the ~824-byte
+    // payload moving on the stack; the box is on the rare error path only.
+    let outcome: Result<(), Box<(AppError, VaultCreationSession)>> =
         tokio::task::spawn_blocking(move || match build_and_serialize_vault_meta(&session) {
-            Err(e) => Err((e, session)),
+            Err(e) => Err(Box::new((e, session))),
             Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
-                Err(e) => Err((AppError::from(e), session)),
+                Err(e) => Err(Box::new((AppError::from(e), session))),
                 Ok(()) => {
                     // MYND-160 Task 12: eager-write the default vault.prefs
                     // blob so every post-MYND-160 vault carries the closed
@@ -636,7 +641,8 @@ pub(crate) async fn commit_with_vault_path(
 
     match outcome {
         Ok(()) => Ok(()),
-        Err((err, session)) => {
+        Err(boxed) => {
+            let (err, session) = *boxed;
             // Re-insert under the same token so the frontend's retry
             // (sending the same token to a follow-up `commit` call)
             // works. `try_insert` cannot exceed the cap here: this
