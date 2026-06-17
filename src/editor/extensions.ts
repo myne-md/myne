@@ -35,12 +35,14 @@ import { DefinitionList } from "../dialect/lezer/definition-list";
 import { Footnote } from "../dialect/lezer/footnote";
 import { Highlight } from "../dialect/lezer/highlight";
 import { Math } from "../dialect/lezer/math";
+import { Comment } from "../dialect/lezer/comment";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { myneDecorations } from "./decorations";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { noteSetExtension } from "./wikilink/note-set";
+import { lineNumbersExtension } from "./line-numbers";
 import { wikilinkHoverExtension } from "./wikilink/hover";
 import { wikilinkPickerExtension } from "./wikilink/picker";
 import { activeViewExtension } from "./active-view";
@@ -80,6 +82,9 @@ export function myneExtensions(): readonly Extension[] {
         Emoji,
         Highlight,
         Math,
+        // Dialect comments `%%…%%` (MYND-315). Must match parser.ts. Hidden
+        // off-cursor by commentDecorations(); never emitted/rewritten (§6 C1).
+        Comment,
         codeNestMarkdownExtension,
       ],
     }),
@@ -147,6 +152,11 @@ export function myneExtensions(): readonly Extension[] {
     ]),
     myneTheme,
     EditorView.lineWrapping,
+    // Optional line-number gutter (editor-line-numbers, MYND-314), seeded OFF
+    // (prose-first default). Lives in a CM6 Compartment so the host can
+    // reconfigure it live on the `editor_line_numbers` pref change (SYNC-3
+    // addendum) without a remount. Stock `lineNumbers()` numbers logical lines.
+    lineNumbersExtension(),
     // Disable the WebView's native OS spellchecker on the editor content
     // (SYNC-5, MYND-264). Myne ships its own fully-offline spell-check; leaving
     // the native speller on would double-underline against the custom squiggle

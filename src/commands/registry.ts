@@ -53,6 +53,10 @@ export type CommandContext = {
   onExportNoteMarkdown: () => void;
   /** Run the per-note PDF-export flow for the selected note (MYND-255). */
   onExportNotePdf: () => void;
+  /** Run the per-note HTML-export flow for the selected note (MYND-340). */
+  onExportNoteHtml: () => void;
+  /** Run the per-note plain-text export flow for the selected note (MYND-340). */
+  onExportNoteTxt: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
   onShowGraph: () => void;
   /** Open the tag browser (modal carve-out: tree + multi-select filter) (MYND-46). */
@@ -71,6 +75,8 @@ export type CommandContext = {
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */
   onToggleRightSidebar: () => void;
+  /** Flip the focused pane's stacked tab-layout (tab-modes / MYND-319). */
+  onToggleStackedTabs: () => void;
   /** Switch active selection to the given note id (mirrors sidebar click). */
   onSelectNote: (id: NoteId) => Promise<void>;
   /** Drive Stage transitions for force-relock paths. */

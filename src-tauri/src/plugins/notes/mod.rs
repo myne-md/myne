@@ -48,6 +48,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::note_snapshot_flush,
             commands::note_export_as_markdown,
             commands::note_export_attachments,
+            commands::note_export_html,
+            commands::note_export_html_attachments,
         ])
         .build()
 }

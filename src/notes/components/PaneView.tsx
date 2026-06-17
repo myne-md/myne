@@ -27,7 +27,7 @@ import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
 import { useAutosave, type SaveStatus } from "../useAutosave";
-import { countBodyWords } from "../wordCount";
+import { computeDocStats, statsOfPlain, type DocStats } from "../documentStats";
 import {
   itemKey,
   parseItemKey,
@@ -50,8 +50,11 @@ import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-ma
 
 export type PaneReadout = {
   status: SaveStatus;
-  /** Body word count of the active note; `null` when the pane is empty. */
-  wordCount: number | null;
+  /** Whole-note statistics of the active note; `null` when the pane is empty. */
+  stats: DocStats | null;
+  /** Statistics of the current non-empty selection; `null` when nothing is
+   *  selected (the readout then shows whole-note `stats`). */
+  selectionStats: DocStats | null;
   retry: () => void;
 };
 
@@ -248,12 +251,26 @@ export function PaneView({
     void ctx.refreshOne(activeId).catch(() => {});
   }, [autosave.status, ctx, activeId]);
 
-  // Word count (debounced) — reported up only while focused.
-  const [wordCount, setWordCount] = useState(0);
+  // Document statistics (MYND-339): whole-doc (debounced from content) +
+  // selection-scoped (from the CMEditor selection seam). Reported up only while
+  // focused. Whole-doc stats are seeded synchronously so the readout doesn't
+  // flash empty for the first 200ms after a note load.
+  const [stats, setStats] = useState<DocStats | null>(() => computeDocStats(content));
   useEffect(() => {
-    const h = setTimeout(() => setWordCount(countBodyWords(content)), 200);
+    const h = setTimeout(() => setStats(computeDocStats(content)), 200);
     return () => clearTimeout(h);
   }, [content]);
+
+  const [selectedText, setSelectedText] = useState("");
+  const handleSelectionChange = useCallback((t: string) => setSelectedText(t), []);
+  const [selectionStats, setSelectionStats] = useState<DocStats | null>(null);
+  useEffect(() => {
+    const h = setTimeout(
+      () => setSelectionStats(selectedText === "" ? null : statsOfPlain(selectedText)),
+      150,
+    );
+    return () => clearTimeout(h);
+  }, [selectedText]);
 
   const retry = autosave.retry;
   const status = autosave.status;
@@ -261,10 +278,11 @@ export function PaneView({
     if (!focused) return;
     onReadout({
       status,
-      wordCount: activeId === null ? null : wordCount,
+      stats: activeId === null ? null : stats,
+      selectionStats: activeId === null ? null : selectionStats,
       retry,
     });
-  }, [focused, status, wordCount, activeId, retry, onReadout]);
+  }, [focused, status, stats, selectionStats, activeId, retry, onReadout]);
 
   const handleBlur = useCallback(() => {
     void autosave.flushIfDirty().catch(() => {});
@@ -416,8 +434,13 @@ export function PaneView({
           value={content}
           onChange={setContent}
           onBlur={handleBlur}
+          onSelectionChange={handleSelectionChange}
           noteSet={notes}
           onOpenWikilink={handleOpenWikilink}
+          // editor-line-numbers (MYND-314): default OFF (prose-first); the open
+          // editor reconfigures its line-number compartment live when the pref
+          // flips (no remount). `prefs` is already a useMemo dep below.
+          lineNumbers={prefs.editor_line_numbers === true}
           style={{
             width: "100%",
             minHeight: 360,
@@ -438,6 +461,7 @@ export function PaneView({
     loading,
     content,
     handleBlur,
+    handleSelectionChange,
     notes,
     handleOpenWikilink,
   ]);
@@ -472,6 +496,18 @@ export function PaneView({
             ? null
             : itemKey(leaf.activeTab)
         }
+        // tab-modes (MYND-319/320): per-tab pin + per-leaf stacked layout. The
+        // strip works in `itemKey` strings; resolve each back to its tab item.
+        isPinned={(key) =>
+          leaf.tabs.find((t) => itemKey(t) === key)?.pinned === true
+        }
+        onTogglePin={(key) => {
+          const tab = leaf.tabs.find((t) => itemKey(t) === key);
+          if (tab !== undefined) {
+            ws.setItemPinned(leaf.id, tab, tab.pinned !== true);
+          }
+        }}
+        stacked={leaf.stacked === true}
         titleOf={(key) => {
           const it = parseItemKey(key);
           if (it.kind === "note") return ctx.cache.get(it.id)?.title ?? null;

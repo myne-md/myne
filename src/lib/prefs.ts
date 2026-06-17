@@ -219,6 +219,14 @@ export interface PrefsView {
    */
   editor_text_size: string | null;
   /**
+   * Editor line-number gutter toggle (editor-line-numbers, MYND-314). `null` ≡
+   * unset → the host applies the default-OFF policy (prose-first; the gutter is
+   * opt-in). `true` shows the gutter, `false` hides it. Serialized from Rust
+   * `Option<bool>`; omitted from the encrypted blob when `null` (byte-identical
+   * to a pre-feature vault). Non-load-bearing cosmetic.
+   */
+  editor_line_numbers: boolean | null;
+  /**
    * User theme preference (MYND-110). `null` ≡ **system** (follow the OS
    * `prefers-color-scheme`) — the canonical encoding of "no explicit choice",
    * omitted from the encrypted blob. `"light"` / `"dark"` are explicit
@@ -540,6 +548,20 @@ export async function setEditorContentWidth(value: string | null): Promise<void>
  */
 export async function setEditorFontFamily(value: string | null): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_font_family", { value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set the editor line-number gutter toggle (editor-line-numbers, MYND-314). Pass
+ * `true` to show the gutter, `false` to hide it (the default). Disk-first, no
+ * native side-effect; a rejected promise means the write failed and the caller's
+ * optimistic UI must revert. Bumps the prefs nonce on success so the open editor
+ * (which reads prefs through its OWN `usePrefs`, separate from the Settings
+ * modal's) re-reads disk truth and reconfigures its line-number compartment live
+ * — same chokepoint discipline as {@link setEditorTextSize}. Non-load-bearing.
+ */
+export async function setEditorLineNumbers(value: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_line_numbers", { enabled: value });
   bumpPrefsNonce();
 }
 

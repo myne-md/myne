@@ -24,28 +24,32 @@ import { locateFrontmatter } from "../dialect/lezer/frontmatter";
 import { noteRead } from "./readNote";
 import { noteCreate } from "./createNote";
 import { normalizeFolderPath } from "../dialect/folderPath";
+import {
+  formatLocalDate,
+  formatLocalDateTime,
+  formatLocalTime,
+  formatLocalWeekday,
+} from "./localDateTime";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-
-const pad2 = (n: number): string => String(n).padStart(2, "0");
 
 /**
  * Build the host-injected {@link RenderContext} from a wall-clock instant and a
  * note name. All time-derived fields are formatted in **local** time (so a note
  * created at 01:00 local in a positive UTC offset stamps today's local calendar
- * day, never the previous UTC day). `weekday` follows the host locale (the
- * app-language proxy until an in-app language setting lands).
+ * day, never the previous UTC day) via the shared `localDateTime` helpers — the
+ * same source of truth the `/date` `/day` `/time` `/now` slash commands use.
+ * `weekday` follows the host locale (the app-language proxy until an in-app
+ * language setting lands).
  */
 export function buildRenderContext(now: Date, title: string): RenderContext {
-  const date = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-  const time = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   return {
     title,
-    date,
-    time,
-    datetime: `${date} ${time}`,
-    weekday: now.toLocaleDateString(undefined, { weekday: "long" }),
+    date: formatLocalDate(now),
+    time: formatLocalTime(now),
+    datetime: formatLocalDateTime(now),
+    weekday: formatLocalWeekday(now),
   };
 }
 

@@ -41,8 +41,10 @@ import {
   openToSide as openToSideOp,
   setActiveTab,
   setFocusedPane,
+  setPinned as setPinnedOp,
   splitPane,
   splitPaneWithItem as splitPaneWithItemOp,
+  toggleStacked as toggleStackedOp,
   viewItem,
   type LeafPane,
   type PaneId,
@@ -152,6 +154,14 @@ export type WorkspaceApi = {
     side: "before" | "after",
     item: WorkspaceItem,
   ) => void;
+
+  // ── tab-modes (MYND-319/320) ───────────────────────────────────
+  /** Set the `pinned` flag on a tab item within a pane (tab-modes / MYND-320). */
+  setItemPinned: (paneId: PaneId, item: WorkspaceItem, pinned: boolean) => void;
+  /** Flip the per-leaf `stacked` layout flag of a pane (tab-modes / MYND-319). */
+  toggleStackedInPane: (paneId: PaneId) => void;
+  /** Flip the focused pane's `stacked` layout flag — the palette-action entry. */
+  toggleStackedFocused: () => void;
 
   // ── flush registry (one entry per live pane editor) ────────────
   registerFlush: (paneId: PaneId, flush: () => Promise<void>) => void;
@@ -322,6 +332,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // ── tab-modes (MYND-319/320) — pin a tab + per-leaf stacked layout. ──
+  const setItemPinned = useCallback(
+    (paneId: PaneId, item: WorkspaceItem, pinned: boolean) => {
+      setState((s) => setPinnedOp(s, paneId, item, pinned));
+    },
+    [],
+  );
+  const toggleStackedInPane = useCallback((paneId: PaneId) => {
+    setState((s) => toggleStackedOp(s, paneId));
+  }, []);
+  const toggleStackedFocused = useCallback(() => {
+    setState((s) => toggleStackedOp(s, s.focusedPaneId));
+  }, []);
+
   // Flush registry — refs (no re-render). Keyed by paneId.
   const flushers = useRef<Map<PaneId, () => Promise<void>>>(new Map());
   const registerFlush = useCallback(
@@ -438,6 +462,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       closeItemInPane,
       dropItemOnPane,
       splitPaneWithItem,
+      setItemPinned,
+      toggleStackedInPane,
+      toggleStackedFocused,
       registerFlush,
       unregisterFlush,
       flushAll,
@@ -470,6 +497,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       closeItemInPane,
       dropItemOnPane,
       splitPaneWithItem,
+      setItemPinned,
+      toggleStackedInPane,
+      toggleStackedFocused,
       registerFlush,
       unregisterFlush,
       flushAll,

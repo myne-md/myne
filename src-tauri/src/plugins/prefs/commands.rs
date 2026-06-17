@@ -332,6 +332,56 @@ pub(crate) async fn set_spell_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `editor_line_numbers` toggle
+/// (editor-line-numbers, MYND-314). Read-modify-write under the per-plugin write
+/// mutex; no native side-effect (like `set_spell_enabled`). Always persists an
+/// explicit `Some(enabled)` — the default-OFF policy (prose-first) is a host
+/// read-time concern, not a stored value. Non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_editor_line_numbers<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_line_numbers_with_dir(&dir, state.inner(), enabled).await
+}
+
+/// Testable core of [`set_editor_line_numbers`].
+pub(crate) async fn set_editor_line_numbers_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.editor_line_numbers = Some(enabled);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_line_numbers",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `show_note_timestamps` toggle
 /// (sidebar-note-timestamps feature). Read-modify-write under the per-plugin
 /// write mutex; no native side-effect (like `set_spell_enabled`). The field is a
@@ -1625,6 +1675,7 @@ mod tests {
                     favorites: Vec::new(),
                     item_order: Vec::new(),
                     editor_layout: None,
+                    editor_line_numbers: None,
                     editor_content_width: None,
                     editor_font_family: None,
                     editor_line_spacing: None,
@@ -2427,6 +2478,51 @@ mod tests {
                 .await
                 .expect("read after on");
             assert!(view.show_note_timestamps);
+        });
+    }
+
+    // ---- editor_line_numbers setter (editor-line-numbers, MYND-314) ---
+
+    #[test]
+    fn set_editor_line_numbers_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-line-numbers-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_editor_line_numbers_with_dir(tmp.path(), &state, true).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn editor_line_numbers_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
+
+            // Default (no write yet) reads back as `None` (host default-OFF).
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read default");
+            assert_eq!(view.editor_line_numbers, None);
+
+            // Turn ON persists (disk-first) + round-trips.
+            set_editor_line_numbers_with_dir(tmp.path(), &state, true)
+                .await
+                .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after on");
+            assert_eq!(view.editor_line_numbers, Some(true));
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Turn OFF overwrites (explicit Some(false), not back to None).
+            set_editor_line_numbers_with_dir(tmp.path(), &state, false)
+                .await
+                .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after off");
+            assert_eq!(view.editor_line_numbers, Some(false));
         });
     }
 

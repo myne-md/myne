@@ -53,3 +53,27 @@ export function scanExcludedAttachments(body: string): ExcludedAttachment[] {
     }))
     .filter((a) => !IMAGE_EXT_RE.test(a.filename));
 }
+
+/**
+ * The distinct IMAGE attachment ids referenced by `body` — the set the
+ * HTML projection inlines as `<img>` and (in an attachments-included
+ * HTML export) writes as relative sidecar files. The mirror of
+ * `scanExcludedAttachments` (same cheap `extractAttachmentRefs` scan +
+ * the same `IMAGE_EXT_RE` test, opposite filter), so the HTML export's
+ * pre-flight "Include N images" count matches what the projection
+ * actually writes beside the `.html`. De-duplicated by id (first
+ * occurrence wins). Used by `runNoteHtmlExportFlow` to decide whether to
+ * show the attachments pre-flight modal.
+ */
+export function scanImageAttachments(body: string): ExcludedAttachment[] {
+  const seen = new Set<string>();
+  const out: ExcludedAttachment[] = [];
+  for (const { id, filename } of extractAttachmentRefs(body)) {
+    const name = attachmentEmbedDisplayName(filename);
+    if (!IMAGE_EXT_RE.test(name)) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, filename: name });
+  }
+  return out;
+}

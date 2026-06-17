@@ -27,9 +27,16 @@ import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   EXPORT_PDF_PLAIN_SENTENCE,
+  EXPORT_PLAIN_HTML_SENTENCE,
   EXPORT_PLAIN_MARKDOWN_SENTENCE,
+  EXPORT_PLAIN_TEXT_SENTENCE,
 } from "../lib/load-bearing-copy";
-import { noteExportAsMarkdown, noteExportAttachments } from "./exportNote";
+import {
+  noteExportAsMarkdown,
+  noteExportAttachments,
+  noteExportHtml,
+  noteExportHtmlAttachments,
+} from "./exportNote";
 import { exportNotePdf } from "./exportPdf";
 import { noteRead } from "./readNote";
 import { extractAttachmentIds } from "./attachmentRef";
@@ -46,6 +53,7 @@ import type {
 import type { PdfExportError } from "../types/pdf-export-error";
 import {
   scanExcludedAttachments,
+  scanImageAttachments,
   type ExcludedAttachment,
 } from "../dialect/html/attachment-classification";
 import type { ToastAction } from "../components/Toast";
@@ -60,7 +68,7 @@ import type { ToastAction } from "../components/Toast";
  */
 export function defaultExportFilename(
   title: string | null | undefined,
-  ext: "md" | "pdf" = "md",
+  ext: "md" | "pdf" | "html" | "txt" = "md",
 ): string {
   const trimmed = (title ?? "").trim();
   if (trimmed === "") return `Untitled.${ext}`;
@@ -155,7 +163,10 @@ export function noteExportOptions(
   noteId: string,
   noteTitle: string | null,
   hooks?: NoteExportUiHooks,
-): NoteExportFlowOptions & NotePdfExportFlowOptions {
+): NoteExportFlowOptions &
+  NotePdfExportFlowOptions &
+  NoteHtmlExportFlowOptions &
+  NoteTxtExportFlowOptions {
   return {
     noteId,
     noteTitle,
@@ -350,6 +361,216 @@ export async function runNotePdfExportFlow({
       message:
         notePdfExportErrorMessage(raw as PdfExportError) ??
         EXPORT_FALLBACK_MESSAGE,
+    });
+  }
+}
+
+export interface NoteHtmlExportFlowOptions {
+  /** Canonical note id (lowercase-hyphenated v7 UUID string). */
+  noteId: string;
+  /** Note title as the caller knows it; null/empty → "Untitled.html". */
+  noteTitle: string | null;
+  /** Toast sink — both success and mapped-error copy go through it. */
+  showToast: (toast: ExportToast) => void;
+  /**
+   * Pre-flight modal hook (the SAME hook the markdown flow uses). Omitted
+   * → the image-attachment scan is skipped and the export is HTML-only
+   * (images as in-app-only `attachment://` refs) — the inert degrade for
+   * isolated renders without the Editor's modal mount.
+   */
+  confirmAttachments?: (count: number) => Promise<AttachmentPreflightChoice | null>;
+  /** Note-body provider (default: the `note_read` IPC). The body is the
+   *  HTML projection input, so a read failure ends the flow with an error
+   *  toast (no degrade — mirrors the PDF flow). */
+  getBody?: (noteId: string) => Promise<string>;
+}
+
+/**
+ * Run the per-note HTML export flow (note-export MYND-340) — the single
+ * entry point both trigger surfaces call (sidebar context-menu "Export as
+ * HTML…" + palette `note.export-html`), mirroring `runNoteExportFlow` /
+ * `runNotePdfExportFlow`.
+ *
+ * Flow: read the body → cheap image-attachment scan
+ * (`scanImageAttachments` — no emitter import) → if the note references
+ * images AND a modal hook exists, ask the "Include N images" question
+ * (the egress sentence rides the modal; cancel is a free exit) → OS save
+ * dialog (`.html`; the "Replace" confirmation IS the overwrite consent,
+ * SYNC-2; when the modal did NOT show, the dialog title carries the
+ * egress sentence so it is said once, SYNC-6) → ONLY NOW compose the
+ * standalone HTML via the dialect assembler (lazy-imported — it pulls the
+ * heavy renderers and must run in the MAIN window) → either
+ * `note_export_html` (no images / opted out) or `note_export_html_attachments`
+ * (images opted in → sidecar files + relative refs) → success toast or
+ * mapped error copy. Never throws.
+ */
+export async function runNoteHtmlExportFlow({
+  noteId,
+  noteTitle,
+  showToast,
+  confirmAttachments,
+  getBody = noteRead,
+}: NoteHtmlExportFlowOptions): Promise<void> {
+  let body: string;
+  try {
+    body = await getBody(noteId);
+  } catch {
+    showToast({ message: "This note could not be read." });
+    return;
+  }
+
+  // Pre-flight: only when a modal hook exists AND the body references
+  // image attachments (the sidecar set). The scan is pure + cheap.
+  let includeAttachments = false;
+  let egressSentenceShown = false;
+  if (confirmAttachments !== undefined) {
+    const count = scanImageAttachments(body).length;
+    if (count > 0) {
+      // The pre-flight modal renders EXPORT_PLAIN_HTML_SENTENCE.
+      egressSentenceShown = true;
+      const choice = await confirmAttachments(count);
+      if (choice === null) return; // cancelled — free exit, nothing invoked
+      includeAttachments = choice.includeAttachments;
+    }
+  }
+
+  const destination = await saveFileDialog({
+    ...(egressSentenceShown ? {} : { title: EXPORT_PLAIN_HTML_SENTENCE }),
+    defaultPath: defaultExportFilename(noteTitle, "html"),
+    filters: [{ name: "HTML", extensions: ["html"] }],
+  }).catch(() => null);
+  if (typeof destination !== "string") return; // dismissed — silent no-op
+
+  let document: string;
+  try {
+    // Projection only after the destination is confirmed — a dismissal
+    // costs nothing. `emitStandaloneHtml` never throws on note content.
+    const { emitStandaloneHtml } = await import("../dialect/html/htmlDocument");
+    const composed = await emitStandaloneHtml(body, {
+      locale:
+        typeof navigator !== "undefined" ? navigator.language : "en-US",
+    });
+    document = composed.document;
+  } catch {
+    showToast({ message: EXPORT_FALLBACK_MESSAGE });
+    return;
+  }
+
+  if (includeAttachments) {
+    const { dir, filename } = splitExportPath(destination);
+    try {
+      const written = await noteExportHtmlAttachments(
+        noteId,
+        document,
+        dir,
+        filename,
+        true,
+      );
+      showToast({
+        message:
+          written === 0
+            ? `Exported to ${filename}`
+            : `Exported to ${filename} + ${written} image${written === 1 ? "" : "s"}`,
+        revealPath: destination,
+      });
+    } catch (raw) {
+      showToast({
+        message:
+          noteExportAttachmentsErrorMessage(raw as NoteExportAttachmentsError) ??
+          EXPORT_FALLBACK_MESSAGE,
+      });
+    }
+    return;
+  }
+
+  try {
+    // overwrite=true: the OS dialog's "Replace" prompt was the consent.
+    await noteExportHtml(document, destination, true);
+    showToast({
+      message: `Exported to ${exportedBasename(destination)}`,
+      revealPath: destination,
+    });
+  } catch (raw) {
+    showToast({
+      message:
+        noteExportErrorMessage(raw as NoteExportError) ?? EXPORT_FALLBACK_MESSAGE,
+    });
+  }
+}
+
+export interface NoteTxtExportFlowOptions {
+  /** Canonical note id (lowercase-hyphenated v7 UUID string). */
+  noteId: string;
+  /** Note title as the caller knows it; null/empty → "Untitled.txt". */
+  noteTitle: string | null;
+  /** Toast sink — both success and mapped-error copy go through it. */
+  showToast: (toast: ExportToast) => void;
+  /** Note-body provider (default: the `note_read` IPC). The body is the
+   *  text projection input, so a read failure ends the flow with an error
+   *  toast. */
+  getBody?: (noteId: string) => Promise<string>;
+}
+
+/**
+ * Run the per-note plain-text export flow (note-export MYND-340) — the
+ * single entry point both trigger surfaces call (sidebar context-menu
+ * "Export as Plain Text…" + palette `note.export-txt`).
+ *
+ * Flow: read the body → OS save dialog (`.txt`; the egress sentence rides
+ * the dialog title, SYNC-6; "Replace" IS the overwrite consent, SYNC-2) →
+ * project to stripped plain text via the dialect emitter (`emitNoteText`
+ * — pure, no attachments, no sidecars) → write via `note_export_html`
+ * (the shared verbatim text-write command) → success toast or mapped
+ * error copy. The TXT projection never includes attachments, so there is
+ * no pre-flight modal. Never throws.
+ */
+export async function runNoteTxtExportFlow({
+  noteId,
+  noteTitle,
+  showToast,
+  getBody = noteRead,
+}: NoteTxtExportFlowOptions): Promise<void> {
+  let body: string;
+  try {
+    body = await getBody(noteId);
+  } catch {
+    showToast({ message: "This note could not be read." });
+    return;
+  }
+
+  const destination = await saveFileDialog({
+    // The egress sentence always rides the dialog title here — TXT has no
+    // pre-flight modal (no attachments), so this is the single decision
+    // point (SYNC-6).
+    title: EXPORT_PLAIN_TEXT_SENTENCE,
+    defaultPath: defaultExportFilename(noteTitle, "txt"),
+    filters: [{ name: "Plain text", extensions: ["txt"] }],
+  }).catch(() => null);
+  if (typeof destination !== "string") return; // dismissed — silent no-op
+
+  let text: string;
+  try {
+    const { emitNoteText } = await import("../dialect/text/emitNoteText");
+    // A trailing newline so the file is a well-formed POSIX text file.
+    text = `${emitNoteText(body)}\n`;
+  } catch {
+    showToast({ message: EXPORT_FALLBACK_MESSAGE });
+    return;
+  }
+
+  try {
+    // overwrite=true: the OS dialog's "Replace" prompt was the consent.
+    // Reuses the shared `note_export_html` text-write command (it writes
+    // any composed text document verbatim — not HTML-specific).
+    await noteExportHtml(text, destination, true);
+    showToast({
+      message: `Exported to ${exportedBasename(destination)}`,
+      revealPath: destination,
+    });
+  } catch (raw) {
+    showToast({
+      message:
+        noteExportErrorMessage(raw as NoteExportError) ?? EXPORT_FALLBACK_MESSAGE,
     });
   }
 }

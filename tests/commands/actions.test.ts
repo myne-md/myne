@@ -29,10 +29,13 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onOpenAttachments: vi.fn(),
     onExportNoteMarkdown: vi.fn(),
     onExportNotePdf: vi.fn(),
+    onExportNoteHtml: vi.fn(),
+    onExportNoteTxt: vi.fn(),
     onImportObsidian: vi.fn(),
     onImportBaseView: vi.fn(),
     onExportVaultMarkdown: vi.fn(),
     onShowViews: vi.fn(),
+    onToggleStackedTabs: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -51,8 +54,10 @@ describe("Command palette action registry", () => {
       "attachments.open",
       "daily.open-today",
       "graph.show",
+      "note.export-html",
       "note.export-markdown",
       "note.export-pdf",
+      "note.export-txt",
       "notes.random",
       "snapshots.open",
       "tags.show",
@@ -64,6 +69,7 @@ describe("Command palette action registry", () => {
       "vault.lock",
       "view.toggle-backlinks-sidebar",
       "view.toggle-notes-sidebar",
+      "view.toggle-stacked-tabs",
       "views.import-base",
       "views.show",
       "wikilinks.convert-in-this-note",
@@ -288,6 +294,30 @@ describe("Command palette action run() side effects", () => {
     const onExportNotePdf = vi.fn();
     find("note.export-pdf").run(makeContext({ onExportNotePdf }));
     expect(onExportNotePdf).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Export note as HTML…\" calls onExportNoteHtml — the shared-flow callback (MYND-340)", () => {
+    const onExportNoteHtml = vi.fn();
+    find("note.export-html").run(makeContext({ onExportNoteHtml }));
+    expect(onExportNoteHtml).toHaveBeenCalledTimes(1);
+  });
+
+  it("\"Export note as Plain Text…\" calls onExportNoteTxt — the shared-flow callback (MYND-340)", () => {
+    const onExportNoteTxt = vi.fn();
+    find("note.export-txt").run(makeContext({ onExportNoteTxt }));
+    expect(onExportNoteTxt).toHaveBeenCalledTimes(1);
+  });
+
+  it("note.export-html / note.export-txt are editor-only AND note-selected (MYND-340)", () => {
+    const noSel = makeContext({ stageName: "editor", selectedNoteId: null });
+    expect(find("note.export-html").visibility(noSel)).toBe("hidden");
+    expect(find("note.export-txt").visibility(noSel)).toBe("hidden");
+    const sel = makeContext({ stageName: "editor", selectedNoteId: "note-1" });
+    expect(find("note.export-html").visibility(sel)).toBe("show");
+    expect(find("note.export-txt").visibility(sel)).toBe("show");
+    const welcome = makeContext({ stageName: "welcome", selectedNoteId: "note-1" });
+    expect(find("note.export-html").visibility(welcome)).toBe("hidden");
+    expect(find("note.export-txt").visibility(welcome)).toBe("hidden");
   });
 
   it("\"Export vault as Markdown…\" calls onExportVaultMarkdown — the same modal as the Settings Export block (MYND-211)", () => {

@@ -34,6 +34,7 @@ import { fencedCodeDecorations } from "./fenced-code";
 import { mermaidDecorations } from "./mermaid";
 import { footnoteDecorations } from "./footnote";
 import { tagChipDecorations } from "./tag-chip";
+import { commentDecorations } from "./comment";
 
 // SYNC-17 (MYND-200 / knowledge-graph-ux; `decisions.md` 2026-06-08 "Interactive
 // tags ship as ONE unit"): the inline-`#tag` chip decoration ships HERE ONLY
@@ -97,5 +98,9 @@ export function myneDecorations(): readonly Extension[] {
     // atomic ranges + click→`myne-open-tag`. Ships with the browse surface (#2),
     // SYNC-17. Last so it composes over the inline layers without ordering deps.
     ...tagChipDecorations(),
+    // Dialect comments `%%…%%` (MYND-315): inline span hidden off-cursor +
+    // multi-line block line-collapse, both revealed raw on-cursor. Render-only,
+    // bytes preserved (§6 C1). Last — purely subtractive, no ordering deps.
+    ...commentDecorations(),
   ];
 }

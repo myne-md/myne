@@ -29,7 +29,8 @@
 
 use crate::atomic_write;
 use crate::export_naming::{
-    rewrite_embeds_to_final_names, sanitize_export_component, suffixed_filename, DEDUP_RETRY_CAP,
+    rewrite_embeds_to_final_names, rewrite_html_attachment_srcs, sanitize_export_component,
+    suffixed_filename, DEDUP_RETRY_CAP,
 };
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
@@ -701,6 +702,120 @@ pub(crate) async fn note_export_with_dir(
     Ok(())
 }
 
+/// Export one note as a standalone HTML document (note-export MYND-340)
+/// — the no-attachments path. Unlike [`note_export_as_markdown`] (which
+/// decrypts the note Rust-side and writes its verbatim plaintext), the
+/// HTML projection is composed in the MAIN window (`emitStandaloneHtml`
+/// — KaTeX / mermaid / highlight need a real WebView, the PDF-export
+/// precedent), so this command receives the ALREADY-COMPOSED `html`
+/// document string and writes it byte-for-byte to the user-chosen path
+/// via the canonical export-destination atomic write — the deliberate
+/// user-initiated plaintext egress across TB3 (the same posture and
+/// `atomic_write_unclobbered` 115-F1 anti-clobber discipline as the
+/// markdown export; egress sentence rides the OS save dialog title,
+/// SYNC-6). Reuses [`NoteExportError`] (the verbatim-write error surface)
+/// — the note-decrypt variants (`NoteNotFound` / `CannotDecrypt` /
+/// `InvalidPlaintextEncoding` / `InvalidNoteId`) are simply never
+/// produced on this string-write path.
+///
+/// **Overwrite consent travels explicitly:** `overwrite=false` maps the
+/// pre-rename `AlreadyExists` to [`NoteExportError::TargetAlreadyExists`]
+/// with the existing target untouched; `overwrite=true` (the OS dialog's
+/// "Replace") replaces.
+#[tauri::command]
+pub async fn note_export_html(
+    state: State<'_, VaultRuntimeState>,
+    html: String,
+    target_path: String,
+    overwrite: bool,
+) -> Result<(), NoteExportError> {
+    note_export_text_to_path(state.inner(), html, PathBuf::from(target_path), overwrite).await
+}
+
+/// Inner — pure-and-testable helper of [`note_export_html`]. Writes an
+/// already-composed text document (the HTML projection) verbatim to
+/// `target_path` under the unlocked-slot gate, mirroring
+/// [`note_export_with_dir`]'s destination-write discipline without the
+/// note-read/decrypt steps (the projection is composed WebView-side).
+pub(crate) async fn note_export_text_to_path(
+    state: &VaultRuntimeState,
+    document: String,
+    target_path: PathBuf,
+    overwrite: bool,
+) -> Result<(), NoteExportError> {
+    // Slot gate: export is an unlocked-session operation. The HTML body
+    // was composed from a decrypted note, so a locked slot means a
+    // routing bug — reject rather than write stale WebView state.
+    let slot = state.slot_read_active().await;
+    match &*slot {
+        Slot::Unlocked(_) => {}
+        Slot::Empty | Slot::Recovering { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_export_html rejected: slot is not Unlocked"
+            );
+            return Err(NoteExportError::VaultNotUnlocked);
+        }
+    }
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let document = Zeroizing::new(document);
+    let started = Instant::now();
+    let join_result = tokio::task::spawn_blocking(move || -> Result<(), NoteExportError> {
+        if !paths::parent_dir_ok(&target_path) {
+            tracing::error!(
+                stage = "dest_check",
+                error_kind = "InvalidDestination",
+                "note_export_html destination parent missing or not a directory"
+            );
+            return Err(NoteExportError::InvalidDestination);
+        }
+        if let Err(e) = atomic_write::atomic_write_unclobbered(
+            &target_path,
+            document.as_bytes(),
+            /* replace = */ overwrite,
+        ) {
+            let mapped = match e.kind() {
+                std::io::ErrorKind::AlreadyExists => NoteExportError::TargetAlreadyExists,
+                other => NoteExportError::Io {
+                    io_error_kind: from_io_error_kind(other),
+                },
+            };
+            tracing::error!(
+                stage = "atomic_write",
+                error_kind = note_export_error_kind(&mapped),
+                "note_export_html atomic_write failed"
+            );
+            return Err(mapped);
+        }
+        Ok(())
+    })
+    .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_export_html write panicked or runtime shutdown"
+            );
+            return Err(NoteExportError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(())) => {}
+    }
+    drop(slot);
+    tracing::debug!(
+        stage = "export_write",
+        duration_ms = duration_ms,
+        event = "note_exported",
+        "note_export_html verbatim atomic write succeeded"
+    );
+    Ok(())
+}
+
 /// Static-string label for [`NoteExportError`] variants — same
 /// drift-detector discipline as [`note_create_error_kind`] /
 /// [`note_read_error_kind`]. A new variant compile-fails this match.
@@ -1169,6 +1284,383 @@ pub(crate) async fn note_export_attachments_with_root(
     tracing::debug!(
         stage = "success",
         event = "note_exported_with_attachments",
+        attachment_count = attachment_count,
+        duration_ms = duration_ms,
+    );
+    Ok(attachment_count)
+}
+
+/// Export one note as a standalone HTML document WITH its image
+/// attachments as relative sidecar files (note-export MYND-340 task 3)
+/// — the HTML projection's arm of the opt-in attachments-included
+/// export, mirroring [`note_export_attachments`] exactly (catalog
+/// resolution, per-attachment decrypt, deterministic suffix-dedup,
+/// all-or-nothing, best-effort rollback) and differing only in the
+/// artifact: it writes the COMPOSED HTML document (passed from the main
+/// window, the PDF-export precedent) with each `attachment://<id>`
+/// `<img src>` rewritten to its final relative sidecar filename — the
+/// HTML arm of the `markdown-dialect.md` §6 sanctioned export transform
+/// (no new §6 entry; HTML joins the existing inverse-of-MYND-52 class).
+///
+/// Only the attachments the COMPOSED HTML actually references
+/// (`attachment://<id>` — the emitter inlines image embeds as `<img>`,
+/// while non-image embeds render as in-document placeholders, never
+/// `attachment://`) are resolved and written, so every sidecar is
+/// referenced and the §6 remap covers every written file. The note's
+/// stored blob is never modified.
+///
+/// `note_filename` is the bare `.html` filename from the OS save dialog;
+/// `overwrite` governs the HTML file only (the dialog's "Replace"
+/// consent, SYNC-2). Returns the number of sidecar files written. Shares
+/// the [`NoteExportAttachmentsError`] surface (identical failure modes).
+#[tauri::command]
+pub async fn note_export_html_attachments<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+    html: String,
+    target_dir: String,
+    note_filename: String,
+    overwrite: bool,
+) -> Result<usize, NoteExportAttachmentsError> {
+    let vault_root =
+        paths::active_vault_root_io(&app, state.active_vault_id().await).map_err(|e| {
+            let io_kind = from_io_error_kind(e.kind());
+            tracing::error!(
+                stage = "vault_root",
+                error_kind = "Io",
+                io_failure_kind = ?io_kind,
+                "note_export_html_attachments vault root resolution failed"
+            );
+            NoteExportAttachmentsError::Io {
+                io_error_kind: io_kind,
+            }
+        })?;
+    note_export_html_attachments_with_root(
+        vault_root,
+        state.inner(),
+        note_id,
+        html,
+        PathBuf::from(target_dir),
+        note_filename,
+        overwrite,
+    )
+    .await
+}
+
+/// The lowercase-hex `attachment://<id>` ids referenced in a composed
+/// HTML document, in FIRST-appearance order (the deterministic
+/// naming/dedup order, mirroring the markdown export's document-order
+/// span scan). Only 64-char lowercase-hex runs are accepted — the exact
+/// shape the emitter writes (`attachmentUrl(id)`).
+fn html_referenced_attachment_ids(html: &str) -> Vec<String> {
+    const PREFIX: &str = "attachment://";
+    let mut ids: Vec<String> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut rest = html;
+    while let Some(pos) = rest.find(PREFIX) {
+        let after = &rest[pos + PREFIX.len()..];
+        let run: String = after
+            .chars()
+            .take_while(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+            .collect();
+        if run.len() == 64 && seen.insert(run.clone()) {
+            ids.push(run);
+        }
+        // Advance past one byte of the trailer to avoid an infinite loop
+        // on a malformed (non-hex) `attachment://` occurrence.
+        rest = &after[1.min(after.len())..];
+    }
+    ids
+}
+
+/// Inner — pure-and-testable helper of [`note_export_html_attachments`].
+/// Takes the vault root + destination directly so tests exercise the
+/// full pipeline under a `ScopedTempDir` without a Tauri runtime
+/// (mirror of [`note_export_attachments_with_root`]).
+pub(crate) async fn note_export_html_attachments_with_root(
+    vault_root: PathBuf,
+    state: &VaultRuntimeState,
+    note_id: String,
+    html: String,
+    target_dir: PathBuf,
+    note_filename: String,
+    overwrite: bool,
+) -> Result<usize, NoteExportAttachmentsError> {
+    let note_id = NoteId::parse(&note_id).map_err(|cause| {
+        tracing::debug!(stage = ?cause, "note_export_html_attachments note_id strict-parse failed");
+        NoteExportAttachmentsError::InvalidNoteId
+    })?;
+    // Bug-canary: `note_filename` is the OS save dialog's final path
+    // component — anything traversal-shaped is a frontend regression.
+    if note_filename.is_empty()
+        || note_filename == "."
+        || note_filename == ".."
+        || note_filename
+            .chars()
+            .any(|c| c == '/' || c == '\\' || c.is_control())
+    {
+        tracing::error!(
+            stage = "note_filename_check",
+            error_kind = "InvalidNoteFilename",
+            "note_export_html_attachments rejected a non-bare note filename"
+        );
+        return Err(NoteExportAttachmentsError::InvalidNoteFilename);
+    }
+
+    // Slot guard — the catalog KEK derivation needs `root_key`, the
+    // attachment decrypt needs `items_key` (the markdown sibling's
+    // pattern). The NOTE itself is NOT re-read here: the HTML body was
+    // composed WebView-side and carries the only refs we honor.
+    let Some((slot_guard, items_key, items_key_id, root_key)) =
+        state.hold_unlocked_attachment_material().await
+    else {
+        tracing::debug!(
+            stage = "slot_check",
+            outcome = "vault_locked",
+            "note_export_html_attachments rejected: slot is not Unlocked"
+        );
+        return Err(NoteExportAttachmentsError::VaultNotUnlocked);
+    };
+    tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    let _ = note_id; // strict-parsed as a bug-canary; the HTML carries the refs.
+    let html = Zeroizing::new(html);
+    let started = Instant::now();
+    let join_result =
+        tokio::task::spawn_blocking(move || -> Result<usize, NoteExportAttachmentsError> {
+            // (1) Destination validation.
+            if !target_dir.is_dir() {
+                tracing::error!(
+                    stage = "dest_check",
+                    error_kind = "InvalidDestination",
+                    "note_export_html_attachments destination missing or not a directory"
+                );
+                return Err(NoteExportAttachmentsError::InvalidDestination);
+            }
+
+            // (2) The image attachments the COMPOSED HTML references, in
+            //     document order (the deterministic naming order).
+            let unique_ids = html_referenced_attachment_ids(&html);
+
+            // (3) Pre-write validation: catalog-resolve AND decrypt EVERY
+            //     referenced image in memory before any write (all-or-
+            //     nothing). Skipped when the HTML references none.
+            let mut pending: Vec<PendingAttachment> = Vec::with_capacity(unique_ids.len());
+            if !unique_ids.is_empty() {
+                use crate::plugins::attachments::commands::{
+                    hex_decode_id, load_catalog_for_export, CatalogLoadError,
+                };
+                let catalog =
+                    load_catalog_for_export(&vault_root, &root_key).map_err(|e| match e {
+                        CatalogLoadError::InvalidVaultMeta => {
+                            tracing::error!(
+                                stage = "read_meta",
+                                error_kind = "InvalidVaultMeta",
+                                "note_export_html_attachments vault.meta parse failed"
+                            );
+                            NoteExportAttachmentsError::InvalidVaultMeta
+                        }
+                        CatalogLoadError::MetaIo(kind) => {
+                            let io_kind = from_io_error_kind(kind);
+                            tracing::error!(
+                                stage = "read_meta",
+                                error_kind = "Io",
+                                io_failure_kind = ?io_kind,
+                                "note_export_html_attachments vault.meta read failed"
+                            );
+                            NoteExportAttachmentsError::Io {
+                                io_error_kind: io_kind,
+                            }
+                        }
+                        CatalogLoadError::CatalogIo(kind) => {
+                            let io_kind = from_io_error_kind(kind);
+                            tracing::error!(
+                                stage = "read_catalog",
+                                error_kind = "Io",
+                                io_failure_kind = ?io_kind,
+                                "note_export_html_attachments catalog read failed"
+                            );
+                            NoteExportAttachmentsError::Io {
+                                io_error_kind: io_kind,
+                            }
+                        }
+                    })?;
+
+                for id_hex in &unique_ids {
+                    let Some(meta) = catalog.entries.get(id_hex) else {
+                        tracing::error!(
+                            stage = "catalog_lookup",
+                            error_kind = "AttachmentMissing",
+                            "note_export_html_attachments referenced id absent from catalog"
+                        );
+                        return Err(NoteExportAttachmentsError::AttachmentMissing);
+                    };
+                    let Some(id_bytes) = hex_decode_id(id_hex) else {
+                        return Err(NoteExportAttachmentsError::AttachmentMissing);
+                    };
+                    let blob = match std::fs::read(vault_root.join("attachments").join(id_hex)) {
+                        Ok(bytes) => bytes,
+                        Err(e) => {
+                            let mapped = match e.kind() {
+                                std::io::ErrorKind::NotFound => {
+                                    NoteExportAttachmentsError::AttachmentMissing
+                                }
+                                other => NoteExportAttachmentsError::Io {
+                                    io_error_kind: from_io_error_kind(other),
+                                },
+                            };
+                            tracing::error!(
+                                stage = "read_attachment_blob",
+                                error_kind = note_export_attachments_error_kind(&mapped),
+                                "note_export_html_attachments attachment blob read failed"
+                            );
+                            return Err(mapped);
+                        }
+                    };
+                    let bytes = protocol::decode_attachment_blob(
+                        &blob,
+                        &id_bytes,
+                        meta.content_type.as_bytes(),
+                        &items_key,
+                        &items_key_id,
+                    )
+                    .map_err(|_| {
+                        tracing::error!(
+                            stage = "decode_attachment",
+                            error_kind = "AttachmentCorrupt",
+                            "note_export_html_attachments attachment blob failed to decrypt"
+                        );
+                        NoteExportAttachmentsError::AttachmentCorrupt
+                    })?;
+                    pending.push(PendingAttachment {
+                        id: id_hex.clone(),
+                        filename: sanitize_export_component(&meta.filename, "attachment"),
+                        bytes,
+                    });
+                }
+            }
+
+            // (4) HTML-target overwrite pre-check (SYNC-2).
+            let note_target = target_dir.join(&note_filename);
+            if !overwrite && note_target.exists() {
+                tracing::debug!(
+                    stage = "note_target_check",
+                    error_kind = "TargetAlreadyExists",
+                    "note_export_html_attachments HTML target exists and overwrite consent is absent"
+                );
+                return Err(NoteExportAttachmentsError::TargetAlreadyExists);
+            }
+
+            // (5) Write the sidecars with deterministic suffix-dedup —
+            //     byte-identical loop to the markdown sibling (the HTML
+            //     filename is reserved in `assigned` so no sidecar can
+            //     take the name the .html is about to take).
+            let mut written: Vec<PathBuf> = Vec::new();
+            let mut final_names: std::collections::HashMap<String, String> =
+                std::collections::HashMap::with_capacity(pending.len());
+            let mut assigned: std::collections::HashSet<String> = std::collections::HashSet::new();
+            assigned.insert(note_filename.clone());
+            for p in &pending {
+                let mut n: u32 = 0;
+                let final_name = loop {
+                    if n > DEDUP_RETRY_CAP {
+                        rollback_written_exports(&written);
+                        tracing::error!(
+                            stage = "attachment_write",
+                            error_kind = "Io",
+                            "note_export_html_attachments exceeded the suffix-dedup retry cap"
+                        );
+                        return Err(NoteExportAttachmentsError::Io {
+                            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+                        });
+                    }
+                    let candidate = if n == 0 {
+                        p.filename.clone()
+                    } else {
+                        suffixed_filename(&p.filename, n)
+                    };
+                    if assigned.contains(&candidate) {
+                        n += 1;
+                        continue;
+                    }
+                    match atomic_write::atomic_write_unclobbered(
+                        &target_dir.join(&candidate),
+                        &p.bytes,
+                        /* replace = */ false,
+                    ) {
+                        Ok(()) => break candidate,
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => n += 1,
+                        Err(e) => {
+                            rollback_written_exports(&written);
+                            let io_kind = from_io_error_kind(e.kind());
+                            tracing::error!(
+                                stage = "attachment_write",
+                                error_kind = "Io",
+                                io_failure_kind = ?io_kind,
+                                "note_export_html_attachments attachment write failed"
+                            );
+                            return Err(NoteExportAttachmentsError::Io {
+                                io_error_kind: io_kind,
+                            });
+                        }
+                    }
+                };
+                written.push(target_dir.join(&final_name));
+                assigned.insert(final_name.clone());
+                final_names.insert(p.id.clone(), final_name);
+            }
+
+            // (6) The §6 export transform (HTML arm): rewrite each
+            //     `attachment://<id>` src to the final relative filename.
+            let rewritten = Zeroizing::new(rewrite_html_attachment_srcs(&html, &final_names));
+            if let Err(e) = atomic_write::atomic_write_unclobbered(
+                &note_target,
+                rewritten.as_bytes(),
+                /* replace = */ overwrite,
+            ) {
+                rollback_written_exports(&written);
+                let mapped = match e.kind() {
+                    std::io::ErrorKind::AlreadyExists => {
+                        NoteExportAttachmentsError::TargetAlreadyExists
+                    }
+                    other => NoteExportAttachmentsError::Io {
+                        io_error_kind: from_io_error_kind(other),
+                    },
+                };
+                tracing::error!(
+                    stage = "note_write",
+                    error_kind = note_export_attachments_error_kind(&mapped),
+                    "note_export_html_attachments HTML write failed"
+                );
+                return Err(mapped);
+            }
+
+            // Closure exit: `html`, `pending` bytes, `rewritten` (all
+            // Zeroizing) drop and wipe. The on-disk copies are the user's
+            // deliberate egress.
+            Ok(written.len())
+        })
+        .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+
+    let attachment_count = match join_result {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_export_html_attachments worker panicked or runtime shutdown"
+            );
+            return Err(NoteExportAttachmentsError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(count)) => count,
+    };
+    drop(slot_guard);
+
+    tracing::debug!(
+        stage = "success",
+        event = "note_exported_html_with_attachments",
         attachment_count = attachment_count,
         duration_ms = duration_ms,
     );
@@ -7148,5 +7640,188 @@ mod tests {
         ] {
             assert_eq!(note_export_attachments_error_kind(&e), expected);
         }
+    }
+
+    // =====================================================================
+    // note_export_html / note_export_html_attachments (MYND-340)
+    // =====================================================================
+
+    #[test]
+    fn html_referenced_attachment_ids_are_first_appearance_unique() {
+        let a = "a".repeat(64);
+        let b = "b".repeat(64);
+        let html = format!(
+            "<img src=\"attachment://{a}\"><img src=\"attachment://{b}\">\
+             <img src=\"attachment://{a}\">"
+        );
+        // First-appearance order, de-duplicated.
+        assert_eq!(html_referenced_attachment_ids(&html), vec![a.clone(), b]);
+        // No refs → empty.
+        assert!(html_referenced_attachment_ids("<p>plain</p>").is_empty());
+        // A non-64-hex trailer is not accepted as an id (no infinite loop).
+        assert!(html_referenced_attachment_ids("attachment://xyz").is_empty());
+    }
+
+    #[test]
+    fn export_text_to_path_writes_verbatim_under_unlocked_slot() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let out = scratch.path().join("out");
+            let dest = out.join("doc.html");
+            let document = "<!DOCTYPE html>\n<html><body><p>x</p></body></html>\n";
+
+            note_export_text_to_path(&state, document.to_string(), dest.clone(), false)
+                .await
+                .expect("html write must succeed under an unlocked slot");
+
+            assert_eq!(std::fs::read(&dest).unwrap(), document.as_bytes());
+            // Atomic publish: no temp sibling.
+            assert_eq!(dir_names(&out), vec!["doc.html"]);
+
+            // overwrite=false against an existing target rejects, untouched.
+            let again =
+                note_export_text_to_path(&state, "REPLACEMENT".to_string(), dest.clone(), false)
+                    .await;
+            assert!(matches!(again, Err(NoteExportError::TargetAlreadyExists)));
+            assert_eq!(std::fs::read(&dest).unwrap(), document.as_bytes());
+
+            // overwrite=true replaces.
+            note_export_text_to_path(&state, "REPLACEMENT".to_string(), dest.clone(), true)
+                .await
+                .unwrap();
+            assert_eq!(std::fs::read(&dest).unwrap(), b"REPLACEMENT");
+        });
+    }
+
+    #[test]
+    fn export_text_to_path_rejects_when_slot_is_locked() {
+        rt().block_on(async {
+            let scratch = ScopedTempDir::new("html-write-locked").unwrap();
+            std::fs::create_dir(scratch.path().join("out")).unwrap();
+            let state = VaultRuntimeState::default(); // Empty slot
+            let res = note_export_text_to_path(
+                &state,
+                "<html></html>".to_string(),
+                scratch.path().join("out").join("x.html"),
+                false,
+            )
+            .await;
+            assert!(matches!(res, Err(NoteExportError::VaultNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn export_html_attachments_writes_sidecars_and_rewrites_srcs() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            // Two DIFFERENT images sharing a display filename → the second
+            // sidecar dedups to "photo (1).png", and BOTH srcs rewrite.
+            let id_a = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
+            let id_b = import_att(&vault_root, &state, ATT_PNG_B, "photo.png").await;
+            // A valid note id is required (bug-canary parse) even though
+            // the HTML — not the note — carries the refs.
+            let note_id =
+                note_create_with_dir(vault_root.join("notes"), &state, "body".to_string())
+                    .await
+                    .unwrap();
+
+            let doc = format!(
+                "<!DOCTYPE html>\n<html><body>\
+                 <img class=\"att-image\" src=\"attachment://{id_a}\" alt=\"a\">\
+                 <img class=\"att-image\" src=\"attachment://{id_b}\" alt=\"b\">\
+                 </body></html>\n"
+            );
+
+            let count = note_export_html_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                doc,
+                out.clone(),
+                "page.html".to_string(),
+                false,
+            )
+            .await
+            .expect("html attachments export must succeed");
+            assert_eq!(count, 2);
+
+            // Side-by-side sidecars, decrypted byte-for-byte, deduped.
+            assert_eq!(std::fs::read(out.join("photo.png")).unwrap(), ATT_PNG_A);
+            assert_eq!(std::fs::read(out.join("photo (1).png")).unwrap(), ATT_PNG_B);
+            assert_eq!(
+                dir_names(&out),
+                vec!["page.html", "photo (1).png", "photo.png"]
+            );
+
+            // The HTML's attachment:// srcs are rewritten to the final
+            // relative filenames (percent-encoded); the scheme is gone.
+            let html = std::fs::read_to_string(out.join("page.html")).unwrap();
+            assert!(!html.contains("attachment://"));
+            assert!(html.contains("src=\"photo.png\""));
+            assert!(html.contains("src=\"photo%20%281%29.png\""));
+        });
+    }
+
+    #[test]
+    fn export_html_attachments_no_refs_writes_only_the_html() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let out = vault_root.join("out");
+            let note_id =
+                note_create_with_dir(vault_root.join("notes"), &state, "body".to_string())
+                    .await
+                    .unwrap();
+            let doc = "<!DOCTYPE html>\n<html><body><p>no images</p></body></html>\n";
+
+            let count = note_export_html_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                doc.to_string(),
+                out.clone(),
+                "page.html".to_string(),
+                false,
+            )
+            .await
+            .unwrap();
+
+            // No image refs → zero sidecars; the HTML is written verbatim
+            // (no vault.meta / catalog read on this path).
+            assert_eq!(count, 0);
+            assert_eq!(dir_names(&out), vec!["page.html"]);
+            assert_eq!(
+                std::fs::read(out.join("page.html")).unwrap(),
+                doc.as_bytes()
+            );
+        });
+    }
+
+    #[test]
+    fn export_html_attachments_rejects_traversal_shaped_filename() {
+        rt().block_on(async {
+            let (scratch, state) = export_att_fixture().await;
+            let vault_root = scratch.path().to_path_buf();
+            let note_id =
+                note_create_with_dir(vault_root.join("notes"), &state, "body".to_string())
+                    .await
+                    .unwrap();
+            let res = note_export_html_attachments_with_root(
+                vault_root.clone(),
+                &state,
+                note_id,
+                "<html></html>".to_string(),
+                vault_root.join("out"),
+                "../escape.html".to_string(),
+                false,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(NoteExportAttachmentsError::InvalidNoteFilename)
+            ));
+        });
     }
 }

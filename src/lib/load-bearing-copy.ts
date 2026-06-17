@@ -83,3 +83,24 @@ export const EXPORT_PDF_PLAIN_SENTENCE =
  *  not just PDFs). */
 export const EXPORT_PDF_EXCLUSION_SENTENCE =
   "Attached files (PDFs and other non-image attachments) are not included in the generated PDF.";
+
+// Per-note HTML + plain-text export (note-export MYND-340). Same honesty
+// discipline as the markdown / PDF sentences above: the egress is stated
+// plainly, once (carried on the OS save dialog title, or shown in the
+// pre-flight attachments modal for HTML), never as a banner; E2E asserts
+// them by FULL-literal equality.
+
+/** The one plain egress sentence of the per-note HTML export — shown in
+ *  the pre-flight modal when the note references image attachments, and
+ *  carried as the OS save dialog's title on the common no-modal path
+ *  (`runNoteHtmlExportFlow`), so it is said exactly once at the decision
+ *  point either way. */
+export const EXPORT_PLAIN_HTML_SENTENCE =
+  "The exported file is plain HTML — it is not encrypted.";
+
+/** The one plain egress sentence of the per-note plain-text export —
+ *  carried as the OS save dialog's title (`runNoteTxtExportFlow`); the
+ *  TXT projection never includes attachments, so there is no pre-flight
+ *  modal and the sentence is said only here. */
+export const EXPORT_PLAIN_TEXT_SENTENCE =
+  "The exported file is plain text — it is not encrypted.";

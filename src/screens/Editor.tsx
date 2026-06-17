@@ -78,7 +78,9 @@ import {
   exportToastAction,
   noteExportOptions,
   runNoteExportFlow,
+  runNoteHtmlExportFlow,
   runNotePdfExportFlow,
+  runNoteTxtExportFlow,
   type AttachmentPreflightChoice,
   type ExportToast,
   type NoteExportUiHooks,
@@ -131,6 +133,7 @@ import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
 import { PaneTree } from "../notes/components/PaneTree";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
 import type { PaneReadout } from "../notes/components/PaneView";
+import type { DocStats } from "../notes/documentStats";
 import { findItemPane, sameItem } from "../notes/workspaceState";
 import {
   deserializeWorkspace,
@@ -588,7 +591,8 @@ function EditorChrome({
   // refresh-after-save; the chrome just mirrors the focused pane's readout.
   const [readout, setReadout] = useState<PaneReadout>({
     status: { status: "clean" },
-    wordCount: null,
+    stats: null,
+    selectionStats: null,
     retry: () => {},
   });
   const onReadout = useCallback((r: PaneReadout) => setReadout(r), []);
@@ -1097,7 +1101,8 @@ function EditorChrome({
         saveStatus={readout.status}
         onRetry={readout.retry}
         hideSaveStatus={ws.focusedLeaf.activeTab === null}
-        wordCount={readout.wordCount}
+        stats={readout.stats}
+        selectionStats={readout.selectionStats}
         hiddenItems={hiddenBarItems}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -1276,6 +1281,24 @@ function EditorChrome({
             noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
           );
         }}
+        onExportNoteHtml={() => {
+          // HTML sibling (MYND-340) — same shared-flow discipline.
+          setPaletteOpen(false);
+          const id = ctx.selectedId;
+          if (id === null) return;
+          void runNoteHtmlExportFlow(
+            noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
+          );
+        }}
+        onExportNoteTxt={() => {
+          // Plain-text sibling (MYND-340) — same shared-flow discipline.
+          setPaletteOpen(false);
+          const id = ctx.selectedId;
+          if (id === null) return;
+          void runNoteTxtExportFlow(
+            noteExportOptions(id, ctx.cache.get(id)?.title ?? null, exportHooks),
+          );
+        }}
         onShowGraph={() => {
           setPaletteOpen(false);
           ws.openGraph();
@@ -1302,6 +1325,10 @@ function EditorChrome({
         onToggleRightSidebar={() => {
           setPaletteOpen(false);
           if (!forced.forceRightCollapsed) layout.toggleRightCollapsed();
+        }}
+        onToggleStackedTabs={() => {
+          setPaletteOpen(false);
+          ws.toggleStackedFocused();
         }}
       />
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
@@ -1532,6 +1559,8 @@ type CommandPaletteHostProps = {
   onOpenSnapshots: () => void;
   onExportNoteMarkdown: () => void;
   onExportNotePdf: () => void;
+  onExportNoteHtml: () => void;
+  onExportNoteTxt: () => void;
   onShowGraph: () => void;
   onShowTags: () => void;
   onShowViews: () => void;
@@ -1542,6 +1571,7 @@ type CommandPaletteHostProps = {
   onLockFlushed: () => Promise<void>;
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
+  onToggleStackedTabs: () => void;
 };
 
 function CommandPaletteHost({
@@ -1554,6 +1584,8 @@ function CommandPaletteHost({
   onOpenSnapshots,
   onExportNoteMarkdown,
   onExportNotePdf,
+  onExportNoteHtml,
+  onExportNoteTxt,
   onShowGraph,
   onShowTags,
   onShowViews,
@@ -1564,6 +1596,7 @@ function CommandPaletteHost({
   onLockFlushed,
   onToggleLeftSidebar,
   onToggleRightSidebar,
+  onToggleStackedTabs,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
   // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
@@ -1647,6 +1680,8 @@ function CommandPaletteHost({
       onOpenSnapshots,
       onExportNoteMarkdown,
       onExportNotePdf,
+      onExportNoteHtml,
+      onExportNoteTxt,
       onShowGraph,
       onShowTags,
       onShowViews,
@@ -1656,6 +1691,7 @@ function CommandPaletteHost({
       onExportVaultMarkdown,
       onToggleLeftSidebar,
       onToggleRightSidebar,
+      onToggleStackedTabs,
       onSelectNote: async (id) => {
         await ctx.open(id).catch(() => {
           /* selection failure surfaces via sidebar UX */
@@ -1675,6 +1711,8 @@ function CommandPaletteHost({
       onOpenSnapshots,
       onExportNoteMarkdown,
       onExportNotePdf,
+      onExportNoteHtml,
+      onExportNoteTxt,
       onShowGraph,
       onShowTags,
       onShowViews,
@@ -1684,6 +1722,7 @@ function CommandPaletteHost({
       onExportVaultMarkdown,
       onToggleLeftSidebar,
       onToggleRightSidebar,
+      onToggleStackedTabs,
     ],
   );
   return (
@@ -2195,10 +2234,13 @@ interface BottomBarProps {
    *  (the indicator would otherwise read "Saved" / a stale relative-
    *  time from the previous note and confuse the user). */
   hideSaveStatus?: boolean;
-  /** Body word count of the active note (frontmatter excluded). `null`
-   *  hides the counter entirely — same rationale as `hideSaveStatus`:
-   *  with no note selected the value would be a meaningless 0. */
-  wordCount?: number | null;
+  /** Whole-note statistics of the active note (frontmatter + markdown syntax
+   *  excluded). `null` hides the readout entirely — same rationale as
+   *  `hideSaveStatus`: with no note selected the values would be meaningless. */
+  stats?: DocStats | null;
+  /** Statistics of the current non-empty selection; when non-null the readout
+   *  shows these instead of whole-note `stats`. */
+  selectionStats?: DocStats | null;
   /** Bottom-bar customization: the set of element ids the user has hidden via
    *  the bar's right-click menu. Each element renders only when its id is NOT
    *  in this set (AND its pre-existing condition holds). */
@@ -2218,7 +2260,8 @@ function BottomBar({
   saveStatus,
   onRetry,
   hideSaveStatus = false,
-  wordCount = null,
+  stats = null,
+  selectionStats = null,
   hiddenItems,
   onContextMenu,
 }: BottomBarProps) {
@@ -2364,16 +2407,34 @@ function BottomBar({
             <span>Lock</span>
           </button>
         )}
-        {wordCount !== null && !isHidden("word-count") && (
-          <span
-            style={{
-              ...STATUS_TEXT_STYLE,
-              fontFamily: "var(--font-mono)",
-            }}
-          >
-            {wordCount} {wordCount === 1 ? "word" : "words"}
-          </span>
-        )}
+        {(() => {
+          // Combined statistics readout (MYND-339), reusing the `word-count`
+          // bar-item id (one toggle). Shows the selection figures when a
+          // non-empty selection exists, else the whole-note figures; the full
+          // four-stat breakdown is in the hover title.
+          const shown = selectionStats ?? stats;
+          if (shown === null || isHidden("word-count")) return null;
+          const isSel = selectionStats !== null;
+          return (
+            <span
+              data-testid="editor.doc-stats"
+              data-scope={isSel ? "selection" : "document"}
+              title={
+                `${shown.characters} characters · ${shown.words} words · ` +
+                `${shown.spaces} spaces · ${shown.paragraphs} ` +
+                `${shown.paragraphs === 1 ? "paragraph" : "paragraphs"}` +
+                `${isSel ? " (selection)" : ""}`
+              }
+              style={{
+                ...STATUS_TEXT_STYLE,
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              {shown.words} {shown.words === 1 ? "word" : "words"} · {shown.characters} chars
+              {isSel ? " (sel)" : ""}
+            </span>
+          );
+        })()}
       </div>
     </div>
   );

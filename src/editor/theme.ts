@@ -296,6 +296,34 @@ export const myneTheme = EditorView.theme({
     overflowX: "auto",
   },
 
+  // Line-number gutter (editor-line-numbers / MYND-314) — opt-in, off by default.
+  // Prose-first: the gutter blends into the editor surface (no chrome block) and
+  // the numbers recede — faint, mono, slightly smaller — so they never compete
+  // with the prose.
+  ".cm-gutters": {
+    backgroundColor: "transparent",
+    border: "none",
+    color: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-lineNumbers .cm-gutterElement": {
+    color: "var(--fg-3, #6b6a64)",
+    opacity: "0.5",
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.8em",
+    padding: "0 12px 0 8px",
+    minWidth: "1.6em",
+  },
+
+  // Dialect comment `%%…%%` (editor-comments / MYND-315) — shown DIMMED in the
+  // editor (always visible as a de-emphasized comment, never fully hidden: a
+  // comment you cannot see is invisible-and-confusing UX). It is stripped from
+  // rendered output + lossy exports by the dialect strip, NOT by this decoration.
+  ".cm-comment": {
+    color: "var(--fg-3, #6b6a64)",
+    opacity: "0.6",
+    fontStyle: "italic",
+  },
+
   // Callouts (MYND-47) — a colored tint on each callout line (composes with
   // blockquote's left bars) + an icon+title header. Colors reuse the semantic
   // soft/solid tokens; `-bg-` tints the line, `-fg-` colors the title+icon.

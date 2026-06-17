@@ -30,6 +30,7 @@ permissions = [
   "allow-set-daily-folder",
   "allow-set-daily-template",
   "allow-set-editor-text-size",
+  "allow-set-editor-line-numbers",
   "allow-set-editor-line-spacing",
   "allow-set-editor-content-width",
   "allow-set-editor-font-family",
@@ -160,6 +161,16 @@ commands.allow = ["set_editor_text_size"]
 identifier = "allow-set-editor-line-spacing"
 description = "Allow invoking prefs:set_editor_line_spacing (Slot::Unlocked-gated setter for the editor_line_spacing preset — tight/normal/relaxed, Option<String> where None clears to the normal default; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_editor_line_spacing"]
+
+# editor-line-numbers (MYND-314): a write setter for the editor_line_numbers
+# toggle — the optional line-number gutter. Inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
+# grant this to any non-main window. Atomic-writes vault.prefs with no native
+# side-effect; non-load-bearing cosmetic (no clamp; default-OFF is host policy).
+[[permission]]
+identifier = "allow-set-editor-line-numbers"
+description = "Allow invoking prefs:set_editor_line_numbers (Slot::Unlocked-gated setter for the editor_line_numbers toggle — the optional editor line-number gutter; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time)."
+commands.allow = ["set_editor_line_numbers"]
 
 [[permission]]
 identifier = "allow-set-editor-content-width"

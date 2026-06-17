@@ -12,6 +12,12 @@ const SKIP_EXACT_NAMES: ReadonlySet<string> = new Set([
   "CodeInfo",
   "WikilinkHeading",
   "WikilinkBlockId",
+  // Dialect comments `%%…%%` (MYND-315): the whole node — body included — is
+  // dialect-hidden, so document statistics exclude it (SYNC-1), matching the
+  // HTML / PDF / stripped-TXT projections. The `.md` export stays verbatim
+  // (SYNC-2) — that path never runs through this projection.
+  "DialectComment",
+  "DialectCommentBlock",
 ]);
 
 function shouldSkipUnconditionally(name: string): boolean {
@@ -19,13 +25,16 @@ function shouldSkipUnconditionally(name: string): boolean {
 }
 
 /**
- * Decoration-stripped, frontmatter-excluded, code-block-included plain
- * text. Whitespace runs collapse to single space; output is trimmed.
+ * Decoration-stripped, frontmatter-excluded, code-block-included plain text,
+ * with the source whitespace **preserved** (NOT collapsed, NOT trimmed). This is
+ * the substrate for character / space / paragraph counting (`documentStats.ts`),
+ * which needs the real whitespace + line breaks that {@link extractFullText}
+ * destroys. For word counting / search, prefer the collapsed `extractFullText`.
  *
  * Pass `fm` when the caller (e.g. `parse()`) has already located the
  * frontmatter range — avoids a redundant scan.
  */
-export function extractFullText(
+export function extractBodyText(
   source: string,
   tree?: Tree,
   fm?: FrontmatterRange | null,
@@ -64,9 +73,25 @@ export function extractFullText(
     },
   });
 
-  const assembled = assembleOutsideSkips(source, skipRanges, {
+  return assembleOutsideSkips(source, skipRanges, {
     start: 0,
     end: source.length,
   });
-  return assembled.replace(/\s+/gu, " ").trim();
+}
+
+/**
+ * Decoration-stripped, frontmatter-excluded, code-block-included plain
+ * text. Whitespace runs collapse to single space; output is trimmed. Thin
+ * wrapper over {@link extractBodyText} (the collapse + trim is the only
+ * difference) — used by word count and search.
+ *
+ * Pass `fm` when the caller (e.g. `parse()`) has already located the
+ * frontmatter range — avoids a redundant scan.
+ */
+export function extractFullText(
+  source: string,
+  tree?: Tree,
+  fm?: FrontmatterRange | null,
+): string {
+  return extractBodyText(source, tree, fm).replace(/\s+/gu, " ").trim();
 }

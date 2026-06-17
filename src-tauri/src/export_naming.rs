@@ -114,6 +114,75 @@ pub(crate) fn rewrite_embeds_to_final_names(
     out
 }
 
+/// Rewrite every `attachment://<id>` reference in an emitted standalone
+/// HTML document to the final relative sidecar filename actually written
+/// beside it (the HTML projection's arm of the `markdown-dialect.md` §6
+/// sanctioned export transform — the same id→final-name remap the
+/// markdown export applies to form-C embeds, here applied to the HTML
+/// body's `<img src>` rather than the markdown wikilink). The filename is
+/// percent-encoded for the URL-shaped `src` attribute (a dedup-suffixed
+/// name like `photo (1).png` carries spaces + parens). An id with no
+/// final name (structurally impossible — the same scan fed both) is left
+/// untouched. Every byte outside the rewritten `attachment://<id>` token
+/// is preserved.
+pub(crate) fn rewrite_html_attachment_srcs(
+    html: &str,
+    final_names: &HashMap<String, String>,
+) -> String {
+    const PREFIX: &str = "attachment://";
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(pos) = rest.find(PREFIX) {
+        out.push_str(&rest[..pos]);
+        let after = &rest[pos + PREFIX.len()..];
+        // The id is the 64-char lowercase-hex run (the emitter writes
+        // exactly that — `attachmentUrl(id)`); read until the first
+        // non-hex char (the closing quote in `src="attachment://<id>"`).
+        let id_len = after.bytes().take_while(|b| b.is_ascii_hexdigit()).count();
+        let id = &after[..id_len];
+        match final_names.get(id) {
+            Some(final_name) => out.push_str(&percent_encode_path(final_name)),
+            // No mapping → keep the original token verbatim (id included).
+            None => {
+                out.push_str(PREFIX);
+                out.push_str(id);
+            }
+        }
+        rest = &after[id_len..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Percent-encode a relative filename for use as an HTML attribute URL
+/// (`<img src="…">`). Only the characters that break an unquoted-shaped
+/// path or the surrounding double-quoted attribute are escaped; the
+/// common safe set (alphanumerics, `-._~`, plus `.`/`-` already covered)
+/// passes through so a plain `photo.png` is emitted as-is. Zero new
+/// dependency (the crate has no percent-encoding crate; adding one is a
+/// TB9 decision — `src-tauri/CLAUDE.md`).
+fn percent_encode_path(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    for b in name.bytes() {
+        let safe = b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~' | b'/');
+        if safe {
+            out.push(b as char);
+        } else {
+            out.push('%');
+            out.push(hex_upper(b >> 4));
+            out.push(hex_upper(b & 0x0f));
+        }
+    }
+    out
+}
+
+fn hex_upper(nibble: u8) -> char {
+    match nibble {
+        0..=9 => (b'0' + nibble) as char,
+        _ => (b'A' + (nibble - 10)) as char,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +303,44 @@ mod tests {
             rewrite_embeds_to_final_names("plain body", &[], &names),
             "plain body"
         );
+    }
+
+    #[test]
+    fn rewrite_html_attachment_srcs_remaps_to_relative_filenames() {
+        let id_a = "a".repeat(64);
+        let id_b = "b".repeat(64);
+        let mut names = HashMap::new();
+        names.insert(id_a.clone(), "photo.png".to_string());
+        names.insert(id_b.clone(), "scan (1).png".to_string());
+        let html = format!(
+            "<p>x</p><img class=\"att-image\" src=\"attachment://{id_a}\" alt=\"a\">\
+             <img class=\"att-image\" src=\"attachment://{id_b}\" alt=\"b\">"
+        );
+        assert_eq!(
+            rewrite_html_attachment_srcs(&html, &names),
+            "<p>x</p><img class=\"att-image\" src=\"photo.png\" alt=\"a\">\
+             <img class=\"att-image\" src=\"scan%20%281%29.png\" alt=\"b\">"
+        );
+    }
+
+    #[test]
+    fn rewrite_html_attachment_srcs_keeps_unmapped_token_verbatim() {
+        let id_a = "a".repeat(64);
+        let html = format!("<img src=\"attachment://{id_a}\">");
+        // Empty map → no rewrite, token untouched (every byte preserved).
+        assert_eq!(rewrite_html_attachment_srcs(&html, &HashMap::new()), html);
+        // No attachment token at all → identity.
+        assert_eq!(
+            rewrite_html_attachment_srcs("<p>plain</p>", &HashMap::new()),
+            "<p>plain</p>"
+        );
+    }
+
+    #[test]
+    fn percent_encode_path_escapes_only_unsafe_bytes() {
+        assert_eq!(percent_encode_path("photo.png"), "photo.png");
+        assert_eq!(percent_encode_path("a-b_c.d~e"), "a-b_c.d~e");
+        assert_eq!(percent_encode_path("scan (1).png"), "scan%20%281%29.png");
+        assert_eq!(percent_encode_path("a&b#c.png"), "a%26b%23c.png");
     }
 }

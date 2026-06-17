@@ -327,16 +327,24 @@ code {
 .tok-emphasis                     { font-style: italic; }
 
 /* === Mermaid ============================================================ */
+/* The diagram sits on the SAME fixed-light card the editor uses
+   (.cm-mermaid-card, theme.ts) so it reads identically: --fg-1 ink for any
+   currentColor-derived glyphs, a #fbfbfa surface the mermaid palette assumes. */
 .mermaid-diagram {
   margin: 12px 0;
   text-align: center;
   max-width: 100%;
+  color: var(--fg-1);
   break-inside: avoid;
   page-break-inside: avoid;
 }
 .mermaid-diagram svg {
   max-width: 100%;
   height: auto;
+  background: #fbfbfa;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2);
+  padding: 12px;
 }
 /* Render-failure fallback: the code card again, dashed to read as degraded. */
 .mermaid-fallback {

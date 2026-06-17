@@ -6,6 +6,11 @@
 //
 // Extracted from `Editor.tsx` so each `<PaneView>` (MYND-166 multi-pane)
 // can count its own note independently.
+//
+// NOTE (MYND-339): the live bottom-bar readout now uses `computeDocStats`
+// (`documentStats.ts`), so this is no longer the production word counter. It is
+// retained as the **parity oracle** that pins `computeDocStats(...).words` to
+// the original word-count definition (`tests/notes/documentStats.test.ts`).
 
 import { extractFullText } from "../dialect";
 

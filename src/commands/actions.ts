@@ -202,6 +202,41 @@ const exportNotePdfAction: CommandAction = {
   },
 };
 
+const exportNoteHtmlAction: CommandAction = {
+  id: "note.export-html",
+  label: "Export note as HTML…",
+  category: "Editor",
+  // Sibling of note.export-markdown / note.export-pdf with the SAME
+  // visibility rules (MYND-340): editor stage AND a selected note, else
+  // hidden. Runs the exact same shared flow as the sidebar context-menu
+  // item (src/notes/exportFlow.ts::runNoteHtmlExportFlow) — deliberate
+  // plaintext egress (TB3); the OS save dialog is the consent.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null
+      ? "show"
+      : "hidden",
+  run: (ctx) => {
+    ctx.onExportNoteHtml();
+  },
+};
+
+const exportNoteTxtAction: CommandAction = {
+  id: "note.export-txt",
+  label: "Export note as Plain Text…",
+  category: "Editor",
+  // Sibling of the other per-note export actions (MYND-340): editor stage
+  // AND a selected note. Runs the shared
+  // src/notes/exportFlow.ts::runNoteTxtExportFlow — deliberate plaintext
+  // egress (TB3); the OS save dialog is the consent.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null
+      ? "show"
+      : "hidden",
+  run: (ctx) => {
+    ctx.onExportNoteTxt();
+  },
+};
+
 const showGraphAction: CommandAction = {
   id: "graph.show",
   label: "Show graph view…",
@@ -276,11 +311,25 @@ const toggleRightSidebarAction: CommandAction = {
   },
 };
 
+const toggleStackedTabsAction: CommandAction = {
+  id: "view.toggle-stacked-tabs",
+  label: "Toggle stacked tabs",
+  category: "View",
+  // tab-modes (MYND-319): per-leaf-pane layout flag on the FOCUSED pane — the
+  // palette is the sole entry point (no pane-header chrome this slice). Editor-
+  // only like the other view toggles; the pane state is always present there.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onToggleStackedTabs();
+  },
+};
+
 export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
   toggleLeftSidebarAction,
   toggleRightSidebarAction,
+  toggleStackedTabsAction,
   newNoteFromTemplateAction,
   openTodayNoteAction,
   randomNoteAction,
@@ -289,6 +338,8 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   openSnapshotsAction,
   exportNoteMarkdownAction,
   exportNotePdfAction,
+  exportNoteHtmlAction,
+  exportNoteTxtAction,
   showGraphAction,
   showTagsAction,
   showViewsAction,

@@ -14,6 +14,7 @@ import {
   GRAPH_TAB_ID,
   itemKey,
   sameItem,
+  type LeafPane,
   type WorkspaceItem,
   type WorkspaceNode,
   type WorkspaceState,
@@ -40,7 +41,15 @@ export async function workspaceStage(descriptor: string): Promise<void> {
   await invoke("plugin:workspace|workspace_stage", { descriptor });
 }
 
-/** Serialize a workspace to the on-disk descriptor string. */
+/** Serialize a workspace to the on-disk descriptor string.
+ *
+ * The tab-modes (MYND-319/320) `pinned` (per-tab) and `stacked` (per-leaf)
+ * fields are **omit-when-default**: the pure model never stores `pinned: false`
+ * or `stacked: false` (the unpin / un-stack transitions DROP the key), and
+ * `JSON.stringify` omits `undefined` keys — so a workspace with no pins and no
+ * stacked panes serializes BYTE-IDENTICAL to a pre-feature descriptor. No
+ * `workspace_format_version` bump; the descriptor stays engine-opaque (§9.7.2,
+ * SYNC-4). */
 export function serializeWorkspace(state: WorkspaceState): string {
   return JSON.stringify({ root: state.root, focusedPaneId: state.focusedPaneId });
 }
@@ -95,13 +104,19 @@ function parseItem(t: unknown): ParsedItem {
   if (typeof t !== "object" || t === null) return "invalid";
   const o = t as Record<string, unknown>;
   if (typeof o.id !== "string") return "invalid";
+  // tab-modes (MYND-320): a per-tab `pinned` flag. Read-when-present, omit-
+  // when-absent (an old descriptor — or any unpinned tab — has no key, which is
+  // the unpinned default). Only a literal `true` pins; anything else (false /
+  // absent / junk) is treated as unpinned, so the key never round-trips as
+  // `false` and a non-pinned tab stays byte-identical to pre-feature.
+  const pinned = o.pinned === true ? { pinned: true as const } : {};
   if (o.kind === "note" || o.kind === "view") {
-    return { item: { kind: o.kind, id: o.id } };
+    return { item: { kind: o.kind, id: o.id, ...pinned } };
   }
   // The whole-vault graph (MYND-198) is a singleton tab; its id is the fixed
   // sentinel, so any persisted id normalizes to a canonical graph item.
   if (o.kind === "graph") {
-    return { item: { kind: "graph", id: GRAPH_TAB_ID } };
+    return { item: { kind: "graph", id: GRAPH_TAB_ID, ...pinned } };
   }
   if (typeof o.kind === "string") return "drop"; // unknown future kind
   return "invalid";
@@ -143,7 +158,13 @@ function normalizeNode(n: unknown): WorkspaceNode | null {
         return null;
       }
     }
-    return { kind: "leaf", id: node.id, tabs, activeTab };
+    // tab-modes (MYND-319): a per-leaf `stacked` layout flag. Read-when-present,
+    // omit-when-absent — only a literal `true` stacks; anything else (false /
+    // absent / junk) is the not-stacked default, so the key never round-trips as
+    // `false` and a non-stacked pane stays byte-identical to pre-feature.
+    const leaf: LeafPane = { kind: "leaf", id: node.id, tabs, activeTab };
+    if (node.stacked === true) leaf.stacked = true;
+    return leaf;
   }
   if (node.kind === "split") {
     if (typeof node.id !== "string") return null;
