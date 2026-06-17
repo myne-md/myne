@@ -88,6 +88,56 @@ pub const DEFAULT_V0_1_KDF_PARAMS: KdfParams = KdfParams {
     argon2_version: ARGON2_VERSION_V13,
 };
 
+/// Inclusive lower bound on Argon2id memory cost accepted from an untrusted
+/// `vault.meta`. 8 MiB is far below the v0.1 desktop default (256 MiB) — low
+/// enough to leave room for a future memory-constrained mobile profile
+/// (spec § 4.2) — yet ~1000× the absolute argon2 floor, blocking the
+/// brute-forceable `m=8 KiB` downgrade. See [`validate_kdf_params`].
+pub const MIN_KDF_M_KIB: u32 = 8 * 1024;
+/// Inclusive upper bound on Argon2id memory cost. 4 GiB is well above any
+/// legitimate profile; its purpose is to stop a tampered `vault.meta` from
+/// declaring an absurd `m_kib` (e.g. 4 TiB) that would trigger a
+/// multi-terabyte allocation — a pre-auth client OOM/DoS — at unlock time.
+pub const MAX_KDF_M_KIB: u32 = 4 * 1024 * 1024;
+/// Inclusive bounds on the Argon2id time cost (passes).
+pub const MIN_KDF_T: u32 = 1;
+/// See [`MIN_KDF_T`].
+pub const MAX_KDF_T: u32 = 16;
+/// Inclusive bounds on the Argon2id parallelism (lanes).
+pub const MIN_KDF_P: u8 = 1;
+/// See [`MIN_KDF_P`].
+pub const MAX_KDF_P: u8 = 16;
+
+/// Reject KDF cost parameters taken from an untrusted `vault.meta` that fall
+/// outside the accepted range, **before** they reach Argon2id.
+///
+/// `parse_kdf_params` validates only the on-disk encoding (kdf_id +
+/// argon2_version); it deliberately leaves `m_kib`/`t`/`p` unbounded so the
+/// test-vector and weak-fixture surfaces stay permissive. Clients call this
+/// at the derivation site to close two gaps an unbounded params block opens:
+///
+/// - **Floor** (`m_kib < MIN_KDF_M_KIB`, `t < MIN_KDF_T`): a vault created or
+///   coerced to brute-forceable cost. A pure tamper of an existing strong
+///   vault is already defeated by the params→AAD binding, but a low floor
+///   honoured blindly weakens any vault legitimately created at that cost.
+/// - **Ceiling** (`m_kib > MAX_KDF_M_KIB`): a tampered block declaring an
+///   unaffordable `m_kib`, which `derive_*` would try to allocate **before**
+///   any AEAD check can fire — a pre-auth OOM/DoS. AAD binding does not help
+///   here because the allocation precedes tag verification.
+///
+/// Returns [`ProtocolError::InvalidVaultMeta`] (a structural, non-credential
+/// failure) when any parameter is out of range. The default v0.1 params pass.
+pub fn validate_kdf_params(params: &KdfParams) -> Result<(), ProtocolError> {
+    let ok = (MIN_KDF_M_KIB..=MAX_KDF_M_KIB).contains(&params.m_kib)
+        && (MIN_KDF_T..=MAX_KDF_T).contains(&params.t)
+        && (MIN_KDF_P..=MAX_KDF_P).contains(&params.p);
+    if ok {
+        Ok(())
+    } else {
+        Err(ProtocolError::InvalidVaultMeta)
+    }
+}
+
 /// Encode `params` to its 11-byte canonical form per
 /// `docs/spec/protocol.md` § 4.3.
 ///
