@@ -132,8 +132,9 @@ pub use search_blob::{
 pub use subkey::{derive_subkey, SubkeyRole};
 pub use template::{render, supported_tokens, RenderContext};
 pub use types::{
-    generate_root_key, parse_kdf_params, serialize_kdf_params, KdfParams, DEFAULT_V0_1_KDF_PARAMS,
-    KDF_PARAMS_CANONICAL_LEN,
+    generate_root_key, parse_kdf_params, serialize_kdf_params, validate_kdf_params, KdfParams,
+    DEFAULT_V0_1_KDF_PARAMS, KDF_PARAMS_CANONICAL_LEN, MAX_KDF_M_KIB, MAX_KDF_P, MAX_KDF_T,
+    MIN_KDF_M_KIB, MIN_KDF_P, MIN_KDF_T,
 };
 pub use vault_indices_blob::{
     decode_vault_indices_blob, encode_vault_indices_blob, encode_vault_indices_blob_raw,

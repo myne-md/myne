@@ -13,11 +13,13 @@
 use protocol::KdfParams;
 use std::path::{Path, PathBuf};
 
-/// Fast Argon2id parameters for tests (RFC 9106 minimum). Production
-/// never uses these — `protocol::DEFAULT_V0_1_KDF_PARAMS` is the only
-/// set that reaches `derive_*_wrap_key` at runtime.
+/// Fast Argon2id parameters for tests — pinned to the `validate_kdf_params`
+/// memory floor (`MIN_KDF_M_KIB` = 8 MiB) so vaults built with these still
+/// pass the unlock/recover/change-password range gate, while staying ~32×
+/// cheaper than production (256 MiB). Production never uses these —
+/// `protocol::DEFAULT_V0_1_KDF_PARAMS` is the only set used at runtime.
 pub(crate) const FAST_TEST_KDF: KdfParams = KdfParams {
-    m_kib: 8,
+    m_kib: protocol::MIN_KDF_M_KIB,
     t: 1,
     p: 1,
     argon2_version: 0x13,

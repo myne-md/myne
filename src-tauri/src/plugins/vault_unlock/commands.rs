@@ -660,6 +660,15 @@ fn derive_root_key(
     password: &str,
     meta: &VaultMeta,
 ) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, VaultUnlockError> {
+    protocol::validate_kdf_params(&meta.kdf_params).map_err(|e| {
+        tracing::error!(
+            stage = "kdf_params_range",
+            protocol_error_kind = protocol_error_kind(&e),
+            "kdf params outside accepted range"
+        );
+        password_or_meta(e)
+    })?;
+
     let wrap_key = protocol::derive_password_wrap_key(
         password,
         &meta.random_salt_password,

@@ -71,6 +71,7 @@ impl PinProvider {
         &self,
         pin_salt: &[u8; QUICK_UNLOCK_PIN_SALT_LEN],
     ) -> Result<Zeroizing<[u8; WRAP_KEY_LEN]>, ProviderError> {
+        protocol::validate_kdf_params(&self.params).map_err(|_| ProviderError::Backend)?;
         derive_quick_unlock_pin_wrap_key(
             self.pin.as_str(),
             pin_salt,
@@ -116,10 +117,11 @@ mod tests {
     const ACCOUNT_HASH: [u8; 16] = [0x5a; 16];
     const ROOT_KEY: [u8; 32] = [0x77; 32];
 
-    // Fast Argon2id params for tests (the production 256 MiB set is too slow
-    // for a unit test; `protocol`'s own kdf tests document this pattern).
+    // Fast Argon2id params for tests, pinned to the validate_kdf_params
+    // memory floor so the PIN derive path's range gate accepts them (the
+    // production 256 MiB set is too slow for a unit test).
     const FAST_PARAMS: KdfParams = KdfParams {
-        m_kib: 8,
+        m_kib: protocol::MIN_KDF_M_KIB,
         t: 1,
         p: 1,
         argon2_version: 0x13,

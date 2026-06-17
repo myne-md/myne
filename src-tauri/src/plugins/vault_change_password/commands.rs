@@ -239,6 +239,16 @@ pub(crate) async fn change_password_with_path(
             //     → `InvalidCredentialOrVault` per the cross-plugin
             //     shared-name discipline; any other ProtocolError
             //     surfaces as `InvalidVaultMeta`.
+            protocol::validate_kdf_params(&existing.kdf_params).map_err(|e| {
+                tracing::error!(
+                    stage = "kdf_params_range",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "kdf params outside accepted range"
+                );
+                VaultChangePasswordError::InvalidVaultMeta
+            })?;
+
             let current_wrap_key = protocol::derive_password_wrap_key(
                 &current_password,
                 &existing.random_salt_password,
