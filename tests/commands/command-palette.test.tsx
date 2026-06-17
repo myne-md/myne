@@ -48,6 +48,7 @@ function buildCtx(over: Partial<CommandContext> = {}): CommandContext {
     onOpenTodayNote: vi.fn(),
     onOpenRandomNote: vi.fn(),
     onOpenAttachments: vi.fn(),
+    onToggleStackedTabs: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };

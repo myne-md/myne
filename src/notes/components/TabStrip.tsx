@@ -27,6 +27,7 @@ import {
 import { Icon } from "../../components/primitives/Icon";
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
  *  starts below the strip and leaves the tabs interactive during a drag. */
@@ -80,6 +81,16 @@ export type TabStripProps = {
   titleOf: (id: string) => string | null;
   /** Leading icon for a tab handle (note vs view, MYND-274). Default file-text. */
   iconOf?: (id: string) => IconName;
+  /** Whether a tab handle is PINNED (tab-modes / MYND-320): a pinned tab shows a
+   *  pin affordance, hides its × close, and offers Unpin in its right-click
+   *  menu. Absent ⇒ no tab pinned. */
+  isPinned?: (id: string) => boolean;
+  /** Toggle a tab's pinned state — wired from the tab right-click menu
+   *  (tab-modes / MYND-320). Absent ⇒ the Pin/Unpin item is not offered. */
+  onTogglePin?: (id: string) => void;
+  /** Render the tabs as a STACKED deck (horizontally-scrolling, partially-
+   *  overlapping) instead of the normal strip (tab-modes / MYND-319). */
+  stacked?: boolean;
   /** Whether the ACTIVE tab currently has unsaved edits (drives its dot). */
   activeDirty?: boolean;
   /** A transient empty "New tab" is open (the chooser). Renders an active
@@ -108,6 +119,9 @@ export function TabStrip({
   activeTab,
   titleOf,
   iconOf,
+  isPinned,
+  onTogglePin,
+  stacked = false,
   activeDirty = false,
   pendingNewTab = false,
   onActivate,
@@ -119,6 +133,10 @@ export function TabStrip({
   insetRight = 0,
 }: TabStripProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Right-click tab context menu (tab-modes / MYND-320): { tab key, click pos }.
+  const [tabMenu, setTabMenu] = useState<{ id: string; x: number; y: number } | null>(
+    null,
+  );
 
   const handleDrop = (e: ReactDragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -166,6 +184,7 @@ export function TabStrip({
       aria-label="Open notes"
       data-testid="editor.tab-strip"
       data-pane-id={paneId}
+      data-stacked={stacked}
       // Whole strip is a drop target (reorder / move / open) — dropping in the
       // empty trailing space appends, dropping among the tabs inserts.
       onDragOver={(e) => {
@@ -173,8 +192,18 @@ export function TabStrip({
       }}
       onDrop={handleDrop}
     >
-      <div style={scrollAreaStyle}>
-        {tabs.map((id) => (
+      <div
+        style={
+          stacked
+            ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative
+              // gap) and the row scrolls horizontally. Functional layout —
+              // visual polish deferred (no Penpot pass this slice).
+              { ...scrollAreaStyle, gap: 0, paddingLeft: 14 }
+            : scrollAreaStyle
+        }
+        data-testid={stacked ? "editor.tab-deck" : undefined}
+      >
+        {tabs.map((id, i) => (
           <Tab
             key={id}
             id={id}
@@ -183,8 +212,16 @@ export function TabStrip({
             icon={iconOf?.(id) ?? "file-text"}
             active={id === activeTab}
             dirty={id === activeTab && activeDirty}
+            pinned={isPinned?.(id) ?? false}
+            stacked={stacked}
+            stackIndex={i}
             onActivate={onActivate}
             onClose={onClose}
+            onContextMenu={
+              onTogglePin
+                ? (x, y) => setTabMenu({ id, x, y })
+                : undefined
+            }
           />
         ))}
         {pendingNewTab && <NewTabChip onClose={onCloseNewTab} />}
@@ -219,8 +256,35 @@ export function TabStrip({
           onClose={() => setMenuOpen(false)}
         />
       )}
+
+      {/* Tab right-click context menu (tab-modes / MYND-320): Pin / Unpin
+          (reuses the shared ContextMenu, like the sidebar + card menus). */}
+      {tabMenu !== null && onTogglePin && (
+        <ContextMenu
+          x={tabMenu.x}
+          y={tabMenu.y}
+          items={tabMenuItems(tabMenu.id, isPinned?.(tabMenu.id) ?? false, onTogglePin)}
+          onClose={() => setTabMenu(null)}
+        />
+      )}
     </div>
   );
+}
+
+/** The tab right-click menu's items (tab-modes / MYND-320): a single
+ *  Pin/Unpin toggle item whose label reflects the current state. */
+function tabMenuItems(
+  id: string,
+  pinned: boolean,
+  onTogglePin: (id: string) => void,
+): ContextMenuItem[] {
+  return [
+    {
+      id: pinned ? "tab.unpin" : "tab.pin",
+      label: pinned ? "Unpin" : "Pin",
+      onSelect: () => onTogglePin(id),
+    },
+  ];
 }
 
 function tabLabel(title: string | null): { text: string; italic: boolean } {
@@ -237,14 +301,36 @@ type TabProps = {
   icon: IconName;
   active: boolean;
   dirty: boolean;
+  /** Pinned (tab-modes / MYND-320): pin affordance shown, × close-guarded. */
+  pinned: boolean;
+  /** Whether the pane is in stacked-deck layout (tab-modes / MYND-319). */
+  stacked: boolean;
+  /** Position in the strip — drives the stacked overlap offset. */
+  stackIndex: number;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
+  /** Right-click (tab-modes / MYND-320): open the Pin/Unpin menu at the cursor. */
+  onContextMenu?: (x: number, y: number) => void;
 };
 
-function Tab({ id, paneId, title, icon, active, dirty, onActivate, onClose }: TabProps) {
+function Tab({
+  id,
+  paneId,
+  title,
+  icon,
+  active,
+  dirty,
+  pinned,
+  stacked,
+  stackIndex,
+  onActivate,
+  onClose,
+  onContextMenu,
+}: TabProps) {
   const [hovering, setHovering] = useState(false);
   const { text, italic } = tabLabel(title);
-  const showClose = hovering || active;
+  // A pinned tab is close-protected — its × is hidden (unpin to close).
+  const showClose = !pinned && (hovering || active);
 
   const handleDragStart = (e: ReactDragEvent<HTMLDivElement>) => {
     writeTabDrag(e.dataTransfer, { tabId: id, fromPaneId: paneId });
@@ -266,29 +352,57 @@ function Tab({ id, paneId, title, icon, active, dirty, onActivate, onClose }: Ta
     padding: "0 6px 0 10px",
     maxWidth: TITLE_MAX + 56,
     minWidth: 0,
-    flexShrink: 1,
+    flexShrink: stacked ? 0 : 1,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
-    borderTop: active ? "1px solid var(--line-1)" : "1px solid transparent",
-    borderLeft: active ? "1px solid var(--line-1)" : "1px solid transparent",
-    borderRight: active ? "1px solid var(--line-1)" : "1px solid transparent",
+    // In a stacked deck every card carries a full hairline (the cards overlap,
+    // so a transparent border would let the underlying card bleed through);
+    // in the normal strip only the active tab is bordered.
+    borderTop:
+      active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
+    borderLeft:
+      active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
+    borderRight:
+      active || stacked ? "1px solid var(--line-1)" : "1px solid transparent",
     background: active
       ? "var(--bg-1)"
-      : hovering
-        ? "var(--paper-3)"
-        : "transparent",
-    color: active ? "var(--fg-1)" : "var(--fg-3)",
-    opacity: active || hovering ? 1 : 0.72,
+      : stacked
+        ? "var(--bg-2)"
+        : hovering
+          ? "var(--paper-3)"
+          : "transparent",
+    color: active ? "var(--fg-1)" : stacked ? "var(--fg-2)" : "var(--fg-3)",
+    // Stacked cards OVERLAP, so a sub-1 opacity would let the card beneath bleed
+    // through (the muddy look). Keep stacked cards fully opaque and convey depth
+    // with z-order + a left-edge shadow instead.
+    opacity: stacked || active || hovering ? 1 : 0.72,
     cursor: "pointer",
     fontFamily: "var(--font-sans)",
     fontSize: 13,
+    // Stacked deck (tab-modes / MYND-319): cards partially overlap and each casts
+    // a soft shadow onto the card behind it, so the row reads as a front-to-back
+    // deck; the active/hovered card lifts above the rest. Functional layout.
+    ...(stacked
+      ? {
+          marginLeft: stackIndex === 0 ? 0 : -16,
+          zIndex: active ? 200 : hovering ? 100 : stackIndex + 1,
+          position: "relative",
+          boxShadow:
+            stackIndex === 0
+              ? "none"
+              : active
+                ? "-5px 0 9px rgba(0, 0, 0, 0.24)"
+                : "-3px 0 6px rgba(0, 0, 0, 0.13)",
+        }
+      : {}),
   };
 
-  // Middle-click closes the tab (browser-tab idiom).
+  // Middle-click closes the tab (browser-tab idiom) — but a pinned tab is
+  // close-protected (unpin first), so middle-click is inert on it.
   const handleAux = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (e.button === 1) {
       e.preventDefault();
-      onClose(id);
+      if (!pinned) onClose(id);
     }
   };
 
@@ -299,12 +413,22 @@ function Tab({ id, paneId, title, icon, active, dirty, onActivate, onClose }: Ta
       data-testid="editor.tab"
       data-tab-id={id}
       data-active={active}
+      data-pinned={pinned}
       title={text}
       draggable
       onDragStart={handleDragStart}
       style={style}
       onClick={() => onActivate(id)}
       onAuxClick={handleAux}
+      onContextMenu={
+        onContextMenu
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onContextMenu(e.clientX, e.clientY);
+            }
+          : undefined
+      }
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
@@ -345,31 +469,51 @@ function Tab({ id, paneId, title, icon, active, dirty, onActivate, onClose }: Ta
       >
         {text}
       </span>
-      <button
-        type="button"
-        aria-label={`Close ${text}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose(id);
-        }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 18,
-          height: 18,
-          flexShrink: 0,
-          padding: 0,
-          border: 0,
-          borderRadius: "var(--radius-1)",
-          background: "transparent",
-          color: "var(--fg-3)",
-          cursor: "pointer",
-          visibility: showClose ? "visible" : "hidden",
-        }}
-      >
-        <Icon name="x" size={12} />
-      </button>
+      {pinned ? (
+        // Pinned: a static pin glyph stands in for the × — the tab is
+        // close-protected (unpin via the right-click menu to close it).
+        <span
+          aria-label="Pinned"
+          title="Pinned — unpin to close"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 18,
+            height: 18,
+            flexShrink: 0,
+            color: "var(--fg-3)",
+          }}
+        >
+          <Icon name="pin" size={12} />
+        </span>
+      ) : (
+        <button
+          type="button"
+          aria-label={`Close ${text}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose(id);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 18,
+            height: 18,
+            flexShrink: 0,
+            padding: 0,
+            border: 0,
+            borderRadius: "var(--radius-1)",
+            background: "transparent",
+            color: "var(--fg-3)",
+            cursor: "pointer",
+            visibility: showClose ? "visible" : "hidden",
+          }}
+        >
+          <Icon name="x" size={12} />
+        </button>
+      )}
     </div>
   );
 }

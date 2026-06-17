@@ -335,6 +335,19 @@ pub struct PrefsView {
     #[serde(default)]
     pub editor_layout: Option<EditorLayout>,
 
+    /// Editor line-number gutter toggle (editor-line-numbers, MYND-314). `None` ≡
+    /// unset → the host applies the default-OFF policy (prose-first; the gutter is
+    /// opt-in). Omitted entirely from the canonical JSON when `None`, so a vault
+    /// that never touched the toggle is byte-identical to a pre-feature
+    /// `vault.prefs` (existing golden vectors unaffected — migration-less additive
+    /// field on `MYP1`, the `spell_enabled` precedent class). **Non-load-bearing**
+    /// (a tampered / replayed value can at worst show or hide the line-number
+    /// gutter) — no protective-envelope clamp. Canonical key `editor_line_numbers`
+    /// — sorts after `editor_layout` (`editor_la` < `editor_li`), before
+    /// `editor_line_spacing` (`editor_line_n` < `editor_line_s`).
+    #[serde(default)]
+    pub editor_line_numbers: Option<bool>,
+
     /// Editor content max-width preset (editor-typography). `None` ≡ the
     /// canonical default `normal`, applied host-side. A closed enum string
     /// (`narrow`/`normal`/`wide`/`full`); stored as a free `Option<String>`
@@ -549,6 +562,7 @@ impl Default for PrefsView {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -783,6 +797,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b",\"right_width\":");
         push_json_uint(&mut out, layout.right_width);
         out.extend_from_slice(b"},");
+    }
+
+    // editor_line_numbers (canonical key 'e', AFTER editor_layout
+    // [`editor_li` > `editor_la`] and BEFORE editor_line_spacing
+    // [`editor_line_n` < `editor_line_s`]). A bool; omitted entirely when None so
+    // a vault that never touched the line-number gutter is byte-identical to a
+    // pre-feature vault.prefs (preserves existing KAT vectors).
+    if let Some(on) = prefs.editor_line_numbers {
+        out.extend_from_slice(b"\"editor_line_numbers\":");
+        out.extend_from_slice(if on { b"true" } else { b"false" });
+        out.push(b',');
     }
 
     // editor_line_spacing + editor_text_size (canonical key 'e', AFTER
@@ -1116,6 +1141,11 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // and favorites (f); parsed from the same monotonic cursor so a later
     // field's key marker is never matched inside the nested object.
     let editor_layout = parse_optional_editor_layout(rest, &mut cursor, b"\"editor_layout\":")?;
+    // editor_line_numbers (key 'e') sits between editor_layout and
+    // editor_line_spacing (`editor_line_n` < `editor_line_s`); a bool parsed from
+    // the same monotonic cursor so canonical key order holds.
+    let editor_line_numbers =
+        parse_optional_bool_field(rest, &mut cursor, b"\"editor_line_numbers\":")?;
     let editor_line_spacing =
         parse_optional_string_field(rest, &mut cursor, b"\"editor_line_spacing\":")?;
     let editor_text_size =
@@ -1216,6 +1246,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         favorites,
         item_order,
         editor_layout,
+        editor_line_numbers,
         editor_content_width,
         editor_font_family,
         editor_line_spacing,
@@ -1311,6 +1342,36 @@ fn parse_optional_uint64_field(
                 return Err(PrefsBlobError::PlaintextParseFailed);
             }
             *cursor = val_start + consumed;
+            Ok(Some(val))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Parse an OPTIONAL canonical JSON boolean field whose key marker is `marker`,
+/// searching `rest` from `*cursor` onward (the cursor-based bool sibling of
+/// [`parse_optional_uint64_field`], for the `editor_line_numbers` field that
+/// sorts BEFORE `screen_capture_protection` — unlike `spell_enabled`, which
+/// sorts AFTER and uses the post-SCP [`parse_optional_bool_marker`]). On a hit,
+/// the literal MUST be `true`/`false` followed by `,` — `screen_capture_protection`
+/// is mandatory and canonically later, so a further member always follows; any
+/// other byte rejects with [`PrefsBlobError::PlaintextParseFailed`]. Advances
+/// `*cursor` past the literal on a hit; returns `None` and leaves `*cursor`
+/// unchanged on a miss.
+fn parse_optional_bool_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Option<bool>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (val, after) =
+                parse_json_bool(&rest[val_start..]).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            if after.first() != Some(&b',') {
+                return Err(PrefsBlobError::PlaintextParseFailed);
+            }
+            *cursor = rest.len() - after.len();
             Ok(Some(val))
         }
         None => Ok(None),
@@ -1821,6 +1882,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -1854,6 +1916,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -2010,6 +2073,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_line_numbers: None,
                 editor_content_width: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
@@ -2045,6 +2109,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_line_numbers: None,
                 editor_content_width: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
@@ -2188,11 +2253,13 @@ mod tests {
     #[test]
     fn encode_places_typography_around_editor_layout() {
         // Canonical key order: editor_content_width < editor_font_family <
-        // editor_layout < editor_line_spacing < editor_text_size (< favorites).
+        // editor_layout < editor_line_numbers < editor_line_spacing <
+        // editor_text_size (< favorites).
         let encoded = canonical_json_encode(&PrefsView {
             editor_content_width: Some(alloc::string::String::from("wide")),
             editor_font_family: Some(alloc::string::String::from("sans")),
             editor_layout: Some(sample_layout()),
+            editor_line_numbers: Some(true),
             editor_line_spacing: Some(alloc::string::String::from("relaxed")),
             editor_text_size: Some(alloc::string::String::from("lg")),
             ..PrefsView::default()
@@ -2201,10 +2268,11 @@ mod tests {
         let cw = s.find("editor_content_width").unwrap();
         let ff = s.find("editor_font_family").unwrap();
         let el = s.find("editor_layout").unwrap();
+        let ln = s.find("editor_line_numbers").unwrap();
         let ls = s.find("editor_line_spacing").unwrap();
         let ts = s.find("editor_text_size").unwrap();
         assert!(
-            cw < ff && ff < el && el < ls && ls < ts,
+            cw < ff && ff < el && el < ln && ln < ls && ls < ts,
             "canonical order: {s}"
         );
     }
@@ -2221,6 +2289,67 @@ mod tests {
         let encoded = canonical_json_encode(&original);
         let decoded = canonical_json_decode(&encoded).expect("decode");
         assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn encode_omits_editor_line_numbers_when_none_byte_identical_to_pre_feature() {
+        // A vault that never touched the line-number gutter encodes byte-
+        // identically to the bare pre-feature form (migration-less additive
+        // field — existing golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView {
+            editor_line_numbers: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_editor_line_numbers_between_layout_and_line_spacing() {
+        // Canonical key order: editor_layout < editor_line_numbers <
+        // editor_line_spacing (`editor_la` < `editor_line_n` < `editor_line_s`).
+        let on = canonical_json_encode(&PrefsView {
+            editor_line_numbers: Some(true),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            on.as_slice(),
+            br#"{"editor_line_numbers":true,"screen_capture_protection":true}"#,
+        );
+        // The non-default `false` is persisted explicitly (Some(false) != None).
+        let off = canonical_json_encode(&PrefsView {
+            editor_line_numbers: Some(false),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            off.as_slice(),
+            br#"{"editor_line_numbers":false,"screen_capture_protection":true}"#,
+        );
+        // With editor_layout present, the new key sorts after it.
+        let with_layout = canonical_json_encode(&PrefsView {
+            editor_layout: Some(sample_layout()),
+            editor_line_numbers: Some(true),
+            editor_line_spacing: Some(alloc::string::String::from("relaxed")),
+            ..PrefsView::default()
+        });
+        let s = core::str::from_utf8(&with_layout).unwrap();
+        let el = s.find("editor_layout").unwrap();
+        let ln = s.find("editor_line_numbers").unwrap();
+        let ls = s.find("editor_line_spacing").unwrap();
+        assert!(el < ln && ln < ls, "canonical order: {s}");
+    }
+
+    #[test]
+    fn editor_line_numbers_round_trips_through_decode() {
+        for value in [Some(true), Some(false), None] {
+            let original = PrefsView {
+                editor_line_numbers: value,
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded, original);
+            assert_eq!(decoded.editor_line_numbers, value);
+        }
     }
 
     #[test]
@@ -2352,6 +2481,7 @@ mod tests {
                 left_collapsed: false,
                 right_collapsed: true,
             }),
+            editor_line_numbers: None,
             theme: Some(ThemeChoice::Dark),
             editor_content_width: None,
             editor_font_family: None,
@@ -2619,6 +2749,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -2659,6 +2790,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -2697,6 +2829,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -2734,6 +2867,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -2834,6 +2968,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -2899,6 +3034,7 @@ mod tests {
                 alloc::string::String::from("n2"),
             ],
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -2943,6 +3079,7 @@ mod tests {
                 alloc::string::String::from("zzz"),
             ],
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3022,6 +3159,7 @@ mod tests {
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
             ],
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3077,6 +3215,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3132,6 +3271,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3169,6 +3309,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3208,6 +3349,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3315,6 +3457,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3396,6 +3539,7 @@ mod tests {
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             editor_layout: Some(sample_layout()),
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3667,6 +3811,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -3708,6 +3853,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             editor_layout: None,
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -4010,6 +4156,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_line_numbers: None,
                 editor_content_width: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
@@ -4044,6 +4191,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 editor_layout: None,
+                editor_line_numbers: None,
                 editor_content_width: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
@@ -4095,6 +4243,7 @@ mod tests {
                 left_collapsed: false,
                 right_collapsed: true,
             }),
+            editor_line_numbers: None,
             editor_content_width: None,
             editor_font_family: None,
             editor_line_spacing: None,
@@ -4768,6 +4917,100 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write last_backup_at prefs vectors dump");
+    }
+
+    /// Generator for the editor-line-numbers (MYND-314) `editor_line_numbers`
+    /// vector cases (appended to the companion repo's `vault-prefs` family;
+    /// per-feature generator, keeps the originals byte-stable — the
+    /// [`emit_amoled_theme_prefs_vector`] pattern):
+    ///
+    /// `cargo test -p protocol --lib emit_line_numbers_prefs_vector -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
+    /// optional line-number gutter toggle (`editor_line_numbers: Some(true)` →
+    /// canonical `"editor_line_numbers":true`). Pins the bool encoding and its
+    /// canonical key slot (after `editor_layout`, before
+    /// `screen_capture_protection`) plus the round-trip back through the decoder.
+    /// Nonce `0xF4` is the next free entry in the family's nonce registry
+    /// (0x77–0xF3 taken by the sibling generators). Omit-when-`None` keeps an
+    /// untouched vault byte-identical to a pre-feature blob (no encrypt case
+    /// needed for that — `encrypt-default` already pins the bare form).
+    #[test]
+    #[ignore]
+    fn emit_line_numbers_prefs_vector() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF4; AEAD_NONCE_LEN];
+        let prefs = PrefsView {
+            editor_line_numbers: Some(true),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"editor_line_numbers":true,"screen_capture_protection":true}"#.as_slice(),
+            "canonical plaintext must place editor_line_numbers before screen_capture_protection as a bare bool",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode line_numbers");
+        // Round-trip self-validation.
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+        assert_eq!(decoded.editor_line_numbers, Some(true));
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin editor_line_numbers prefs vectors (MYND-314)---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-editor-line-numbers\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-editor-line-numbers (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!("input_blob_hex: {}\n", hex_lower(&blob)));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"editor_line_numbers\": true, \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str("---end editor_line_numbers prefs vectors---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_line_numbers_vector.txt",
+            dump.as_bytes(),
+        )
+        .expect("write line_numbers prefs vector dump");
     }
 
     /// Generator for the MYND-227 structural `parse_fail` vector cases

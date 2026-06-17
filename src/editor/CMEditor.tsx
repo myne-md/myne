@@ -16,13 +16,20 @@ import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { diffDoc } from "./doc-diff";
 import { myneExtensions } from "./extensions";
+import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
+import { reconfigureLineNumbers } from "./line-numbers";
 import type { ResolverNote } from "../notes/resolveWikilink";
 
 export type CMEditorProps = {
   value: string;
   onChange: (next: string) => void;
   onBlur?: () => void;
+  /** Selection observer (MYND-339): the concatenated non-empty selection
+   *  ranges (joined by `\n`), or `""` when nothing is selected. Fired on every
+   *  selection or document change so selection-scoped document statistics stay
+   *  live. Ref-backed like `onChange` — no view rebuild. */
+  onSelectionChange?: (selectedText: string) => void;
   /** Composed alongside `myneExtensions`. v0 baseline does not use this. */
   extensions?: readonly Extension[];
   /** WL-5: the live resolver note-set. Pushed into the editor's note-set
@@ -32,16 +39,22 @@ export type CMEditorProps = {
   /** Called when a resolved wikilink chip is clicked (the workspace opens the
    *  target note). The chip emits a `myne-open-wikilink` event; this relays it. */
   onOpenWikilink?: (noteUuid: string) => void;
+  /** editor-line-numbers (MYND-314): show the line-number gutter. Pushed into
+   *  the editor's line-number compartment (re-mount-free) whenever it changes,
+   *  so toggling the `editor_line_numbers` pref updates the open note live while
+   *  preserving cursor / scroll / undo. Defaults OFF (prose-first). */
+  lineNumbers?: boolean;
   readOnly?: boolean;
   style?: CSSProperties;
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, extensions, noteSet, onOpenWikilink, readOnly = false, style } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, onOpenWikilink, lineNumbers = false, readOnly = false, style } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const onOpenWikilinkRef = useRef(onOpenWikilink);
   useEffect(() => {
     onOpenWikilinkRef.current = onOpenWikilink;
@@ -55,6 +68,9 @@ export function CMEditor(props: CMEditorProps) {
   useEffect(() => {
     onBlurRef.current = onBlur;
   }, [onBlur]);
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
 
   // Mount + destroy lifecycle. The view is built once; subsequent `value`
   // changes from outside are mirrored via `dispatch` in the effect below.
@@ -72,6 +88,9 @@ export function CMEditor(props: CMEditorProps) {
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               onChangeRef.current(update.state.doc.toString());
+            }
+            if (update.selectionSet || update.docChanged) {
+              onSelectionChangeRef.current?.(selectedRangesText(update.state));
             }
           }),
           EditorView.domEventHandlers({
@@ -132,6 +151,17 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null || noteSet === undefined) return;
     view.dispatch({ effects: reconfigureNoteSet(noteSet) });
   }, [noteSet]);
+
+  // editor-line-numbers (MYND-314): push the line-number gutter toggle into the
+  // view's line-number compartment whenever the `editor_line_numbers` pref
+  // changes (re-mount-free reconfigure — cursor / scroll / undo preserved). The
+  // compartment is seeded OFF at mount, so this runs once on mount to honor an
+  // already-on pref, then on every subsequent toggle.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null) return;
+    view.dispatch({ effects: reconfigureLineNumbers(lineNumbers) });
+  }, [lineNumbers]);
 
   // Relay the chip click-to-navigate event (dispatched on the editor DOM by the
   // wikilink chip extension) to the `onOpenWikilink` callback.

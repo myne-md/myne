@@ -32,12 +32,14 @@ let load: Loader = async () => {
     securityLevel: "strict", // sanitize + no click/script in diagrams
     htmlLabels: false, // no raw-HTML labels
     fontFamily: "inherit",
-    // The diagram renders on a fixed-light card (`.cm-mermaid-card`, theme.ts) so
-    // it reads on either editor theme. Mermaid's default light palette suits that
-    // surface; we only pin `edgeLabelBackground` to the card fill so edge labels
-    // ("Encrypt"/"Decrypt"/…) sit on an opaque light pill instead of showing the
-    // surface through — the low-contrast-label bug — and dark `textColor`s so all
-    // glyphs read on the card.
+    // The diagram renders on a fixed-light card (`.cm-mermaid-card`, theme.ts;
+    // and the export's `.mermaid-diagram`, print-stylesheet.ts) so it reads on
+    // either editor theme AND in the light HTML/PDF export. We pin the FULL light
+    // node palette (not just edge/text colors) in Myne tokens: relying on
+    // mermaid's class-based `<style>` fills alone left flowchart nodes rendering
+    // as the SVG default (black `fill`) in the standalone export — explicit
+    // `mainBkg`/`primaryColor`/border/text values bake a visible light fill into
+    // every node class so a flowchart reads identically in-editor and in export.
     theme: "default",
     themeVariables: {
       fontFamily: "inherit",
@@ -45,6 +47,22 @@ let load: Loader = async () => {
       edgeLabelBackground: "#fbfbfa",
       textColor: "#1a1a17",
       lineColor: "#6b6a64",
+      // Node fills + borders + label text (flowchart / class / state / ER …).
+      mainBkg: "#eef0f4",
+      primaryColor: "#eef0f4",
+      primaryBorderColor: "#c8c7c1",
+      primaryTextColor: "#1a1a17",
+      secondaryColor: "#e6eaf0",
+      secondaryBorderColor: "#c8c7c1",
+      secondaryTextColor: "#1a1a17",
+      tertiaryColor: "#f0f1f4",
+      tertiaryBorderColor: "#c8c7c1",
+      tertiaryTextColor: "#1a1a17",
+      nodeBorder: "#c8c7c1",
+      nodeTextColor: "#1a1a17",
+      titleColor: "#1a1a17",
+      clusterBkg: "#f4f4f2",
+      clusterBorder: "#e3e2dd",
     },
   });
   return async (id, code) => {

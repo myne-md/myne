@@ -12,6 +12,7 @@
 // lives in the two child components.
 
 import { TypographySettings } from "./TypographySettings";
+import { LineNumbersSettings } from "./LineNumbersSettings";
 import { SpellSettings } from "./SpellSettings";
 import { DailyNotesSettings } from "./DailyNotesSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
@@ -23,6 +24,10 @@ export function EditorPanel() {
           content width / font family presets. First, as the core authoring
           surface. */}
       <TypographySettings />
+
+      {/* Line-number gutter toggle (editor-line-numbers, MYND-314) — off by
+          default; lives next to typography as an editor-display preference. */}
+      <LineNumbersSettings />
 
       {/* Spell-check configuration (MYND-267) — toggle + language picker. */}
       <SpellSettings />

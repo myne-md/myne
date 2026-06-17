@@ -47,21 +47,34 @@ export const GRAPH_TAB_ID = "graph";
  * A tab item: a note, a saved view (MYND-274 / SYNC-10), or the whole-vault
  * graph. The `kind` tag discriminates; the id alone does not (a note and a view
  * may share an id-string). Identity across the workspace is `(kind, id)`.
+ *
+ * `pinned` is an Obsidian-style per-tab flag (tab-modes / MYND-320): a pinned
+ * tab is close-protected, and navigating from it opens a NEW tab in the same
+ * pane rather than replacing it. It is **omit-when-default** — `undefined` /
+ * absent means unpinned. It is NOT part of identity: `itemKey` / `sameItem`
+ * ignore it, so the global `(kind,id)` duplicate-forbid invariant is unaffected.
  */
 export type WorkspaceItem =
-  | { kind: "note"; id: NoteId }
-  | { kind: "view"; id: ViewId }
-  | { kind: "graph"; id: typeof GRAPH_TAB_ID };
+  | { kind: "note"; id: NoteId; pinned?: boolean }
+  | { kind: "view"; id: ViewId; pinned?: boolean }
+  | { kind: "graph"; id: typeof GRAPH_TAB_ID; pinned?: boolean };
 
 /** Stable string key for an item — `"note:<id>"` / `"view:<id>"`. Used for
- *  set/equality comparisons over the heterogeneous tab strip. */
+ *  set/equality comparisons over the heterogeneous tab strip. Ignores `pinned`
+ *  (identity is `(kind,id)` only). */
 export function itemKey(item: WorkspaceItem): string {
   return `${item.kind}:${item.id}`;
 }
 
-/** Structural equality of two items (same `kind` AND `id`). */
+/** Structural equality of two items (same `kind` AND `id`). Ignores `pinned` —
+ *  identity is `(kind,id)`, so a pin flip never changes which tab an item is. */
 export function sameItem(a: WorkspaceItem, b: WorkspaceItem): boolean {
   return a.kind === b.kind && a.id === b.id;
+}
+
+/** Whether an item's tab is pinned (omit-when-default: absent ⇒ unpinned). */
+export function isPinned(item: WorkspaceItem): boolean {
+  return item.pinned === true;
 }
 
 /** Wrap a note id as a tab item — the convenience callers use at the boundary. */
@@ -94,12 +107,19 @@ export function parseItemKey(key: string): WorkspaceItem {
  * A leaf pane: owns an ordered tab strip (`tabs`) and the currently
  * active tab within it (`activeTab`, `null` only when the strip is empty —
  * the empty-editor-shell case for the last pane).
+ *
+ * `stacked` is the per-leaf-pane tab-layout flag (tab-modes / MYND-319): when
+ * set, the pane renders its tabs as a horizontally-scrolling, partially-
+ * overlapping deck instead of the normal strip. It is a per-LEAF flag so it
+ * composes with the recursive split-pane tree (one pane stacked, another
+ * normal). **Omit-when-default** — `undefined` / absent means not stacked.
  */
 export type LeafPane = {
   kind: "leaf";
   id: PaneId;
   tabs: WorkspaceItem[];
   activeTab: WorkspaceItem | null;
+  stacked?: boolean;
 };
 
 /**
@@ -322,7 +342,9 @@ export function reveal(state: WorkspaceState, item: WorkspaceItem): WorkspaceSta
   return {
     root: updateLeaf(state.root, paneId, (leaf) => ({
       ...leaf,
-      activeTab: item,
+      // Activate the STORED tab (preserving its `pinned` flag) rather than the
+      // caller's item, which may be a bare `(kind,id)` handle with no flag.
+      activeTab: leaf.tabs.find((t) => sameItem(t, item)) ?? item,
     })),
     focusedPaneId: paneId,
   };
@@ -332,12 +354,22 @@ export function reveal(state: WorkspaceState, item: WorkspaceItem): WorkspaceSta
  * Sidebar-click behavior: open `item` in the focused pane's *active*
  * tab, reusing that slot (the previous item leaves the strip). Already
  * open elsewhere → reveal. Empty focused pane → seed its first tab.
+ *
+ * **Pin-aware (tab-modes / MYND-320, Obsidian-full):** when the focused
+ * pane's active tab is PINNED, the reuse-the-active-slot path is suppressed —
+ * the open APPENDS a new tab (like {@link openInNewTab}) so the pinned tab is
+ * never replaced. A non-pinned active tab keeps the original reuse behavior.
  */
 export function openInFocusedTab(
   state: WorkspaceState,
   item: WorkspaceItem,
 ): WorkspaceState {
   if (findItemPane(state, item) !== null) return reveal(state, item);
+  const focused = findLeaf(state.root, state.focusedPaneId);
+  // Pinned active tab → never reuse its slot; append a fresh tab instead.
+  if (focused !== null && focused.activeTab !== null && isPinned(focused.activeTab)) {
+    return openInNewTab(state, item);
+  }
   return {
     ...state,
     root: updateLeaf(state.root, state.focusedPaneId, (leaf) => {
@@ -478,12 +510,21 @@ export function splitPaneWithItem(
   // duplicate-forbid invariant rejects).
   if (fromPaneId === targetPaneId && target.tabs.length <= 1) return state;
 
-  // 1. Detach the item from its current pane (if open). `closeTab`
-  //    collapses an emptied non-last source; the degenerate guard above
-  //    ensures the target itself survives this removal.
+  // Carry the source tab's `pinned` flag onto the moved item (a pinned tab
+  // stays pinned after a drag-to-split) — the caller's `item` may be a bare
+  // `(kind,id)` handle with no flag.
+  const moved: WorkspaceItem =
+    fromPaneId !== null
+      ? (findLeaf(state.root, fromPaneId)!.tabs.find((t) => sameItem(t, item)) ?? item)
+      : item;
+
+  // 1. Detach the item from its current pane (if open). `detachTab` (the
+  //    unguarded form — a pinned tab relocates, it doesn't close) collapses an
+  //    emptied non-last source; the degenerate guard above ensures the target
+  //    itself survives this removal.
   let s = state;
   if (fromPaneId !== null) {
-    s = closeTab(s, fromPaneId, item);
+    s = detachTab(s, fromPaneId, item);
   }
   // 2. The target must still exist (it had other tabs, or wasn't the source).
   if (findLeaf(s.root, targetPaneId) === null) return state;
@@ -494,8 +535,8 @@ export function splitPaneWithItem(
   const newLeaf: LeafPane = {
     kind: "leaf",
     id: newLeafId,
-    tabs: [item],
-    activeTab: item,
+    tabs: [moved],
+    activeTab: moved,
   };
   return {
     root: splitLeafSide(
@@ -510,7 +551,8 @@ export function splitPaneWithItem(
   };
 }
 
-/** Activate `item` within `paneId` (no-op if that pane doesn't hold it). */
+/** Activate `item` within `paneId` (no-op if that pane doesn't hold it). The
+ *  STORED tab is activated, so its `pinned` flag survives a bare-handle call. */
 export function setActiveTab(
   state: WorkspaceState,
   paneId: PaneId,
@@ -518,11 +560,10 @@ export function setActiveTab(
 ): WorkspaceState {
   return {
     ...state,
-    root: updateLeaf(state.root, paneId, (leaf) =>
-      leaf.tabs.some((t) => sameItem(t, item))
-        ? { ...leaf, activeTab: item }
-        : leaf,
-    ),
+    root: updateLeaf(state.root, paneId, (leaf) => {
+      const stored = leaf.tabs.find((t) => sameItem(t, item));
+      return stored !== undefined ? { ...leaf, activeTab: stored } : leaf;
+    }),
   };
 }
 
@@ -537,12 +578,103 @@ export function setFocusedPane(
 }
 
 /**
+ * Set the `pinned` flag on `item`'s tab within `paneId` (tab-modes /
+ * MYND-320). No-op if that pane doesn't hold the item. The flag is written
+ * omit-when-default: pinning sets `pinned: true`; unpinning DROPS the key so
+ * an unpinned tab serializes byte-identical to a pre-feature tab. Both the
+ * `tabs` entry and `activeTab` (when it is this item) are kept in sync.
+ */
+export function setPinned(
+  state: WorkspaceState,
+  paneId: PaneId,
+  item: WorkspaceItem,
+  pinned: boolean,
+): WorkspaceState {
+  const apply = (t: WorkspaceItem): WorkspaceItem => {
+    if (pinned) return { ...t, pinned: true };
+    // Unpin → drop the key entirely (omit-when-default discipline).
+    const { pinned: _drop, ...rest } = t;
+    return rest as WorkspaceItem;
+  };
+  return {
+    ...state,
+    root: updateLeaf(state.root, paneId, (leaf) =>
+      leaf.tabs.some((t) => sameItem(t, item))
+        ? {
+            ...leaf,
+            tabs: leaf.tabs.map((t) => (sameItem(t, item) ? apply(t) : t)),
+            activeTab:
+              leaf.activeTab !== null && sameItem(leaf.activeTab, item)
+                ? apply(leaf.activeTab)
+                : leaf.activeTab,
+          }
+        : leaf,
+    ),
+  };
+}
+
+/**
+ * Set the per-leaf `stacked` layout flag (tab-modes / MYND-319). No-op if
+ * `paneId` isn't a leaf. Omit-when-default: turning stacked OFF DROPS the key
+ * so a non-stacked pane serializes byte-identical to a pre-feature pane.
+ */
+export function setStacked(
+  state: WorkspaceState,
+  paneId: PaneId,
+  stacked: boolean,
+): WorkspaceState {
+  return {
+    ...state,
+    root: updateLeaf(state.root, paneId, (leaf) => {
+      if (stacked) return { ...leaf, stacked: true };
+      const { stacked: _drop, ...rest } = leaf;
+      return rest as LeafPane;
+    }),
+  };
+}
+
+/** Flip the per-leaf `stacked` flag (tab-modes / MYND-319). No-op off a leaf. */
+export function toggleStacked(
+  state: WorkspaceState,
+  paneId: PaneId,
+): WorkspaceState {
+  const leaf = findLeaf(state.root, paneId);
+  if (leaf === null) return state;
+  return setStacked(state, paneId, leaf.stacked !== true);
+}
+
+/**
  * Close `item`'s tab in `paneId`. A surviving tab inherits focus
  * (right neighbor, else left). When the strip empties: the only pane
  * stays tabless (empty-editor-shell); any other pane is removed and the
  * tree collapses, relocating focus if it lived there.
+ *
+ * **Close-guarded (tab-modes / MYND-320):** a PINNED tab is not closed by the
+ * normal close path — closing it is a no-op (the user must unpin first). This
+ * is enforced against the flag stored in the strip, not the caller's `item`.
  */
 export function closeTab(
+  state: WorkspaceState,
+  paneId: PaneId,
+  item: WorkspaceItem,
+): WorkspaceState {
+  const leaf = findLeaf(state.root, paneId);
+  if (leaf === null || !leaf.tabs.some((t) => sameItem(t, item))) return state;
+  // Close-guard: a pinned tab can't be closed via this user-facing path (unpin
+  // first). Internal detach during a move/split uses `detachTab` (no guard) —
+  // a pinned tab still drags to another pane / splits; it just can't be CLOSED.
+  const stored = leaf.tabs.find((t) => sameItem(t, item));
+  if (stored !== undefined && isPinned(stored)) return state;
+  return detachTab(state, paneId, item);
+}
+
+/**
+ * Remove `item`'s tab from `paneId` with the same focus/collapse rules as
+ * {@link closeTab} but WITHOUT the pinned close-guard. Internal: the detach
+ * step of a tab move / drag-to-split, where a pinned tab relocates rather than
+ * closes (its pin flag rides along with the moved item).
+ */
+function detachTab(
   state: WorkspaceState,
   paneId: PaneId,
   item: WorkspaceItem,
@@ -604,16 +736,20 @@ export function moveTab(
   if (from === null || to === null || !from.tabs.some((t) => sameItem(t, item)))
     return state;
 
+  // Move the STORED tab (preserving its `pinned` flag) — the caller's `item`
+  // may be a bare `(kind,id)` handle. A pinned tab stays pinned after a move.
+  const moved = from.tabs.find((t) => sameItem(t, item)) ?? item;
+
   if (fromPaneId === toPaneId) {
     const without = from.tabs.filter((t) => !sameItem(t, item));
     const idx = Math.max(0, Math.min(toIndex, without.length));
-    const tabs = [...without.slice(0, idx), item, ...without.slice(idx)];
+    const tabs = [...without.slice(0, idx), moved, ...without.slice(idx)];
     return {
       ...state,
       root: updateLeaf(state.root, fromPaneId, (l) => ({
         ...l,
         tabs,
-        activeTab: item,
+        activeTab: moved,
       })),
     };
   }
@@ -628,12 +764,12 @@ export function moveTab(
         null)
       : from.activeTab;
   const idx = Math.max(0, Math.min(toIndex, to.tabs.length));
-  const toTabs = [...to.tabs.slice(0, idx), item, ...to.tabs.slice(idx)];
+  const toTabs = [...to.tabs.slice(0, idx), moved, ...to.tabs.slice(idx)];
 
   let root = updateLeaf(state.root, toPaneId, (l) => ({
     ...l,
     tabs: toTabs,
-    activeTab: item,
+    activeTab: moved,
   }));
   if (fromTabs.length > 0) {
     root = updateLeaf(root, fromPaneId, (l) => ({

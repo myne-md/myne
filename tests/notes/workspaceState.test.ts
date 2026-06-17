@@ -17,6 +17,7 @@ import {
   focusedLeaf,
   GRAPH_TAB_ID,
   graphItem,
+  isPinned,
   itemKey,
   type LeafPane,
   moveTab,
@@ -28,8 +29,11 @@ import {
   reveal,
   setActiveTab,
   setFocusedPane,
+  setPinned,
+  setStacked,
   splitPane,
   splitPaneWithItem,
+  toggleStacked,
   viewItem,
   type WorkspaceState,
 } from "../../src/notes/workspaceState";
@@ -512,5 +516,159 @@ describe("graph tab (MYND-198 — whole-vault graph as a tab)", () => {
     ws = closeTab(ws, "root", graphItem());
     expect(focusedLeaf(ws).tabs).toEqual([n("a")]);
     assertNoDuplicates(ws);
+  });
+});
+
+// ── tab-modes: pinned tabs (MYND-320) ────────────────────────────────────
+
+describe("pinned tabs (MYND-320)", () => {
+  /** The focused leaf's first tab's pinned flag (terse assertion helper). */
+  function firstPinned(ws: WorkspaceState): boolean {
+    return isPinned(focusedLeaf(ws).tabs[0]!);
+  }
+
+  it("setPinned sets the flag on the matching tab + the active tab", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    expect(firstPinned(ws)).toBe(false);
+    ws = setPinned(ws, "root", n("a"), true);
+    expect(firstPinned(ws)).toBe(true);
+    expect(isPinned(activeItem(ws)!)).toBe(true);
+  });
+
+  it("unpinning DROPS the key (omit-when-default — no `pinned: false`)", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = setPinned(ws, "root", n("a"), true);
+    ws = setPinned(ws, "root", n("a"), false);
+    const tab = focusedLeaf(ws).tabs[0]!;
+    expect(isPinned(tab)).toBe(false);
+    expect("pinned" in tab).toBe(false); // the key is gone, not set to false
+  });
+
+  it("setPinned leaves the tree unchanged when the pane doesn't hold the item", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    const out = setPinned(ws, "root", n("nope"), true);
+    expect(out).toEqual(ws);
+    expect(firstPinned(out)).toBe(false);
+  });
+
+  it("pin is NOT part of identity — duplicate-forbid + sameItem hold", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = setPinned(ws, "root", n("a"), true);
+    // Re-opening the (now-pinned) item reveals it, never a 2nd instance.
+    ws = openInFocusedTab(ws, n("a"));
+    expect(focusedLeaf(ws).tabs).toHaveLength(1);
+    assertNoDuplicates(ws);
+  });
+
+  it("navigating from a PINNED active tab opens a NEW tab in the same pane", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a")); // [a] active a
+    ws = setPinned(ws, "root", n("a"), true);
+    ws = openInFocusedTab(ws, n("b")); // would normally REUSE a's slot
+    expect(tabIds(focusedLeaf(ws))).toEqual(["a", "b"]); // a survives, b appended
+    expect(activeId(ws)).toBe("b");
+    expect(firstPinned(ws)).toBe(true); // a is still pinned
+    assertNoDuplicates(ws);
+  });
+
+  it("navigating from a NON-pinned active tab still reuses the slot (unchanged)", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInFocusedTab(ws, n("a")); // seed
+    ws = openInFocusedTab(ws, n("b")); // reuse a's slot
+    expect(tabIds(focusedLeaf(ws))).toEqual(["b"]);
+    expect(activeId(ws)).toBe("b");
+  });
+
+  it("a pinned tab is NOT closed by closeTab; unpin restores the close", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = openInNewTab(ws, n("b"));
+    ws = setPinned(ws, "root", n("a"), true);
+    const guarded = closeTab(ws, "root", n("a"));
+    expect(guarded).toBe(ws); // no-op: pinned tab survives
+    expect(tabIds(focusedLeaf(ws))).toEqual(["a", "b"]);
+    // Unpin → close now works.
+    ws = setPinned(ws, "root", n("a"), false);
+    ws = closeTab(ws, "root", n("a"));
+    expect(tabIds(focusedLeaf(ws))).toEqual(["b"]);
+  });
+
+  it("activating a pinned tab via a bare handle preserves its pinned flag", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = openInNewTab(ws, n("b"));
+    ws = setPinned(ws, "root", n("a"), true);
+    ws = setActiveTab(ws, "root", n("a")); // bare handle (no pinned key)
+    expect(isPinned(activeItem(ws)!)).toBe(true);
+  });
+
+  it("a pinned tab keeps its flag across a same-pane reorder", () => {
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = openInNewTab(ws, n("b"));
+    ws = setPinned(ws, "root", n("a"), true);
+    ws = moveTab(ws, "root", "root", n("a"), 2); // move a to the end
+    const leaf = focusedLeaf(ws);
+    expect(tabIds(leaf)).toEqual(["b", "a"]);
+    expect(isPinned(leaf.tabs[1]!)).toBe(true);
+  });
+
+  it("a pinned tab can still drag-to-split (relocates, doesn't close)", () => {
+    const id = counter();
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = openInNewTab(ws, n("b"));
+    ws = setPinned(ws, "root", n("a"), true);
+    ws = splitPaneWithItem(ws, "root", "row", "after", n("a"), id);
+    expect(collectLeaves(ws.root)).toHaveLength(2);
+    // a relocated to the new pane and is STILL pinned.
+    const moved = collectLeaves(ws.root).flatMap((l) => l.tabs).find((t) => t.id === "a")!;
+    expect(isPinned(moved)).toBe(true);
+    assertNoDuplicates(ws);
+  });
+});
+
+// ── tab-modes: stacked layout (MYND-319) ─────────────────────────────────
+
+describe("stacked layout (MYND-319)", () => {
+  it("setStacked sets the per-leaf flag; turning it off DROPS the key", () => {
+    let ws = emptyWorkspace("root");
+    ws = setStacked(ws, "root", true);
+    expect((focusedLeaf(ws) as LeafPane).stacked).toBe(true);
+    ws = setStacked(ws, "root", false);
+    const leaf = focusedLeaf(ws);
+    expect(leaf.stacked).toBeUndefined();
+    expect("stacked" in leaf).toBe(false); // omit-when-default
+  });
+
+  it("toggleStacked flips the focused leaf's flag", () => {
+    let ws = emptyWorkspace("root");
+    ws = toggleStacked(ws, "root");
+    expect(focusedLeaf(ws).stacked).toBe(true);
+    ws = toggleStacked(ws, "root");
+    expect(focusedLeaf(ws).stacked).toBeUndefined();
+  });
+
+  it("is per-leaf — one pane stacked while another stays normal (composes with splits)", () => {
+    const id = counter();
+    let ws = emptyWorkspace("root");
+    ws = openInNewTab(ws, n("a"));
+    ws = openToSide(ws, n("b"), id); // split → 2 leaves
+    const [left, right] = collectLeaves(ws.root);
+    ws = setStacked(ws, right!.id, true);
+    const [l2, r2] = collectLeaves(ws.root);
+    expect(l2!.stacked).toBeUndefined();
+    expect(r2!.stacked).toBe(true);
+    expect(left!.id).toBe(l2!.id);
+  });
+
+  it("toggleStacked is a no-op off a leaf id", () => {
+    let ws = emptyWorkspace("root");
+    const out = toggleStacked(ws, "ghost");
+    expect(out).toBe(ws);
   });
 });

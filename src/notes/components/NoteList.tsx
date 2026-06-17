@@ -35,7 +35,9 @@ import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import {
   noteExportOptions,
   runNoteExportFlow,
+  runNoteHtmlExportFlow,
   runNotePdfExportFlow,
+  runNoteTxtExportFlow,
   type NoteExportUiHooks,
 } from "../exportFlow";
 import { DecorationPopover } from "./DecorationPopover";
@@ -1492,6 +1494,33 @@ function PopulatedList({
         label: "Export as PDF…",
         onSelect: () =>
           void runNotePdfExportFlow(
+            noteExportOptions(
+              menu.id,
+              ctx.cache.get(menu.id)?.title ?? null,
+              exportHooks,
+            ),
+          ),
+      },
+      {
+        // Sibling HTML egress (MYND-340) — same export group, same shared-
+        // flow discipline (runNoteHtmlExportFlow is the palette's flow too).
+        id: "export-html",
+        label: "Export as HTML…",
+        onSelect: () =>
+          void runNoteHtmlExportFlow(
+            noteExportOptions(
+              menu.id,
+              ctx.cache.get(menu.id)?.title ?? null,
+              exportHooks,
+            ),
+          ),
+      },
+      {
+        // Sibling plain-text egress (MYND-340).
+        id: "export-txt",
+        label: "Export as Plain Text…",
+        onSelect: () =>
+          void runNoteTxtExportFlow(
             noteExportOptions(
               menu.id,
               ctx.cache.get(menu.id)?.title ?? null,

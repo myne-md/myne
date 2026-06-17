@@ -462,6 +462,8 @@ function renderBlockNode(ctx: Ctx, node: SyntaxNode): string {
     case "CommentBlock":
     case "ProcessingInstructionBlock":
       return ""; // invisible content — omitted
+    case "DialectCommentBlock":
+      return ""; // `%%…%%` comment stripped on lossy projection (MYND-315, §6)
     case "LinkReference":
       return ""; // resolved definitions never render (CommonMark)
     case "FootnoteDefinition":
@@ -785,6 +787,8 @@ function renderInlineNode(ctx: Ctx, node: SyntaxNode): string {
       return renderInlineMath(ctx, node);
     case "InlineTag":
       return escapeHtml(slice(ctx, node)); // plain text — SYNC-17, no chip
+    case "DialectComment":
+      return ""; // `%%…%%` comment stripped on lossy projection (MYND-315, §6)
     case "Emoji": {
       const raw = slice(ctx, node);
       const name = raw.slice(1, -1);

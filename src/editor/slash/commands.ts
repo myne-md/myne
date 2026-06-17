@@ -9,6 +9,12 @@ import { pickAndInsert } from "../attachments/picker";
 import { startVoiceRecording } from "../attachments/voiceRecord";
 import { requestTableCellFocus } from "../decorations/table";
 import { emptyTableGrid, serializeTable } from "../decorations/table-model";
+import {
+  formatLocalDate,
+  formatLocalDateTime,
+  formatLocalTime,
+  formatLocalWeekday,
+} from "../../notes/localDateTime";
 
 export type SlashCommand = {
   id: string;
@@ -147,6 +153,34 @@ export function slashCommands(): readonly SlashCommand[] {
       label: "Divider",
       icon: "—",
       apply: (v, f, t) => insertAtTrigger(v, f, t, "---\n"),
+    },
+    {
+      // `/date` `/day` `/time` `/now` (MYND-338): insert the current local
+      // date/time as FROZEN plain text at the trigger (not a live token). Formats
+      // reuse the shared `localDateTime` helpers — the same source of truth as the
+      // `{{date}}` template render context (local time, no UTC, no config).
+      id: "date",
+      label: "Date",
+      icon: "D",
+      apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalDate(new Date())),
+    },
+    {
+      id: "day",
+      label: "Day",
+      icon: "W",
+      apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalWeekday(new Date())),
+    },
+    {
+      id: "time",
+      label: "Time",
+      icon: "T",
+      apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalTime(new Date())),
+    },
+    {
+      id: "now",
+      label: "Now",
+      icon: "N",
+      apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalDateTime(new Date())),
     },
     {
       // `/table` (MYND-162): insert a canonical empty 2×2 GFM table (header +

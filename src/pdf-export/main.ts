@@ -26,48 +26,13 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { composePrintStylesheet } from "../dialect/html/page-geometry";
+import { FONT_FACE_CSS } from "../dialect/html/font-face";
 
 /** Wire mirror of `commands.rs::PdfExportPayload`. */
 interface PdfExportPayload {
   readonly html: string;
   readonly title: string | null;
 }
-
-// The bundled self-hosted faces (public/fonts/ — see src/CLAUDE.md
-// "Design tokens"). PRINT_CSS references the family NAMES only (both
-// the "… Variable" and plain forms, mirroring colors_and_type.css);
-// this standalone document serves the faces itself. Both names map to
-// the same variable-font file.
-const FONT_FACE_CSS = `
-@font-face {
-  font-family: "Inter Variable";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: block;
-  src: url("/fonts/InterVariable.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Inter";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: block;
-  src: url("/fonts/InterVariable.woff2") format("woff2");
-}
-@font-face {
-  font-family: "JetBrains Mono Variable";
-  font-style: normal;
-  font-weight: 100 800;
-  font-display: block;
-  src: url("/fonts/JetBrainsMono.woff2") format("woff2");
-}
-@font-face {
-  font-family: "JetBrains Mono";
-  font-style: normal;
-  font-weight: 100 800;
-  font-display: block;
-  src: url("/fonts/JetBrainsMono.woff2") format("woff2");
-}
-`;
 
 /** Explicit font-load nudges so `document.fonts.ready` deterministically
  *  covers the faces the print CSS uses (a face nothing has laid out yet

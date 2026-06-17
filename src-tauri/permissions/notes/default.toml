@@ -24,6 +24,8 @@ permissions = [
     "allow-note-snapshot-flush",
     "allow-note-export-as-markdown",
     "allow-note-export-attachments",
+    "allow-note-export-html",
+    "allow-note-export-html-attachments",
 ]
 
 [[permission]]
@@ -80,3 +82,13 @@ commands.allow = ["note_export_as_markdown"]
 identifier = "allow-note-export-attachments"
 description = "Allow invoking notes:note_export_attachments (MYND-115 — opt-in attachments-included export: decrypt one note plus every form-C-referenced attachment and write them side-by-side into a user-chosen directory, with embeds rewritten to the final collision-suffixed filenames per the markdown-dialect §6 sanctioned export transform; attachments never overwrite anything; the note file's overwrite consent travels explicitly; the vault's stored blob is never modified)."
 commands.allow = ["note_export_attachments"]
+
+[[permission]]
+identifier = "allow-note-export-html"
+description = "Allow invoking notes:note_export_html (MYND-340 — write a standalone HTML projection of one note, composed WebView-side, byte-for-byte to a user-chosen path via atomic_write; deliberate user-initiated plaintext egress across TB3 under dialog-plugin authority; overwrite consent travels explicitly — overwrite=false rejects an existing target with TargetAlreadyExists)."
+commands.allow = ["note_export_html"]
+
+[[permission]]
+identifier = "allow-note-export-html-attachments"
+description = "Allow invoking notes:note_export_html_attachments (MYND-340 — opt-in attachments-included HTML export: write the composed HTML document plus every referenced image attachment as relative sidecar files into a user-chosen directory, with each attachment:// src rewritten to the final collision-suffixed filename per the markdown-dialect §6 sanctioned export transform (HTML arm); attachments never overwrite anything; the HTML file's overwrite consent travels explicitly; the vault's stored blob is never modified)."
+commands.allow = ["note_export_html_attachments"]

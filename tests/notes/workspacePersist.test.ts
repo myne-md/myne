@@ -14,6 +14,8 @@ import {
   noteItem,
   openInNewTab,
   openToSide,
+  setPinned,
+  setStacked,
   viewItem,
   type WorkspaceState,
 } from "../../src/notes/workspaceState";
@@ -216,5 +218,87 @@ describe("workspace descriptor (de)serialization", () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  // ── tab-modes (MYND-319/320): pinned (per-tab) + stacked (per-leaf) ──────
+
+  it("round-trips pinned tabs + a stacked pane identically", () => {
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, noteItem("a"));
+    ws = openInNewTab(ws, noteItem("b"));
+    ws = setPinned(ws, "p", noteItem("a"), true);
+    ws = setStacked(ws, "p", true);
+    const restored = deserializeWorkspace(serializeWorkspace(ws));
+    expect(restored).toEqual(ws);
+    if (restored!.root.kind === "leaf") {
+      expect(restored!.root.tabs[0]).toEqual({ kind: "note", id: "a", pinned: true });
+      expect(restored!.root.tabs[1]).toEqual(noteItem("b")); // unpinned: no key
+      expect(restored!.root.stacked).toBe(true);
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+
+  it("a pinned VIEW + GRAPH tab round-trips (any tab kind is pinnable)", () => {
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, viewItem("books"));
+    ws = openInNewTab(ws, graphItem());
+    ws = setPinned(ws, "p", viewItem("books"), true);
+    ws = setPinned(ws, "p", graphItem(), true);
+    const restored = deserializeWorkspace(serializeWorkspace(ws));
+    expect(restored).toEqual(ws);
+  });
+
+  it("a workspace with NO pins/stacked serializes BYTE-IDENTICAL to pre-feature (omit-when-default)", () => {
+    // The pre-feature descriptor shape is exactly {root,focusedPaneId} with
+    // tabs carrying ONLY {kind,id} and a leaf carrying ONLY {kind,id,tabs,
+    // activeTab}. A workspace that never pins/stacks must emit that byte-for-
+    // byte — no `pinned`/`stacked` keys leak in.
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, noteItem("a"));
+    ws = openInNewTab(ws, noteItem("b"));
+    const expectedPreFeature = JSON.stringify({
+      root: {
+        kind: "leaf",
+        id: "p",
+        tabs: [
+          { kind: "note", id: "a" },
+          { kind: "note", id: "b" },
+        ],
+        activeTab: { kind: "note", id: "b" },
+      },
+      focusedPaneId: "p",
+    });
+    expect(serializeWorkspace(ws)).toBe(expectedPreFeature);
+    // And a transient pin/unpin (or stack/unstack) round leaves it byte-stable.
+    let toggled = setPinned(ws, "p", noteItem("a"), true);
+    toggled = setPinned(toggled, "p", noteItem("a"), false);
+    toggled = setStacked(toggled, "p", true);
+    toggled = setStacked(toggled, "p", false);
+    expect(serializeWorkspace(toggled)).toBe(expectedPreFeature);
+  });
+
+  it("ignores a non-true `pinned`/`stacked` value (no `false` round-trips in)", () => {
+    const restored = deserializeWorkspace(
+      JSON.stringify({
+        root: {
+          kind: "leaf",
+          id: "p",
+          tabs: [{ kind: "note", id: "a", pinned: false }],
+          activeTab: { kind: "note", id: "a" },
+          stacked: false,
+        },
+        focusedPaneId: "p",
+      }),
+    );
+    expect(restored).not.toBeNull();
+    if (restored!.root.kind === "leaf") {
+      // `pinned: false` is normalized away (absent key = unpinned default).
+      expect(restored!.root.tabs[0]).toEqual(noteItem("a"));
+      expect("pinned" in restored!.root.tabs[0]!).toBe(false);
+      expect(restored!.root.stacked).toBeUndefined();
+    } else {
+      throw new Error("expected a leaf root");
+    }
   });
 });

@@ -149,6 +149,8 @@ fn main() {
                     "note_snapshot_flush",
                     "note_export_as_markdown",
                     "note_export_attachments",
+                    "note_export_html",
+                    "note_export_html_attachments",
                 ]),
             )
             .plugin(
