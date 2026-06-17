@@ -109,6 +109,17 @@ const CSS = `
   color: var(--fg-3);
   line-height: 1.2;
 }
+/* Folder-target row (MYND-370): single line, glyph + path. Overrides the
+   note row's column stack with a glyph-then-label horizontal layout. */
+.cm-wiki-picker-folder-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.cm-wiki-picker-folder-glyph {
+  width: 16px;
+  color: var(--fg-3);
+}
 
 .cm-toolbar {
   display: inline-flex;

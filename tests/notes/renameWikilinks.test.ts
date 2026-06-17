@@ -2,12 +2,14 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  planInboundFolderRewrites,
   planInboundRewrites,
   type InboundRewrite,
 } from "../../src/notes/renameWikilinks";
 
 const afters = (rows: InboundRewrite[]) => rows.map((r) => r.after);
 const t = { oldTitle: "Old Title", newTitle: "New Title" };
+const ft = { oldFolder: "Projects/", newFolder: "Work/" };
 
 describe("planInboundRewrites (§8.2 form preservation)", () => {
   it("title-only → swaps the title text", () => {
@@ -87,5 +89,46 @@ describe("planInboundRewrites (§8.2 form preservation)", () => {
         "[[New Title#H|New Title]]",
       ]);
     });
+  });
+});
+
+describe("planInboundFolderRewrites (MYND-370 folder-target links)", () => {
+  it("rewrites `[[Projects/]]` → `[[Work/]]`", () => {
+    expect(afters(planInboundFolderRewrites("go [[Projects/]] now", ft))).toEqual([
+      "[[Work/]]",
+    ]);
+  });
+
+  it("re-roots a descendant folder target `[[Projects/Myne/]]` → `[[Work/Myne/]]`", () => {
+    expect(afters(planInboundFolderRewrites("[[Projects/Myne/]]", ft))).toEqual([
+      "[[Work/Myne/]]",
+    ]);
+  });
+
+  it("preserves alias + embed form on a folder target", () => {
+    expect(afters(planInboundFolderRewrites("![[Projects/|Label]]", ft))).toEqual([
+      "![[Work/|Label]]",
+    ]);
+  });
+
+  it("leaves a note path-form link `[[Projects/Note]]` untouched (no trailing slash)", () => {
+    expect(planInboundFolderRewrites("[[Projects/Note]]", ft)).toEqual([]);
+  });
+
+  it("leaves a title-only link `[[Projects]]` untouched", () => {
+    expect(planInboundFolderRewrites("[[Projects]]", ft)).toEqual([]);
+  });
+
+  it("does not false-match a name-prefix sibling `[[Projectsx/]]`", () => {
+    expect(planInboundFolderRewrites("[[Projectsx/]]", ft)).toEqual([]);
+  });
+
+  it("is empty for a no-op rename (source === target)", () => {
+    expect(
+      planInboundFolderRewrites("[[Projects/]]", {
+        oldFolder: "Projects/",
+        newFolder: "Projects/",
+      }),
+    ).toEqual([]);
   });
 });

@@ -65,6 +65,76 @@ describe("deriveFolderTree — ancestor expansion", () => {
   });
 });
 
+// === MYND-370: folder-index note derivation ===
+describe("deriveFolderTree — folder-index note (MYND-370)", () => {
+  // Note variant carrying the `folder_index` flag.
+  const idxNote = (
+    noteUuid: string,
+    folder: string | null,
+    folderIndex: boolean,
+  ) => ({ noteUuid, folder, folderIndex });
+
+  it("leaves indexNoteId null and no conflict for a folder with no flagged note", () => {
+    const tree = deriveFolderTree([note("n1", "Projects/")], []);
+    const root = tree.roots[0]!;
+    expect(root.indexNoteId).toBeNull();
+    expect(root.indexConflictIds).toEqual([]);
+  });
+
+  it("identifies the single flagged note as the folder's index", () => {
+    const tree = deriveFolderTree(
+      [idxNote("n1", "Projects/", true), note("n2", "Projects/")],
+      [],
+    );
+    const root = tree.roots[0]!;
+    expect(root.indexNoteId).toBe("n1");
+    expect(root.indexConflictIds).toEqual([]);
+  });
+
+  it("keeps the index note in noteIds, pinned to the front (not hidden)", () => {
+    const tree = deriveFolderTree(
+      [note("a-note", "Projects/"), idxNote("z-index", "Projects/", true)],
+      [],
+    );
+    const root = tree.roots[0]!;
+    // z-index is the index note → pinned first despite insertion order.
+    expect(root.noteIds[0]).toBe("z-index");
+    expect(root.noteIds).toContain("a-note");
+    expect(root.noteIds).toHaveLength(2);
+  });
+
+  it("resolves a two-claim conflict to the smallest-uuid winner, rest as conflicts", () => {
+    const tree = deriveFolderTree(
+      [
+        idxNote("n-b", "Projects/", true),
+        idxNote("n-a", "Projects/", true),
+        idxNote("n-c", "Projects/", true),
+      ],
+      [],
+    );
+    const root = tree.roots[0]!;
+    expect(root.indexNoteId).toBe("n-a");
+    expect(root.indexConflictIds).toEqual(["n-b", "n-c"]);
+    expect(root.noteIds[0]).toBe("n-a");
+  });
+
+  it("does not treat a root/unfiled note's folder_index flag as an index", () => {
+    const tree = deriveFolderTree([idxNote("n1", null, true)], []);
+    expect(tree.unfiledNoteIds).toEqual(["n1"]);
+    expect(tree.roots).toEqual([]);
+  });
+
+  it("binds the index to the note's own folder (move follows the flag)", () => {
+    // The same note, now living in Work/, indexes Work/ — not Projects/.
+    const tree = deriveFolderTree(
+      [idxNote("n1", "Work/", true), note("n2", "Projects/")],
+      ["Projects/"],
+    );
+    expect(find(tree.roots, "Work/")!.indexNoteId).toBe("n1");
+    expect(find(tree.roots, "Projects/")!.indexNoteId).toBeNull();
+  });
+});
+
 describe("deriveFolderTree — union + dedup", () => {
   it("merges a note folder and a deliberate folder into one node", () => {
     const tree = deriveFolderTree([note("n1", "Projects/")], ["Projects/"]);
