@@ -29,6 +29,20 @@ export interface FolderNode {
   deliberate: boolean;
   /** Note IDs whose folder resolves exactly to this path (not descendants). */
   noteIds: string[];
+  /**
+   * The note ID of this folder's **index note** (MYND-370) — the in-folder note
+   * carrying `folder_index: true`, or `null` if the folder has none. Always a
+   * member of `noteIds` and pinned to its front (see ordering below). When more
+   * than one in-folder note claims the flag, the deterministic winner (smallest
+   * `noteUuid`) is chosen and the rest land in {@link indexConflictIds}.
+   */
+  indexNoteId: string | null;
+  /**
+   * Index-flag claimants in this folder that LOST the deterministic tiebreak
+   * (every claimant except {@link indexNoteId}). Non-empty only on a conflict;
+   * the UI surfaces a "folder already has an index" warning for these.
+   */
+  indexConflictIds: string[];
   /** Child folders, sorted by folded name. */
   children: FolderNode[];
 }
@@ -43,6 +57,10 @@ export interface FolderTree {
 interface NoteLike {
   noteUuid: string;
   folder: string | null;
+  /** True when the note carries the value-strict `folder_index: true` flag
+   *  (MYND-370). Optional so existing callers that don't track it still type-check;
+   *  absent / false means "ordinary note". */
+  folderIndex?: boolean;
 }
 
 interface Builder {
@@ -52,11 +70,25 @@ interface Builder {
   deliberateDisplay: string | null;
   deliberate: boolean;
   noteIds: string[];
+  /** Note IDs in this folder that claim `folder_index: true` (any number). */
+  indexClaimantIds: string[];
 }
 
 function lastSegment(canonical: string): string {
   const segs = canonical.split("/").filter((s) => s.length > 0);
   return segs[segs.length - 1] ?? "";
+}
+
+/**
+ * The deterministic folder-index winner among `folder_index: true` claimants in a
+ * single folder: the smallest `noteUuid` by locale-independent code-unit order
+ * (MYND-370). The ONE definition of the tiebreak — `resolveWikilink`'s folder-
+ * target path calls this too, so the sidebar badge and the `[[Projects/]]`
+ * resolution can never point at different notes (`wikilink.md` §5.5). Returns
+ * `null` for no claimants.
+ */
+export function pickIndexNote(claimantUuids: readonly string[]): string | null {
+  return [...claimantUuids].sort()[0] ?? null;
 }
 
 /**
@@ -81,6 +113,7 @@ export function deriveFolderTree(
         deliberateDisplay: null,
         deliberate: false,
         noteIds: [],
+        indexClaimantIds: [],
       };
       byKey.set(key, b);
     }
@@ -111,10 +144,14 @@ export function deriveFolderTree(
   for (const n of notes) {
     const norm = normalizeFolderPath(n.folder);
     if (norm === null) {
+      // A root/unfiled note cannot be a folder index — there is no folder to
+      // index — so its `folder_index` flag (if any) is silently inert here.
       unfiledNoteIds.push(n.noteUuid);
       continue;
     }
-    register(norm, false).noteIds.push(n.noteUuid);
+    const leaf = register(norm, false);
+    leaf.noteIds.push(n.noteUuid);
+    if (n.folderIndex === true) leaf.indexClaimantIds.push(n.noteUuid);
   }
 
   for (const raw of deliberateFolders) {
@@ -128,13 +165,32 @@ export function deriveFolderTree(
   for (const [key, b] of byKey) {
     const displayPath =
       b.deliberateDisplay ?? [...b.candidates].sort()[0] ?? "";
+
+    // Index-note selection (MYND-370). Multiple in-folder notes may claim
+    // `folder_index: true`; pick the deterministic winner (smallest noteUuid,
+    // stable across reloads) and report the rest as conflicts. The winner is
+    // pinned to the FRONT of `noteIds` so the render layer shows it first; it
+    // stays a member of `noteIds` (the index note is NOT hidden, unlike
+    // trashed/template notes).
+    const indexNoteId = pickIndexNote(b.indexClaimantIds);
+    const indexConflictIds =
+      indexNoteId === null
+        ? []
+        : [...b.indexClaimantIds].sort().filter((id) => id !== indexNoteId);
+    const orderedNoteIds =
+      indexNoteId === null
+        ? b.noteIds
+        : [indexNoteId, ...b.noteIds.filter((id) => id !== indexNoteId)];
+
     nodeByKey.set(key, {
       path: displayPath,
       key,
       name: lastSegment(displayPath),
       depth: displayPath.split("/").filter((s) => s.length > 0).length,
       deliberate: b.deliberate,
-      noteIds: b.noteIds,
+      noteIds: orderedNoteIds,
+      indexNoteId,
+      indexConflictIds,
       children: [],
     });
   }

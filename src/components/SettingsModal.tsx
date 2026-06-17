@@ -30,6 +30,7 @@ import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import { AppearancePanel } from "./settings/AppearancePanel";
 import { EditorPanel } from "./settings/EditorPanel";
+import { HotkeysPanel } from "./settings/HotkeysPanel";
 import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
@@ -43,6 +44,7 @@ type PanelId =
   | "account"
   | "privacy"
   | "editor"
+  | "hotkeys"
   | "appearance"
   | "storage"
   | "about";
@@ -56,6 +58,7 @@ const PANELS: readonly PanelMeta[] = [
   { id: "account", label: "Account" },
   { id: "privacy", label: "Privacy" },
   { id: "editor", label: "Editor" },
+  { id: "hotkeys", label: "Hotkeys" },
   { id: "appearance", label: "Appearance" },
   { id: "storage", label: "Storage" },
   { id: "about", label: "About" },
@@ -229,6 +232,7 @@ export function SettingsModal({
     account: null,
     privacy: null,
     editor: null,
+    hotkeys: null,
     appearance: null,
     storage: null,
     about: null,
@@ -297,6 +301,7 @@ export function SettingsModal({
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     editor: <EditorPanel />,
+    hotkeys: <HotkeysPanel />,
     appearance: <AppearancePanel />,
     storage: (
       <StoragePanel

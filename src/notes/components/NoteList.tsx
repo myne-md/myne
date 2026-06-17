@@ -44,6 +44,11 @@ import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
+import {
+  createFolderNote,
+  setFolderIndex,
+  unsetFolderIndex,
+} from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
 import { useWorkspace } from "../workspaceContext";
@@ -797,6 +802,24 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     }
     return map;
   }, [treeAnim, rows]);
+  // Folder-index lookup (MYND-370): note-id → its role in its folder. The
+  // authoritative winner (`indexNoteId`, pinned by `deriveFolderTree`) reads
+  // "index"; every claimant that lost the tiebreak (`indexConflictIds`) reads
+  // "conflict". Threaded into every NoteRow so the badge / conflict indicator
+  // come from the FolderNode, not the per-note `folderIndex` flag alone (which
+  // can't tell the winner from a loser).
+  const folderIndexRoles = useMemo(() => {
+    const map = new Map<NoteId, "index" | "conflict">();
+    const walk = (nodes: readonly FolderNode[]): void => {
+      for (const n of nodes) {
+        if (n.indexNoteId !== null) map.set(n.indexNoteId, "index");
+        for (const id of n.indexConflictIds) map.set(id, "conflict");
+        walk(n.children);
+      }
+    };
+    walk(tree.roots);
+    return map;
+  }, [tree]);
   // Favorites section rows (MYND-183) — note rows keyed `fav-<id>`, rendered
   // above the tree. Stale-UUID GC (render half) is in `buildFavoriteRows`; a
   // trashed favorite is absent from `live` so it is hidden until restore.
@@ -874,6 +897,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           navIds={navIds}
           treeAnimRows={treeAnimRows}
           folderOptions={folderOptions}
+          folderIndexRoles={folderIndexRoles}
           onToggleFolder={toggleFolder}
           onCreate={handleCreate}
           fm={fm}
@@ -1064,6 +1088,7 @@ function PopulatedList({
   navIds,
   treeAnimRows,
   folderOptions,
+  folderIndexRoles,
   onToggleFolder,
   onCreate,
   fm,
@@ -1077,6 +1102,10 @@ function PopulatedList({
   /** Flat folder choices (tree order, depth-indented label) for the bulk
    *  "Move N notes to…" target submenu (MYND-367). Reuses the parent's memo. */
   folderOptions: FolderOption[];
+  /** Note-id → folder-index role (MYND-370): "index" = the folder's index note,
+   *  "conflict" = a claimant that lost the tiebreak. Drives the NoteRow badge +
+   *  conflict indicator. Computed in the parent off the derived tree. */
+  folderIndexRoles: ReadonlyMap<NoteId, "index" | "conflict">;
   /** Per-row folder disclosure-animation descriptors, keyed by VirtualList row
    *  key (empty when no expand/collapse is animating). Computed in the parent so
    *  it shares `treeAnim` state with the toggle handler; each entry's `mode` +
@@ -1246,25 +1275,30 @@ function PopulatedList({
   // identical NoteRow (only the `favorited` flag + the surrounding drag wrapper
   // differ). Keeping the prop wiring in one place stops the two sites drifting.
   const renderNoteRow = useCallback(
-    (record: TitleRecord, id: NoteId, favorited: boolean) => (
-      <NoteRow
-        record={record}
-        selected={noteHighlightActive && ctx.selectedId === id}
-        multiSelected={noteHighlightActive && ctx.selectedIds.has(id)}
-        renaming={ctx.renamingId === id}
-        onSelect={(noteId, opts) => activateRow(noteId, opts)}
-        onStartRename={ctx.startRename}
-        onContextMenu={handleContextMenu}
-        onCommitRename={async (noteId, newTitle) => {
-          await executeRenameCommit(noteId, newTitle, ctx);
-        }}
-        onCancelRename={ctx.cancelRename}
-        favorited={favorited}
-        onToggleFavorite={fm.toggleFavorite}
-        colorSlot={fm.itemColors[id]}
-        showTimestamps={showTimestamps}
-      />
-    ),
+    (record: TitleRecord, id: NoteId, favorited: boolean) => {
+      const role = folderIndexRoles.get(id);
+      return (
+        <NoteRow
+          record={record}
+          selected={noteHighlightActive && ctx.selectedId === id}
+          multiSelected={noteHighlightActive && ctx.selectedIds.has(id)}
+          renaming={ctx.renamingId === id}
+          onSelect={(noteId, opts) => activateRow(noteId, opts)}
+          onStartRename={ctx.startRename}
+          onContextMenu={handleContextMenu}
+          onCommitRename={async (noteId, newTitle) => {
+            await executeRenameCommit(noteId, newTitle, ctx);
+          }}
+          onCancelRename={ctx.cancelRename}
+          favorited={favorited}
+          onToggleFavorite={fm.toggleFavorite}
+          colorSlot={fm.itemColors[id]}
+          showTimestamps={showTimestamps}
+          isIndexNote={role === "index"}
+          indexConflict={role === "conflict"}
+        />
+      );
+    },
     [
       ctx,
       activateRow,
@@ -1273,6 +1307,7 @@ function PopulatedList({
       noteHighlightActive,
       fm.itemColors,
       showTimestamps,
+      folderIndexRoles,
     ],
   );
 
@@ -1325,6 +1360,69 @@ function PopulatedList({
       }
     });
   }, [undoToast, ctx]);
+
+  // ---- folder notes (MYND-370) -------------------------------------------
+  // Create a new index note for `folderPath`, settle it into the cache (so the
+  // new row + its badge appear), then open it in the focused pane. Mirrors the
+  // `newNoteHere` create-then-refresh discipline; `createFolderNote` mints the
+  // note via the same `note_create` IPC, so `refreshOne` pulls the real slice.
+  const handleCreateFolderNote = useCallback(
+    async (folderPath: string) => {
+      try {
+        const newId = await createFolderNote(folderPath);
+        await ctx.refreshOne(newId);
+        openNote(newId);
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[NoteList] createFolderNote failed:", err);
+        }
+      }
+    },
+    [ctx, openNote],
+  );
+
+  // Open a folder's existing index note — the same open path a note-row click
+  // uses (reuse the focused pane).
+  const handleOpenIndexNote = useCallback(
+    (noteId: NoteId) => openNote(noteId),
+    [openNote],
+  );
+
+  // Designate / undesignate a note as its folder's index, then refresh its
+  // record so the derived tree + badge update. The flag flip writes through the
+  // dedicated `folderNote` orchestrators (no `updated:` bump); `refreshOne`
+  // re-reads the slice so `folderIndex` settles into the cache.
+  const handleSetIndex = useCallback(
+    async (id: NoteId) => {
+      setMenu(null);
+      try {
+        await setFolderIndex(id);
+        await ctx.refreshOne(id);
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[NoteList] setFolderIndex failed:", err);
+        }
+      }
+    },
+    [ctx],
+  );
+  const handleUnsetIndex = useCallback(
+    async (id: NoteId) => {
+      setMenu(null);
+      try {
+        await unsetFolderIndex(id);
+        await ctx.refreshOne(id);
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[NoteList] unsetFolderIndex failed:", err);
+        }
+      }
+    },
+    [ctx],
+  );
 
   // Bulk move (MYND-367): move the whole multi-selection to `folder` (or root)
   // best-effort, then collapse the set. Reads `selectedIds` at call time (not
@@ -1462,6 +1560,27 @@ function PopulatedList({
           : "Add to favorites",
         onSelect: () => fm.toggleFavorite(menu.id),
       },
+      // Folder note (MYND-370): only for a note that lives IN a folder — a
+      // root/unfiled note can't index anything, so it gets neither entry. The
+      // current index note offers "Remove"; any other in-folder note offers
+      // "Set".
+      ...(ctx.cache.get(menu.id)?.folder != null
+        ? folderIndexRoles.get(menu.id) === "index"
+          ? [
+              {
+                id: "note.unset-index",
+                label: "Remove as folder note",
+                onSelect: () => void handleUnsetIndex(menu.id),
+              },
+            ]
+          : [
+              {
+                id: "note.set-index",
+                label: "Set as folder note",
+                onSelect: () => void handleSetIndex(menu.id),
+              },
+            ]
+        : []),
       {
         id: "color",
         label: "Color…",
@@ -1535,7 +1654,19 @@ function PopulatedList({
         onSelect: () => void handleTrash(menu.id),
       },
     ];
-  }, [menu, ctx, handleTrash, handleBulkDelete, fm, favSet, openNote, exportHooks]);
+  }, [
+    menu,
+    ctx,
+    handleTrash,
+    handleBulkDelete,
+    fm,
+    favSet,
+    openNote,
+    exportHooks,
+    folderIndexRoles,
+    handleSetIndex,
+    handleUnsetIndex,
+  ]);
 
   // Folder context-menu items (right-click a folder row).
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -1549,6 +1680,18 @@ function PopulatedList({
         label: "New note here",
         onSelect: () => fm.newNoteHere(node.path),
       },
+      // Folder note (MYND-370): open the existing index, or create one.
+      node.indexNoteId !== null
+        ? {
+            id: "folder.open-index",
+            label: "Open folder note",
+            onSelect: () => handleOpenIndexNote(node.indexNoteId as string),
+          }
+        : {
+            id: "folder.create-index",
+            label: "Create folder note",
+            onSelect: () => void handleCreateFolderNote(node.path),
+          },
       {
         id: "new-subfolder",
         label: "New subfolder",
@@ -1572,7 +1715,7 @@ function PopulatedList({
         onSelect: () => void fm.deleteFolderAction(node),
       },
     ];
-  }, [fm]);
+  }, [fm, handleOpenIndexNote, handleCreateFolderNote]);
 
   // Background (root-level) context-menu items — Story F2.
   const bgMenuItems: ContextMenuItem[] = useMemo(
@@ -1791,6 +1934,10 @@ function PopulatedList({
                       void fm.commitRenameFolder(node, newName)
                     }
                     onCancelRename={fm.cancelRenameFolder}
+                    onOpenIndexNote={handleOpenIndexNote}
+                    onCreateFolderNote={(folderPath) =>
+                      void handleCreateFolderNote(folderPath)
+                    }
                   />
                 </DisclosureWrapper>
               );

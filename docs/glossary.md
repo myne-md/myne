@@ -231,6 +231,12 @@ The IETF AEAD specified in RFC 8439, using the ChaCha20 stream cipher and the Po
 Used in: `spec/protocol.md` §5.1
 Reference: RFC 8439.
 
+### **chord** &nbsp; 📦 *Product*
+
+A single keyboard-shortcut combination, e.g. `Mod-Shift-g` (hotkeys epic, MYND-304). Myne's canonical chord string is CodeMirror-`KeyBinding.key`-compatible: a `-`-separated sequence of modifier tokens followed by one logical key, using the cross-platform `Mod` token (Cmd on macOS, Ctrl elsewhere) and the layout-respecting *logical* key (what the user sees on the key, not the physical `code`); single-character keys are lowercased. Stored NFC-normalized inside `vault.prefs` (the `keymap` field). See **keymap**, **key binding**.
+
+Used in: `spec/protocol.md` §9.5.2
+
 ### **code-signed releases** &nbsp; 🛠️ *Tooling*
 
 Myne desktop installers and auto-update payloads are cryptographically signed with hardware-backed keys controlled by the team. Auto-update verification (`threat-model.md` §3 TB7) refuses any artifact that fails signature or hash check. The signing keys are themselves the largest unmitigated risk against A9 (compromised distribution).
@@ -389,6 +395,12 @@ Reserved term for `appname-v005` multi-device support: a per-device asymmetric k
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 
+### **device-local credential** &nbsp; 🗝️ *Key/identifier*
+
+A credential that lives only on one device and is **never synchronized**, because it is bound to that device's hardware. The v0.1 instance is the [quick-unlock credential](#quick-unlock-credential) blob (`vault.quickunlock`, `spec/protocol.md` §9.14): its wrap key is held in the OS keychain with `thisDeviceOnly` accessibility, so a copy on another device is inert. Contrast the master-password and recovery-phrase credentials, which are device-portable and ride in the synced `vault.meta`. Each device that opts into quick-unlock mints its own device-local credential.
+
+Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
+
 ### **domain separation** &nbsp; 📋 *Protocol*
 
 The cryptographic principle that contexts which should not produce equal outputs from equal inputs MUST mix in a context-distinguishing string. Myne applies it pervasively: HKDF context strings (§3.2), AAD prefixes (§5.2), KDF-parameter binding (§4.3), and protocol-version magic bytes (§9, §10). Failure to domain-separate is the root cause of many published protocol vulnerabilities.
@@ -467,6 +479,18 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
 A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Folders and folderless notes share a single interleaved tree at every level, ordered by [item order](#item-order) (MYND-183) — a folderless note is not bucketed into a separate section but renders at the root level alongside top-level folders. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [item order](#item-order).
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
+
+### **folder note** &nbsp; 📦 *Product*
+
+A note designated the **index note** of its [folder](#folder) via the value-strict `folder_index: true` frontmatter flag — the sixth [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field) (`spec/markdown-dialect.md` §3.6.1). The note indexes whichever folder its own `folder:` names; the binding is the boolean alone and carries **no path**, so a folder rename rewrites `folder:` and the binding follows for free (rename drift is structurally impossible). Unlike a [note template](#note-template) or a trashed note (both **hidden** from the views), a folder note stays a **fully visible, enumerable** child of its folder — pinned to the top with a badge, never excluded from sidebar / folder-tree / search. It is targetable by a [folder-target wikilink](#folder-target-wikilink) `[[<folder>/]]`. Value-strict exactly like `template:`: only the canonical unquoted `true` designates it; `1` / `yes` / `"true"` / absence leave the note ordinary. Owned by the folder-note designate / undesignate actions (`src/notes/folderNote.ts`) only — never written by body autosave; surgery via `patchFolderIndexField`, read via `readFolderIndexFromFmBody`. If two in-folder notes both carry the flag, a deterministic winner is chosen (smallest `note_uuid`) and the rest are flagged. Rides the existing `.myn` AEAD envelope — no new magic byte, no AAD / version bump, no on-disk-layout change (within v0.1; forward-incompatible-by-design with v005). See also [folder](#folder), [folder-target wikilink](#folder-target-wikilink), [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field). (MYND-370)
+
+Used in: `spec/markdown-dialect.md` §3.6.1, `spec/wikilink.md` §5.5; `decisions.md` 2026-06-17
+
+### **folder-target wikilink** &nbsp; 📦 *Product*
+
+The trailing-slash wikilink form `[[<folder>/]]` (form 11, `spec/wikilink.md` §2 / §5.5) that resolves to a folder's [folder note](#folder-note) — its index note (`folder_index: true`). The trailing `/` is the sole discriminator from a title-only target: `[[Projects]]` targets a note titled "Projects", `[[Projects/]]` targets the index note of the *folder* "Projects". It reuses the ordinary wikilink machinery — backlinks, hover, graph — so it is a different spelling of "link to this note", not a different link kind. Two distinct broken hints: **"(no folder note)"** when the folder exists but has no index note, **"(no match)"** when the folder does not exist. A folder rename refreshes inbound folder-target links' path segment on the best-effort §8.1 pass (the index-note binding itself is path-free, so the target note tracks the rename regardless). Recognized and resolved but not the canonical authoring emission (Myne emits the note-targeting form 6); round-trips byte-for-byte. See also [folder note](#folder-note), [bidirectional links](#bidirectional-links). (MYND-370)
+
+Used in: `spec/wikilink.md` §2, §5.5, `spec/markdown-dialect.md` §3.5; `decisions.md` 2026-06-17
 
 ### **footnote definition** &nbsp; 📦 *Product*
 
@@ -672,12 +696,24 @@ The asymmetric building block of a hybrid encryption scheme. Generates a random 
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 
+### **key binding** &nbsp; 📦 *Product*
+
+An association between a **chord** and a command id (hotkeys epic, MYND-304). A command may have zero, one, or several key bindings. Defaults live in the application's command registry (in code); user changes persist as overrides in the **keymap**. The effective binding is `override ?? default`.
+
+Used in: hotkeys epic (MYND-304)
+
 ### **key-committing AEAD** &nbsp; 🏗️ *Construction*
 
 An AEAD that commits to its key, in the sense that no two distinct keys can decrypt the same ciphertext to two valid plaintexts. Plain XChaCha20-Poly1305 is **not** key-committing; Myne achieves the property by wrapping it in CTX commitment.
 
 Used in: `spec/protocol.md` §5.1
 Reference: Chan & Rogaway 2022.
+
+### **keymap** &nbsp; 📦 *Product*
+
+The set of user keybinding *overrides* persisted in `vault.prefs` (the `keymap` field, MYND-304): a map from command id to its set of **chord**s. Overrides only — a command absent from the keymap uses its in-code default; a command mapped to an empty set (`[]`) is explicitly unbound (no shortcut). The effective binding is `override ?? default`. Additive optional `MYP1` field (no new magic / major-version event); non-load-bearing (a tampered value can at worst rebind or drop a shortcut — every command stays reachable via the **command palette**).
+
+Used in: `spec/protocol.md` §9.5.2
 
 ### **Key Transparency (KT)** &nbsp; ⚠️ *Threat*
 
@@ -912,6 +948,18 @@ Used in: `threat-model.md` §5, §7
 The one-time MAC algorithm by Daniel J. Bernstein, used as the authenticator inside ChaCha20-Poly1305 and XChaCha20-Poly1305. In Myne's CTX-wrapped construction the 16-byte Poly1305 tag T is recomputed at decrypt time from `(K, N, AAD, ciphertext)` rather than stored on disk; only the 32-byte CTX commitment tag T' is persisted.
 
 Used in: `spec/protocol.md` §5.1
+
+### **quick-unlock credential** &nbsp; 🗝️ *Key/identifier*
+
+A [device-local credential](#device-local-credential) (`vault.quickunlock`, `spec/protocol.md` §9.14, magic `MYQ1`) that holds a **third wrapped copy of `root_key`** so a re-lock (auto-lock-on-idle) can be reversed with a fast second credential — Touch ID / Windows Hello, or a PIN — instead of the full master-password Argon2id path. It wraps the already-derived `root_key`; it never participates in `root_key` derivation, so it does not touch the zero-knowledge root (the master password stays the primary credential). Its wrap key comes from a [wrap-key provider](#wrap-key-provider), not a `DeriveSubkey` role. Threat class: an **A6** convenience gate over the already-encrypted store; it does **not** defend against **A7** (active local malware), and the PIN provider's blob is offline-brute-forceable by **A4** bounded only by Argon2id cost. Introduced MYND-329.
+
+Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
+
+### **wrap-key provider** &nbsp; 🗝️ *Key/identifier*
+
+The pluggable source of the 32-byte symmetric wrap key that protects the [quick-unlock credential](#quick-unlock-credential) blob. The on-disk blob is provider-agnostic — always `AEAD(wrap_key, root_key)` — and only the wrap-key source differs: a macOS Keychain secret gated by `kSecAccessControlBiometryCurrentSet` (biometric), a future Windows Hello / TPM challenge-response, or a PIN run through the vault's Argon2id parameters. Modeled as a single Rust trait (`QuickUnlockProvider`); adding a provider is not an on-disk-format change. The biometric provider is hardware-bound and OS-invalidated on biometric-set change; the PIN provider's strength is bounded by PIN entropy × the memory-hard Argon2id cost.
+
+Used in: `spec/protocol.md` §9.14.2
 
 ### **post-compromise security** &nbsp; ⚠️ *Threat*
 

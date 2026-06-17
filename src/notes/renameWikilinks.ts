@@ -7,13 +7,25 @@
 // primitive (Ömer / MYND-89), not this module.
 
 import { extractWikilinks } from "../dialect/visitors/wikilinks";
-import { foldSegment, titleToFilename } from "../dialect/folderPath";
+import {
+  foldSegment,
+  isFolderTarget,
+  normalizeFolderPath,
+  titleToFilename,
+} from "../dialect/folderPath";
 import { parseTarget } from "./resolveWikilink";
 import type { ByteRange, WikilinkRef } from "../dialect/types";
 
 export interface RenameTarget {
   readonly oldTitle: string;
   readonly newTitle: string;
+}
+
+export interface FolderRenameTarget {
+  /** The folder being renamed, canonical trailing-slash form, e.g. "Projects/". */
+  readonly oldFolder: string;
+  /** Its new canonical trailing-slash form, e.g. "Work/". */
+  readonly newFolder: string;
 }
 
 export interface InboundRewrite {
@@ -68,6 +80,41 @@ export function planInboundRewrites(
     const newAlias =
       ref.alias !== null && foldSegment(ref.alias) === key ? newTitle : ref.alias;
     const after = rebuild(ref, newTarget(ref, newTitle), newAlias);
+    if (after === ref.raw) continue;
+    out.push({ byteRange: ref.byteRange, before: ref.raw, after });
+  }
+  return out;
+}
+
+/**
+ * Plan the rewrite of every inbound **folder-target** link (`[[Projects/]]`) in
+ * `body` affected by renaming `oldFolder` → `newFolder` (MYND-370). A link whose
+ * target folder is the renamed folder OR a descendant of it is re-rooted under
+ * the new prefix, preserving the descendant suffix and the link's form (alias /
+ * embed). Folded-prefix match with trailing slash — exactly the subtree selection
+ * `planFolderRename` uses for the notes themselves — so the link set and the
+ * note moves stay in lockstep. Title-keyed (`[[Note]]`) and path-form note links
+ * (`[[Projects/Note]]`) are untouched: a folder rename does not change any note's
+ * resolution key, so those resolve unchanged (§5.3 / §8.1).
+ */
+export function planInboundFolderRewrites(
+  body: string,
+  { oldFolder, newFolder }: FolderRenameTarget,
+): InboundRewrite[] {
+  const oldNorm = normalizeFolderPath(oldFolder);
+  const newNorm = normalizeFolderPath(newFolder);
+  if (oldNorm === null || newNorm === null || oldNorm === newNorm) return [];
+  const oldKey = foldSegment(oldNorm);
+
+  const out: InboundRewrite[] = [];
+  for (const ref of extractWikilinks(body)) {
+    if (!isFolderTarget(ref.target)) continue;
+    const targetNorm = normalizeFolderPath(ref.target);
+    if (targetNorm === null) continue;
+    // Subtree match: the link's folder is the renamed folder or below it.
+    if (!foldSegment(targetNorm).startsWith(oldKey)) continue;
+    const newPath = newNorm + targetNorm.slice(oldNorm.length);
+    const after = rebuild(ref, newPath, ref.alias);
     if (after === ref.raw) continue;
     out.push({ byteRange: ref.byteRange, before: ref.raw, after });
   }

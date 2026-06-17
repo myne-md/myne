@@ -482,6 +482,73 @@ pub(crate) async fn set_spell_languages_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for ONE command's keymap override (hotkeys
+/// epic, MYND-304). Three states via `Option<Vec<String>>`:
+/// - `Some(non-empty)` → override the command to those chords;
+/// - `Some(empty)` → explicit-unbind (the `[]` state — the command has no shortcut);
+/// - `None` → remove the override entry (revert to the in-code default).
+///
+/// Read-modify-write under the per-plugin write mutex; no native side-effect.
+/// The codec NFC-sorts + exact-dedupes each chord set on encode (set-canonical),
+/// so the caller passes the raw desired set. **Non-load-bearing** (a tampered /
+/// replayed value can at worst rebind or drop a shortcut; every command stays
+/// reachable via the palette) — no protective-envelope clamp. Logs the
+/// remove/set discriminator + chord count only — never the command id or the
+/// chord strings (a user's specific binding is mildly fingerprintable, like
+/// `spell_languages`). Inherits the main-window-only invariant of the other
+/// `set_*` setters.
+#[tauri::command]
+pub async fn set_keymap_binding<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    command_id: String,
+    chords: Option<Vec<String>>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_keymap_binding_with_dir(&dir, state.inner(), command_id, chords).await
+}
+
+/// Testable core of [`set_keymap_binding`].
+pub(crate) async fn set_keymap_binding_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    command_id: String,
+    chords: Option<Vec<String>>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let removed = chords.is_none();
+    let count = chords.as_ref().map(Vec::len).unwrap_or(0);
+    match chords {
+        Some(c) => {
+            prefs.keymap.insert(command_id, c);
+        }
+        None => {
+            prefs.keymap.remove(&command_id);
+        }
+    }
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(event = "prefs_written", field = "keymap", removed, count);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `deliberate_folders` set
 /// (MYND-144 — the carrier for empty / deliberately-created folders in
 /// the virtual-folder model). Read-modify-write under the per-plugin
@@ -1674,6 +1741,7 @@ mod tests {
                     daily_template: None,
                     favorites: Vec::new(),
                     item_order: Vec::new(),
+                    keymap: Default::default(),
                     editor_layout: None,
                     editor_line_numbers: None,
                     editor_content_width: None,
@@ -2523,6 +2591,96 @@ mod tests {
                 .await
                 .expect("read after off");
             assert_eq!(view.editor_line_numbers, Some(false));
+        });
+    }
+
+    // ---- set_keymap_binding setter (hotkeys epic, MYND-304) -----------
+
+    #[test]
+    fn set_keymap_binding_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-keymap-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_keymap_binding_with_dir(
+                tmp.path(),
+                &state,
+                "graph.show".to_string(),
+                Some(vec!["Mod-Shift-g".to_string()]),
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn keymap_binding_round_trips_three_states() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4B).await;
+
+            // Default (no write yet) reads back as an empty keymap.
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read default");
+            assert!(view.keymap.is_empty());
+
+            // Override: Some(non-empty) persists; codec NFC-sorts + dedupes the
+            // chord set (caller order/dupes collapse to canonical form).
+            set_keymap_binding_with_dir(
+                tmp.path(),
+                &state,
+                "app.command-palette".to_string(),
+                Some(vec![
+                    "Mod-p".to_string(),
+                    "Mod-k".to_string(),
+                    "Mod-p".to_string(),
+                ]),
+            )
+            .await
+            .expect("write override");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after override");
+            assert_eq!(
+                view.keymap.get("app.command-palette"),
+                Some(&vec!["Mod-k".to_string(), "Mod-p".to_string()])
+            );
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Explicit-unbind: Some(empty) persists `[]` (distinct from absent).
+            set_keymap_binding_with_dir(
+                tmp.path(),
+                &state,
+                "vault.lock".to_string(),
+                Some(Vec::new()),
+            )
+            .await
+            .expect("write unbind");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after unbind");
+            assert_eq!(view.keymap.get("vault.lock"), Some(&Vec::<String>::new()));
+            // The earlier override is independent + untouched.
+            assert_eq!(
+                view.keymap.get("app.command-palette"),
+                Some(&vec!["Mod-k".to_string(), "Mod-p".to_string()])
+            );
+
+            // Remove: None drops the entry (revert to the code default).
+            set_keymap_binding_with_dir(
+                tmp.path(),
+                &state,
+                "app.command-palette".to_string(),
+                None,
+            )
+            .await
+            .expect("write remove");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after remove");
+            assert!(!view.keymap.contains_key("app.command-palette"));
+            // The unbind entry survives the unrelated remove.
+            assert_eq!(view.keymap.get("vault.lock"), Some(&Vec::<String>::new()));
         });
     }
 

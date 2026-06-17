@@ -392,4 +392,53 @@ mod tests {
             "WrongVersion"
         );
     }
+
+    /// ADVERSARIAL (filesystem path-injection): `NoteId::parse` is the
+    /// WebView->host (TB6) gate for the string that becomes the on-disk
+    /// `notes/<id>.myn` filename. Every traversal / separator / escape
+    /// attempt must be rejected so a hostile or buggy frontend can never
+    /// steer a read/write outside the `notes/` directory.
+    #[test]
+    fn adversarial_path_injection_note_ids_all_rejected() {
+        let attacks = [
+            "../../../../etc/passwd",
+            "/etc/passwd",
+            "..\\..\\windows\\system32\\config",
+            "0000000000007000800000000000002e/..", // embedded traversal
+            "0000/0000-7000-8000-000000000000",    // slash at a hyphen slot
+            "0000000000007000.8000.000000000000.", // dots
+            "%2e%2e%2f%2e%2e%2fetc%2fpasswd",      // url-encoded traversal
+            "0000000000007000800000000000000\0",   // null byte
+            "AABBCCDD-0000-7000-8000-000000000000", // uppercase hex
+            "",                                    // empty
+            "....................................", // 36 dots: right length, bad charset
+            "/../../../../../../../../../tmp/x.myn",
+        ];
+        for a in attacks {
+            assert!(
+                NoteId::parse(a).is_err(),
+                "PATH INJECTION: hostile note_id {a:?} was accepted by the TB6 gate"
+            );
+        }
+    }
+
+    /// A parsed `NoteId` always renders as a canonical 36-char hyphenated
+    /// hex UUID — so the derived `{uuid}.myn` filename can never carry a
+    /// path separator or traversal sequence, whatever the input was.
+    #[test]
+    fn adversarial_parsed_note_id_filename_is_separator_free() {
+        for _ in 0..1000 {
+            let id = NoteId::new_v7();
+            let rendered = id.as_uuid().to_string();
+            assert_eq!(rendered.len(), 36, "uuid render must be 36 chars");
+            assert!(
+                rendered.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-'),
+                "non-path-safe char in rendered uuid: {rendered}"
+            );
+            assert!(
+                !rendered.contains('/') && !rendered.contains('\\') && !rendered.contains(".."),
+                "path separator/traversal in rendered uuid: {rendered}"
+            );
+        }
+    }
 }

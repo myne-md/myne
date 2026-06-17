@@ -32,6 +32,20 @@ mod vault_sweep;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Install the log sink so the app's `tracing::*!` events reach stdout —
+    // without this nothing is printed (the protocol crate + plugins emit
+    // `tracing` but no subscriber was wired). Filter via the `RUST_LOG` env var
+    // (e.g. `RUST_LOG=debug pnpm tauri dev`); defaults to `info`. `try_init`
+    // never panics if a subscriber is already set (e.g. in tests). Honors the
+    // secret-handling logging discipline — only bounded variant names / stage
+    // tags / OS status codes are emitted, never key material.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .try_init();
+
     let builder = tauri::Builder::default();
 
     // Desktop-only: register `tauri-plugin-single-instance` FIRST so a
@@ -67,6 +81,7 @@ pub fn run() {
         .plugin(plugins::notes::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::vault_indices::init())
+        .plugin(plugins::quick_unlock::init())
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::workspace::init())

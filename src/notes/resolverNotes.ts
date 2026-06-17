@@ -20,7 +20,15 @@ export function resolverNotesFromCache(
 ): ResolverNote[] {
   const out: ResolverNote[] = [];
   for (const r of liveCache(cache).values()) {
-    out.push({ noteUuid: r.noteUuid, title: r.title, folder: r.folder });
+    // `folderIndex` is carried so folder-target wikilinks (`[[Projects/]]`)
+    // resolve to the folder's index note (MYND-370). A folder note is neither
+    // trashed nor a template, so it survives `liveCache`'s exclusion.
+    out.push({
+      noteUuid: r.noteUuid,
+      title: r.title,
+      folder: r.folder,
+      folderIndex: r.folderIndex,
+    });
   }
   return out;
 }

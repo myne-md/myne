@@ -625,6 +625,11 @@ pub(crate) async fn unlock_with_path(
         );
     }
 
+    // MYND-329 task 9: a full master-password unlock opens the spring-loaded
+    // quick-unlock gate for this session (a restart resets it, forcing one
+    // full-password unlock before quick-unlock resumes).
+    state.mark_full_unlock_done();
+
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
     // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
@@ -655,6 +660,15 @@ fn derive_root_key(
     password: &str,
     meta: &VaultMeta,
 ) -> Result<Zeroizing<[u8; AEAD_KEY_LEN]>, VaultUnlockError> {
+    protocol::validate_kdf_params(&meta.kdf_params).map_err(|e| {
+        tracing::error!(
+            stage = "kdf_params_range",
+            protocol_error_kind = protocol_error_kind(&e),
+            "kdf params outside accepted range"
+        );
+        password_or_meta(e)
+    })?;
+
     let wrap_key = protocol::derive_password_wrap_key(
         password,
         &meta.random_salt_password,
@@ -1514,6 +1528,53 @@ mod tests {
         (bytes, original_root_key)
     }
 
+    /// ADVERSARIAL (runtime leak): a FAILED unlock must never let the
+    /// password reach any tracing sink. Drives the full `unlock_with_path`
+    /// failure path (all instrumented call sites) with a distinctive marker
+    /// password and asserts it never appears in captured logs — the runtime
+    /// proof of the `src-tauri/CLAUDE.md` DENY-list discipline (the
+    /// reviewer-enforced "never log the password" rule, now machine-checked).
+    #[test]
+    #[tracing_test::traced_test]
+    fn adversarial_failed_unlock_never_logs_password() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, _) = seed_vault_meta("the genuine vault password");
+            scratch.write_meta(&meta_bytes);
+
+            const MARKER: &str = "ZZ_LEAK_MARKER_PW_DO_NOT_LOG_42";
+            let state = VaultRuntimeState::default();
+            let result = unlock_with_path(MARKER.to_string(), None, scratch.path(), &state).await;
+            assert!(result.is_err(), "wrong password must fail to unlock");
+            assert!(
+                !logs_contain(MARKER),
+                "SECRET LEAK: password appeared in tracing output (DENY-list violation)"
+            );
+        });
+    }
+
+    /// ADVERSARIAL: a SUCCESSFUL unlock must also never log the password.
+    /// Seed the vault WITH the marker as its real password, unlock with it,
+    /// and assert the marker never reaches a log line.
+    #[test]
+    #[tracing_test::traced_test]
+    fn adversarial_successful_unlock_never_logs_password() {
+        rt().block_on(async {
+            const MARKER: &str = "ZZ_SUCCESS_MARKER_PW_DO_NOT_LOG_77";
+            let scratch = scratch_vault();
+            let (meta_bytes, _) = seed_vault_meta(MARKER);
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            let result = unlock_with_path(MARKER.to_string(), None, scratch.path(), &state).await;
+            assert!(result.is_ok(), "correct password must unlock");
+            assert!(
+                !logs_contain(MARKER),
+                "SECRET LEAK: password appeared in tracing output on success path"
+            );
+        });
+    }
+
     /// `Slot::Unlocked.vault_meta_bytes_hash` must equal SHA-256 of
     /// the on-disk vault.meta bytes after a successful unlock — the
     /// CAS anchor for `vault_change_password`'s in-place rewrite. See
@@ -1596,6 +1657,7 @@ mod tests {
                     daily_template: None,
                     favorites: Vec::new(),
                     item_order: Vec::new(),
+                    keymap: Default::default(),
                     editor_layout: None,
                     editor_line_numbers: None,
                     editor_content_width: None,
@@ -1714,6 +1776,7 @@ mod tests {
                 daily_template: None,
                 favorites: Vec::new(),
                 item_order: Vec::new(),
+                keymap: Default::default(),
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,

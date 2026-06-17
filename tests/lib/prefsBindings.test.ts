@@ -32,6 +32,7 @@ import {
   setEditorLineSpacing,
   setEditorTextSize,
   setFavorites,
+  setKeymapBinding,
   setScreenCaptureProtection,
   setShowNoteTimestamps,
   setSpellLanguages,
@@ -167,6 +168,28 @@ describe("prefs-nonce bump discipline", () => {
     expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_editor_text_size", {
       value: null,
     });
+  });
+
+  it("setKeymapBinding sends { commandId, chords } and bumps the nonce (3 states)", async () => {
+    // Override.
+    await setKeymapBinding("graph.show", ["Mod-Shift-g"]);
+    expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_keymap_binding", {
+      commandId: "graph.show",
+      chords: ["Mod-Shift-g"],
+    });
+    // Explicit-unbind ([]).
+    await setKeymapBinding("vault.lock", []);
+    expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_keymap_binding", {
+      commandId: "vault.lock",
+      chords: [],
+    });
+    // Remove (revert to default).
+    await setKeymapBinding("graph.show", null);
+    expect(invokeMock).toHaveBeenLastCalledWith("plugin:prefs|set_keymap_binding", {
+      commandId: "graph.show",
+      chords: null,
+    });
+    expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(3);
   });
 });
 

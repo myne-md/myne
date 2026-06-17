@@ -27,15 +27,18 @@ export {
   formatYamlScalar,
   patchFirstH1Line,
   patchFolderField,
+  patchFolderIndexField,
   patchFrontmatterField,
   patchSourceRanges,
   patchTemplateField,
   patchTitleField,
   patchTrashedField,
   patchUpdatedField,
+  readFolderIndexFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
   readTrashedFromFmBody,
+  FOLDER_INDEX_FLAG_VALUE,
   TEMPLATE_FLAG_VALUE,
 } from "./surgery";
 export { parseStream } from "./worker";

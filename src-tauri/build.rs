@@ -76,6 +76,23 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["vault_residue_scan", "vault_repair"]),
             )
             .plugin(
+                "quick-unlock",
+                // MYND-329 task 6: PIN / biometric quick-unlock over the
+                // auto-lock envelope. Ships the PIN setup/unlock/status/disable
+                // commands (the biometric branch lands in task 7). Adding a
+                // command here without a matching `commands.allow` entry in
+                // `permissions/quick-unlock/default.toml` is a security
+                // regression.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "quick_unlock_setup_pin",
+                    "quick_unlock_with_pin",
+                    "quick_unlock_setup_biometric",
+                    "quick_unlock_with_biometric",
+                    "quick_unlock_status",
+                    "quick_unlock_disable",
+                ]),
+            )
+            .plugin(
                 "vault-change-password",
                 // Task 7 of `vault-change-password` (MYND-22) ships
                 // the `change_password` command (scaffolding stub;

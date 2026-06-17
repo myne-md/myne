@@ -239,6 +239,16 @@ pub(crate) async fn change_password_with_path(
             //     → `InvalidCredentialOrVault` per the cross-plugin
             //     shared-name discipline; any other ProtocolError
             //     surfaces as `InvalidVaultMeta`.
+            protocol::validate_kdf_params(&existing.kdf_params).map_err(|e| {
+                tracing::error!(
+                    stage = "kdf_params_range",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "kdf params outside accepted range"
+                );
+                VaultChangePasswordError::InvalidVaultMeta
+            })?;
+
             let current_wrap_key = protocol::derive_password_wrap_key(
                 &current_password,
                 &existing.random_salt_password,
@@ -505,6 +515,13 @@ pub(crate) async fn change_password_with_path(
         duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
         "vault password rotated successfully (root_key unchanged; only its wrap rotated)"
     );
+
+    // MYND-329 task 8: a password change invalidates any quick-unlock credential
+    // for this vault (defense-in-depth — a password change signals "reset my
+    // access", User Story 8). Best-effort; absence of a credential is a no-op.
+    if let Some(vault_dir) = vault_path.parent() {
+        crate::plugins::quick_unlock::commands::invalidate_credential(vault_dir);
+    }
 
     Ok(())
 }

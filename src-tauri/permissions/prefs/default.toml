@@ -40,6 +40,7 @@ permissions = [
   "allow-set-spell-enabled",
   "allow-set-spell-languages",
   "allow-set-show-note-timestamps",
+  "allow-set-keymap-binding",
   "allow-upsert-saved-view",
   "allow-delete-saved-view",
   "allow-set-view-order",
@@ -235,6 +236,15 @@ commands.allow = ["set_show_note_timestamps"]
 # (a view's name/filter/property is AS3-Sensitive). Atomic-writes vault.prefs
 # with no native side-effect; the 64 KiB MYP1 cap fails the encode (no write)
 # before touching disk; non-load-bearing (no clamp).
+# MYND-304 rebindable hotkeys: a write setter for one command's keymap override.
+# Inherits the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
+# Atomic-writes vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-keymap-binding"
+description = "Allow invoking prefs:set_keymap_binding (Slot::Unlocked-gated setter for ONE command's keymap override; Option<Vec<String>> where Some(non-empty)=override, Some(empty)=explicit-unbind ([]), None=remove (revert to default); codec NFC-sorts+dedupes each chord set; atomic-writes vault.prefs with no native side-effect; logs set/remove + chord count only, never the command id or chords)."
+commands.allow = ["set_keymap_binding"]
+
 [[permission]]
 identifier = "allow-upsert-saved-view"
 description = "Allow invoking prefs:upsert_saved_view (Slot::Unlocked-gated save/edit of one SavedView — replaces by id else appends; atomic-writes vault.prefs with no native side-effect; over the 64 KiB MYP1 cap fails PrefsEncodeFailed before any write, leaving on-disk prefs intact; logs view count only, never a name/filter/property)."

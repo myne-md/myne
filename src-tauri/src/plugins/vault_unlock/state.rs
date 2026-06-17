@@ -54,7 +54,7 @@ use crate::vault_id::VaultId;
 use protocol::AEAD_KEY_LEN;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 use tokio::sync::{RwLock, Semaphore};
 use zeroize::Zeroizing;
@@ -136,6 +136,20 @@ pub struct VaultRuntimeState {
     /// locked vault stops surfacing its real name (SYNC-3 — label only for
     /// this-session-unlocked vaults).
     label_cache: RwLock<HashMap<VaultId, String>>,
+
+    /// Spring-loaded quick-unlock gate (MYND-329 task 9). `false` at process
+    /// start; set `true` the first time a **master-password unlock** succeeds
+    /// this session ([`Self::mark_full_unlock_done`]). Quick-unlock
+    /// (PIN/biometric) is permitted ONLY while this is `true`, so an app
+    /// restart forces one full-password unlock before quick-unlock resumes —
+    /// the 1Password "restarting won't keep it unlocked" model. Held outside
+    /// the slot `RwLock`, same rationale as `last_activity_millis`.
+    ///
+    /// The recovery-phrase path deliberately does NOT open the gate: a recovery
+    /// is rare and security-sensitive, and leaving the gate closed after it is
+    /// strictly *stricter* (the user does one password unlock before
+    /// quick-unlock works) — never weaker — so it needs no wiring there.
+    full_unlock_this_session: AtomicBool,
 }
 
 impl Default for VaultRuntimeState {
@@ -147,6 +161,7 @@ impl Default for VaultRuntimeState {
             last_activity_millis: AtomicU64::new(0),
             auto_lock_timeout_secs: AtomicU32::new(crate::auto_lock::DEFAULT_AUTO_LOCK_SECS),
             label_cache: RwLock::new(HashMap::new()),
+            full_unlock_this_session: AtomicBool::new(false),
         }
     }
 }
@@ -273,6 +288,21 @@ impl VaultRuntimeState {
     /// read by the idle timer each tick.
     pub fn auto_lock_timeout_secs(&self) -> u32 {
         self.auto_lock_timeout_secs.load(Ordering::Relaxed)
+    }
+
+    /// Record that a master-password unlock has succeeded this process session
+    /// — opens the spring-loaded quick-unlock gate (MYND-329 task 9). Called
+    /// from the password-unlock success path (the recovery path intentionally
+    /// leaves the gate closed; see the field doc).
+    pub fn mark_full_unlock_done(&self) {
+        self.full_unlock_this_session.store(true, Ordering::Relaxed);
+    }
+
+    /// Whether a full-credential unlock has happened this session. Quick-unlock
+    /// is permitted only when this is `true` (an app restart resets it to
+    /// `false`, forcing one full-password unlock before quick-unlock resumes).
+    pub fn has_full_unlock_this_session(&self) -> bool {
+        self.full_unlock_this_session.load(Ordering::Relaxed)
     }
 
     /// Insert/replace the decrypted label for `id` in the per-session label

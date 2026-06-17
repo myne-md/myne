@@ -30,6 +30,7 @@ import {
 import type { TitleRecord } from "../loadNoteBatch";
 import { uuidv7Ms } from "../sidebarState";
 import { ColorDot } from "./ColorDot";
+import { Icon } from "../../components/primitives/Icon";
 import { formatRelativeTime, useTick } from "./relativeTime";
 
 export type NoteRowProps = {
@@ -78,6 +79,15 @@ export type NoteRowProps = {
    *  `<div>` is omitted entirely and the title vertically centers in the row's
    *  fixed `minHeight`. Driven by `PrefsView.show_note_timestamps`. */
   showTimestamps?: boolean;
+  /** Whether this note is its folder's **index note** (MYND-370) — the
+   *  authoritative winner pinned by `FolderNode.indexNoteId`, threaded from
+   *  NoteList. Renders a subtle index badge after the title. Distinct from
+   *  `record.folderIndex`, which can't tell a conflict loser from the winner. */
+  isIndexNote?: boolean;
+  /** Whether this note CLAIMED `folder_index: true` but lost the deterministic
+   *  tiebreak (its id is in `FolderNode.indexConflictIds`, MYND-370). Surfaces a
+   *  muted "folder already has an index" indicator so the user can resolve it. */
+  indexConflict?: boolean;
 };
 
 // ─── Token-bound style constants ──────────────────────────────────
@@ -208,6 +218,31 @@ const errorIndicatorStyle: CSSProperties = {
   verticalAlign: "middle",
 };
 
+/** Folder-index badge (MYND-370) — a small muted open-book glyph trailing the
+ *  title on the folder's index note. Subtle by design (PRODUCT.md calm tone):
+ *  `fg-3` ink, no fill, no accent. */
+const indexBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  marginLeft: 6,
+  color: "var(--fg-3)",
+  verticalAlign: "middle",
+};
+
+/** Index-conflict indicator (MYND-370) — a muted warning dot trailing the title
+ *  on a note that claimed `folder_index: true` but lost the tiebreak. Muted
+ *  (`line-3`, not the loud `--warning`) so it reads as "FYI, this folder already
+ *  has an index" rather than an error. */
+const indexConflictStyle: CSSProperties = {
+  display: "inline-block",
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  background: "var(--line-3)",
+  marginLeft: 6,
+  verticalAlign: "middle",
+};
+
 const renameInputStyle: CSSProperties = {
   display: "block",
   width: "100%",
@@ -242,6 +277,8 @@ export function NoteRow(props: NoteRowProps) {
     colorSlot,
     showTimestamps = true,
     multiSelected = false,
+    isIndexNote = false,
+    indexConflict = false,
   } = props;
 
   const [hovering, setHovering] = useState(false);
@@ -340,7 +377,12 @@ export function NoteRow(props: NoteRowProps) {
             onCancel={onCancelRename}
           />
         ) : (
-          <TitleLine record={record} colorSlot={colorSlot} />
+          <TitleLine
+            record={record}
+            colorSlot={colorSlot}
+            isIndexNote={isIndexNote}
+            indexConflict={indexConflict}
+          />
         )}
         {showTimestamps && (
           <div style={subtitleStyle} data-testid="notes.row-subtitle">
@@ -382,17 +424,48 @@ export function NoteRow(props: NoteRowProps) {
 function TitleLine({
   record,
   colorSlot,
+  isIndexNote = false,
+  indexConflict = false,
 }: {
   record: TitleRecord;
   colorSlot?: string;
+  isIndexNote?: boolean;
+  indexConflict?: boolean;
 }) {
   const dot = <ColorDot slot={colorSlot} style={{ marginRight: 6, verticalAlign: "middle" }} />;
+  // Trailing markers (MYND-370) — the index badge on the folder's index note,
+  // and the muted conflict dot on a claimant that lost the tiebreak. Both are
+  // subtle, inline-after-title, and mutually exclusive in practice (a winner is
+  // never a conflict loser).
+  const markers = (
+    <>
+      {isIndexNote && (
+        <span
+          style={indexBadgeStyle}
+          data-testid="notes.row-folder-index-badge"
+          title="Folder note — this folder's index"
+          aria-label="Folder note"
+        >
+          <Icon name="book-open" size={12} />
+        </span>
+      )}
+      {indexConflict && (
+        <span
+          style={indexConflictStyle}
+          data-testid="notes.folder-index-conflict"
+          title="This folder already has an index note"
+          aria-label="Folder already has an index note"
+        />
+      )}
+    </>
+  );
   if (record.error !== undefined) {
     return (
       <div style={titleUntitledStyle} title="Couldn't load this note">
         {dot}
         <span style={errorIndicatorStyle} aria-hidden="true" />
         Untitled
+        {markers}
       </div>
     );
   }
@@ -401,6 +474,7 @@ function TitleLine({
       <div style={titleUntitledStyle}>
         {dot}
         Untitled
+        {markers}
       </div>
     );
   }
@@ -408,6 +482,7 @@ function TitleLine({
     <div style={titleStyle}>
       {dot}
       {record.title}
+      {markers}
     </div>
   );
 }
