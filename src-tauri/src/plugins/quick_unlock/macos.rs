@@ -60,7 +60,10 @@ impl MacosBiometricProvider {
             Some(ProtectionMode::AccessibleWhenUnlockedThisDeviceOnly),
             kSecAccessControlBiometryCurrentSet,
         )
-        .map_err(|_| ProviderError::Backend)
+        .map_err(|e| {
+            log_keychain_err("access_control_create", &e);
+            ProviderError::Backend
+        })
     }
 }
 
@@ -82,7 +85,10 @@ impl QuickUnlockProvider for MacosBiometricProvider {
         options.set_access_control(access_control);
         // Store the wrap key behind the biometric gate.
         security_framework::passwords::set_generic_password_options(wrap_key.as_slice(), options)
-            .map_err(|_| ProviderError::Backend)?;
+            .map_err(|e| {
+            log_keychain_err("store", &e);
+            ProviderError::Backend
+        })?;
 
         Ok(ProviderSecret {
             wrap_key,
@@ -116,13 +122,36 @@ impl QuickUnlockProvider for MacosBiometricProvider {
     }
 }
 
-/// Map a Keychain error to the coarse provider error. NOTE: precise mapping
-/// (user-cancel `errSecUserCanceled` vs missing `errSecItemNotFound` vs
-/// biometry-lockout) is part of the pending hardware review — today an
-/// unauthenticated/failed read collapses to `UserCancelled` so the command
-/// layer falls back to the password path rather than burning an attempt.
-fn map_keychain_error(_e: security_framework::base::Error) -> ProviderError {
-    ProviderError::UserCancelled
+/// `errSecUserCanceled` — the user dismissed the biometric prompt.
+const ERR_SEC_USER_CANCELED: i32 = -128;
+/// `errSecItemNotFound` — the Keychain item is absent (wiped / never set).
+const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
+
+/// Log a Keychain failure with its OSStatus code (safe to emit — an OS status
+/// code is not key material; the DENY-list covers keys/PINs/paths, not error
+/// codes). The code is the diagnostic the hardware review needs (e.g.
+/// `-34018` errSecMissingEntitlement → the dev build isn't signed with the
+/// keychain entitlement; `-25293` errSecAuthFailed → biometric mismatch).
+fn log_keychain_err(op: &'static str, e: &security_framework::base::Error) {
+    tracing::warn!(
+        stage = "quick_unlock_biometric",
+        op,
+        errsec_code = e.code(),
+        "macOS Keychain operation failed"
+    );
+}
+
+/// Map a Keychain error (from `retrieve`) to the coarse provider error, logging
+/// its OSStatus code first. User-cancel → silent password fallback (no attempt
+/// burned); item-not-found → credential missing; everything else → a backend
+/// failure surfaced (with the logged code) so the real cause is visible.
+fn map_keychain_error(e: security_framework::base::Error) -> ProviderError {
+    log_keychain_err("retrieve", &e);
+    match e.code() {
+        ERR_SEC_USER_CANCELED => ProviderError::UserCancelled,
+        ERR_SEC_ITEM_NOT_FOUND => ProviderError::CredentialMissing,
+        _ => ProviderError::Backend,
+    }
 }
 
 /// Lowercase-hex encode (no external dep; matches the device-local naming).
