@@ -231,6 +231,12 @@ The IETF AEAD specified in RFC 8439, using the ChaCha20 stream cipher and the Po
 Used in: `spec/protocol.md` §5.1
 Reference: RFC 8439.
 
+### **chord** &nbsp; 📦 *Product*
+
+A single keyboard-shortcut combination, e.g. `Mod-Shift-g` (hotkeys epic, MYND-304). Myne's canonical chord string is CodeMirror-`KeyBinding.key`-compatible: a `-`-separated sequence of modifier tokens followed by one logical key, using the cross-platform `Mod` token (Cmd on macOS, Ctrl elsewhere) and the layout-respecting *logical* key (what the user sees on the key, not the physical `code`); single-character keys are lowercased. Stored NFC-normalized inside `vault.prefs` (the `keymap` field). See **keymap**, **key binding**.
+
+Used in: `spec/protocol.md` §9.5.2
+
 ### **code-signed releases** &nbsp; 🛠️ *Tooling*
 
 Myne desktop installers and auto-update payloads are cryptographically signed with hardware-backed keys controlled by the team. Auto-update verification (`threat-model.md` §3 TB7) refuses any artifact that fails signature or hash check. The signing keys are themselves the largest unmitigated risk against A9 (compromised distribution).
@@ -666,12 +672,24 @@ The asymmetric building block of a hybrid encryption scheme. Generates a random 
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 
+### **key binding** &nbsp; 📦 *Product*
+
+An association between a **chord** and a command id (hotkeys epic, MYND-304). A command may have zero, one, or several key bindings. Defaults live in the application's command registry (in code); user changes persist as overrides in the **keymap**. The effective binding is `override ?? default`.
+
+Used in: hotkeys epic (MYND-304)
+
 ### **key-committing AEAD** &nbsp; 🏗️ *Construction*
 
 An AEAD that commits to its key, in the sense that no two distinct keys can decrypt the same ciphertext to two valid plaintexts. Plain XChaCha20-Poly1305 is **not** key-committing; Myne achieves the property by wrapping it in CTX commitment.
 
 Used in: `spec/protocol.md` §5.1
 Reference: Chan & Rogaway 2022.
+
+### **keymap** &nbsp; 📦 *Product*
+
+The set of user keybinding *overrides* persisted in `vault.prefs` (the `keymap` field, MYND-304): a map from command id to its set of **chord**s. Overrides only — a command absent from the keymap uses its in-code default; a command mapped to an empty set (`[]`) is explicitly unbound (no shortcut). The effective binding is `override ?? default`. Additive optional `MYP1` field (no new magic / major-version event); non-load-bearing (a tampered value can at worst rebind or drop a shortcut — every command stays reachable via the **command palette**).
+
+Used in: `spec/protocol.md` §9.5.2
 
 ### **Key Transparency (KT)** &nbsp; ⚠️ *Threat*
 

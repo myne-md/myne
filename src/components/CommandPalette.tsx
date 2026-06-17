@@ -24,6 +24,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { COMMAND_ACTIONS, fuzzyFilter } from "../commands";
+import { formatChord } from "../commands/chord";
 import type {
   ActionVisibility,
   CommandAction,
@@ -456,6 +457,15 @@ function renderRow(
     : selected
       ? ROW_SELECTED_STYLE
       : ROW_STYLE;
+  // Keystroke hint for an enabled action row: derive from the command's default
+  // binding via the shared formatChord util (SYNC-3), with the hand-typed `kbd`
+  // literal as a fallback only — so the hint can't drift from the canonical chord.
+  const actionHint =
+    row.kind === "action" && !isDisabled
+      ? row.action.defaultBinding
+        ? formatChord(row.action.defaultBinding)
+        : row.action.kbd
+      : undefined;
   return (
     <div
       style={style}
@@ -481,9 +491,7 @@ function renderRow(
           {isDisabled && row.action.disabledHint !== undefined && (
             <span style={HINT_STYLE}>{row.action.disabledHint}</span>
           )}
-          {!isDisabled && row.action.kbd !== undefined && (
-            <span style={HINT_STYLE}>{row.action.kbd}</span>
-          )}
+          {actionHint !== undefined && <span style={HINT_STYLE}>{actionHint}</span>}
         </>
       ) : (
         <>

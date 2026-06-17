@@ -28,6 +28,7 @@ const openSettingsAction: CommandAction = {
   label: "Open settings…",
   category: "App",
   kbd: "⌘,",
+  defaultBinding: "Mod-,",
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onOpenSettings();
@@ -207,6 +208,7 @@ const showGraphAction: CommandAction = {
   label: "Show graph view…",
   category: "Editor",
   kbd: "⌘⇧G",
+  defaultBinding: "Mod-Shift-g",
   // Editor-only, like the other modal carve-outs. The whole-vault graph is a
   // wedge-first-class surface, so it ALSO has a persistent BottomBar affordance
   // (SYNC-7) — the palette action is one of two entry points, not the only one.
