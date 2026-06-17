@@ -203,3 +203,74 @@ describe("resolutionHint — shared display-hint (§6.2 copy)", () => {
     });
   });
 });
+
+// === MYND-370: folder-target wikilinks (`[[Projects/]]`) ===
+describe("resolveWikilink — folder target", () => {
+  const idxNote = (
+    noteUuid: string,
+    title: string | null,
+    folder: string | null,
+    folderIndex: boolean,
+  ): ResolverNote => ({ noteUuid, title, folder, folderIndex });
+
+  it("resolves `[[Projects/]]` to the folder's index note", () => {
+    const r = resolveWikilink(ref("Projects/", "vault-path"), [
+      idxNote("idx", "Projects", "Projects/", true),
+      note("other", "Notes", "Projects/"),
+    ]);
+    expect(r.status).toBe("resolved");
+    expect(r.status === "resolved" && r.noteUuid).toBe("idx");
+  });
+
+  it("is broken with no-folder-note hint when the folder exists but has no index", () => {
+    const r = resolveWikilink(ref("Projects/", "vault-path"), [
+      note("a", "Notes", "Projects/"),
+    ]);
+    expect(r.status).toBe("broken");
+    expect(r.status === "broken" && r.brokenReason).toBe("no-folder-note");
+    expect(resolutionHint(r)).toEqual({
+      broken: true,
+      ambiguous: false,
+      text: "(no folder note)",
+    });
+  });
+
+  it("is broken with no-match hint when the folder does not exist at all", () => {
+    const r = resolveWikilink(ref("Ghost/", "vault-path"), [
+      idxNote("idx", "Projects", "Projects/", true),
+    ]);
+    expect(r.status).toBe("broken");
+    expect(r.status === "broken" && r.brokenReason).toBe("no-match");
+    expect(resolutionHint(r)).toEqual({
+      broken: true,
+      ambiguous: false,
+      text: "(no match)",
+    });
+  });
+
+  it("does not treat `[[Projects]]` (no slash) as a folder target", () => {
+    // No trailing slash → ordinary title resolution; a note titled "Projects"
+    // resolves, the index note does not interfere.
+    const r = resolveWikilink(ref("Projects", "title"), [
+      note("titled", "Projects", null),
+      idxNote("idx", "Index", "Projects/", true),
+    ]);
+    expect(r.status === "resolved" && r.noteUuid).toBe("titled");
+  });
+
+  it("resolves a nested folder target `[[Projects/Myne/]]`", () => {
+    const r = resolveWikilink(ref("Projects/Myne/", "vault-path"), [
+      idxNote("idx", "Myne", "Projects/Myne/", true),
+      note("other", "Sibling", "Projects/"),
+    ]);
+    expect(r.status === "resolved" && r.noteUuid).toBe("idx");
+  });
+
+  it("picks the smallest-uuid winner on multiple index claimants", () => {
+    const r = resolveWikilink(ref("Projects/", "vault-path"), [
+      idxNote("n-b", "B", "Projects/", true),
+      idxNote("n-a", "A", "Projects/", true),
+    ]);
+    expect(r.status === "resolved" && r.noteUuid).toBe("n-a");
+  });
+});

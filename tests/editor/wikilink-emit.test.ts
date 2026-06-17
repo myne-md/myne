@@ -2,7 +2,7 @@
 // with #4 conversion + #5 rename — assert the bytes precisely.
 
 import { describe, it, expect } from "vitest";
-import { emitNoteWikilink } from "../../src/editor/wikilink/emit";
+import { emitNoteWikilink, emitFolderWikilink } from "../../src/editor/wikilink/emit";
 
 describe("emitNoteWikilink (§3, WL-4 always-bake folder)", () => {
   it("root note → [[<title>.md|<title>]]", () => {
@@ -23,5 +23,15 @@ describe("emitNoteWikilink (§3, WL-4 always-bake folder)", () => {
     expect(emitNoteWikilink(null, "01-10 Wednesday")).toBe(
       "[[01-10 Wednesday.md|01-10 Wednesday]]",
     );
+  });
+});
+
+describe("emitFolderWikilink (MYND-370 folder-target form)", () => {
+  it("inserts the trailing-slash path verbatim, no alias", () => {
+    expect(emitFolderWikilink("Projects/")).toBe("[[Projects/]]");
+  });
+
+  it("preserves a nested folder path's trailing slash", () => {
+    expect(emitFolderWikilink("Projects/Myne/")).toBe("[[Projects/Myne/]]");
   });
 });

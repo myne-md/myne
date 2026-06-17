@@ -26,6 +26,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { load as parseYaml } from "js-yaml";
 import {
+  readFolderIndexFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
   readTrashedFromFmBody,
@@ -81,6 +82,16 @@ export type TitleRecord = {
    * `readTemplateFromFmBody`).
    */
   template: boolean;
+  /**
+   * Value-strict `folder_index:` marker (MYND-370) — `true` iff the note carries
+   * the canonical `folder_index: true` flag, designating it the **index note** of
+   * whichever folder its own `folder:` field names. Unlike `trashed:`/`template:`,
+   * this does NOT hide the note: the index note stays a visible, enumerable child
+   * of its folder, pinned to the top by the folder-tree derivation. A user's own
+   * non-canonical `folder_index:` value reads as `false` (value-strict —
+   * `readFolderIndexFromFmBody`).
+   */
+  folderIndex: boolean;
   error?: NoteTitleError;
 };
 
@@ -174,6 +185,10 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // object) so the sidebar/list path and the dialect read helper share one
   // definition — mirrors the `trashed:` rationale above.
   const template = readTemplateFromFmBody(slice.frontmatter_bytes ?? "");
+  // `folder_index:` read value-strict from the raw FM slice, same rationale as
+  // `template:`/`trashed:` — js-yaml would coerce `true` to a boolean and a
+  // user's `folder_index: "true"` would not stay value-strict.
+  const folderIndex = readFolderIndexFromFmBody(slice.frontmatter_bytes ?? "");
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
@@ -181,6 +196,7 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
     updatedAt: deriveUpdatedAt(parsed),
     trashed,
     template,
+    folderIndex,
   };
 }
 
@@ -226,6 +242,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       updatedAt: null,
       trashed: null,
       template: false,
+      folderIndex: false,
       error: r.Err,
     };
   });

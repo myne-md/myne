@@ -15,6 +15,7 @@ const TITLE_KEY_RE = /^([ \t]*title[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_KEY_RE = /^([ \t]*folder[ \t]*:[ \t]*)(.*)$/;
 const TRASHED_KEY_RE = /^([ \t]*trashed[ \t]*:[ \t]*)(.*)$/;
 const TEMPLATE_KEY_RE = /^([ \t]*template[ \t]*:[ \t]*)(.*)$/;
+const FOLDER_INDEX_KEY_RE = /^([ \t]*folder_index[ \t]*:[ \t]*)(.*)$/;
 
 // The single canonical value that marks a note a template. Value-strict:
 // `readTemplateFromFmBody` accepts only this literal, unquoted form
@@ -973,6 +974,79 @@ function isCanonicalTemplateFlag(valuePortion: string): boolean {
   const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
   const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
   return raw.trim() === TEMPLATE_FLAG_VALUE;
+}
+
+// === patchFolderIndexField — folder-note write target for FM `folder_index:` ===
+//
+// Spec: docs/spec/markdown-dialect.md §3.6.1 (`folder_index:` is the 6th
+// Myne-managed canonical FM field). Write trigger = folder-note designate /
+// undesignate actions (`src/notes/folderNote.ts`) only — never body autosave.
+// MYND-370. The note is the index of whichever folder its own `folder:` field
+// names, so the marker is a **value-strict boolean** (canonical unquoted `true`)
+// and carries NO path — folder rename rewrites `folder:`, the binding follows for
+// free, and folder-rename drift is structurally impossible.
+//
+// Unlike `template:` / `trashed:` (which HIDE the note from sidebar / folder-tree
+// / search), `folder_index: true` does NOT hide: the index note stays a fully
+// visible, enumerable child of its folder, pinned to the top with a badge.
+//
+// The set/delete surgery is the generic keyed `patchFrontmatterField` over the
+// `folder_index` key (states A/B/C/D with empty-block collapse) — no bespoke
+// field family is needed because the only value Myne ever writes is the canonical
+// `true`. The value-strict READ is bespoke (mirrors `readTemplateFromFmBody`),
+// since a user's own non-canonical `folder_index:` must read as an ordinary note.
+
+// The single canonical value that marks a note its folder's index. Value-strict,
+// exactly like `TEMPLATE_FLAG_VALUE`: `1` / `yes` / `True` / quoted `"true"` all
+// read as an ordinary note.
+export const FOLDER_INDEX_FLAG_VALUE = "true";
+
+/**
+ * Set or delete the Myne-managed `folder_index:` frontmatter field.
+ * `on === true` writes the canonical `folder_index: true`; `on === false` deletes
+ * the field (with empty-block collapse). Touches only the `folder_index:` line,
+ * so it composes with `folder:` / `trashed:` / `template:` and any user-authored
+ * fields without clobbering them. Thin wrapper over {@link patchFrontmatterField}.
+ */
+export function patchFolderIndexField(
+  bytes: Uint8Array,
+  on: boolean,
+): Uint8Array {
+  return patchFrontmatterField(
+    bytes,
+    "folder_index",
+    on ? FOLDER_INDEX_FLAG_VALUE : null,
+  );
+}
+
+/**
+ * Read the Myne-managed `folder_index:` marker, **value-strict**, from a
+ * frontmatter **body** (the slice shape `loadNoteBatch` parses, identical to
+ * {@link readTemplateFromFmBody}). Returns `true` iff a `folder_index:` field
+ * carries the canonical, unquoted boolean {@link FOLDER_INDEX_FLAG_VALUE}
+ * (`true`), else `false`. A user's own non-canonical `folder_index:` value
+ * (`1`, `yes`, `"true"`, `True`) leaves the note ordinary — the documented
+ * mitigation for the unprefixed-field collision footgun (§3.6.1; same
+ * value-strict rule as `template:`).
+ */
+export function readFolderIndexFromFmBody(fmBody: string): boolean {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = FOLDER_INDEX_KEY_RE.exec(line);
+    if (m === null) continue;
+    return isCanonicalFolderIndexFlag(m[2] ?? "");
+  }
+  return false;
+}
+
+// Value-strict canonical check for a `folder_index:` scalar. Identical contract
+// to `isCanonicalTemplateFlag`: strips a trailing `# comment` and requires the
+// literal unquoted `true`; a quoted `"true"` is a YAML string, not the canonical
+// boolean, so it is rejected.
+function isCanonicalFolderIndexFlag(valuePortion: string): boolean {
+  const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+  const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
+  return raw.trim() === FOLDER_INDEX_FLAG_VALUE;
 }
 
 // === patchFrontmatterField — generic keyed scalar surgery ===

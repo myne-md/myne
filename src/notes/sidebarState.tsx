@@ -131,6 +131,7 @@ export function applyOptimisticCreate(
     updatedAt: null,
     trashed: null,
     template: false,
+    folderIndex: false,
   });
 }
 

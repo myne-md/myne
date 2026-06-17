@@ -11,8 +11,10 @@
 import {
   filenameToTitle,
   foldSegment,
-  normalizeFolderPath,
+  folderKey,
+  isFolderTarget,
 } from "../dialect/folderPath";
+import { pickIndexNote } from "./folderTree";
 import type { WikilinkRef } from "../dialect/types";
 
 /** A note as seen by the resolver — title + canonical folder (or null = root). */
@@ -20,6 +22,10 @@ export interface ResolverNote {
   noteUuid: string;
   title: string | null;
   folder: string | null;
+  /** True when the note is its folder's index note (`folder_index: true`,
+   *  MYND-370). Optional so callers that don't track it still type-check; only
+   *  the folder-target (`[[Projects/]]`) resolution path reads it. */
+  folderIndex?: boolean;
 }
 
 /** The note's vault-relative path (`<folder>/<title>.md`; root → `<title>.md`).
@@ -55,7 +61,16 @@ export type WikilinkResolution =
        *  re-filtering titles. For a single hit this is the one resolved note. */
       candidates: ResolverNote[];
     }
-  | { status: "broken"; matchCount: 0; candidates: ResolverNote[] };
+  | {
+      status: "broken";
+      matchCount: 0;
+      candidates: ResolverNote[];
+      /** Why the link is broken (MYND-370). `"no-folder-note"` — a folder-target
+       *  link (`[[Projects/]]`) where the folder exists but has no index note;
+       *  `"no-match"` (or absent) — no matching note / folder at all. Drives the
+       *  distinct broken-link hint copy in {@link resolutionHint}. */
+      brokenReason?: "no-match" | "no-folder-note";
+    };
 
 /** Split a wikilink target into its title component + (for path forms) folder.
  *  Exported so the VaultIndices edge extractor derives the folded title-key
@@ -81,8 +96,42 @@ function folderDepth(folder: string | null): number {
   return folder === null ? 0 : folder.split("/").filter((s) => s.length > 0).length;
 }
 
-function foldedFolder(folder: string | null): string {
-  return foldSegment(normalizeFolderPath(folder) ?? "");
+/**
+ * Resolve a folder-target wikilink (`[[Projects/]]`) to that folder's index note
+ * (`folder_index: true`). Mechanically a normal resolve to the index note, so
+ * backlinks / hover / graph treat it like any wikilink to that note. Two distinct
+ * broken states: the folder exists (some note lives in it) but has no index note
+ * → `"no-folder-note"`; nothing lives in the folder at all → `"no-match"`.
+ */
+function resolveFolderTarget(
+  ref: WikilinkRef,
+  notes: ReadonlyArray<ResolverNote>,
+): WikilinkResolution {
+  const fk = folderKey(ref.target);
+  const inFolder = notes.filter((n) => folderKey(n.folder) === fk);
+  const indexNotes = inFolder.filter((n) => n.folderIndex === true);
+
+  if (indexNotes.length === 0) {
+    return {
+      status: "broken",
+      matchCount: 0,
+      candidates: [],
+      brokenReason: inFolder.length > 0 ? "no-folder-note" : "no-match",
+    };
+  }
+
+  // Deterministic winner on the (rare) multi-claimant case — the shared
+  // `pickIndexNote` tiebreak, so the link and the sidebar badge agree on which
+  // note is the index.
+  const winner = pickIndexNote(indexNotes.map((n) => n.noteUuid));
+  const pick = indexNotes.find((n) => n.noteUuid === winner) ?? indexNotes[0]!;
+  return {
+    status: "resolved",
+    noteUuid: pick.noteUuid,
+    ambiguous: false,
+    matchCount: indexNotes.length,
+    candidates: indexNotes,
+  };
 }
 
 /**
@@ -93,6 +142,10 @@ export function resolveWikilink(
   ref: WikilinkRef,
   notes: ReadonlyArray<ResolverNote>,
 ): WikilinkResolution {
+  // Folder-target form (`[[Projects/]]`) resolves to the folder's index note —
+  // a separate path from title-keyed note resolution (MYND-370).
+  if (isFolderTarget(ref.target)) return resolveFolderTarget(ref, notes);
+
   const { title, folder } = parseTarget(ref);
   const titleKey = foldSegment(title);
 
@@ -117,7 +170,7 @@ export function resolveWikilink(
   // (3) multiple hits → folder segment as first-tier disambiguator
   if (folder !== null) {
     const fk = foldSegment(folder);
-    const folderMatches = candidates.filter((n) => foldedFolder(n.folder) === fk);
+    const folderMatches = candidates.filter((n) => folderKey(n.folder) === fk);
     if (folderMatches.length === 1) {
       return {
         status: "resolved",
@@ -135,7 +188,7 @@ export function resolveWikilink(
     const da = folderDepth(a.folder);
     const db = folderDepth(b.folder);
     if (da !== db) return da - db;
-    return foldedFolder(a.folder).localeCompare(foldedFolder(b.folder));
+    return folderKey(a.folder).localeCompare(folderKey(b.folder));
   })[0]!;
   return {
     status: "resolved",
@@ -160,7 +213,9 @@ export function resolutionHint(res: WikilinkResolution): {
   ambiguous: boolean;
 } {
   if (res.status === "broken") {
-    return { broken: true, ambiguous: false, text: "(no match)" };
+    const text =
+      res.brokenReason === "no-folder-note" ? "(no folder note)" : "(no match)";
+    return { broken: true, ambiguous: false, text };
   }
   if (res.ambiguous) {
     return { broken: false, ambiguous: true, text: `(${res.matchCount} matches)` };

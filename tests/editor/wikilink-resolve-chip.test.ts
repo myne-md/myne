@@ -5,6 +5,8 @@ import { describe, it, expect } from "vitest";
 import {
   isWikilinkBroken,
   chipHoverText,
+  chipKeySets,
+  isChipBroken,
   resolveChipParts,
 } from "../../src/editor/wikilink/resolve-chip";
 import type { WikilinkParts } from "../../src/editor/wikilink/chip-widget";
@@ -15,6 +17,12 @@ const note = (
   title: string | null,
   folder: string | null,
 ): ResolverNote => ({ noteUuid, title, folder });
+
+const idxNote = (
+  noteUuid: string,
+  title: string | null,
+  folder: string | null,
+): ResolverNote => ({ noteUuid, title, folder, folderIndex: true });
 
 const parts = (over: Partial<WikilinkParts>): WikilinkParts => ({
   isEmbed: false,
@@ -42,6 +50,42 @@ describe("isWikilinkBroken (§5.3)", () => {
   });
   it("empty target is not broken-styled", () => {
     expect(isWikilinkBroken(parts({ target: "" }), [])).toBe(false);
+  });
+});
+
+describe("isChipBroken — folder-target chips (MYND-370)", () => {
+  const broken = (p: WikilinkParts, notes: ResolverNote[]) => {
+    const { titles, folderIndex } = chipKeySets(notes);
+    return isChipBroken(p, titles, folderIndex);
+  };
+
+  it("`[[Projects/]]` is NOT broken when the folder has an index note", () => {
+    expect(
+      broken(parts({ target: "Projects/" }), [idxNote("i", "Index", "Projects/")]),
+    ).toBe(false);
+  });
+
+  it("`[[Projects/]]` IS broken when the folder has no index note", () => {
+    // The folder exists (a note lives in it) but carries no index note.
+    expect(
+      broken(parts({ target: "Projects/" }), [note("a", "Note", "Projects/")]),
+    ).toBe(true);
+  });
+
+  it("`[[Ghost/]]` IS broken when the folder does not exist", () => {
+    expect(broken(parts({ target: "Ghost/" }), [idxNote("i", "I", "Projects/")])).toBe(
+      true,
+    );
+  });
+
+  it("a non-folder chip still uses the title path (no slash)", () => {
+    // `[[Projects]]` resolves on title, unaffected by the folder-index set.
+    expect(broken(parts({ target: "Projects" }), [idxNote("i", "I", "Projects/")])).toBe(
+      true,
+    );
+    expect(broken(parts({ target: "Index" }), [idxNote("i", "Index", "Projects/")])).toBe(
+      false,
+    );
   });
 });
 
