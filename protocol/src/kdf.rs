@@ -198,9 +198,10 @@ fn build_salt(
 
 /// Drive Argon2id with `params` and produce a 32-byte output.
 ///
-/// Maps `KdfParams::argon2_version` (`0x13` or `0x10`) onto
-/// [`argon2::Version`]. Any other value, plus any error from the
-/// underlying `argon2` crate, becomes [`ProtocolError::KdfFailure`].
+/// Maps `KdfParams::argon2_version` (`0x13` only) onto
+/// [`argon2::Version`]. Any other value — including the rejected Argon2
+/// v1.0 (`0x10`) per spec §9.3 — plus any error from the underlying
+/// `argon2` crate, becomes [`ProtocolError::KdfFailure`].
 fn argon2id_derive(
     password: &[u8],
     salt: &[u8; ARGON2_SALT_LEN],
@@ -208,7 +209,9 @@ fn argon2id_derive(
 ) -> Result<Zeroizing<[u8; ARGON2_OUTPUT_LEN]>, ProtocolError> {
     let version = match params.argon2_version {
         0x13 => Version::V0x13,
-        0x10 => Version::V0x10,
+        // v1.0 (0x10) and everything else is rejected — the on-disk parser
+        // (`parse_kdf_params`) already gates argon2_version to 0x13, so a
+        // 0x10 arm here was unreachable dead code (spec §9.3 rejects v1.0).
         _ => return Err(ProtocolError::KdfFailure),
     };
     let argon_params = Params::new(
