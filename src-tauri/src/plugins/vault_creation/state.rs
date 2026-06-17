@@ -543,6 +543,94 @@ mod tests {
         drop(held);
     }
 
+    /// ADVERSARIAL (host-layer red-team): hammer the `try_reserve` CAS loop
+    /// plus `SlotReservation` Drop from many threads at once. A non-atomic
+    /// admission counter would either OVER-ADMIT (in_flight exceeds the cap
+    /// — a memory-pressure DoS, more concurrent Argon2id sessions than the
+    /// limit) or DRIFT (balanced reserve/drop leaves the counter ≠ 0 — a
+    /// slow leak that permanently wedges vault creation at the cap). High
+    /// iteration count surfaces a race the single-threaded tests cannot.
+    #[test]
+    fn adversarial_concurrent_reserve_churn_holds_cap_and_balances() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        let state = VaultCreationState::default();
+        let over_admitted = AtomicBool::new(false);
+        let high_water = AtomicUsize::new(0);
+
+        std::thread::scope(|s| {
+            for _ in 0..16 {
+                s.spawn(|| {
+                    for _ in 0..20_000 {
+                        if let Ok(_res) = state.try_reserve() {
+                            // We are holding a reservation; the live count
+                            // (reserved + materialized) must never exceed cap.
+                            let n = state.in_flight_count();
+                            if n > MAX_CONCURRENT_SESSIONS {
+                                over_admitted.store(true, Ordering::SeqCst);
+                            }
+                            let mut hw = high_water.load(Ordering::Relaxed);
+                            while n > hw {
+                                match high_water.compare_exchange(
+                                    hw,
+                                    n,
+                                    Ordering::Relaxed,
+                                    Ordering::Relaxed,
+                                ) {
+                                    Ok(_) => break,
+                                    Err(a) => hw = a,
+                                }
+                            }
+                            // `_res` drops here → fetch_sub releases the slot.
+                        }
+                    }
+                });
+            }
+        });
+
+        assert!(
+            !over_admitted.load(Ordering::SeqCst),
+            "OVER-ADMISSION: in_flight exceeded MAX_CONCURRENT_SESSIONS={MAX_CONCURRENT_SESSIONS}"
+        );
+        assert!(high_water.load(Ordering::Relaxed) <= MAX_CONCURRENT_SESSIONS);
+        assert_eq!(
+            state.in_flight_count(),
+            0,
+            "COUNTER DRIFT: balanced reserve/drop left in_flight non-zero"
+        );
+    }
+
+    /// ADVERSARIAL: releasing a slot at the cap must free exactly one slot —
+    /// no off-by-one that leaves creation permanently wedged. (The flagged
+    /// gap: existing tests prove reject-at-cap but not release→reacquire.)
+    #[test]
+    fn adversarial_release_at_cap_frees_exactly_one_slot() {
+        let state = VaultCreationState::default();
+        let mut held: Vec<_> = (0..MAX_CONCURRENT_SESSIONS)
+            .map(|_| state.try_reserve().expect("reserve up to cap"))
+            .collect();
+        assert!(matches!(
+            state.try_reserve(),
+            Err(AppError::TooManyConcurrentSessions)
+        ));
+
+        // Release one — exactly one slot must open.
+        held.pop();
+        assert_eq!(state.in_flight_count(), MAX_CONCURRENT_SESSIONS - 1);
+        let reacquired = state
+            .try_reserve()
+            .expect("one slot must be free after release");
+        assert_eq!(state.in_flight_count(), MAX_CONCURRENT_SESSIONS);
+        // ...and the cap is firm again.
+        assert!(matches!(
+            state.try_reserve(),
+            Err(AppError::TooManyConcurrentSessions)
+        ));
+
+        drop(reacquired);
+        drop(held);
+        assert_eq!(state.in_flight_count(), 0);
+    }
+
     #[test]
     fn dropping_unconsumed_reservation_releases_slot() {
         let state = VaultCreationState::default();

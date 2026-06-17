@@ -842,6 +842,50 @@ mod tests {
     }
 
     #[test]
+    fn adversarial_repeated_empty_legacy_boots_never_erode_real_vaults() {
+        // Faithful to the incident DYNAMIC, not just its single-boot snapshot:
+        // the resolver side-effect re-materialized an empty legacy `vault/` on
+        // EVERY boot, and under the old design it was a *later* boot's discard
+        // pass that wiped real vaults. Here the empty legacy dir is regenerated
+        // and migration re-run many times over MANY real siblings; every byte
+        // of every real vault must survive every single boot, and the vault
+        // count must never change.
+        let tmp = ScopedTempDir::new("mig-incident-loop").unwrap();
+        let siblings: Vec<_> = (0..5u8)
+            .map(|i| seed_real_sibling_vault(tmp.path(), 0x20 + i))
+            .collect();
+        let before: Vec<_> = siblings.iter().map(|s| read_tree(s)).collect();
+
+        for boot in 0..8 {
+            // Resolver side-effect: an empty legacy dir reappears each boot.
+            std::fs::create_dir_all(tmp.path().join(LEGACY_VAULT_DIR_NAME)).unwrap();
+
+            let outcome = migrate_legacy_vault(tmp.path()).unwrap();
+            assert_eq!(
+                outcome,
+                MigrationOutcome::RemovedEmptyLegacy,
+                "boot {boot}: empty legacy must be removed, never treated as migratable"
+            );
+            assert!(
+                !tmp.path().join(LEGACY_VAULT_DIR_NAME).exists(),
+                "boot {boot}: the trigger dir must be gone (no boot-loop)"
+            );
+            assert_eq!(
+                vault_roots(tmp.path()).len(),
+                siblings.len(),
+                "boot {boot}: a real vault was added or removed"
+            );
+            for (s, b0) in siblings.iter().zip(&before) {
+                assert_eq!(
+                    &read_tree(s),
+                    b0,
+                    "boot {boot}: a real vault's bytes were mutated or erased"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn junk_only_legacy_counts_as_empty_and_is_removed() {
         // OS droppings + empty subdirs are not content: the legacy dir is
         // still provably empty and is removed without touching anything else.
