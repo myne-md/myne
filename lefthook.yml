@@ -45,8 +45,12 @@ pre-commit:
 
     cargo-lock-singleton:
       # TB9 audit anchor: workspace must keep a single Cargo.lock at the root.
+      # protocol/fuzz is an intentionally severed tooling workspace (its own
+      # empty [workspace] table so the nightly libFuzzer toolchain stays out of
+      # the product build) — its Cargo.lock is gitignored, not a product audit
+      # anchor, so it is excluded here.
       run: |
-        extra=$(find . -name Cargo.lock -not -path './target/*' -not -path './node_modules/*' -not -path './Cargo.lock' 2>/dev/null)
+        extra=$(find . -name Cargo.lock -not -path './target/*' -not -path './node_modules/*' -not -path './protocol/fuzz/*' -not -path './Cargo.lock' 2>/dev/null)
         if [ -n "$extra" ]; then
           echo "extra Cargo.lock files outside workspace root:"
           echo "$extra"
