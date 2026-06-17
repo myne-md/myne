@@ -1736,6 +1736,7 @@ function CommandPaletteHost({
       ctx={commandCtx}
       isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
       isTemplate={(id) => ctx.cache.get(id)?.template === true}
+      isArchived={(id) => ctx.cache.get(id)?.archived != null}
     />
   );
 }
@@ -2043,6 +2044,23 @@ function RightSidebar() {
                   style={{ fontSize: 12, color: "var(--fg-3)", marginLeft: 6 }}
                 >
                   ({row.count})
+                </span>
+              )}
+              {/* Archived source (MYND-331): a backlink from an archived note
+                  still resolves (archive ≠ soft-trash) — a small badge tells the
+                  user the source lives in the Archive, not the working tree. */}
+              {ctx.cache.get(row.sourceUuid)?.archived != null && (
+                <span
+                  data-testid="editor.backlink-archived-badge"
+                  title="Archived"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    marginLeft: 6,
+                    color: "var(--fg-3)",
+                  }}
+                >
+                  <Icon name="archive" size={12} />
                 </span>
               )}
             </button>

@@ -14,6 +14,7 @@ const UPDATED_KEY_RE = /^([ \t]*updated[ \t]*:[ \t]*)(.*)$/;
 const TITLE_KEY_RE = /^([ \t]*title[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_KEY_RE = /^([ \t]*folder[ \t]*:[ \t]*)(.*)$/;
 const TRASHED_KEY_RE = /^([ \t]*trashed[ \t]*:[ \t]*)(.*)$/;
+const ARCHIVED_KEY_RE = /^([ \t]*archived[ \t]*:[ \t]*)(.*)$/;
 const TEMPLATE_KEY_RE = /^([ \t]*template[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_INDEX_KEY_RE = /^([ \t]*folder_index[ \t]*:[ \t]*)(.*)$/;
 
@@ -790,6 +791,178 @@ export function readTrashedFromFmBody(fmBody: string): string | null {
     return null;
   }
   return null;
+}
+
+/**
+ * Read the Myne-managed `archived:` marker, **value-strict**, from a frontmatter
+ * **body** — the exact value-strict twin of {@link readTrashedFromFmBody}.
+ * Returns the RFC 3339 timestamp string iff an `archived:` field carries a valid
+ * RFC 3339 value, else `null` (not archived). A user's own non-timestamp
+ * `archived:` (e.g. `archived: true`) leaves the note live — the same
+ * unprefixed-field collision mitigation as `trashed:` (§3.6.1; note-archive /
+ * MYND-331). `archived:` is the 7th Myne-managed canonical FM field, joining
+ * `updated:` / `title:` / `folder:` / `trashed:` / `template:` / `folder_index:`.
+ * It shares `extractTrashedScalar` + `isValidRfc3339` with `trashed:` because the
+ * two are structurally identical timestamp fields (a `/simplify` candidate is to
+ * fold the two into one keyed timestamp-read helper).
+ */
+export function readArchivedFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = ARCHIVED_KEY_RE.exec(line);
+    if (m === null) continue;
+    const value = extractTrashedScalar(m[2] ?? "");
+    if (value !== null && isValidRfc3339(value)) return value;
+    return null;
+  }
+  return null;
+}
+
+// === patchArchivedField — note-archive write target for FM `archived:` ===
+//
+// Spec: docs/spec/markdown-dialect.md §3.6.1 (`archived:` is the 7th Myne-managed
+// canonical FM field). Write trigger = archive (`src/notes/archiveNote.ts`) +
+// unarchive (state-D delete). note-archive / MYND-331. Structurally identical to
+// `patchTrashedField`: A/B/C value-surgery for the set path, plus state D (delete
+// on unarchive) with empty-block collapse. Values are always RFC 3339 (plain-scalar
+// safe). `archived:` and `trashed:` are independent lines on the blob — each patcher
+// only touches its own line — so the archive action layer composes them (clear one,
+// set the other) to enforce the archive ⊥ trash mutual exclusion.
+
+function applyStateAArchived(source: string, value: string): string {
+  return (
+    FRONTMATTER_OPENER +
+    "archived: " + formatYamlScalar(value) + NEWLINE +
+    FRONTMATTER_DELIMITER + NEWLINE +
+    NEWLINE +
+    source
+  );
+}
+
+function applyStateBArchived(
+  source: string,
+  bodyEnd: number,
+  value: string,
+): string {
+  const insert = "archived: " + formatYamlScalar(value) + NEWLINE;
+  return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
+}
+
+function applyStateCArchived(
+  source: string,
+  bodyStart: number,
+  bodyEnd: number,
+  value: string,
+): string | null {
+  const fmBody = source.substring(bodyStart, bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = ARCHIVED_KEY_RE.exec(lines[i] ?? "");
+    if (m === null) continue;
+    const prefix = m[1] ?? "";
+    const valuePortion = m[2] ?? "";
+    const trimmedValue = valuePortion.trim();
+
+    if (/^[|>]/.test(trimmedValue)) {
+      lines[i] = prefix + formatYamlScalar(value);
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
+      lines.splice(i + 1, j - (i + 1));
+      return lines.join(NEWLINE);
+    }
+
+    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
+    if (quotedM !== null) {
+      const quote = quotedM[1] ?? '"';
+      const trailing = quotedM[3] ?? "";
+      const escaped =
+        quote === '"'
+          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          : value.replace(/'/g, "''");
+      lines[i] = prefix + quote + escaped + quote + trailing;
+      return lines.join(NEWLINE);
+    }
+
+    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+    if (commentM !== null) {
+      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
+      return lines.join(NEWLINE);
+    }
+
+    lines[i] = prefix + formatYamlScalar(value);
+    return lines.join(NEWLINE);
+  }
+
+  return null;
+}
+
+// State D — delete the archived field (unarchive). Mirrors `deleteTrashedField`:
+// removes only the `archived:` line; if the block empties (no residual key or
+// comment), removes the whole block + the canonical trailing blank line so the
+// result is byte-identical to a note that never had frontmatter.
+function deleteArchivedField(source: string): string {
+  const fm = locateFrontmatter(source);
+  if (fm === null) return source;
+
+  const fmBody = source.substring(fm.bodyStart, fm.bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+  const archivedIdx = lines.findIndex((l) => ARCHIVED_KEY_RE.test(l));
+  if (archivedIdx === -1) return source;
+
+  const remaining = lines
+    .slice(0, archivedIdx)
+    .concat(lines.slice(archivedIdx + 1));
+  const hasResidual = remaining.some((l) => l.trim() !== "");
+
+  if (!hasResidual) {
+    let removalEnd = fm.blockEnd;
+    if (source.charAt(removalEnd) === NEWLINE) removalEnd += NEWLINE.length;
+    return source.substring(removalEnd);
+  }
+
+  const newBody = remaining.join(NEWLINE);
+  return (
+    source.substring(0, fm.bodyStart) + newBody + source.substring(fm.bodyEnd)
+  );
+}
+
+/**
+ * Set, insert, or delete the Myne-managed `archived:` frontmatter field.
+ * `value === null` deletes the field (unarchive, state D); a string sets it
+ * (states A/B/C). `archiveNote` passes an RFC 3339 timestamp; `unarchiveNote`
+ * passes `null`. Mirrors {@link patchTrashedField} — touches only the `archived:`
+ * line, so it composes with `trashed:` (the action layer clears one and sets the
+ * other to keep archive ⊥ trash) and any user-authored fields without clobbering.
+ */
+export function patchArchivedField(
+  bytes: Uint8Array,
+  value: string | null,
+): Uint8Array {
+  const source = utf8Decoder.decode(bytes);
+
+  if (value === null) {
+    return utf8Encoder.encode(deleteArchivedField(source));
+  }
+
+  const fm = locateFrontmatter(source);
+  if (fm === null) {
+    return utf8Encoder.encode(applyStateAArchived(source, value));
+  }
+
+  const stateCResult = applyStateCArchived(
+    source,
+    fm.bodyStart,
+    fm.bodyEnd,
+    value,
+  );
+  if (stateCResult !== null) {
+    const before = source.substring(0, fm.bodyStart);
+    const after = source.substring(fm.bodyEnd);
+    return utf8Encoder.encode(before + stateCResult + after);
+  }
+
+  return utf8Encoder.encode(applyStateBArchived(source, fm.bodyEnd, value));
 }
 
 // === patchTemplateField — note-template write target for FM `template:` ===

@@ -25,6 +25,7 @@ export { stripDialectComments, hasDialectComment } from "./stripComments";
 export {
   buildInitialPlaintext,
   formatYamlScalar,
+  patchArchivedField,
   patchFirstH1Line,
   patchFolderField,
   patchFolderIndexField,
@@ -34,6 +35,7 @@ export {
   patchTitleField,
   patchTrashedField,
   patchUpdatedField,
+  readArchivedFromFmBody,
   readFolderIndexFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,

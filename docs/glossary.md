@@ -103,6 +103,16 @@ A class of password-authenticated key exchange where the server stores no passwo
 Used in: `decisions.md` (Deferred #4)
 Reference: RFC 9807.
 
+### **archive** &nbsp; 📦 *Product*
+
+The indefinite-retention declutter layer: a note the user has set aside but keeps forever (no auto-purge), distinct from the Trash. Archiving hides a note from the working set (sidebar tree + favorites display) but — unlike trashing — leaves it discoverable in full-text search and resolvable as a wikilink/backlink target. Archive and trash are two positions on one *location* axis and are mutually exclusive: a note is at most one of live / archived / trashed. Backed by the value-strict [archived field](#archived-field) (MYND-331).
+
+Used in: `spec/markdown-dialect.md` §3.6.1
+
+### **archived field** &nbsp; 📋 *Protocol*
+
+The seventh Myne-managed canonical frontmatter field, `archived:` — a **value-strict** RFC 3339 UTC timestamp marking when a note was archived (the exact twin of `trashed:`; any non-timestamp value leaves the note live). Written only by the archive/unarchive actions (`src/notes/archiveNote.ts`) via `patchArchivedField` over the existing `note_update` IPC; neither transition bumps `updated:`. Mutually exclusive with `trashed:` at the action layer. Rides the existing `.myn` AEAD envelope — no `protocol.md` magic-byte / AAD / version change (MYND-331). See [archive](#archive).
+
 ### **Argon2id** &nbsp; 🔐 *Primitive* (deep entry)
 
 The memory-hard password-based key derivation function specified in RFC 9106. Argon2id combines the side-channel resistance of Argon2i with the GPU-cracking resistance of Argon2d. Myne uses Argon2id at two call sites (deriving `password_wrap_key` from the master password, deriving `recovery_wrap_key` from the BIP-39 phrase), with parameters `m=256 MiB, t=3, p=2, version 1.3` stored in `vault.meta` rather than hardcoded so they can be tuned per platform and bound into the wrap AADs to defeat parameter-downgrade tampering. Argon2i and Argon2d are not used in this protocol — the "id" variant is the only correct choice for password-stretching in 2026.
