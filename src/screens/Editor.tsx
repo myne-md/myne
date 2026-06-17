@@ -41,6 +41,10 @@ import {
 } from "react";
 import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
+import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
+import type { KeybindEntry } from "../commands/keybindEngine";
+import { catalogDefaults } from "../commands/bindableCatalog";
+import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
@@ -1801,109 +1805,91 @@ function SidebarBootstrap() {
  *   Cmd/Ctrl+Alt+Arrows     move focus to the next / prev pane
  *   Cmd/Ctrl+[ / ]          navigate back / forward through note history
  */
-// True when keystrokes are landing in a plain (non-editor) text field — a
-// sidebar rename / search box — where the window shortcuts must stand down.
-// The CM6 surface (`.cm-content`) is NOT plain: shortcuts stay live there.
-function isTypingInPlainInput(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName.toLowerCase();
-  return (
-    (tag === "input" || tag === "textarea") &&
-    !target.classList.contains("cm-content")
-  );
-}
+// In-code DEFAULT chords for the keybind dispatcher (hotkeys epic, MYND-304).
+// Sourced from the single bindable-command catalog (no second copy of the
+// chord literals — the catalog is the one place defaults live). The dispatcher
+// only fires the ids it has entries for, so passing the full catalog (including
+// the commands handled elsewhere) is harmless; the user override
+// (vault.prefs.keymap) shadows these per id. Ctrl+Tab is deliberately NOT a
+// catalog-rebindable default — see the inline handler note below.
+const KEYBIND_DEFAULTS: Readonly<Record<string, string[]>> = catalogDefaults();
 
 function WorkspaceHotkeys() {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
+  const { prefs } = usePrefs();
+
+  // The Mod-based window shortcuts now flow through the central keybind engine
+  // (MYND-304): each is a registered entry whose effective chord = the user
+  // override (vault.prefs.keymap) else the in-code default. `run` closures carry
+  // the EXACT prior behaviour; the dispatcher applies the scope gate (stands
+  // down in plain inputs, like the old `isTypingInPlainInput` guard) and the
+  // capture phase for `nav.back`/`nav.forward` (so Cmd-[/] still beats CM's
+  // indent via stopPropagation).
+  const entries = useMemo<KeybindEntry[]>(() => {
+    const focusAdjacent = (forward: boolean) => {
+      const ids = ws.leaves.map((l) => l.id);
+      if (ids.length < 2) return;
+      const i = ids.indexOf(ws.focusedPaneId);
+      const next = ids[(i + (forward ? 1 : -1) + ids.length) % ids.length]!;
+      ws.focusPane(next);
+    };
+    return [
+      {
+        id: "note.new-tab",
+        scope: {},
+        run: () => void ctx.createAndStartRename().catch(() => {}),
+      },
+      {
+        id: "pane.close-tab",
+        scope: {},
+        run: () => {
+          const a = ws.focusedLeaf.activeTab;
+          if (a !== null && a.kind === "note") ws.closeTabInPane(ws.focusedPaneId, a.id);
+        },
+      },
+      { id: "pane.split-row", scope: {}, run: () => ws.splitFocused("row") },
+      { id: "pane.split-column", scope: {}, run: () => ws.splitFocused("column") },
+      { id: "pane.focus-next", scope: {}, run: () => focusAdjacent(true) },
+      { id: "pane.focus-prev", scope: {}, run: () => focusAdjacent(false) },
+      { id: "nav.back", scope: {}, phase: "capture", run: () => ws.goBack() },
+      { id: "nav.forward", scope: {}, phase: "capture", run: () => ws.goForward() },
+    ];
+  }, [ws, ctx]);
+
+  useKeybindDispatcher({
+    entries,
+    defaults: KEYBIND_DEFAULTS,
+    overrides: prefs.keymap,
+    stageName: "editor",
+    selectedNoteId: null,
+    activeModal: null,
+  });
+
+  // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused pane. Kept as a
+  // literal-Ctrl inline handler OUTSIDE the rebindable keymap: Ctrl+Tab is a
+  // cross-platform browser convention (literal Ctrl on every OS), but the
+  // engine's `Mod` token maps `ctrlKey`→`Mod` on non-mac, so a literal Ctrl
+  // can't be distinctly represented as a keymap chord. Treated as an
+  // OS/browser-convention chord (same spirit as SYNC-9's CM-formatting
+  // deferral); revisit if cross-platform literal-Ctrl bindings become rebindable.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (isTypingInPlainInput(e.target)) return;
-      const mod = e.metaKey || e.ctrlKey;
-
-      // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused pane.
-      if (e.ctrlKey && e.key === "Tab") {
-        const tabs = ws.focusedLeaf.tabs;
-        if (tabs.length === 0) return;
-        e.preventDefault();
-        const cur = ws.focusedLeaf.activeTab;
-        const i = cur === null ? -1 : tabs.findIndex((t) => sameItem(t, cur));
-        const len = tabs.length;
-        const next = e.shiftKey
-          ? tabs[(i - 1 + len) % len]!
-          : tabs[(i + 1) % len]!;
-        // Task-1 boundary: panes hold only note tabs until #4 task 2 — the
-        // context's activate API is note-id-keyed for now.
-        if (next.kind === "note") ws.activateInPane(ws.focusedPaneId, next.id);
-        return;
-      }
-
-      if (!mod) return;
-
-      // Cmd/Ctrl+Alt+Arrow — move focus between panes (tree order).
-      if (
-        e.altKey &&
-        (e.key === "ArrowLeft" ||
-          e.key === "ArrowRight" ||
-          e.key === "ArrowUp" ||
-          e.key === "ArrowDown")
-      ) {
-        const ids = ws.leaves.map((l) => l.id);
-        if (ids.length < 2) return;
-        e.preventDefault();
-        const i = ids.indexOf(ws.focusedPaneId);
-        const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
-        const next = ids[(i + (forward ? 1 : -1) + ids.length) % ids.length]!;
-        ws.focusPane(next);
-        return;
-      }
-
-      switch (e.key) {
-        case "t":
-        case "T":
-          e.preventDefault();
-          void ctx.createAndStartRename().catch(() => {});
-          return;
-        case "w":
-        case "W": {
-          const a = ws.focusedLeaf.activeTab;
-          if (a === null) return;
-          e.preventDefault();
-          if (a.kind === "note") ws.closeTabInPane(ws.focusedPaneId, a.id);
-          return;
-        }
-        case "\\":
-          e.preventDefault();
-          ws.splitFocused(e.shiftKey ? "column" : "row");
-          return;
-        default:
-          return;
-      }
+      // Stand down while typing in a plain input (sidebar rename / search) —
+      // the CM6 surface is not "plain-input", so tab-cycle stays live there.
+      if (focusKindOf(e.target) === "plain-input") return;
+      if (!(e.ctrlKey && e.key === "Tab")) return;
+      const tabs = ws.focusedLeaf.tabs;
+      if (tabs.length === 0) return;
+      e.preventDefault();
+      const cur = ws.focusedLeaf.activeTab;
+      const i = cur === null ? -1 : tabs.findIndex((t) => sameItem(t, cur));
+      const len = tabs.length;
+      const next = e.shiftKey ? tabs[(i - 1 + len) % len]! : tabs[(i + 1) % len]!;
+      if (next.kind === "note") ws.activateInPane(ws.focusedPaneId, next.id);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [ws, ctx]);
-
-  // Cmd/Ctrl+[ and ] — back / forward through note history (MYND-260). These
-  // live in their OWN capture-phase listener rather than the bubble-phase
-  // switch above because CM's `defaultKeymap` binds `Mod-[`/`Mod-]` to
-  // indentLess/indentMore and consumes them in its own DOM handlers: a
-  // bubble-phase handler would fire too late (CM already indented). Capturing
-  // at the window first + `stopPropagation` keeps the chord from reaching CM,
-  // so it navigates instead of indenting. Skips a plain (non-editor) input so
-  // a sidebar rename field still types brackets normally.
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
-      if (e.key !== "[" && e.key !== "]") return;
-      if (isTypingInPlainInput(e.target)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === "[") ws.goBack();
-      else ws.goForward();
-    };
-    window.addEventListener("keydown", handler, true);
-    return () => window.removeEventListener("keydown", handler, true);
   }, [ws]);
 
   return null;

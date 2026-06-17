@@ -85,6 +85,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_spell_enabled,
             commands::set_spell_languages,
             commands::set_show_note_timestamps,
+            commands::set_keymap_binding,
             commands::upsert_saved_view,
             commands::delete_saved_view,
             commands::set_view_order,
