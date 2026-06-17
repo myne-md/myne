@@ -38,6 +38,21 @@ fn baseline_legitimate_decrypt_roundtrips() {
     assert_eq!(note.plaintext(), SECRET);
 }
 
+/// MUTATION-HARDENING: a note at exactly `MAX_PLAINTEXT_LEN` (16 MiB) must
+/// round-trip. This pins the decode-side `ciphertext_len` cap at its exact
+/// upper boundary. cargo-mutants showed every off-by-one / arithmetic
+/// mutation of that cap (blob.rs §9.2 `ciphertext_len > MAX + 32`) survived
+/// because no test exercised a maximum-size note; this one fails them all —
+/// each mutated cap wrongly rejects the valid maximum.
+#[test]
+fn baseline_max_size_note_roundtrips_pinning_the_cap() {
+    let big = vec![0x61u8; protocol::MAX_PLAINTEXT_LEN];
+    let blob = encode_new_note(&ITEMS_KEY, &ITEMS_KEY_ID, &NOTE_UUID, &big).expect("encode max");
+    let note = decode_note(&blob, &NOTE_UUID, &ITEMS_KEY, &ITEMS_KEY_ID).expect("decode max");
+    assert_eq!(note.plaintext().len(), protocol::MAX_PLAINTEXT_LEN);
+    assert_eq!(note.plaintext(), &big[..]);
+}
+
 // ───────────────────────── Battery 1: AEAD integrity / forgery ────────────
 
 /// Exhaustive single-byte forgery: flip every byte of the blob, one at a
