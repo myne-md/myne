@@ -93,6 +93,10 @@ export const ICON_PATHS: Record<string, string> = {
   // folder's index note from its ordinary members.
   "book-open":
     '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  // Archive (MYND-331) — sidebar footer Archive entry + the search/backlink
+  // "archived" badge. Lucide `archive` (the box-with-lid glyph).
+  archive:
+    '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
 };
 
 export type IconName = keyof typeof ICON_PATHS;

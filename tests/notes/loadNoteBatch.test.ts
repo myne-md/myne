@@ -242,6 +242,50 @@ describe("loadNoteBatch — updated_at derivation", () => {
   });
 });
 
+describe("loadNoteBatch — archived derivation (value-strict)", () => {
+  it("exposes the timestamp for a valid RFC 3339 `archived:` value", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "id-a1",
+          frontmatter_bytes: "archived: 2026-06-17T09:30:00Z\n",
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["id-a1"]);
+    expect(rec.archived).toBe("2026-06-17T09:30:00Z");
+  });
+
+  it("reads a non-timestamp `archived:` value as live (null)", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "id-a2",
+          frontmatter_bytes: "archived: true\n",
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["id-a2"]);
+    expect(rec.archived).toBeNull();
+  });
+
+  it("yields null archived when the field is absent", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "id-a3",
+          frontmatter_bytes: "title: T\n",
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["id-a3"]);
+    expect(rec.archived).toBeNull();
+  });
+});
+
 describe("loadNoteBatch — per-item error pass-through", () => {
   it("surfaces per-item Err as TitleRecord with error + null title", async () => {
     invokeMock.mockResolvedValueOnce([

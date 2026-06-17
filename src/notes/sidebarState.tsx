@@ -25,6 +25,12 @@ import {
 } from "react";
 import { createNote } from "./createNote";
 import { deleteNote } from "./deleteNote";
+import {
+  archiveNote,
+  bulkArchiveNotes,
+  unarchiveNote,
+  type BulkArchiveResult,
+} from "./archiveNote";
 import { duplicateNote } from "./duplicateNote";
 import { emptyTrash, type EmptyTrashResult } from "./emptyTrash";
 import { bulkMoveNotes, type BulkMoveResult } from "./moveNote";
@@ -130,6 +136,7 @@ export function applyOptimisticCreate(
     folder: null,
     updatedAt: null,
     trashed: null,
+    archived: null,
     template: false,
     folderIndex: false,
   });
@@ -137,12 +144,15 @@ export function applyOptimisticCreate(
 
 /**
  * Live (working-set) entries of the cache as a fresh `Map`, for the sidebar
- * tree / folder derivation / favorites. A record is excluded when it is in the
- * trash (value-strict `trashed:` marker non-null, MYND-133) OR is a template
- * (value-strict `template:` flag, MYND-186) — templates are the inverse-
- * visibility twin of trash: hidden from every working view, surfaced only by the
- * template picker + management UI ({@link templateRecords}). The trash complement
- * ({@link trashedRecords} / {@link trashedCount}) backs the Trash panel + count.
+ * tree / folder derivation / favorites display / new-tab quick-open / saved-view
+ * results. A record is excluded when it is in the trash (value-strict `trashed:`
+ * marker non-null, MYND-133) OR is archived (value-strict `archived:` marker
+ * non-null, note-archive / MYND-331) OR is a template (value-strict `template:`
+ * flag, MYND-186). This is the **working-set** axis of the two-axis split: archive
+ * is hidden from the active tree/favorites (declutter) but — unlike trash —
+ * stays discoverable via {@link resolverCache} (backlinks/graph/tag) and search.
+ * Complements: {@link trashedRecords}/{@link trashedCount} back the Trash panel;
+ * {@link archivedRecords}/{@link archivedCount} back the Archive view.
  */
 export function liveCache(
   cache: ReadonlyMap<NoteId, TitleRecord>,
@@ -151,10 +161,34 @@ export function liveCache(
   for (const [id, record] of cache) {
     // `== null` (loose) treats a missing marker as live — defensive against a
     // record constructed without the field. Templates are excluded regardless of
-    // trash state (a template is never part of the working set).
-    if (record.trashed == null && record.template !== true) live.set(id, record);
+    // trash/archive state (a template is never part of the working set).
+    if (
+      record.trashed == null &&
+      record.archived == null &&
+      record.template !== true
+    ) {
+      live.set(id, record);
+    }
   }
   return live;
+}
+
+/**
+ * Reference/discovery entries of the cache — the **resolver** axis of the two-axis
+ * split (note-archive / MYND-331 Q3/B). Excludes trashed + template like the
+ * working set, but **keeps archived**: an archived note must still resolve as a
+ * backlink target and surface in the graph / tag-browser (archive ≠ soft-trash).
+ * This is the set {@link resolverNotesFromCache} projects for the single §5.3
+ * resolver. The working-set ({@link liveCache}) is a strict subset of this.
+ */
+export function resolverCache(
+  cache: ReadonlyMap<NoteId, TitleRecord>,
+): Map<NoteId, TitleRecord> {
+  const out = new Map<NoteId, TitleRecord>();
+  for (const [id, record] of cache) {
+    if (record.trashed == null && record.template !== true) out.set(id, record);
+  }
+  return out;
 }
 
 /** Trashed entries of the cache (the Trash panel view), newest-trashed first.
@@ -179,6 +213,32 @@ export function trashedCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
   let n = 0;
   for (const record of cache.values()) {
     if (record.trashed != null) n += 1;
+  }
+  return n;
+}
+
+/** Archived entries of the cache (the Archive view), newest-archived first
+ * (note-archive / MYND-331). The twin of {@link trashedRecords}: archive and
+ * trash are disjoint rafts, so an archived note is never trashed and vice versa
+ * (the action layer keeps them mutually exclusive). Sorted by the `archived:`
+ * timestamp descending — the same flat, time-ordered shape as the Trash view. */
+export function archivedRecords(
+  cache: ReadonlyMap<NoteId, TitleRecord>,
+): TitleRecord[] {
+  const out: TitleRecord[] = [];
+  for (const record of cache.values()) {
+    if (record.archived != null) out.push(record);
+  }
+  out.sort((a, b) => (b.archived ?? "").localeCompare(a.archived ?? ""));
+  return out;
+}
+
+/** Count of archived entries — the Archive footer count. Twin of
+ * {@link trashedCount}; counts the disjoint archive raft. */
+export function archivedCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
+  let n = 0;
+  for (const record of cache.values()) {
+    if (record.archived != null) n += 1;
   }
   return n;
 }
@@ -351,6 +411,64 @@ export function rollbackOptimisticTrashedFlag(
   if (existing === undefined) return state;
   const cache = new Map(state.cache);
   cache.set(id, { ...existing, trashed: snapshot.prev });
+  return { ...state, cache };
+}
+
+/** Snapshot for an optimistic archive flip — captures BOTH prior markers because
+ * archiving clears `trashed:` for archive ⊥ trash (note-archive / MYND-331). */
+export type ArchivedFlagSnapshot = {
+  prevArchived: string | null;
+  prevTrashed: string | null;
+};
+
+/**
+ * Optimistic archive/unarchive: set (`value` = RFC 3339 string) or clear
+ * (`value` = null) the cache record's `archived:` marker immediately, so the row
+ * leaves the live tree (archive) or re-enters it (unarchive) before the IPC
+ * resolves (MYND-331). Archiving (`value !== null`) also clears `trashed:` so the
+ * optimistic state honors archive ⊥ trash. No-op if the entry is not cached.
+ * Twin of {@link applyOptimisticTrashedFlag}; paired with
+ * {@link rollbackOptimisticArchivedFlag}.
+ */
+export function applyOptimisticArchivedFlag(
+  state: SidebarState,
+  id: NoteId,
+  value: string | null,
+): { next: SidebarState; snapshot: ArchivedFlagSnapshot } {
+  const existing = state.cache.get(id);
+  if (existing === undefined) {
+    return { next: state, snapshot: { prevArchived: null, prevTrashed: null } };
+  }
+  const cache = new Map(state.cache);
+  cache.set(id, {
+    ...existing,
+    archived: value,
+    // Archiving demotes any trash state; unarchive leaves trashed untouched.
+    trashed: value !== null ? null : existing.trashed,
+  });
+  return {
+    next: { ...state, cache },
+    snapshot: { prevArchived: existing.archived, prevTrashed: existing.trashed },
+  };
+}
+
+/**
+ * Rollback for {@link applyOptimisticArchivedFlag} — restores both prior markers.
+ * No-op if the cache entry vanished in the meantime.
+ */
+export function rollbackOptimisticArchivedFlag(
+  state: SidebarState,
+  id: NoteId,
+  snapshot: ArchivedFlagSnapshot,
+): SidebarState {
+  const existing = state.cache.get(id);
+  if (existing === undefined) return state;
+  const cache = new Map(state.cache);
+  cache.set(id, {
+    ...existing,
+    archived: snapshot.prevArchived,
+    trashed: snapshot.prevTrashed,
+  });
   return { ...state, cache };
 }
 
@@ -548,6 +666,12 @@ export type UseSelectedNoteReturn = {
   trashWithRollback: (id: NoteId) => Promise<void>;
   /** Restore a note from the trash (optimistic `trashed:` clear + rollback). */
   restoreWithRollback: (id: NoteId) => Promise<void>;
+  /** Archive a note (optimistic `archived:` set + `trashed:` clear + rollback). MYND-331. */
+  archiveWithRollback: (id: NoteId) => Promise<void>;
+  /** Unarchive a note (optimistic `archived:` clear + rollback). MYND-331. */
+  unarchiveWithRollback: (id: NoteId) => Promise<void>;
+  /** Archive every id at once (MYND-367 bulk archive); optimistic + rollback. */
+  bulkArchiveWithSync: (ids: readonly NoteId[]) => Promise<BulkArchiveResult>;
   /** Permanently delete every id (empty trash); drops purged ids from the cache. */
   emptyTrashWithSync: (ids: readonly NoteId[]) => Promise<EmptyTrashResult>;
   /** Soft-trash every id at once (e.g. a non-empty folder delete); optimistic + rollback. */
@@ -813,6 +937,58 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
+  // Archive a note: optimistically set `archived:` + clear `trashed:` (the row
+  // leaves the live tree at once), call `archiveNote`, then refresh to the
+  // canonical timestamp. Rollback restores both prior markers on IPC failure.
+  // Twin of `trashWithRollback` (MYND-331).
+  const archiveWithRollback = useCallback(
+    async (id: NoteId) => {
+      const iso = new Date().toISOString();
+      let snapshot: ArchivedFlagSnapshot = {
+        prevArchived: null,
+        prevTrashed: null,
+      };
+      setState((prev) => {
+        const result = applyOptimisticArchivedFlag(prev, id, iso);
+        snapshot = result.snapshot;
+        return result.next;
+      });
+      try {
+        await archiveNote(id);
+        await refreshOne(id);
+      } catch (err) {
+        setState((prev) => rollbackOptimisticArchivedFlag(prev, id, snapshot));
+        throw err;
+      }
+    },
+    [refreshOne],
+  );
+
+  // Unarchive a note: optimistically clear `archived:` (the row re-enters the
+  // live tree, back in its folder), call `unarchiveNote`, then refresh. Rollback
+  // re-applies the marker on IPC failure. Backs the Archive panel's Restore.
+  const unarchiveWithRollback = useCallback(
+    async (id: NoteId) => {
+      let snapshot: ArchivedFlagSnapshot = {
+        prevArchived: null,
+        prevTrashed: null,
+      };
+      setState((prev) => {
+        const result = applyOptimisticArchivedFlag(prev, id, null);
+        snapshot = result.snapshot;
+        return result.next;
+      });
+      try {
+        await unarchiveNote(id);
+        await refreshOne(id);
+      } catch (err) {
+        setState((prev) => rollbackOptimisticArchivedFlag(prev, id, snapshot));
+        throw err;
+      }
+    },
+    [refreshOne],
+  );
+
   // Permanently delete every id in `ids` (empty trash). Best-effort
   // (`emptyTrash` never rejects); the purged ids are dropped from the cache so
   // the Trash panel + count update. Returns the result for remaining-count UX.
@@ -874,6 +1050,44 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
+  // Archive every id in `ids` at once (MYND-367 bulk archive — the "Arşivle N
+  // not" action). Optimistically marks all rows archived (they leave the live
+  // tree at once), archives them best-effort via `bulkArchiveNotes`, refreshes
+  // the survivors, and rolls back any that failed. Batched twin of
+  // `archiveWithRollback` / `bulkTrashWithSync` (MYND-331).
+  const bulkArchiveWithSync = useCallback(
+    async (ids: readonly NoteId[]): Promise<BulkArchiveResult> => {
+      if (ids.length === 0) return { archived: [], failed: [] };
+      const iso = new Date().toISOString();
+      const snapshots = new Map<NoteId, ArchivedFlagSnapshot>();
+      setState((prev) => {
+        let next = prev;
+        for (const id of ids) {
+          const result = applyOptimisticArchivedFlag(next, id, iso);
+          snapshots.set(id, result.snapshot);
+          next = result.next;
+        }
+        return next;
+      });
+      const result = await bulkArchiveNotes([...ids]);
+      if (result.failed.length > 0) {
+        setState((prev) => {
+          let next = prev;
+          for (const { noteId } of result.failed) {
+            const snap = snapshots.get(noteId);
+            if (snap !== undefined) {
+              next = rollbackOptimisticArchivedFlag(next, noteId, snap);
+            }
+          }
+          return next;
+        });
+      }
+      await Promise.allSettled(result.archived.map((id) => refreshOne(id)));
+      return result;
+    },
+    [refreshOne],
+  );
+
   // Move every id to `folder` (or root) at once (MYND-367 bulk move). Best-
   // effort via `bulkMoveNotes` (folder-move is not correctness-critical, Q4) —
   // no optimistic pre-write is needed (a move only relocates rows within the
@@ -926,6 +1140,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       deleteWithRollback,
       trashWithRollback,
       restoreWithRollback,
+      archiveWithRollback,
+      unarchiveWithRollback,
+      bulkArchiveWithSync,
       emptyTrashWithSync,
       bulkTrashWithSync,
       bulkMoveWithSync,
@@ -949,6 +1166,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       deleteWithRollback,
       trashWithRollback,
       restoreWithRollback,
+      archiveWithRollback,
+      unarchiveWithRollback,
+      bulkArchiveWithSync,
       emptyTrashWithSync,
       bulkTrashWithSync,
       bulkMoveWithSync,
