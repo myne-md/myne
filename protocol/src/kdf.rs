@@ -58,6 +58,12 @@ const SALT_PREFIX_PASSWORD: &[u8] = b"myne.v0.1 argon2id-password|";
 /// (spec § 3.1; 28 ASCII bytes, trailing pipe).
 const SALT_PREFIX_RECOVERY: &[u8] = b"myne.v0.1 argon2id-recovery|";
 
+/// Salt prefix for the PIN-derived quick-unlock wrap key
+/// (spec § 9.14.2; 35 ASCII bytes, trailing pipe). DISTINCT from the password
+/// and recovery prefixes so a PIN wrap key is domain-separated from the
+/// credential wrap keys even if a user's PIN coincided with their password.
+const SALT_PREFIX_QUICKUNLOCK_PIN: &[u8] = b"myne.v0.1 argon2id-quickunlock-pin|";
+
 /// Argon2id salt length: 16 bytes (truncated SHA-256 output).
 pub const ARGON2_SALT_LEN: usize = 16;
 
@@ -150,6 +156,29 @@ pub fn derive_recovery_wrap_key_from_normalized(
     argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
 }
 
+/// Derive the 32-byte AEAD wrap key for the **PIN-protected quick-unlock copy**
+/// of `root_key` (spec § 9.14.2).
+///
+/// Salt = SHA-256(`"myne.v0.1 argon2id-quickunlock-pin|"` || `account_number_hash`
+/// || `pin_salt`)[:16]. Argon2id runs with `params` — the **same** memory-hard
+/// parameter set the vault uses for the master password (drawn from `vault.meta`
+/// § 4.2): the memory-hardness is what makes a low-entropy PIN costly to
+/// brute-force offline. `pin` is the user's PIN as UTF-8 bytes (the host layer
+/// enforces a minimum length before calling this); the distinct salt prefix
+/// domain-separates it from [`derive_password_wrap_key`].
+///
+/// Returns [`ProtocolError::KdfFailure`] on Argon2id error (same discipline as
+/// [`derive_password_wrap_key`]).
+pub fn derive_quick_unlock_pin_wrap_key(
+    pin: &str,
+    pin_salt: &[u8; 16],
+    account_number_hash: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let salt = build_salt(SALT_PREFIX_QUICKUNLOCK_PIN, account_number_hash, pin_salt);
+    argon2id_derive(pin.as_bytes(), &salt, params)
+}
+
 /// `salt = SHA-256(prefix || account_number_hash || salt_random)[:16]`
 /// per spec § 3.1.
 fn build_salt(
@@ -233,6 +262,69 @@ mod tests {
         0xFF, 0x10, 0x21, 0x32, 0x43, 0x54, 0x65, 0x76, 0x87, 0x98, 0xA9, 0xBA, 0xCB, 0xDC, 0xED,
         0xFE, 0x0F,
     ];
+
+    #[test]
+    fn quick_unlock_pin_wrap_key_is_deterministic() {
+        let a = derive_quick_unlock_pin_wrap_key(
+            "123456",
+            &FIXED_SALT_RANDOM,
+            &FIXED_ACCOUNT_HASH,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("derive a");
+        let b = derive_quick_unlock_pin_wrap_key(
+            "123456",
+            &FIXED_SALT_RANDOM,
+            &FIXED_ACCOUNT_HASH,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("derive b");
+        assert_eq!(a.as_slice(), b.as_slice());
+    }
+
+    #[test]
+    fn quick_unlock_pin_wrap_key_is_domain_separated_from_password() {
+        // The same secret + salt + account hash produce DIFFERENT keys for the
+        // PIN quick-unlock domain vs the password domain — the distinct salt
+        // prefix (`argon2id-quickunlock-pin|` vs `argon2id-password|`) is what
+        // guarantees this even if a user's PIN equalled their password.
+        let pin_key = derive_quick_unlock_pin_wrap_key(
+            "secret",
+            &FIXED_SALT_RANDOM,
+            &FIXED_ACCOUNT_HASH,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("pin key");
+        let password_key = derive_password_wrap_key(
+            "secret",
+            &FIXED_SALT_RANDOM,
+            &FIXED_ACCOUNT_HASH,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("password key");
+        assert_ne!(pin_key.as_slice(), password_key.as_slice());
+    }
+
+    #[test]
+    fn quick_unlock_pin_wrap_key_varies_with_salt() {
+        let a = derive_quick_unlock_pin_wrap_key(
+            "123456",
+            &FIXED_SALT_RANDOM,
+            &FIXED_ACCOUNT_HASH,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("a");
+        let mut other_salt = FIXED_SALT_RANDOM;
+        other_salt[0] ^= 0x01;
+        let b = derive_quick_unlock_pin_wrap_key(
+            "123456",
+            &other_salt,
+            &FIXED_ACCOUNT_HASH,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("b");
+        assert_ne!(a.as_slice(), b.as_slice());
+    }
 
     #[test]
     fn salt_prefixes_match_spec_verbatim() {

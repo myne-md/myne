@@ -67,6 +67,7 @@ pub fn run() {
         .plugin(plugins::notes::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::vault_indices::init())
+        .plugin(plugins::quick_unlock::init())
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::workspace::init())

@@ -226,6 +226,8 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
 
+The **quick-unlock credential blob** (`vault.quickunlock`, §9.14) is deliberately **NOT** in this registry: its KEK is **not** a `DeriveSubkey(root_key, …)` subkey. Because the blob wraps `root_key` itself, a `root_key`-derived KEK would be circular; instead its wrap key is supplied by an external, hardware-bound provider (macOS Keychain biometric secret) or derived from a PIN (§9.14.2). It is the one §9 blob with no §3.4 row.
+
 The deferred resolution of `server-auth` does not affect the v0.1 wire format or any blob produced under v0.1 — the subkey is derived but never used by any v0.1 client. A v0.1 vault opened by a Phase 2 client will still produce the same `server-auth` bytes deterministically; the Phase 2 protocol layer determines what to do with them.
 
 ---
@@ -1224,6 +1226,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.attachments` | IN if present | Authoritative attachment metadata (§9.10) |
 | `attachments/<attachment-id-hex>` | IN | Attachment blobs (§9.9) |
 | `vault.search` | OUT | Pure rebuildable cache; first unlock after restore rebuilds (§9.6.4) |
+| `vault.quickunlock` | OUT | Device-local credential (§9.14); wrap key is bound to *this* device's hardware (`thisDeviceOnly`), so a copy is inert elsewhere — re-set per device after restore |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
 | `.rename-journal` (notes dir) | OUT | Empty roll-forward marker for the transactional multi-note rename (§9.12); transient WAL sentinel, never user data |
 | `vaults/registry.json` | OUT (structurally) | Per-install plaintext cache living outside the vault root |
@@ -1465,6 +1468,130 @@ conflict semantics are **union + add-wins** (AS6-safe, no wall-clock), like
 `deliberate_folders` (§9.5.2). A v0.1 client MUST reject `MYD5` and any unregistered
 magic; a v005 client MUST refuse `MYD1` (§10.4).
 
+### 9.14 Quick-unlock credential blob (`vault.quickunlock`, `MYQ1`)
+
+`vault.quickunlock` is a **device-local credential** holding a **third wrapped copy of
+`root_key`** — the structural realization of the §3.1 forward-look ("adding a third
+encrypted copy of `root_key` under a third wrap key, with no change to the rest of the
+protocol"). It exists so a re-lock (auto-lock-on-idle, §9.5 / `auto_lock.rs`) can be
+reversed with a fast second credential (Touch ID / Windows Hello / a PIN) instead of the
+full master-password Argon2id path, **without touching the cryptographic root**: the
+blob wraps the already-derived `root_key`; it never participates in `root_key` derivation
+(MYND-329).
+
+Unlike every other §9 blob, `vault.quickunlock` is **NOT** wrapped under a
+`DeriveSubkey(root_key, …)` KEK — that would be circular, since the blob *is* what
+protects `root_key`. Its wrap key is supplied by an **external wrap-key provider** bound
+to OS-backed hardware (macOS Keychain item gated by `kSecAccessControlBiometryCurrentSet`,
+or a future Windows Hello / TPM challenge-response) or, as a fallback, derived from a PIN
+via the vault's existing Argon2id parameters. The blob therefore has **no §3.4 subkey
+role**.
+
+**Device-local, never synchronized.** `vault.quickunlock` lives at
+`<vault-root>/vault.quickunlock` but, unlike `vault.meta` and the `.myn` files (the only
+artifacts that leave the device, §9.3), it is **never** part of any sync set: the wrap
+key is bound to *this* device's hardware (`thisDeviceOnly` keychain accessibility), so a
+copy on another device is inert. Each device that opts in mints its own blob. This is the
+per-device refinement of §3.1's "third copy lives in `vault.meta`" sketch (which assumed
+a single device); see `decisions.md` 2026-06-16.
+
+#### 9.14.1 On-disk layout
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                  Description
+------  ---------  ---------------------  -------------------------------------
+0       4 bytes    magic                  ASCII "MYQ1"
+4       1 byte     protocol_version       0x01 for this specification
+5       1 byte     provider_kind          0x01 = macOS-biometric (Keychain),
+                                          0x02 = PIN (Argon2id). Other values
+                                          reserved (Windows Hello = future).
+                                          Bound into the AAD (§9.14.3) so a blob
+                                          minted for one provider cannot be
+                                          reinterpreted under another.
+6       16 bytes   pin_salt               Argon2id salt for the PIN provider; all
+                                          zero when provider_kind != 0x02. The
+                                          Argon2id m/t/p parameters are NOT stored
+                                          here — the PIN provider reuses the
+                                          vault's parameter set from vault.meta
+                                          (§4.2), available because quick-unlock
+                                          setup happens while unlocked.
+22      24 bytes   wrap_nonce             192-bit random nonce (OS CSPRNG) for the
+                                          AEAD wrap of root_key under wrap_key.
+46      4 bytes    ciphertext_len         M = 32 + 32 (root_key plaintext + CTX tag).
+50      M bytes    ciphertext             root_key (32 bytes) AEAD-encrypted under
+                                          wrap_key with wrap_nonce, then the 32-byte
+                                          CTX commitment tag T' (§5.1). AAD in §9.14.3.
+```
+
+Magic + `protocol_version` MUST be checked **before** any decryption (the
+magic-byte-before-decrypt discipline of §9.2 / §9.3 / §9.13.1).
+
+#### 9.14.2 Wrap-key providers
+
+The on-disk blob is **provider-agnostic**: it is always `AEAD(wrap_key, root_key)`, and
+only the source of the 32-byte `wrap_key` differs. v0.1 defines:
+
+- **`0x01` macOS-biometric** — `wrap_key` is a 32-byte random secret stored in the macOS
+  Keychain under an access-control object built with `kSecAccessControlBiometryCurrentSet`
+  + `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. Retrieval triggers the OS biometric
+  prompt inherently (the resource is gated, not an app-level boolean — the bypass lesson
+  of OWASP-MASTG / Teleport RFD 54). The `biometryCurrentSet` flag invalidates the secret
+  at the OS level when the enrolled biometric set changes.
+- **`0x02` PIN** — `wrap_key = Argon2id(password = pin, salt = SHA-256("myne.v0.1 argon2id-quickunlock-pin|" || account_number_hash || pin_salt)[:16], m,t,p from vault.meta §4.2)`.
+  The salt prefix `"myne.v0.1 argon2id-quickunlock-pin|"` is **distinct** from the
+  password (`argon2id-password|`) and recovery (`argon2id-recovery|`) prefixes, so a
+  PIN wrap key is domain-separated from the credential wrap keys even if a user's PIN
+  coincided with their password (§3.1 salt-domain discipline). The memory-hard
+  parameters (m = 256 MiB baseline) are what make a low-entropy PIN costly to
+  brute-force offline. A minimum 6-digit PIN is enforced host-side.
+
+The provider abstraction is a single Rust trait (the implementation's `QuickUnlockProvider`);
+adding Windows Hello later is a new provider value, **not** a format change.
+
+#### 9.14.3 AAD construction
+
+`AAD_quick_unlock_blob` mirrors `AAD_personal_dictionary_blob` (§9.13.3) with role string
+`"quick-unlock-blob"`, and additionally binds `provider_kind`:
+
+```text
+"myne.v0.1|"                        10 bytes  (AAD prefix, §5.2)
+0x01                                 1 byte   (protocol_version)
+u16_be(17) || "quick-unlock-blob"   19 bytes  (length-prefixed role)
+account_number_hash                 16 bytes  (vault identity, §9.3 offset 6)
+provider_kind                        1 byte   (binds the provider; §9.14.1 offset 5)
+```
+
+Total 47 bytes. `account_number_hash` binds the blob to its specific vault; binding
+`provider_kind` prevents reinterpreting a biometric-minted blob as a PIN blob (or the
+reverse) at the AEAD layer.
+
+#### 9.14.4 Lifecycle, invalidation, and threat class
+
+`vault.quickunlock` is written only while the vault is **Unlocked** (the setup path clones
+the in-memory `root_key`). It is **deleted** (blob + provider credential) on any of:
+(1) master-password change (the wrapped copy is of the *old* `root_key` lineage — the
+client re-offers setup under the new password); (2) enrolled-biometric-set change
+(automatic at the OS level via `biometryCurrentSet` for provider `0x01`); (3) user
+disabling the feature; (4) vault deletion (the blob lives in the vault directory). A
+**code-enforced** failed-attempt counter (the `auto_lock.rs` two-class discipline,
+`threat-model.md` §7) wipes the blob after a bounded number of consecutive failures —
+this bounds *online* guessing; it does not bound offline brute-force.
+
+**Threat class (distinct from the non-load-bearing prefs blobs).** `vault.quickunlock`
+is a **credential**, not a cosmetic preference: it holds a wrapped `root_key`. Its
+guarantee is an **A6 gate** (brief physical access to a running-but-locked app /
+shoulder-surf) layered over the already-encrypted store — it never weakens the
+zero-knowledge root (the master-password Argon2id path is unchanged and remains the
+primary credential). It does **not** defend against **A7** (active local malware, which
+can satisfy the biometric prompt or read process memory — out of scope, `threat-model.md`
+§5). For the PIN provider, a disk-copy attacker (**A4**) can attempt offline brute-force
+of the blob; the only defense is PIN entropy × the memory-hard Argon2id cost, so PIN-only
+quick-unlock is strictly weaker than the hardware-bound biometric path and is documented
+as such. A v0.1 client MUST reject `MYQ5` and any unregistered magic; a v005 client MUST
+refuse `MYQ1` (§10.4).
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -1502,6 +1629,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
 | Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
 | Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.13 | MYND-266 |
+| Quick-unlock credential (`vault.quickunlock`) | `MYQ1` | `MYQ5` | §9.14 | MYND-329 |
 
 Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary) use the `MY?5` v005 convention.
 

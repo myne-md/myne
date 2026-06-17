@@ -61,6 +61,7 @@ pub mod kdf;
 pub mod password_policy;
 pub mod phrase;
 pub mod prefs;
+pub mod quick_unlock_blob;
 pub mod saved_view;
 pub mod search_blob;
 pub mod subkey;
@@ -141,9 +142,9 @@ pub use vault_indices_blob::{
     VAULT_INDICES_BLOB_PROTOCOL_VERSION,
 };
 pub use vault_meta::{
-    parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta, VaultMeta,
-    VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN, VAULT_META_MAGIC,
-    VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
+    derive_items_key, parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta,
+    VaultMeta, VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
+    VAULT_META_MAGIC, VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 pub use workspace_blob::{
