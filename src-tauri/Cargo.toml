@@ -34,6 +34,11 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
 # variant-name fields only; see src-tauri/CLAUDE.md
 # "Secret-handling logging discipline").
 tracing = "0.1"
+# `tracing-subscriber` installs the actual log sink so `tracing::*!` events
+# reach stdout (env-filtered via `RUST_LOG`, default `info`). Promoted
+# transitive→direct (already locked at 0.3.23 — zero dependency-tree
+# expansion, same posture as the objc2/windows-sys promotions below).
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Direct-dep widening of the existing workspace-transitive
 # `unicode-normalization` (already pulled in via `protocol`'s vault.prefs

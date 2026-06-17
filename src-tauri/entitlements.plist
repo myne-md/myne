@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Keychain access for the MYND-329 quick-unlock Touch ID provider
+    (src-tauri/src/plugins/quick_unlock/macos.rs). Without this entitlement on a
+    SIGNED binary, storing/reading a biometric-gated (kSecAccessControlBiometry-
+    CurrentSet) Keychain item fails with errSecMissingEntitlement (-34018).
+
+    The access group is the app's own identifier (self-access). With a real
+    Apple Development / Developer ID certificate, prefix it with the team:
+    `<string>$(AppIdentifierPrefix)md.myne.desktop</string>`. With ad-hoc
+    signing (`codesign -s -`) the literal identifier below is used.
+
+    NOTE: `tauri dev` runs an UNSIGNED binary, so biometric still fails there.
+    These entitlements apply to `tauri build` (configured via
+    bundle.macOS.entitlements) or when the dev binary is signed manually.
+  -->
+  <key>keychain-access-groups</key>
+  <array>
+    <string>md.myne.desktop</string>
+  </array>
+</dict>
+</plist>
