@@ -18,6 +18,7 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
+import { QuickUnlockSettings } from "./QuickUnlockSettings";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
@@ -188,6 +189,7 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           void setAutoLock(secs);
         }}
       />
+      <QuickUnlockSettings />
     </div>
   );
 }

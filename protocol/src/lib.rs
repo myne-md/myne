@@ -61,6 +61,7 @@ pub mod kdf;
 pub mod password_policy;
 pub mod phrase;
 pub mod prefs;
+pub mod quick_unlock_blob;
 pub mod saved_view;
 pub mod search_blob;
 pub mod subkey;
@@ -131,8 +132,9 @@ pub use search_blob::{
 pub use subkey::{derive_subkey, SubkeyRole};
 pub use template::{render, supported_tokens, RenderContext};
 pub use types::{
-    generate_root_key, parse_kdf_params, serialize_kdf_params, KdfParams, DEFAULT_V0_1_KDF_PARAMS,
-    KDF_PARAMS_CANONICAL_LEN,
+    generate_root_key, parse_kdf_params, serialize_kdf_params, validate_kdf_params, KdfParams,
+    DEFAULT_V0_1_KDF_PARAMS, KDF_PARAMS_CANONICAL_LEN, MAX_KDF_M_KIB, MAX_KDF_P, MAX_KDF_T,
+    MIN_KDF_M_KIB, MIN_KDF_P, MIN_KDF_T,
 };
 pub use vault_indices_blob::{
     decode_vault_indices_blob, encode_vault_indices_blob, encode_vault_indices_blob_raw,
@@ -141,9 +143,9 @@ pub use vault_indices_blob::{
     VAULT_INDICES_BLOB_PROTOCOL_VERSION,
 };
 pub use vault_meta::{
-    parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta, VaultMeta,
-    VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN, VAULT_META_MAGIC,
-    VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
+    derive_items_key, parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta,
+    VaultMeta, VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
+    VAULT_META_MAGIC, VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 pub use workspace_blob::{

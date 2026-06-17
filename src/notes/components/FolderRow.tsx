@@ -16,6 +16,7 @@ import {
 import type { FolderNode } from "../folderTree";
 import { ColorDot } from "./ColorDot";
 import { FolderGlyph } from "./FolderGlyph";
+import { Icon } from "../../components/primitives/Icon";
 import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
 
 const INDENT_PER_LEVEL = 18;
@@ -70,6 +71,27 @@ const renameInputStyle: CSSProperties = {
   borderRadius: 3,
   padding: "1px 4px",
   outline: "none",
+};
+
+/** Trailing folder-note affordance (MYND-370). When the folder HAS an index
+ *  note it's an icon-only "open the folder note" button; with NO index it reads
+ *  "+ folder note" (revealed on hover) to create one. Subtle `fg-3` ink; both
+ *  stop click-propagation so they never toggle collapse. */
+const indexAffordanceBaseStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  marginLeft: "auto",
+  flexShrink: 0,
+  padding: "1px 5px",
+  border: 0,
+  borderRadius: "var(--radius-1)",
+  background: "transparent",
+  color: "var(--fg-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: 11,
+  fontWeight: 500,
+  cursor: "pointer",
 };
 
 // Single right-pointing chevron that rotates 90° to point down when the folder
@@ -204,6 +226,12 @@ export type FolderRowProps = {
   /** Custom folder-icon glyph name (MYND-185) — replaces the default folder
    *  icon. Undefined when the folder uses the default glyph. */
   iconName?: string;
+  /** Open this folder's index note (MYND-370) — wired only when the folder HAS
+   *  an index (`node.indexNoteId !== null`). Same open path as a note-row click. */
+  onOpenIndexNote?: (noteId: string) => void;
+  /** Create a new index note for this folder (MYND-370) — wired only when the
+   *  folder has NO index note. Mints + opens the note. */
+  onCreateFolderNote?: (folderPath: string) => void;
 };
 
 export function FolderRow({
@@ -228,6 +256,8 @@ export function FolderRow({
   onCancelRename,
   colorSlot,
   iconName,
+  onOpenIndexNote,
+  onCreateFolderNote,
 }: FolderRowProps) {
   const [hovering, setHovering] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -357,6 +387,45 @@ export function FolderRow({
         <>
           <span style={empty ? emptyNameStyle : nameStyle}>{node.name}</span>
           {empty && <span style={emptyHintStyle}>empty</span>}
+          {node.indexNoteId !== null ? (
+            onOpenIndexNote && (
+              <button
+                type="button"
+                style={indexAffordanceBaseStyle}
+                data-testid="notes.folder-index-affordance"
+                data-folder-path={node.path}
+                title="Open folder note"
+                aria-label="Open folder note"
+                onClick={(e) => {
+                  // Never toggle collapse — opening the index note is its own
+                  // action (MYND-370).
+                  e.stopPropagation();
+                  onOpenIndexNote(node.indexNoteId as string);
+                }}
+              >
+                <Icon name="book-open" size={13} />
+              </button>
+            )
+          ) : (
+            onCreateFolderNote &&
+            hovering && (
+              <button
+                type="button"
+                style={indexAffordanceBaseStyle}
+                data-testid="notes.folder-index-affordance"
+                data-folder-path={node.path}
+                title="Create a folder note"
+                aria-label="Create a folder note"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateFolderNote(node.path);
+                }}
+              >
+                <Icon name="book-open" size={13} />
+                <span>folder note</span>
+              </button>
+            )
+          )}
         </>
       )}
     </div>

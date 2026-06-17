@@ -26,3 +26,15 @@ export function emitNoteWikilink(
   const path = (folder ?? "") + titleToFilename(title);
   return `[[${path}|${display ?? title}]]`;
 }
+
+/**
+ * Emit a folder-target wikilink (MYND-370) — the trailing-slash form
+ * `[[Projects/]]` that {@link resolveWikilink} routes to the folder's index
+ * note. No alias is baked: unlike a note link there is no title/disambiguator
+ * to populate, and the trailing `/` is the load-bearing signal `isFolderTarget`
+ * keys on.
+ * @param path the folder's canonical trailing-slash path (e.g. `"Projects/Myne/"`).
+ */
+export function emitFolderWikilink(path: string): string {
+  return `[[${path}]]`;
+}

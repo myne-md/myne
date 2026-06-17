@@ -37,12 +37,7 @@ import {
 } from "@codemirror/view";
 import { parseAttachmentTarget } from "../../notes/attachmentRef";
 import { readNoteSet } from "./note-set";
-import {
-  chipTitleKey,
-  isBrokenKey,
-  presentTitleKeys,
-  resolveChipParts,
-} from "./resolve-chip";
+import { chipKeySets, isChipBroken, resolveChipParts } from "./resolve-chip";
 import { pickerActiveFromField } from "./picker";
 
 export type WikilinkParts = {
@@ -149,7 +144,12 @@ function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<
   // WL-5: the live note-set the chip resolves against for §5.3 broken styling.
   // Fold the note titles into a key set ONCE (not per chip) so each chip's
   // broken check is an O(1) lookup, not an O(notes) resolver scan.
-  const presentKeys = presentTitleKeys(readNoteSet(state));
+  // Both broken-check key sets folded from the note-set in one pass: `titles`
+  // for ordinary chips, `folderIndex` for folder-target chips (`[[Projects/]]`,
+  // MYND-370). Built ONCE per build so each chip's check stays an O(1) lookup.
+  const { titles: presentKeys, folderIndex: presentFolderIndex } = chipKeySets(
+    readNoteSet(state),
+  );
   // The `[[…]]` the `[[` picker is actively authoring — left as raw text.
   const activeFrom = state.field(pickerActiveFromField, false) ?? null;
   for (const { from, to } of ranges) {
@@ -166,7 +166,7 @@ function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<
         // Empty `[[]]` is plain text on disk (§10) — never a chip.
         if ((parts.target ?? "") === "") return false;
         const display = chipDisplayText(parts);
-        const broken = isBrokenKey(chipTitleKey(parts), presentKeys);
+        const broken = isChipBroken(parts, presentKeys, presentFolderIndex);
         decorations.push(
           Decoration.replace({
             widget: new WikilinkChipWidget(display, parts.isEmbed, broken),

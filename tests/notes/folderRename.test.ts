@@ -1,132 +1,266 @@
-// Folder rename (MYND-144 Task 9): rewrite the `folder:` of every note under
-// the old prefix (subtree bulk move → updated: bump) + prefix-rewrite the
-// matching deliberate_folders entries. Not correctness-critical for wikilink
-// resolution (Q4) → notes are moved best-effort (partial-fail reported).
+// Folder rename (MYND-144 Task 9 + MYND-370): rewrite the `folder:` of every
+// note under the old prefix AND rewrite inbound folder-target (`[[Old/]]`)
+// wikilinks, committed all-or-nothing through the transactional batch primitive
+// (MYND-370 grill Q7 — folder-target links break on rename since the folder path
+// IS their resolution key, so the legacy best-effort folder move is lifted to the
+// same transactional parity note-title rename has). Plus prefix-rewrite of the
+// matching deliberate_folders entries.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const moveNoteMock = vi.fn();
+const noteReadMock = vi.fn();
+const writeBatchMock = vi.fn();
+const reindexMock = vi.fn();
 const setDeliberateFoldersMock = vi.fn();
-vi.mock("../../src/notes/moveNote", () => ({
-  moveNote: (...a: unknown[]) => moveNoteMock(...a),
+const flushMock = vi.fn();
+vi.mock("../../src/notes/renameFlushHook", () => ({
+  renameFlushHooks: () => ({
+    openNoteIds: () => new Set<string>(),
+    flushOpenPanes: (...a: unknown[]) => flushMock(...a),
+  }),
+}));
+vi.mock("../../src/notes/readNote", () => ({
+  noteRead: (...a: unknown[]) => noteReadMock(...a),
+}));
+vi.mock("../../src/notes/noteWriteBatch", () => ({
+  noteWriteBatchTransactional: (...a: unknown[]) => writeBatchMock(...a),
+}));
+vi.mock("../../src/notes/vaultIndices", () => ({
+  reindexNoteFromBody: (...a: unknown[]) => reindexMock(...a),
 }));
 vi.mock("../../src/lib/prefs", () => ({
   setDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
 }));
 
-import { planFolderRename, renameFolder } from "../../src/notes/folderActions";
+import {
+  planFolderRenameBatch,
+  renameFolder,
+  type FolderRenameNote,
+} from "../../src/notes/folderActions";
 
 type Note = { noteUuid: string; folder: string | null };
 
+const NOW = "2026-06-17T00:00:00Z";
+
 beforeEach(() => {
-  moveNoteMock.mockReset();
+  noteReadMock.mockReset();
+  writeBatchMock.mockReset();
+  reindexMock.mockReset();
   setDeliberateFoldersMock.mockReset();
+  flushMock.mockReset();
+  flushMock.mockResolvedValue(undefined);
 });
 afterEach(() => {
-  moveNoteMock.mockReset();
+  noteReadMock.mockReset();
+  writeBatchMock.mockReset();
+  reindexMock.mockReset();
   setDeliberateFoldersMock.mockReset();
+  flushMock.mockReset();
 });
 
-describe("planFolderRename — pure", () => {
-  it("computes new folders for the renamed subtree, leaving others alone", () => {
-    const notes: Note[] = [
-      { noteUuid: "n1", folder: "Projects/" },
-      { noteUuid: "n2", folder: "Projects/Myne/" },
-      { noteUuid: "n3", folder: "Other/" },
-      { noteUuid: "n4", folder: null },
-    ];
-    const plan = planFolderRename("Projects/", "Work/", notes, []);
+describe("planFolderRenameBatch — pure (MYND-370 transactional plan)", () => {
+  const n = (noteUuid: string, folder: string | null, body: string): FolderRenameNote => ({
+    noteUuid,
+    folder,
+    body,
+  });
+
+  it("re-roots `folder:` of moved notes (with updated: bump) into the batch", () => {
+    const plan = planFolderRenameBatch(
+      "Projects/",
+      "Work/",
+      [n("n1", "Projects/", "# A"), n("n2", "Projects/Myne/", "# B"), n("n3", "Other/", "# C")],
+      ["Projects/"],
+      NOW,
+    );
     if ("invalid" in plan) throw new Error("unexpected invalid");
-    expect(plan.moves).toEqual([
-      { noteId: "n1", newFolder: "Work/" },
-      { noteId: "n2", newFolder: "Work/Myne/" },
-    ]);
+    expect(plan.movedIds.sort()).toEqual(["n1", "n2"]);
+    const byId = new Map(plan.batch.map((e) => [e.noteId, e.plaintext]));
+    expect(byId.get("n1")).toContain("folder: Work/");
+    expect(byId.get("n1")).toContain(`updated: ${NOW}`);
+    expect(byId.get("n2")).toContain("folder: Work/Myne/");
+    expect(byId.has("n3")).toBe(false);
+    expect(plan.nextDeliberate).toEqual(["Work/"]);
+  });
+
+  it("does not prefix-false-match a name-prefix sibling", () => {
+    const plan = planFolderRenameBatch(
+      "Projects/",
+      "Work/",
+      [n("x", "Projectsx/", "# X")],
+      ["Projectsx/"],
+      NOW,
+    );
+    if ("invalid" in plan) throw new Error("unexpected invalid");
+    expect(plan.movedIds).toEqual([]);
+    expect(plan.batch).toEqual([]);
+    expect(plan.nextDeliberate).toEqual(["Projectsx/"]);
+  });
+
+  it("matches case-insensitively, normalizing the renamed prefix", () => {
+    const plan = planFolderRenameBatch(
+      "Projects/",
+      "Work/",
+      [n("n", "projects/myne/", "# B")],
+      [],
+      NOW,
+    );
+    if ("invalid" in plan) throw new Error("unexpected invalid");
+    expect(plan.movedIds).toEqual(["n"]);
+    expect(plan.batch[0]!.plaintext).toContain("folder: Work/myne/");
+  });
+
+  it("normalizes non-canonical source/target inputs", () => {
+    const plan = planFolderRenameBatch(
+      "Projects",
+      "Work",
+      [n("n", "Projects/Sub", "# B")],
+      [],
+      NOW,
+    );
+    if ("invalid" in plan) throw new Error("unexpected invalid");
+    expect(plan.batch[0]!.plaintext).toContain("folder: Work/Sub/");
   });
 
   it("prefix-rewrites matching deliberate_folders entries", () => {
-    const plan = planFolderRename("Projects/", "Work/", [], [
+    const plan = planFolderRenameBatch(
       "Projects/",
-      "Projects/Myne/",
-      "Archive/",
-    ]);
+      "Work/",
+      [],
+      ["Projects/", "Projects/Myne/", "Archive/"],
+      NOW,
+    );
     if ("invalid" in plan) throw new Error("unexpected invalid");
     expect(plan.nextDeliberate).toEqual(["Work/", "Work/Myne/", "Archive/"]);
     expect(plan.deliberateRewritten).toBe(2);
   });
 
-  it("does not prefix-false-match a name-prefix sibling", () => {
-    const plan = planFolderRename("Projects/", "Work/", [
-      { noteUuid: "x", folder: "Projectsx/" },
-    ], ["Projectsx/"]);
+  it("rewrites inbound folder-target links `[[Old/]]` → `[[New/]]` in any note", () => {
+    const plan = planFolderRenameBatch(
+      "Projects/",
+      "Work/",
+      [n("ref", "Other/", "see [[Projects/]] and [[Projects/Myne/]]")],
+      [],
+      NOW,
+    );
     if ("invalid" in plan) throw new Error("unexpected invalid");
-    expect(plan.moves).toEqual([]);
-    expect(plan.nextDeliberate).toEqual(["Projectsx/"]);
+    expect(plan.inboundIds).toEqual(["ref"]);
+    expect(plan.movedIds).toEqual([]);
+    const text = plan.batch.find((e) => e.noteId === "ref")!.plaintext;
+    expect(text).toBe("see [[Work/]] and [[Work/Myne/]]");
   });
 
-  it("matches case-insensitively, normalizing the renamed prefix", () => {
-    const plan = planFolderRename("Projects/", "Work/", [
-      { noteUuid: "n", folder: "projects/myne/" },
-    ], []);
+  it("composes a move + an inbound rewrite on the same note", () => {
+    // A note in the renamed subtree that also links to its own folder index.
+    const plan = planFolderRenameBatch(
+      "Projects/",
+      "Work/",
+      [n("self", "Projects/", "body [[Projects/]] end")],
+      [],
+      NOW,
+    );
     if ("invalid" in plan) throw new Error("unexpected invalid");
-    expect(plan.moves).toEqual([{ noteId: "n", newFolder: "Work/myne/" }]);
+    expect(plan.movedIds).toEqual(["self"]);
+    expect(plan.inboundIds).toEqual(["self"]);
+    const text = plan.batch.find((e) => e.noteId === "self")!.plaintext;
+    expect(text).toContain("folder: Work/");
+    expect(text).toContain("[[Work/]]");
+    expect(text).not.toContain("[[Projects/]]");
   });
 
-  it("normalizes non-canonical inputs", () => {
-    const plan = planFolderRename("Projects", "Work", [
-      { noteUuid: "n", folder: "Projects/Sub" },
-    ], []);
+  it("leaves title-keyed and note path-form links untouched", () => {
+    const plan = planFolderRenameBatch(
+      "Projects/",
+      "Work/",
+      [n("x", "Other/", "[[Note]] and [[Projects/Note]] stay")],
+      [],
+      NOW,
+    );
     if ("invalid" in plan) throw new Error("unexpected invalid");
-    expect(plan.moves).toEqual([{ noteId: "n", newFolder: "Work/Sub/" }]);
+    expect(plan.batch).toEqual([]);
   });
 
   it("is invalid for a root source/target", () => {
-    expect(planFolderRename("", "Work/", [], [])).toEqual({ invalid: true });
-    expect(planFolderRename("Projects/", "", [], [])).toEqual({ invalid: true });
+    expect(planFolderRenameBatch("", "Work/", [], [], NOW)).toEqual({ invalid: true });
   });
 
-  it("is a no-op when source equals target", () => {
-    const plan = planFolderRename("Projects/", "Projects/", [
-      { noteUuid: "n", folder: "Projects/" },
-    ], ["Projects/"]);
+  it("is an empty no-op batch when source equals target", () => {
+    const plan = planFolderRenameBatch(
+      "Projects/",
+      "Projects/",
+      [n("x", "Projects/", "[[Projects/]]")],
+      ["Projects/"],
+      NOW,
+    );
     if ("invalid" in plan) throw new Error("unexpected invalid");
-    expect(plan.moves).toEqual([]);
+    expect(plan.batch).toEqual([]);
     expect(plan.deliberateRewritten).toBe(0);
   });
 });
 
-describe("renameFolder — async apply (best-effort)", () => {
-  it("moves each note + persists the rewritten deliberate set", async () => {
-    moveNoteMock.mockResolvedValue(undefined);
+describe("renameFolder — async apply (transactional)", () => {
+  it("reads bodies, commits one batch, persists the deliberate set, re-indexes moves", async () => {
+    noteReadMock.mockImplementation((id: string) =>
+      Promise.resolve(id === "ref" ? "[[Projects/]]" : "---\nfolder: Projects/\n---\n\n# B"),
+    );
+    writeBatchMock.mockResolvedValueOnce(undefined);
     setDeliberateFoldersMock.mockResolvedValueOnce(undefined);
     const notes: Note[] = [
       { noteUuid: "n1", folder: "Projects/" },
-      { noteUuid: "n2", folder: "Projects/Myne/" },
+      { noteUuid: "ref", folder: "Other/" },
     ];
     const result = await renameFolder("Projects/", "Work/", notes, ["Projects/"]);
-    expect(result.moved.sort()).toEqual(["n1", "n2"]);
     expect(result.failed).toEqual([]);
-    expect(moveNoteMock).toHaveBeenCalledWith("n1", "Work/");
-    expect(moveNoteMock).toHaveBeenCalledWith("n2", "Work/Myne/");
+    expect(result.moved.sort()).toEqual(["n1", "ref"]);
+    // Exactly one transactional commit carrying both the move + the inbound rewrite.
+    expect(writeBatchMock).toHaveBeenCalledTimes(1);
+    const batch = writeBatchMock.mock.calls[0]![0] as Array<{ noteId: string; plaintext: string }>;
+    expect(batch.map((e) => e.noteId).sort()).toEqual(["n1", "ref"]);
     expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Work/"]);
+    // Moved note re-indexed; the pure inbound-only note is not a move.
+    expect(reindexMock).toHaveBeenCalledWith("n1", expect.stringContaining("folder: Work/"));
   });
 
-  it("reports a per-note failure without aborting the rest", async () => {
-    moveNoteMock.mockImplementation((id: string) =>
-      id === "bad" ? Promise.reject({ kind: "Io" }) : Promise.resolve(undefined),
-    );
-    const notes: Note[] = [
-      { noteUuid: "ok", folder: "P/" },
-      { noteUuid: "bad", folder: "P/x/" },
-    ];
-    const result = await renameFolder("P/", "Q/", notes, []);
-    expect(result.moved).toEqual(["ok"]);
+  it("flushes open dirty panes BEFORE reading any body (WL-8 pre-flight)", async () => {
+    const order: string[] = [];
+    flushMock.mockImplementation(() => {
+      order.push("flush");
+      return Promise.resolve(undefined);
+    });
+    noteReadMock.mockImplementation(() => {
+      order.push("read");
+      return Promise.resolve("# x");
+    });
+    await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], []);
+    expect(flushMock).toHaveBeenCalledTimes(1);
+    expect(order[0]).toBe("flush");
+    expect(order).toContain("read");
+    expect(order.indexOf("flush")).toBeLessThan(order.indexOf("read"));
+  });
+
+  it("on a transactional failure reports all-as-failed and writes nothing else", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\nx");
+    writeBatchMock.mockRejectedValueOnce({ kind: "Io" });
+    const notes: Note[] = [{ noteUuid: "n", folder: "P/" }];
+    const result = await renameFolder("P/", "Q/", notes, ["P/"]);
+    expect(result.moved).toEqual([]);
     expect(result.failed).toHaveLength(1);
-    expect(result.failed[0]?.noteId).toBe("bad");
+    expect(result.failed[0]?.noteId).toBe("n");
+    // Atomic at the orchestrator level: no deliberate write on rollback.
+    expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
   });
 
-  it("does not persist the deliberate set when nothing matched", async () => {
-    moveNoteMock.mockResolvedValue(undefined);
-    await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["Other/"]);
+  it("does not commit or persist when nothing changed", async () => {
+    noteReadMock.mockResolvedValue("# unrelated, no links, not in subtree");
+    await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "Other/" }], ["Other/"]);
+    expect(writeBatchMock).not.toHaveBeenCalled();
     expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
+  });
+
+  it("returns invalid for a root source without reading or writing", async () => {
+    const result = await renameFolder("", "Q/", [], []);
+    expect(result.invalid).toBe(true);
+    expect(noteReadMock).not.toHaveBeenCalled();
+    expect(writeBatchMock).not.toHaveBeenCalled();
   });
 });

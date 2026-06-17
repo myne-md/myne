@@ -24,6 +24,11 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
+# Property-based testing (dev-only; never enters the shipped dependency
+# graph). Used by tests/crypto_properties.rs to assert universal laws
+# (roundtrip, determinism, forgery-rejection) over thousands of generated
+# inputs, complementing the example-based attack suite + mutation testing.
+proptest = "1"
 
 [lints.rust]
 # `cargo-llvm-cov` sets these cfgs when instrumenting; `coverage_nightly`

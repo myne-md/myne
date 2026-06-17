@@ -755,11 +755,11 @@ fn seal_32_byte_secret(
 mod tests {
     use super::*;
 
-    /// Fast Argon2id parameters for tests (mirrors
-    /// `protocol::kdf::tests::FAST_TEST_KDF_PARAMS` shape — RFC 9106
-    /// minimum). DEFAULT would add ~1–2 s per test call.
+    /// Fast Argon2id parameters for tests, pinned to the
+    /// `validate_kdf_params` memory floor so a vault created here still
+    /// passes the unlock-path range gate. DEFAULT would add ~1–2 s per call.
     const FAST_TEST_KDF: KdfParams = KdfParams {
-        m_kib: 8,
+        m_kib: protocol::MIN_KDF_M_KIB,
         t: 1,
         p: 1,
         argon2_version: 0x13,

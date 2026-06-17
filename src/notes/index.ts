@@ -57,14 +57,15 @@ export type { BulkMoveResult } from "./moveNote";
 export {
   planFolderDelete,
   persistFolderDelete,
-  planFolderRename,
+  planFolderRenameBatch,
   renameFolder,
 } from "./folderActions";
 export { resolveWikilink } from "./resolveWikilink";
 export type { ResolverNote, WikilinkResolution } from "./resolveWikilink";
 export type {
   FolderDeletePlan,
-  FolderRenamePlan,
+  FolderRenameNote,
+  FolderRenameBatchPlan,
   FolderRenameResult,
 } from "./folderActions";
 export {

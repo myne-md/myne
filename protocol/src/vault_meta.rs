@@ -276,6 +276,38 @@ pub fn rewrite_vault_meta_password_side(
     Ok(serialize_vault_meta(&new_meta))
 }
 
+/// Re-derive the singleton `itemsKey` from `root_key` + a parsed [`VaultMeta`]
+/// (spec § 3.2 / § 3.4): `itemsKey_wrap_key = DeriveSubkey(root_key,
+/// ItemsKeyWrap)`, then AEAD-open `enc_items_key` under it. This is the
+/// canonical post-`root_key` step every unlock path runs (password unlock,
+/// recovery, quick-unlock); centralizing it here keeps the one load-bearing
+/// composite in the crypto crate rather than hand-copied per plugin.
+///
+/// Returns [`ProtocolError::AeadFailure`] on AEAD failure (a tampered
+/// `enc_items_key` / wrong `root_key`); callers map it to their own
+/// post-credential error (never a credential-distinguishing one — the password
+/// wrap already verified upstream).
+pub fn derive_items_key(
+    root_key: &[u8; AEAD_KEY_LEN],
+    meta: &VaultMeta,
+) -> Result<zeroize::Zeroizing<[u8; AEAD_KEY_LEN]>, ProtocolError> {
+    let items_wrap_key =
+        crate::subkey::derive_subkey(root_key, crate::subkey::SubkeyRole::ItemsKeyWrap);
+    let aad = crate::aead::aad_vault_items_key_wrap(&meta.items_key_id);
+    let plaintext = crate::aead::aead_open_ctx(
+        &items_wrap_key,
+        &meta.items_key_nonce,
+        &meta.enc_items_key,
+        &aad,
+    )?;
+    if plaintext.len() != AEAD_KEY_LEN {
+        return Err(ProtocolError::AeadFailure);
+    }
+    let mut items_key = zeroize::Zeroizing::new([0u8; AEAD_KEY_LEN]);
+    items_key.copy_from_slice(&plaintext);
+    Ok(items_key)
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -1232,5 +1264,39 @@ mod tests {
         // Salt @ offset 33..49 must be different by construction.
         assert_eq!(&a[33..49], &TEST_FRESH_SALT[..]);
         assert_eq!(&b[33..49], &alt_salt[..]);
+    }
+
+    #[test]
+    fn derive_items_key_round_trips_and_rejects_wrong_root_key() {
+        use crate::aead::{aad_vault_items_key_wrap, aead_seal_ctx};
+        use crate::subkey::{derive_subkey, SubkeyRole};
+
+        let root_key = [0x33u8; AEAD_KEY_LEN];
+        let items_key = [0xCCu8; AEAD_KEY_LEN];
+        let items_key_id = [0x07u8; 16];
+
+        // Seal items_key under itemsKey_wrap_key = DeriveSubkey(root_key, ItemsKeyWrap).
+        let items_wrap_key = derive_subkey(&root_key, SubkeyRole::ItemsKeyWrap);
+        let aad = aad_vault_items_key_wrap(&items_key_id);
+        let nonce = [0x08u8; AEAD_NONCE_LEN];
+        let sealed = aead_seal_ctx(&items_wrap_key, &nonce, &items_key, &aad).unwrap();
+        let mut enc_items_key = [0u8; VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+        enc_items_key.copy_from_slice(&sealed);
+
+        let mut meta = fixture_vault_meta();
+        meta.items_key_id = items_key_id;
+        meta.items_key_nonce = nonce;
+        meta.enc_items_key = enc_items_key;
+
+        // Correct root_key recovers the exact items_key.
+        let recovered = derive_items_key(&root_key, &meta).unwrap();
+        assert_eq!(recovered.as_slice(), &items_key);
+
+        // A wrong root_key derives a wrong wrap key → AEAD fails.
+        let wrong_root = [0x44u8; AEAD_KEY_LEN];
+        assert_eq!(
+            derive_items_key(&wrong_root, &meta),
+            Err(ProtocolError::AeadFailure)
+        );
     }
 }

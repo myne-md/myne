@@ -148,6 +148,17 @@ export function folderKey(folder: string | null): string {
 }
 
 /**
+ * Whether a raw wikilink target is the **folder-target** form `[[Projects/]]`
+ * (MYND-370, `wikilink.md` §2.1 form 11): a non-empty target ending in `/`. This
+ * is the single load-bearing lexical discriminator between a folder-target link
+ * and a note link (`[[Projects]]` / `[[Projects/Note]]`) — the ONE home for the
+ * rule so the resolver, the rename rewriter, and the editor chip can never drift.
+ */
+export function isFolderTarget(target: string): boolean {
+  return target.length > 1 && target.endsWith("/");
+}
+
+/**
  * Every ancestor folder of a canonical trailing-slash path, inclusive:
  * `"A/B/C/"` → `["A/", "A/B/", "A/B/C/"]`. Root / empty → `[]`.
  */

@@ -122,6 +122,18 @@ export interface PrefsView {
    */
   spell_languages: string[];
   /**
+   * User keybinding overrides (hotkeys epic, MYND-304). A map from a command id
+   * (an existing frozen `COMMAND_ACTIONS` id, e.g. `graph.show`) to its set of
+   * canonical chord strings (`Mod-Shift-g` form). **Overrides only** — a command
+   * absent from the map uses its in-code default; the effective binding is
+   * `override ?? default`. Three states: key absent ≡ default; a non-empty array
+   * ≡ override; an empty array (`[]`) ≡ explicitly unbound (no shortcut). Defaults
+   * to `{}` (no overrides). Serialized from Rust `BTreeMap<String, Vec<String>>`
+   * (each chord set NFC-sorted + deduped on disk; the whole field omitted when
+   * empty). Read-only here; write via {@link setKeymapBinding}.
+   */
+  keymap: Record<string, string[]>;
+  /**
    * Unix epoch seconds of the vault's last backup export (MYND-58,
    * spec §9.5.2). `null` ≡ never backed up. Drives the 30-day backup
    * reminder banner. Written by an UNLOCKED export only (the documented
@@ -487,6 +499,31 @@ export async function setSpellEnabled(enabled: boolean): Promise<void> {
  */
 export async function setSpellLanguages(languages: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_spell_languages", { languages });
+}
+
+/**
+ * Set, unbind, or remove ONE command's keymap override (hotkeys epic, MYND-304).
+ * Three states via the `chords` argument:
+ * - a non-empty array → override the command to those chords;
+ * - an empty array (`[]`) → explicit-unbind (the command has no shortcut);
+ * - `null` → remove the override entry (revert to the in-code default).
+ *
+ * The backend NFC-sorts + dedupes the chord set for canonical byte-stability, so
+ * pass the raw desired set. Disk-first, no native side-effect; a rejected promise
+ * means the write failed and the caller's optimistic UI must revert.
+ * Non-load-bearing.
+ *
+ * Bumps the prefs nonce after a successful write so the live keybinding engine —
+ * which reads the keymap through its OWN `usePrefs` instance, separate from the
+ * Settings modal's — re-reads disk truth and the rebound shortcut takes effect
+ * immediately (same chokepoint discipline as {@link setShowNoteTimestamps}).
+ */
+export async function setKeymapBinding(
+  commandId: string,
+  chords: string[] | null,
+): Promise<void> {
+  await invoke<void>("plugin:prefs|set_keymap_binding", { commandId, chords });
+  bumpPrefsNonce();
 }
 
 /**

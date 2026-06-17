@@ -31,8 +31,11 @@ The parser recognizes the union of forms below. Forms in **Authoring** column sh
 | 8 | `![[Note Title]]` | no | yes | Embed/transclusion form (rendered as labeled chip; no transclusion engine) |
 | 9 | `![[image.png]]` | no | yes | Image embed (rendering gated on attachment-encryption pipeline) |
 | 10 | `[[]]` (empty) | no | yes (preserved as plain text) | Triggers note-picker autocomplete in editor; on disk stays as literal `[[]]` |
+| 11 | `[[Projects/]]` (trailing slash) | no² | yes | **Folder-target wikilink** — resolves to the named folder's index note (§5.5); reuses backlinks / hover / graph |
 
 ¹ Forms 5 and 7 are recognized for round-trip but not emitted by Myne-authoring affordances. New Myne wikilinks always include a display alias (form 6) — see §4.
+
+² Form 11 (the folder-target wikilink) is recognized and resolved but, like the path-only forms, is not the canonical authoring emission — Myne's affordances emit the note-targeting form 6; a user types `[[Projects/]]` by hand when they want the folder's index note. The form round-trips byte-for-byte.
 
 ### 2.1 Lexical rules
 
@@ -42,6 +45,7 @@ The parser recognizes the union of forms below. Forms in **Authoring** column sh
 - **Alias divider**: `|` (U+007C) within a wikilink separates the target from the display alias. The alias divider is **not** an escape boundary; characters on either side are literal.
 - **Heading anchor delimiter**: `#` within the target portion (before any `|`) separates the note reference from a heading anchor.
 - **Block reference delimiter**: `^` within the target portion (before any `|`) separates the note reference from a block ID.
+- **Folder-target trailing slash**: a target portion (before any `|`, `#`, or `^`) ending in a single `/` marks a **folder-target wikilink** (form 11) — the target names a folder, not a note, and resolves to that folder's index note (§5.5). The trailing slash is the sole discriminator from a title-only target; `[[Projects]]` targets a note titled "Projects", `[[Projects/]]` targets the index note of the folder "Projects".
 - **Forbidden inside a wikilink target**: the substring `]]`. Note titles and paths therefore **must not** contain `]]`. This is inherited from Obsidian's restriction; v0.1 does not provide an escape sequence for `]]` inside wikilinks.
 - **Line breaks**: a wikilink terminates at the first line break encountered between `[[` and `]]`. A wikilink does not span multiple lines.
 
@@ -143,6 +147,17 @@ Unlike other markdown decorations (headings, bold, links), **wikilink chips do n
 
 This is intentional: lifting a wikilink chip would expose `[[vault/relative/path.md|Display]]` as raw text on the active line, which the secondary persona experiences as "this is suddenly a programmer tool". The chip stays.
 
+### 5.5 Folder-target resolution (MYND-370)
+
+A **folder-target wikilink** (form 11, trailing slash — §2.1) resolves to the **index note** of the named folder: the in-folder note carrying `folder_index: true` ([`markdown-dialect.md`](markdown-dialect.md) §3.6.1). The resolution algorithm:
+
+1. Fold the target's folder path (case-fold + NFC + trailing-slash normalization, the §3.6.2 folder identity rule) and match it against the vault's reconstructed folder set.
+2. **Folder exists, has an index note** → resolve to that note (its `folder:` folds-equal to the target *and* it carries `folder_index: true`). The chip renders with the index note's title, and the link participates in backlinks, hover, and the graph exactly like a note-targeting wikilink — the folder-target form is a different *spelling* of "link to this note", not a different link kind.
+3. **Folder exists, no index note** → the wikilink is **broken** with the distinct hover hint **"(no folder note)"** (§6.2): the folder is real, but no in-folder note has been designated its index.
+4. **Folder does not exist** → the wikilink is **broken** with the distinct hover hint **"(no match)"** (§6.2), the same hint a note-target that resolves to zero notes shows.
+
+Broken folder-target links render with the same broken-link styling as §5.3. If two in-folder notes both carry `folder_index: true` (a conflict), resolution picks the deterministic winner — the note with the smallest `note_uuid` — and the conflict is flagged so the user can resolve it; the link still resolves rather than breaking.
+
 ## 6. Editor-time UX
 
 ### 6.1 Autocomplete picker
@@ -165,6 +180,7 @@ Every chip — both Myne-authored path forms and imported title-only forms — s
 - For path-form `[[notes/2025/01-10.md|Wednesday]]`: hover shows "Wednesday → notes/2025/01-10.md".
 - For title-only `[[Wednesday]]` (imported): hover shows "Wednesday → notes/2025/01-10.md" (resolved via vault index).
 - For broken links: hover shows "(no match)" or, if multiple ambiguous matches exist for a title, "(N matches)" with the first match shown.
+- For a broken **folder-target** wikilink (form 11, §5.5): hover distinguishes the two failure modes — **"(no folder note)"** when the folder exists but has no index note (`folder_index: true`), versus **"(no match)"** when the named folder does not exist at all.
 
 R1 hover tooltip never mutates the source. The path information is rendered, not authored.
 
@@ -205,7 +221,7 @@ When a note file is renamed or moved within the vault, Myne walks the vault inde
 Auto-update fires on:
 
 - **Title rename** (correctness-critical) — sidebar right-click → rename, command palette rename action. This rewrites a note's `title:`, which is the resolution **key** (§5.3); a stale inbound link would genuinely break, so the update is **transactional** (§8.3).
-- **Folder move / folder rename** (best-effort, MYND-144) — moving a note to a different folder (sidebar drag-move) or renaming a folder. These change a note's `folder:`, **not** the resolution key, so resolution survives a stale link (title-keyed, §5.3). Inbound path-form links get a **cosmetic** refresh of their folder segment — best-effort, **not** transactional: a partial failure leaves a stale folder segment that the resolver tolerates (and the R1 hover surfaces, §6.2). Title-only imported links are unaffected by a folder move (their title is unchanged).
+- **Folder move / folder rename** (best-effort, MYND-144) — moving a note to a different folder (sidebar drag-move) or renaming a folder. These change a note's `folder:`, **not** the resolution key, so resolution survives a stale link (title-keyed, §5.3). Inbound path-form links get a **cosmetic** refresh of their folder segment — best-effort, **not** transactional: a partial failure leaves a stale folder segment that the resolver tolerates (and the R1 hover surfaces, §6.2). Title-only imported links are unaffected by a folder move (their title is unchanged). **A folder rename also refreshes inbound folder-target wikilinks** (form 11, §5.5): because such a link carries the folder path literally in its target, a folder rename rewrites the path segment of every `[[OldFolder/]]` to `[[NewFolder/]]` on the same best-effort, non-transactional pass — a stale folder-target segment is a resolver-tolerated cosmetic drift, never a correctness break (the index-note binding itself is path-free, §3.6.1, so the link's *target note* tracks the rename even before the segment is refreshed).
 
 Auto-update does **not** fire on:
 
@@ -222,6 +238,7 @@ Auto-update **preserves the syntactic shape** of every wikilink it touches:
 - An imported `[[Old Title#Heading]]` becomes `[[New Title#Heading]]` — the anchor is preserved.
 - An imported `[[Old Title^block-id]]` becomes `[[New Title^block-id]]` — the block ID is preserved.
 - An embed `![[Old Title]]` becomes `![[New Title]]` — the embed prefix is preserved.
+- A folder-target `[[OldFolder/]]` becomes `[[NewFolder/]]` on a **folder** rename (§8.1) — the trailing-slash folder-target shape is preserved; only the folder path segment updates.
 
 Auto-update never **promotes** a wikilink's syntactic form during a rename. A user who explicitly wants imported title-only wikilinks rewritten as Myne path-forms must invoke R2 (§7).
 

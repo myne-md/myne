@@ -12,7 +12,7 @@ import {
   type WikilinkResolution,
 } from "../../notes/resolveWikilink";
 import { classifyTarget } from "../../dialect/visitors/wikilinks";
-import { foldSegment } from "../../dialect/folderPath";
+import { foldSegment, folderKey, isFolderTarget } from "../../dialect/folderPath";
 import { isMediaTarget } from "../../notes/vaultIndices";
 import type { WikilinkRef } from "../../dialect/types";
 import type { WikilinkParts } from "./chip-widget";
@@ -68,6 +68,51 @@ export function presentTitleKeys(notes: readonly ResolverNote[]): Set<string> {
 /** §5.3 broken decision from a precomputed key + the present-key set. */
 export function isBrokenKey(key: string | null, present: ReadonlySet<string>): boolean {
   return key !== null && !present.has(key);
+}
+
+/** The folded folder key a folder-target chip (`[[Projects/]]`, MYND-370)
+ *  resolves on — the trailing-slash form's normalized folder path — or `null`
+ *  when the chip is not a folder target (so the caller falls back to the
+ *  title-key path). Shares the resolver's `isFolderTarget` discriminator. */
+export function chipFolderTargetKey(parts: WikilinkParts): string | null {
+  const target = parts.target ?? "";
+  if (!isFolderTarget(target) || !isResolvableChip(parts)) return null;
+  return folderKey(target);
+}
+
+/** Both key-sets the chip-decoration build needs, folded from the note-set in a
+ *  SINGLE pass (MYND-370): `titles` for ordinary chips, `folderIndex` (folders
+ *  that HAVE an index note) for folder-target chips. Built ONCE per build so each
+ *  chip's broken check stays an O(1) set lookup. */
+export function chipKeySets(notes: readonly ResolverNote[]): {
+  titles: Set<string>;
+  folderIndex: Set<string>;
+} {
+  const titles = new Set<string>();
+  const folderIndex = new Set<string>();
+  for (const n of notes) {
+    if (n.title !== null) titles.add(foldSegment(n.title));
+    if (n.folderIndex === true && n.folder !== null) {
+      folderIndex.add(folderKey(n.folder));
+    }
+  }
+  return { titles, folderIndex };
+}
+
+/**
+ * §5.3 broken-styling decision for a chip, folder-target-aware (MYND-370). A
+ * folder-target chip (`[[Projects/]]`) is broken iff its folder has no index
+ * note; any other chip uses the title-key path. The two present-sets are
+ * precomputed once per decoration build by the caller.
+ */
+export function isChipBroken(
+  parts: WikilinkParts,
+  presentTitle: ReadonlySet<string>,
+  presentFolderIndex: ReadonlySet<string>,
+): boolean {
+  const folderKey = chipFolderTargetKey(parts);
+  if (folderKey !== null) return !presentFolderIndex.has(folderKey);
+  return isBrokenKey(chipTitleKey(parts), presentTitle);
 }
 
 /** §5.3: a non-embed wikilink whose target matches no note is broken. Convenience

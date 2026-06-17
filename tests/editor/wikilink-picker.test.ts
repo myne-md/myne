@@ -66,6 +66,10 @@ function typeText(view: EditorView, text: string): void {
 const menu = (): HTMLElement | null => document.body.querySelector(".cm-wiki-picker");
 const rows = (): HTMLElement[] =>
   Array.from(document.body.querySelectorAll<HTMLElement>(".cm-wiki-picker-row"));
+const noteRows = (): HTMLElement[] =>
+  Array.from(document.body.querySelectorAll<HTMLElement>('[data-testid="picker.note-row"]'));
+const folderRows = (): HTMLElement[] =>
+  Array.from(document.body.querySelectorAll<HTMLElement>('[data-testid="picker.folder-row"]'));
 const selectedIdx = (): number => rows().findIndex((r) => r.classList.contains("cm-slash-menu-row-selected"));
 
 let teardowns: Array<() => void> = [];
@@ -76,14 +80,34 @@ afterEach(() => {
 });
 
 describe("WikilinkPicker ViewPlugin", () => {
-  it("opens on a typed `[[`, lists every titled note, and selects row 0", async () => {
+  it("opens on a typed `[[`, lists every titled note + implied folder, and selects row 0", async () => {
     const { view } = mount();
     teardowns.push(() => view.destroy());
     typeText(view, "[[");
     await raf();
     expect(menu()).not.toBeNull();
-    expect(rows()).toHaveLength(3);
+    // 3 titled notes + 3 implied folders (notes/, notes/2025/, Projects/).
+    expect(noteRows()).toHaveLength(3);
+    expect(folderRows()).toHaveLength(3);
     expect(selectedIdx()).toBe(0);
+    // Notes rank before folders at equal (empty-query) score → row 0 is a note.
+    expect(rows()[0]?.getAttribute("data-testid")).toBe("picker.note-row");
+  });
+
+  it("offers a folder-target row and inserts the trailing-slash form `[[Projects/]]`", async () => {
+    const { view } = mount();
+    teardowns.push(() => view.destroy());
+    typeText(view, "[[projects");
+    await raf();
+    expect(menu()).not.toBeNull();
+    const folder = folderRows().find(
+      (r) => r.querySelector(".cm-wiki-picker-title")?.textContent === "Projects/",
+    )!;
+    expect(folder).toBeDefined();
+    folder.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    await raf();
+    expect(view.state.doc.toString()).toBe("[[Projects/]]");
+    expect(menu()).toBeNull();
   });
 
   it("filters as the user types into the link and ranks the match first", async () => {
@@ -123,6 +147,7 @@ describe("WikilinkPicker ViewPlugin", () => {
     teardowns.push(() => view.destroy());
     typeText(view, "[[");
     await raf();
+    const last = rows().length - 1;
     expect(selectedIdx()).toBe(0);
 
     runKey(view, "ArrowDown");
@@ -135,7 +160,7 @@ describe("WikilinkPicker ViewPlugin", () => {
     expect(selectedIdx()).toBe(0);
     runKey(view, "ArrowUp");
     await raf();
-    expect(selectedIdx()).toBe(2);
+    expect(selectedIdx()).toBe(last);
   });
 
   it("Enter inserts the canonical §3 link for the selected row and closes", async () => {

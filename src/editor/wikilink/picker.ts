@@ -32,7 +32,7 @@ import { ensureFloatingStyles } from "../floating-styles";
 import { isSlashSuppressed } from "../slash/plugin";
 import { readNoteSet } from "./note-set";
 import { rankNotes, type PickerRow } from "./picker-rank";
-import { emitNoteWikilink } from "./emit";
+import { emitNoteWikilink, emitFolderWikilink } from "./emit";
 
 // The picker AUTHORS wikilinks, so the cursor being inside a (new, empty)
 // wikilink is the TRIGGER, not a suppressor — only code spans / URLs suppress
@@ -211,13 +211,29 @@ class WikilinkPickerView implements PluginValue {
           ?.querySelectorAll(".cm-slash-menu-row")
           .forEach((r, idx) => r.classList.toggle("cm-slash-menu-row-selected", idx === i));
       });
-      const title = document.createElement("span");
-      title.className = "cm-slash-menu-label cm-wiki-picker-title";
-      title.textContent = row.note.title ?? "";
-      const path = document.createElement("span");
-      path.className = "cm-wiki-picker-path";
-      path.textContent = row.path;
-      el.append(title, path);
+      if (row.kind === "folder") {
+        // Folder-target row (MYND-370): a folder glyph + the trailing-slash path,
+        // visually distinct from a note's title-over-path stack.
+        el.classList.add("cm-wiki-picker-folder-row");
+        el.setAttribute("data-testid", "picker.folder-row");
+        const glyph = document.createElement("span");
+        glyph.className = "cm-slash-menu-icon cm-wiki-picker-folder-glyph";
+        glyph.setAttribute("aria-hidden", "true");
+        glyph.textContent = "▸";
+        const label = document.createElement("span");
+        label.className = "cm-slash-menu-label cm-wiki-picker-title";
+        label.textContent = row.path;
+        el.append(glyph, label);
+      } else {
+        el.setAttribute("data-testid", "picker.note-row");
+        const title = document.createElement("span");
+        title.className = "cm-slash-menu-label cm-wiki-picker-title";
+        title.textContent = row.note.title ?? "";
+        const path = document.createElement("span");
+        path.className = "cm-wiki-picker-path";
+        path.textContent = row.path;
+        el.append(title, path);
+      }
       el.addEventListener("mousedown", (e) => {
         e.preventDefault();
         this.applyRow(row);
@@ -269,7 +285,10 @@ class WikilinkPickerView implements PluginValue {
     } else if (this.view.state.doc.sliceString(triggerTo, triggerTo + 1) === "]") {
       end = triggerTo + 1;
     }
-    const insert = emitNoteWikilink(row.note.folder, row.note.title ?? "");
+    const insert =
+      row.kind === "folder"
+        ? emitFolderWikilink(row.path)
+        : emitNoteWikilink(row.note.folder, row.note.title ?? "");
     this.view.dispatch({
       changes: { from: triggerFrom, to: end, insert },
       selection: { anchor: triggerFrom + insert.length },

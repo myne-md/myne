@@ -726,6 +726,15 @@ fn derive_root_key_from_phrase(
     // membership signal per `recovery-flow.md` §3.2. Invalid phrases
     // produce a wrap key that fails AEAD-tag verification on
     // `enc_root_key_recovery` downstream.
+    protocol::validate_kdf_params(&meta.kdf_params).map_err(|e| {
+        tracing::error!(
+            stage = "kdf_params_range",
+            protocol_error_kind = protocol_error_kind(&e),
+            "kdf params outside accepted range"
+        );
+        phrase_or_meta(e)
+    })?;
+
     let wrap_key = protocol::derive_recovery_wrap_key_from_normalized(
         normalized.as_str(),
         &meta.random_salt_recovery,

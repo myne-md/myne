@@ -90,8 +90,23 @@ export type CommandAction = {
   label: string;
   /** Optional category label for grouped display. */
   category?: string;
-  /** Optional keyboard hint displayed at the right edge of the row. */
+  /**
+   * Optional keyboard hint displayed at the right edge of the palette row.
+   * **Display only** — NOT a binding source of truth (SYNC-4). Once the keybind
+   * engine lands, this is derived from {@link defaultBinding} via `formatChord`;
+   * read the effective binding through `effectiveBinding` (commands/keymap.ts),
+   * never this field.
+   */
   kbd?: string;
+  /**
+   * The command's DEFAULT key binding as a canonical chord string (hotkeys epic,
+   * MYND-304) — spec-owned, CodeMirror-`KeyBinding.key`-compatible (`Mod-Shift-g`
+   * form, logical key, cross-platform `Mod`). Lives in code (defaults are never
+   * persisted); a user override in `vault.prefs.keymap` shadows it. `undefined` ≡
+   * the command has no default chord. Resolve the effective binding via
+   * `effectiveBinding` (commands/keymap.ts): `override ?? [defaultBinding]`.
+   */
+  defaultBinding?: string;
   /** Optional helper text shown when the action is disabled. */
   disabledHint?: string;
   /**

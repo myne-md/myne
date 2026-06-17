@@ -1,0 +1,100 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Fuzz harness crate for the `protocol` blob decoders.
+#
+# DELIBERATELY EXCLUDED from the root Cargo workspace (see the empty
+# `[workspace]` table at the bottom). Rationale:
+#   * libFuzzer requires a NIGHTLY toolchain; the product is pinned to
+#     stable 1.96.0 in `rust-toolchain.toml`. Keeping this crate out of the
+#     workspace lets `cargo +nightly fuzz` build it without dragging nightly
+#     into the product build or CI.
+#   * `libfuzzer-sys` / `arbitrary` never enter the shipped binary's
+#     dependency graph — "adding a dependency is a security decision"
+#     (root CLAUDE.md) stays intact.
+#
+# Run recipes live in README.md.
+
+[package]
+name = "protocol-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.protocol]
+path = ".."
+
+# Each target fuzzes ONE decoder. `test`/`doc`/`bench` off — these are
+# libFuzzer entrypoints (`#![no_main]`), not normal bins.
+[[bin]]
+name = "note"
+path = "fuzz_targets/note.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vault_meta"
+path = "fuzz_targets/vault_meta.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "search"
+path = "fuzz_targets/search.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vault_indices"
+path = "fuzz_targets/vault_indices.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "prefs"
+path = "fuzz_targets/prefs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "dictionary"
+path = "fuzz_targets/dictionary.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "attachment"
+path = "fuzz_targets/attachment.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "catalog"
+path = "fuzz_targets/catalog.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "workspace"
+path = "fuzz_targets/workspace.rs"
+test = false
+doc = false
+bench = false
+
+# Empty table => this crate is its OWN workspace root, severed from the
+# parent workspace at the repo root. Do not remove.
+[workspace]

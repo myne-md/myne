@@ -286,6 +286,45 @@ pub fn aad_personal_dictionary_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD wrap of the v0.1 quick-unlock credential
+/// blob (`vault.quickunlock`, `MYQ1`, MYND-329; `protocol.md` § 9.14.3). Same
+/// shape as [`aad_personal_dictionary_blob`] with a distinct role string
+/// `"quick-unlock-blob"`, and additionally binds the `provider_kind` byte so a
+/// blob minted for one wrap-key provider (e.g. macOS biometric) can never
+/// AEAD-verify reinterpreted as another (e.g. PIN).
+///
+/// Layout (47 bytes):
+///
+/// ```text
+/// "myne.v0.1|"                       10 bytes  (AAD prefix, § 5.2)
+/// 0x01                                1 byte   (protocol_version, § 9.14.1)
+/// u16_be(17) || "quick-unlock-blob"  19 bytes  (length-prefixed role)
+/// account_number_hash                16 bytes  (vault identity, § 9.3 offset 6)
+/// provider_kind                       1 byte   (§ 9.14.1 offset 5)
+/// ```
+///
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// quick-unlock blob wraps `root_key` itself and lives outside any `items_key`
+/// lineage. The blob has no `DeriveSubkey` role (its KEK is provider-supplied,
+/// not `root_key`-derived — that would be circular; § 3.4).
+pub fn aad_quick_unlock_blob(account_number_hash: &[u8; 16], provider_kind: u8) -> Vec<u8> {
+    const ROLE_STR_QUICK_UNLOCK_BLOB: &[u8] = b"quick-unlock-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len()
+            + 1
+            + 2
+            + ROLE_STR_QUICK_UNLOCK_BLOB.len()
+            + account_number_hash.len()
+            + 1,
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_QUICK_UNLOCK_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad.push(provider_kind);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of the v0.1 editor
 /// workspace-state blob (`vault.workspace`, MYND-166). Same shape as
 /// [`aad_prefs_blob`] / [`aad_search_index_blob`] with a distinct role
