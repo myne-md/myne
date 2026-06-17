@@ -164,6 +164,15 @@ gtk = "0.18"
 # `objc2-web-kit 0.3.2` are already locked via tauri/wry on macOS; zero
 # dependency-tree expansion (the `windows-sys` precedent above).
 [target.'cfg(target_os = "macos")'.dependencies]
+# `security-framework` (+ its `-sys` for the access-control flag constant) backs
+# the MYND-329 macOS Touch ID quick-unlock provider: a Keychain item gated by
+# `kSecAccessControlBiometryCurrentSet` (gated read = the biometric prompt; the
+# OWASP/Teleport "gate the resource, not a boolean" lesson). New direct deps —
+# a deliberate security decision (CLAUDE.md / TB9), recorded in `decisions.md`
+# 2026-06-17. The macOS provider's FFI is hardware-gated and pending Touch ID +
+# primitive-level review before it is trusted (see plugins/quick_unlock/macos.rs).
+security-framework = "3"
+security-framework-sys = "2"
 objc2 = { version = "0.6", default-features = false }
 objc2-app-kit = { version = "0.3", default-features = false, features = [
     "std",

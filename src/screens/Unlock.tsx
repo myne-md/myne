@@ -46,6 +46,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
+import { QuickUnlockEntry } from "../components/QuickUnlockEntry";
 import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
@@ -519,6 +520,10 @@ export function Unlock({
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
       <h1 style={CARD_TITLE_STYLE}>Unlock your vault.</h1>
       <p style={CARD_BODY_STYLE}>Enter your password to continue.</p>
+      {/* Quick-unlock (PIN / Touch ID) affordance — rendered only when
+          configured + usable this session; self-hides otherwise. The password
+          form below stays the always-present escape hatch (MYND-329). */}
+      <QuickUnlockEntry onUnlocked={onUnlocked} />
       {/* `data-vault-id` mirrors the picker-row idiom (SYNC-8): the
           vault-addressed unlock target threaded from the Stage payload,
           observable to the E2E suite (MYND-127 story 2). Absent when the

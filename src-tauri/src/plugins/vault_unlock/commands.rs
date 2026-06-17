@@ -625,6 +625,11 @@ pub(crate) async fn unlock_with_path(
         );
     }
 
+    // MYND-329 task 9: a full master-password unlock opens the spring-loaded
+    // quick-unlock gate for this session (a restart resets it, forcing one
+    // full-password unlock before quick-unlock resumes).
+    state.mark_full_unlock_done();
+
     // Success event. Coarse `duration_ms` only — no account
     // identifier, no path, no key material. Per ALLOW-list in
     // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".

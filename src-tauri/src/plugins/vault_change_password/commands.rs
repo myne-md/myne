@@ -506,6 +506,13 @@ pub(crate) async fn change_password_with_path(
         "vault password rotated successfully (root_key unchanged; only its wrap rotated)"
     );
 
+    // MYND-329 task 8: a password change invalidates any quick-unlock credential
+    // for this vault (defense-in-depth — a password change signals "reset my
+    // access", User Story 8). Best-effort; absence of a credential is a no-op.
+    if let Some(vault_dir) = vault_path.parent() {
+        crate::plugins::quick_unlock::commands::invalidate_credential(vault_dir);
+    }
+
     Ok(())
 }
 

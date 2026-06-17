@@ -389,6 +389,12 @@ Reserved term for `appname-v005` multi-device support: a per-device asymmetric k
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 
+### **device-local credential** &nbsp; 🗝️ *Key/identifier*
+
+A credential that lives only on one device and is **never synchronized**, because it is bound to that device's hardware. The v0.1 instance is the [quick-unlock credential](#quick-unlock-credential) blob (`vault.quickunlock`, `spec/protocol.md` §9.14): its wrap key is held in the OS keychain with `thisDeviceOnly` accessibility, so a copy on another device is inert. Contrast the master-password and recovery-phrase credentials, which are device-portable and ride in the synced `vault.meta`. Each device that opts into quick-unlock mints its own device-local credential.
+
+Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
+
 ### **domain separation** &nbsp; 📋 *Protocol*
 
 The cryptographic principle that contexts which should not produce equal outputs from equal inputs MUST mix in a context-distinguishing string. Myne applies it pervasively: HKDF context strings (§3.2), AAD prefixes (§5.2), KDF-parameter binding (§4.3), and protocol-version magic bytes (§9, §10). Failure to domain-separate is the root cause of many published protocol vulnerabilities.
@@ -924,6 +930,18 @@ Used in: `threat-model.md` §5, §7
 The one-time MAC algorithm by Daniel J. Bernstein, used as the authenticator inside ChaCha20-Poly1305 and XChaCha20-Poly1305. In Myne's CTX-wrapped construction the 16-byte Poly1305 tag T is recomputed at decrypt time from `(K, N, AAD, ciphertext)` rather than stored on disk; only the 32-byte CTX commitment tag T' is persisted.
 
 Used in: `spec/protocol.md` §5.1
+
+### **quick-unlock credential** &nbsp; 🗝️ *Key/identifier*
+
+A [device-local credential](#device-local-credential) (`vault.quickunlock`, `spec/protocol.md` §9.14, magic `MYQ1`) that holds a **third wrapped copy of `root_key`** so a re-lock (auto-lock-on-idle) can be reversed with a fast second credential — Touch ID / Windows Hello, or a PIN — instead of the full master-password Argon2id path. It wraps the already-derived `root_key`; it never participates in `root_key` derivation, so it does not touch the zero-knowledge root (the master password stays the primary credential). Its wrap key comes from a [wrap-key provider](#wrap-key-provider), not a `DeriveSubkey` role. Threat class: an **A6** convenience gate over the already-encrypted store; it does **not** defend against **A7** (active local malware), and the PIN provider's blob is offline-brute-forceable by **A4** bounded only by Argon2id cost. Introduced MYND-329.
+
+Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
+
+### **wrap-key provider** &nbsp; 🗝️ *Key/identifier*
+
+The pluggable source of the 32-byte symmetric wrap key that protects the [quick-unlock credential](#quick-unlock-credential) blob. The on-disk blob is provider-agnostic — always `AEAD(wrap_key, root_key)` — and only the wrap-key source differs: a macOS Keychain secret gated by `kSecAccessControlBiometryCurrentSet` (biometric), a future Windows Hello / TPM challenge-response, or a PIN run through the vault's Argon2id parameters. Modeled as a single Rust trait (`QuickUnlockProvider`); adding a provider is not an on-disk-format change. The biometric provider is hardware-bound and OS-invalidated on biometric-set change; the PIN provider's strength is bounded by PIN entropy × the memory-hard Argon2id cost.
+
+Used in: `spec/protocol.md` §9.14.2
 
 ### **post-compromise security** &nbsp; ⚠️ *Threat*
 
