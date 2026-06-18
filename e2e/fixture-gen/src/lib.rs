@@ -32,11 +32,20 @@ use protocol::{
 };
 use zeroize::Zeroizing;
 
-/// Weak Argon2id parameters for fast fixtures (RFC 9106 minimum) —
-/// mirrors `src-tauri/src/test_support.rs::FAST_TEST_KDF`. Lives only
-/// in fixture bytes, never in production code (SYNC-9).
+/// Weak Argon2id parameters for fast fixtures — mirrors
+/// `src-tauri/src/test_support.rs::FAST_TEST_KDF`. Lives only in fixture
+/// bytes, never in production code (SYNC-9).
+///
+/// `m_kib` is pinned to `protocol::MIN_KDF_M_KIB` (8 MiB), the floor
+/// `validate_kdf_params` (5750b1d) enforces on vault-supplied cost
+/// params before derivation. A sub-floor value (the old 8 KiB) makes the
+/// real unlock/recover/quick-unlock/change-password paths reject the
+/// fixture with `InvalidVaultMeta` → the editor never mounts and every
+/// unlock-bearing E2E scenario times out. 8 MiB keeps a single Argon2id
+/// pass in the low-millisecond range (vs 256 MiB production), so fixtures
+/// stay fast while clearing the gate.
 pub const WEAK_TEST_KDF: KdfParams = KdfParams {
-    m_kib: 8,
+    m_kib: protocol::MIN_KDF_M_KIB,
     t: 1,
     p: 1,
     argon2_version: 0x13,
