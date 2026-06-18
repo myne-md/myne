@@ -51,11 +51,24 @@ function coerceCaseInput(inputYamlHex: string): ReturnType<typeof coerceValue> {
   return coerceValue(doc.prop);
 }
 
-describe("property-coercion golden vectors (markdown-dialect §3.6.4)", () => {
-  const doc = JSON.parse(fs.readFileSync(CASES_PATH, "utf-8")) as {
-    schema: string;
-    cases: Case[];
-  };
+// Skip-if-missing discipline, mirroring `protocol/tests/vectors.rs`: the
+// `myne-test-vectors` companion repo is not checked out in main-repo CI, so the
+// runner skips with an explanatory line rather than failing the suite on ENOENT.
+const VECTORS_PRESENT = fs.existsSync(CASES_PATH);
+if (!VECTORS_PRESENT) {
+  console.warn(
+    `[skip] property-coercion: companion repo fixture not present at ${CASES_PATH}`,
+  );
+}
+const describeVectors = VECTORS_PRESENT ? describe : describe.skip;
+
+describeVectors("property-coercion golden vectors (markdown-dialect §3.6.4)", () => {
+  const doc = VECTORS_PRESENT
+    ? (JSON.parse(fs.readFileSync(CASES_PATH, "utf-8")) as {
+        schema: string;
+        cases: Case[];
+      })
+    : { schema: "property-coercion", cases: [] as Case[] };
 
   it("reads the property-coercion category from the companion repo", () => {
     expect(doc.schema).toBe("property-coercion");
