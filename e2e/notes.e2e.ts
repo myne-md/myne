@@ -205,10 +205,10 @@ describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", ()
 
         // Folder + a note inside it (context-menu "New note here").
         await (await s.byTestId("notes.new-folder")).click();
-        await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv");
+        await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
         const folder = await s.byTestId("notes.folder-row");
         await contextMenuPick(s, folder, "new-note");
-        await (await s.byTestId("notes.rename-input")).sendKeys("Klasör Notu");
+        await (await s.byTestId("notes.rename-input")).sendKeys("Klasör Notu\uE007");
         await s.waitForGone(testIdSelector("notes.rename-input"));
         await s.byTestId("notes.row");
 
@@ -240,9 +240,12 @@ describeE2E("ms1 multi-select bulk move (MYND-367)", () => {
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        // An (empty) destination folder + two root notes to gather.
+        // An (empty) destination folder + two root notes to gather. The
+        // trailing `\uE007` (W3C Enter) commits the inline new-folder input —
+        // without it the input never materializes `notes.folder-row` and the
+        // next line times out (the nc4 site above carries the same key).
         await (await s.byTestId("notes.new-folder")).click();
-        await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv");
+        await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
         await s.byTestId("notes.folder-row");
         await createNote(s, "Multi Alfa");
         await createNote(s, "Multi Beta");
