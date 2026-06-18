@@ -215,6 +215,12 @@ Bitcoin Improvement Proposal 39, defining a mapping from random entropy to a seq
 Used in: `spec/protocol.md` §7
 Reference: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
+### **bootstrap-fingerprint** &nbsp; 📋 *Protocol*
+
+A short, eye-comparable code derived from a [vault head](#vault-head)'s [head_id](#head_id), compared **out-of-band** between two devices at the device-approval moment to harden the [TOFU bootstrap](#tofu-bootstrap) of a newly-enrolled device against a malicious server — the same role as Signal/Matrix safety numbers. A fresh device has no prior head to compare against, so its first adopted state would otherwise be taken on faith; the user eye-comparing the fingerprint on both screens turns "trust the server" into "verified against an existing trusted device". ~SAS-magnitude (tens of bits), not the full 32-byte MAC. v1 ships the substrate (the fingerprint is a deterministic function of `head_id`); the general always-available fork-audit fingerprint UI is v1.x. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head); `spec/protocol.md` §3.4 (MYND-416)
+
 ### **bottom bar** &nbsp; 📦 *Product*
 
 The 28px status bar pinned to the bottom of the editor (`BottomBar`, `src/screens/Editor.tsx`). Hosts the connection/sync status text, the [save-status](#optimistic-ui-rollback) badge, and the persistent affordances for the [tag browser](#tag-browser), Saved Views, the whole-vault graph, Settings, vault Lock, and the live document-statistics readout (characters / words / spaces / paragraphs — selection-scoped when a non-empty selection exists, the full breakdown in its hover title; MYND-339, reusing the `word-count` item id). **Bottom-bar customization** (2026-06-15) lets the user hide/show each item via a right-click context menu; the hidden set persists per-vault in the `vault.prefs` `hidden_bar_items` field (set semantics, omitted-when-empty — a fully-visible bar is byte-identical to a pre-feature vault). The bar root stays right-clickable even when fully emptied, which is the only restore path (no Settings-panel mirror). There is deliberately **no** separate top bar — the top controls float into the OS title-bar row (MYND-166).
@@ -303,7 +309,7 @@ Used in: `spec/protocol.md` §3.2, §3.4
 
 ### **context string registry** &nbsp; 📋 *Protocol*
 
-The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth` and `backup-key` (both reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10). v005 strings will be registered under the `"myne.v005 "` prefix.
+The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth`, `backup-key`, and `vault-head-mac` (all reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10; `vault-head-mac` is the Phase 2 [vault head](#vault-head) MAC key, MYND-416). v005 strings will be registered under the `"myne.v005 "` prefix.
 
 Used in: `spec/protocol.md` §3.4
 
@@ -410,6 +416,12 @@ Used in: `spec/protocol.md` §3.2.1
 Reserved term for `appname-v005` multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
+
+### **device_id (VV-actor)** &nbsp; 🗝️ *Key/identifier*
+
+The permanent, client-generated 16-byte random identifier of a device as it appears in a [vault head](#vault-head)'s [version vector](#version-vector-vv). Allocated once at enrollment, registered in the per-account device table (**AS16**), and **kept separate from** the device's secret per-device token/credential: the token is revocable/rotatable (an availability control), whereas `device_id` is permanent *history* — deriving the id from the token would let a revocation rewrite version-vector history and break [fork-consistency](#fork-consistency) continuity. Its legitimacy is **not** separately authenticated and need not be: single-user → all devices share `root_key` → the shared-key head MAC is the actor-set authority, and a malicious server (lacking `root_key`) cannot inject a phantom `device_id`. A reset/re-enrolled device generates a **new** `device_id` (the old one's VV component freezes — never pruned in v1). Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head, version vector)
 
 ### **device-local credential** &nbsp; 🗝️ *Key/identifier*
 
@@ -526,6 +538,12 @@ An inline `[^N]` marker in the Myne dialect (`spec/markdown-dialect.md` §3.4), 
 
 Used in: `spec/markdown-dialect.md` §3.4, §8; `decisions.md` 2026-05-31; `src/dialect/lezer/footnote.ts`, `src/editor/decorations/footnote.ts`
 
+### **fork-consistency** &nbsp; 🏗️ *Construction*
+
+The integrity property a [vault head](#vault-head) provides against a malicious sync server (**TB5**) that cannot read or forge content but can still **rollback** (serve an older authentic blob), **withhold** (hide an update), or **equivocate / fork** (show different devices divergent histories). Following SUNDR (OSDI 2004): every update is committed into an unforgeable, monotonic, hash-chained head, so the server cannot *heal* a fork — once it shows two devices divergent heads, their [version vectors](#version-vector-vv) never re-converge and the split surfaces on the next cross-read. Fork detection is therefore **delayed and in-band** (caught when devices observe each other's state) or immediate only via an [out-of-band fingerprint](#bootstrap-fingerprint); a lone client with no external comparison cannot detect equivocation (the SUNDR theorem). Withholding of a device's *own* work is caught in-band; withholding of *other* devices' work / global staleness is best-effort. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head); `threat-model.md` §7
+
 ### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 
 Myne's architectural commitment that each major protocol version (v0.1, v005, v006, …) is a closed, complete specification with distinct magic bytes, AAD prefix, and context-string prefix. Cross-major reads happen only via explicit user-initiated migration (`spec/protocol.md` §10.4); a v005 client refuses to silently parse a v0.1 blob, and vice versa. The choice contradicts the additive-extension model common in TLS 1.0–1.2 and OpenPGP; the reasoning is that those protocols' downgrade-attack history (POODLE, FREAK, Logjam, MEGA-2022) shows additive extension to be a structural risk. v005's anticipated changes (PQ hybrid wrap, MLS multi-device, OPAQUE auth, KT log) are too deep to be additive in any honest sense.
@@ -561,6 +579,12 @@ Used in: `vision.md` Phase 1 Scope
 Lockfiles checked into the repository that record the exact SHA hash of every direct and transitive dependency. Myne covers Cargo (Rust), npm (Phase 3 web UI), Go modules (server), and any WASM artifacts. Updates require explicit review.
 
 Used in: `threat-model.md` §6, §7
+
+### **head_id** &nbsp; 🗝️ *Key/identifier*
+
+The identity of a single [vault head](#vault-head): `head_id = SHA-256(serialized full head record INCLUDING its head_mac)`. Hashing over the MAC (not just the pre-MAC content) makes the hash-DAG bind **authentication**, not merely content. A head's parent links (`prev_head_hash[]`) are the `head_id`s of its parents — one parent = linear extension, two = a legitimate concurrent-push merge (byte-sorted lexicographically for encoding determinism). Domain-separated from the [vault-head manifest](#vault-head-manifest) hash and the §5.1 [CTX commitment](#ctx-commitment) by a distinct leading prefix, so no SHA-256 input is reinterpretable as another's. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head)
 
 ### **HKDF (HKDF-SHA-256)** &nbsp; 🔐 *Primitive*
 
@@ -1327,6 +1351,12 @@ The structured catalog of adversaries, assets, trust boundaries, and defensive p
 
 Used in: `threat-model.md`
 
+### **TOFU bootstrap** &nbsp; 📋 *Protocol*
+
+Trust-on-first-use: how a freshly enrolled or reset device adopts its first [vault head](#vault-head). [Fork-consistency](#fork-consistency) via version-vector dominance is a **continuity** guarantee — it only protects a device that already holds a persisted last-seen baseline. A device with no baseline has nothing to compare against, so it takes the server-served head on faith after verifying its MAC (the MAC proves "a `root_key` holder authored this", **not** "this is the latest, unforked head") — the same model as Signal/Matrix key TOFU. The "first device" is not cryptographically special; "has-a-baseline-or-not" is (a reset device is also a TOFU client). The only hardening is an out-of-band [bootstrap-fingerprint](#bootstrap-fingerprint) compared at the device-approval gate. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head); `threat-model.md` §7
+
 ### **traffic analysis** &nbsp; ⚠️ *Threat*
 
 Adversary class A13: a server-side or network observer correlating sync timing, blob sizes, and account activity to infer behavior even without decrypting content. Myne v0.1 is Best-effort against A13 — sync timing, blob count, and blob size are visible to anyone observing the network or the server, and connection IPs are visible transiently (not logged). Padding, cover traffic, and timing randomization are deferred beyond v0.1.
@@ -1404,6 +1434,18 @@ Used in: `spec/protocol.md` §9.11; `threat-model.md` §7; `decisions.md` 2026-0
 The backend-resident state held between the `begin` and `commit` IPC calls of the vault-creation flow. A `VaultCreationSession` (Rust struct in `src-tauri/src/plugins/vault_creation/state.rs`) carries the freshly generated `account_number`, `recovery_phrase`, `root_key`, two Argon2id salts, the cached password and recovery wrap keys, the chosen `KdfParams`, and a `created_at: Instant` timestamp. Lives in a `Mutex<HashMap<Uuid, VaultCreationSession>>` indexed by **session token**. Bounded by `MAX_CONCURRENT_SESSIONS = 4` and `SESSION_TTL_SECS = 600` (10 minutes); evicted by a background `tokio::time::interval(60s)` task whose evicted tokens land in a parallel **tombstone** map for up to `TOMBSTONE_RETENTION_SECS = 3600` (1 hour). `root_key` and the wrap keys never cross the IPC boundary — they live only in this session until `commit` consumes it.
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
+
+### **vault head** &nbsp; 📋 *Protocol* (deep entry)
+
+The malicious-server hardening primitive for Phase 2 sync: a small, server-relayed, per-push record that commits the vault's current state under an HMAC-SHA-256 keyed by `DeriveSubkey(root_key, "vault-head-mac")` (§3.4). It commits a flat `SHA-256` of the canonical [vault-head manifest](#vault-head-manifest) (`uuid → content_nonce` of content blobs only — notes + attachments), a per-device [version vector](#version-vector-vv), and `prev_head_hash[]` parent links ([head_id](#head_id)s) forming a git-like hash-DAG, plus an auxiliary Lamport `seq`. Provides [fork-consistency](#fork-consistency): devices verify on pull that a new head **extends** their last-seen one (VV-dominance), and divergence surfaces on cross-read. The head is **wire-only** (no on-disk magic; the device-local last-seen baseline is the `MYH1` `vault.head-state` blob, `spec/protocol.md` §9.15). The server, lacking `root_key`, can only replay/withhold/reorder real heads, never forge one. **HMAC-not-signature**: single-user → all devices share `root_key` → a symmetric MAC suffices (no Ed25519, closed primitive set). Phase 2; full spec in `spec/sync-protocol.md`.
+
+Used in: `spec/sync-protocol.md`; `spec/protocol.md` §3.4, §9.15, §10.3; `threat-model.md` §7 (MYND-416)
+
+### **vault-head manifest** &nbsp; 📋 *Protocol*
+
+The `uuid → content_nonce` map of a vault's **content blobs only** (notes + attachments; synced singletons like [vault.prefs](#vaultprefs) / [vault.meta](#vaultmeta) are excluded — their rollback is the already-accepted "local prefs replay" of `threat-model.md` §7). A [vault head](#vault-head) commits a flat `SHA-256` of this map's canonical encoding (uuid-sorted, fixed-width), not the map itself, keeping the head O(1). Binding [content_nonce](#content_type) (fresh-random per save, §6.3) rather than a bare counter gives **two-layer** rollback detection: a server serving an old version mismatches the manifest *before* decryption, and the AEAD nonce-binding makes a header/content splice fail *on* decrypt. The manifest object's own canonical encoding is the sync wire protocol's concern (MYND-414); the head only anchors its hash. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head)
 
 ### **vault label** &nbsp; 📦 *Product*
 
@@ -1494,6 +1536,12 @@ Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/sl
 The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext; persisted encrypted-at-rest as the [vault.indices](#vaultindices) / `MYI1` blob (`spec/protocol.md` §9.8 — the MYND-31 design, persistence landed by MYND-271 alongside the typed [property](#property) index). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **version vector (VV)** &nbsp; 🏗️ *Construction*
+
+A per-device monotonic counter map (`device_id → count`) embedded in and MAC'd by each [vault head](#vault-head), carrying the count of heads each [device](#device_id-vv-actor) has authored (at **push** granularity, not per keystroke). It is the single mechanism behind both concurrency and fork detection: componentwise comparison of a new head's VV to the last-seen one yields **extension** (≥ componentwise → accept), **rollback** (any decreased component → reject), or **incomparable** (concurrent → the device writes a merge head, componentwise-max + author+1). A VV that *never* re-converges across devices is a [fork](#fork-consistency); one that is merely incomparable is a legitimate concurrent edit. This is the same VV the sync conflict layer uses — fork-consistency adds no separate structure. Not pruned in v1 (a unilateral drop would let a server hide a fork; a v005 prune must ride an authenticated device-retirement event). Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head)
 
 ### **view mode** &nbsp; 📦 *Product*
 
@@ -1631,6 +1679,7 @@ Used in: `spec/protocol.md` §4.1
 | `item_key` (32 B random) | Encrypts one note's plaintext | Encrypted in `.myn` file | Note lifetime |
 | `server-auth` subkey | Reserved for Phase 2 sync auth | Derived only (not transmitted in v0.1) | Session |
 | `backup-key` | Reserved for a future sealed-backup variant — not used in v0.1 (demoted 2026-06-10) | Derived only (reserved) | — |
+| `head_mac_key` | Reserved for Phase 2 [vault head](#vault-head) fork-consistency MAC (`vault-head-mac`) | Derived only (not used in v0.1) | Session |
 | `account_number` (95-bit + Damm) | User identifier; bearer token in P2+ | User offline storage | Permanent |
 | `account_number_hash` (SHA-256[:16]) | Argon2id salt binding | `vault.meta` | Vault lifetime |
 

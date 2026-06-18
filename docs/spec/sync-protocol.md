@@ -1,0 +1,271 @@
+# Myne Sync Protocol Specification (Phase 2)
+
+> **Status: draft.** Phase 2 multi-device synchronization over an untrusted server (TB5). This document specifies the **vault head** fork-consistency primitive (MYND-416) and will grow to cover the sync wire protocol (push/pull/CAS — MYND-414), server protocol (MYND-415), and conflict resolution. It builds on the at-rest protocol in [`protocol.md`](protocol.md); all cryptographic primitives, the subkey-derivation helper (§3.2), the AAD/encode-then-hash discipline (§5), and the magic-byte registry (§10.3) are inherited from there. v0.1 and v005 remain forward-incompatible (`protocol.md` §10); nothing here changes the v0.1 at-rest vault format — the head is **sync-wire-only** plus one device-local blob (`MYH1`, `protocol.md` §9.15).
+
+---
+
+## 1. Scope & threat
+
+### 1.1 Scope
+
+This document (as of MYND-416) defines the **vault head**: a small, server-relayed, per-push record that lets multiple devices of a single user detect a malicious server's attempts to **rewind, hide, or split** their vault, even though the server can never read or forge their content.
+
+In scope here:
+- The head record, its canonical byte encoding, and the HMAC that authenticates it (§3).
+- The semantics of the committed fields — the version vector, the manifest, and the push compare-and-swap (§4).
+- The on-pull verification algorithm and the detection of rollback / fork / withholding (§5).
+- Bootstrap of a fresh device (TOFU) and genesis (§6).
+- The device-local last-seen baseline that anchors continuity across restarts (§7).
+
+Out of scope (other Phase 2 work items): the sync wire protocol and the canonical encoding of the **manifest object itself** (MYND-414 — the head only anchors `SHA-256` of its bytes), the server protocol and storage (MYND-415/419/421), server authentication (MYND-420), device enrollment / approval / the bootstrap-fingerprint UI (MYND-425), tombstones / quota / rate-limit (MYND-422), the Rust implementation (MYND-417), and the cross-implementation golden vectors (MYND-418).
+
+### 1.2 Threat
+
+The sync server is **fully untrusted** (TB5; adversary A1, traffic-analysis-adjacent A13). End-to-end AEAD + AAD (`protocol.md` §5) already defeats content tampering, note substitution, and downgrade. What it does **not** stop is a "dumb blob store" that serves authentic-but-wrong bytes:
+
+| Attack | What the server does | Caught by |
+|---|---|---|
+| **Rollback** | Serve an older, correctly-MAC'd head/blob (revert an edit, resurrect a deleted note) | VV-dominance (§5), operative, immediate |
+| **Withholding** | Refuse to deliver the newest update | own-work: in-band (§5); other/global: best-effort (accepted) |
+| **Equivocation / fork** | Show device A and device B divergent histories | delayed in-band on cross-read (§5) + out-of-band fingerprint (§6) |
+
+The server cannot **forge** a head: the head's MAC key is derived from `root_key`, which the server never holds. Its only powers are to replay, withhold, reorder, or equivocate over **real** heads that some device of the user authored. The whole design follows from this single fact.
+
+### 1.3 Conventions
+
+Inherited from `protocol.md` §1.2: RFC 2119 keywords; `||` is concatenation; multi-byte integers are **big-endian** unless stated; `DeriveSubkey(root_key, role)` is the sole subkey helper (`protocol.md` §3.2.1). "Content blob" means a `.myn` note (§9.2) or an attachment (`MYA1`, §9.9) — the only blobs the head's manifest covers (§4).
+
+---
+
+## 2. Vault head — overview
+
+A **vault head** is authored by a device at each **push** (sync point — not per keystroke; edits coalesce per the Phase 2 write cadence). It commits the vault's current state under a symmetric MAC and chains to its predecessor, forming a git-like **hash-DAG**:
+
+- one parent → a linear extension;
+- two parents → a legitimate concurrent-push **merge**;
+- zero parents → the **genesis** head (§6).
+
+The head commits four things (full encoding in §3, semantics in §4):
+
+1. `manifest_hash` — a flat `SHA-256` of the canonical [vault-head manifest](#42-manifest-and-what-version-means) (`uuid → content_nonce` of content blobs only). Keeping a *hash* (not the map) makes the head O(1) in vault size.
+2. `version_vector` — a per-device monotonic counter map; the authority for concurrency and fork detection.
+3. `prev_head_hash[]` — the `head_id`(s) of the parent head(s); the structural backbone that makes a fork permanent.
+4. `seq` — an auxiliary monotonic Lamport scalar (`max(parent_seq)+1`); fast-compare / display only, **never** a second source of truth over the VV.
+
+The head is **HMAC-SHA-256**'d, not signed: Myne is single-user, so all devices share `root_key` and a symmetric MAC suffices. This keeps the construction inside the closed RustCrypto primitive set (HMAC-SHA-256 already keys attachment-ids, `protocol.md` §9.9) — no Ed25519, no new dependency, preserving the §6 audit-substitute posture. The accepted cost: `root_key` compromise is total compromise (no forward secrecy; `protocol.md` §11), which a signature scheme would not have improved for a single user.
+
+The head is **wire-only** — it has no on-disk magic and is never stored in the synced vault tree. Each device keeps its own last-seen head as a device-local `MYH1` baseline (§7).
+
+---
+
+## 3. Head record & canonical encoding
+
+The head is authenticated by an HMAC over a canonically-encoded message. As with the CTX commitment (`protocol.md` §5.1.3) and the AAD construction (§5.2), the encoding is **encode-then-MAC** with fixed-width and length/count-prefixed segments, so two independent implementations produce **bit-identical** bytes and no attacker can shift bytes between a fixed and a variable region (Chan & Rogaway). All multi-byte integers are big-endian.
+
+### 3.1 Head MAC key
+
+```
+head_mac_key = DeriveSubkey(root_key, "vault-head-mac")        (32 bytes)
+```
+
+Per `protocol.md` §3.2 / §3.4. This is the only subkey this primitive introduces; the device-local baseline (§7) re-verifies the head's own MAC under this same key — there is no second context string.
+
+### 3.2 Canonical HMAC message
+
+```
+head_mac_input =
+    "myne.v0.1|"            (10 B   ASCII domain prefix, incl. pipe — protocol.md §5.2)
+ || protocol_version        ( 1 B   = 0x01)
+ || head_format_version     ( 1 B   = 0x01; the sync-format version hook — see §3.6)
+ || account_number_hash     (16 B   the vault-binding field, protocol.md §9.3 / §5.2)
+ || manifest_hash           (32 B   SHA-256 of the canonical manifest bytes; §4)
+ || seq                     ( 8 B   u64 big-endian; §4)
+ || parent_count            ( 1 B   0 = genesis, 1 = linear, 2 = merge)
+ || prev_head_hash[i]       (32 B × parent_count, byte-sorted; §3.4)
+ || vv_len                  ( 4 B   u32 big-endian — byte length of vv_canonical)
+ || vv_canonical            (vv_len B; §3.3)
+
+head_mac  = HMAC-SHA-256(head_mac_key, head_mac_input)          (32 B, full tag — no truncation)
+```
+
+Notes:
+- **`account_number_hash` is bound** even though `head_mac_key` is already vault-specific. This mirrors the deliberate redundancy of `protocol.md` §5.2 (which binds it into the prefs/search/catalog AADs despite their root_key-derived KEKs): it is defense against a future key-derivation bug on our side (e.g. a fixture that reused a key across vaults), forcing cross-vault heads to mismatch regardless. It leaks nothing new (the field is already in `vault.meta` and the storage key).
+- **No in-message role/domain tag** beyond the version bytes. The MAC key is purpose-specific (its `DeriveSubkey` context), and `head_format_version` already disambiguates "this is a head" inside the `myne.v0.1` domain. Adding a separate `"vault-head"` role string would be a needless separator, against the §3.2.2 spirit.
+- **Full 32-byte tag**, no truncation — consistent with the on-disk CTX commitment tag width.
+- `parent_count` MUST be 0, 1, or 2. A head with `parent_count > 2` is rejected (v0.1 sync produces at most a two-way merge; an N-way concurrent burst resolves as a chain of two-way merges).
+
+### 3.3 Version-vector canonical encoding
+
+`vv_canonical` pins the inner order so the outer `vv_len` prefix is not the only determinism guarantee:
+
+```
+vv_canonical =
+    entry_count               ( 4 B   u32 big-endian)
+ || for each entry, SORTED ASCENDING BY device_id (lexicographic, byte-order):
+        device_id             (16 B)
+        counter               ( 8 B   u64 big-endian)
+```
+
+`device_id` is the 16-byte VV-actor identifier (§4); `counter` is that device's authored-head count. Entries MUST be sorted by `device_id` and a `device_id` MUST appear at most once. (Semantics of `device_id` and `counter`: §4.)
+
+### 3.4 `head_id` and the hash-DAG
+
+A head's identity binds its **authentication**, not merely its content:
+
+```
+head_id = SHA-256( head_mac_input || head_mac )        (32 B — the full record, MAC included)
+```
+
+`prev_head_hash[i]` values are the `head_id`s of the parent head(s). When `parent_count == 2`, the two `prev_head_hash` values MUST be emitted **sorted ascending lexicographically (byte-order)** — a hash-sort is encoding-deterministic without any seq/VV lookup, so two implementations merging the same two parents emit identical bytes (a missing or unstable order would produce a different `head_mac` and a *spurious* fork). The genesis head has `parent_count == 0` and no `prev_head_hash`.
+
+Because `head_id` covers `head_mac`, the chain is unforgeable end-to-end: a server cannot fabricate a `prev_head_hash` pointing at a head it did not receive from a real device, and cannot alter any ancestor without breaking every descendant's `head_id`.
+
+### 3.5 SHA-256 domain separation
+
+Three distinct SHA-256 inputs exist in the combined protocol, and none may be reinterpretable as another:
+
+| Hash | Input begins with | Defined in |
+|---|---|---|
+| `manifest_hash` | the manifest canonical prefix (MYND-414) | §4 / MYND-414 |
+| `head_id` | `head_mac_input`, i.e. `"myne.v0.1|"` … | §3.4 |
+| CTX commitment | the §5.1.3 `canonical_encode` of (K, N, AD, T) | `protocol.md` §5.1.3 |
+
+Each input starts with a distinct, non-overlapping prefix (the head via the `"myne.v0.1|"` AAD prefix; the manifest under its own MYND-414 prefix; the CTX commitment under its fixed-length key/nonce-first layout), so no hash input is a prefix or re-encoding of another. Implementations MUST NOT feed bare, prefix-free data into any of these.
+
+### 3.6 `head_format_version` (forward hook)
+
+`head_format_version` is bound into the MAC so the sync layer can evolve the head's *shape* without a v0.1 major-version event — the head is wire-only, so no on-disk format bakes it in (`protocol.md` §10 reserved-expansion ban does not apply). The documented Phase-3 use is upgrading `manifest_hash` from a flat hash to a Merkle root (enabling light-client / partial-sync inclusion proofs); that is a sync-wire bump, not a vault-format change. v0.1 uses `head_format_version = 0x01`.
+
+---
+
+## 4. Committed-field semantics
+
+§3 fixed the *bytes*; this section fixes what they *mean*.
+
+### 4.1 Version vector
+
+The version vector (VV) is the authority for concurrency and fork detection. Each entry is `device_id → counter`.
+
+**`device_id`** is a **client-generated, 16-byte random** identifier, allocated once when a device is enrolled and registered in the per-account device table (AS16). It MUST be generated by the device itself (OS CSPRNG), not assigned by the server (TB5 — a server-assigned id would let the untrusted server muddy VV semantics). It MUST be kept **separate from the device's secret per-device token**: the token is a revocable/rotatable bearer credential (an *availability* control — revoking it stops that device syncing), whereas `device_id` is permanent *history*. Deriving `device_id` from the token would let a token rotation rewrite VV history and break fork-consistency continuity. A reset or re-enrolled device generates a **new** `device_id`; the old device's component freezes (it authors no further heads) and is **never pruned** in v1.
+
+**`counter`** is that device's **authored-head count** — incremented by exactly one each time the device authors a head, at **push** granularity (one head per sync point, never per keystroke; edits coalesce per the Phase 2 write cadence, so the counter leaks no per-keystroke activity).
+
+**Composition rules:**
+- **genesis** (`parent_count == 0`): the authoring device's component = 1; no other components.
+- **linear** (`parent_count == 1`): copy the parent's VV, then `+1` to the author's component.
+- **merge** (`parent_count == 2`): take the **componentwise maximum** of the two parents' VVs, then `+1` to the author's component.
+
+**Explicit author + consistency check.** The head carries the `author_device_id` (16 B) explicitly (encoded as part of the head record alongside the VV — chosen for simplicity; deriving it by diffing parent VVs is possible but expensive and off-by-one fragile). A verifier MUST reject a head whose author component is not exactly one above the parents' maximum for that device — i.e. `VV[author] == max(parents' VV[author]) + 1`, and `== 1` at genesis. This turns the redundant field into a free consistency check; it cannot contradict the VV.
+
+**Actor-set authority (no separate roster).** A device's right to be a VV actor is **not** separately authenticated and need not be. Myne is single-user: anyone holding `root_key` is a legitimate author, so a device can introduce a new `device_id` simply by authoring a `root_key`-MAC'd head bearing it. The server, lacking `root_key`, cannot forge a head and therefore cannot inject a phantom `device_id` (it can only replay/withhold/reorder real heads). The VV actor-set is exactly "every `device_id` that appears in a validly-MAC'd head" = the user's enrolled devices. The Phase 2 device-approval gate (MYND-425) is an *availability* control over token issuance, **not** a cryptographic VV roster. Implementations MUST NOT add a roster-authentication step here.
+
+**No pruning (v1).** A VV grows with the user's *lifetime* device count, not the active count. Dropping a component is forbidden in v1: it is "tombstone GC before causal stability" — it would make a fork involving that device undetectable thereafter. For a single user the device count is small, so there is no pressure. If pruning is ever introduced (v005), it MUST ride an authenticated device-retirement event (a current device authoring a head that records "device X retired at component N"), never a unilateral drop — a unilateral drop is a server fork-hiding door.
+
+### 4.2 Manifest, and what "version" means
+
+The **vault-head manifest** is the `uuid → content_nonce` map the head commits (as a `SHA-256` of its canonical bytes, §3.2). Two decisions are load-bearing:
+
+**Scope = content blobs only.** The manifest covers **notes** (`.myn`, keyed by note UUID) and **attachments** (keyed by `attachment-id`). It does **not** cover the synced singletons (`vault.prefs`, `vault.meta`, `vault.dictionary`, `vault.attachments` catalog). Their rollback is the already-accepted "local prefs replay" limitation (`threat-model.md` §7) — `vault.meta` additionally has the Q2 bespoke-merge + the `root_key`-invariant, so a credential-rollback is low-impact — and excluding them keeps the manifest uniform on a single discriminator (`content_nonce`), avoiding a per-singleton exception.
+
+**The discriminator is `content_nonce`, not a counter.** Each note's `content_nonce` (`protocol.md` §9.2) is freshly random per save (§6.3 there: `item_key_nonce` is persistent, `content_nonce` is regenerated every content encryption), so it is the correct per-revision discriminator, and it is readable from the cleartext header **without decrypting**. Committing it gives **two-layer** rollback detection:
+1. **Pre-decrypt:** a server serving an older revision presents a header `content_nonce` that ≠ the head's manifest entry → caught on a ~header-sized read, no decryption.
+2. **On-decrypt:** the server cannot write the current `content_nonce` into the header while keeping old content — the AEAD binds the nonce to the ciphertext, so decryption fails (the tag was computed under the real nonce).
+
+Binding the server's **opaque per-note version counter** instead would commit only a bare number, leaving which ciphertext counts as "version N" for the server to play with. The opaque counter is therefore **orthogonal** to the head: it is the sync transport's compare-and-swap token for individual note pushes (MYND-421), not something the head commits.
+
+**Deleted notes (tombstones).** A deletion is a `deleted`-marked new note version with its own fresh `content_nonce` (Q3 / MYND-422), so it stays **in the manifest** until horizon-GC — the head commits it, and a server attempting resurrection (serving the pre-deletion `content_nonce`) mismatches the head and is caught. Once horizon-GC fully purges a note, its UUID drops from the manifest; from that point a resurrection is covered not by the head but by Q3's full-reconcile-on-bootstrap + §6 TOFU (a device returning past the horizon is in full-reconcile mode and will not resurrect a vanished note). Pre-GC = head-protected; post-GC = handed to full-reconcile.
+
+### 4.3 Push compare-and-swap = `prev_head_hash`
+
+The head pointer is updated by an optimistic **compare-and-swap**, and `prev_head_hash` **is** the CAS token — there is no separate head counter. The server keeps exactly one *current-head pointer* per vault and, on a push, accepts the new head iff its current pointer matches one of the pushed head's `prev_head_hash` values, then sets the current pointer to the pushed `head_id`. The server treats the head as an opaque, MAC'd blob; it performs only the pointer comparison, learning nothing (server-trust-minimal).
+
+Concurrent push resolves exactly as in git: if device A wins (`H0 → head_A`), device B's push (still `prev = H0`) fails the CAS; B pulls `head_A`, finds `head_A.VV` **incomparable** to `head_B.VV`, authors a two-way **merge** head (parents byte-sorted per §3.4), and pushes it — which now CAS-matches the current `head_A`. The server cannot forge a DAG edge (every `prev_head_hash` is bound into an unforgeable `head_id`); it can only accept or reject, which is the Q9-consistent availability bound.
+
+---
+
+## 5. Verification
+
+### 5.1 Persisted baseline
+
+Each device persists its **last-seen head** — the full wire-head record of the most recent head it accepted (or authored) — in the device-local `MYH1` baseline (§7). Verification is *relative to* this baseline; a device with no baseline is bootstrapping (§6, TOFU). In-session, the baseline is held in memory and only ever advances (a pull can never lower it); `MYH1` is the restart anchor.
+
+### 5.2 On-pull algorithm
+
+On receiving a candidate head `H` from the server, a device with last-seen baseline `B` MUST, in order:
+
+1. **MAC-verify.** Recompute `head_mac` over `H`'s canonical `head_mac_input` (§3.2) under `head_mac_key`; reject if it does not match (constant-time compare). A head that fails here was not authored by a `root_key` holder — discard it. *(This is the only check the server could even attempt to attack, and it cannot: it lacks `root_key`.)*
+2. **Structural well-formedness.** `parent_count ∈ {0,1,2}`; `prev_head_hash[]` byte-sorted and the right length; VV well-formed (sorted, no duplicate `device_id`); the explicit-author consistency check of §4.1 (`VV[author] == max(parents)[author] + 1`, `== 1` at genesis). Reject on any failure.
+3. **VV-dominance (the operative rollback test).** Compare `H.VV` to `B.VV` **componentwise** (treat absent components as 0). This is O(devices) on the single head's embedded VV — **no chain walk, no intermediate-head fetch**. Route to §5.3.
+
+The `prev_head_hash` chain is **not** walked in the happy path. It is the structural backbone for fork-permanence and for **lazy merge-parent verification** (§5.4) only. VV-dominance is sufficient for rollback rejection precisely because the server cannot forge a head with a fabricated VV (step 1): any head it serves carries the *real* VV its author committed.
+
+### 5.3 The three cases
+
+- **`H.VV ≥ B.VV` componentwise, with at least one component strictly greater → extension.** Accept; `H` becomes the new baseline.
+- **Any component of `H.VV` is *less* than `B.VV` → rollback.** Reject. (The server is replaying an older real head.)
+- **`H.VV` is incomparable to `B.VV` (some components greater, some less) → concurrent.** This is a *legitimate* concurrent edit, **not** a fork. The device's response is **active**: it authors a two-way **merge** head (componentwise-max + author+1, §4.1) and pushes it (§4.3). That single move is both the conflict resolution (the merge becomes the new converged head) **and** the fork-test: if the server refuses to serve the merge to the other branch, the divergence surfaces (§5.5).
+
+A fork is distinguished from mere concurrency by **convergence over time**: incomparable-then-merged is concurrency; incomparable that **never re-converges** across devices (one device's accepted head is never an ancestor of what another device later reads) is a **fork** — caught delayed, in-band, on cross-read, and confirmed only via the out-of-band fingerprint (§6).
+
+### 5.4 Lazy merge-parent verification
+
+For a linear head (`parent_count == 1`) the device never walks the chain. For a **merge** head (`parent_count == 2`), the device fetches and MAC-verifies (§5.2 step 1) any parent `head_id` it does not already hold, and applies the merge-VV consistency check (`merge.VV == componentwise-max(parents) + author+1`). If a parent is **unfetchable** (beyond the Q3 horizon-GC), the device skips that consistency check and accepts the merge on faith — its author is a `root_key`-MAC'd device, i.e. one of the user's own, so the check guards against the user's *own* bug (like the `account_number_hash` redundancy of §3.2), not against the server. The walk is therefore lazy and best-effort-if-parents-on-hand; it is never part of the happy-path latency.
+
+### 5.5 Withholding (honest split)
+
+Withholding is a liveness attack and is **not** fully preventable — but v1 is **not blind to its own work**:
+
+- **Withholding of the device's *own* authored work is caught in-band.** Because VV-dominance includes the self component, any head the server serves must carry `H.VV[self] ≥ B.VV[self]` (the device's own pushes are real heads it remembers authoring). A server that lowers, omits, or rolls back the self component is caught immediately at §5.3 — the device knows what it authored.
+- **Withholding of *other* devices' work, and global staleness, is best-effort.** A server can serve a head that dominates *this* device's baseline while omitting another device A's latest push — this is not a dominance violation (the head dominates my VV; it simply does not carry A's newer component). Likewise a server can hide the newest head and serve an older-but-not-rolled-back one; the device cannot distinguish "nothing new" from "withholding." These are **accepted** in v1; a signed freshness-box (a monotonic timestamp token) is deferred to v005.
+
+Spec language MUST say "liveness, best-effort" for the second class and MUST NOT claim withholding is undetectable in general — the self-work case is detected.
+
+### 5.6 Continuity, not bootstrap
+
+Everything in §5 is a **continuity** guarantee: it protects a device that already holds a baseline `B`. A device with no baseline (fresh, reset, re-enrolled) has nothing to compare against and is in **TOFU bootstrap** (§6). This boundary is load-bearing and MUST be stated wherever the rollback guarantee is described.
+
+### 5.7 Properties to verify (MYND-417/418)
+
+This primitive **requires a primitive-level cryptographic review, not merely an architectural one**, before implementation lands. The following properties MUST be covered by `proptest` (Rust, `crypto_properties.rs` discipline) and by the golden vectors (MYND-418, schema in `myne-test-vectors`):
+
+- **Encode→decode roundtrip.** A head encoded per §3 and decoded yields an identical record; `head_id` is stable.
+- **Rollback-rejection.** A head with any VV component below the baseline is rejected (§5.3).
+- **Fork-incomparability.** Two incomparable heads never both validate as a linear extension of the same baseline (exactly one, or neither, extends; the other forces a merge).
+- **Merge-VV-consistency.** For any DAG, a merge head's author component equals `max(parents) + 1` and all other components equal the componentwise max (§4.1); genesis = `{author: 1}`.
+- **Canonical-encoding determinism.** Independent encoders (Rust, Go) emit byte-identical `head_mac_input` for the same logical head — the bit-identical bar of §3 (VV sort, merge-parent lexicographic sort, fixed widths, big-endian).
+
+---
+
+## 6. Genesis & TOFU bootstrap
+
+### 6.1 Genesis
+
+The **genesis** head is authored by the first device to push, at **first sync** — not at vault creation (the head is wire-only; a vault that never syncs has no head, and Phase 1 must not gain a sync artefact). Genesis commits the **entire existing local corpus**: `manifest_hash` over every current content blob's `(uuid, content_nonce)`, `VV = {author: 1}`, `seq = 1`, `parent_count = 0`. The authoring device is **authoritative** — it knows its own local state is real, so genesis carries no TOFU risk.
+
+Head state is fully **re-derivable**: total loss of a device's head state (corrupted/cleared `MYH1`) costs at most a re-genesis (a TOFU reset, §6.2) — the vault *content* is untouched, since the head is a sync artefact, not authoritative content.
+
+### 6.2 TOFU bootstrap
+
+The "first device" is not cryptographically special; **"has a persisted baseline or not"** is. A fresh, reset, or re-enrolled device has no baseline, so §5's continuity guarantee does not yet apply: it adopts the server-served head on **trust-on-first-use**. MAC-verifying that head proves only that *a `root_key` holder authored it* — **not** that it is the latest, unforked head. A malicious server can therefore seat a brand-new device onto a stale or forked history undetectably, because the device has no prior state to contradict it. This is intrinsic to fork-consistency (SUNDR: a client that has observed nothing can detect nothing); it is the same posture as Signal/Matrix key TOFU.
+
+A re-enrolled device generates a **new** `device_id` (§4.1) — it does not reclaim the old one; the old component freezes.
+
+### 6.3 Bootstrap-fingerprint (the only hardening)
+
+The bootstrap is **not** in a vacuum: enrollment (MYND-425) runs a **device-approval gate** where an existing, unlocked device approves the newcomer — so the user is physically at *both* devices, and an out-of-band channel (their eyes) is naturally present. v1 hardens TOFU by having both devices display a short **bootstrap-fingerprint** derived from the adopted `head_id`, for the user to eye-compare — exactly Signal/Matrix safety-number verification. A match turns "trust the untrusted server" into "verified against an existing trusted device."
+
+- The fingerprint is **~SAS-magnitude** (tens of bits — a few words / a 6–8 char code), eye-comparable, a deterministic function of `head_id` (not the full 32-byte value).
+- It is **targeted** to the approval moment. If the device-approval gate ships in v1, this compare ships in v1 (the marginal UX cost is one glance on a screen the user is already on, at the exact vulnerability point).
+- It is distinct from the **general fork-audit fingerprint** — an always-available affordance to compare current heads across devices at any time — whose prompt-UX stays v1.x. v1 ships the *substrate* (a deterministic fingerprint of any `head_id`); the general UI is later.
+
+Without an out-of-band compare, TOFU adoption remains trust-the-server; with it, the malicious-server bootstrap attack is closed for that enrollment. The spec MUST present TOFU honestly (the guarantee holds only after a verified baseline exists) and MUST NOT imply that MAC-verification alone authenticates freshness.
+
+---
+
+## 7. Device-local baseline (`MYH1`)
+
+The last-seen head (§5.1) is persisted **device-locally** in the `MYH1` `vault.head-state` blob; its on-disk format, integrity rule, and honest limits are normative in [`protocol.md`](protocol.md) §9.15. The sync-relevant properties:
+
+- **Device-local, never synced, never backed up.** The baseline MUST NOT live on the server — a server-held baseline would let the server roll *it* back too, defeating §5 entirely. It is structurally excluded from sync by the closed sync-allowlist's **default-deny** (it is simply not an allowlisted member, not a special-cased exclusion) and from backup by the §9.11.3 allowlist (a restored baseline would be stale → the restored vault re-bootstraps via §6 TOFU).
+- **Stores the full wire-head TIP only**, re-verifying the head's own `vault-head-mac` on load (no separate at-rest MAC, no KEK — the head carries no vault plaintext the sync server doesn't already see). Written every accepted-pull and every authored-push.
+- **Anti-rollback of the baseline itself is bounded, not absolute.** Lowering the on-disk baseline to force acceptance of a server rollback requires a **conjunction** — local-disk-write **and** a colluding malicious server; neither alone suffices (disk-write-only: an honest server still serves the real, dominating tip; server-rollback-only: an intact baseline rejects it). Impact is bounded to stale *own* data (never forged or decrypted), and the in-session RAM baseline only advances. Accepted for v0.1 and recorded in `threat-model.md` §7; a hardware monotonic counter is the v005 closure (`protocol.md` §9.15).
