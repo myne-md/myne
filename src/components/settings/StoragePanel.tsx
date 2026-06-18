@@ -15,6 +15,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "../primitives/Button";
+import { AutomaticBackupBlock } from "./AutomaticBackupBlock";
 import { ControlBlock } from "./ControlBlock";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 
@@ -86,6 +87,9 @@ interface StoragePanelProps {
    *  disabled, same defensive degrade as the other rows (Settings only opens
    *  from the unlocked editor, so the vault is unlocked by construction). */
   onExportVault?: () => void;
+  /** Toast surface — threaded to the automatic-backup block for a failed
+   *  settings write (MYND-351). */
+  onShowToast?: (message: string) => void;
 }
 
 export function StoragePanel({
@@ -93,6 +97,7 @@ export function StoragePanel({
   onBackupVault,
   onRestoreBackup,
   onExportVault,
+  onShowToast,
 }: StoragePanelProps = {}) {
   const [vaultPath, setVaultPath] = useState<string>("…");
 
@@ -175,6 +180,8 @@ export function StoragePanel({
           </div>
         }
       />
+
+      <AutomaticBackupBlock onShowToast={onShowToast} />
 
       <ControlBlock
         label="Export"

@@ -154,6 +154,13 @@ pub async fn vault_delete<R: Runtime>(
     // sole-vault id derived from the resolved root (same derivation as
     // `unlock` / `recover` when no explicit id was threaded).
     let vault_id = target.unwrap_or_else(|| crate::paths::vault_id_from_root(&vault_dir));
+
+    // MYND-351 Direction 2: a user-initiated delete preempts an in-flight
+    // scheduled backup (which holds the shared auth permit) so the `try_acquire`
+    // inside `vault_delete_with_dir` is not rejected by the invisible job.
+    crate::plugins::backup::commands::preempt_inflight_backup_for_user_auth(state.inner(), &app)
+        .await;
+
     let result = vault_delete_with_dir(vault_dir, vault_id, state.inner()).await;
 
     // MYND-29 Task 8: the slot was dropped iff the delete actually proceeded

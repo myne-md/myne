@@ -104,3 +104,13 @@ export const EXPORT_PLAIN_HTML_SENTENCE =
  *  modal and the sentence is said only here. */
 export const EXPORT_PLAIN_TEXT_SENTENCE =
   "The exported file is plain text — it is not encrypted.";
+
+// Automatic local-backup failure toast (MYND-351). A backup feature must never
+// fail silently — when a scheduled backup cannot write (target gone / disk full
+// / permission denied) the user sees this once (debounced); the schedule stays
+// enabled and retries next cycle. E2E (task 8 failure-path) asserts it by
+// FULL-literal equality, so it lives here as the single source.
+
+/** Scheduled-backup failure toast — the quiet, non-silent failure alert. */
+export const BACKUP_SCHEDULE_FAILED_TOAST =
+  "Automatic backup failed. Check your backup folder in Settings → Storage.";

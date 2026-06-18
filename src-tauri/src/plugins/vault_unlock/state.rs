@@ -71,6 +71,13 @@ use zeroize::Zeroizing;
 /// `VaultRecoveryError::RecoveryInProgress`), not queued.
 pub const AUTH_PERMITS: usize = 1;
 
+/// Bounded wait for an in-flight scheduled backup to release the auth permit
+/// when a user-initiated auth op preempts it (MYND-351). Interval × attempts
+/// caps how long the user waits before the op rejects (when the permit is held
+/// by a non-cancellable auth op rather than the cancellable backup). ~2s ceiling.
+const BACKUP_YIELD_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(25);
+const BACKUP_YIELD_POLL_ATTEMPTS: u32 = 80;
+
 /// Tauri-managed runtime state for the vault auth domain.
 ///
 /// One singleton per app process. Created by `vault_unlock::init()` and
@@ -171,6 +178,46 @@ impl VaultRuntimeState {
     /// this in their command's critical-section guard.
     pub fn auth_permits(&self) -> &Semaphore {
         &self.auth_permits
+    }
+
+    /// "User always wins" preemption of an in-flight scheduled backup before a
+    /// user-initiated auth op acquires the shared auth permit (MYND-351, design
+    /// session 2026-06-17 Q6 / Direction 2).
+    ///
+    /// A scheduled `vault_export_backup` holds the auth permit for its whole
+    /// run; without this, a user clicking change-password / delete during that
+    /// window would be rejected by their own `try_acquire`. This signals the
+    /// export's cooperative `backup_cancel` flag (the export aborts at its next
+    /// per-member tick, discards partial output, and drops the permit) and then
+    /// waits — bounded — for the permit to free, so the caller's subsequent
+    /// `try_acquire` succeeds.
+    ///
+    /// Best-effort and non-poisoning:
+    /// - Fast path: if the permit is already free (no in-flight holder) it
+    ///   returns immediately WITHOUT touching the cancel flag.
+    /// - If the permit is held by ANOTHER auth op (not the cancellable backup)
+    ///   the wait times out and the caller's `try_acquire` rejects as before —
+    ///   auth-vs-auth reject-never-queue is unchanged.
+    /// - The cancel flag it sets is cleared by the next export's post-acquire
+    ///   `reset_cancel`, so it never poisons a future backup.
+    pub async fn preempt_backup_for_user_auth(
+        &self,
+        backup_cancel: &std::sync::atomic::AtomicBool,
+    ) {
+        use std::sync::atomic::Ordering;
+        // Nothing holds the permit → no backup in flight; do not cancel.
+        if self.auth_permits().available_permits() > 0 {
+            return;
+        }
+        // Signal the cooperative cancel and wait (bounded) for release.
+        backup_cancel.store(true, Ordering::Relaxed);
+        for _ in 0..BACKUP_YIELD_POLL_ATTEMPTS {
+            if self.auth_permits().available_permits() > 0 {
+                return;
+            }
+            tokio::time::sleep(BACKUP_YIELD_POLL_INTERVAL).await;
+        }
+        // Timed out: a non-backup auth op holds it. Caller's try_acquire rejects.
     }
 
     /// The `VaultId` of the sole `Slot::Unlocked` entry, or `None` if no
@@ -1271,6 +1318,67 @@ mod tests {
             .enable_all()
             .build()
             .expect("current-thread runtime build")
+    }
+
+    // ---- MYND-351: preempt_backup_for_user_auth (Direction 2) ----------
+
+    #[test]
+    fn preempt_is_noop_when_permit_free() {
+        // No in-flight backup → the fast path returns without signalling cancel.
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            state.preempt_backup_for_user_auth(&cancel).await;
+            assert!(
+                !cancel.load(std::sync::atomic::Ordering::Relaxed),
+                "no in-flight backup → cancel must NOT be signalled"
+            );
+            assert_eq!(state.auth_permits().available_permits(), 1);
+        });
+    }
+
+    #[test]
+    fn preempt_cancels_and_waits_for_in_flight_backup_release() {
+        // A simulated in-flight backup holds the permit and releases it once the
+        // cooperative cancel flag is signalled — the "user always wins" bridge.
+        // Multi-thread runtime so the spawned preempt runs concurrently with the
+        // foreground releaser (no `tokio::join!` — the macros feature is off).
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("multi-thread runtime");
+        rt.block_on(async {
+            let state = Arc::new(VaultRuntimeState::default());
+            let cancel = Arc::new(AtomicBool::new(false));
+            let permit = state.auth_permits().try_acquire().expect("hold permit");
+            assert_eq!(state.auth_permits().available_permits(), 0);
+
+            let s2 = state.clone();
+            let c2 = cancel.clone();
+            let preempt = tokio::spawn(async move {
+                s2.preempt_backup_for_user_auth(&c2).await;
+            });
+
+            // Mimic the export's cooperative cancel: release once signalled.
+            while !cancel.load(Ordering::Relaxed) {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+            drop(permit);
+            preempt.await.expect("preempt task");
+
+            assert!(
+                cancel.load(Ordering::Relaxed),
+                "preempt must signal the cooperative backup cancel"
+            );
+            assert_eq!(
+                state.auth_permits().available_permits(),
+                1,
+                "the permit is free once the cancelled backup releases it"
+            );
+        });
     }
 
     /// SYNC-6 writer-guard mechanism: every `hold_unlocked_*` guard keeps a

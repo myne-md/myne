@@ -249,6 +249,13 @@ fn main() {
                     "vault_restore_backup",
                     "backup_default_filename",
                     "backup_cancel",
+                    // MYND-351: device-local automatic-backup schedule config
+                    // (read/write the `vaults/backup-schedule.json` store) +
+                    // the scheduler's post-run result recorder (ledger append +
+                    // keep-last-N prune / failure stamp).
+                    "backup_schedule_read",
+                    "backup_schedule_write",
+                    "backup_schedule_record_result",
                 ]),
             )
             .plugin(

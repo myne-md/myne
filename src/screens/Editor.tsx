@@ -119,6 +119,8 @@ import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
+import { useBackupScheduler } from "../hooks/useBackupScheduler";
+import { BACKUP_SCHEDULE_FAILED_TOAST } from "../lib/load-bearing-copy";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
@@ -753,6 +755,17 @@ function EditorChrome({
   // timer. The Editor is mounted iff the vault is Unlocked, so the heartbeat
   // runs exactly while a lockable session is live.
   useActivityHeartbeat();
+
+  // MYND-351 — automatic local-backup scheduler (Model A: runs only while the
+  // app is open and a vault is unlocked, i.e. exactly while this Editor is
+  // mounted). A backup must never fail silently: a fresh failure (debounced so
+  // a persistent failure toasts once) surfaces the quiet alert; success is a
+  // silent status line the StoragePanel reads. The schedule never auto-disables.
+  useBackupScheduler((scheduleTick) => {
+    if (scheduleTick.freshFailure) {
+      setToast({ message: BACKUP_SCHEDULE_FAILED_TOAST });
+    }
+  });
 
   // Close / lock / idle-lock flush EVERY pane's pending save via the
   // workspace flush registry (each PaneView registers its `flushIfDirty`).

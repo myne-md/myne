@@ -19,6 +19,9 @@ permissions = [
     "allow-vault-restore-backup",
     "allow-backup-default-filename",
     "allow-backup-cancel",
+    "allow-backup-schedule-read",
+    "allow-backup-schedule-write",
+    "allow-backup-schedule-record-result",
 ]
 
 [[permission]]
@@ -40,3 +43,18 @@ commands.allow = ["backup_cancel"]
 identifier = "allow-vault-restore-backup"
 description = "Allow invoking backup:vault_restore_backup (recreate a vault from a user-chosen .myne-backup file: credential-free validation incl. the embedded vault.meta structural parse, staging into a discovery-invisible directory, atomic commit as a fresh vaults/<id>/ under the lifecycle permit — spec §9.11.6, SYNC-5/6)."
 commands.allow = ["vault_restore_backup"]
+
+[[permission]]
+identifier = "allow-backup-schedule-read"
+description = "Allow invoking backup:backup_schedule_read (read the device-local automatic-backup schedule config for one vault from vaults/backup-schedule.json; returns sane defaults — disabled, keep-7 — when nothing is stored; MYND-351)."
+commands.allow = ["backup_schedule_read"]
+
+[[permission]]
+identifier = "allow-backup-schedule-write"
+description = "Allow invoking backup:backup_schedule_write (upsert the user-editable automatic-backup settings — enabled / interval / target folder / retention N — for one vault, preserving engine state; device-local plaintext store; MYND-351)."
+commands.allow = ["backup_schedule_write"]
+
+[[permission]]
+identifier = "allow-backup-schedule-record-result"
+description = "Allow invoking backup:backup_schedule_record_result (record the outcome of a scheduled backup run: on success append the path to the keep-last-N pruning ledger + stamp the per-device success clock, on failure stamp the attempt clock; device-local store; MYND-351)."
+commands.allow = ["backup_schedule_record_result"]
