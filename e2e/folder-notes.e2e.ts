@@ -63,7 +63,10 @@ async function contextMenuPick(
  *  product one). */
 async function createFolder(s: Session, name: string): Promise<void> {
   await (await s.byTestId("notes.new-folder")).click();
-  await (await s.byTestId("notes.new-folder-input")).sendKeys(name);
+  // `\uE007` is the W3C Enter code point — it commits the inline new-folder
+  // input. Without it the input never materializes `notes.folder-row` and the
+  // next line times out (the nc4 site in notes.e2e.ts carries the same key).
+  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}\uE007`);
   await s.byTestId("notes.folder-row");
 }
 
@@ -76,7 +79,10 @@ async function createNoteInFolder(
   title: string,
 ): Promise<void> {
   await contextMenuPick(s, folder, "new-note");
-  await (await s.byTestId("notes.rename-input")).sendKeys(title);
+  // Trailing `` (W3C Enter) commits the inline rename; without it the
+  // rename input never closes and `waitForGone` below times out. Mirrors the
+  // canonical `flows.ts::createNote`, which carries the same commit key.
+  await (await s.byTestId("notes.rename-input")).sendKeys(`${title}\uE007`);
   await s.waitForGone(testIdSelector("notes.rename-input"));
 }
 
