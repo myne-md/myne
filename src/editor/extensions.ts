@@ -18,7 +18,7 @@
 // T5 slash/toolbar/keymap, T6 theme) land in subsequent tasks and append
 // to this list.
 
-import { EditorView, keymap } from "@codemirror/view";
+import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
 import {
   defaultKeymap,
   history,
@@ -28,7 +28,7 @@ import {
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Subscript, Superscript, Emoji } from "@lezer/markdown";
-import { type Extension } from "@codemirror/state";
+import { EditorState, type Extension } from "@codemirror/state";
 import { Wikilink } from "../dialect/lezer/wikilink";
 import { InlineTag } from "../dialect/lezer/inline-tag";
 import { DefinitionList } from "../dialect/lezer/definition-list";
@@ -38,7 +38,7 @@ import { Math } from "../dialect/lezer/math";
 import { Comment } from "../dialect/lezer/comment";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
-import { myneDecorations } from "./decorations";
+import { viewModeExtension, type ViewMode } from "./view-mode";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { noteSetExtension } from "./wikilink/note-set";
@@ -54,16 +54,42 @@ import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
 import { completionExtension } from "./completion";
 import { clickCollapseExtension } from "./click-collapse";
+import { myneFolding } from "./folding";
 import { findExtension } from "./find/find-extension";
 import { spellDecorations } from "./decorations/spell";
 import { spellCorrectionMenu } from "./spell/correction-menu";
 import { myneKeyBindings } from "./keymap";
+import { selectionCountObserver } from "./selection-count";
+import { focusModeExtension } from "./focus-mode";
 import { myneTheme } from "./theme";
 
-export function myneExtensions(): readonly Extension[] {
+export function myneExtensions(opts?: { viewMode?: ViewMode; readOnly?: boolean }): readonly Extension[] {
+  const viewMode = opts?.viewMode ?? "live";
+  const readOnly = opts?.readOnly ?? false;
   return [
     history(),
     closeBrackets(),
+    // Multi-cursor / multiple selections (MYND-306). Two pieces:
+    //   1. Enable the facet — CM6 defaults `allowMultipleSelections` to false,
+    //      so transactions collapse to the primary range. Flipping it on is the
+    //      single required enablement; Alt-click add-cursor (CM6 native
+    //      `mouseSelectionStyle`) and vertical add-cursor `Mod-Alt-↑/↓` (already
+    //      in the installed `defaultKeymap`) then work, and `Mod-d` →
+    //      `selectNextOccurrence` is bound in `keymap.ts`. Always-on (no pref).
+    //   2. drawSelection() (SYNC-3): this feature OWNS the single drawSelection()
+    //      insertion — heading-list-folding (MYND-300) deliberately did NOT add
+    //      it and must NOT re-add it. Load-bearing: without it the browser paints
+    //      only the primary cursor even when multiple selections exist in state.
+    //      Mounted once, early, so it takes over cursor painting before the
+    //      decoration / cursor-aware-reveal layers run.
+    EditorState.allowMultipleSelections.of(true),
+    drawSelection(),
+    // focus-mode (MYND-348): mark the active line(s) so focus-mode line-dimming
+    // (pure CSS, gated by the editor's `data-focus-dim` ancestor in tokens.css)
+    // can keep them bright. The active-line BACKGROUND is neutralized in theme.ts
+    // so this is invisible in normal mode — it only supplies the `.cm-activeLine`
+    // class the dim rule un-dims.
+    highlightActiveLine(),
     markdown({
       base: markdownLanguage,
       // codeNestMarkdownExtension nests per-language Lezer parsers into closed
@@ -102,7 +128,12 @@ export function myneExtensions(): readonly Extension[] {
     // import is in flight (MYND-164 polish). Decoration-only — never writes to
     // the doc, so the placeholder can't be persisted.
     attachmentInsertPlaceholderExtension(),
-    ...myneDecorations(),
+    // View-mode compartments (reading-source-modes, MYND-299): the live-preview
+    // decoration stack + editability, seeded from the tab's mode. Source mode
+    // empties the decorations (raw markdown, syntax highlight still on); reading
+    // mode makes the view non-editable so cursor-aware reveal stays off and
+    // everything renders. Reconfigured live by CMEditor via reconfigureViewMode().
+    viewModeExtension(viewMode, readOnly),
     // WL-5: the live resolver note-set facet (seeded empty; the host
     // reconfigures it from `useResolverNotes()`). MUST precede the chip + hover
     // so the facet exists when they read it.
@@ -122,6 +153,12 @@ export function myneExtensions(): readonly Extension[] {
     // `#tag` (suggests existing tags, MYND-45). Both override-sources in ONE
     // config (`completion.ts`) so they coexist.
     completionExtension(),
+    // Heading-section + nested-list folding (MYND-300): mounts codeFolding() +
+    // a hover-reveal foldGutter() + the custom list-fold service. Heading-section
+    // fold ranges come free from lang-markdown's headerIndent foldService;
+    // mounting the gutter surfaces them. Fold state is EPHEMERAL (no persistence)
+    // — CM6 drops it on unmount, which is the note-switch / lock / quit reset.
+    myneFolding(),
     // Collapse the spurious tiny selection a plain click makes when the
     // cursor-aware reveal reflows the clicked line (e.g. an H1 re-showing `# `).
     clickCollapseExtension(),
@@ -166,5 +203,13 @@ export function myneExtensions(): readonly Extension[] {
     // Register the focused view so command-palette actions (R2 convert, MYND-84)
     // can reach the active pane's view + WL-5 note-set.
     activeViewExtension(),
+    // Multi-cursor observability (MYND-306, SYNC-8): mirror the active
+    // selection-range count onto the editor DOM as `data-selection-count` so
+    // E2E can assert multi-cursor state. Observability-only — no chrome.
+    ...selectionCountObserver(),
+    // focus-mode (MYND-348): typewriter scroll — always mounted, inert unless the
+    // editor's `data-focus-typewriter` ancestor gate is present (focusActive &&
+    // pref). Keeps the active line vertically centered as the cursor moves.
+    focusModeExtension(),
   ];
 }

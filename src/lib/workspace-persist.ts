@@ -14,9 +14,13 @@ import {
   GRAPH_TAB_ID,
   itemKey,
   sameItem,
+  wrapAsSingleSlot,
   type LeafPane,
+  type NamedWorkspaces,
+  type ViewMode,
   type WorkspaceItem,
   type WorkspaceNode,
+  type WorkspaceSlot,
   type WorkspaceState,
 } from "../notes/workspaceState";
 
@@ -41,15 +45,17 @@ export async function workspaceStage(descriptor: string): Promise<void> {
   await invoke("plugin:workspace|workspace_stage", { descriptor });
 }
 
-/** Serialize a workspace to the on-disk descriptor string.
+/** Serialize a single descriptor to the on-disk string form.
  *
  * The tab-modes (MYND-319/320) `pinned` (per-tab) and `stacked` (per-leaf)
- * fields are **omit-when-default**: the pure model never stores `pinned: false`
- * or `stacked: false` (the unpin / un-stack transitions DROP the key), and
- * `JSON.stringify` omits `undefined` keys — so a workspace with no pins and no
- * stacked panes serializes BYTE-IDENTICAL to a pre-feature descriptor. No
- * `workspace_format_version` bump; the descriptor stays engine-opaque (§9.7.2,
- * SYNC-4). */
+ * fields, plus the reading-source-modes (MYND-299) per-tab `viewMode`, are all
+ * **omit-when-default**: the pure model never stores `pinned: false`,
+ * `stacked: false`, or `viewMode: "live"` (the un-set transitions DROP the key),
+ * and `JSON.stringify` omits `undefined` keys — so a workspace with no pins, no
+ * stacked panes, and all-default view modes serializes BYTE-IDENTICAL to a
+ * pre-feature descriptor. The single-descriptor form stays engine-opaque
+ * (§9.7.2, SYNC-4); the container form ({@link serializeWorkspaces}) rides the
+ * MYW1 0x02 blob (MYND-308). */
 export function serializeWorkspace(state: WorkspaceState): string {
   return JSON.stringify({ root: state.root, focusedPaneId: state.focusedPaneId });
 }
@@ -91,6 +97,89 @@ export function deserializeWorkspace(json: string): WorkspaceState | null {
   return state;
 }
 
+// ============================================================
+// Named-workspaces container (de)serialization (MYND-308 task 2).
+//
+// This is the inner plaintext sealed into the MYW1 0x02 blob. The container is
+// `{ slots: WorkspaceSlot[]; activeId: string }`; each slot's `state` is an
+// ordinary single descriptor handled by the functions above (so per-tab
+// `viewMode` omit-when-default is preserved per slot automatically). Migration-
+// on-read wraps a stray LEGACY single-descriptor payload (the 0x01 shape) as a
+// single "Default" slot — defensive even though the Rust envelope now rejects
+// 0x01.
+// ============================================================
+
+/** Serialize a `NamedWorkspaces` container to the MYW1 0x02 descriptor string.
+ *  Each slot's `state` is emitted as a `{root, focusedPaneId}` object, so the
+ *  same omit-when-default discipline (pinned / stacked / viewMode) applies
+ *  per slot. */
+export function serializeWorkspaces(container: NamedWorkspaces): string {
+  return JSON.stringify({
+    slots: container.slots.map((s) => ({
+      id: s.id,
+      name: s.name,
+      state: { root: s.state.root, focusedPaneId: s.state.focusedPaneId },
+    })),
+    activeId: container.activeId,
+  });
+}
+
+/**
+ * Parse + structurally validate a MYW1 descriptor into a `NamedWorkspaces`
+ * container. Accepts BOTH shapes:
+ *  - the container shape (`{slots, activeId}`) — the 0x02 form;
+ *  - a LEGACY single descriptor (`{root, focusedPaneId}` with no `slots`) —
+ *    migrated-on-read by wrapping it as a single "Default" slot.
+ * Returns `null` on any malformation (the caller falls back to a fresh single
+ * empty slot). `newId` mints the migration slot id (defaults to
+ * `crypto.randomUUID`; tests inject a deterministic value).
+ */
+export function deserializeWorkspaces(
+  json: string,
+  newId: () => string = () => crypto.randomUUID(),
+): NamedWorkspaces | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const obj = parsed as Record<string, unknown>;
+
+  // Legacy single-descriptor migration: no `slots`, but the bare descriptor
+  // shape. Re-serialize the descriptor sub-object and run it through the
+  // single-descriptor validator, then wrap as a single Default slot.
+  if (!("slots" in obj)) {
+    const legacy = deserializeWorkspace(json);
+    if (legacy === null) return null;
+    return wrapAsSingleSlot(legacy, newId());
+  }
+
+  if (!Array.isArray(obj.slots) || obj.slots.length === 0) return null;
+  if (typeof obj.activeId !== "string") return null;
+
+  const slots: WorkspaceSlot[] = [];
+  const slotIds = new Set<string>();
+  for (const raw of obj.slots) {
+    if (typeof raw !== "object" || raw === null) return null;
+    const s = raw as Record<string, unknown>;
+    if (typeof s.id !== "string" || typeof s.name !== "string") return null;
+    if (slotIds.has(s.id)) return null; // duplicate slot ids reject
+    const state = deserializeWorkspace(JSON.stringify(s.state));
+    if (state === null) return null;
+    slotIds.add(s.id);
+    slots.push({ id: s.id, name: s.name, state });
+  }
+
+  // activeId must name an existing slot; otherwise reject (the consistency
+  // fallback lives in `resolveActiveSlot`, applied against the MYP1 pointer —
+  // a self-inconsistent blob is corruption and rejects here).
+  if (!slotIds.has(obj.activeId)) return null;
+
+  return { slots, activeId: obj.activeId };
+}
+
 /** One parsed tab: a valid item, a well-formed-but-unknown-kind tab to DROP
  *  (forward-compat), or genuinely malformed input that rejects the blob. */
 type ParsedItem = { item: WorkspaceItem } | "drop" | "invalid";
@@ -110,13 +199,23 @@ function parseItem(t: unknown): ParsedItem {
   // absent / junk) is treated as unpinned, so the key never round-trips as
   // `false` and a non-pinned tab stays byte-identical to pre-feature.
   const pinned = o.pinned === true ? { pinned: true as const } : {};
+  // reading-source-modes (MYND-299): a per-tab `viewMode`. Read-when-present,
+  // omit-when-default — only an explicit `"reading"` / `"source"` round-trips;
+  // anything else (absent / `"live"` / junk) is the `"live"` default, so the key
+  // never persists for a default-mode tab and stays byte-identical to pre-feature.
+  const viewMode: { viewMode?: ViewMode } =
+    o.viewMode === "reading"
+      ? { viewMode: "reading" }
+      : o.viewMode === "source"
+        ? { viewMode: "source" }
+        : {};
   if (o.kind === "note" || o.kind === "view") {
-    return { item: { kind: o.kind, id: o.id, ...pinned } };
+    return { item: { kind: o.kind, id: o.id, ...pinned, ...viewMode } };
   }
   // The whole-vault graph (MYND-198) is a singleton tab; its id is the fixed
   // sentinel, so any persisted id normalizes to a canonical graph item.
   if (o.kind === "graph") {
-    return { item: { kind: "graph", id: GRAPH_TAB_ID, ...pinned } };
+    return { item: { kind: "graph", id: GRAPH_TAB_ID, ...pinned, ...viewMode } };
   }
   if (typeof o.kind === "string") return "drop"; // unknown future kind
   return "invalid";

@@ -12,6 +12,8 @@
 
 import type { CommandAction } from "./registry";
 import { runWikilinkConvert } from "../editor/wikilink/convert-command";
+import { foldAll, unfoldAll } from "@codemirror/language";
+import { getActiveEditorView } from "../editor/active-view";
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
@@ -150,6 +152,36 @@ const convertWikilinksAction: CommandAction = {
     ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden",
   run: () => {
     void runWikilinkConvert();
+  },
+};
+
+const foldAllAction: CommandAction = {
+  id: "editor.fold-all",
+  label: "Fold all",
+  category: "Editor",
+  kbd: "⌘⌥[",
+  defaultBinding: "Mod-Alt-[",
+  // Editor-only; reaches the focused pane's view directly via getActiveEditorView()
+  // (the convertWikilinksAction pattern) — folding is ephemeral CM6 state, so no
+  // CommandContext callback is threaded through React. foldAll/unfoldAll are the
+  // CM Commands; this is the palette twin of the Mod-Alt-[/] keymap entries.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) foldAll(view);
+  },
+};
+
+const unfoldAllAction: CommandAction = {
+  id: "editor.unfold-all",
+  label: "Unfold all",
+  category: "Editor",
+  kbd: "⌘⌥]",
+  defaultBinding: "Mod-Alt-]",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) unfoldAll(view);
   },
 };
 
@@ -326,17 +358,112 @@ const toggleStackedTabsAction: CommandAction = {
   },
 };
 
+const toggleReadingAction: CommandAction = {
+  id: "view.toggle-reading",
+  label: "Toggle reading view",
+  category: "View",
+  kbd: "⇧⌘E",
+  // reading-source-modes (MYND-299): Edit ⇄ Reading on the focused note tab. The
+  // live chord fires through the WorkspaceHotkeys keybind entry + catalog default
+  // (Mod-Shift-e); this `defaultBinding` is the palette display hint (SYNC-4).
+  defaultBinding: "Mod-Shift-e",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onToggleReading();
+  },
+};
+
+const toggleSourceAction: CommandAction = {
+  id: "view.toggle-source",
+  label: "Toggle source mode",
+  category: "View",
+  // Secondary live ⇄ source toggle on the focused note tab. No default chord
+  // (grill D2) — palette + the bottom-bar switcher are its entry points.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onToggleSource();
+  },
+};
+
+const toggleFocusAction: CommandAction = {
+  id: "view.toggle-focus",
+  label: "Toggle focus mode",
+  category: "View",
+  kbd: "⇧⌘F",
+  // focus-mode (MYND-348): distraction-free toggle. Live chord fires through the
+  // WorkspaceHotkeys keybind entry + catalog default (Mod-Shift-f); this
+  // `defaultBinding` is the palette display hint (SYNC-4).
+  defaultBinding: "Mod-Shift-f",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onToggleFocus();
+  },
+};
+
+// named-workspaces (MYND-308): save-as / switch / rename / delete the active
+// named workspace. No default chord (deliberately none — rebindable only,
+// catalog `defaultBindings: []`); the bottom-bar dropdown is the discoverable
+// twin entry point. Editor-only like the other view commands.
+const saveWorkspaceAsAction: CommandAction = {
+  id: "workspace.save-as",
+  label: "Save workspace as…",
+  category: "View",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onSaveWorkspaceAs();
+  },
+};
+
+const switchWorkspaceAction: CommandAction = {
+  id: "workspace.switch",
+  label: "Switch workspace…",
+  category: "View",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onSwitchWorkspace();
+  },
+};
+
+const renameWorkspaceAction: CommandAction = {
+  id: "workspace.rename",
+  label: "Rename workspace…",
+  category: "View",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onRenameWorkspace();
+  },
+};
+
+const deleteWorkspaceAction: CommandAction = {
+  id: "workspace.delete",
+  label: "Delete workspace…",
+  category: "View",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onDeleteWorkspace();
+  },
+};
+
 export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
   toggleLeftSidebarAction,
   toggleRightSidebarAction,
   toggleStackedTabsAction,
+  toggleReadingAction,
+  toggleSourceAction,
+  toggleFocusAction,
+  saveWorkspaceAsAction,
+  switchWorkspaceAction,
+  renameWorkspaceAction,
+  deleteWorkspaceAction,
   newNoteFromTemplateAction,
   openTodayNoteAction,
   randomNoteAction,
   manageTemplatesAction,
   openAttachmentsAction,
+  foldAllAction,
+  unfoldAllAction,
   openSnapshotsAction,
   exportNoteMarkdownAction,
   exportNotePdfAction,

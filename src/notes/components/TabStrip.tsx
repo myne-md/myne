@@ -182,6 +182,7 @@ export function TabStrip({
       }}
       role="tablist"
       aria-label="Open notes"
+      data-editor-chrome
       data-testid="editor.tab-strip"
       data-pane-id={paneId}
       data-stacked={stacked}

@@ -44,6 +44,14 @@ export type ViewId = string;
 export const GRAPH_TAB_ID = "graph";
 
 /**
+ * Per-tab editor view mode (reading-source-modes / MYND-299): how the tab's
+ * buffer renders. `"live"` is the default WYSIWYG editing surface; `"reading"`
+ * is read-only with decorations fully rendered; `"source"` shows raw markdown
+ * with decorations off. **Omit-when-default** — `undefined` / absent ≡ `"live"`.
+ */
+export type ViewMode = "live" | "reading" | "source";
+
+/**
  * A tab item: a note, a saved view (MYND-274 / SYNC-10), or the whole-vault
  * graph. The `kind` tag discriminates; the id alone does not (a note and a view
  * may share an id-string). Identity across the workspace is `(kind, id)`.
@@ -53,11 +61,15 @@ export const GRAPH_TAB_ID = "graph";
  * pane rather than replacing it. It is **omit-when-default** — `undefined` /
  * absent means unpinned. It is NOT part of identity: `itemKey` / `sameItem`
  * ignore it, so the global `(kind,id)` duplicate-forbid invariant is unaffected.
+ *
+ * `viewMode` is the per-tab render mode (reading-source-modes / MYND-299), also
+ * **omit-when-default** (absent ≡ `"live"`) and not part of identity. It rides
+ * the opaque descriptor with no MYW1 format change (MYND-299 task 2).
  */
 export type WorkspaceItem =
-  | { kind: "note"; id: NoteId; pinned?: boolean }
-  | { kind: "view"; id: ViewId; pinned?: boolean }
-  | { kind: "graph"; id: typeof GRAPH_TAB_ID; pinned?: boolean };
+  | { kind: "note"; id: NoteId; pinned?: boolean; viewMode?: ViewMode }
+  | { kind: "view"; id: ViewId; pinned?: boolean; viewMode?: ViewMode }
+  | { kind: "graph"; id: typeof GRAPH_TAB_ID; pinned?: boolean; viewMode?: ViewMode };
 
 /** Stable string key for an item — `"note:<id>"` / `"view:<id>"`. Used for
  *  set/equality comparisons over the heterogeneous tab strip. Ignores `pinned`
@@ -75,6 +87,11 @@ export function sameItem(a: WorkspaceItem, b: WorkspaceItem): boolean {
 /** Whether an item's tab is pinned (omit-when-default: absent ⇒ unpinned). */
 export function isPinned(item: WorkspaceItem): boolean {
   return item.pinned === true;
+}
+
+/** An item's tab view mode (omit-when-default: absent ⇒ `"live"`). */
+export function itemViewMode(item: WorkspaceItem): ViewMode {
+  return item.viewMode ?? "live";
 }
 
 /** Wrap a note id as a tab item — the convenience callers use at the boundary. */
@@ -614,6 +631,43 @@ export function setPinned(
 }
 
 /**
+ * Set the per-tab `viewMode` on `item`'s tab within `paneId` (reading-source-
+ * modes / MYND-299). No-op if that pane doesn't hold the item. Mirrors
+ * {@link setPinned}: the flag is written omit-when-default — setting `"reading"`
+ * or `"source"` writes the key; setting `"live"` (the default) DROPS the key so
+ * a default-mode tab serializes byte-identical to a pre-feature tab. Both the
+ * `tabs` entry and `activeTab` (when it is this item) are kept in sync.
+ */
+export function setItemViewMode(
+  state: WorkspaceState,
+  paneId: PaneId,
+  item: WorkspaceItem,
+  viewMode: ViewMode,
+): WorkspaceState {
+  const apply = (t: WorkspaceItem): WorkspaceItem => {
+    if (viewMode !== "live") return { ...t, viewMode };
+    // Default (`"live"`) → drop the key entirely (omit-when-default discipline).
+    const { viewMode: _drop, ...rest } = t;
+    return rest as WorkspaceItem;
+  };
+  return {
+    ...state,
+    root: updateLeaf(state.root, paneId, (leaf) =>
+      leaf.tabs.some((t) => sameItem(t, item))
+        ? {
+            ...leaf,
+            tabs: leaf.tabs.map((t) => (sameItem(t, item) ? apply(t) : t)),
+            activeTab:
+              leaf.activeTab !== null && sameItem(leaf.activeTab, item)
+                ? apply(leaf.activeTab)
+                : leaf.activeTab,
+          }
+        : leaf,
+    ),
+  };
+}
+
+/**
  * Set the per-leaf `stacked` layout flag (tab-modes / MYND-319). No-op if
  * `paneId` isn't a leaf. Omit-when-default: turning stacked OFF DROPS the key
  * so a non-stacked pane serializes byte-identical to a pre-feature pane.
@@ -801,4 +855,249 @@ export function closePane(
       ? state.focusedPaneId
       : firstLeafId(root);
   return { root, focusedPaneId };
+}
+
+// ============================================================
+// Named workspaces — N slots over the per-slot descriptor (MYND-308 task 2).
+//
+// Backward-compat by construction: each slot's `state` is an ordinary
+// `WorkspaceState`, so every existing reducer/selector above keeps operating on
+// the ACTIVE slot's descriptor unchanged. The container is a NEW layer; no
+// existing consumer is forced to change. The container rides the MYW1 0x02
+// opaque blob (the inner descriptor sealed under `session_state_key`); no Rust
+// parsing — Rust only ticks the format version (MYND-308 task 1).
+// ============================================================
+
+/** Stable slot identifier (a uuid-like string; the app wires
+ *  `crypto.randomUUID`, tests inject a deterministic factory). */
+export type SlotId = string;
+
+/** One named workspace: a stable id, a user-facing name, and its layout. */
+export type WorkspaceSlot = {
+  id: SlotId;
+  name: string;
+  state: WorkspaceState;
+};
+
+/** The container: N named slots + a pointer to the active one. Existing
+ *  reducers operate on `slots[activeId].state` via {@link activeSlotState}. */
+export type NamedWorkspaces = {
+  slots: WorkspaceSlot[];
+  activeId: SlotId;
+};
+
+/** Caller-supplied slot-id factory (the app wires `crypto.randomUUID`). */
+export type SlotIdFactory = () => SlotId;
+
+/** The default fresh-slot name (used when the last slot is deleted). */
+export const DEFAULT_SLOT_NAME = "Default";
+
+/**
+ * A fresh container holding a single "Default" slot. `paneId` seeds that slot's
+ * empty workspace; `slotId` (defaulting to `crypto.randomUUID`) names the slot.
+ */
+export function emptyNamedWorkspaces(
+  paneId: PaneId,
+  slotId: SlotId = crypto.randomUUID(),
+  name: string = DEFAULT_SLOT_NAME,
+): NamedWorkspaces {
+  return {
+    slots: [{ id: slotId, name, state: emptyWorkspace(paneId) }],
+    activeId: slotId,
+  };
+}
+
+/** Wrap a bare descriptor as a single-slot container — the migration shape for
+ *  a legacy single-`WorkspaceState` payload (MYND-308 task 2). */
+export function wrapAsSingleSlot(
+  state: WorkspaceState,
+  slotId: SlotId = crypto.randomUUID(),
+  name: string = DEFAULT_SLOT_NAME,
+): NamedWorkspaces {
+  return { slots: [{ id: slotId, name, state }], activeId: slotId };
+}
+
+/** All slots (in declaration order). */
+export function listSlots(container: NamedWorkspaces): WorkspaceSlot[] {
+  return container.slots;
+}
+
+/** The active slot, or `null` when `activeId` dangles (a self-heal caller then
+ *  falls back to the first slot — see {@link resolveActiveSlot}). */
+export function activeSlot(container: NamedWorkspaces): WorkspaceSlot | null {
+  return container.slots.find((s) => s.id === container.activeId) ?? null;
+}
+
+/**
+ * The active slot's descriptor — the bridge existing reducers/selectors plug
+ * into. Falls back to the FIRST slot when `activeId` dangles (defensive; the
+ * container always has ≥1 slot, so this never returns from an empty list).
+ */
+export function activeSlotState(container: NamedWorkspaces): WorkspaceState {
+  return (activeSlot(container) ?? container.slots[0]!).state;
+}
+
+/**
+ * Replace the active slot's descriptor with `next` (immutably). This is how the
+ * app layer commits the result of an existing reducer back into the container:
+ * `setActiveSlotState(c, openInNewTab(activeSlotState(c), item))`.
+ */
+export function setActiveSlotState(
+  container: NamedWorkspaces,
+  next: WorkspaceState,
+): NamedWorkspaces {
+  const targetId = activeSlot(container) !== null
+    ? container.activeId
+    : container.slots[0]!.id;
+  return {
+    ...container,
+    activeId: targetId,
+    slots: container.slots.map((s) =>
+      s.id === targetId ? { ...s, state: next } : s,
+    ),
+  };
+}
+
+/**
+ * Create a new slot named `name` holding `state` (a fresh empty workspace when
+ * omitted) and make it active. `newId` mints the slot id (defaults to
+ * `crypto.randomUUID`); `newPaneId` seeds a fresh slot's root pane.
+ */
+export function createSlot(
+  container: NamedWorkspaces,
+  name: string,
+  state?: WorkspaceState,
+  newId: SlotIdFactory = () => crypto.randomUUID(),
+  newPaneId: IdFactory = () => crypto.randomUUID(),
+): NamedWorkspaces {
+  const id = newId();
+  const slot: WorkspaceSlot = {
+    id,
+    name,
+    state: state ?? emptyWorkspace(newPaneId()),
+  };
+  return { slots: [...container.slots, slot], activeId: id };
+}
+
+/**
+ * "Save as…": clone the ACTIVE slot's current descriptor under a new `name` and
+ * switch to the clone (the original slot is left untouched). The clone is a
+ * structural snapshot — later edits to either slot don't bleed across.
+ */
+export function saveAsSlot(
+  container: NamedWorkspaces,
+  name: string,
+  newId: SlotIdFactory = () => crypto.randomUUID(),
+): NamedWorkspaces {
+  return createSlot(container, name, cloneState(activeSlotState(container)), newId);
+}
+
+/** Activate `id` (no-op if it isn't a known slot). */
+export function switchToSlot(
+  container: NamedWorkspaces,
+  id: SlotId,
+): NamedWorkspaces {
+  if (!container.slots.some((s) => s.id === id)) return container;
+  return { ...container, activeId: id };
+}
+
+/** Rename slot `id` (no-op if unknown). */
+export function renameSlot(
+  container: NamedWorkspaces,
+  id: SlotId,
+  name: string,
+): NamedWorkspaces {
+  if (!container.slots.some((s) => s.id === id)) return container;
+  return {
+    ...container,
+    slots: container.slots.map((s) => (s.id === id ? { ...s, name } : s)),
+  };
+}
+
+/**
+ * Delete slot `id`. Deleting a non-active slot keeps the active pointer.
+ * Deleting the active slot relocates the pointer to a sibling (the slot before
+ * it in order, else the one after). Deleting the LAST remaining slot yields a
+ * fresh empty "Default" slot (the container is never slotless). No-op if `id`
+ * is unknown.
+ */
+export function deleteSlot(
+  container: NamedWorkspaces,
+  id: SlotId,
+  newId: SlotIdFactory = () => crypto.randomUUID(),
+  newPaneId: IdFactory = () => crypto.randomUUID(),
+): NamedWorkspaces {
+  const idx = container.slots.findIndex((s) => s.id === id);
+  if (idx < 0) return container;
+  const remaining = container.slots.filter((s) => s.id !== id);
+  if (remaining.length === 0) {
+    // Deleted the last slot → fall back to a fresh empty Default.
+    return emptyNamedWorkspaces(newPaneId(), newId());
+  }
+  let activeId = container.activeId;
+  if (activeId === id) {
+    // Active slot deleted → prefer the previous sibling, else the next.
+    const fallback = container.slots[idx - 1] ?? container.slots[idx + 1]!;
+    activeId = fallback.id;
+  }
+  return { slots: remaining, activeId };
+}
+
+/**
+ * The slot id to activate given a persisted `active_workspace` pref pointer
+ * (MYP1, MYND-308 task 3): the pref's id when it names an existing slot,
+ * otherwise the first slot's id (the consistency fallback for a stale/missing
+ * pointer). Pure — the caller self-heals the pref on the next write.
+ */
+export function resolveActiveSlot(
+  slots: WorkspaceSlot[],
+  activeWorkspacePref: string | null | undefined,
+): SlotId {
+  if (
+    activeWorkspacePref != null &&
+    slots.some((s) => s.id === activeWorkspacePref)
+  ) {
+    return activeWorkspacePref;
+  }
+  return slots[0]!.id;
+}
+
+/**
+ * Coalescing-flush decision (MYND-308 task 4): whether the staged MYW1
+ * descriptor should be flushed to disk NOW. True at most once per ~5 minutes of
+ * activity, and only while dirty. Pure — `nowMs` is injected (the app layer owns
+ * the timer + Date.now + the flush-on-graceful-exit/lock path; this is only the
+ * decision). `lastFlushAtMs === null` means "never flushed" → flush as soon as
+ * dirty.
+ */
+export const WORKSPACE_FLUSH_INTERVAL_MS = 300_000; // ~5 min
+
+export function shouldFlushWorkspace(args: {
+  lastFlushAtMs: number | null;
+  nowMs: number;
+  dirty: boolean;
+}): boolean {
+  const { lastFlushAtMs, nowMs, dirty } = args;
+  if (!dirty) return false;
+  if (lastFlushAtMs === null) return true;
+  return nowMs - lastFlushAtMs >= WORKSPACE_FLUSH_INTERVAL_MS;
+}
+
+/**
+ * Revert the active slot to a last-persisted descriptor ("Reset to snapshot",
+ * MYND-308 task 4). Pure — the caller supplies the last-persisted `WorkspaceState`
+ * (e.g. from re-deserializing the staged/on-disk blob). No-op shape if the
+ * container has no active slot (falls back to setting the first slot).
+ */
+export function resetActiveToSnapshot(
+  container: NamedWorkspaces,
+  lastPersisted: WorkspaceState,
+): NamedWorkspaces {
+  return setActiveSlotState(container, cloneState(lastPersisted));
+}
+
+/** Deep structural clone of a descriptor (slot snapshots must not alias the
+ *  source tree). Pure data — `structuredClone` is sufficient and dependency-free. */
+function cloneState(state: WorkspaceState): WorkspaceState {
+  return structuredClone(state);
 }

@@ -148,6 +148,15 @@ export interface PrefsView {
    */
   deliberate_folders: string[];
   /**
+   * Active workspace slot id (MYND-308) — the workspace slot the editor restores
+   * on unlock. `null` ≡ unset → the host applies its default (first / last-used)
+   * workspace policy. A free string stored verbatim (NFC on the wire); the
+   * client owns the slot-id interpretation. Serialized from Rust
+   * `Option<String>`; omitted from the encrypted blob when `null` (byte-identical
+   * to a pre-feature vault). Non-load-bearing. Canonical key sorts FIRST.
+   */
+  active_workspace: string | null;
+  /**
    * Auto-lock-on-idle timeout in integer seconds (MYND-121). `null` when the
    * user has set no value — the backend then applies its protective-envelope
    * default for the timer. Serialized from Rust `Option<u32>` (null | number).
@@ -211,6 +220,32 @@ export interface PrefsView {
    * encrypted blob when `null`. Non-load-bearing cosmetic.
    */
   editor_content_width: string | null;
+  /**
+   * Editor default view-mode preset (MYND-299) — `"live"` | `"reading"` |
+   * `"source"`. `null` ≡ the host-applied default. A free enum string on the
+   * wire (Rust `Option<String>`); the client validates + maps an unknown value
+   * to the default. Omitted from the encrypted blob when `null`. Non-load-bearing.
+   * Canonical key slot: after `editor_content_width`, before
+   * `editor_focus_dim_inactive`.
+   */
+  editor_default_view_mode: string | null;
+  /**
+   * Editor focus-mode dim-inactive toggle (MYND-348). `null` ≡ unset → the host
+   * applies its default focus-mode policy. `true` dims inactive paragraphs,
+   * `false` leaves them lit. Serialized from Rust `Option<bool>`; omitted from
+   * the encrypted blob when `null`. Non-load-bearing cosmetic. Canonical key
+   * slot: after `editor_default_view_mode`, before `editor_focus_typewriter`.
+   */
+  editor_focus_dim_inactive: boolean | null;
+  /**
+   * Editor focus-mode typewriter-scrolling toggle (MYND-348). `null` ≡ unset →
+   * the host applies its default focus-mode policy. `true` keeps the caret
+   * vertically centered, `false` scrolls normally. Serialized from Rust
+   * `Option<bool>`; omitted from the encrypted blob when `null`. Non-load-bearing
+   * cosmetic. Canonical key slot: after `editor_focus_dim_inactive`, before
+   * `editor_font_family`.
+   */
+  editor_focus_typewriter: boolean | null;
   /**
    * Editor font-family preset (editor-typography) — `"mono"` | `"sans"`.
    * `null` ≡ the canonical default `"mono"`. Same free-enum-string discipline
@@ -599,6 +634,49 @@ export async function setEditorFontFamily(value: string | null): Promise<void> {
  */
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_line_numbers", { enabled: value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set (or clear) the active workspace slot id (MYND-308) — pass the slot id, or
+ * `null` to clear back to the host default workspace policy. Disk-first; bumps
+ * the prefs nonce on success so open consumers re-read disk truth. Same contract
+ * as {@link setEditorContentWidth}.
+ */
+export async function setActiveWorkspace(value: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_active_workspace", { value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set (or clear) the editor default view-mode preset (MYND-299) — pass
+ * `"live"`/`"reading"`/`"source"`, or `null` to clear to the host default. Same
+ * contract as {@link setEditorContentWidth}.
+ */
+export async function setEditorDefaultViewMode(value: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_default_view_mode", { value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set the editor focus-mode dim-inactive toggle (MYND-348). Pass `true` to dim
+ * inactive paragraphs, `false` to leave them lit. Disk-first, no native
+ * side-effect; bumps the prefs nonce on success. Same contract as
+ * {@link setEditorLineNumbers}. Non-load-bearing.
+ */
+export async function setEditorFocusDimInactive(value: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_focus_dim_inactive", { enabled: value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set the editor focus-mode typewriter-scrolling toggle (MYND-348). Pass `true`
+ * to keep the caret vertically centered, `false` for normal scrolling.
+ * Disk-first, no native side-effect; bumps the prefs nonce on success. Same
+ * contract as {@link setEditorLineNumbers}. Non-load-bearing.
+ */
+export async function setEditorFocusTypewriter(value: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_focus_typewriter", { enabled: value });
   bumpPrefsNonce();
 }
 

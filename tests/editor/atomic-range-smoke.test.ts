@@ -1,14 +1,21 @@
 // @vitest-environment jsdom
 //
-// jsdom keystroke smoke test for the wikilink chip atomic-range — one
-// regression detector that the keymap → command pipeline fires
-// `deleteCharBackward` on a real Backspace KeyboardEvent.
+// jsdom keystroke smoke test for the wikilink chip — one regression detector
+// that the keymap → command pipeline fires `deleteCharBackward` on a real
+// Backspace KeyboardEvent.
 //
 // Per grill 2026-05-16 Q6 (S2+E3) — this is the single integration test
 // that complements the 8 state-machine tests in atomic-range.test.ts.
 // Its job is to surface keymap-wiring breakage in future CM6 major bumps;
-// it does NOT assert the entire DOM rendering, only that the doc reflects
-// atomic-range behavior after a synthetic keystroke.
+// it does NOT assert the entire DOM rendering, only that the doc changes
+// after a synthetic keystroke.
+//
+// MYND-299 cursor-reveal update: a link on the FOCUSED caret's line lifts to its
+// raw, editable `[[…]]` text and is NOT atomic (so arrow keys can enter it to add
+// a `#heading` anchor — chip-widget.ts `isWikilinkRevealed`). So a caret resting
+// right after a chip, on its line, edits the now-raw link char-by-char rather
+// than atomic-deleting the whole chip. (The static atomic set — caret off the
+// link's line — is still covered by atomic-range.test.ts via `wikilinkAtomicRanges`.)
 
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
@@ -29,7 +36,7 @@ describe("Wikilink chip atomic-range — keystroke smoke", () => {
     host = null;
   });
 
-  it("synthetic Backspace KeyboardEvent right-of-chip deletes whole wikilink atom", () => {
+  it("synthetic Backspace right-of-chip edits the cursor-revealed link (char delete)", () => {
     const doc = "before [[Note]] after";
     const rightOfChip = doc.indexOf("]]") + 2;
 
@@ -61,6 +68,9 @@ describe("Wikilink chip atomic-range — keystroke smoke", () => {
     });
     view.contentDOM.dispatchEvent(event);
 
-    expect(view.state.doc.toString()).toBe("before  after");
+    // The caret is on the link's line → the chip is revealed (raw, non-atomic),
+    // so Backspace deletes ONE char (the trailing `]`) — edit mode, not an atomic
+    // whole-chip delete. Confirms the keymap → deleteCharBackward pipeline fired.
+    expect(view.state.doc.toString()).toBe("before [[Note] after");
   });
 });

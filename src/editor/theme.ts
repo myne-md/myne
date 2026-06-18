@@ -37,6 +37,12 @@ export const myneTheme = EditorView.theme({
   "&.cm-focused": {
     outline: "none",
   },
+  // focus-mode (MYND-348): highlightActiveLine() is mounted only to supply the
+  // `.cm-activeLine` class for focus-mode line-dimming (tokens.css). Neutralize
+  // its default background so it is invisible in normal mode.
+  ".cm-activeLine": {
+    background: "transparent",
+  },
   "&.cm-focused .cm-cursor": {
     borderLeftColor: "var(--accent, #2c4a7a)",
   },
@@ -306,12 +312,79 @@ export const myneTheme = EditorView.theme({
     color: "var(--fg-3, #6b6a64)",
   },
   ".cm-lineNumbers .cm-gutterElement": {
+    // Vertically center the number on the line's text row so it aligns with the
+    // prose AND the fold chevron (which already centers). CM's default top-aligns
+    // the number, which floats it above the text on tall heading lines — the
+    // misalignment in the gutter (MYND-299 QA). Right-aligned toward the content.
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
     color: "var(--fg-3, #6b6a64)",
     opacity: "0.5",
     fontFamily: "var(--font-mono)",
     fontSize: "0.8em",
     padding: "0 12px 0 8px",
     minWidth: "1.6em",
+  },
+
+  // Fold gutter (heading-list-folding / MYND-300) — HOVER-REVEAL, Obsidian-style
+  // minimal chrome on a prose-first editor. The gutter slot stays narrow + quiet;
+  // the fold arrow appears only when the editor is hovered (the "can fold" ⌄),
+  // EXCEPT a line that is currently folded keeps its › visible so the user can
+  // always find + click to unfold. Tokens only (no hex).
+  ".cm-foldGutter .cm-gutterElement": {
+    padding: "0 2px",
+    minWidth: "1.1em",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ".cm-fold-marker": {
+    color: "var(--fg-3, #6b6a64)",
+    cursor: "pointer",
+    fontSize: "0.9em",
+    lineHeight: "1",
+    userSelect: "none",
+    transition:
+      "opacity var(--duration-fast, 120ms) var(--ease-standard, ease), color var(--duration-fast, 120ms) var(--ease-standard, ease)",
+  },
+  // "Can fold" arrow: invisible until the editor is hovered (hover-reveal).
+  '.cm-fold-marker[data-fold-open="true"]': {
+    opacity: "0",
+  },
+  '&:hover .cm-fold-marker[data-fold-open="true"]': {
+    opacity: "0.7",
+  },
+  // A FOLDED line's arrow stays visible (and reads as accent) so it can't be
+  // lost — folding is reversible only if the affordance is findable.
+  '.cm-fold-marker[data-fold-open="false"]': {
+    opacity: "1",
+    color: "var(--accent, #2c4a7a)",
+  },
+  ".cm-fold-marker:hover": {
+    color: "var(--accent, #2c4a7a)",
+  },
+
+  // Inline collapsed-section placeholder (the `⋯` shown where folded text was).
+  // A quiet pill on the recessed surface; clickable to unfold.
+  ".cm-foldPlaceholder": {
+    display: "inline-block",
+    margin: "0 2px",
+    padding: "0 6px",
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    borderRadius: "var(--radius-1, 3px)",
+    color: "var(--fg-3, #6b6a64)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "0.85em",
+    lineHeight: "1.2",
+    cursor: "pointer",
+    verticalAlign: "baseline",
+  },
+  ".cm-foldPlaceholder:hover": {
+    backgroundColor: "var(--paper-3, #ece9e2)",
+    color: "var(--fg-1)",
+    borderColor: "var(--line-2, #c8c7c1)",
   },
 
   // Dialect comment `%%…%%` (editor-comments / MYND-315) — shown DIMMED in the
@@ -987,6 +1060,11 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-panels.cm-panels-top": {
     borderBottom: "none",
+    // Opaque fill (MYND-299 QA): the find bar is a sticky top panel inside a
+    // padded scroll container, so a transparent panel let the scrolled note text
+    // bleed through the strip above the bar. Match the bar's own `--paper` so the
+    // whole top-panel region is solid — no content shows behind it.
+    backgroundColor: "var(--paper)",
   },
 
   // Attachment embeds (MYND-164 / 147 / 149) — decorations/attachment-embed.ts,
