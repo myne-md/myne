@@ -804,6 +804,11 @@ export const myneTheme = EditorView.theme({
     fontSize: "13px",
     cursor: "pointer",
     verticalAlign: "baseline",
+    // `text-indent` is inherited and applies to an inline-block's own first
+    // line. Inside a `.cm-list-item-line` (which sets `text-indent: -1.5em`
+    // for its hanging indent) the chip would otherwise shift its label ~1.5em
+    // left, escaping the pill. Reset it so the label stays centered in the box.
+    textIndent: "0",
   },
   ".cm-wikilink-chip:hover": {
     backgroundColor: "var(--paper-3, #ece9e2)",
