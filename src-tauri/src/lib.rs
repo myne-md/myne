@@ -1,6 +1,7 @@
 mod atomic_write;
 mod auto_lock;
 mod backup_container;
+mod backup_schedule;
 mod export_naming;
 mod io_failure_kind;
 mod note_txn;

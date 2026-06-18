@@ -62,3 +62,15 @@ export function orderByLastUnlock(vaults: VaultSummary[]): VaultSummary[] {
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 }
+
+/**
+ * Resolve the active vault's id — the head of the canonical last-unlock
+ * ordering (the same vault the boot picker / switcher treat as active under
+ * SYNC-1). `null` when no vault is discoverable. Shared by the automatic-backup
+ * scheduler ({@link ../hooks/useBackupScheduler}) and its Settings block.
+ */
+export async function resolveActiveVaultId(): Promise<string | null> {
+  const res = await listVaults();
+  if (!("ok" in res) || res.ok.length === 0) return null;
+  return orderByLastUnlock(res.ok)[0].id;
+}

@@ -103,6 +103,16 @@ A class of password-authenticated key exchange where the server stores no passwo
 Used in: `decisions.md` (Deferred #4)
 Reference: RFC 9807.
 
+### **archive** &nbsp; 📦 *Product*
+
+The indefinite-retention declutter layer: a note the user has set aside but keeps forever (no auto-purge), distinct from the Trash. Archiving hides a note from the working set (sidebar tree + favorites display) but — unlike trashing — leaves it discoverable in full-text search and resolvable as a wikilink/backlink target. Archive and trash are two positions on one *location* axis and are mutually exclusive: a note is at most one of live / archived / trashed. Backed by the value-strict [archived field](#archived-field) (MYND-331).
+
+Used in: `spec/markdown-dialect.md` §3.6.1
+
+### **archived field** &nbsp; 📋 *Protocol*
+
+The seventh Myne-managed canonical frontmatter field, `archived:` — a **value-strict** RFC 3339 UTC timestamp marking when a note was archived (the exact twin of `trashed:`; any non-timestamp value leaves the note live). Written only by the archive/unarchive actions (`src/notes/archiveNote.ts`) via `patchArchivedField` over the existing `note_update` IPC; neither transition bumps `updated:`. Mutually exclusive with `trashed:` at the action layer. Rides the existing `.myn` AEAD envelope — no `protocol.md` magic-byte / AAD / version change (MYND-331). See [archive](#archive).
+
 ### **Argon2id** &nbsp; 🔐 *Primitive* (deep entry)
 
 The memory-hard password-based key derivation function specified in RFC 9106. Argon2id combines the side-channel resistance of Argon2i with the GPU-cracking resistance of Argon2d. Myne uses Argon2id at two call sites (deriving `password_wrap_key` from the master password, deriving `recovery_wrap_key` from the BIP-39 phrase), with parameters `m=256 MiB, t=3, p=2, version 1.3` stored in `vault.meta` rather than hardcoded so they can be tuned per platform and bound into the wrap AADs to defeat parameter-downgrade tampering. Argon2i and Argon2d are not used in this protocol — the "id" variant is the only correct choice for password-stretching in 2026.
@@ -169,6 +179,12 @@ Used in: `threat-model.md` §1 (A6); `decisions.md` 2026-05-30 "Auto-lock on idl
 The code-enforced upper bound on the auto-lock timeout — the load-bearing edge of auto-lock's *protective envelope*. The effective timeout is `clamp(vault.prefs value or default, FLOOR?, AUTO_LOCK_CEILING)` and the enabled flag is a code constant, not a preference. Because the ceiling and the always-on flag live in code rather than the replayable `vault.prefs` blob, a disk-level attacker (A4) who replays, deletes, or tampers the preferences file can only make auto-lock *stricter* — never disable it or push it past the ceiling. This is why auto-lock does **not** inherit the local-prefs-replay limitation (`threat-model.md` §7) that best-effort preferences such as the screen-capture toggle do.
 
 Used in: `threat-model.md` §7; `decisions.md` 2026-05-30 "Auto-lock on idle"
+
+### **backup schedule** &nbsp; 📦 *Product*
+
+The device-local configuration that drives a vault's [scheduled backup](#scheduled-backup) (MYND-351): per-`VaultId` it records `enabled`, the cadence (`every-unlock` / `daily` / `weekly`), the target folder, the retention count N, the written-backup ledger (the prune allowlist), and the per-device status/clock (`last_scheduled_success_at`, `last_backup_attempt_at`, `last_backup_status`). Persisted as best-effort plaintext JSON at `<app_data_dir>/vaults/backup-schedule.json` — a sibling of the `registry.json` cache, modelled on it, and Myne's first persistent device-local *user-setting* store. It deliberately stores plaintext filesystem paths (the target folder + ledger), a recorded departure from `registry.json`'s no-paths discipline — backups are ciphertext, so a known location is not a confidentiality break (`decisions.md` 2026-06-18). The schedule does **not** sync across devices (the target is per-device); its clock is intentionally separate from [last_backup_at](#last_backup_at) (the synced reminder clock).
+
+Used in: `decisions.md` 2026-06-18; `agent-tooling/features/scheduled-local-backup/`
 
 ### **backup-key** &nbsp; 🗝️ *Key/identifier*
 
@@ -1100,6 +1116,12 @@ Used in: `spec/protocol.md` §3.1
 A named, **read-only** derived view over a vault's own plain-markdown notes (Saved Views epic, MYND-271) — a filter (over [properties](#property), tags, folders) + a sort + an optional `groupBy`, rendered as one of a closed set of [view types](#view-type). The Obsidian-Bases analogue, deliberately narrowed: **no database, no formula/code-eval** — only a declarative, closed-allow-list query (the query-engine sub-feature) over the derived property index. The view *definition* is authored content persisted in `vault.prefs` / `MYP1` (not the index blob); the data it queries lives in the rebuildable [vault.indices](#vaultindices) / `MYI1` cache. Because it is read-only over plain markdown with `.myn` as the source of truth, it does **not** violate the `vision.md` "no databases" / "no proprietary format" anti-features (same precedent class as the [search index](#search-index)); see `decisions.md` 2026-06-14 "Saved Views is a read-only derived projection over plain markdown, not a database". The [filter AST](#filter-ast) is created and edited through the **filter builder** UI — single-level filter groups over tag / folder / search conditions, a deliberate representable subset of the AST's full nesting (MYND-282).
 
 Used in: Saved Views (MYND-271, MYND-282); `decisions.md` 2026-06-14
+
+### **scheduled backup** &nbsp; 📦 *Product*
+
+An automatic, recurring [vault backup file](#vault-backup-file) written to a user-chosen local folder on a cadence (MYND-351). Runs only while the app is open and the vault is unlocked ("Model A"), driven by an opportunistic elapsed-time check (`now − last success ≥ interval`) on unlock and periodically while unlocked — not a wall-clock timer (auto-lock would starve one). Reuses the manual export path verbatim (no new cryptography; the `.myne-backup` stays exactly as encrypted as the vault). Governed by a device-local [backup schedule](#backup-schedule). Keeps the most recent N (user-set, default 7), pruning only files it wrote. **No email or cloud delivery — ever** (`vision.md` anti-feature); the user's own folder-sync handles offsite. Distinct from [restore (from backup)](#restore-from-backup) and from the manual click-to-back-up action. Leak/egress posture is that of any backup file: `threat-model.md` §7, TB3.
+
+Used in: `decisions.md` 2026-06-18; `agent-tooling/features/scheduled-local-backup/`
 
 ### **screen-capture protection** &nbsp; 📦 *Product*
 

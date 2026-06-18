@@ -309,6 +309,7 @@ export function SettingsModal({
         onBackupVault={onBackupVault}
         onRestoreBackup={onRestoreBackup}
         onExportVault={onExportVault}
+        onShowToast={onShowToast}
       />
     ),
     about: <AboutPanel />,

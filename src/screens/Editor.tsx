@@ -120,6 +120,8 @@ import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
+import { useBackupScheduler } from "../hooks/useBackupScheduler";
+import { BACKUP_SCHEDULE_FAILED_TOAST } from "../lib/load-bearing-copy";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
@@ -805,6 +807,17 @@ function EditorChrome({
   // timer. The Editor is mounted iff the vault is Unlocked, so the heartbeat
   // runs exactly while a lockable session is live.
   useActivityHeartbeat();
+
+  // MYND-351 — automatic local-backup scheduler (Model A: runs only while the
+  // app is open and a vault is unlocked, i.e. exactly while this Editor is
+  // mounted). A backup must never fail silently: a fresh failure (debounced so
+  // a persistent failure toasts once) surfaces the quiet alert; success is a
+  // silent status line the StoragePanel reads. The schedule never auto-disables.
+  useBackupScheduler((scheduleTick) => {
+    if (scheduleTick.freshFailure) {
+      setToast({ message: BACKUP_SCHEDULE_FAILED_TOAST });
+    }
+  });
 
   // Close / lock / idle-lock flush EVERY pane's pending save via the
   // workspace flush registry (each PaneView registers its `flushIfDirty`).
@@ -2005,6 +2018,7 @@ function CommandPaletteHost({
       ctx={commandCtx}
       isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
       isTemplate={(id) => ctx.cache.get(id)?.template === true}
+      isArchived={(id) => ctx.cache.get(id)?.archived != null}
     />
   );
 }
@@ -2350,6 +2364,23 @@ function RightSidebar() {
                   style={{ fontSize: 12, color: "var(--fg-3)", marginLeft: 6 }}
                 >
                   ({row.count})
+                </span>
+              )}
+              {/* Archived source (MYND-331): a backlink from an archived note
+                  still resolves (archive ≠ soft-trash) — a small badge tells the
+                  user the source lives in the Archive, not the working tree. */}
+              {ctx.cache.get(row.sourceUuid)?.archived != null && (
+                <span
+                  data-testid="editor.backlink-archived-badge"
+                  title="Archived"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    marginLeft: 6,
+                    color: "var(--fg-3)",
+                  }}
+                >
+                  <Icon name="archive" size={12} />
                 </span>
               )}
             </button>

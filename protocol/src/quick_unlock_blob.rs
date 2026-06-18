@@ -465,4 +465,451 @@ mod tests {
         let root_key = decode_quick_unlock_blob(&WRAP_KEY, &ACCOUNT_HASH, &blob).expect("decode");
         assert_eq!(root_key.as_slice(), &ROOT_KEY);
     }
+
+    // ---- KAT vector regenerator (companion repo) ----------------------
+
+    /// Emits the full `cases.json` for
+    /// `myne-test-vectors/vectors/vault-quickunlock/v0.1/cases.json` as a
+    /// pretty-printed JSON file at `/tmp/myne_vault_quickunlock_vectors.json`,
+    /// ready to copy verbatim into the companion repo.
+    ///
+    /// `#[ignore]` because regenerating vectors is a deliberate act, not a
+    /// side effect of `cargo test`. Run with:
+    /// `cargo test -p protocol --lib emit_quick_unlock_vectors_for_paste -- --ignored`
+    ///
+    /// 12 cases pin (MYND-329 / §9.14):
+    /// - 2 `encrypt` × {biometric (provider_kind 0x01, all-zero pin_salt) /
+    ///   PIN (provider_kind 0x02, real pin_salt)} — pin the `MYQ1` byte output.
+    ///   The `wrap_key` is supplied DIRECTLY (provider-agnostic codec — the blob
+    ///   never runs Argon2id; the PIN→wrap_key derivation is pinned separately
+    ///   in the `argon2id` family). `root_key` (0x33×32) is the wrapped secret.
+    /// - 1 `decrypt_ok` (biometric round-trip → the unwrapped `root_key`).
+    /// - 3 `decrypt_aead_fail` — (a) CTX-tag tamper, (b) cross-vault wrong
+    ///   `account_number_hash`, (c) `provider_kind` flipped 0x01→0x02 on a valid
+    ///   biometric blob (AAD-bound, so it AEAD-fails rather than mis-decoding).
+    ///   All collapse to `QuickUnlockBlobError::CannotDecrypt` (non-distinguishing,
+    ///   §6.4); real-key fixtures make a skipped check observable.
+    /// - 6 `parse_fail` — one per distinguishable pre-decryption reject
+    ///   (`MagicMismatch`, `ProtocolVersionMismatch`, `ProviderKindUnsupported`,
+    ///   `CiphertextLenInvalid`, `HeaderTooShort`, `CiphertextTruncated`).
+    ///   There is NO `ciphertext_len_overflow` case: the ciphertext length is
+    ///   the fixed constant 64, validated exactly (`CiphertextLenInvalid`).
+    ///
+    /// `PlaintextLenInvalid` (unreachable for a well-formed 64-byte ciphertext)
+    /// and `RandomnessUnavailable` (encode-side) cannot be expressed as a
+    /// decode-a-blob case, so they are not vectored (documented in schema.md).
+    #[test]
+    #[ignore]
+    fn emit_quick_unlock_vectors_for_paste() {
+        extern crate std;
+
+        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
+            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+
+        fn json_escape(input: &str) -> alloc::string::String {
+            let mut out = alloc::string::String::with_capacity(input.len() + 2);
+            for c in input.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    c if (c as u32) < 0x20 => {
+                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
+                    }
+                    c => out.push(c),
+                }
+            }
+            out
+        }
+
+        // Fixed fixtures — the wrap_key is PRE-DERIVED (the codec is
+        // provider-agnostic). Patterns match this test mod's inline fixtures.
+        let wrap_key: [u8; AEAD_KEY_LEN] = [0x42; AEAD_KEY_LEN];
+        let account_hash: [u8; QUICK_UNLOCK_ACCOUNT_HASH_LEN] =
+            [0x7c; QUICK_UNLOCK_ACCOUNT_HASH_LEN];
+        let other_account_hash: [u8; QUICK_UNLOCK_ACCOUNT_HASH_LEN] =
+            [0x11; QUICK_UNLOCK_ACCOUNT_HASH_LEN];
+        let pin_salt: [u8; QUICK_UNLOCK_PIN_SALT_LEN] = [0xab; QUICK_UNLOCK_PIN_SALT_LEN];
+        let zero_pin_salt: [u8; QUICK_UNLOCK_PIN_SALT_LEN] = [0u8; QUICK_UNLOCK_PIN_SALT_LEN];
+        let root_key: [u8; AEAD_KEY_LEN] = [0x33; AEAD_KEY_LEN];
+        let nonce: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
+
+        let blob_biometric = encode_quick_unlock_blob_raw(
+            &wrap_key,
+            &account_hash,
+            PROVIDER_KIND_BIOMETRIC,
+            &zero_pin_salt,
+            &root_key,
+            &nonce,
+        )
+        .expect("encode biometric");
+        let blob_pin = encode_quick_unlock_blob_raw(
+            &wrap_key,
+            &account_hash,
+            PROVIDER_KIND_PIN,
+            &pin_salt,
+            &root_key,
+            &nonce,
+        )
+        .expect("encode pin");
+
+        // Round-trip sanity (both providers).
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &blob_biometric)
+                .expect("decode biometric")
+                .as_slice(),
+            &root_key
+        );
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &blob_pin)
+                .expect("decode pin")
+                .as_slice(),
+            &root_key
+        );
+
+        // decrypt_aead_fail (a): flip the final byte (inside the CTX tag).
+        let mut blob_tag_tamper = blob_biometric.clone();
+        let last = blob_tag_tamper.len() - 1;
+        blob_tag_tamper[last] ^= 0xFF;
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &blob_tag_tamper),
+            Err(QuickUnlockBlobError::CannotDecrypt),
+            "tag tamper must reject"
+        );
+        // decrypt_aead_fail (b): intact blob, wrong account_hash (AAD bind).
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &other_account_hash, &blob_biometric),
+            Err(QuickUnlockBlobError::CannotDecrypt),
+            "cross-vault account_hash must reject"
+        );
+        // decrypt_aead_fail (c): valid biometric blob, provider_kind flipped to
+        // PIN. provider_kind is AAD-bound, so it AEAD-fails (NOT a structural
+        // reject — 0x02 is a registered provider).
+        let mut blob_provider_flip = blob_biometric.clone();
+        blob_provider_flip[5] = PROVIDER_KIND_PIN;
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &blob_provider_flip),
+            Err(QuickUnlockBlobError::CannotDecrypt),
+            "provider_kind flip must reject (AAD-bound)"
+        );
+
+        // parse_fail blobs: corrupt a valid blob per structural reject.
+        let mut pf_magic = blob_biometric.clone();
+        pf_magic[0] = b'X';
+        let mut pf_version = blob_biometric.clone();
+        pf_version[4] = 0x02;
+        let mut pf_provider = blob_biometric.clone();
+        pf_provider[5] = 0x09; // not a registered provider
+        let mut pf_len_invalid = blob_biometric.clone();
+        pf_len_invalid[46..50].copy_from_slice(&65u32.to_be_bytes()); // != 64
+        let pf_header_short: alloc::vec::Vec<u8> = QUICK_UNLOCK_BLOB_MAGIC.to_vec(); // 4 < 50
+        let mut pf_truncated = blob_biometric.clone();
+        pf_truncated.truncate(pf_truncated.len() - 1);
+
+        // Sanity: each corrupted blob hits its intended reject (real key/hash —
+        // a port skipping a structural check would surface CannotDecrypt, which
+        // the runner catches as a mismatch).
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &pf_magic),
+            Err(QuickUnlockBlobError::MagicMismatch)
+        );
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &pf_version),
+            Err(QuickUnlockBlobError::ProtocolVersionMismatch)
+        );
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &pf_provider),
+            Err(QuickUnlockBlobError::ProviderKindUnsupported)
+        );
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &pf_len_invalid),
+            Err(QuickUnlockBlobError::CiphertextLenInvalid)
+        );
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &pf_header_short),
+            Err(QuickUnlockBlobError::HeaderTooShort)
+        );
+        assert_eq!(
+            decode_quick_unlock_blob(&wrap_key, &account_hash, &pf_truncated),
+            Err(QuickUnlockBlobError::CiphertextTruncated)
+        );
+
+        let wrap_key_hex = hex_lower(&wrap_key);
+        let account_hash_hex = hex_lower(&account_hash);
+        let other_account_hash_hex = hex_lower(&other_account_hash);
+        let pin_salt_hex = hex_lower(&pin_salt);
+        let zero_pin_salt_hex = hex_lower(&zero_pin_salt);
+        let root_key_hex = hex_lower(&root_key);
+        let nonce_hex = hex_lower(&nonce);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"vault-quickunlock\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.14 + §5.2 + §6.4\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_quick_unlock_blob_raw + protocol::decode_quick_unlock_blob byte mapping for the MYQ1 vault.quickunlock device-local credential codec (MYND-329; §9.14). The blob wraps a THIRD copy of root_key (32 bytes) under a provider-supplied wrap_key — the codec is PROVIDER-AGNOSTIC: it never runs Argon2id (the PIN→wrap_key derivation is pinned separately in the argon2id family as input_path 'quickunlock-pin'), so vectors supply wrap_key DIRECTLY as a fixed fixture. provider_kind (0x01 biometric / 0x02 PIN) and account_number_hash both bind via aad_quick_unlock_blob (AAD role 'quick-unlock-blob'); there is NO HKDF SubkeyRole (a root_key-derived KEK would be circular). ciphertext_len is the fixed constant 64 (root_key 32 + CTX tag 32), so there is no size cap / ciphertext_len_overflow case. 12 cases: 2 encrypt (biometric + PIN) + 1 decrypt_ok + 3 decrypt_aead_fail (tag-tamper + cross-vault + provider_kind-flip, all non-distinguishing per §6.4) + 6 parse_fail (one per distinguishable pre-decryption structural reject). Cases generated by `cargo test -p protocol --lib emit_quick_unlock_vectors_for_paste -- --ignored` (in protocol/src/quick_unlock_blob.rs).\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        // ---- encrypt closure ----------------------------------------
+        let emit_encrypt = |dump: &mut alloc::string::String,
+                            slug: &str,
+                            description: &str,
+                            provider_kind: u8,
+                            pin_salt_arg_hex: &str,
+                            blob: &[u8],
+                            trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-quickunlock/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"encrypt\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_wrap_key_hex\": \"{}\",\n",
+                wrap_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                account_hash_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_provider_kind\": {},\n",
+                provider_kind
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_pin_salt_hex\": \"{}\",\n",
+                pin_salt_arg_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                root_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_nonce_hex\": \"{}\",\n",
+                nonce_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_vault_quickunlock_blob_hex\": \"{}\"\n",
+                hex_lower(blob)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_encrypt(
+            &mut dump,
+            "encrypt-biometric",
+            "Encode under the biometric provider (provider_kind=0x01, e.g. macOS Keychain). pin_salt is all-zero (unused by a non-PIN provider but still a header field). The wrap_key is the provider's symmetric secret, supplied directly. Expected blob = 50-byte header + 32-byte root_key ciphertext + 32-byte CTX tag = 114 bytes.",
+            PROVIDER_KIND_BIOMETRIC,
+            &zero_pin_salt_hex,
+            &blob_biometric,
+            true,
+        );
+        emit_encrypt(
+            &mut dump,
+            "encrypt-pin",
+            "Encode under the PIN provider (provider_kind=0x02). pin_salt (0xab×16) is the Argon2id salt the desktop layer used to derive wrap_key from the PIN; it is stored in the public header so the salt can be read back before decode. The wrap_key here is the already-derived 32-byte key (the Argon2id step is pinned separately in the argon2id family). Expected blob = 114 bytes.",
+            PROVIDER_KIND_PIN,
+            &pin_salt_hex,
+            &blob_pin,
+            true,
+        );
+
+        // ---- decrypt_ok ---------------------------------------------
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-quickunlock/v0.1/decrypt-ok-biometric\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Round-trip the biometric blob back to the wrapped root_key under the matching wrap_key + account_number_hash. Proves the decoder's header parse + AEAD unwrap reconstruct the exact 32-byte root_key (the third wrapped copy).")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_biometric)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_wrap_key_hex\": \"{}\",\n",
+            wrap_key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            account_hash_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_root_key_hex\": \"{}\"\n",
+            root_key_hex
+        ));
+        dump.push_str("    },\n");
+
+        // ---- decrypt_aead_fail closure ------------------------------
+        let emit_aead_fail = |dump: &mut alloc::string::String,
+                              slug: &str,
+                              description: &str,
+                              blob: &[u8],
+                              account_hash_arg_hex: &str,
+                              tamper_desc: &str,
+                              trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-quickunlock/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"decrypt_aead_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_wrap_key_hex\": \"{}\",\n",
+                wrap_key_hex
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                account_hash_arg_hex
+            ));
+            dump.push_str("      \"expected_kind\": \"aead_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"informational_tamper_description\": \"{}\"\n",
+                json_escape(tamper_desc)
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_aead_fail(
+            &mut dump,
+            "decrypt-tampered-ctx-tag",
+            "Take the biometric blob and flip the final byte (inside the 32-byte CTX commitment tag) via XOR 0xFF. The decoder MUST surface a non-distinguishing CannotDecrypt. Same observable outcome as the cross-vault and provider-flip cases (spec §6.4).",
+            &blob_tag_tamper,
+            &account_hash_hex,
+            "final byte (inside CTX tag) flipped via XOR 0xFF",
+            true,
+        );
+        emit_aead_fail(
+            &mut dump,
+            "decrypt-cross-vault-account-hash",
+            "Take the intact biometric blob but decrypt under a DIFFERENT account_number_hash (0x11×16 instead of 0x7c×16). aad_quick_unlock_blob binds the account hash, so the AAD differs and AEAD verification fails — a credential from vault A cannot unwrap vault B's root_key. Collapses to the same CannotDecrypt; ports MUST NOT distinguish.",
+            &blob_biometric,
+            &other_account_hash_hex,
+            "intact blob decrypted under wrong account_number_hash (0x11×16)",
+            true,
+        );
+        emit_aead_fail(
+            &mut dump,
+            "decrypt-provider-kind-flip",
+            "Take the valid biometric blob (provider_kind=0x01) and flip the provider_kind byte (offset 5) to 0x02 (PIN). Both values are registered, so this passes the structural provider_kind check — but provider_kind is bound into the AAD (§9.14.3), so the AEAD verification fails. This is a decrypt_aead_fail, NOT a parse_fail: it proves a biometric-minted credential cannot be reinterpreted as a PIN credential.",
+            &blob_provider_flip,
+            &account_hash_hex,
+            "provider_kind byte flipped 0x01 (biometric) -> 0x02 (PIN); AAD-bound",
+            true,
+        );
+
+        // ---- parse_fail closure -------------------------------------
+        let emit_parse_fail = |dump: &mut alloc::string::String,
+                               slug: &str,
+                               description: &str,
+                               blob: &[u8],
+                               expected_error: &str,
+                               trailing_comma: bool| {
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-quickunlock/v0.1/{}\",\n",
+                slug
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(description)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_fail\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex_lower(blob)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_error\": \"{}\"\n",
+                expected_error
+            ));
+            if trailing_comma {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        };
+
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-magic-mismatch",
+            "First byte of the MYQ1 magic corrupted to 'X'. Rejected at offset 0 before any decryption (magic-byte-before-decrypt discipline, §9.14.1).",
+            &pf_magic,
+            "magic_mismatch",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-protocol-version-mismatch",
+            "protocol_version byte (offset 4) set to 0x02 instead of 0x01. A v0.1 decoder rejects an unknown protocol version before decrypting.",
+            &pf_version,
+            "protocol_version_mismatch",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-provider-kind-unsupported",
+            "provider_kind byte (offset 5) set to 0x09 — not a registered provider (only 0x01 biometric / 0x02 PIN exist). Rejected structurally before decryption. Contrast the provider-kind-flip decrypt_aead_fail case, where the flipped value (0x02) IS registered and so reaches the AAD-bound AEAD stage.",
+            &pf_provider,
+            "provider_kind_unsupported",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-ciphertext-len-invalid",
+            "ciphertext_len field (offset 46..50) set to 65 instead of the fixed 64 (root_key 32 + CTX tag 32). The quick-unlock blob always wraps exactly one root_key, so any other length is rejected before the AEAD stage (there is no variable-size cap here, unlike vault-search/indices).",
+            &pf_len_invalid,
+            "ciphertext_len_invalid",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-header-too-short",
+            "Only the 4-byte MYQ1 magic, no room for the 50-byte header. Rejected before any field read.",
+            &pf_header_short,
+            "header_too_short",
+            true,
+        );
+        emit_parse_fail(
+            &mut dump,
+            "parse-fail-ciphertext-truncated",
+            "Valid header advertising ciphertext_len = 64, but the blob is one byte shorter than header + 64. Rejected before the AEAD stage.",
+            &pf_truncated,
+            "ciphertext_truncated",
+            false,
+        );
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write("/tmp/myne_vault_quickunlock_vectors.json", dump.as_bytes())
+            .expect("write vault-quickunlock vectors dump");
+    }
 }

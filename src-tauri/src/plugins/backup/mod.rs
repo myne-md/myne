@@ -15,6 +15,7 @@
 pub mod commands;
 pub mod error;
 pub mod restore;
+pub mod schedule;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
@@ -27,6 +28,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::backup_default_filename,
             commands::backup_cancel,
             restore::vault_restore_backup,
+            schedule::backup_schedule_read,
+            schedule::backup_schedule_write,
+            schedule::backup_schedule_record_result,
         ])
         .setup(|app, _api| {
             use tauri::Manager;

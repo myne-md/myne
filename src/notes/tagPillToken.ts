@@ -41,6 +41,10 @@ export function tagChipCmTheme(): Record<string, Record<string, string>> {
       fontSize: `${TAG_PILL_TOKEN.fontSize}px`,
       cursor: "pointer",
       verticalAlign: "baseline",
+      // `text-indent` is inherited and applies to an inline-block's own first
+      // line. Inside a `.cm-list-item-line` (hanging indent `text-indent:
+      // -1.5em`) the chip would shift its label left, out of the pill. Reset.
+      textIndent: "0",
     },
     ".cm-tag-chip:hover": {
       backgroundColor: TAG_PILL_TOKEN.bgSelected,

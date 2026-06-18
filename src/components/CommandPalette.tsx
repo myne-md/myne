@@ -24,6 +24,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { COMMAND_ACTIONS, fuzzyFilter } from "../commands";
+import { Icon } from "./primitives/Icon";
 import { formatChord } from "../commands/chord";
 import type {
   ActionVisibility,
@@ -118,6 +119,17 @@ const HINT_STYLE: CSSProperties = {
   fontFamily: "var(--font-mono)",
 };
 
+// Archived-note badge in the NOTES section (MYND-331) — a quiet right-aligned
+// icon + label, distinct from the mono body-match hint.
+const ARCHIVED_BADGE_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  fontSize: 11,
+  color: "var(--fg-3)",
+  flexShrink: 0,
+};
+
 // Section divider label ("Commands" / "Notes"). Shown only when BOTH sections
 // have rows, so a single-section list stays unlabeled.
 const SECTION_LABEL_STYLE: CSSProperties = {
@@ -156,11 +168,24 @@ export type CommandPaletteProps = {
    * the Editor from the sidebar cache's value-strict `template:` flag.
    */
   isTemplate?: (noteId: string) => boolean;
+  /**
+   * Predicate identifying archived notes (MYND-331). Unlike `isTrashed` /
+   * `isTemplate`, this does NOT filter — archived notes stay in search results
+   * (archive ≠ soft-trash) — it only flags them so the row renders an archive
+   * badge. Omitted → no badge. Wired from the sidebar cache's `archived:` marker.
+   */
+  isArchived?: (noteId: string) => boolean;
 };
 
 type Row =
   | { kind: "action"; action: CommandAction; visibility: ActionVisibility }
-  | { kind: "note"; id: NoteId; title: string; matchedIn: NoteMatchedIn };
+  | {
+      kind: "note";
+      id: NoteId;
+      title: string;
+      matchedIn: NoteMatchedIn;
+      archived: boolean;
+    };
 
 /**
  * Trailing debounce for the note-search dispatch (MYND-40): coalesces a
@@ -176,6 +201,7 @@ export function CommandPalette({
   ctx,
   isTrashed,
   isTemplate,
+  isArchived,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -304,6 +330,9 @@ export function CommandPalette({
                 id: h.note_id,
                 title: h.title === "" ? "Untitled" : h.title,
                 matchedIn: h.matched_in,
+                // Archived notes STAY in search (archive ≠ soft-trash) — flagged
+                // for the badge, not filtered out (MYND-331).
+                archived: isArchived?.(h.note_id) ?? false,
               }),
             );
 
@@ -311,7 +340,7 @@ export function CommandPalette({
     // sections in the flat list (commands always lead) — used for section
     // labels without re-scanning `rows`.
     return { rows: [...commandRows, ...noteRows], commandCount: commandRows.length };
-  }, [query, ctx, noteHits, isTrashed, isTemplate]);
+  }, [query, ctx, noteHits, isTrashed, isTemplate, isArchived]);
 
   // Clamp selected index when row count changes.
   useEffect(() => {
@@ -496,6 +525,19 @@ function renderRow(
       ) : (
         <>
           <span style={{ flex: 1 }}>{row.title}</span>
+          {/* Archived marker (MYND-331): an archived note still appears in search
+              (archive ≠ soft-trash) — a small badge tells the user why it is not
+              in the working tree. */}
+          {row.archived && (
+            <span
+              style={ARCHIVED_BADGE_STYLE}
+              data-testid="palette.archived-badge"
+              title="Archived"
+            >
+              <Icon name="archive" size={12} />
+              Arşiv
+            </span>
+          )}
           {/* Body-only match (MYND-40): the query matched in the note body but
               not its title, so the title here does not contain the query — a
               quiet right-aligned marker (reusing the palette's hint slot) tells

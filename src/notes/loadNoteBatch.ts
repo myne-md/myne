@@ -26,6 +26,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { load as parseYaml } from "js-yaml";
 import {
+  readArchivedFromFmBody,
   readFolderIndexFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
@@ -70,6 +71,17 @@ export type TitleRecord = {
    * `trashed:` value reads as `null` here (value-strict — `readTrashedFromFmBody`).
    */
   trashed: string | null;
+  /**
+   * Value-strict `archived:` marker (RFC 3339 UTC string) when the note is in
+   * the indefinite-retention Archive, else `null` (not archived). note-archive /
+   * MYND-331. The value-strict twin of `trashed:`: a user's own non-timestamp
+   * `archived:` value reads as `null` here (`readArchivedFromFmBody`). Archive
+   * and trash are mutually exclusive — a note is at most one of `archived` /
+   * `trashed`. Consumers exclude `archived !== null` records from the live
+   * sidebar tree / folder derivation / favorites display, but — unlike trashed —
+   * keep them in search results + backlink resolution (archive ≠ soft-trash).
+   */
+  archived: string | null;
   /**
    * Value-strict `template:` marker (MYND-186) — `true` iff the note carries the
    * canonical `template: true` flag, marking it a reusable template skeleton.
@@ -181,6 +193,9 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // object) so the sidebar path and the dialect `readTrashedField` share one
   // definition — js-yaml would coerce a date-only value to a Date and diverge.
   const trashed = readTrashedFromFmBody(slice.frontmatter_bytes ?? "");
+  // `archived:` read value-strict from the raw FM slice — same rationale and
+  // RFC 3339 shape as `trashed:` (the value-strict timestamp twin).
+  const archived = readArchivedFromFmBody(slice.frontmatter_bytes ?? "");
   // `template:` is read value-strict from the raw FM slice (NOT the js-yaml
   // object) so the sidebar/list path and the dialect read helper share one
   // definition — mirrors the `trashed:` rationale above.
@@ -195,6 +210,7 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
     folder: normalizeFolderPath(folderRaw),
     updatedAt: deriveUpdatedAt(parsed),
     trashed,
+    archived,
     template,
     folderIndex,
   };
@@ -241,6 +257,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       folder: null,
       updatedAt: null,
       trashed: null,
+      archived: null,
       template: false,
       folderIndex: false,
       error: r.Err,

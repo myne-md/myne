@@ -1,25 +1,29 @@
 // The canonical resident note-set for resolver-driven reader surfaces
-// (backlinks, graph, tag-browser). Derived ONCE from the live sidebar cache so
+// (backlinks, graph, tag-browser). Derived ONCE from the resolver cache so
 // trash/template exclusion can never drift between surfaces (SYNC-1, knowledge-
 // graph-ux epic). The Rust index is trash-blind; exclusion is entirely TS-side
-// via `liveCache`.
+// via `resolverCache`. NOTE (note-archive / MYND-331 Q3/B): this uses
+// `resolverCache`, NOT `liveCache` — an archived note is excluded from the
+// working-set tree/favorites but must STILL resolve as a backlink target and show
+// in the graph/tag-browser. The two-axis split lives here: tree → `liveCache`
+// (archived out), resolver → `resolverCache` (archived in).
 
 import { useMemo } from "react";
 import type { TitleRecord } from "./loadNoteBatch";
 import type { ResolverNote } from "./resolveWikilink";
-import { liveCache, useSelectedNote, type NoteId } from "./sidebarState";
+import { resolverCache, useSelectedNote, type NoteId } from "./sidebarState";
 
 /**
- * Map the live (non-trashed, non-template) cache to the resolver's note-set
- * shape ({@link ResolverNote}). `TitleRecord` is a superset of `ResolverNote`
- * (it already carries `noteUuid`/`title`/`folder`), so this is a projection of
- * `liveCache`. Pure — unit-testable without React.
+ * Map the resolver (non-trashed, non-template; archived-inclusive) cache to the
+ * resolver's note-set shape ({@link ResolverNote}). `TitleRecord` is a superset
+ * of `ResolverNote` (it already carries `noteUuid`/`title`/`folder`), so this is
+ * a projection of `resolverCache`. Pure — unit-testable without React.
  */
 export function resolverNotesFromCache(
   cache: ReadonlyMap<NoteId, TitleRecord>,
 ): ResolverNote[] {
   const out: ResolverNote[] = [];
-  for (const r of liveCache(cache).values()) {
+  for (const r of resolverCache(cache).values()) {
     // `folderIndex` is carried so folder-target wikilinks (`[[Projects/]]`)
     // resolve to the folder's index note (MYND-370). A folder note is neither
     // trashed nor a template, so it survives `liveCache`'s exclusion.

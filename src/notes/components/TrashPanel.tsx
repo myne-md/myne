@@ -22,108 +22,28 @@ import {
   type NoteId,
 } from "../sidebarState";
 import { BACKDROP_STYLE, DeleteConfirmModal } from "./DeleteConfirmModal";
+import {
+  AGE_STYLE,
+  COUNT_STYLE,
+  EMPTY_STATE_STYLE,
+  FOOTER_STYLE,
+  HEADER_STYLE,
+  HEADER_TITLE_STYLE,
+  LIST_STYLE,
+  PANEL_STYLE,
+  ROW_BTN_STYLE,
+  ROW_STYLE,
+  ROW_TITLE_STYLE,
+  STATUS_STYLE,
+} from "./notePanelStyles";
 import { formatRelativeTime } from "./relativeTime";
 
-const PANEL_STYLE: CSSProperties = {
-  width: 460,
-  maxHeight: "70vh",
-  display: "flex",
-  flexDirection: "column",
-  background: "var(--paper)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-3)",
-  boxShadow: "var(--shadow-3)",
-  fontFamily: "var(--font-sans)",
-  overflow: "hidden",
-};
-
-const HEADER_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "baseline",
-  justifyContent: "space-between",
-  padding: "var(--space-4) var(--space-5)",
-  borderBottom: "1px solid var(--line-1)",
-};
-
-const HEADER_TITLE_STYLE: CSSProperties = {
-  fontSize: 15,
-  fontWeight: 600,
-  color: "var(--fg-1)",
-  margin: 0,
-};
-
-const COUNT_STYLE: CSSProperties = {
-  fontSize: 12,
-  color: "var(--fg-3)",
-};
-
-const LIST_STYLE: CSSProperties = {
-  overflowY: "auto",
-  padding: "var(--space-2) 0",
-  flex: 1,
-};
-
-const ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-3)",
-  padding: "var(--space-2) var(--space-5)",
-};
-
-const ROW_TITLE_STYLE: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  fontSize: 13,
-  color: "var(--fg-1)",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const AGE_STYLE: CSSProperties = {
-  fontSize: 11,
-  color: "var(--fg-3)",
-  flexShrink: 0,
-};
-
-const ROW_BTN_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  fontWeight: 500,
-  padding: "4px 8px",
-  borderRadius: 5,
-  cursor: "pointer",
-  border: "1px solid var(--line-2)",
-  background: "var(--paper-2)",
-  color: "var(--fg-1)",
-  flexShrink: 0,
-};
-
+// Trash-only buttons — the destructive purge / empty actions + Close. The
+// shared shell styles come from `notePanelStyles` (mirrored by ArchivePanel).
 const PURGE_BTN_STYLE: CSSProperties = {
   ...ROW_BTN_STYLE,
   color: "var(--warning)",
   borderColor: "var(--line-2)",
-};
-
-const EMPTY_STATE_STYLE: CSSProperties = {
-  padding: "var(--space-7) var(--space-5)",
-  textAlign: "center",
-  fontSize: 13,
-  color: "var(--fg-3)",
-};
-
-const FOOTER_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
-  padding: "var(--space-3) var(--space-5)",
-  borderTop: "1px solid var(--line-1)",
-};
-
-const STATUS_STYLE: CSSProperties = {
-  fontSize: 12,
-  color: "var(--warning)",
 };
 
 const EMPTY_TRASH_BTN_STYLE: CSSProperties = {
