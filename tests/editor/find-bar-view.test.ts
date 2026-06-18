@@ -21,6 +21,10 @@ function noopHandlers(): FindBarHandlers {
     onPrev: vi.fn(),
     onToggleCase: vi.fn(),
     onClose: vi.fn(),
+    onToggleReplace: vi.fn(),
+    onReplaceChange: vi.fn(),
+    onReplaceOne: vi.fn(),
+    onReplaceAll: vi.fn(),
   };
 }
 
@@ -29,6 +33,8 @@ const IDLE: FindBarState = {
   caseSensitive: false,
   status: "idle",
   match: null,
+  expanded: false,
+  replace: "",
 };
 
 let bar: FindBarView | null = null;
@@ -65,6 +71,8 @@ describe("find-bar view: render states", () => {
       caseSensitive: false,
       status: "matches",
       match: { current: 3, total: 12 },
+      expanded: false,
+      replace: "",
     });
     expect(status(bar).textContent).toBe("3/12");
     expect(status(bar).className).toContain("cm-find-bar-status--count");
@@ -80,6 +88,8 @@ describe("find-bar view: render states", () => {
       caseSensitive: false,
       status: "no-match",
       match: null,
+      expanded: false,
+      replace: "",
     });
     expect(status(bar).textContent).toBe("No matches");
     expect(status(bar).className).toContain("cm-find-bar-status--nomatch");
@@ -92,7 +102,14 @@ describe("find-bar view: render states", () => {
     bar = createFindBarView(IDLE, noopHandlers());
     // Defensive branch: status==="matches" but match===null must not crash and
     // must not render a bogus count.
-    bar.update({ query: "foo", caseSensitive: false, status: "matches", match: null });
+    bar.update({
+      query: "foo",
+      caseSensitive: false,
+      status: "matches",
+      match: null,
+      expanded: false,
+      replace: "",
+    });
     expect(status(bar).textContent).toBe("");
     expect(status(bar).className).toContain("cm-find-bar-status--hidden");
   });

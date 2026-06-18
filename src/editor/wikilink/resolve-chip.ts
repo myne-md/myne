@@ -27,7 +27,11 @@ function chipRef(parts: WikilinkParts): WikilinkRef {
     targetKind: classifyTarget(target),
     alias: parts.alias,
     heading: parts.heading,
-    blockId: null,
+    // MYND-305: carry the parsed `^block-id` anchor instead of hard-coding null,
+    // so resolve-on-click can scroll to an imported marker (§5.6). The block-id
+    // does not affect NOTE resolution (it's an in-note scroll target), but a
+    // `WikilinkRef` faithful to the parsed parts keeps this glue honest.
+    blockId: parts.blockId,
   };
 }
 

@@ -37,6 +37,8 @@ import {
   findPrevious,
   getSearchQuery,
   setSearchQuery,
+  replaceNext,
+  replaceAll,
   SearchQuery,
 } from "@codemirror/search";
 import { createFindBarView } from "./find-bar-view";
@@ -66,11 +68,25 @@ function createFindPanel(view: EditorView): Panel {
   let matches: { from: number; to: number }[] = [];
   let scanTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Replace affordance state (MYND-302) — in-memory only, scoped to this panel
+  // instance (cleared on close). `expanded` drives the replace-row disclosure;
+  // `replaceText` is the replacement string carried on the query so the engine's
+  // replaceNext / replaceAll commands read it (they pull `query.replace`).
+  let expanded = false;
+  let replaceText = "";
+
   const applyQuery = (query: string): void => {
     view.dispatch({
       effects: setSearchQuery.of(
         // literal: true → plain substring, never regex (regex is out of scope v1).
-        new SearchQuery({ search: query, caseSensitive: getFindCaseSensitive(), literal: true }),
+        // `replace` is carried on the query so @codemirror/search's replaceNext /
+        // replaceAll find the replacement; match-case is inherited (same field).
+        new SearchQuery({
+          search: query,
+          caseSensitive: getFindCaseSensitive(),
+          literal: true,
+          replace: replaceText,
+        }),
       ),
     });
   };
@@ -116,12 +132,12 @@ function createFindPanel(view: EditorView): Panel {
     const query = bar.input.value;
     const caseSensitive = getFindCaseSensitive();
     if (query.length === 0) {
-      bar.update({ query, caseSensitive, status: "idle", match: null });
+      bar.update({ query, caseSensitive, status: "idle", match: null, expanded, replace: replaceText });
       return;
     }
     const total = matches.length;
     if (total === 0) {
-      bar.update({ query, caseSensitive, status: "no-match", match: null });
+      bar.update({ query, caseSensitive, status: "no-match", match: null, expanded, replace: replaceText });
       return;
     }
     bar.update({
@@ -129,6 +145,8 @@ function createFindPanel(view: EditorView): Panel {
       caseSensitive,
       status: "matches",
       match: { current: currentOrdinal(), total },
+      expanded,
+      replace: replaceText,
     });
   };
 
@@ -138,6 +156,8 @@ function createFindPanel(view: EditorView): Panel {
       caseSensitive: getFindCaseSensitive(),
       status: "idle",
       match: null,
+      expanded,
+      replace: replaceText,
     },
     {
       onQueryChange: (query) => applyQuery(query),
@@ -154,6 +174,30 @@ function createFindPanel(view: EditorView): Panel {
       },
       onClose: () => {
         closeSearchPanel(view);
+      },
+      onToggleReplace: () => {
+        expanded = !expanded;
+        render(); // attach/detach the replace row + flip the disclosure
+        if (expanded) bar.replaceInput.focus();
+        else bar.focus(); // collapsing returns focus to the find input
+      },
+      onReplaceChange: (value) => {
+        replaceText = value;
+        // Re-carry the replacement on the query so replaceNext/replaceAll see it.
+        // No rescan needed (the search string is unchanged), but the query object
+        // must be re-dispatched to update its `replace` field.
+        applyQuery(bar.input.value);
+      },
+      onReplaceOne: () => {
+        // Replaces the current match (if the selection sits on one) and advances
+        // to the next; otherwise just advances. The selection move rides the
+        // existing cursor-aware reveal (un-folds folded regions, SYNC-6).
+        replaceNext(view);
+      },
+      onReplaceAll: () => {
+        // One undoable transaction over the canonical buffer (folded regions
+        // included) — a single Cmd/Ctrl+Z reverts the whole bulk replace.
+        replaceAll(view);
       },
     },
   );
@@ -176,6 +220,22 @@ function createFindPanel(view: EditorView): Panel {
       e.preventDefault();
       if (e.shiftKey) findPrevious(view);
       else findNext(view);
+    }
+  });
+
+  // Keyboard on the replace input (MYND-302):
+  //   Esc          → close the whole bar (mirrors the find input + editor body)
+  //   Enter        → replace the current match and advance (replaceNext); the
+  //                  primary one-handed flow without leaving the field.
+  bar.replaceInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeSearchPanel(view);
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      replaceNext(view);
     }
   });
 

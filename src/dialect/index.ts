@@ -21,6 +21,10 @@ export type {
 
 export { parse } from "./parse";
 export { extractFullText, extractBodyText } from "./visitors/fullText";
+// SYNC-1 (MYND-300): the canonical heading-list-with-positions surface MYND-305
+// imports for anchor resolution + `[[#` autocomplete.
+export { headingSections } from "./visitors/headingSections";
+export type { HeadingSection } from "./visitors/headingSections";
 export { stripDialectComments, hasDialectComment } from "./stripComments";
 export {
   buildInitialPlaintext,

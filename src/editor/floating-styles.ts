@@ -120,6 +120,31 @@ const CSS = `
   width: 16px;
   color: var(--fg-3);
 }
+/* [[# current-note heading row (MYND-305): a # glyph (its repeat hints the
+   level) + the heading text on one line — the current note IS the context, so no
+   secondary path line, matching the folder row's single-line glyph layout. */
+.cm-wiki-picker-heading-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.cm-wiki-picker-heading-glyph {
+  min-width: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent, var(--fg-3));
+  text-align: left;
+}
+/* [[## vault-wide heading row (MYND-305): heading text over a smaller note-
+   context line (the owning note's title) — the title-over-path stack of a note
+   row, so the two pick surfaces read consistently and the vault scope is legible
+   at a glance vs the single-line current-note rows. */
+.cm-wiki-picker-vault-heading-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
 
 .cm-toolbar {
   display: inline-flex;
@@ -383,15 +408,65 @@ const CSS = `
    bottom hairline and NO shadow (DESIGN.md: nothing on the editor surface gets a
    shadow — the deliberate difference from the floating slash-menu/toolbar above). */
 .cm-find-bar {
+  /* MYND-302: a column of rows (find row + optional replace row). The flex
+     chrome the single-row bar carried now lives on .cm-find-bar-row. */
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
   box-sizing: border-box;
   padding: 8px 12px;
   background-color: var(--paper, #fbfbfa);
   border-bottom: 1px solid var(--line-1, #e3e2dd);
   font-family: var(--font-sans);
+}
+.cm-find-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+/* The replace row's leading glyph sits in the same lead column as the find
+   row's search icon (the toggle is the first element on the find row; the
+   replace row reuses the lead-icon slot so the two inputs align). */
+.cm-find-bar-toggle {
+  color: var(--fg-3, #6b6a64);
+  transition: transform var(--duration-fast, 120ms) var(--ease-standard, ease);
+}
+/* Expanded: the disclosure chevron rotates from ▶ to ▼. */
+.cm-find-bar-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+.cm-find-bar-replace-lead {
+  color: var(--fg-3, #6b6a64);
+}
+/* Replace action buttons ("Replace" / "Replace all (N)") — text pills matching
+   the inline-URL apply button's restraint, but secondary (not accent-filled):
+   the bulk action is undoable, so it doesn't need an attention-grabbing fill. */
+.cm-find-bar-action {
+  flex-shrink: 0;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-2, #c8c7c1);
+  background-color: var(--paper, #fbfbfa);
+  color: var(--fg-2, #3a3934);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 10px;
+  border-radius: var(--radius-1, 3px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cm-find-bar-action:hover {
+  background-color: var(--paper-2, #f4f4f2);
+  border-color: var(--line-3, #a3a29c);
+}
+.cm-find-bar-action:disabled {
+  color: var(--line-3, #a3a29c);
+  border-color: var(--line-1, #e3e2dd);
+  cursor: default;
+  background-color: transparent;
 }
 .cm-find-bar-lead {
   display: inline-flex;

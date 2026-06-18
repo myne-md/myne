@@ -14,3 +14,11 @@ export {
   wikilinkChipExtensions,
   type WikilinkParts,
 } from "./chip-widget";
+// Anchor (heading / imported block-id) deep-link resolution (MYND-305).
+export {
+  findBlockOffset,
+  findHeadingOffset,
+  hasAnchor,
+  resolveAnchorOffset,
+  type WikilinkAnchor,
+} from "./anchor";

@@ -13,9 +13,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState, Text } from "@codemirror/state";
 import { EditorView, type Command, type KeyBinding } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { foldedRanges, forceParsing, syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { codeNestMarkdownExtension } from "../../src/editor/code-highlight";
+import { myneFolding } from "../../src/editor/folding";
 import { myneKeyBindings, scopedSelectAllRange } from "../../src/editor/keymap";
 
 const FM = "---\ntitle: Note\nupdated: 2026-01-01\n---\nBody line one\nBody two\n";
@@ -62,12 +63,27 @@ function mount(doc: string, anchor: number, head = anchor): Mounted {
       selection: { anchor, head },
       extensions: [
         markdown({ base: markdownLanguage, extensions: [codeNestMarkdownExtension] }),
+        // Folding extensions so foldAll/unfoldAll have a fold state to drive.
+        myneFolding(),
+        // Multi-cursor (MYND-306): selectNextOccurrence only adds a second range
+        // when the facet is on — mirror the production enablement here.
+        EditorState.allowMultipleSelections.of(true),
       ],
     }),
     parent: host,
   });
   forceParsing(view);
+  syntaxTree(view.state);
   return { view, host };
+}
+
+/** Count folded ranges in the view's state. */
+function foldedCount(view: EditorView): number {
+  let n = 0;
+  foldedRanges(view.state).between(0, view.state.doc.length, () => {
+    n++;
+  });
+  return n;
 }
 
 function teardown(m: Mounted): void {
@@ -158,6 +174,48 @@ describe("myneKeyBindings — list prefix toggles", () => {
     m = mount(doc, 0, doc.length); // select all three lines
     run("Mod-Shift-8", m.view);
     expect(m.view.state.doc.toString()).toBe("- one\n- two\n- three");
+  });
+});
+
+describe("myneKeyBindings — fold all / unfold all (MYND-300)", () => {
+  it("binds Mod-Alt-[ and Mod-Alt-] to commands", () => {
+    // The chords are present and distinct from the reserved set.
+    expect(myneKeyBindings.some((b) => b.key === "Mod-Alt-[")).toBe(true);
+    expect(myneKeyBindings.some((b) => b.key === "Mod-Alt-]")).toBe(true);
+  });
+
+  it("Mod-Alt-[ folds, Mod-Alt-] unfolds a multi-heading doc", () => {
+    m = mount("# A\nbody a\n## A.1\nchild\n# B\nbody b\n", 0);
+    expect(foldedCount(m.view)).toBe(0);
+    expect(run("Mod-Alt-[", m.view)).toBe(true);
+    expect(foldedCount(m.view)).toBeGreaterThan(0);
+    expect(run("Mod-Alt-]", m.view)).toBe(true);
+    expect(foldedCount(m.view)).toBe(0);
+  });
+});
+
+describe("myneKeyBindings — Mod-d selectNextOccurrence (multi-cursor, MYND-306)", () => {
+  it("binds Mod-d explicitly (no searchKeymap wholesale install)", () => {
+    expect(myneKeyBindings.some((b) => b.key === "Mod-d")).toBe(true);
+  });
+
+  it("Mod-d on a selected word adds the next occurrence to the multi-selection", () => {
+    // Select the first "cat"; Mod-d extends to the second "cat".
+    m = mount("cat dog cat", 0, 3);
+    expect(m.view.state.selection.ranges.length).toBe(1);
+    expect(run("Mod-d", m.view)).toBe(true);
+    expect(m.view.state.selection.ranges.length).toBe(2);
+    // Both ranges cover a "cat" occurrence.
+    for (const r of m.view.state.selection.ranges) {
+      expect(m.view.state.doc.sliceString(r.from, r.to)).toBe("cat");
+    }
+  });
+
+  it("repeated Mod-d keeps extending across all occurrences", () => {
+    m = mount("cat cat cat", 0, 3);
+    run("Mod-d", m.view);
+    run("Mod-d", m.view);
+    expect(m.view.state.selection.ranges.length).toBe(3);
   });
 });
 

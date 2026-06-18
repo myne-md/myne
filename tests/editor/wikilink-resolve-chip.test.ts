@@ -29,6 +29,7 @@ const parts = (over: Partial<WikilinkParts>): WikilinkParts => ({
   target: null,
   alias: null,
   heading: null,
+  blockId: null,
   ...over,
 });
 
