@@ -37,7 +37,11 @@ RUN_FLAGS=(
 )
 
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target /usr/local/cargo/registry'
+# Chown ALL of /work (not just the volumes): on a native-Linux bind mount the
+# repo root stays host-owned (root), so the unprivileged `e2e` build user can't
+# create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS
+# masks this via ownership remapping; native Linux / CI does not.)
+FIX_PERMS='chown -R e2e:e2e /work /usr/local/cargo/registry'
 
 BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then
