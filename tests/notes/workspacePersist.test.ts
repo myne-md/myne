@@ -6,14 +6,20 @@
 import { describe, expect, it } from "vitest";
 import {
   deserializeWorkspace,
+  deserializeWorkspaces,
   serializeWorkspace,
+  serializeWorkspaces,
 } from "../../src/lib/workspace-persist";
 import {
+  createSlot,
+  emptyNamedWorkspaces,
   emptyWorkspace,
   graphItem,
   noteItem,
   openInNewTab,
   openToSide,
+  setActiveSlotState,
+  setItemViewMode,
   setPinned,
   setStacked,
   viewItem,
@@ -300,5 +306,134 @@ describe("workspace descriptor (de)serialization", () => {
     } else {
       throw new Error("expected a leaf root");
     }
+  });
+
+  // ── reading-source-modes (MYND-299): per-tab viewMode omit-when-default ─────
+
+  it("round-trips a non-default viewMode tab", () => {
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, noteItem("a"));
+    ws = openInNewTab(ws, noteItem("b"));
+    ws = setItemViewMode(ws, "p", noteItem("a"), "reading");
+    ws = setItemViewMode(ws, "p", noteItem("b"), "source");
+    const restored = deserializeWorkspace(serializeWorkspace(ws));
+    expect(restored).toEqual(ws);
+    if (restored!.root.kind === "leaf") {
+      expect(restored!.root.tabs[0]).toEqual({ kind: "note", id: "a", viewMode: "reading" });
+      expect(restored!.root.tabs[1]).toEqual({ kind: "note", id: "b", viewMode: "source" });
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+
+  it("a default (live) viewMode serializes BYTE-IDENTICAL to pre-feature (no key leaks)", () => {
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, noteItem("a"));
+    const expectedPreFeature = JSON.stringify({
+      root: {
+        kind: "leaf",
+        id: "p",
+        tabs: [{ kind: "note", id: "a" }],
+        activeTab: { kind: "note", id: "a" },
+      },
+      focusedPaneId: "p",
+    });
+    expect(serializeWorkspace(ws)).toBe(expectedPreFeature);
+    // A transient set-then-reset-to-live leaves it byte-stable.
+    let toggled = setItemViewMode(ws, "p", noteItem("a"), "source");
+    toggled = setItemViewMode(toggled, "p", noteItem("a"), "live");
+    expect(serializeWorkspace(toggled)).toBe(expectedPreFeature);
+  });
+
+  it("ignores a non-enum `viewMode` value (junk/`live` ⇒ default, no key round-trips in)", () => {
+    const restored = deserializeWorkspace(
+      JSON.stringify({
+        root: {
+          kind: "leaf",
+          id: "p",
+          tabs: [
+            { kind: "note", id: "a", viewMode: "live" },
+            { kind: "note", id: "b", viewMode: "wat" },
+          ],
+          activeTab: { kind: "note", id: "a" },
+        },
+        focusedPaneId: "p",
+      }),
+    );
+    expect(restored).not.toBeNull();
+    if (restored!.root.kind === "leaf") {
+      expect(restored!.root.tabs[0]).toEqual(noteItem("a"));
+      expect("viewMode" in restored!.root.tabs[0]!).toBe(false);
+      expect(restored!.root.tabs[1]).toEqual(noteItem("b"));
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+});
+
+// ── named-workspaces (MYND-308): container (de)serialization + migration ─────
+
+describe("named-workspaces container (de)serialization", () => {
+  it("round-trips a multi-slot container with per-tab viewMode preserved per slot", () => {
+    let c = emptyNamedWorkspaces("p1", "s1");
+    c = setActiveSlotState(
+      c,
+      setItemViewMode(
+        openInNewTab(emptyWorkspace("p1"), noteItem("a")),
+        "p1",
+        noteItem("a"),
+        "reading",
+      ),
+    );
+    c = createSlot(c, "Second", openInNewTab(emptyWorkspace("p2"), noteItem("b")), () => "s2");
+    const restored = deserializeWorkspaces(serializeWorkspaces(c));
+    expect(restored).toEqual(c);
+    // viewMode survived inside slot s1.
+    const s1 = restored!.slots.find((s) => s.id === "s1")!;
+    if (s1.state.root.kind === "leaf") {
+      expect(s1.state.root.tabs[0]).toEqual({ kind: "note", id: "a", viewMode: "reading" });
+    } else {
+      throw new Error("expected a leaf root");
+    }
+  });
+
+  it("migrates a LEGACY single-descriptor payload to a single Default slot", () => {
+    const legacy = serializeWorkspace(openInNewTab(emptyWorkspace("p"), noteItem("a")));
+    const restored = deserializeWorkspaces(legacy, () => "migrated-id");
+    expect(restored).not.toBeNull();
+    expect(restored!.slots).toHaveLength(1);
+    expect(restored!.slots[0]!.id).toBe("migrated-id");
+    expect(restored!.slots[0]!.name).toBe("Default");
+    expect(restored!.activeId).toBe("migrated-id");
+    expect(restored!.slots[0]!.state).toEqual(
+      openInNewTab(emptyWorkspace("p"), noteItem("a")),
+    );
+  });
+
+  it("rejects non-JSON / empty-slots / dangling activeId / duplicate slot ids", () => {
+    expect(deserializeWorkspaces("not json{")).toBeNull();
+    expect(deserializeWorkspaces(JSON.stringify({ slots: [], activeId: "x" }))).toBeNull();
+    const oneSlot = {
+      id: "s1",
+      name: "A",
+      state: { root: { kind: "leaf", id: "p", tabs: [], activeTab: null }, focusedPaneId: "p" },
+    };
+    // Dangling activeId.
+    expect(
+      deserializeWorkspaces(JSON.stringify({ slots: [oneSlot], activeId: "ghost" })),
+    ).toBeNull();
+    // Duplicate slot ids.
+    expect(
+      deserializeWorkspaces(JSON.stringify({ slots: [oneSlot, oneSlot], activeId: "s1" })),
+    ).toBeNull();
+    // A slot whose descriptor is corrupt rejects the whole blob.
+    expect(
+      deserializeWorkspaces(
+        JSON.stringify({
+          slots: [{ id: "s1", name: "A", state: { focusedPaneId: "p" } }],
+          activeId: "s1",
+        }),
+      ),
+    ).toBeNull();
   });
 });

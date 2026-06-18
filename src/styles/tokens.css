@@ -563,6 +563,33 @@ textarea,
   user-select: text;
 }
 
+/* -- Focus mode (MYND-348) --------------------------------------------------
+   Distraction-free writing: when the editor root carries data-focus-active, fade
+   every chrome element that opted in (tab strip, bottom bar, floated title-bar
+   cluster) and disable its pointer events. Sidebars are collapsed separately (to
+   reclaim editor width). The opacity transition is zeroed by the reduced-motion
+   rule below, so reduced-motion users get an instant, non-animated toggle. */
+[data-editor-chrome] {
+  transition: opacity 200ms ease;
+}
+[data-focus-active="true"] [data-editor-chrome] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Focus-mode line dimming (MYND-348): when the editor root carries
+   data-focus-dim (= focus active && the editor_focus_dim_inactive pref), dim
+   every editor line except the active one(s). `.cm-activeLine` comes from the
+   highlightActiveLine() extension (its background is neutralized in theme.ts, so
+   it is invisible in normal mode and only marks the active line here). */
+[data-focus-dim="true"] .cm-line {
+  opacity: 0.4;
+  transition: opacity 200ms ease;
+}
+[data-focus-dim="true"] .cm-line.cm-activeLine {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0ms !important;

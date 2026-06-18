@@ -77,6 +77,20 @@ export type CommandContext = {
   onToggleRightSidebar: () => void;
   /** Flip the focused pane's stacked tab-layout (tab-modes / MYND-319). */
   onToggleStackedTabs: () => void;
+  /** Toggle the focused note tab between Edit and Reading view (MYND-299). */
+  onToggleReading: () => void;
+  /** Toggle the focused note tab's Edit surface between live-preview and source (MYND-299). */
+  onToggleSource: () => void;
+  /** Toggle distraction-free focus mode — fade chrome, collapse sidebars (MYND-348). */
+  onToggleFocus: () => void;
+  /** Save the active layout as a new named workspace (MYND-308). */
+  onSaveWorkspaceAs: () => void;
+  /** Switch to another named workspace (MYND-308). */
+  onSwitchWorkspace: () => void;
+  /** Rename the active named workspace (MYND-308). */
+  onRenameWorkspace: () => void;
+  /** Delete the active named workspace (MYND-308). */
+  onDeleteWorkspace: () => void;
   /** Switch active selection to the given note id (mirrors sidebar click). */
   onSelectNote: (id: NoteId) => Promise<void>;
   /** Drive Stage transitions for force-relock paths. */

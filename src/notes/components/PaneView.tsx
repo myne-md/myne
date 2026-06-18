@@ -17,12 +17,19 @@ import {
   type CSSProperties,
   type DragEvent as ReactDragEvent,
 } from "react";
-import { CMEditor } from "../../editor/CMEditor";
+import { CMEditor, type ScrollAnchorRequest } from "../../editor/CMEditor";
+import { asViewMode, type ViewMode } from "../../editor/view-mode";
+
+/** Stable no-op onChange for the read-only preview companion (MYND-299) — a fresh
+ *  arrow each render would rebuild nothing here, but a module const keeps it tidy. */
+const NOOP_ON_CHANGE = (_next: string): void => {};
+import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
 import { createNote } from "../createNote";
 import { useSelectedNote, type NoteId } from "../sidebarState";
 import { useResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
+import { useVaultHeadings } from "../useVaultHeadings";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
@@ -147,6 +154,15 @@ export function PaneView({
   // note editor; `activeViewId` is non-null exactly then.
   const activeViewId: string | null =
     leaf.activeTab?.kind === "view" ? leaf.activeTab.id : null;
+  // reading-source-modes (MYND-299): the effective view mode for this pane's
+  // note tab — the tab's own per-tab mode if set, else the global
+  // `editor_default_view_mode` pref, else `live`. Drives the CMEditor below
+  // (re-mount-free reconfigure on change).
+  const defaultViewMode: ViewMode = asViewMode(prefs.editor_default_view_mode);
+  const effectiveViewMode: ViewMode =
+    leaf.activeTab?.kind === "note" && leaf.activeTab.viewMode
+      ? leaf.activeTab.viewMode
+      : defaultViewMode;
   // A graph-kind active tab renders the whole-vault graph pane (MYND-198) in
   // place of the note editor — a first-class tab, no longer a modal carve-out.
   const isGraph = leaf.activeTab?.kind === "graph";
@@ -159,13 +175,47 @@ export function PaneView({
   const liveNotes = useResolverNotes();
   const indexNonce = useIndexNonce();
   const notes = useMemo(() => liveNotes.slice(), [liveNotes, indexNonce]);
-  // Click-to-navigate target for a resolved wikilink chip → open the note.
+  // MYND-305: the vault-wide heading set the `[[##` autocomplete searches (built
+  // lazily by reading note bodies; rebuilt on the index nonce). Empty until the
+  // first async build settles — `[[##` simply finds nothing until then.
+  const vaultHeadings = useVaultHeadings();
+  // Click-to-navigate target for a resolved wikilink chip → open the note, and
+  // (MYND-305) carry the GENERIC deep-link anchor so the editor scrolls to the
+  // `#heading` / imported `^block-id` AFTER the note body loads. A click focuses
+  // this pane (`onMouseDownCapture`), so the resolved note opens HERE; the
+  // pending request is consumed by the CMEditor below once `activeId` matches and
+  // its body settles. The nonce bumps per click so re-clicking the same anchor
+  // re-fires the scroll.
+  const [scrollAnchor, setScrollAnchor] = useState<ScrollAnchorRequest>(null);
+  // reading-source-modes (MYND-299): side-by-side preview companion — a PaneView-
+  // local, read-only Reading mirror of the SAME `content` buffer. It is NOT a
+  // workspace item (the global duplicate-forbid `(kind,id)` invariant is
+  // untouched) and writes nothing (this PaneView stays the single autosave owner).
+  // The side-by-side preview companion (MYND-299) is ephemeral per-pane state in
+  // the workspace context (shared with the bottom-bar "Preview" toggle). Only
+  // meaningful in SOURCE mode — live renders inline, reading IS the rendered view,
+  // so a companion left open auto-hides when you leave source.
+  const companionOpen = ws.isCompanionOpen(leaf.id);
+  const companionVisible = companionOpen && effectiveViewMode === "source";
+  const pendingAnchorTargetRef = useRef<NoteId | null>(null);
   const handleOpenWikilink = useCallback(
-    (noteUuid: string) => {
+    (noteUuid: string, anchor: WikilinkAnchor | null) => {
+      if (anchor !== null && hasAnchor(anchor)) {
+        pendingAnchorTargetRef.current = noteUuid as NoteId;
+        setScrollAnchor({ anchor, nonce: Date.now() });
+      }
       void ctx.open(noteUuid as NoteId);
     },
     [ctx],
   );
+  // Only feed the pending scroll into the editor once THIS pane is actually
+  // showing the deep-link target (the body-load effect keys on `activeId`); a
+  // stale request for a different note is dropped so we never scroll the wrong
+  // note.
+  const activeScrollAnchor =
+    scrollAnchor !== null && pendingAnchorTargetRef.current === activeId
+      ? scrollAnchor
+      : null;
 
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -428,29 +478,60 @@ export function PaneView({
       // wrapper and updates the editor live (no CodeMirror remount).
       <div
         data-testid="editor.content-frame"
-        style={{ ...typographyStyle(prefs), margin: "0 auto" }}
+        style={
+          companionVisible
+            ? { ...typographyStyle(prefs), maxWidth: "none", margin: 0, display: "flex", gap: 16 }
+            : { ...typographyStyle(prefs), margin: "0 auto" }
+        }
       >
-        <CMEditor
-          value={content}
-          onChange={setContent}
-          onBlur={handleBlur}
-          onSelectionChange={handleSelectionChange}
-          noteSet={notes}
-          onOpenWikilink={handleOpenWikilink}
-          // editor-line-numbers (MYND-314): default OFF (prose-first); the open
-          // editor reconfigures its line-number compartment live when the pref
-          // flips (no remount). `prefs` is already a useMemo dep below.
-          lineNumbers={prefs.editor_line_numbers === true}
-          style={{
-            width: "100%",
-            minHeight: 360,
-            color: "var(--fg-1)",
-          }}
-        />
+        <div style={{ minWidth: 0, flex: companionVisible ? 1 : undefined }}>
+          <CMEditor
+            value={content}
+            onChange={setContent}
+            onBlur={handleBlur}
+            onSelectionChange={handleSelectionChange}
+            noteSet={notes}
+            vaultHeadings={vaultHeadings}
+            onOpenWikilink={handleOpenWikilink}
+            scrollAnchor={activeScrollAnchor}
+            // editor-line-numbers (MYND-314): default OFF (prose-first); the open
+            // editor reconfigures its line-number compartment live when the pref
+            // flips (no remount). `prefs` is already a useMemo dep below.
+            lineNumbers={prefs.editor_line_numbers === true}
+            // reading-source-modes (MYND-299): per-tab live/reading/source. The
+            // editor reconfigures its view-mode compartments live (no remount).
+            viewMode={effectiveViewMode}
+            style={{
+              width: "100%",
+              minHeight: 360,
+              color: "var(--fg-1)",
+            }}
+          />
+        </div>
+        {companionVisible && (
+          // Read-only Reading mirror of the same buffer (single autosave owner is
+          // the primary editor above; this one never calls onChange).
+          <div
+            data-testid="editor.preview-companion"
+            style={{ flex: 1, minWidth: 0, borderLeft: "1px solid var(--line-1)", paddingLeft: 16 }}
+          >
+            <CMEditor
+              value={content}
+              onChange={NOOP_ON_CHANGE}
+              noteSet={notes}
+              vaultHeadings={vaultHeadings}
+              readOnly
+              viewMode="reading"
+              style={{ width: "100%", minHeight: 360, color: "var(--fg-1)" }}
+            />
+          </div>
+        )}
       </div>
     );
   }, [
     prefs,
+    effectiveViewMode,
+    companionVisible,
     inNewTabState,
     activeViewId,
     isGraph,
@@ -463,7 +544,9 @@ export function PaneView({
     handleBlur,
     handleSelectionChange,
     notes,
+    vaultHeadings,
     handleOpenWikilink,
+    activeScrollAnchor,
   ]);
 
   return (
@@ -547,10 +630,15 @@ export function PaneView({
           flex: 1,
           minHeight: 0,
           overflow: "auto",
-          padding: "12px 24px 32px",
+          // No TOP padding here: this div is the scroll parent of the in-note
+          // find bar's sticky top panel, and a top padding leaves a band above the
+          // bar where scrolled text bleeds through (MYND-299 QA). The 12px top
+          // breathing-room moves onto the inner wrapper below, so it scrolls UNDER
+          // the now-flush sticky bar instead of opening a gap above it.
+          padding: "0 24px 32px",
         }}
       >
-        {editorEl}
+        <div style={{ paddingTop: 12 }}>{editorEl}</div>
       </div>
       {dragActive && (
         // Capture overlay — only mounted during a tab/note drag, covering the

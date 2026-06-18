@@ -27,31 +27,44 @@ import {
 } from "react";
 import type { NoteId } from "./sidebarState";
 import {
+  activeSlotState,
   allOpenItems,
   closePane as closePaneOp,
   closeTab as closeTabOp,
   collectLeaves,
+  deleteSlot as deleteSlotOp,
   dropItemOnPane as dropItemOnPaneOp,
   emptyWorkspace,
   focusedLeaf,
   graphItem,
+  listSlots,
   noteItem,
   openInFocusedTab,
   openInNewTab,
   openToSide as openToSideOp,
+  renameSlot as renameSlotOp,
+  saveAsSlot as saveAsSlotOp,
+  setActiveSlotState,
   setActiveTab,
   setFocusedPane,
   setPinned as setPinnedOp,
+  setItemViewMode as setItemViewModeOp,
   splitPane,
   splitPaneWithItem as splitPaneWithItemOp,
+  switchToSlot as switchToSlotOp,
   toggleStacked as toggleStackedOp,
   viewItem,
+  wrapAsSingleSlot,
+  type NamedWorkspaces,
+  type SlotId,
+  type ViewMode,
   type LeafPane,
   type PaneId,
   type SplitDirection,
   type ViewId,
   type WorkspaceItem,
   type WorkspaceNode,
+  type WorkspaceSlot,
   type WorkspaceState,
 } from "./workspaceState";
 import {
@@ -95,8 +108,28 @@ export type WorkspaceApi = {
   /** Dismiss the empty new-tab chooser. */
   cancelNewTab: () => void;
 
-  /** Replace the whole workspace (used to restore a persisted session). */
+  /** Replace the ACTIVE slot's workspace (used to restore a persisted session). */
   restore: (state: WorkspaceState) => void;
+
+  // ── named workspaces (slots) — N named layouts over one container (MYND-308) ──
+  /** All slots in declaration order (drives the switcher list). */
+  slots: WorkspaceSlot[];
+  /** The active slot's id (the switcher's current selection + the MYP1 pointer). */
+  activeWorkspaceId: SlotId;
+  /** Replace the WHOLE container (used by the loader to apply a deserialized
+   *  `{slots, activeId}` payload). */
+  restoreContainer: (container: NamedWorkspaces) => void;
+  /** "Save as…": clone the active slot under `name` and switch to the clone. */
+  saveWorkspaceAs: (name: string) => void;
+  /** Switch the active slot to `id` (no-op if unknown). */
+  switchWorkspace: (id: SlotId) => void;
+  /** Rename slot `id` (no-op if unknown). */
+  renameWorkspace: (id: SlotId, name: string) => void;
+  /** Delete slot `id` (deleting the last yields a fresh empty Default). */
+  deleteWorkspace: (id: SlotId) => void;
+  /** The CURRENT container — read live (ref-backed) so a persistence caller never
+   *  sees a stale snapshot. Mirrors the `stateRef` discipline. */
+  workspacesSnapshot: () => NamedWorkspaces;
 
   // ── back/forward history (focused pane; ephemeral, never persisted) ──
   /** Step the focused pane back to the previously viewed note (no-op when
@@ -163,6 +196,16 @@ export type WorkspaceApi = {
   /** Flip the focused pane's `stacked` layout flag — the palette-action entry. */
   toggleStackedFocused: () => void;
 
+  // ── reading-source-modes (MYND-299) ────────────────────────────
+  /** Set the focused pane's active NOTE tab to a view mode (live/reading/source).
+   *  No-op when the active tab is not a note. The Edit⇄Reading / live↔source
+   *  toggles compute the target mode at the call site from `focusedLeaf`. */
+  setFocusedTabViewMode: (mode: ViewMode) => void;
+  /** Whether the side-by-side preview companion is open for a pane (MYND-299, ephemeral). */
+  isCompanionOpen: (paneId: PaneId) => boolean;
+  /** Toggle the side-by-side preview companion for a pane (MYND-299, ephemeral). */
+  toggleCompanion: (paneId: PaneId) => void;
+
   // ── flush registry (one entry per live pane editor) ────────────
   registerFlush: (paneId: PaneId, flush: () => Promise<void>) => void;
   unregisterFlush: (paneId: PaneId) => void;
@@ -173,8 +216,28 @@ export type WorkspaceApi = {
 const WorkspaceContext = createContext<WorkspaceApi | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<WorkspaceState>(() =>
-    emptyWorkspace(newPaneId()),
+  // Named workspaces (MYND-308 task 4): the live workspace is backed by a
+  // `NamedWorkspaces` container (N named slots + an active pointer), but the
+  // existing reducer surface is preserved EXACTLY — `state` is the active slot's
+  // descriptor and `setState` edits that slot. Every existing reducer call site
+  // (`setState((s) => op(s, …))`) keeps compiling and behaving identically.
+  const [container, setContainer] = useState<NamedWorkspaces>(() =>
+    wrapAsSingleSlot(emptyWorkspace(newPaneId())),
+  );
+  const state = activeSlotState(container);
+  // The wrapped `setState` preserves BOTH the value form and the updater form,
+  // applying either to the ACTIVE slot's descriptor via `setActiveSlotState`.
+  const setState = useCallback(
+    (u: WorkspaceState | ((s: WorkspaceState) => WorkspaceState)) =>
+      setContainer((c) =>
+        setActiveSlotState(
+          c,
+          typeof u === "function"
+            ? (u as (s: WorkspaceState) => WorkspaceState)(activeSlotState(c))
+            : u,
+        ),
+      ),
+    [],
   );
 
   // Which pane (if any) is showing the empty "new tab" chooser (MYND-166).
@@ -229,9 +292,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [setPending],
   );
-  const restore = useCallback((next: WorkspaceState) => {
-    setState(next);
+  const restore = useCallback(
+    (next: WorkspaceState) => {
+      setState(next);
+    },
+    [setState],
+  );
+  // Named workspaces (MYND-308 task 4) — container-level operations. Each is a
+  // thin `setContainer((c) => op(c, …))` over the pure container ops; the loader
+  // uses `restoreContainer` to apply a deserialized payload, and the switcher UI
+  // uses save-as / switch / rename / delete.
+  const restoreContainer = useCallback((c: NamedWorkspaces) => {
+    setContainer(c);
   }, []);
+  const saveWorkspaceAs = useCallback((name: string) => {
+    setContainer((c) => saveAsSlotOp(c, name));
+  }, []);
+  const switchWorkspace = useCallback((id: SlotId) => {
+    setContainer((c) => switchToSlotOp(c, id));
+  }, []);
+  const renameWorkspace = useCallback((id: SlotId, name: string) => {
+    setContainer((c) => renameSlotOp(c, id, name));
+  }, []);
+  const deleteWorkspace = useCallback((id: SlotId) => {
+    setContainer((c) => deleteSlotOp(c, id));
+  }, []);
+  // Ref-backed live container so a persistence caller reading it never sees a
+  // stale snapshot (mirrors `stateRef` below; the graceful-exit + coalesced-flush
+  // paths in Editor.tsx call this from captured closures).
+  const containerRef = useRef(container);
+  containerRef.current = container;
+  const workspacesSnapshot = useCallback(() => containerRef.current, []);
   const activateInPane = useCallback(
     (paneId: PaneId, id: NoteId) => {
       setPending(null);
@@ -346,6 +437,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setState((s) => toggleStackedOp(s, s.focusedPaneId));
   }, []);
 
+  // reading-source-modes (MYND-299): set the focused pane's active note tab to a
+  // view mode. Toggle semantics (Edit⇄Reading, live↔source) are computed by the
+  // caller from `focusedLeaf.activeTab.viewMode`; this just applies the target.
+  const setFocusedTabViewMode = useCallback((mode: ViewMode) => {
+    setState((s) => {
+      const tab = focusedLeaf(s).activeTab;
+      if (tab === null || tab.kind !== "note") return s;
+      return setItemViewModeOp(s, s.focusedPaneId, tab, mode);
+    });
+  }, []);
+
+  // reading-source-modes (MYND-299): side-by-side preview companion open-state,
+  // EPHEMERAL per pane (never persisted — like back/forward history). Held here so
+  // the focused pane's bottom-bar "Preview" toggle and that pane's own editor
+  // share one source of truth. Only meaningful in source mode.
+  const [companionPanes, setCompanionPanes] = useState<ReadonlySet<PaneId>>(
+    () => new Set(),
+  );
+  const isCompanionOpen = useCallback(
+    (paneId: PaneId) => companionPanes.has(paneId),
+    [companionPanes],
+  );
+  const toggleCompanion = useCallback((paneId: PaneId) => {
+    setCompanionPanes((prev) => {
+      const next = new Set(prev);
+      if (next.has(paneId)) next.delete(paneId);
+      else next.add(paneId);
+      return next;
+    });
+  }, []);
+
   // Flush registry — refs (no re-render). Keyed by paneId.
   const flushers = useRef<Map<PaneId, () => Promise<void>>>(new Map());
   const registerFlush = useCallback(
@@ -445,6 +567,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       beginNewTab,
       cancelNewTab,
       restore,
+      slots: listSlots(container),
+      activeWorkspaceId: container.activeId,
+      restoreContainer,
+      saveWorkspaceAs,
+      switchWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
+      workspacesSnapshot,
       goBack,
       goForward,
       canGoBack,
@@ -465,12 +595,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setItemPinned,
       toggleStackedInPane,
       toggleStackedFocused,
+      setFocusedTabViewMode,
+      isCompanionOpen,
+      toggleCompanion,
       registerFlush,
       unregisterFlush,
       flushAll,
     }),
     [
       state,
+      container,
       leaves,
       focused,
       openInFocused,
@@ -480,6 +614,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       beginNewTab,
       cancelNewTab,
       restore,
+      restoreContainer,
+      saveWorkspaceAs,
+      switchWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
+      workspacesSnapshot,
       goBack,
       goForward,
       canGoBack,
@@ -500,6 +640,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setItemPinned,
       toggleStackedInPane,
       toggleStackedFocused,
+      setFocusedTabViewMode,
+      isCompanionOpen,
+      toggleCompanion,
       registerFlush,
       unregisterFlush,
       flushAll,

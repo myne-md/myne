@@ -13,6 +13,8 @@
 
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
+import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
+import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
 import { DailyNotesSettings } from "./DailyNotesSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
@@ -28,6 +30,14 @@ export function EditorPanel() {
       {/* Line-number gutter toggle (editor-line-numbers, MYND-314) — off by
           default; lives next to typography as an editor-display preference. */}
       <LineNumbersSettings />
+
+      {/* Default view mode (reading-source-modes, MYND-299) — Live/Reading/Source
+          a note opens in; per-tab override via ⇧⌘E / the bottom-bar switcher. */}
+      <DefaultViewModeSettings />
+
+      {/* Focus-mode behaviours (focus-mode, MYND-348) — typewriter scroll + dim
+          inactive lines, both honored when focus mode (⇧⌘F) is active. */}
+      <FocusModeSettings />
 
       {/* Spell-check configuration (MYND-267) — toggle + language picker. */}
       <SpellSettings />

@@ -12,6 +12,7 @@
 
 import {
   type EditorState,
+  Facet,
   StateEffect,
   StateField,
   type Transaction,
@@ -19,6 +20,18 @@ import {
 import { EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { searchPanelOpen } from "@codemirror/search";
+
+/**
+ * Reading-view reveal suppressor (reading-source-modes, MYND-299). When `true`,
+ * cursor-aware reveal is hard-OFF regardless of focus/selection — so the
+ * read-only Reading view ALWAYS renders fully and never lifts markdown source
+ * under a click (a non-editable CM6 view can still take a selection, so gating on
+ * `view.hasFocus` alone is not enough to honor the "Reading view never lifts
+ * source" contract). Provided as `true` by `view-mode.ts` in reading mode.
+ */
+export const readingModeFacet = Facet.define<boolean, boolean>({
+  combine: (vals) => vals.some(Boolean),
+});
 
 /** Code-construct node names (fenced / indented / inline). */
 const CODE_NODE_RE = /Code|FencedCode|InlineCode|CodeBlock|CodeText/;
@@ -57,6 +70,8 @@ export function selectionTouchesLines(
 }
 
 export function isCursorLine(view: EditorView, from: number, to: number): boolean {
+  // Reading view (MYND-299): never reveal, whatever the focus/selection.
+  if (view.state.facet(readingModeFacet)) return false;
   // When the editor loses focus (sidebar click, settings modal, OS focus
   // change), the cursor-aware reveal must lift — the decorations should
   // re-apply so the markdown reads as a rendered document. Selection state
@@ -82,6 +97,7 @@ export function isCursorLine(view: EditorView, from: number, to: number): boolea
  * so the rendered view is restored as soon as focus leaves the editor.
  */
 export function isInsideRange(view: EditorView, from: number, to: number): boolean {
+  if (view.state.facet(readingModeFacet)) return false; // Reading view (MYND-299)
   if (!view.hasFocus) return false;
   for (const range of view.state.selection.ranges) {
     if (range.head >= from && range.head <= to) return true;
@@ -155,6 +171,8 @@ export function collapseLineRange(
  * tracks via `editorFocusChanged`.
  */
 export function revealActive(state: EditorState): boolean {
+  // Reading view (MYND-299): never reveal, whatever the focus / find state.
+  if (state.facet(readingModeFacet)) return false;
   return state.field(editorFocusField) || searchPanelOpen(state);
 }
 

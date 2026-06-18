@@ -39,12 +39,49 @@ import { parseAttachmentTarget } from "../../notes/attachmentRef";
 import { readNoteSet } from "./note-set";
 import { chipKeySets, isChipBroken, resolveChipParts } from "./resolve-chip";
 import { pickerActiveFromField } from "./picker";
+import { hasAnchor, type WikilinkAnchor } from "./anchor";
+import { isCursorLine, readingModeFacet } from "../decorations/cursor-aware";
+
+/**
+ * Whether a wikilink chip spanning `[from, to]` should LIFT to its raw, editable
+ * `[[…]]` text — so the user can edit the target / add a `#heading` anchor by
+ * arrow-keying onto its line. This is LINE-level reveal via `isCursorLine` (the
+ * exact predicate every other cursor-aware decoration uses): focused + not
+ * Reading view + a selection touching the link's line. Line-level (not char) is
+ * deliberate — the chip is an ATOMIC range, so a char-level caret could never
+ * land on it to trigger reveal (atomic motion skips it); revealing the whole line
+ * means links on the caret's line are non-atomic, so arrow keys move into them
+ * freely. Consistent with how the rest of Myne's editor reveals markup.
+ */
+function isWikilinkRevealed(view: EditorView, from: number, to: number): boolean {
+  return isCursorLine(view, from, to);
+}
+
+/** A cheap, line-granular signature of where reveal is active — the sorted set of
+ *  line numbers any selection range touches (focused + not Reading, else ""). The
+ *  decoration / atomic caches key on this, so it changes only when the caret
+ *  crosses to a different line; intra-line caret moves stay cache hits. */
+function revealKey(view: EditorView): string {
+  const state = view.state;
+  if (!view.hasFocus || state.facet(readingModeFacet)) return "";
+  const lines = new Set<number>();
+  for (const r of state.selection.ranges) {
+    lines.add(state.doc.lineAt(r.from).number);
+    lines.add(state.doc.lineAt(r.to).number);
+  }
+  return [...lines].sort((a, b) => a - b).join(",");
+}
 
 export type WikilinkParts = {
   isEmbed: boolean;
   target: string | null;
   alias: string | null;
   heading: string | null;
+  /** The `^block-id` anchor (MYND-305) — recognized + carried for resolve-on-
+   *  click of IMPORTED Obsidian markers (§5.6 step 2). Previously dropped (the
+   *  chip-widget never read `WikilinkBlockId`); now threaded so the click handler
+   *  can scroll to an existing marker. Myne never AUTHORS this (§9). */
+  blockId: string | null;
 };
 
 export function parseWikilinkParts(
@@ -57,6 +94,7 @@ export function parseWikilinkParts(
     target: null,
     alias: null,
     heading: null,
+    blockId: null,
   };
   const firstChar = state.doc.sliceString(wikilinkFrom, wikilinkFrom + 1);
   if (firstChar === "!") {
@@ -72,6 +110,8 @@ export function parseWikilinkParts(
         result.alias = state.doc.sliceString(node.from, node.to);
       } else if (node.name === "WikilinkHeading") {
         result.heading = state.doc.sliceString(node.from, node.to);
+      } else if (node.name === "WikilinkBlockId") {
+        result.blockId = state.doc.sliceString(node.from, node.to);
       }
     },
   });
@@ -139,7 +179,8 @@ export class WikilinkChipWidget extends WidgetType {
   }
 }
 
-function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<{ from: number; to: number }>): DecorationSet {
+function buildWikilinkChipDecorations(view: EditorView, ranges: ReadonlyArray<{ from: number; to: number }>): DecorationSet {
+  const state = view.state;
   const decorations: Array<Range<Decoration>> = [];
   // WL-5: the live note-set the chip resolves against for §5.3 broken styling.
   // Fold the note titles into a key set ONCE (not per chip) so each chip's
@@ -160,6 +201,8 @@ function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<
         if (node.name !== "Wikilink") return undefined;
         // The link the picker is authoring stays raw/editable (no chip).
         if (node.from === activeFrom) return false;
+        // A link on the caret's line lifts to raw, editable text (cursor reveal).
+        if (isWikilinkRevealed(view, node.from, node.to)) return false;
         const parts = parseWikilinkParts(state, node.from, node.to);
         // Form-C attachment embeds are rendered by attachment-embed.ts.
         if (isAttachmentEmbed(parts)) return false;
@@ -188,14 +231,25 @@ function buildWikilinkChipDecorations(state: EditorState, ranges: ReadonlyArray<
 // instead of re-walking the full document on every selection change.
 const atomicRangesCache = new WeakMap<
   ReturnType<typeof syntaxTree>,
-  { activeFrom: number | null; ranges: ReturnType<RangeSetBuilder<Decoration>["finish"]> }
+  {
+    activeFrom: number | null;
+    revealKey: string;
+    ranges: ReturnType<RangeSetBuilder<Decoration>["finish"]>;
+  }
 >();
 
 function cachedWikilinkAtomicRanges(view: EditorView) {
   const tree = syntaxTree(view.state);
   const activeFrom = view.state.field(pickerActiveFromField, false) ?? null;
+  // Links on the caret's line are NOT atomic — their chips are lifted to raw text
+  // and the cursor must be able to move into / edit them (cursor reveal). The
+  // cache keys on a line-granular `revealKey`, so the atomic set rebuilds only
+  // when the caret crosses to a different line; intra-line moves stay cache hits.
+  const key = revealKey(view);
   const cached = atomicRangesCache.get(tree);
-  if (cached !== undefined && cached.activeFrom === activeFrom) return cached.ranges;
+  if (cached !== undefined && cached.activeFrom === activeFrom && cached.revealKey === key) {
+    return cached.ranges;
+  }
   const ranges: Array<Range<Decoration>> = [];
   tree.iterate({
     from: 0,
@@ -203,9 +257,12 @@ function cachedWikilinkAtomicRanges(view: EditorView) {
     enter: (node) => {
       if (node.name === "Wikilink") {
         // Attachment embeds register their own atomic range in attachment-embed.ts;
-        // an empty `[[]]` is plain text (§10) and the `[[` picker's active node is
-        // raw/editable — none are atomic (the cursor edits them freely).
-        if (node.from === activeFrom) return false;
+        // an empty `[[]]` is plain text (§10), the `[[` picker's active node is
+        // raw/editable, and a link on the caret's line is lifted for editing —
+        // none are atomic (the cursor edits them freely).
+        if (node.from === activeFrom || isWikilinkRevealed(view, node.from, node.to)) {
+          return false;
+        }
         const parts = parseWikilinkParts(view.state, node.from, node.to);
         if (!isAttachmentEmbed(parts) && (parts.target ?? "") !== "") {
           ranges.push(Decoration.replace({}).range(node.from, node.to));
@@ -219,7 +276,7 @@ function cachedWikilinkAtomicRanges(view: EditorView) {
   ranges.sort((a, b) => a.from - b.from);
   for (const r of ranges) builder.add(r.from, r.to, r.value);
   const finished = builder.finish();
-  atomicRangesCache.set(tree, { activeFrom, ranges: finished });
+  atomicRangesCache.set(tree, { activeFrom, revealKey: key, ranges: finished });
   return finished;
 }
 
@@ -228,9 +285,14 @@ export function wikilinkChipExtensions(): readonly Extension[] {
     ViewPlugin.fromClass(
       class {
         decorations: DecorationSet;
+        // The reveal signature (caret line-set) at the last build — so a cursor
+        // move only re-decorates when it crosses to a different line, not on every
+        // intra-line move.
+        lastRevealKey: string;
         constructor(view: EditorView) {
+          this.lastRevealKey = revealKey(view);
           this.decorations = buildWikilinkChipDecorations(
-            view.state,
+            view,
             view.visibleRanges,
           );
         }
@@ -245,14 +307,21 @@ export function wikilinkChipExtensions(): readonly Extension[] {
           const activeChanged =
             update.startState.field(pickerActiveFromField, false) !==
             update.state.field(pickerActiveFromField, false);
+          // The caret crossed to a different line (or focus changed) → re-chip so
+          // links on the new line lift to raw text (and links on the old line
+          // re-render as chips). Only rebuilds when the reveal signature changes.
+          const key = revealKey(update.view);
+          const revealChanged = key !== this.lastRevealKey;
           if (
             update.docChanged ||
             update.viewportChanged ||
             noteSetChanged ||
-            activeChanged
+            activeChanged ||
+            revealChanged
           ) {
+            this.lastRevealKey = key;
             this.decorations = buildWikilinkChipDecorations(
-              update.state,
+              update.view,
               update.view.visibleRanges,
             );
           }
@@ -277,23 +346,31 @@ export function wikilinkChipExtensions(): readonly Extension[] {
         }
         const pos = view.posAtDOM(chipEl);
         let noteUuid: string | null = null;
+        // SYNC-5: carry the GENERIC anchor (`#heading` / imported `^block-id`)
+        // alongside the resolved note so the open chain can scroll to it after
+        // the body loads (MYND-305). Not a wikilink-specific side channel — the
+        // `anchor` shape is reusable by any open-API caller.
+        let anchor: WikilinkAnchor | null = null;
         syntaxTree(view.state).iterate({
           from: pos,
           to: pos + 1,
           enter: (node) => {
             if (node.name !== "Wikilink") return undefined;
-            const res = resolveChipParts(
-              parseWikilinkParts(view.state, node.from, node.to),
-              readNoteSet(view.state),
-            );
-            if (res !== null && res.status === "resolved") noteUuid = res.noteUuid;
+            const parts = parseWikilinkParts(view.state, node.from, node.to);
+            const res = resolveChipParts(parts, readNoteSet(view.state));
+            if (res !== null && res.status === "resolved") {
+              noteUuid = res.noteUuid;
+              if (hasAnchor({ heading: parts.heading, blockId: parts.blockId })) {
+                anchor = { heading: parts.heading, blockId: parts.blockId };
+              }
+            }
             return false;
           },
         });
         if (noteUuid === null) return false;
         view.dom.dispatchEvent(
           new CustomEvent("myne-open-wikilink", {
-            detail: { noteUuid },
+            detail: { noteUuid, anchor },
             bubbles: true,
           }),
         );
@@ -309,6 +386,9 @@ export function wikilinkChipExtensions(): readonly Extension[] {
 export function wikilinkAtomicRanges(state: EditorState): RangeSet<Decoration> {
   const ranges: Array<Range<Decoration>> = [];
   const activeFrom = state.field(pickerActiveFromField, false) ?? null;
+  // NOTE: the caret-reveal exclusion (an editable link under the cursor) needs the
+  // live view's focus, so it lives in the view-bound `cachedWikilinkAtomicRanges`;
+  // this state-only test export reports the static atomic set (picker-active aside).
   syntaxTree(state).iterate({
     from: 0,
     to: state.doc.length,

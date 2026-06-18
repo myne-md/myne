@@ -58,6 +58,17 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
 
   // View
   { id: "graph.show", label: "Show graph view", group: "View", defaultBindings: ["Mod-Shift-g"], rebindable: true },
+  // reading-source-modes (MYND-299): Edit⇄Reading default Mod-Shift-e (inline-code
+  // keeps Mod-e); the secondary live↔source toggle ships with NO default chord.
+  { id: "view.toggle-reading", label: "Toggle reading view", group: "View", defaultBindings: ["Mod-Shift-e"], rebindable: true },
+  { id: "view.toggle-source", label: "Toggle source mode", group: "View", defaultBindings: [], rebindable: true },
+  // focus-mode (MYND-348): distraction-free toggle, default Mod-Shift-f.
+  { id: "view.toggle-focus", label: "Toggle focus mode", group: "View", defaultBindings: ["Mod-Shift-f"], rebindable: true },
+  // named-workspaces (MYND-308): no default chord (rebindable only).
+  { id: "workspace.save-as", label: "Save workspace as", group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.switch", label: "Switch workspace", group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.rename", label: "Rename workspace", group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.delete", label: "Delete workspace", group: "View", defaultBindings: [], rebindable: true },
 
   // Editor formatting (CodeMirror-owned, SYNC-9 — fixed, not rebindable yet)
   { id: "editor.bold", label: "Bold", group: "Editor formatting", defaultBindings: ["Mod-b"], rebindable: false },
@@ -69,6 +80,10 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   { id: "editor.task-list", label: "Toggle task list", group: "Editor formatting", defaultBindings: ["Mod-Shift-m"], rebindable: false },
   { id: "editor.wikilink", label: "Insert wikilink", group: "Editor formatting", defaultBindings: ["Mod-Shift-l"], rebindable: false },
   { id: "editor.select-all", label: "Select all (scoped)", group: "Editor formatting", defaultBindings: ["Mod-a"], rebindable: false },
+  // Heading/list folding (MYND-300) — CodeMirror-owned chords, fixed like the
+  // other editor-formatting rows (SYNC-9). Per-fold is the gutter click.
+  { id: "editor.fold-all", label: "Fold all", group: "Editor formatting", defaultBindings: ["Mod-Alt-["], rebindable: false },
+  { id: "editor.unfold-all", label: "Unfold all", group: "Editor formatting", defaultBindings: ["Mod-Alt-]"], rebindable: false },
 ];
 
 /** The display groups in panel order. */

@@ -36,6 +36,13 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onExportVaultMarkdown: vi.fn(),
     onShowViews: vi.fn(),
     onToggleStackedTabs: vi.fn(),
+    onToggleReading: vi.fn(),
+    onToggleSource: vi.fn(),
+    onToggleFocus: vi.fn(),
+    onSaveWorkspaceAs: vi.fn(),
+    onSwitchWorkspace: vi.fn(),
+    onRenameWorkspace: vi.fn(),
+    onDeleteWorkspace: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -53,6 +60,8 @@ describe("Command palette action registry", () => {
       "app.open-settings",
       "attachments.open",
       "daily.open-today",
+      "editor.fold-all",
+      "editor.unfold-all",
       "graph.show",
       "note.export-html",
       "note.export-markdown",
@@ -68,12 +77,37 @@ describe("Command palette action registry", () => {
       "vault.import-obsidian",
       "vault.lock",
       "view.toggle-backlinks-sidebar",
+      "view.toggle-focus",
       "view.toggle-notes-sidebar",
+      "view.toggle-reading",
+      "view.toggle-source",
       "view.toggle-stacked-tabs",
       "views.import-base",
       "views.show",
       "wikilinks.convert-in-this-note",
+      "workspace.delete",
+      "workspace.rename",
+      "workspace.save-as",
+      "workspace.switch",
     ]);
+  });
+
+  it("workspace.* commands are editor-only and dispatch to their callbacks (MYND-308)", () => {
+    const cases = [
+      { id: "workspace.save-as", cb: "onSaveWorkspaceAs" },
+      { id: "workspace.switch", cb: "onSwitchWorkspace" },
+      { id: "workspace.rename", cb: "onRenameWorkspace" },
+      { id: "workspace.delete", cb: "onDeleteWorkspace" },
+    ] as const;
+    for (const { id, cb } of cases) {
+      expect(find(id).visibility(makeContext({ stageName: "editor" }))).toBe("show");
+      expect(find(id).visibility(makeContext({ stageName: "welcome" }))).toBe(
+        "hidden",
+      );
+      const fn = vi.fn();
+      void find(id).run(makeContext({ [cb]: fn }));
+      expect(fn).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("views.import-base is editor-only and dispatches to onImportBaseView (MYND-276 #6)", () => {

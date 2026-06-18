@@ -44,6 +44,7 @@ import type { CommandContext } from "../commands";
 import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
 import type { KeybindEntry } from "../commands/keybindEngine";
 import { catalogDefaults } from "../commands/bindableCatalog";
+import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
 import { Icon } from "../components/primitives/Icon";
@@ -138,14 +139,24 @@ import { PaneTree } from "../notes/components/PaneTree";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
 import type { PaneReadout } from "../notes/components/PaneView";
 import type { DocStats } from "../notes/documentStats";
-import { findItemPane, sameItem } from "../notes/workspaceState";
 import {
-  deserializeWorkspace,
-  serializeWorkspace,
+  findItemPane,
+  resolveActiveSlot,
+  sameItem,
+  shouldFlushWorkspace,
+  switchToSlot,
+  type SlotId,
+  type WorkspaceSlot,
+} from "../notes/workspaceState";
+import {
+  deserializeWorkspaces,
+  serializeWorkspaces,
   workspaceRead,
   workspaceStage,
   workspaceWrite,
 } from "../lib/workspace-persist";
+import { setActiveWorkspace } from "../lib/prefs";
+import { promptForText } from "../lib/promptForText";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
 // bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
@@ -164,6 +175,15 @@ const STATUS_TEXT_STYLE: CSSProperties = {
 };
 
 /**
+ * Poll cadence (ms) for the MYND-308 coalesced workspace flush. The timer fires
+ * often (~30 s) but the pure `shouldFlushWorkspace` gate only permits an actual
+ * disk write ≤ once per `WORKSPACE_FLUSH_INTERVAL_MS` (5 min) of dirty activity,
+ * so the blob's mtime stays a coarse (≤ ~5 min) signal — the SYNC-6 mtime-defense
+ * relaxation, bounded + documented.
+ */
+const COALESCED_FLUSH_POLL_MS = 30_000;
+
+/**
  * The toggleable BottomBar element ids + their menu labels (bottom-bar
  * customization). Single source of truth: the BottomBar gates each element's
  * render on `!hiddenItems.includes(id)`, and the right-click menu in
@@ -173,6 +193,8 @@ const STATUS_TEXT_STYLE: CSSProperties = {
 const BAR_ITEMS: ReadonlyArray<{ id: string; label: string }> = [
   { id: "sync-status", label: "Sync status" },
   { id: "save-status", label: "Save status" },
+  { id: "view-mode", label: "View mode" },
+  { id: "workspace", label: "Workspace" },
   { id: "tags", label: "Tags" },
   { id: "views", label: "Views" },
   { id: "graph", label: "Graph" },
@@ -180,6 +202,20 @@ const BAR_ITEMS: ReadonlyArray<{ id: string; label: string }> = [
   { id: "lock", label: "Lock" },
   { id: "word-count", label: "Word count" },
 ];
+
+/** reading-source-modes (MYND-299): short labels for the BottomBar view-mode
+ *  switcher. */
+const VIEW_MODE_LABEL: Record<ViewMode, string> = {
+  live: "Live",
+  reading: "Reading",
+  source: "Source",
+};
+/** The switcher click cycles live → reading → source → live. */
+const NEXT_VIEW_MODE: Record<ViewMode, ViewMode> = {
+  live: "reading",
+  reading: "source",
+  source: "live",
+};
 
 /**
  * Device-local dismissal flag for the Obsidian-import onboarding offer (MYND-53,
@@ -631,8 +667,17 @@ function EditorChrome({
     layout.leftCollapsed ? 0 : layout.leftWidth,
     layout.rightCollapsed ? 0 : layout.rightWidth,
   );
-  const leftCollapsed = layout.leftCollapsed || forced.forceLeftCollapsed;
-  const rightCollapsed = layout.rightCollapsed || forced.forceRightCollapsed;
+  // focus-mode (MYND-348): ephemeral distraction-free state. When active the
+  // sidebars collapse (reclaiming editor width) and the tab strip / bottom bar /
+  // title-bar cluster fade via the `[data-focus-active]` CSS rule (tokens.css).
+  // Not persisted (opt in each session); exit via ⇧⌘F or Esc.
+  const [focusActive, setFocusActive] = useState(false);
+  const toggleFocus = useCallback(() => setFocusActive((v) => !v), []);
+  const exitFocus = useCallback(() => setFocusActive(false), []);
+  const leftCollapsed =
+    layout.leftCollapsed || forced.forceLeftCollapsed || focusActive;
+  const rightCollapsed =
+    layout.rightCollapsed || forced.forceRightCollapsed || focusActive;
 
   // Reveal the Saved Views surface (MYND-274) — the "Views" section lives in the
   // left (notes) sidebar, so revealing it ensures that sidebar is expanded, then
@@ -740,6 +785,13 @@ function EditorChrome({
   }, [selectedId, openInFocused]);
 
   const focusedActive = ws.focusedLeaf.activeTab;
+  // reading-source-modes (MYND-299): the focused note tab's effective view mode
+  // for the BottomBar switcher — the tab's own mode, else the default pref, else
+  // live; null when no note tab is active (hides the switcher).
+  const focusedTabViewMode: ViewMode | null =
+    focusedActive !== null && focusedActive.kind === "note"
+      ? focusedActive.viewMode ?? asViewMode(barPrefs.editor_default_view_mode)
+      : null;
   // The sidebar highlight / backlinks track the focused pane's active NOTE; a
   // view-kind active tab (MYND-274) clears the note selection.
   const focusedActiveNoteId =
@@ -762,11 +814,15 @@ function EditorChrome({
   // the cross-pane flush.
   const flushAll = ws.flushAll;
 
-  // MYND-166 — restore the persisted workspace ONCE on mount (unlock).
-  // A missing / unreadable / malformed descriptor leaves the default
-  // single empty pane (spec § 9.7.4). Runs after the slot guard, so the
-  // backend read is Slot::Unlocked-gated.
-  const restore = ws.restore;
+  // MYND-166 / MYND-308 — restore the persisted workspace CONTAINER ONCE on
+  // mount (unlock). A missing / unreadable / malformed descriptor leaves the
+  // default single empty pane (spec § 9.7.4). Runs after the slot guard, so the
+  // backend read is Slot::Unlocked-gated. The descriptor is the MYW1 0x02
+  // `{slots, activeId}` container (a legacy single descriptor is migrated to a
+  // Default slot by `deserializeWorkspaces`); the active slot to restore comes
+  // from the MYP1 `active_workspace` pref via `resolveActiveSlot` (the
+  // consistency fallback to the first slot when the pointer is stale/missing).
+  const restoreContainer = ws.restoreContainer;
   const restoredRef = useRef(false);
   // Gates the staging effect: until the restore IO settles, staging would
   // push the DEFAULT empty layout, so an immediate post-unlock quit could
@@ -780,29 +836,55 @@ function EditorChrome({
       try {
         const descriptor = await workspaceRead();
         if (descriptor === null) return;
-        const state = deserializeWorkspace(descriptor);
-        if (state !== null) restore(state);
+        const container = deserializeWorkspaces(descriptor);
+        if (container === null) return; // malformed → keep the default container
+        // Apply the persisted active-slot pointer (MYP1) against the loaded
+        // slots; `resolveActiveSlot` self-heals a stale/missing pointer to the
+        // first slot. `prefsRead` defaults the field to null on any read miss.
+        let activePref: SlotId | null = null;
+        try {
+          activePref = (await prefsRead()).active_workspace;
+        } catch {
+          // Pref read failure → fall back to the container's own activeId.
+        }
+        const resolvedId = resolveActiveSlot(container.slots, activePref);
+        restoreContainer(switchToSlot(container, resolvedId));
       } catch {
         // Read failure → keep the default workspace (best-effort restore).
       } finally {
         setRestoreSettled(true);
       }
     })();
-  }, [restore]);
+  }, [restoreContainer]);
 
-  // Latest serialized descriptor, refreshed every render so the
+  // Latest serialized container descriptor, refreshed every render so the
   // graceful-exit hooks (which capture a stale closure) always persist the
-  // CURRENT layout. Serialization is cheap (a small JSON tree).
+  // CURRENT layout. Serialization is cheap (a small JSON tree). This is the
+  // MYW1 0x02 `{slots, activeId}` payload (MYND-308); the active slot's
+  // descriptor mirrors the live `ws.root` / `ws.focusedPaneId` (they ARE the
+  // active slot's state via `activeSlotState`), so re-reading the snapshot on
+  // each render keeps the staged blob current as the user edits.
   const descriptorRef = useRef("");
-  descriptorRef.current = serializeWorkspace({
-    root: ws.root,
-    focusedPaneId: ws.focusedPaneId,
-  });
-  // Persist the workspace descriptor (graceful-exit only — never per
-  // tab-switch, so the blob mtime stays a low-resolution lock/quit signal).
+  const activeWorkspaceIdRef = useRef<SlotId>(ws.activeWorkspaceId);
+  descriptorRef.current = serializeWorkspaces(ws.workspacesSnapshot());
+  activeWorkspaceIdRef.current = ws.activeWorkspaceId;
+  // MYND-308 — set by the staging effect on any container change; the coalesced
+  // flush timer (and a graceful-exit save) clears it after a successful write.
+  const workspaceDirtyRef = useRef(false);
+  // Timestamp (ms) of the last actual blob flush — the coalescing reference.
+  // `null` ≡ never flushed → flush as soon as dirty.
+  const lastFlushAtMsRef = useRef<number | null>(null);
+  // Persist the workspace container + the MYP1 active pointer (graceful-exit /
+  // coalesced — never on every switch, so the blob mtime stays a low-resolution
+  // signal). Writes the descriptor first, then the active-slot pointer.
   const persistWorkspace = useCallback(async () => {
     try {
       await workspaceWrite(descriptorRef.current);
+      await setActiveWorkspace(activeWorkspaceIdRef.current);
+      // Graceful-exit save counts as a flush — reset the coalescing window so
+      // the timer doesn't redundantly re-write moments later.
+      lastFlushAtMsRef.current = Date.now();
+      workspaceDirtyRef.current = false;
     } catch {
       // Best-effort — a failed convenience write never blocks lock/close.
     }
@@ -820,20 +902,50 @@ function EditorChrome({
     }
   }, []);
 
-  // MYND-166 — mirror the current layout into the backend's in-RAM staging
-  // slot on every change (incl. the restored/default state on mount). The
-  // backend flushes it to vault.workspace on `ExitRequested`, so an app QUIT
-  // (Cmd+Q / app-menu Quit) persists the layout even though it never fires
-  // the window's `onCloseRequested`. Staging is RAM-only — it never writes
-  // the blob, so its mtime stays a low-resolution lock/quit signal.
+  // MYND-166 / MYND-308 — mirror the current container into the backend's
+  // in-RAM staging slot on every change (incl. the restored/default state on
+  // mount). The backend flushes it to vault.workspace on `ExitRequested`, so an
+  // app QUIT (Cmd+Q / app-menu Quit) persists the layout even though it never
+  // fires the window's `onCloseRequested`. Staging is RAM-only — it never writes
+  // the blob, so its mtime stays a low-resolution lock/quit signal. The whole
+  // `{slots, activeId}` container is staged (so a slot save / switch survives a
+  // quit), and the staged change marks the coalesced-flush path dirty.
   useEffect(() => {
     if (!restoreSettled) return; // don't stage the pre-restore default layout
-    void workspaceStage(
-      serializeWorkspace({ root: ws.root, focusedPaneId: ws.focusedPaneId }),
-    ).catch(() => {
+    workspaceDirtyRef.current = true;
+    void workspaceStage(serializeWorkspaces(ws.workspacesSnapshot())).catch(() => {
       // Best-effort; outside Tauri (browser dev shim) the invoke rejects.
     });
-  }, [restoreSettled, ws.root, ws.focusedPaneId]);
+    // `slots` identity changes on save-as/switch/rename/delete; `root` /
+    // `focusedPaneId` change on every layout edit of the active slot.
+  }, [restoreSettled, ws.slots, ws.activeWorkspaceId, ws.root, ws.focusedPaneId]);
+
+  // MYND-308 (SYNC-6, mtime-defense) — coalesced background flush. The
+  // graceful-exit save (lock / close / quit / switch-vault) is the always-flush
+  // path; this adds a periodic flush so a CRASH loses ≤ ~5 min of layout work.
+  // A ~30 s interval polls the pure `shouldFlushWorkspace` decision against the
+  // dirty flag + the last-flush timestamp (≤ once per `WORKSPACE_FLUSH_INTERVAL_MS`
+  // = 5 min). NEVER a per-switch file write — switches only set `dirty`, the
+  // timer decides when to actually touch the blob. `persistWorkspace` writes BOTH
+  // the container (MYW1) and the active pointer (MYP1).
+  useEffect(() => {
+    if (!restoreSettled) return;
+    const id = setInterval(() => {
+      if (
+        !shouldFlushWorkspace({
+          lastFlushAtMs: lastFlushAtMsRef.current,
+          nowMs: Date.now(),
+          dirty: workspaceDirtyRef.current,
+        })
+      ) {
+        return;
+      }
+      lastFlushAtMsRef.current = Date.now();
+      workspaceDirtyRef.current = false;
+      void persistWorkspace();
+    }, COALESCED_FLUSH_POLL_MS);
+    return () => clearInterval(id);
+  }, [restoreSettled, persistWorkspace]);
 
   // T28 — Tauri close-intercept. Block window close until pending saves
   // flush (every pane), then persist the workspace descriptor. Safe to
@@ -913,6 +1025,72 @@ function EditorChrome({
     onLock?.();
   }, [flushAll, persistWorkspace, persistVaultIndices, onLock]);
 
+  // named-workspaces (MYND-308) — palette command handlers. The BottomBar
+  // dropdown is the primary discoverable surface for switch + save-as; the
+  // palette commands are the in-focus-mode escape (the bar fades). Save-as and
+  // rename ask for a name via the in-WebView text prompt (`window.prompt` is a
+  // no-op in the Tauri WebView); switch cycles to the next slot when invoked
+  // text-free from the palette; delete removes the active slot.
+  const saveWorkspaceAs = ws.saveWorkspaceAs;
+  const switchWorkspace = ws.switchWorkspace;
+  const renameWorkspace = ws.renameWorkspace;
+  const deleteWorkspace = ws.deleteWorkspace;
+  const handleSaveWorkspaceAs = useCallback(() => {
+    void (async () => {
+      const name = await promptForText({
+        title: "Save workspace as",
+        confirmLabel: "Save",
+        placeholder: "Workspace name",
+        testIdPrefix: "workspace-prompt",
+      });
+      if (name !== null) saveWorkspaceAs(name);
+    })();
+  }, [saveWorkspaceAs]);
+  const handleRenameWorkspace = useCallback(() => {
+    const snapshot = ws.workspacesSnapshot();
+    const active = snapshot.slots.find((s) => s.id === snapshot.activeId);
+    if (active === undefined) return;
+    void (async () => {
+      const name = await promptForText({
+        title: "Rename workspace",
+        initialValue: active.name,
+        confirmLabel: "Rename",
+        testIdPrefix: "workspace-prompt",
+      });
+      if (name !== null) renameWorkspace(active.id, name);
+    })();
+  }, [ws, renameWorkspace]);
+  // Rename a SPECIFIC slot (the per-row pencil in the bottom-bar switcher) — vs
+  // handleRenameWorkspace which renames the active slot (the palette command).
+  const handleRenameWorkspaceById = useCallback(
+    (id: SlotId) => {
+      const slot = ws.workspacesSnapshot().slots.find((s) => s.id === id);
+      if (slot === undefined) return;
+      void (async () => {
+        const name = await promptForText({
+          title: "Rename workspace",
+          initialValue: slot.name,
+          confirmLabel: "Rename",
+          testIdPrefix: "workspace-prompt",
+        });
+        if (name !== null) renameWorkspace(id, name);
+      })();
+    },
+    [ws, renameWorkspace],
+  );
+  const handleSwitchWorkspaceCycle = useCallback(() => {
+    // Palette switch (no inline picker): cycle to the next slot in order.
+    const snapshot = ws.workspacesSnapshot();
+    const ids = snapshot.slots.map((s) => s.id);
+    if (ids.length < 2) return;
+    const i = ids.indexOf(snapshot.activeId);
+    switchWorkspace(ids[(i + 1) % ids.length]!);
+  }, [ws, switchWorkspace]);
+  const handleDeleteWorkspace = useCallback(() => {
+    const snapshot = ws.workspacesSnapshot();
+    deleteWorkspace(snapshot.activeId);
+  }, [ws, deleteWorkspace]);
+
   const centerViewValue = useMemo(
     () => ({ view: centerView, setView: setCenterView }),
     [centerView],
@@ -921,6 +1099,16 @@ function EditorChrome({
   return (
     <CenterViewProvider value={centerViewValue}>
     <div
+      data-focus-active={focusActive ? "true" : undefined}
+      // focus-mode (MYND-348): dim / typewriter gates = focus active && the pref
+      // (default on → `!== false`). Pure-CSS dim (tokens.css) + the typewriter
+      // ViewPlugin (focus-mode.ts) read these off the DOM, so no state threading.
+      data-focus-dim={
+        focusActive && barPrefs.editor_focus_dim_inactive !== false ? "true" : undefined
+      }
+      data-focus-typewriter={
+        focusActive && barPrefs.editor_focus_typewriter !== false ? "true" : undefined
+      }
       style={{
         position: "relative",
         display: "flex",
@@ -1047,8 +1235,9 @@ function EditorChrome({
         )}
       </div>
       {/* Sidebar toggles, floated into the editor's top corners (the title-bar
-          row), level with the macOS traffic lights. */}
+          row), level with the macOS traffic lights. Faded in focus mode. */}
       <div
+        data-editor-chrome
         style={{
           position: "absolute",
           top: 6,
@@ -1107,6 +1296,20 @@ function EditorChrome({
         hideSaveStatus={ws.focusedLeaf.activeTab === null}
         stats={readout.stats}
         selectionStats={readout.selectionStats}
+        viewMode={focusedTabViewMode}
+        onCycleViewMode={
+          focusedTabViewMode === null
+            ? undefined
+            : () => ws.setFocusedTabViewMode(NEXT_VIEW_MODE[focusedTabViewMode])
+        }
+        showPreview={focusedTabViewMode === "source"}
+        previewActive={ws.isCompanionOpen(ws.focusedPaneId)}
+        onTogglePreview={() => ws.toggleCompanion(ws.focusedPaneId)}
+        workspaceSlots={ws.slots}
+        activeWorkspaceId={ws.activeWorkspaceId}
+        onSwitchWorkspace={ws.switchWorkspace}
+        onSaveWorkspaceAs={handleSaveWorkspaceAs}
+        onRenameWorkspace={handleRenameWorkspaceById}
         hiddenItems={hiddenBarItems}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -1334,9 +1537,47 @@ function EditorChrome({
           setPaletteOpen(false);
           ws.toggleStackedFocused();
         }}
+        onToggleReading={() => {
+          setPaletteOpen(false);
+          const tab = ws.focusedLeaf.activeTab;
+          if (tab !== null && tab.kind === "note") {
+            ws.setFocusedTabViewMode(tab.viewMode === "reading" ? "live" : "reading");
+          }
+        }}
+        onToggleSource={() => {
+          setPaletteOpen(false);
+          const tab = ws.focusedLeaf.activeTab;
+          if (tab !== null && tab.kind === "note") {
+            ws.setFocusedTabViewMode(tab.viewMode === "source" ? "live" : "source");
+          }
+        }}
+        onToggleFocus={() => {
+          setPaletteOpen(false);
+          toggleFocus();
+        }}
+        onSaveWorkspaceAs={() => {
+          setPaletteOpen(false);
+          handleSaveWorkspaceAs();
+        }}
+        onSwitchWorkspace={() => {
+          setPaletteOpen(false);
+          handleSwitchWorkspaceCycle();
+        }}
+        onRenameWorkspace={() => {
+          setPaletteOpen(false);
+          handleRenameWorkspace();
+        }}
+        onDeleteWorkspace={() => {
+          setPaletteOpen(false);
+          handleDeleteWorkspace();
+        }}
       />
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
-      <WorkspaceHotkeys />
+      <WorkspaceHotkeys
+        focusActive={focusActive}
+        onToggleFocus={toggleFocus}
+        onExitFocus={exitFocus}
+      />
       <NoteExportModal
         open={exportPreflight !== null}
         attachmentCount={exportPreflight?.count ?? 0}
@@ -1576,6 +1817,13 @@ type CommandPaletteHostProps = {
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
   onToggleStackedTabs: () => void;
+  onToggleReading: () => void;
+  onToggleSource: () => void;
+  onToggleFocus: () => void;
+  onSaveWorkspaceAs: () => void;
+  onSwitchWorkspace: () => void;
+  onRenameWorkspace: () => void;
+  onDeleteWorkspace: () => void;
 };
 
 function CommandPaletteHost({
@@ -1601,6 +1849,13 @@ function CommandPaletteHost({
   onToggleLeftSidebar,
   onToggleRightSidebar,
   onToggleStackedTabs,
+  onToggleReading,
+  onToggleSource,
+  onToggleFocus,
+  onSaveWorkspaceAs,
+  onSwitchWorkspace,
+  onRenameWorkspace,
+  onDeleteWorkspace,
 }: CommandPaletteHostProps) {
   const ctx = useSelectedNote();
   // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
@@ -1696,6 +1951,13 @@ function CommandPaletteHost({
       onToggleLeftSidebar,
       onToggleRightSidebar,
       onToggleStackedTabs,
+      onToggleReading,
+      onToggleSource,
+      onToggleFocus,
+      onSaveWorkspaceAs,
+      onSwitchWorkspace,
+      onRenameWorkspace,
+      onDeleteWorkspace,
       onSelectNote: async (id) => {
         await ctx.open(id).catch(() => {
           /* selection failure surfaces via sidebar UX */
@@ -1727,6 +1989,13 @@ function CommandPaletteHost({
       onToggleLeftSidebar,
       onToggleRightSidebar,
       onToggleStackedTabs,
+      onToggleReading,
+      onToggleSource,
+      onToggleFocus,
+      onSaveWorkspaceAs,
+      onSwitchWorkspace,
+      onRenameWorkspace,
+      onDeleteWorkspace,
     ],
   );
   return (
@@ -1853,7 +2122,15 @@ function SidebarBootstrap() {
 // catalog-rebindable default — see the inline handler note below.
 const KEYBIND_DEFAULTS: Readonly<Record<string, string[]>> = catalogDefaults();
 
-function WorkspaceHotkeys() {
+function WorkspaceHotkeys({
+  focusActive,
+  onToggleFocus,
+  onExitFocus,
+}: {
+  focusActive: boolean;
+  onToggleFocus: () => void;
+  onExitFocus: () => void;
+}) {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
   const { prefs } = usePrefs();
@@ -1893,8 +2170,22 @@ function WorkspaceHotkeys() {
       { id: "pane.focus-prev", scope: {}, run: () => focusAdjacent(false) },
       { id: "nav.back", scope: {}, phase: "capture", run: () => ws.goBack() },
       { id: "nav.forward", scope: {}, phase: "capture", run: () => ws.goForward() },
+      // reading-source-modes (MYND-299): Edit⇄Reading on the focused note tab.
+      // Default Mod-Shift-e (catalog), rebindable; inline-code keeps Mod-e.
+      {
+        id: "view.toggle-reading",
+        scope: {},
+        run: () => {
+          const tab = ws.focusedLeaf.activeTab;
+          if (tab !== null && tab.kind === "note") {
+            ws.setFocusedTabViewMode(tab.viewMode === "reading" ? "live" : "reading");
+          }
+        },
+      },
+      // focus-mode (MYND-348): distraction-free toggle (default Mod-Shift-f).
+      { id: "view.toggle-focus", scope: {}, run: () => onToggleFocus() },
     ];
-  }, [ws, ctx]);
+  }, [ws, ctx, onToggleFocus]);
 
   useKeybindDispatcher({
     entries,
@@ -1930,6 +2221,22 @@ function WorkspaceHotkeys() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [ws]);
+
+  // focus-mode (MYND-348): Esc exits focus as a LOW-precedence fallback. CM6 and
+  // the editor's own handlers (autocomplete dismiss, multi-cursor clear) process
+  // Escape on the content first and call preventDefault when they consume it; this
+  // bubble-phase listener only acts when Escape was NOT already consumed, so it
+  // never preempts those. Inactive (no listener) unless focus mode is on.
+  useEffect(() => {
+    if (!focusActive) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      onExitFocus();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [focusActive, onExitFocus]);
 
   return null;
 }
@@ -2227,6 +2534,28 @@ interface BottomBarProps {
   /** Statistics of the current non-empty selection; when non-null the readout
    *  shows these instead of whole-note `stats`. */
   selectionStats?: DocStats | null;
+  /** reading-source-modes (MYND-299): the focused note tab's effective view mode
+   *  (live/reading/source), or `null` when no note tab is active (hides the
+   *  switcher). */
+  viewMode?: ViewMode | null;
+  /** Cycle the focused note tab's view mode (live → reading → source → live). */
+  onCycleViewMode?: () => void;
+  /** reading-source-modes (MYND-299): show the side-by-side preview toggle (only
+   *  in source mode), its pressed state, and the toggle handler. */
+  showPreview?: boolean;
+  previewActive?: boolean;
+  onTogglePreview?: () => void;
+  /** named-workspaces (MYND-308): the slot list driving the bottom-bar switcher
+   *  dropdown (active name + switch targets). */
+  workspaceSlots?: WorkspaceSlot[];
+  /** The active workspace slot id (the dropdown's current selection). */
+  activeWorkspaceId?: SlotId;
+  /** Switch the active workspace to a slot id (dropdown row click). */
+  onSwitchWorkspace?: (id: SlotId) => void;
+  /** Open the "Save current as…" name prompt (dropdown footer). */
+  onSaveWorkspaceAs?: () => void;
+  /** Rename a specific workspace slot (the per-row pencil in the dropdown). */
+  onRenameWorkspace?: (id: SlotId) => void;
   /** Bottom-bar customization: the set of element ids the user has hidden via
    *  the bar's right-click menu. Each element renders only when its id is NOT
    *  in this set (AND its pre-existing condition holds). */
@@ -2248,6 +2577,16 @@ function BottomBar({
   hideSaveStatus = false,
   stats = null,
   selectionStats = null,
+  viewMode = null,
+  onCycleViewMode,
+  showPreview = false,
+  previewActive = false,
+  onTogglePreview,
+  workspaceSlots = [],
+  activeWorkspaceId,
+  onSwitchWorkspace,
+  onSaveWorkspaceAs,
+  onRenameWorkspace,
   hiddenItems,
   onContextMenu,
 }: BottomBarProps) {
@@ -2261,6 +2600,7 @@ function BottomBar({
   return (
     <div
       data-testid="editor.bottom-bar"
+      data-editor-chrome
       onContextMenu={onContextMenu}
       style={{
         height: 28,
@@ -2279,6 +2619,66 @@ function BottomBar({
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {!hideSaveStatus && !isHidden("save-status") && (
           <SaveStatusBadge status={saveStatus} onRetry={onRetry} />
+        )}
+        {!isHidden("workspace") &&
+          onSwitchWorkspace !== undefined &&
+          activeWorkspaceId !== undefined && (
+            <WorkspaceSwitcherControl
+              slots={workspaceSlots}
+              activeId={activeWorkspaceId}
+              onSwitch={onSwitchWorkspace}
+              onSaveAs={onSaveWorkspaceAs}
+              onRename={onRenameWorkspace}
+            />
+          )}
+        {viewMode !== null && onCycleViewMode && !isHidden("view-mode") && (
+          <button
+            type="button"
+            onClick={onCycleViewMode}
+            aria-label="Cycle view mode"
+            data-testid="editor.view-mode-cta"
+            data-view-mode={viewMode}
+            title={`View mode: ${VIEW_MODE_LABEL[viewMode]} (click to cycle)`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px 8px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
+              fontWeight: 500,
+            }}
+          >
+            {VIEW_MODE_LABEL[viewMode]}
+          </button>
+        )}
+        {showPreview && onTogglePreview && (
+          <button
+            type="button"
+            onClick={onTogglePreview}
+            aria-label="Toggle side-by-side preview"
+            aria-pressed={previewActive}
+            data-testid="editor.preview-companion-toggle"
+            title="Toggle side-by-side preview"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px 6px",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-1)",
+              color: previewActive ? "var(--fg-1)" : "var(--fg-3)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="panel-right" size={14} />
+          </button>
         )}
         {onShowTags && !isHidden("tags") && (
           <button
@@ -2422,6 +2822,243 @@ function BottomBar({
           );
         })()}
       </div>
+    </div>
+  );
+}
+
+/**
+ * named-workspaces (MYND-308 task 5) — the bottom-bar workspace switcher: a chip
+ * showing the active workspace name with a dropdown listing the slots to switch
+ * to plus a "Save current as…" affordance. Carries `data-editor-chrome` so it
+ * fades with the rest of the chrome in focus mode (the `[data-focus-active]` CSS
+ * rule keys on that attribute) and `data-testid="editor.workspace-switcher"` for
+ * the E2E harness (SYNC-8). The palette `workspace.*` commands are the in-focus
+ * escape (the bar fades).
+ */
+function WorkspaceSwitcherControl({
+  slots,
+  activeId,
+  onSwitch,
+  onSaveAs,
+  onRename,
+}: {
+  slots: WorkspaceSlot[];
+  activeId: SlotId;
+  onSwitch: (id: SlotId) => void;
+  onSaveAs?: () => void;
+  onRename?: (id: SlotId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  // Close on outside click / Esc while open.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: globalThis.MouseEvent) => {
+      if (ref.current !== null && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const active = slots.find((s) => s.id === activeId);
+  const activeName = active?.name ?? "Workspace";
+
+  return (
+    <div
+      ref={ref}
+      data-editor-chrome
+      data-testid="editor.workspace-switcher"
+      style={{ position: "relative", display: "flex", alignItems: "center" }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Switch workspace"
+        data-testid="editor.workspace-switcher.toggle"
+        title={`Workspace: ${activeName}`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          maxWidth: 160,
+          padding: "2px 8px",
+          background: "transparent",
+          border: 0,
+          borderRadius: "var(--radius-1)",
+          color: "var(--fg-3)",
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+          fontSize: 12,
+          fontWeight: 500,
+        }}
+      >
+        <Icon name="layout-grid" size={12} />
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {activeName}
+        </span>
+        <Icon name="chevron-up" size={12} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          data-testid="editor.workspace-switcher.menu"
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 4px)",
+            right: 0,
+            minWidth: 200,
+            maxHeight: 320,
+            overflowY: "auto",
+            background: "var(--bg-1)",
+            border: "1px solid var(--line-1)",
+            borderRadius: "var(--radius-2)",
+            boxShadow: "var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12))",
+            padding: 4,
+            zIndex: 60,
+          }}
+        >
+          {slots.map((s) => {
+            const isActive = s.id === activeId;
+            return (
+              <div
+                key={s.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: "var(--radius-1)",
+                  background: isActive ? "var(--paper-2)" : "transparent",
+                }}
+              >
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={isActive}
+                  data-testid="editor.workspace-switcher.item"
+                  data-workspace-id={s.id}
+                  data-active={isActive ? "true" : "false"}
+                  onClick={() => {
+                    if (!isActive) onSwitch(s.id);
+                    setOpen(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    textAlign: "left",
+                    padding: "6px 8px",
+                    background: "transparent",
+                    border: 0,
+                    borderRadius: "var(--radius-1)",
+                    color: "var(--fg-1)",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 12,
+                  }}
+                >
+                  <span style={{ width: 14, flexShrink: 0, color: "var(--fg-3)" }}>
+                    {isActive ? <Icon name="check" size={12} /> : null}
+                  </span>
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {s.name}
+                  </span>
+                </button>
+                {onRename !== undefined && (
+                  <button
+                    type="button"
+                    aria-label={`Rename workspace ${s.name}`}
+                    data-testid="editor.workspace-switcher.rename"
+                    data-workspace-id={s.id}
+                    title="Rename workspace"
+                    onClick={() => {
+                      setOpen(false);
+                      onRename(s.id);
+                    }}
+                    style={{
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "4px 8px",
+                      background: "transparent",
+                      border: 0,
+                      borderRadius: "var(--radius-1)",
+                      color: "var(--fg-3)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Icon name="pencil" size={12} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {onSaveAs !== undefined && (
+            <>
+              <div
+                style={{
+                  height: 1,
+                  margin: "4px 0",
+                  background: "var(--line-1)",
+                }}
+              />
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="editor.workspace-switcher.save-as"
+                onClick={() => {
+                  setOpen(false);
+                  onSaveAs();
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "6px 8px",
+                  background: "transparent",
+                  border: 0,
+                  borderRadius: "var(--radius-1)",
+                  color: "var(--fg-2)",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: 12,
+                }}
+              >
+                <span style={{ width: 14, flexShrink: 0, color: "var(--fg-3)" }}>
+                  <Icon name="plus" size={12} />
+                </span>
+                <span>Save current as…</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

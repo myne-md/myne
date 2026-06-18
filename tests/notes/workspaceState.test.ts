@@ -7,10 +7,15 @@
 import { describe, expect, it } from "vitest";
 import {
   activeItem,
+  activeSlot,
+  activeSlotState,
   closePane,
   closeTab,
   collectLeaves,
+  createSlot,
+  deleteSlot,
   dropItemOnPane,
+  emptyNamedWorkspaces,
   emptyWorkspace,
   findItemPane,
   findLeaf,
@@ -19,22 +24,34 @@ import {
   graphItem,
   isPinned,
   itemKey,
+  itemViewMode,
   type LeafPane,
+  listSlots,
   moveTab,
+  type NamedWorkspaces,
   noteItem,
   openInFocusedTab,
   openInNewTab,
   openToSide,
   parseItemKey,
+  renameSlot,
+  resetActiveToSnapshot,
+  resolveActiveSlot,
   reveal,
+  saveAsSlot,
+  setActiveSlotState,
   setActiveTab,
   setFocusedPane,
+  setItemViewMode,
   setPinned,
   setStacked,
+  shouldFlushWorkspace,
   splitPane,
   splitPaneWithItem,
+  switchToSlot,
   toggleStacked,
   viewItem,
+  WORKSPACE_FLUSH_INTERVAL_MS,
   type WorkspaceState,
 } from "../../src/notes/workspaceState";
 
@@ -670,5 +687,222 @@ describe("stacked layout (MYND-319)", () => {
     let ws = emptyWorkspace("root");
     const out = toggleStacked(ws, "ghost");
     expect(out).toBe(ws);
+  });
+});
+
+// ── reading-source-modes (MYND-299): per-tab viewMode ────────────────────────
+
+describe("setItemViewMode", () => {
+  function twoTabs(): WorkspaceState {
+    let ws = emptyWorkspace("p");
+    ws = openInNewTab(ws, n("a"));
+    ws = openInNewTab(ws, n("b"));
+    return ws;
+  }
+
+  it("defaults to live (omit-when-default: absent ⇒ live)", () => {
+    expect(itemViewMode(n("a"))).toBe("live");
+    const ws = twoTabs();
+    expect(itemViewMode(focusedLeaf(ws).tabs[0]!)).toBe("live");
+  });
+
+  it("sets a non-default mode and keeps the activeTab in sync", () => {
+    let ws = twoTabs(); // active is "b"
+    ws = setItemViewMode(ws, "p", n("b"), "reading");
+    const leaf = focusedLeaf(ws);
+    expect(itemViewMode(leaf.tabs[1]!)).toBe("reading");
+    expect(leaf.activeTab).toEqual({ kind: "note", id: "b", viewMode: "reading" });
+  });
+
+  it("setting back to live DROPS the key (no `viewMode: 'live'` round-trips in)", () => {
+    let ws = twoTabs();
+    ws = setItemViewMode(ws, "p", n("a"), "source");
+    expect(focusedLeaf(ws).tabs[0]).toEqual({ kind: "note", id: "a", viewMode: "source" });
+    ws = setItemViewMode(ws, "p", n("a"), "live");
+    expect(focusedLeaf(ws).tabs[0]).toEqual(n("a"));
+    expect("viewMode" in focusedLeaf(ws).tabs[0]!).toBe(false);
+  });
+
+  it("is a no-op when the pane doesn't hold the item", () => {
+    const ws = twoTabs();
+    const out = setItemViewMode(ws, "p", n("zzz"), "reading");
+    expect(out).toEqual(ws);
+  });
+
+  it("composes with pinned (both flags coexist on a tab)", () => {
+    let ws = twoTabs();
+    ws = setPinned(ws, "p", n("a"), true);
+    ws = setItemViewMode(ws, "p", n("a"), "reading");
+    expect(focusedLeaf(ws).tabs[0]).toEqual({
+      kind: "note",
+      id: "a",
+      pinned: true,
+      viewMode: "reading",
+    });
+  });
+});
+
+// ── named-workspaces (MYND-308): N slots over the descriptor ─────────────────
+
+describe("named workspaces — container construction + selectors", () => {
+  it("emptyNamedWorkspaces holds one active Default slot", () => {
+    const c = emptyNamedWorkspaces("root", "s1");
+    expect(c.slots).toHaveLength(1);
+    expect(c.slots[0]!.name).toBe("Default");
+    expect(c.activeId).toBe("s1");
+    expect(activeSlot(c)!.id).toBe("s1");
+    expect(activeSlotState(c)).toEqual(emptyWorkspace("root"));
+  });
+
+  it("setActiveSlotState commits a descriptor onto the active slot only", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = setActiveSlotState(c, openInNewTab(activeSlotState(c), n("a")));
+    expect(activeSlotState(c).root).toEqual(
+      openInNewTab(emptyWorkspace("root"), n("a")).root,
+    );
+  });
+});
+
+describe("named workspaces — CRUD", () => {
+  function ids(...values: string[]): () => string {
+    let i = 0;
+    return () => values[i++]!;
+  }
+
+  it("createSlot appends a fresh slot and activates it", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = createSlot(c, "Research", undefined, ids("s2"), () => "pane2");
+    expect(listSlots(c)).toHaveLength(2);
+    expect(c.activeId).toBe("s2");
+    expect(activeSlot(c)!.name).toBe("Research");
+  });
+
+  it("saveAsSlot clones the active descriptor under a new name, original untouched", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = setActiveSlotState(c, openInNewTab(activeSlotState(c), n("a")));
+    c = saveAsSlot(c, "Copy", ids("s2"));
+    expect(c.activeId).toBe("s2");
+    // Both slots have the tab, but they are distinct (no aliasing).
+    const original = c.slots.find((s) => s.id === "s1")!;
+    const clone = c.slots.find((s) => s.id === "s2")!;
+    expect(activeSlotState(c).root).toEqual(original.state.root);
+    expect(clone.state).not.toBe(original.state);
+    expect(clone.state.root).not.toBe(original.state.root);
+    // Mutating the clone via a reducer does not touch the original.
+    c = setActiveSlotState(c, openInNewTab(activeSlotState(c), n("b")));
+    expect(c.slots.find((s) => s.id === "s1")!.state).toEqual(original.state);
+  });
+
+  it("switchToSlot activates an existing slot; no-op on unknown id", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = createSlot(c, "B", undefined, ids("s2"), () => "p2");
+    c = switchToSlot(c, "s1");
+    expect(c.activeId).toBe("s1");
+    expect(switchToSlot(c, "ghost")).toBe(c);
+  });
+
+  it("renameSlot renames; no-op on unknown id", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = renameSlot(c, "s1", "Renamed");
+    expect(c.slots[0]!.name).toBe("Renamed");
+    expect(renameSlot(c, "ghost", "x")).toBe(c);
+  });
+
+  it("deleteSlot of a non-active slot keeps the active pointer", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = createSlot(c, "B", undefined, ids("s2"), () => "p2"); // active = s2
+    c = deleteSlot(c, "s1");
+    expect(c.slots.map((s) => s.id)).toEqual(["s2"]);
+    expect(c.activeId).toBe("s2");
+  });
+
+  it("deleteSlot of the active slot relocates the pointer to a sibling", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = createSlot(c, "B", undefined, ids("s2"), () => "p2");
+    c = createSlot(c, "C", undefined, ids("s3"), () => "p3"); // active = s3
+    c = switchToSlot(c, "s2"); // active = s2 (middle)
+    c = deleteSlot(c, "s2");
+    expect(c.slots.map((s) => s.id)).toEqual(["s1", "s3"]);
+    expect(c.activeId).toBe("s1"); // previous sibling
+  });
+
+  it("deleting the LAST slot yields a fresh empty Default slot", () => {
+    let c = emptyNamedWorkspaces("root", "s1");
+    c = deleteSlot(c, "s1", ids("s-new"), () => "pane-new");
+    expect(c.slots).toHaveLength(1);
+    expect(c.slots[0]!.id).toBe("s-new");
+    expect(c.slots[0]!.name).toBe("Default");
+    expect(c.activeId).toBe("s-new");
+    expect(activeSlotState(c)).toEqual(emptyWorkspace("pane-new"));
+  });
+
+  it("deleteSlot is a no-op on an unknown id", () => {
+    const c = emptyNamedWorkspaces("root", "s1");
+    expect(deleteSlot(c, "ghost")).toBe(c);
+  });
+});
+
+describe("resolveActiveSlot — MYP1 active_workspace consistency fallback", () => {
+  const slots = [
+    { id: "s1", name: "A", state: emptyWorkspace("p1") },
+    { id: "s2", name: "B", state: emptyWorkspace("p2") },
+  ];
+
+  it("returns the pref id when it names an existing slot", () => {
+    expect(resolveActiveSlot(slots, "s2")).toBe("s2");
+  });
+
+  it("falls back to the first slot when the pref is missing/null/unknown", () => {
+    expect(resolveActiveSlot(slots, null)).toBe("s1");
+    expect(resolveActiveSlot(slots, undefined)).toBe("s1");
+    expect(resolveActiveSlot(slots, "ghost")).toBe("s1");
+  });
+});
+
+describe("shouldFlushWorkspace — coalesced ≤5-min write cadence", () => {
+  it("never flushes when not dirty", () => {
+    expect(
+      shouldFlushWorkspace({ lastFlushAtMs: null, nowMs: 999999, dirty: false }),
+    ).toBe(false);
+  });
+
+  it("flushes immediately when dirty and never flushed before", () => {
+    expect(
+      shouldFlushWorkspace({ lastFlushAtMs: null, nowMs: 0, dirty: true }),
+    ).toBe(true);
+  });
+
+  it("does NOT flush again before the interval elapses", () => {
+    expect(
+      shouldFlushWorkspace({
+        lastFlushAtMs: 1_000_000,
+        nowMs: 1_000_000 + WORKSPACE_FLUSH_INTERVAL_MS - 1,
+        dirty: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("flushes once the interval has elapsed (≥ exactly 5 min)", () => {
+    expect(
+      shouldFlushWorkspace({
+        lastFlushAtMs: 1_000_000,
+        nowMs: 1_000_000 + WORKSPACE_FLUSH_INTERVAL_MS,
+        dirty: true,
+      }),
+    ).toBe(true);
+    expect(WORKSPACE_FLUSH_INTERVAL_MS).toBeLessThanOrEqual(300_000);
+  });
+});
+
+describe("resetActiveToSnapshot", () => {
+  it("reverts the active slot to a last-persisted descriptor (no aliasing)", () => {
+    let c: NamedWorkspaces = emptyNamedWorkspaces("root", "s1");
+    const snapshot = openInNewTab(emptyWorkspace("root"), n("saved"));
+    // Dirty the active slot away from the snapshot.
+    c = setActiveSlotState(c, openInNewTab(activeSlotState(c), n("scratch")));
+    c = resetActiveToSnapshot(c, snapshot);
+    expect(activeSlotState(c)).toEqual(snapshot);
+    // The container holds a clone, not the passed-in object.
+    expect(activeSlotState(c)).not.toBe(snapshot);
   });
 });
