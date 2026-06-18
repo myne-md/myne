@@ -222,6 +222,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
 | `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
 | `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.13) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
+| `"myne.v0.1 vault-head-mac"` | HMAC-SHA-256 key for the sync **vault head** fork-consistency MAC (§9.15; full primitive in `sync-protocol.md`) — **placeholder, Phase 2** | Derived locally; **not used in Phase 1** (no sync server exists), exactly like `server-auth`. Keys the monotonic, git-like hash-DAG vault head that hardens multi-device sync against a malicious server (rollback / withholding / equivocation; TB5). The context string is **allocated now** so it stays stable and **activates when Phase 2 sync ships**. The device-local last-seen baseline (`vault.head-state`, `MYH1`, §9.15) re-verifies the head's own MAC under this **same** key — no second context. **HMAC-not-signature** is deliberate: single-user → all devices share `root_key` → a symmetric MAC suffices and stays in the closed RustCrypto primitive set (no Ed25519, no new dependency; `head_mac_key = DeriveSubkey(root_key, "vault-head-mac")`, used like `attachments-id-hmac`). See `sync-protocol.md` (MYND-416). |
 | (future v005 contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
@@ -1245,6 +1246,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `attachments/<attachment-id-hex>` | IN | Attachment blobs (§9.9) |
 | `vault.search` | OUT | Pure rebuildable cache; first unlock after restore rebuilds (§9.6.4) |
 | `vault.quickunlock` | OUT | Device-local credential (§9.14); wrap key is bound to *this* device's hardware (`thisDeviceOnly`), so a copy is inert elsewhere — re-set per device after restore |
+| `vault.head-state` | OUT | Device-local sync baseline (§9.15); a backed-up baseline would be stale on restore — the restored vault TOFU-re-bootstraps (`sync-protocol.md` §6) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
 | `.rename-journal` (notes dir) | OUT | Empty roll-forward marker for the transactional multi-note rename (§9.12); transient WAL sentinel, never user data |
 | `vaults/registry.json` | OUT (structurally) | Per-install plaintext cache living outside the vault root |
@@ -1610,6 +1612,24 @@ quick-unlock is strictly weaker than the hardware-bound biometric path and is do
 as such. A v0.1 client MUST reject `MYQ5` and any unregistered magic; a v005 client MUST
 refuse `MYQ1` (§10.4).
 
+### 9.15 Device-local sync baseline (`vault.head-state`, `MYH1`)
+
+A **device-local** file at `<vault-root>/vault.head-state` that persists the device's **last-seen [vault head](sync-protocol.md)** so the rollback/fork checks of `sync-protocol.md` §5 survive a restart (without it, every launch would be a fresh trust-on-first-use, `sync-protocol.md` §6). It is a Phase 2 artefact: derived/written only once a vault syncs. Like `vault.quickunlock` (§9.14) it is **device-local — never synchronized and never backed up** (excluded from the §9.11.3 allowlist; a restored vault TOFU-re-bootstraps).
+
+```
+offset  size       field                  description
+0       4 bytes    magic                  ASCII "MYH1"
+4       1 byte     protocol_version       0x01
+5       1 byte     head_format_version    mirrors the stored head's byte (sync-protocol.md §3.6)
+6       N bytes    head_record            the full wire head: head_mac_input || head_mac
+                                          (sync-protocol.md §3.2), where the trailing 32 bytes
+                                          are the head's own HMAC-SHA-256 tag
+```
+
+Only the **TIP** is stored — a single head record, not the chain (ancestors, when needed for a merge, are pulled and verified lazily, `sync-protocol.md` §5.4). The write cadence is **every accepted-pull and every authored-push** (after a push the device's own head becomes its new baseline; otherwise the file would lag).
+
+**Integrity, and the honest limit.** `vault.head-state` is **not** AEAD-encrypted under a KEK and carries **no §3.4 row**: its bytes are exactly the head the sync server already relays (hashes + version-vector metadata, no vault plaintext), so at-rest confidentiality would add nothing the server does not already see. Integrity against a **non-`root_key`** attacker (corruption, a tamperer without the key) is the head's **own** HMAC: on load the client recomputes `HMAC-SHA-256(DeriveSubkey(root_key, "vault-head-mac"), head_mac_input)` and MUST reject a mismatch — this re-uses the head's MAC under the same key (no new context string). What this does **not** provide is **freshness of the baseline itself**: an attacker who can both write the local disk **and** collude with a malicious server could swap the file for an *older but genuine* head (which passes its own HMAC) to make the device accept a server rollback. This is a **conjunction** beyond a pure malicious server (A1) — it requires local-disk-write (A4/A7) too — has bounded impact (stale **own** data, never forged or decrypted), and is narrowed further because the in-session baseline is monotone in RAM (`sync-protocol.md` §5.1). It is **accepted for v0.1 and documented** (`threat-model.md` §7); a hardware monotonic counter (TPM / Secure Enclave) that would close it is deferred to v005. A v0.1 client MUST reject `MYH5` and any unregistered magic; a v005 client MUST refuse `MYH1` (§10.4).
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -1648,8 +1668,9 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
 | Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.13 | MYND-266 |
 | Quick-unlock credential (`vault.quickunlock`) | `MYQ1` | `MYQ5` | §9.14 | MYND-329 |
+| Device-local sync baseline (`vault.head-state`) | `MYH1` | `MYH5` | §9.15 | MYND-416 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary) use the `MY?5` v005 convention.
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/head-state) use the `MY?5` v005 convention. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.15) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
 
 ### 10.4 Migration procedure (cross-major)
 
