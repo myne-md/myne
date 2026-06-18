@@ -474,6 +474,12 @@ The recursive, **closed-allow-list** tree that expresses a [saved view](#saved-v
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
 
+### **focus mode** &nbsp; 📦 *Product*
+
+The editor's distraction-free writing state (MYND-348): a `Mod-Shift-F` toggle fades the in-app chrome (sidebars, tab strip, [bottom bar](#bottom-bar), floated title-bar cluster) and centers the column, so only the words remain. The fade is **in-app only** — a CSS rule keyed on the editor root's `data-focus-active` attribute, never OS fullscreen (no Tauri window-API capability is added). The active state is **ephemeral** React state (opt in each session, never auto-entered, not persisted to any blob). Exit via the toggle or **Esc** at low keymap precedence (the editor's autocomplete / multi-cursor consume Esc first). v1 also ships [typewriter scroll](#typewriter-scroll) and [line-focus dimming](#line-focus-dimming), each a Settings → Editor toggle (the `editor_focus_typewriter` / `editor_focus_dim_inactive` MYP1 fields, default on); the command palette and Settings open over focus and return to it on close. Threat-neutral (UI state + two cosmetic prefs fields). See also [typewriter scroll](#typewriter-scroll), [line-focus dimming](#line-focus-dimming).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
+
 ### **folder** &nbsp; 📦 *Product*
 
 A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Folders and folderless notes share a single interleaved tree at every level, ordered by [item order](#item-order) (MYND-183) — a folderless note is not bucketed into a separate section but renders at the root level alongside top-level folders. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [item order](#item-order).
@@ -755,6 +761,12 @@ Rust FFI bindings to the libsodium C library. The desktop crypto layer uses one 
 
 Used in: `decisions.md` (Tauri stack realignment)
 
+### **line-focus dimming** &nbsp; 📦 *Product*
+
+A [focus-mode](#focus-mode) reading aid (MYND-348): every editor line except the one the cursor is on is visually dimmed, so the active line stands out. Implemented as a CodeMirror decoration gated by the editor root's `data-focus-dim` attribute (set only when focus mode is active **and** the `editor_focus_dim_inactive` MYP1 pref is on — default on; the Settings → Editor toggle flips it). Respects `prefers-reduced-motion` and the no-pulsing PRODUCT stance — it is a static opacity step, never an animated pulse. Toggleable because some writers find per-line dimming disorienting. Non-load-bearing cosmetic (AS-low). See also [focus mode](#focus-mode), [typewriter scroll](#typewriter-scroll).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
+
 ### **link reference definition** &nbsp; 📦 *Product*
 
 A `[label]: url` line (CommonMark "link reference definition") that supplies the destination for a [reference link](#reference-link) (`[text][label]`) or a reference-style image (`![alt][label]`) elsewhere in the same note. Labels match by CommonMark rules — case-folded with internal whitespace collapsed — and the first definition of a given label wins. In the Myne editor a shared collector scans all such definition lines into a `label → { target, range }` map; a definition referenced by a resolved reference link is hidden off-cursor (it reads as body noise otherwise) and revealed when the cursor enters its line. The definition bytes are preserved (§6 C1) and the form is never emitted by an authoring affordance. See also [reference link](#reference-link).
@@ -1016,6 +1028,12 @@ The UI library used for the Phase 1 desktop client UI inside the Tauri WebView, 
 Used in: `decisions.md`; `threat-model.md` §7
 Reference: https://react.dev
 
+### **Reading view** &nbsp; 📦 *Product*
+
+The read-only rendered [view mode](#view-mode) of a note tab (MYND-299): all editor [decorations](#decoration-layer) are applied, but the surface is non-editable and there is **no** [cursor-aware reveal](#cursor-aware-reveal) — markdown source never lifts, so the note reads as finished prose without edit chrome or markup flicker. Keystrokes are no-ops (an optional one-time "⇧⌘E to edit" hint tells the reader how to switch back). It reuses `CMEditor`'s `readOnly` path; §6 C1 keeps the underlying bytes untouched. The primary **Edit ⇄ Reading** toggle is `Mod-Shift-E`. The read-only [preview companion](#view-mode) pane is a side-by-side Reading mirror of the *same* buffer (a linked mirror, not a second `(kind,id)` instance — it preserves the one-editable-buffer-per-note invariant). Contrast [Source mode](#source-mode) (raw markdown, decorations off) and live preview (today's cursor-aware default). See also [view mode](#view-mode), [Source mode](#source-mode), [cursor-aware reveal](#cursor-aware-reveal).
+
+Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
+
 ### **Recovering** (slot state) &nbsp; 📦 *Product*
 
 The intermediate variant of the [`Slot`] enum representing a vault that has successfully completed phrase-based recovery (`vault_recover_with_phrase`) but has not yet committed a new master password (`vault_complete_recovery`). Carries `root_key`, `items_key`, `items_key_id`, and `recovered_at: Instant` in `Zeroizing` wrappers — both keys are derived eagerly during the recovery step so the entire credential chain is verified before the slot transitions. Editor commands cannot pattern-match `Slot::Recovering` and are therefore structurally denied access during this window per `recovery-flow.md` §4.1's non-dismissible chained step. The only legal transitions out are `Slot::Recovering → Slot::Unlocked` (via `vault_complete_recovery` success) or `Slot::Recovering → Slot::Empty` (via `vault_lock` — the §4.3 within-session bail case).
@@ -1107,9 +1125,21 @@ The 32-byte AEAD KEK encrypting `vault.workspace` (the [workspace-state blob](#w
 
 Used in: `spec/protocol.md` §3.4, §9.7
 
+### **named workspace** &nbsp; 📦 *Product*
+
+A user-named, switchable editor layout (MYND-308): a stored snapshot of the open-tab set, pane-split layout, focused pane, per-tab cursor/scroll, and per-tab [view mode](#view-mode), recalled under a chosen name ("Writing", "Research"). The [workspace-state blob](#workspace-state-blob) descriptor evolves from a single workspace to **N named [slots](#workspace-slot)** with an `{slots, active}` inner schema — `workspace_format_version` ticks `0x01 → 0x02` (an old binary hits `FormatUnsupported` and defaults to a single empty pane; magic / AAD / HKDF unchanged). Surfaced via a [bottom-bar](#bottom-bar) dropdown + command palette (save-as / switch / rename / delete; no default chord). Switching is **hybrid**: the outgoing slot auto-saves its live layout, plus explicit Save-as / Reset-to-snapshot. The active-slot pointer lives in MYP1 ([`active_workspace`](#vaultprefs), a stable slot id — survives a crash; falls back to the first slot if the named slot is gone). Names + layouts stay inside the AEAD envelope (AS3). Writes are **coalesced** — ≤ once per ~5 min of active use plus graceful exit / auto-lock — a deliberate, bounded relaxation of the §9.7.4 graceful-exit-only cadence (`threat-model.md` §7). See also [workspace slot](#workspace-slot), [workspace-state blob](#workspace-state-blob).
+
+Used in: `spec/protocol.md` §9.7; `threat-model.md` §7; `decisions.md` 2026-06-17 (MYND-308)
+
+### **workspace slot** &nbsp; 📦 *Product*
+
+One [named workspace](#named-workspace) within the `0x02` [workspace-state blob](#workspace-state-blob) descriptor (MYND-308). A slot carries a **stable `id`** (the durable identity — rename never changes it, so the MYP1 [`active_workspace`](#vaultprefs) pointer is rename-free), a display `name`, and the workspace descriptor itself (pane tree, focused pane, per-tab items incl. [view mode](#view-mode)). Slots are opaque to the protocol codec — the desktop client serializes the `{slots, active}` structure and the codec treats it as raw inner bytes (like the pre-0x02 single descriptor). Deleting the last slot leaves a fresh empty "Default" slot (the container is never slotless). See also [named workspace](#named-workspace).
+
+Used in: `spec/protocol.md` §9.7; `decisions.md` 2026-06-17 (MYND-308)
+
 ### **workspace-state blob** &nbsp; 📦 *Product*
 
-The encrypted `vault.workspace` artifact (`MYW1`, `spec/protocol.md` §9.7) carrying the editor's **workspace state** — the open-tab set per pane, the recursive pane-split layout, each pane's active tab, the focused pane, and per-tab cursor/scroll positions (MYND-166). AS3-Sensitive (note ids + structure): persisting *which notes are open* is activity metadata, so it rides inside the AEAD envelope under [session-state-key](#session-state-key) rather than as plaintext local state. Written **only on graceful exit** (manual lock / idle auto-lock grace / quit) — never per tab-switch — so the blob's mtime stays a low-resolution lock/quit signal and never becomes an editor-activity log (a filesystem adversary A4/A7 learns nothing about *which* notes are open or *when* they were switched). Best-effort, not crash-durable; a missing / tampered / malformed blob falls back to a single empty pane (§9.7.4). The inner descriptor is client-opaque to the protocol layer, like the [search index](#search-index).
+The encrypted `vault.workspace` artifact (`MYW1`, `spec/protocol.md` §9.7) carrying the editor's **workspace state** — the open-tab set per pane, the recursive pane-split layout, each pane's active tab, the focused pane, per-tab cursor/scroll positions, and per-tab [view mode](#view-mode) (MYND-166; per-tab view mode added by MYND-299, named slots by MYND-308). AS3-Sensitive (note ids + structure): persisting *which notes are open* is activity metadata, so it rides inside the AEAD envelope under [session-state-key](#session-state-key) rather than as plaintext local state. The inner descriptor is client-opaque to the protocol layer (like the [search index](#search-index)); since MYND-308 it holds `{slots, active}` ([named workspaces](#named-workspace)) and `workspace_format_version` is `0x02` (an old `0x01` binary hits `FormatUnsupported` → single empty pane). Write cadence is **graceful-exit only** in the single-workspace baseline (manual lock / idle auto-lock grace / quit, never per tab-switch), **coalesced to ≤ once per ~5 min of active use** once named workspaces are in play (MYND-308 — a bounded relaxation of §9.7.4, `threat-model.md` §7) — so the blob's mtime stays a coarse signal, never a high-resolution editor-activity log. Best-effort, not crash-durable; a missing / tampered / malformed / wrong-version blob falls back to a single empty pane (§9.7.4).
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 
@@ -1183,6 +1213,12 @@ Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generaliza
 An encrypted previous version of a note, captured automatically as the note is edited so an accidental overwrite or bad edit can be recovered (the MYND-96 file-recovery feature — Myne's answer to Obsidian File Recovery). A snapshot is a **frozen [`.myn`](#myn-file) revision**: the prior note plaintext re-sealed under the note's own `item_key` in the `MY01` envelope (`spec/protocol.md` §9.2) — **no new magic byte, no new subkey role**. Snapshots live in a flat `<vault-root>/snapshots/` directory (§9.1), captured **time-coalesced** (≈ one per note per 5 min of active editing, plus on editor-close / vault-lock), retained for a **bounded window** (default ~7 days) with a safety backstop, and pruned eagerly. On **permanent** delete a note's snapshots are purged, preserving cryptographic erase; soft-[Trash](#trash) (an ordinary update, the note still exists) keeps snapshotting. Distinct from the unrelated `vault.prefs` *replay* sense ("restore prior valid `vault.prefs` snapshots") in `threat-model.md` §7. See also [`.myn` file](#myn-file), [Trash](#trash).
 
 Used in: `spec/protocol.md` §9.1; `threat-model.md` §7; `decisions.md` 2026-06-08
+
+### **Source mode** &nbsp; 📦 *Product*
+
+The raw-markdown [view mode](#view-mode) of a note tab (MYND-299): the [decoration layer](#decoration-layer) is emptied, so the editor shows the exact on-disk markdown with no rendering — headings keep their `#`s, links show their brackets, nothing is hidden. Because §6 C1 guarantees the editor buffer is byte-identical to the stored `.myn`, Source mode displays exactly the stored bytes. It is editable (unlike [Reading view](#reading-view)) — the writer's surface for inspecting or hand-editing raw syntax. Reached via the command palette or the bottom-bar [view-mode switcher](#view-mode), **not** a default chord (the secondary live ↔ source toggle is deliberately chord-free; `Mod-Shift-E` is reserved for Edit ⇄ Reading). Contrast live preview (cursor-aware reveal) and [Reading view](#reading-view) (rendered, read-only). See also [view mode](#view-mode), [Reading view](#reading-view).
+
+Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
 
 ### **state-level actor** &nbsp; ⚠️ *Threat*
 
@@ -1286,6 +1322,12 @@ Used in: `spec/markdown-dialect.md` §3.6.1, `decisions.md` 2026-06-03 + 2026-05
 A line in the system where the security model changes — what is trusted on one side is not trusted on the other. Myne catalogs nine boundaries (TB1–TB9). See `threat-model.md` §3 for the full table.
 
 Used in: `threat-model.md` §3
+
+### **typewriter scroll** &nbsp; 📦 *Product*
+
+A [focus-mode](#focus-mode) writing aid (MYND-348): the line being edited is kept vertically centered in the viewport as the writer types, so the eyes stay in one place instead of drifting to the bottom of the screen. A hand-rolled CodeMirror extension (active-line scroll-margin / `scrollIntoView` centering — **no new dependency**) gated by the editor root's `data-focus-typewriter` attribute (set only when focus mode is active **and** the `editor_focus_typewriter` MYP1 pref is on — default on; the Settings → Editor toggle flips it). Honors `prefers-reduced-motion`. Toggleable because some writers find the constant re-centering disorienting. Non-load-bearing cosmetic (AS-low). See also [focus mode](#focus-mode), [line-focus dimming](#line-focus-dimming).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
 
 ### **unused attachment** &nbsp; 📋 *Protocol*
 
@@ -1430,6 +1472,12 @@ Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/sl
 The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext; persisted encrypted-at-rest as the [vault.indices](#vaultindices) / `MYI1` blob (`spec/protocol.md` §9.8 — the MYND-31 design, persistence landed by MYND-271 alongside the typed [property](#property) index). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **view mode** &nbsp; 📦 *Product*
+
+The per-tab live / reading / source axis for a note tab (MYND-299) — the three ways a note's buffer renders: **live** (today's default, the [cursor-aware reveal](#cursor-aware-reveal) live-preview surface), **[reading](#reading-view)** (rendered, read-only, no reveal), and **[source](#source-mode)** (raw markdown, decorations off). Stored per tab as an optional `viewMode?: "live" | "reading" | "source"` field on each tab's [workspace](#named-workspace) descriptor item — engine-opaque inside `MYW1`, omit-when-default (absent ≡ live), serialized exactly like the existing `pinned` flag, **no** `workspace_format_version` bump for the field itself. The vault-wide **default** for newly-opened tabs is the separate MYP1 `editor_default_view_mode` field (enum string, omit-when-default, `live` canonical default). The primary Edit ⇄ Reading toggle is `Mod-Shift-E`; the secondary live ↔ source toggle has no default chord (command palette + the bottom-bar **view-mode switcher**, which reflects the current mode in `data-view-mode`). A read-only **preview companion** can open a [Reading-view](#reading-view) mirror of the same buffer side-by-side without a second editable instance. See also [Reading view](#reading-view), [Source mode](#source-mode), [cursor-aware reveal](#cursor-aware-reveal).
+
+Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
 
 ### **view order** &nbsp; 📦 *Product*
 
