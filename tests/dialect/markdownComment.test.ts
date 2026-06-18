@@ -39,11 +39,24 @@ function toHex(s: string): string {
   return Buffer.from(s, "utf8").toString("hex");
 }
 
-describe("markdown-comment golden vectors (markdown-dialect §3.1/§3.2/§3.7.5/§6)", () => {
-  const doc = JSON.parse(fs.readFileSync(CASES_PATH, "utf-8")) as {
-    schema: string;
-    cases: Case[];
-  };
+// Skip-if-missing discipline, mirroring `protocol/tests/vectors.rs`: the
+// `myne-test-vectors` companion repo is not checked out in main-repo CI, so the
+// runner skips with an explanatory line rather than failing the suite on ENOENT.
+const VECTORS_PRESENT = fs.existsSync(CASES_PATH);
+if (!VECTORS_PRESENT) {
+  console.warn(
+    `[skip] markdown-comment: companion repo fixture not present at ${CASES_PATH}`,
+  );
+}
+const describeVectors = VECTORS_PRESENT ? describe : describe.skip;
+
+describeVectors("markdown-comment golden vectors (markdown-dialect §3.1/§3.2/§3.7.5/§6)", () => {
+  const doc = VECTORS_PRESENT
+    ? (JSON.parse(fs.readFileSync(CASES_PATH, "utf-8")) as {
+        schema: string;
+        cases: Case[];
+      })
+    : { schema: "markdown-comment", cases: [] as Case[] };
 
   it("reads the markdown-comment category from the companion repo", () => {
     expect(doc.schema).toBe("markdown-comment");
