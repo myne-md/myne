@@ -54,6 +54,13 @@ pub async fn change_password<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<(), VaultChangePasswordError> {
     let vault_path = vault_meta_path(&app, state.active_vault_id().await)?;
+
+    // MYND-351 Direction 2: a user-initiated change-password preempts an
+    // in-flight scheduled backup (which holds the shared auth permit) so the
+    // pipeline's `try_acquire` below is not rejected by the invisible job.
+    crate::plugins::backup::commands::preempt_inflight_backup_for_user_auth(state.inner(), &app)
+        .await;
+
     let result =
         change_password_with_path(current_password, new_password, &vault_path, state.inner()).await;
 

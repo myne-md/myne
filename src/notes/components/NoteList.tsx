@@ -22,12 +22,14 @@ import {
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
 import {
+  archivedCount,
   liveCache,
   trashedCount,
   useSelectedNote,
   type NoteId,
   type UseSelectedNoteReturn,
 } from "../sidebarState";
+import { ArchivePanel } from "./ArchivePanel";
 import { TrashPanel } from "./TrashPanel";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deriveFolderTree, type FolderNode } from "../folderTree";
@@ -846,6 +848,11 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // (like `live`) so the scan runs once per mutation, not on every re-render
   // (NoteList re-renders on selection / rename-toggle, which don't touch cache).
   const trashCount = useMemo(() => trashedCount(ctx.cache), [ctx.cache]);
+  // Archive entry (MYND-331): sibling to Trash in the footer, opening the
+  // Archive panel. Count from the value-strict `archived:` set (the disjoint
+  // archive raft); memoized on cache identity like `trashCount`.
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const archiveCount = useMemo(() => archivedCount(ctx.cache), [ctx.cache]);
 
   // F2 global keymap → enter inline-rename on the selected row.
   useEffect(() => {
@@ -960,8 +967,22 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
             <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
           )}
         </button>
+        <button
+          type="button"
+          style={FOOTER_ENTRY_STYLE}
+          data-testid="notes.archive-open"
+          onClick={() => setArchiveOpen(true)}
+          title="Open the archive"
+        >
+          <Icon name="archive" size={15} />
+          <span>Archive</span>
+          {archiveCount > 0 && (
+            <span style={TRASH_COUNT_BADGE_STYLE}>{archiveCount}</span>
+          )}
+        </button>
       </div>
       <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
+      <ArchivePanel open={archiveOpen} onClose={() => setArchiveOpen(false)} />
     </aside>
   );
 }
@@ -1348,6 +1369,38 @@ function PopulatedList({
     [ctx, navIds],
   );
 
+  // Archive a single note (MYND-331): optimistically pull it from the live tree
+  // (archiveWithRollback sets `archived:` + clears any `trashed:`), move the
+  // editor to an adjacent row if the archived note was open. Mirrors
+  // `handleTrash` minus the undo toast — the note is recoverable from the
+  // Archive section, not a transient undo.
+  const handleArchive = useCallback(
+    async (id: NoteId) => {
+      const wasSelected = ctx.selectedId === id;
+      const adjacent = wasSelected ? pickAdjacentAfterDelete(navIds, id) : null;
+      setMenu(null);
+      try {
+        await ctx.archiveWithRollback(id);
+        if (wasSelected) {
+          if (adjacent !== null) {
+            void ctx.open(adjacent).catch(() => {
+              /* editor body load failure surfaces via its own UX */
+            });
+          } else {
+            ctx.select(null);
+          }
+        }
+      } catch (err) {
+        setTrashError("Couldn't archive the note.");
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[NoteList] archiveWithRollback failed:", err);
+        }
+      }
+    },
+    [ctx, navIds],
+  );
+
   // "Undo" on the trash toast → restore the just-trashed note.
   const handleUndoTrash = useCallback(() => {
     if (undoToast === null) return;
@@ -1482,6 +1535,40 @@ function PopulatedList({
     ctx.clearMultiSelection();
   }, [ctx, navIds]);
 
+  // Bulk archive (MYND-331 / MYND-367): archive the whole multi-selection
+  // (recoverable from the Archive section), then collapse the set. If the OPEN
+  // note is among them, move the editor to the first surviving nav row.
+  const handleBulkArchive = useCallback(async () => {
+    const ids = [...ctx.selectedIds];
+    setMenu(null);
+    if (ids.length === 0) return;
+    const victims = new Set(ids);
+    const openIsVictim =
+      ctx.selectedId !== null && victims.has(ctx.selectedId);
+    const survivor = openIsVictim
+      ? (navIds.find((nid) => !victims.has(nid)) ?? null)
+      : null;
+    try {
+      await ctx.bulkArchiveWithSync(ids);
+      if (openIsVictim) {
+        if (survivor !== null) {
+          void ctx.open(survivor).catch(() => {
+            /* editor body load failure surfaces via its own UX */
+          });
+        } else {
+          ctx.select(null);
+        }
+      }
+    } catch (err) {
+      setTrashError("Couldn't archive the notes.");
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[NoteList] bulkArchiveWithSync failed:", err);
+      }
+    }
+    ctx.clearMultiSelection();
+  }, [ctx, navIds]);
+
   // "Undo" on the bulk-trash toast → restore every just-trashed note.
   const handleUndoBulk = useCallback(() => {
     const ids = bulkUndo;
@@ -1521,6 +1608,11 @@ function PopulatedList({
           id: "bulk-move",
           label: `Move ${selCount} notes to…`,
           onSelect: () => setMoveTarget({ x: menu.x, y: menu.y }),
+        },
+        {
+          id: "bulk-archive",
+          label: `Arşivle ${selCount} not`,
+          onSelect: () => void handleBulkArchive(),
         },
         {
           id: "bulk-delete",
@@ -1648,6 +1740,13 @@ function PopulatedList({
           ),
       },
       {
+        // Archive (MYND-331): pull the note out of the working set into the
+        // indefinite-retention Archive section. Near Delete, but not destructive.
+        id: "archive",
+        label: "Arşivle",
+        onSelect: () => void handleArchive(menu.id),
+      },
+      {
         id: "delete",
         label: "Delete",
         destructive: true,
@@ -1658,7 +1757,9 @@ function PopulatedList({
     menu,
     ctx,
     handleTrash,
+    handleArchive,
     handleBulkDelete,
+    handleBulkArchive,
     fm,
     favSet,
     openNote,

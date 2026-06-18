@@ -77,9 +77,9 @@ pub use account_number::{
 };
 pub use aead::{
     aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
-    aad_personal_dictionary_blob, aad_prefs_blob, aad_recovery_wrap, aad_search_index_blob,
-    aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob, aead_open_ctx,
-    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
+    aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob,
+    aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use attachment_blob::{
     aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id, decode_attachment_blob,

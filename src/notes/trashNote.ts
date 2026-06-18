@@ -13,7 +13,7 @@
 // timestamp must not advance. The `trashed:` value itself records *when* the
 // note was trashed (surfaced as the Trash panel's relative age).
 
-import { patchTrashedField } from "../dialect";
+import { patchArchivedField, patchTrashedField } from "../dialect";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 
@@ -22,16 +22,20 @@ const decoder = new TextDecoder();
 
 /**
  * Move a note to the vault trash by writing `trashed: <now>` (RFC 3339 UTC)
- * into its frontmatter. Idempotent: trashing an already-trashed note simply
- * refreshes the timestamp (state-C replace). Rejects with whatever
- * `noteRead` / `noteUpdate` propagate (IPC error shapes).
+ * into its frontmatter, clearing any `archived:` first (archive ⊥ trash —
+ * deleting an archived note moves it to trash; note-archive / MYND-331 Q2).
+ * Idempotent: trashing an already-trashed note simply refreshes the timestamp
+ * (state-C replace). The `archived:` clear is a state-D no-op on a note that is
+ * not archived (the common case), so a plain live note trashes byte-for-byte as
+ * before. Rejects with whatever `noteRead` / `noteUpdate` propagate (IPC error
+ * shapes).
  */
 export async function trashNote(noteId: string): Promise<void> {
   const current = await noteRead(noteId);
-  const trashed = patchTrashedField(
-    encoder.encode(current),
-    new Date().toISOString(),
-  );
+  // Clear archived first (no-op when absent), then set trashed — keeps the
+  // archive ⊥ trash invariant when deleting straight from the Archive view.
+  const unarchived = patchArchivedField(encoder.encode(current), null);
+  const trashed = patchTrashedField(unarchived, new Date().toISOString());
   await noteUpdate(noteId, decoder.decode(trashed));
 }
 
