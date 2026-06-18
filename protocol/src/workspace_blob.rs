@@ -26,9 +26,10 @@
 //! ------  ----  ------------------------  ----------------------------------
 //! 0       4     magic                     ASCII "MYW1"
 //! 4       1     protocol_version          0x01
-//! 5       1     workspace_format_version  0x01 = the v0.1 inner-plaintext
-//!                                         schema; bumping it lets a client
-//!                                         fall to default on an unknown form
+//! 5       1     workspace_format_version  0x02 = the named-workspaces inner
+//!                                         schema ({slots, active}, MYND-308);
+//!                                         any other value lets a client fall
+//!                                         to default on an unknown form
 //! 6       24    nonce                     XChaCha20-Poly1305 nonce
 //! 30      4     ciphertext_len            big-endian uint32, plaintext_len + 32
 //! 34      M     ciphertext                AEAD ciphertext + 32-byte CTX tag T'
@@ -59,11 +60,15 @@ pub const WORKSPACE_BLOB_MAGIC: [u8; 4] = *b"MYW1";
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const WORKSPACE_BLOB_PROTOCOL_VERSION: u8 = 0x01;
 
-/// `workspace_format_version` byte at offset 5 — the v0.1 inner-plaintext
-/// schema. Distinct from `protocol_version`: the pane-tree schema may grow
-/// fields within v0.1, and a client that does not understand a newer form
-/// falls back to the default workspace (§ 9.7.4) rather than mis-parsing.
-pub const WORKSPACE_BLOB_FORMAT_V1: u8 = 0x01;
+/// `workspace_format_version` byte at offset 5 — the named-workspaces
+/// inner-plaintext schema (`{slots, active}`, MYND-308). Distinct from
+/// `protocol_version`: the pane-tree schema evolves independently within
+/// v0.1, and a client that does not understand a given form falls back to
+/// the default workspace (§ 9.7.4) rather than mis-parsing. Bumped
+/// `0x01 → 0x02` for the named-workspaces descriptor; the older `0x01`
+/// single-descriptor form is no longer accepted and collapses to the
+/// fall-back default like any other unknown version.
+pub const WORKSPACE_BLOB_FORMAT_VERSION: u8 = 0x02;
 
 /// Length of the 16-byte `account_number_hash` bound into
 /// `AAD_workspace_blob` (spec § 9.7.3 + § 9.3 offset 6).
@@ -157,7 +162,7 @@ pub fn encode_workspace_blob_raw(
     let mut out = Vec::with_capacity(WORKSPACE_BLOB_HEADER_LEN + ciphertext_len);
     out.extend_from_slice(&WORKSPACE_BLOB_MAGIC);
     out.push(WORKSPACE_BLOB_PROTOCOL_VERSION);
-    out.push(WORKSPACE_BLOB_FORMAT_V1);
+    out.push(WORKSPACE_BLOB_FORMAT_VERSION);
     out.extend_from_slice(nonce);
     out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
     out.extend_from_slice(&sealed);
@@ -199,7 +204,7 @@ pub fn decode_workspace_blob(
     if blob[4] != WORKSPACE_BLOB_PROTOCOL_VERSION {
         return Err(WorkspaceBlobError::ProtocolVersionMismatch);
     }
-    if blob[5] != WORKSPACE_BLOB_FORMAT_V1 {
+    if blob[5] != WORKSPACE_BLOB_FORMAT_VERSION {
         return Err(WorkspaceBlobError::FormatUnsupported);
     }
 
@@ -252,7 +257,7 @@ mod tests {
         let blob = encode_workspace_blob_raw(&key, &h, pt, &nonce()).unwrap();
         assert_eq!(&blob[0..4], b"MYW1");
         assert_eq!(blob[4], 0x01);
-        assert_eq!(blob[5], 0x01);
+        assert_eq!(blob[5], 0x02);
         let out = decode_workspace_blob(&key, &h, &blob).unwrap();
         assert_eq!(out.as_slice(), pt.as_slice());
     }
@@ -295,7 +300,23 @@ mod tests {
         let key = fixed_key();
         let h = account_hash();
         let mut blob = encode_workspace_blob_raw(&key, &h, b"x", &nonce()).unwrap();
-        blob[5] = 0x02;
+        // 0x03 is an unknown future form → caller falls back to the default.
+        blob[5] = 0x03;
+        assert_eq!(
+            decode_workspace_blob(&key, &h, &blob),
+            Err(WorkspaceBlobError::FormatUnsupported),
+        );
+    }
+
+    #[test]
+    fn legacy_v1_format_rejects_for_default() {
+        // The retired 0x01 single-descriptor form (pre-MYND-308) is no longer
+        // accepted; it collapses to the fall-back default like any other
+        // unsupported version (§9.7.4).
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_workspace_blob_raw(&key, &h, b"x", &nonce()).unwrap();
+        blob[5] = 0x01;
         assert_eq!(
             decode_workspace_blob(&key, &h, &blob),
             Err(WorkspaceBlobError::FormatUnsupported),
@@ -473,7 +494,9 @@ mod tests {
         let mut pf_version = blob_small.clone();
         pf_version[4] = 0x02;
         let mut pf_workspace_format = blob_small.clone();
-        pf_workspace_format[5] = 0x02;
+        // 0x02 is now the accepted named-workspaces form (MYND-308); 0x03 is a
+        // future schema this client does not understand → format_unsupported.
+        pf_workspace_format[5] = 0x03;
         let pf_header_short: alloc::vec::Vec<u8> = WORKSPACE_BLOB_MAGIC.to_vec(); // 4 bytes < 34
         let mut pf_truncated = blob_small.clone();
         pf_truncated.truncate(pf_truncated.len() - 1);
@@ -716,7 +739,7 @@ mod tests {
         emit_parse_fail(
             &mut dump,
             "parse-fail-format-unsupported",
-            "workspace_format_version byte (offset 5) set to 0x02 — a future pane-tree serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls back to the default (empty) workspace (§9.7.4). This is the forward-migration hook and is load-bearing.",
+            "workspace_format_version byte (offset 5) set to 0x03 — a future pane-tree serialization this client does not understand (0x02 is the accepted named-workspaces form, MYND-308). The decoder rejects cleanly so the caller falls back to the default (empty) workspace (§9.7.4). This is the forward-migration hook and is load-bearing.",
             &pf_workspace_format,
             "format_unsupported",
             true,

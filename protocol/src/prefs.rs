@@ -324,6 +324,22 @@ pub struct PrefsView {
     #[serde(default)]
     pub item_order: Vec<alloc::string::String>,
 
+    /// Active workspace slot id (MYND-308) — the id of the workspace slot the
+    /// editor should restore on unlock. `None` ≡ unset → the host applies its
+    /// default (first / last-used) workspace policy. A free `Option<String>`
+    /// stored verbatim (NFC-normalized at encode time); no codec-level value
+    /// validation (the `daily_folder` precedent class — the client owns the
+    /// slot-id interpretation + unknown→default fallback). Omitted entirely from
+    /// the canonical JSON when `None`, so a vault that never set an active
+    /// workspace is byte-identical to a pre-feature `vault.prefs` (existing
+    /// golden vectors unaffected — migration-less additive field on `MYP1`).
+    /// **Non-load-bearing** (a tampered / replayed value can at worst restore
+    /// the wrong workspace) — no protective-envelope clamp. Canonical key
+    /// `active_workspace` — sorts FIRST, before `auto_lock_seconds`
+    /// (`ac` < `au`).
+    #[serde(default)]
+    pub active_workspace: Option<alloc::string::String>,
+
     /// Editor three-pane layout (sidebar widths + collapsed flags,
     /// MYND-137). `None` = the user never customized the layout → the
     /// field is omitted entirely from the canonical JSON, so a vault
@@ -357,16 +373,58 @@ pub struct PrefsView {
     /// the measure is byte-identical to a pre-feature `vault.prefs`.
     /// **Non-load-bearing** cosmetic (AS-low) — no protective-envelope clamp.
     /// Canonical key `editor_content_width` — sorts after `deliberate_folders`
-    /// (`d` < `e`), before `editor_font_family` (`editor_c` < `editor_f`).
+    /// (`d` < `e`), before `editor_default_view_mode`
+    /// (`editor_c` < `editor_d`).
     #[serde(default)]
     pub editor_content_width: Option<alloc::string::String>,
+
+    /// Editor default view-mode preset (MYND-299) — the mode a note opens in:
+    /// `live` / `reading` / `source`. `None` ≡ the canonical default applied
+    /// host-side. A closed enum string stored as a free `Option<String>` — the
+    /// enum interpretation + unknown→default fallback live on the client (no
+    /// codec-level validation, the `editor_content_width` precedent class).
+    /// Omitted entirely from the canonical JSON when `None`, so a vault that
+    /// never customized the default view is byte-identical to a pre-feature
+    /// `vault.prefs`. **Non-load-bearing** cosmetic — no protective-envelope
+    /// clamp. Canonical key `editor_default_view_mode` — sorts after
+    /// `editor_content_width` (`editor_c` < `editor_d`), before
+    /// `editor_focus_dim_inactive` (`editor_d` < `editor_f`).
+    #[serde(default)]
+    pub editor_default_view_mode: Option<alloc::string::String>,
+
+    /// Editor focus-mode dim-inactive toggle (MYND-348). `None` ≡ unset → the
+    /// host applies its default focus-mode policy at read time. Omitted entirely
+    /// from the canonical JSON when `None`, so a vault that never touched the
+    /// toggle is byte-identical to a pre-feature `vault.prefs` (existing golden
+    /// vectors unaffected — migration-less additive field on `MYP1`, the
+    /// `editor_line_numbers` precedent class). **Non-load-bearing** (a tampered /
+    /// replayed value can at worst dim or undim the inactive paragraphs) — no
+    /// protective-envelope clamp. Canonical key `editor_focus_dim_inactive` —
+    /// sorts after `editor_default_view_mode` (`editor_d` < `editor_f`), before
+    /// `editor_focus_typewriter` (`editor_focus_d` < `editor_focus_t`).
+    #[serde(default)]
+    pub editor_focus_dim_inactive: Option<bool>,
+
+    /// Editor focus-mode typewriter-scrolling toggle (MYND-348). `None` ≡ unset →
+    /// the host applies its default focus-mode policy at read time. Omitted
+    /// entirely from the canonical JSON when `None`, so a vault that never touched
+    /// the toggle is byte-identical to a pre-feature `vault.prefs` (existing
+    /// golden vectors unaffected — the `editor_line_numbers` precedent class).
+    /// **Non-load-bearing** (a tampered / replayed value can at worst enable or
+    /// disable typewriter scrolling) — no protective-envelope clamp. Canonical
+    /// key `editor_focus_typewriter` — sorts after `editor_focus_dim_inactive`
+    /// (`editor_focus_d` < `editor_focus_t`), before `editor_font_family`
+    /// (`editor_focus` < `editor_font`: `c` < `n`).
+    #[serde(default)]
+    pub editor_focus_typewriter: Option<bool>,
 
     /// Editor font-family preset (editor-typography). `None` ≡ the canonical
     /// default `mono`. A closed enum string (`mono`/`sans`); same free-string
     /// storage + client-side validation discipline as
     /// [`PrefsView::editor_content_width`]. Omitted when `None`.
     /// Non-load-bearing. Canonical key `editor_font_family` — sorts after
-    /// `editor_content_width`, before `editor_layout` (`editor_f` < `editor_l`).
+    /// `editor_focus_typewriter` (`editor_focus` < `editor_font`), before
+    /// `editor_layout` (`editor_f` < `editor_l`).
     #[serde(default)]
     pub editor_font_family: Option<alloc::string::String>,
 
@@ -588,9 +646,13 @@ impl Default for PrefsView {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -732,9 +794,21 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     let mut out = Vec::with_capacity(64);
     out.push(b'{');
 
-    // auto_lock_seconds (canonically FIRST — 'a' < 'd' < 's'); omitted
-    // entirely when None so an unset vault is byte-identical to a
-    // pre-MYND-121 vault.prefs (preserves existing KAT vectors).
+    // active_workspace (canonically FIRST — 'ac' < 'au' = auto_lock_seconds,
+    // MYND-308). A free enum string; omitted entirely when None so a vault
+    // that never set an active workspace is byte-identical to a pre-feature
+    // vault.prefs (preserves existing KAT vectors). NFC-normalized like the
+    // daily_* / custom_theme string fields.
+    if let Some(ref slot) = prefs.active_workspace {
+        out.extend_from_slice(b"\"active_workspace\":");
+        push_json_string(&mut out, &slot.nfc().collect::<String>());
+        out.push(b',');
+    }
+
+    // auto_lock_seconds (canonically after active_workspace — 'au' > 'ac';
+    // 'a' < 'd' < 's'); omitted entirely when None so an unset vault is
+    // byte-identical to a pre-MYND-121 vault.prefs (preserves existing KAT
+    // vectors).
     if let Some(secs) = prefs.auto_lock_seconds {
         out.extend_from_slice(b"\"auto_lock_seconds\":");
         push_json_uint(&mut out, secs);
@@ -784,14 +858,40 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
-    // editor-typography string presets (canonical key 'e'). Two sort BEFORE
-    // editor_layout (`editor_c`/`editor_f` < `editor_l`), two AFTER it (below).
-    // Each omitted when None so a vault that never customized typography is
-    // byte-identical to a pre-feature vault.prefs. Free enum strings — the
-    // client validates + maps unknown→default.
+    // editor-typography string presets (canonical key 'e'). content_width +
+    // default_view_mode + font_family sort BEFORE editor_layout
+    // (`editor_c`/`editor_d`/`editor_f` < `editor_l`), the focus bools + the
+    // other typography presets AFTER it (below). Each omitted when None so a
+    // vault that never customized typography is byte-identical to a pre-feature
+    // vault.prefs. Free enum strings — the client validates + maps unknown→default.
     if let Some(ref v) = prefs.editor_content_width {
         out.extend_from_slice(b"\"editor_content_width\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+    // editor_default_view_mode (MYND-299) — after editor_content_width
+    // (`editor_c` < `editor_d`), before editor_focus_dim_inactive
+    // (`editor_d` < `editor_f`). A free enum string ("live"/"reading"/"source"),
+    // NFC-normalized; omitted when None.
+    if let Some(ref v) = prefs.editor_default_view_mode {
+        out.extend_from_slice(b"\"editor_default_view_mode\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+    // editor_focus_* bools (MYND-348) — after editor_default_view_mode
+    // (`editor_d` < `editor_f`), before editor_font_family (`editor_focus` <
+    // `editor_font`: 'c' < 'n'). dim_inactive < typewriter
+    // (`editor_focus_d` < `editor_focus_t`). Bare bools; omitted when None so a
+    // vault that never touched focus mode is byte-identical to a pre-feature
+    // vault.prefs.
+    if let Some(on) = prefs.editor_focus_dim_inactive {
+        out.extend_from_slice(b"\"editor_focus_dim_inactive\":");
+        out.extend_from_slice(if on { b"true" } else { b"false" });
+        out.push(b',');
+    }
+    if let Some(on) = prefs.editor_focus_typewriter {
+        out.extend_from_slice(b"\"editor_focus_typewriter\":");
+        out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
     }
     if let Some(ref v) = prefs.editor_font_family {
@@ -1157,14 +1257,35 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         .and_then(|p| p.strip_suffix(b"}"))
         .ok_or(PrefsBlobError::PlaintextParseFailed)?;
 
-    // ---- auto_lock_seconds (optional, canonically FIRST) ----
+    // ---- active_workspace (optional, canonically FIRST — MYND-308) ----
+    // Canonical key order is active_workspace < auto_lock_seconds <
+    // deliberate_folders < … < screen_capture_protection, so when present this
+    // field is a literal PREFIX of the stripped object — matched by
+    // `strip_prefix` rather than `find_subslice`, so a later folder name
+    // containing an `"active_workspace":`-looking substring cannot fool it. The
+    // string value MUST be followed by `,` — screen_capture_protection is
+    // mandatory and canonically last, so a further field always follows.
+    let active_marker = b"\"active_workspace\":";
+    let (active_workspace, post_active) = match stripped.strip_prefix(active_marker) {
+        Some(after) => {
+            let (val, consumed) =
+                parse_json_string(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            let rest = after[consumed..]
+                .strip_prefix(b",")
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            (Some(val), rest)
+        }
+        None => (None, stripped),
+    };
+
+    // ---- auto_lock_seconds (optional, after active_workspace) ----
     // Canonical key order is auto_lock_seconds < deliberate_folders <
-    // screen_capture_protection, so when present this field is a literal
-    // PREFIX of the stripped object — matched by `strip_prefix` rather
-    // than `find_subslice`, so a later folder name containing a
-    // `"auto_lock_seconds":`-looking substring cannot fool it.
+    // screen_capture_protection (and after active_workspace), so when present
+    // this field is a literal PREFIX of the post-active_workspace bytes —
+    // matched by `strip_prefix` rather than `find_subslice`, so a later folder
+    // name containing a `"auto_lock_seconds":`-looking substring cannot fool it.
     let auto_marker = b"\"auto_lock_seconds\":";
-    let (auto_lock_seconds, rest) = match stripped.strip_prefix(auto_marker) {
+    let (auto_lock_seconds, rest) = match post_active.strip_prefix(auto_marker) {
         Some(after) => {
             let (val, consumed) = parse_json_uint(after)?;
             // The integer MUST be followed by `,` — screen_capture_protection
@@ -1176,7 +1297,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
                 .ok_or(PrefsBlobError::PlaintextParseFailed)?;
             (Some(val), rest)
         }
-        None => (None, stripped),
+        None => (None, post_active),
     };
 
     // ---- optional string-array fields (canonical key order) ----
@@ -1204,6 +1325,19 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // All parsed from the same monotonic cursor so canonical key order holds.
     let editor_content_width =
         parse_optional_string_field(rest, &mut cursor, b"\"editor_content_width\":")?;
+    // editor_default_view_mode (MYND-299) sits between editor_content_width
+    // (`editor_c` < `editor_d`) and the editor_focus_* bools (`editor_d` <
+    // `editor_f`); a free enum string parsed from the same monotonic cursor.
+    let editor_default_view_mode =
+        parse_optional_string_field(rest, &mut cursor, b"\"editor_default_view_mode\":")?;
+    // editor_focus_* bools (MYND-348) sit between editor_default_view_mode
+    // (`editor_d` < `editor_f`) and editor_font_family (`editor_focus` <
+    // `editor_font`); dim_inactive < typewriter. Both parsed from the same
+    // monotonic cursor so canonical key order holds.
+    let editor_focus_dim_inactive =
+        parse_optional_bool_field(rest, &mut cursor, b"\"editor_focus_dim_inactive\":")?;
+    let editor_focus_typewriter =
+        parse_optional_bool_field(rest, &mut cursor, b"\"editor_focus_typewriter\":")?;
     let editor_font_family =
         parse_optional_string_field(rest, &mut cursor, b"\"editor_font_family\":")?;
     // editor_layout (canonical key 'e') sits between deliberate_folders (d)
@@ -1321,9 +1455,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         favorites,
         item_order,
         keymap,
+        active_workspace,
         editor_layout,
         editor_line_numbers,
         editor_content_width,
+        editor_default_view_mode,
+        editor_focus_dim_inactive,
+        editor_focus_typewriter,
         editor_font_family,
         editor_line_spacing,
         editor_text_size,
@@ -2021,9 +2159,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -2056,9 +2198,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -2214,9 +2360,13 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                active_workspace: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
+                editor_default_view_mode: None,
+                editor_focus_dim_inactive: None,
+                editor_focus_typewriter: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
@@ -2251,9 +2401,13 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                active_workspace: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
+                editor_default_view_mode: None,
+                editor_focus_dim_inactive: None,
+                editor_focus_typewriter: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
@@ -2603,6 +2757,161 @@ mod tests {
         }
     }
 
+    // ---- active_workspace (MYND-308) -----------------------------------
+
+    #[test]
+    fn encode_omits_active_workspace_when_none_byte_identical_to_pre_feature() {
+        // A vault that never set an active workspace encodes byte-identically to
+        // the bare pre-feature form (migration-less additive field).
+        let encoded = canonical_json_encode(&PrefsView {
+            active_workspace: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_active_workspace_first_before_auto_lock_seconds() {
+        // Canonical key order: active_workspace < auto_lock_seconds ("ac" < "au").
+        let encoded = canonical_json_encode(&PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-1")),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"active_workspace":"ws-1","screen_capture_protection":true}"#,
+        );
+        // With auto_lock_seconds present, active_workspace still sorts first.
+        let with_auto = canonical_json_encode(&PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-1")),
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        });
+        let s = core::str::from_utf8(&with_auto).unwrap();
+        let aw = s.find("active_workspace").unwrap();
+        let al = s.find("auto_lock_seconds").unwrap();
+        assert!(aw < al, "canonical order: {s}");
+    }
+
+    #[test]
+    fn active_workspace_is_nfc_normalized_on_encode() {
+        // "é" as NFD (e + combining acute) normalizes to NFC single codepoint.
+        let nfd = alloc::string::String::from("ws-Cafe\u{0301}");
+        let encoded = canonical_json_encode(&PrefsView {
+            active_workspace: Some(nfd),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            "{\"active_workspace\":\"ws-Café\",\"screen_capture_protection\":true}".as_bytes(),
+        );
+    }
+
+    #[test]
+    fn active_workspace_round_trips_through_decode() {
+        for value in [Some(alloc::string::String::from("ws-1")), None] {
+            let original = PrefsView {
+                active_workspace: value.clone(),
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded, original);
+            assert_eq!(decoded.active_workspace, value);
+        }
+        // Round-trips alongside auto_lock_seconds (active_workspace canonically
+        // first; auto_lock_seconds is the strip_prefix-matched second field).
+        let original = PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-7")),
+            auto_lock_seconds: Some(900),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    // ---- editor focus + default-view-mode (MYND-299 / MYND-348) --------
+
+    #[test]
+    fn encode_omits_editor_batch_fields_when_none_byte_identical_to_pre_feature() {
+        // A vault that never touched the batch editor fields encodes byte-
+        // identically to the bare pre-feature form (migration-less additive
+        // fields — existing golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView {
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_places_editor_batch_fields_in_canonical_order() {
+        // Canonical editor_* order: editor_content_width <
+        // editor_default_view_mode < editor_focus_dim_inactive <
+        // editor_focus_typewriter < editor_font_family.
+        let encoded = canonical_json_encode(&PrefsView {
+            editor_content_width: Some(alloc::string::String::from("wide")),
+            editor_default_view_mode: Some(alloc::string::String::from("reading")),
+            editor_focus_dim_inactive: Some(true),
+            editor_focus_typewriter: Some(false),
+            editor_font_family: Some(alloc::string::String::from("sans")),
+            ..PrefsView::default()
+        });
+        let s = core::str::from_utf8(&encoded).unwrap();
+        let cw = s.find("editor_content_width").unwrap();
+        let dvm = s.find("editor_default_view_mode").unwrap();
+        let di = s.find("editor_focus_dim_inactive").unwrap();
+        let tw = s.find("editor_focus_typewriter").unwrap();
+        let ff = s.find("editor_font_family").unwrap();
+        assert!(
+            cw < dvm && dvm < di && di < tw && tw < ff,
+            "canonical order: {s}"
+        );
+        // Bools encode as bare true/false; the string view-mode as a JSON string.
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"editor_content_width":"wide","editor_default_view_mode":"reading","editor_focus_dim_inactive":true,"editor_focus_typewriter":false,"editor_font_family":"sans","screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn editor_default_view_mode_is_nfc_normalized_on_encode() {
+        let nfd = alloc::string::String::from("Cafe\u{0301}");
+        let encoded = canonical_json_encode(&PrefsView {
+            editor_default_view_mode: Some(nfd),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            "{\"editor_default_view_mode\":\"Café\",\"screen_capture_protection\":true}".as_bytes(),
+        );
+    }
+
+    #[test]
+    fn editor_batch_fields_round_trip_through_decode() {
+        for dvm in [Some(alloc::string::String::from("source")), None] {
+            for di in [Some(true), Some(false), None] {
+                for tw in [Some(true), Some(false), None] {
+                    let original = PrefsView {
+                        editor_default_view_mode: dvm.clone(),
+                        editor_focus_dim_inactive: di,
+                        editor_focus_typewriter: tw,
+                        ..PrefsView::default()
+                    };
+                    let encoded = canonical_json_encode(&original);
+                    let decoded = canonical_json_decode(&encoded).expect("decode");
+                    assert_eq!(decoded, original);
+                    assert_eq!(decoded.editor_default_view_mode, dvm);
+                    assert_eq!(decoded.editor_focus_dim_inactive, di);
+                    assert_eq!(decoded.editor_focus_typewriter, tw);
+                }
+            }
+        }
+    }
+
     #[test]
     fn label_is_nfc_normalized_on_encode() {
         // "é" as NFD (e + combining acute) normalizes to NFC single codepoint.
@@ -2735,7 +3044,11 @@ mod tests {
             }),
             editor_line_numbers: None,
             theme: Some(ThemeChoice::Dark),
+            active_workspace: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3001,9 +3314,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3043,9 +3360,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3083,9 +3404,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3122,9 +3447,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3224,9 +3553,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3291,9 +3624,13 @@ mod tests {
                 alloc::string::String::from("Zebra/"),
                 alloc::string::String::from("n2"),
             ],
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3337,9 +3674,13 @@ mod tests {
                 alloc::string::String::from("mmm"),
                 alloc::string::String::from("zzz"),
             ],
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3418,9 +3759,13 @@ mod tests {
                 alloc::string::String::from("Projects/"),
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
             ],
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3475,9 +3820,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3532,9 +3881,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3571,9 +3924,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3612,9 +3969,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3721,9 +4082,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -3804,9 +4169,13 @@ mod tests {
             daily_template: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
+            active_workspace: None,
             editor_layout: Some(sample_layout()),
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -4077,9 +4446,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -4120,9 +4493,13 @@ mod tests {
             daily_date_format: None,
             daily_folder: None,
             daily_template: None,
+            active_workspace: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: None,
+            editor_focus_dim_inactive: None,
+            editor_focus_typewriter: None,
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -4424,9 +4801,13 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                active_workspace: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
+                editor_default_view_mode: None,
+                editor_focus_dim_inactive: None,
+                editor_focus_typewriter: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
@@ -4460,9 +4841,13 @@ mod tests {
                 daily_date_format: None,
                 daily_folder: None,
                 daily_template: None,
+                active_workspace: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
+                editor_default_view_mode: None,
+                editor_focus_dim_inactive: None,
+                editor_focus_typewriter: None,
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
@@ -4508,6 +4893,9 @@ mod tests {
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
                 alloc::string::String::from("Archive/2025/"),
             ],
+            active_workspace: Some(alloc::string::String::from(
+                "0190a000-0000-7000-8000-0000000000ff",
+            )),
             editor_layout: Some(EditorLayout {
                 left_width: 312,
                 right_width: 288,
@@ -4516,6 +4904,9 @@ mod tests {
             }),
             editor_line_numbers: None,
             editor_content_width: None,
+            editor_default_view_mode: Some(alloc::string::String::from("reading")),
+            editor_focus_dim_inactive: Some(true),
+            editor_focus_typewriter: Some(false),
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
@@ -5282,6 +5673,102 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write line_numbers prefs vector dump");
+    }
+
+    /// Generator for the batch editor-prefs (MYND-308 / MYND-299 / MYND-348)
+    /// vector cases (appended to the companion repo's `vault-prefs` family;
+    /// per-feature generator, keeps the originals byte-stable — the
+    /// [`emit_line_numbers_prefs_vector`] pattern):
+    ///
+    /// `cargo test -p protocol --lib emit_batch_editor_prefs_vector -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying all four
+    /// optional batch fields at once — `active_workspace` (canonical FIRST key),
+    /// `editor_default_view_mode` (string), `editor_focus_dim_inactive` +
+    /// `editor_focus_typewriter` (bools). Pins the canonical key slots
+    /// (active_workspace < … < editor_content_width < editor_default_view_mode <
+    /// editor_focus_dim_inactive < editor_focus_typewriter < editor_font_family)
+    /// and the string-vs-bare-bool encoding plus the round-trip back through the
+    /// decoder. Nonce `0x95` is a free entry in the family's nonce registry.
+    /// Omit-when-`None` keeps an untouched vault byte-identical to a pre-feature
+    /// blob (no encrypt case needed for that — `encrypt-default` already pins it).
+    #[test]
+    #[ignore]
+    fn emit_batch_editor_prefs_vector() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce: [u8; AEAD_NONCE_LEN] = [0x95; AEAD_NONCE_LEN];
+        let prefs = PrefsView {
+            active_workspace: Some(alloc::string::String::from(
+                "0190a000-0000-7000-8000-0000000000ff",
+            )),
+            editor_default_view_mode: Some(alloc::string::String::from("reading")),
+            editor_focus_dim_inactive: Some(true),
+            editor_focus_typewriter: Some(false),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"active_workspace":"0190a000-0000-7000-8000-0000000000ff","editor_default_view_mode":"reading","editor_focus_dim_inactive":true,"editor_focus_typewriter":false,"screen_capture_protection":true}"#.as_slice(),
+            "canonical plaintext must place active_workspace first then the editor batch fields in canonical order",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode batch editor prefs");
+        // Round-trip self-validation.
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin batch editor prefs vectors (MYND-308/299/348)---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-batch-editor-prefs\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-batch-editor-prefs (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!("input_blob_hex: {}\n", hex_lower(&blob)));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n\n",
+            hex_lower(&canonical)
+        ));
+
+        dump.push_str("---end batch editor prefs vectors---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_batch_editor_vector.txt",
+            dump.as_bytes(),
+        )
+        .expect("write batch editor prefs vector dump");
     }
 
     /// Generator for the MYND-304 `keymap` vector cases (hotkeys epic;

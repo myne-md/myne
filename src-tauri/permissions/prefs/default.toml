@@ -34,6 +34,10 @@ permissions = [
   "allow-set-editor-line-spacing",
   "allow-set-editor-content-width",
   "allow-set-editor-font-family",
+  "allow-set-active-workspace",
+  "allow-set-editor-default-view-mode",
+  "allow-set-editor-focus-dim-inactive",
+  "allow-set-editor-focus-typewriter",
   "allow-set-item-colors",
   "allow-set-folder-icons",
   "allow-vault-set-label",
@@ -182,6 +186,31 @@ commands.allow = ["set_editor_content_width"]
 identifier = "allow-set-editor-font-family"
 description = "Allow invoking prefs:set_editor_font_family (Slot::Unlocked-gated setter for the editor_font_family preset — mono/sans, Option<String> where None clears to the mono default; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_editor_font_family"]
+
+# MYND-308 / MYND-299 / MYND-348: write setters for the active-workspace slot id
+# + the editor default-view-mode + the two focus-mode toggles. Each inherits the
+# same main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-active-workspace"
+description = "Allow invoking prefs:set_active_workspace (Slot::Unlocked-gated setter for the active_workspace slot id — Option<String> where None clears to the host default workspace policy; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_active_workspace"]
+
+[[permission]]
+identifier = "allow-set-editor-default-view-mode"
+description = "Allow invoking prefs:set_editor_default_view_mode (Slot::Unlocked-gated setter for the editor_default_view_mode preset — live/reading/source, Option<String> where None clears to the host default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_default_view_mode"]
+
+[[permission]]
+identifier = "allow-set-editor-focus-dim-inactive"
+description = "Allow invoking prefs:set_editor_focus_dim_inactive (Slot::Unlocked-gated setter for the editor_focus_dim_inactive toggle — the focus-mode dim-inactive-paragraphs option; atomic-writes vault.prefs with no native side-effect; the default focus policy is applied host-side at read time)."
+commands.allow = ["set_editor_focus_dim_inactive"]
+
+[[permission]]
+identifier = "allow-set-editor-focus-typewriter"
+description = "Allow invoking prefs:set_editor_focus_typewriter (Slot::Unlocked-gated setter for the editor_focus_typewriter toggle — the focus-mode typewriter-scrolling option; atomic-writes vault.prefs with no native side-effect; the default focus policy is applied host-side at read time)."
+commands.allow = ["set_editor_focus_typewriter"]
 
 [[permission]]
 identifier = "allow-set-item-colors"

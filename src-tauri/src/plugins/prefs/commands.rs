@@ -382,6 +382,142 @@ pub(crate) async fn set_editor_line_numbers_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `active_workspace` slot id (MYND-308) —
+/// the workspace slot the editor restores on unlock, or `None` to clear back to
+/// the host default. Read-modify-write under the per-plugin write mutex; no
+/// native side-effect. A free `Option<String>` stored verbatim (the
+/// `set_custom_theme` precedent class); non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_active_workspace<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(&dir, state.inner(), "active_workspace", |p| {
+        p.active_workspace = value;
+    })
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `editor_default_view_mode` preset
+/// (MYND-299) — `live`/`reading`/`source`, or `None` to clear to the host
+/// default. Read-modify-write under the write mutex; no native side-effect. A
+/// free `Option<String>` (the `set_editor_content_width` precedent class); the
+/// enum interpretation + unknown→default fallback live on the client.
+#[tauri::command]
+pub async fn set_editor_default_view_mode<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(&dir, state.inner(), "editor_default_view_mode", |p| {
+        p.editor_default_view_mode = value;
+    })
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `editor_focus_dim_inactive` toggle
+/// (MYND-348). Read-modify-write under the per-plugin write mutex; no native
+/// side-effect (like `set_editor_line_numbers`). Always persists an explicit
+/// `Some(enabled)` — the host applies the default focus-mode policy at read time.
+/// Non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_editor_focus_dim_inactive<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_focus_dim_inactive_with_dir(&dir, state.inner(), enabled).await
+}
+
+/// Testable core of [`set_editor_focus_dim_inactive`].
+pub(crate) async fn set_editor_focus_dim_inactive_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.editor_focus_dim_inactive = Some(enabled);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_focus_dim_inactive",
+        value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `editor_focus_typewriter` toggle
+/// (MYND-348). Read-modify-write under the per-plugin write mutex; no native
+/// side-effect (like `set_editor_line_numbers`). Always persists an explicit
+/// `Some(enabled)` — the host applies the default focus-mode policy at read time.
+/// Non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_editor_focus_typewriter<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_focus_typewriter_with_dir(&dir, state.inner(), enabled).await
+}
+
+/// Testable core of [`set_editor_focus_typewriter`].
+pub(crate) async fn set_editor_focus_typewriter_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.editor_focus_typewriter = Some(enabled);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_focus_typewriter",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `show_note_timestamps` toggle
 /// (sidebar-note-timestamps feature). Read-modify-write under the per-plugin
 /// write mutex; no native side-effect (like `set_spell_enabled`). The field is a
@@ -1742,9 +1878,13 @@ mod tests {
                     favorites: Vec::new(),
                     item_order: Vec::new(),
                     keymap: Default::default(),
+                    active_workspace: None,
                     editor_layout: None,
                     editor_line_numbers: None,
                     editor_content_width: None,
+                    editor_default_view_mode: None,
+                    editor_focus_dim_inactive: None,
+                    editor_focus_typewriter: None,
                     editor_font_family: None,
                     editor_line_spacing: None,
                     editor_text_size: None,
@@ -2591,6 +2731,96 @@ mod tests {
                 .await
                 .expect("read after off");
             assert_eq!(view.editor_line_numbers, Some(false));
+        });
+    }
+
+    // ---- batch editor setters (MYND-308 / MYND-299 / MYND-348) --------
+
+    #[test]
+    fn set_editor_focus_dim_inactive_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-focus-dim-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, true).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_editor_focus_typewriter_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-focus-tw-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_editor_focus_typewriter_with_dir(tmp.path(), &state, true).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn editor_focus_toggles_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x47).await;
+
+            // Default (no write yet) reads back as `None`.
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read default");
+            assert_eq!(view.editor_focus_dim_inactive, None);
+            assert_eq!(view.editor_focus_typewriter, None);
+
+            // Enable both persists (disk-first) + round-trips.
+            set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, true)
+                .await
+                .expect("write dim on");
+            set_editor_focus_typewriter_with_dir(tmp.path(), &state, false)
+                .await
+                .expect("write typewriter off");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after writes");
+            assert_eq!(view.editor_focus_dim_inactive, Some(true));
+            assert_eq!(view.editor_focus_typewriter, Some(false));
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+        });
+    }
+
+    #[test]
+    fn active_workspace_and_default_view_mode_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x48).await;
+
+            // Set both string fields (via the shared typography core, the
+            // command wrappers' read-modify-write helper).
+            set_typography_field_with_dir(tmp.path(), &state, "active_workspace", |p| {
+                p.active_workspace = Some(String::from("ws-7"));
+            })
+            .await
+            .expect("write active_workspace");
+            set_typography_field_with_dir(tmp.path(), &state, "editor_default_view_mode", |p| {
+                p.editor_default_view_mode = Some(String::from("reading"));
+            })
+            .await
+            .expect("write default view mode");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after writes");
+            assert_eq!(view.active_workspace.as_deref(), Some("ws-7"));
+            assert_eq!(view.editor_default_view_mode.as_deref(), Some("reading"));
+            assert!(view.screen_capture_protection);
+
+            // None clears active_workspace back to the default (omitted on disk).
+            set_typography_field_with_dir(tmp.path(), &state, "active_workspace", |p| {
+                p.active_workspace = None;
+            })
+            .await
+            .expect("clear active_workspace");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert_eq!(view.active_workspace, None);
+            assert_eq!(view.editor_default_view_mode.as_deref(), Some("reading"));
         });
     }
 
