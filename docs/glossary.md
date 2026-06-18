@@ -180,6 +180,12 @@ The code-enforced upper bound on the auto-lock timeout — the load-bearing edge
 
 Used in: `threat-model.md` §7; `decisions.md` 2026-05-30 "Auto-lock on idle"
 
+### **backup schedule** &nbsp; 📦 *Product*
+
+The device-local configuration that drives a vault's [scheduled backup](#scheduled-backup) (MYND-351): per-`VaultId` it records `enabled`, the cadence (`every-unlock` / `daily` / `weekly`), the target folder, the retention count N, the written-backup ledger (the prune allowlist), and the per-device status/clock (`last_scheduled_success_at`, `last_backup_attempt_at`, `last_backup_status`). Persisted as best-effort plaintext JSON at `<app_data_dir>/vaults/backup-schedule.json` — a sibling of the `registry.json` cache, modelled on it, and Myne's first persistent device-local *user-setting* store. It deliberately stores plaintext filesystem paths (the target folder + ledger), a recorded departure from `registry.json`'s no-paths discipline — backups are ciphertext, so a known location is not a confidentiality break (`decisions.md` 2026-06-18). The schedule does **not** sync across devices (the target is per-device); its clock is intentionally separate from [last_backup_at](#last_backup_at) (the synced reminder clock).
+
+Used in: `decisions.md` 2026-06-18; `myne-agents/features/scheduled-local-backup/`
+
 ### **backup-key** &nbsp; 🗝️ *Key/identifier*
 
 A subkey context string (`"myne.v0.1 backup-key"`) **reserved but not used in v0.1** (demoted 2026-06-10; the entry previously claimed it encrypts exported backup files). The v0.1 [vault backup file](#vault-backup-file) is a verbatim ciphertext copy with no outer encryption layer; the demotion rationale lives in the §3.4 registry row and `decisions.md` 2026-06-10. Retained, like `server-auth`, so the context string stays allocated for a potential future sealed-backup variant.
@@ -1092,6 +1098,12 @@ Used in: `spec/protocol.md` §3.1
 A named, **read-only** derived view over a vault's own plain-markdown notes (Saved Views epic, MYND-271) — a filter (over [properties](#property), tags, folders) + a sort + an optional `groupBy`, rendered as one of a closed set of [view types](#view-type). The Obsidian-Bases analogue, deliberately narrowed: **no database, no formula/code-eval** — only a declarative, closed-allow-list query (the query-engine sub-feature) over the derived property index. The view *definition* is authored content persisted in `vault.prefs` / `MYP1` (not the index blob); the data it queries lives in the rebuildable [vault.indices](#vaultindices) / `MYI1` cache. Because it is read-only over plain markdown with `.myn` as the source of truth, it does **not** violate the `vision.md` "no databases" / "no proprietary format" anti-features (same precedent class as the [search index](#search-index)); see `decisions.md` 2026-06-14 "Saved Views is a read-only derived projection over plain markdown, not a database". The [filter AST](#filter-ast) is created and edited through the **filter builder** UI — single-level filter groups over tag / folder / search conditions, a deliberate representable subset of the AST's full nesting (MYND-282).
 
 Used in: Saved Views (MYND-271, MYND-282); `decisions.md` 2026-06-14
+
+### **scheduled backup** &nbsp; 📦 *Product*
+
+An automatic, recurring [vault backup file](#vault-backup-file) written to a user-chosen local folder on a cadence (MYND-351). Runs only while the app is open and the vault is unlocked ("Model A"), driven by an opportunistic elapsed-time check (`now − last success ≥ interval`) on unlock and periodically while unlocked — not a wall-clock timer (auto-lock would starve one). Reuses the manual export path verbatim (no new cryptography; the `.myne-backup` stays exactly as encrypted as the vault). Governed by a device-local [backup schedule](#backup-schedule). Keeps the most recent N (user-set, default 7), pruning only files it wrote. **No email or cloud delivery — ever** (`vision.md` anti-feature); the user's own folder-sync handles offsite. Distinct from [restore (from backup)](#restore-from-backup) and from the manual click-to-back-up action. Leak/egress posture is that of any backup file: `threat-model.md` §7, TB3.
+
+Used in: `decisions.md` 2026-06-18; `myne-agents/features/scheduled-local-backup/`
 
 ### **screen-capture protection** &nbsp; 📦 *Product*
 

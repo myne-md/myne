@@ -371,6 +371,23 @@ pub(crate) fn backup_runtime<R: Runtime>(app: &AppHandle<R>) -> tauri::State<'_,
     app.state::<BackupRuntime>()
 }
 
+/// "User always wins" bridge (MYND-351, Direction 2): preempt an in-flight
+/// scheduled backup so a user-initiated auth op takes the shared auth permit.
+/// Signals this app's `BackupRuntime` cancel flag and waits (bounded) for the
+/// permit to free (`VaultRuntimeState::preempt_backup_for_user_auth`).
+///
+/// Called from the editor-originated auth ops that can race a live scheduled
+/// backup — `change_password` and `vault_delete`. `unlock` / `vault_recover` /
+/// `vault_creation` deliberately do NOT call it: they run pre-editor, when no
+/// scheduled backup is live (Model A), so there is nothing to preempt.
+pub(crate) async fn preempt_inflight_backup_for_user_auth<R: Runtime>(
+    state: &VaultRuntimeState,
+    app: &AppHandle<R>,
+) {
+    let backup_cancel = backup_runtime(app).cancel.clone();
+    state.preempt_backup_for_user_auth(&backup_cancel).await;
+}
+
 /// Cancel the in-flight backup export, if any. Idempotent; the export
 /// returns `Cancelled` at its next cooperative check and removes the
 /// partial file (the opposite of the importer's keep-partial Cancel).
