@@ -7,6 +7,8 @@
 
 import { type ChangeSpec, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
+import { foldAll, unfoldAll } from "@codemirror/language";
+import { selectNextOccurrence } from "@codemirror/search";
 import { toggleWrap } from "./wrap-toggle";
 import { cachedLocateFrontmatter } from "./frontmatter-cache";
 import { openWikilinkPicker } from "./wikilink/picker";
@@ -102,4 +104,19 @@ export const myneKeyBindings: readonly KeyBinding[] = [
   { key: "Mod-Shift-m", run: toggleListPrefix("- [ ] ") },
   // Cmd/Ctrl+Shift+L (MYND-38): open the `[[` note picker at the cursor.
   { key: "Mod-Shift-l", run: openWikilinkPicker },
+  // Heading/list folding (MYND-300): collapse / expand every fold in the note.
+  // `Mod-Alt-[` / `Mod-Alt-]` are CodeMirror's own foldAll/unfoldAll chords
+  // (the Obsidian convention too) and shadow no reserved chord — Cmd+1–6,
+  // Cmd+K, Cmd+Shift+L, Cmd+Shift+H, Cmd+, are all distinct. Per-fold is the
+  // gutter click; there is intentionally NO toggle-fold-at-cursor chord
+  // (minimal keymap, PRD Out of Scope).
+  { key: "Mod-Alt-[", run: foldAll },
+  { key: "Mod-Alt-]", run: unfoldAll },
+  // Multi-cursor (MYND-306): Mod-d adds the next occurrence of the current
+  // selection to the multi-selection (the VS Code / Obsidian convention). Bound
+  // EXPLICITLY (SYNC-2) — Myne installs only `Escape` from @codemirror/search,
+  // never `searchKeymap` wholesale. `Mod-d` is confirmed free. The companion
+  // select-all-occurrences is intentionally omitted (its conventional
+  // `Mod-Shift-L` chord is the `[[` wikilink picker above).
+  { key: "Mod-d", run: selectNextOccurrence },
 ];

@@ -31,8 +31,41 @@ import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
 import { isSlashSuppressed } from "../slash/plugin";
 import { readNoteSet } from "./note-set";
+import { readVaultHeadings, vaultHeadingsExtension } from "./vault-headings";
 import { rankNotes, type PickerRow } from "./picker-rank";
-import { emitNoteWikilink, emitFolderWikilink } from "./emit";
+import {
+  rankCurrentHeadings,
+  rankVaultHeadings,
+  type CurrentHeadingRow,
+  type VaultHeadingRow,
+} from "./picker-heading-rank";
+import { headingSections } from "../../dialect";
+import {
+  emitNoteWikilink,
+  emitFolderWikilink,
+  emitHeadingAnchorWikilink,
+  emitVaultHeadingWikilink,
+} from "./emit";
+
+// MYND-305: the picker has three modes, discriminated by the filter prefix after
+// `[[`. `##query` → vault-wide headings; `#query` → current-note headings; else
+// the default note picker. The union row type the render/move/confirm path
+// agrees on.
+type AnchorPickerRow = CurrentHeadingRow | VaultHeadingRow;
+type AnyPickerRow = PickerRow | AnchorPickerRow;
+
+type PickerMode =
+  | { kind: "note"; query: string }
+  | { kind: "current-heading"; query: string }
+  | { kind: "vault-heading"; query: string };
+
+/** Classify the raw filter (the text after `[[`) into a picker mode + its query.
+ *  `##x` → vault-heading "x"; `#x` → current-heading "x"; otherwise note "x". */
+export function classifyPickerFilter(filter: string): PickerMode {
+  if (filter.startsWith("##")) return { kind: "vault-heading", query: filter.slice(2) };
+  if (filter.startsWith("#")) return { kind: "current-heading", query: filter.slice(1) };
+  return { kind: "note", query: filter };
+}
 
 // The picker AUTHORS wikilinks, so the cursor being inside a (new, empty)
 // wikilink is the TRIGGER, not a suppressor — only code spans / URLs suppress
@@ -112,9 +145,20 @@ class WikilinkPickerView implements PluginValue {
   }
 
   /** The ranked rows for the current filter — the one source render/move/confirm
-   *  agree on. */
-  private currentRows(): PickerRow[] {
-    return rankNotes(this.currentFilter(), readNoteSet(this.view.state));
+   *  agree on. Mode (note / current-heading / vault-heading) is the filter
+   *  prefix (MYND-305). */
+  private currentRows(): AnyPickerRow[] {
+    const mode = classifyPickerFilter(this.currentFilter());
+    if (mode.kind === "current-heading") {
+      return rankCurrentHeadings(
+        mode.query,
+        headingSections(this.view.state.doc.toString()),
+      );
+    }
+    if (mode.kind === "vault-heading") {
+      return rankVaultHeadings(mode.query, readVaultHeadings(this.view.state));
+    }
+    return rankNotes(mode.query, readNoteSet(this.view.state));
   }
 
   private open(triggerFrom: number, triggerTo: number): void {
@@ -211,29 +255,7 @@ class WikilinkPickerView implements PluginValue {
           ?.querySelectorAll(".cm-slash-menu-row")
           .forEach((r, idx) => r.classList.toggle("cm-slash-menu-row-selected", idx === i));
       });
-      if (row.kind === "folder") {
-        // Folder-target row (MYND-370): a folder glyph + the trailing-slash path,
-        // visually distinct from a note's title-over-path stack.
-        el.classList.add("cm-wiki-picker-folder-row");
-        el.setAttribute("data-testid", "picker.folder-row");
-        const glyph = document.createElement("span");
-        glyph.className = "cm-slash-menu-icon cm-wiki-picker-folder-glyph";
-        glyph.setAttribute("aria-hidden", "true");
-        glyph.textContent = "▸";
-        const label = document.createElement("span");
-        label.className = "cm-slash-menu-label cm-wiki-picker-title";
-        label.textContent = row.path;
-        el.append(glyph, label);
-      } else {
-        el.setAttribute("data-testid", "picker.note-row");
-        const title = document.createElement("span");
-        title.className = "cm-slash-menu-label cm-wiki-picker-title";
-        title.textContent = row.note.title ?? "";
-        const path = document.createElement("span");
-        path.className = "cm-wiki-picker-path";
-        path.textContent = row.path;
-        el.append(title, path);
-      }
+      this.renderRowBody(el, row);
       el.addEventListener("mousedown", (e) => {
         e.preventDefault();
         this.applyRow(row);
@@ -273,7 +295,89 @@ class WikilinkPickerView implements PluginValue {
     }
   }
 
-  private applyRow(row: PickerRow): void {
+  /** Paint one row's body by kind (Task 4, the `[design]` subtask). The note +
+   *  folder rows keep their existing look; the two heading kinds (MYND-305) reuse
+   *  the same row chrome + design tokens but carry distinct testids and a context
+   *  line: `[[#` rows show a `#` glyph + the heading text (no note context — it's
+   *  the current note); `[[##` rows show the heading over a smaller note-context
+   *  line (title), matching the note row's title-over-path stack so the two pick
+   *  surfaces read consistently. */
+  private renderRowBody(el: HTMLDivElement, row: AnyPickerRow): void {
+    if (row.kind === "folder") {
+      // Folder-target row (MYND-370): a folder glyph + the trailing-slash path,
+      // visually distinct from a note's title-over-path stack.
+      el.classList.add("cm-wiki-picker-folder-row");
+      el.setAttribute("data-testid", "picker.folder-row");
+      const glyph = document.createElement("span");
+      glyph.className = "cm-slash-menu-icon cm-wiki-picker-folder-glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.textContent = "▸";
+      const label = document.createElement("span");
+      label.className = "cm-slash-menu-label cm-wiki-picker-title";
+      label.textContent = row.path;
+      el.append(glyph, label);
+      return;
+    }
+    if (row.kind === "current-heading") {
+      // `[[#` — a CURRENT-NOTE heading. A `#` glyph (its repeat hints the level)
+      // + the heading text. No note context: it's this note.
+      el.classList.add("cm-wiki-picker-heading-row");
+      el.setAttribute("data-testid", "picker.heading-row");
+      el.setAttribute("data-heading-scope", "current");
+      const glyph = document.createElement("span");
+      glyph.className = "cm-slash-menu-icon cm-wiki-picker-heading-glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.textContent = "#".repeat(Math.min(row.level, 6));
+      const label = document.createElement("span");
+      label.className = "cm-slash-menu-label cm-wiki-picker-title";
+      label.textContent = row.heading;
+      el.append(glyph, label);
+      return;
+    }
+    if (row.kind === "vault-heading") {
+      // `[[##` — a VAULT-WIDE heading. The heading text over a smaller context
+      // line naming its note, so two notes' `## Setup` are distinguishable.
+      el.classList.add("cm-wiki-picker-heading-row", "cm-wiki-picker-vault-heading-row");
+      el.setAttribute("data-testid", "picker.vault-heading-row");
+      el.setAttribute("data-heading-scope", "vault");
+      const heading = document.createElement("span");
+      heading.className = "cm-slash-menu-label cm-wiki-picker-title";
+      heading.textContent = row.entry.heading;
+      const context = document.createElement("span");
+      context.className = "cm-wiki-picker-path";
+      context.textContent = row.entry.title ?? "";
+      el.append(heading, context);
+      return;
+    }
+    // Default: a note row — title over a smaller vault-path line.
+    el.setAttribute("data-testid", "picker.note-row");
+    const title = document.createElement("span");
+    title.className = "cm-slash-menu-label cm-wiki-picker-title";
+    title.textContent = row.note.title ?? "";
+    const path = document.createElement("span");
+    path.className = "cm-wiki-picker-path";
+    path.textContent = row.path;
+    el.append(title, path);
+  }
+
+  private emitForRow(row: AnyPickerRow): string {
+    switch (row.kind) {
+      case "folder":
+        return emitFolderWikilink(row.path);
+      case "current-heading":
+        return emitHeadingAnchorWikilink(row.heading);
+      case "vault-heading":
+        return emitVaultHeadingWikilink(
+          row.entry.folder,
+          row.entry.title ?? "",
+          row.entry.heading,
+        );
+      default:
+        return emitNoteWikilink(row.note.folder, row.note.title ?? "");
+    }
+  }
+
+  private applyRow(row: AnyPickerRow): void {
     if (this.state === null) return;
     const { triggerFrom, triggerTo } = this.state;
     this.clearMenu();
@@ -285,10 +389,7 @@ class WikilinkPickerView implements PluginValue {
     } else if (this.view.state.doc.sliceString(triggerTo, triggerTo + 1) === "]") {
       end = triggerTo + 1;
     }
-    const insert =
-      row.kind === "folder"
-        ? emitFolderWikilink(row.path)
-        : emitNoteWikilink(row.note.folder, row.note.title ?? "");
+    const insert = this.emitForRow(row);
     this.view.dispatch({
       changes: { from: triggerFrom, to: end, insert },
       selection: { anchor: triggerFrom + insert.length },
@@ -368,6 +469,9 @@ function wikilinkPickerKeymap(): readonly KeyBinding[] {
 export function wikilinkPickerExtension(): Extension {
   return [
     pickerActiveFromField,
+    // MYND-305: the vault-wide heading facet the `[[##` mode reads (seeded empty;
+    // the host reconfigures it). Composed here so the picker plugin can read it.
+    vaultHeadingsExtension(),
     wikilinkPickerPlugin,
     Prec.highest(keymap.of(wikilinkPickerKeymap())),
   ];
