@@ -4025,3 +4025,201 @@ fn note_template_vectors() {
         "note-template vectors must include the single-pass pin (a render case whose ctx value contains a {{{{token}}}} shape that stays literal)"
     );
 }
+
+#[test]
+fn vault_head_vectors() {
+    use protocol::{
+        compute_head_id, compute_vault_head_mac, derive_subkey, vv_dominance, Dominance,
+        SubkeyRole, VaultHead, VvEntry, DEVICE_ID_LEN, HEAD_ID_LEN, HEAD_MAC_LEN,
+        VAULT_HEAD_FORMAT_V1,
+    };
+
+    let path = companion_vectors_root()
+        .join("vault-head")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] vault-head: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "vault-head");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 8,
+        "vault-head must carry at least 8 vectors (4 encode + 4 verify); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("vault-head", cases);
+
+    fn parse_vv(val: &serde_json::Value, id: &str) -> Vec<VvEntry> {
+        val.as_array()
+            .unwrap_or_else(|| panic!("[{id}] version vector must be an array"))
+            .iter()
+            .map(|e| VvEntry {
+                device_id: hex_decode_array::<DEVICE_ID_LEN>(
+                    e["input_device_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] vv entry missing input_device_id_hex")),
+                ),
+                counter: e["counter"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] vv entry missing counter")),
+            })
+            .collect()
+    }
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_decisions = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encode" => {
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_number_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let manifest_hash: [u8; 32] = hex_decode_array(
+                    case["input_manifest_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_manifest_hash_hex")),
+                );
+                let seq = case["input_seq"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_seq"));
+                let prev_head_hash: Vec<[u8; HEAD_ID_LEN]> = case["input_prev_head_hash_hex"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_prev_head_hash_hex"))
+                    .iter()
+                    .map(|h| {
+                        hex_decode_array::<HEAD_ID_LEN>(
+                            h.as_str().unwrap_or_else(|| panic!("[{id}] bad prev hash")),
+                        )
+                    })
+                    .collect();
+                let version_vector = parse_vv(&case["input_version_vector"], id);
+
+                let head = VaultHead {
+                    head_format_version: VAULT_HEAD_FORMAT_V1,
+                    account_number_hash,
+                    manifest_hash,
+                    seq,
+                    prev_head_hash,
+                    version_vector,
+                };
+
+                // informational head_mac_key cross-check (HKDF role "vault-head-mac").
+                if let Some(info_hex) = case
+                    .get("informational_head_mac_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info: [u8; 32] = hex_decode_array(info_hex);
+                    let derived = derive_subkey(&root_key, SubkeyRole::VaultHeadMac);
+                    assert_eq!(
+                        derived.as_slice(),
+                        info.as_slice(),
+                        "[{id}] informational_head_mac_key_hex disagrees with derive_subkey(root_key, VaultHeadMac)",
+                    );
+                }
+
+                let mac_input = head
+                    .encode_mac_input()
+                    .unwrap_or_else(|e| panic!("[{id}] encode_mac_input failed: {e:?}"));
+                let expected_input = hex_decode(
+                    case["expected_head_mac_input_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_head_mac_input_hex")),
+                );
+                assert_eq!(
+                    mac_input.as_slice(),
+                    expected_input.as_slice(),
+                    "[{id}] head_mac_input mismatch\n  expected: {}\n  actual:   {}",
+                    hex_encode(&expected_input),
+                    hex_encode(&mac_input),
+                );
+
+                let mac = compute_vault_head_mac(&root_key, &mac_input);
+                let expected_mac: [u8; HEAD_MAC_LEN] = hex_decode_array(
+                    case["expected_head_mac_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_head_mac_hex")),
+                );
+                assert_eq!(mac, expected_mac, "[{id}] head_mac mismatch");
+
+                let sealed = head
+                    .seal(&root_key)
+                    .unwrap_or_else(|e| panic!("[{id}] seal failed: {e:?}"));
+                let expected_id: [u8; HEAD_ID_LEN] = hex_decode_array(
+                    case["expected_head_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_head_id_hex")),
+                );
+                assert_eq!(sealed.head_id, expected_id, "[{id}] head_id mismatch");
+                // head_id is SHA-256 over the full record.
+                assert_eq!(
+                    compute_head_id(&sealed.record),
+                    expected_id,
+                    "[{id}] head_id != SHA-256(record)"
+                );
+            }
+            "verify" => {
+                let baseline = parse_vv(&case["input_baseline_version_vector"], id);
+                let candidate = parse_vv(&case["input_candidate_version_vector"], id);
+                let want = case["expected_decision"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_decision"));
+                seen_decisions.insert(want.to_string());
+                let got = vv_dominance(&baseline, &candidate);
+                let want_enum = match want {
+                    "extension" => Dominance::Extension,
+                    "rollback" => Dominance::Rollback,
+                    "incomparable_merge" => Dominance::Incomparable,
+                    "bootstrap_tofu" => Dominance::BootstrapTofu,
+                    other => panic!("[{id}] unknown expected_decision {other:?}"),
+                };
+                assert_eq!(got, want_enum, "[{id}] vv_dominance decision mismatch");
+            }
+            other => panic!("[{id}] unknown case_kind {other:?}"),
+        }
+    }
+
+    assert!(
+        seen_kinds.contains("encode") && seen_kinds.contains("verify"),
+        "vault-head must cover both case_kinds (encode + verify); saw {seen_kinds:?}"
+    );
+    for d in [
+        "extension",
+        "rollback",
+        "incomparable_merge",
+        "bootstrap_tofu",
+    ] {
+        assert!(
+            seen_decisions.contains(d),
+            "vault-head verify cases must cover the §5.3 decision {d:?}; saw {seen_decisions:?}"
+        );
+    }
+}
