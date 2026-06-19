@@ -67,6 +67,7 @@ pub mod search_blob;
 pub mod subkey;
 pub mod template;
 pub mod types;
+pub mod vault_head;
 pub mod vault_indices_blob;
 pub mod vault_meta;
 pub mod workspace_blob;
@@ -135,6 +136,13 @@ pub use types::{
     generate_root_key, parse_kdf_params, serialize_kdf_params, validate_kdf_params, KdfParams,
     DEFAULT_V0_1_KDF_PARAMS, KDF_PARAMS_CANONICAL_LEN, MAX_KDF_M_KIB, MAX_KDF_P, MAX_KDF_T,
     MIN_KDF_M_KIB, MIN_KDF_P, MIN_KDF_T,
+};
+pub use vault_head::{
+    compute_head_id, compute_vault_head_mac, decode_head_state, encode_head_state, open_vault_head,
+    vv_dominance, Dominance, SealedHead, VaultHead, VaultHeadError, VvEntry, DEVICE_ID_LEN,
+    HEAD_ID_LEN, HEAD_MAC_LEN, VAULT_HEAD_ACCOUNT_HASH_LEN, VAULT_HEAD_DOMAIN_PREFIX,
+    VAULT_HEAD_FORMAT_V1, VAULT_HEAD_MANIFEST_HASH_LEN, VAULT_HEAD_PROTOCOL_VERSION,
+    VAULT_HEAD_STATE_MAGIC,
 };
 pub use vault_indices_blob::{
     decode_vault_indices_blob, encode_vault_indices_blob, encode_vault_indices_blob_raw,

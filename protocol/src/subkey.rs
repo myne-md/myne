@@ -108,6 +108,14 @@ const ROLE_STR_PERSONAL_DICT_KEY: &[u8] = b"personal-dictionary-key";
 /// (BM25 full-text) are separate blob families (one magic / one KEK per family).
 const ROLE_STR_VAULT_INDICES_KEY: &[u8] = b"vault-indices-key";
 
+/// Registered role string for the v0.1 vault-head MAC key
+/// (MYND-416; keys `HMAC-SHA-256(key, head_mac_input)` for the sync fork-consistency
+/// vault head — `vault_head.rs`, `sync-protocol.md` §3 + `protocol.md` §3.4).
+/// Phase 2 — derived but not used until sync ships (like `server-auth`). NOT a
+/// blob KEK; keys the head MAC and re-verifies the device-local `MYH1` baseline.
+/// Load-bearing: drift silently changes every head MAC.
+const ROLE_STR_VAULT_HEAD_MAC: &[u8] = b"vault-head-mac";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -158,6 +166,13 @@ pub enum SubkeyRole {
     /// `SearchIndexKey` so the structured-index and full-text-search blob
     /// families are domain-separated (one KEK per family).
     VaultIndicesKey,
+    /// HMAC key for the v0.1 sync **vault head** (`vault.head-state` / wire head,
+    /// MYND-416; `sync-protocol.md` §3). Keys `HMAC-SHA-256(key, head_mac_input)`
+    /// for the fork-consistency head and re-verifies the device-local `MYH1`
+    /// baseline. **Phase 2** — derived but not transmitted until sync ships
+    /// (like the reserved `server-auth` material). NOT a blob KEK; distinct from
+    /// every other role so the head MAC is domain-separated.
+    VaultHeadMac,
 }
 
 impl SubkeyRole {
@@ -174,6 +189,7 @@ impl SubkeyRole {
             SubkeyRole::SessionStateKey => ROLE_STR_SESSION_STATE_KEY,
             SubkeyRole::PersonalDictKey => ROLE_STR_PERSONAL_DICT_KEY,
             SubkeyRole::VaultIndicesKey => ROLE_STR_VAULT_INDICES_KEY,
+            SubkeyRole::VaultHeadMac => ROLE_STR_VAULT_HEAD_MAC,
         }
     }
 }
@@ -541,6 +557,7 @@ mod tests {
                 SubkeyRole::SessionStateKey => "session-state-key",
                 SubkeyRole::PersonalDictKey => "personal-dictionary-key",
                 SubkeyRole::VaultIndicesKey => "vault-indices-key",
+                SubkeyRole::VaultHeadMac => "vault-head-mac",
             }
         }
 
