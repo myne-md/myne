@@ -221,6 +221,12 @@ A short, eye-comparable code derived from a [vault head](#vault-head)'s [head_id
 
 Used in: `spec/sync-protocol.md` (vault head); `spec/protocol.md` §3.4 (MYND-416)
 
+### **blind blob store** &nbsp; 📦 *Product*
+
+The Phase 2 sync server's role: it stores **opaque ciphertext blobs and key-wrapping material only**, and performs **structural** operations on them — current-head pointer compare-and-swap, the per-note version-counter increment, quota accounting — but **never** decrypts, merges, or interprets content (A1; TB5). Plaintext, decryption keys, and the master password never leave the client. Conflict resolution is consequently client-side (`sync-protocol.md` §10). "Blind" = the server is structurally incapable of reading what it relays; self-hosted and hosted operators are identical in this respect (TB5). Phase 2.
+
+Used in: `spec/server-protocol.md` §1–§2
+
 ### **bottom bar** &nbsp; 📦 *Product*
 
 The 28px status bar pinned to the bottom of the editor (`BottomBar`, `src/screens/Editor.tsx`). Hosts the connection/sync status text, the [save-status](#optimistic-ui-rollback) badge, and the persistent affordances for the [tag browser](#tag-browser), Saved Views, the whole-vault graph, Settings, vault Lock, and the live document-statistics readout (characters / words / spaces / paragraphs — selection-scoped when a non-empty selection exists, the full breakdown in its hover title; MYND-339, reusing the `word-count` item id). **Bottom-bar customization** (2026-06-15) lets the user hide/show each item via a right-click context menu; the hidden set persists per-vault in the `vault.prefs` `hidden_bar_items` field (set semantics, omitted-when-empty — a fully-visible bar is byte-identical to a pre-feature vault). The bar root stays right-clickable even when fully emptied, which is the only restore path (no Settings-panel mirror). There is deliberately **no** separate top bar — the top controls float into the OS title-bar row (MYND-166).
@@ -428,6 +434,12 @@ Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 The permanent, client-generated 16-byte random identifier of a device as it appears in a [vault head](#vault-head)'s [version vector](#version-vector-vv). Allocated once at enrollment, registered in the per-account device table (**AS16**), and **kept separate from** the device's secret per-device token/credential: the token is revocable/rotatable (an availability control), whereas `device_id` is permanent *history* — deriving the id from the token would let a revocation rewrite version-vector history and break [fork-consistency](#fork-consistency) continuity. Its legitimacy is **not** separately authenticated and need not be: single-user → all devices share `root_key` → the shared-key head MAC is the actor-set authority, and a malicious server (lacking `root_key`) cannot inject a phantom `device_id`. A reset/re-enrolled device generates a **new** `device_id` (the old one's VV component freezes — never pruned in v1). Phase 2.
 
 Used in: `spec/sync-protocol.md` (vault head, version vector)
+
+### **device registry** &nbsp; 📦 *Product*
+
+The Phase 2 server's per-account table of enrolled devices, the server-side record that makes **revocation** possible (AS16 — device count per account is server-visible by necessity). Keyed by the client-generated [device_id](#device_id-vv-actor) (the VV-actor), **distinct from** the secret per-device token. Revocation in v0.1 = token iptal (an **availability** control — it stops a device syncing; it is not forward-secret, which is a v005/MLS feature, `threat-model.md` §7). The device-approval gate that admits a new enrollment is a server authz concern (the ceremony is MYND-425). Phase 2.
+
+Used in: `spec/server-protocol.md` §4; `threat-model.md` AS16
 
 ### **device-local credential** &nbsp; 🗝️ *Key/identifier*
 
@@ -1061,11 +1073,29 @@ Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `v
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
+### **per-account quota** &nbsp; 📦 *Product*
+
+The Phase 2 hosted-sync storage ceiling: per-account aggregate **deduplicated** ciphertext bytes (AS17 — one stored blob is counted once, not once per referencing note). Keyed on the account, never on identity beyond `account_number_hash`; a self-host operator sets their own ceiling (the protocol exposes the counter, the operator sets policy — TB5). Distinct from the [per-account rate-limit](#per-account-rate-limit) (bytes-at-rest vs request-frequency). Phase 2.
+
+Used in: `spec/server-protocol.md` §5
+
+### **per-account rate-limit** &nbsp; 📦 *Product*
+
+The Phase 2 abuse bound: a per-account **token-bucket keyed on `account_number_hash`**, **never on IP** (C4 / AS14 — the server keeps no persistent IP log; TLS sees the connection IP transiently and discards it). Abuse mitigation is therefore designed in around per-account counters from the start, not retrofitted as IP bans. Bounds the damage a Sybil/abusive account can do; primary Sybil resistance on hosted is the payment-gate (the payment system is MYND-430). Phase 2.
+
+Used in: `spec/server-protocol.md` §5
+
 ### **per-blob sync-meta** &nbsp; 📋 *Protocol*
 
 The small, server-visible descriptor a Phase 2 [pull](#sync-cursor) returns for each changed content blob: `(uuid, version, content_nonce, size)`. The client uses it to decide what to fetch — `content_nonce` is the decryption-free staleness discriminator (§9.6.4), `version` the server's opaque per-note counter (AS6), `size` the AS17 quota unit. It exposes nothing the server doesn't already hold (the [vault head](#vault-head) commits the same `content_nonce`s); the client never trusts it for integrity — that is the head's job. Phase 2.
 
 Used in: `spec/sync-protocol.md` §8
+
+### **per-vault namespace** &nbsp; 📋 *Protocol*
+
+The Phase 2 server storage layout: each vault's ciphertext blobs live in a namespace scoped to that vault — there is **no global content-addressed bucket**. Because attachment-ids are vault-scoped keyed-HMAC (`protocol.md` §9.9), cross-vault deduplication is **structurally impossible** (and undesired — a global bucket would be a known-file confirmation oracle). Dedup is intra-vault only; quota (AS17) and the tombstone ledger are kept clean per vault. Phase 2.
+
+Used in: `spec/server-protocol.md` §2
 
 ### **property** &nbsp; 📦 *Product*
 
