@@ -301,6 +301,12 @@ A length-prefixed UTF-8 string carried in the AAD of content-encryption AEAD ope
 
 Used in: `spec/protocol.md` §5.2
 
+### **contentless poke** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync change-notification signal: a **zero-payload** "vault changed, come pull" message carrying **no note-id, no version, no count, no cursor** — anything beyond mere arrival would leak which/what/how-much changed to the untrusted server or a network observer (A13). Polling is the **privacy-default baseline** (a device appears online only at poll time); the poke (over SSE) is an **opt-in low-latency** layer. Presence + timing of a poke is intrinsic A13 (a push already reveals it) and accepted; no payload is added on top. See [sync cursor](#sync-cursor). Phase 2.
+
+Used in: `spec/sync-protocol.md` §8
+
 ### **context string** &nbsp; 📋 *Protocol*
 
 A canonical UTF-8 string passed as the `info` parameter to HKDF-Expand to domain-separate one subkey from another. Myne context strings are drawn from a registered table (§3.4) and follow the format `"myne.v0.1 " || role`. The `derive_key` pattern (§3.2.1) is the only sanctioned way to construct and use them.
@@ -489,6 +495,12 @@ Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 20
 The fallback path for loading the [search index](#search-index) when the cached `vault.search` blob (`spec/protocol.md` §9.6) cannot be trusted or used — blob absent, magic / version mismatch, AEAD-verification failure, or an unreadable staleness manifest. Instead of incrementally reconciling the cached index against the notes, the client **rebuilds it from scratch** by decrypting every `.myn`. Rebuild always recovers the correct index, so `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more. The complement of the **incremental reconcile** happy path (re-index only the notes whose `content_nonce` changed) — fall-to-rebuild is the always-correct safety net beneath it (`decisions.md` 2026-05-31).
 
 Used in: `spec/protocol.md` §9.6.4
+
+### **full-reconcile** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync recovery mode a device enters when incremental catch-up is impossible or untrusted — a [soft-retired](#soft-retire) device returning past the [tombstone horizon](#tombstone-horizon), or any device whose cursor is too stale to trust. Instead of replaying missed deltas, the device reconciles its entire local state against the server's authoritative manifest (the same decryption-free [content_nonce](#content_type) reconcile as [fall-to-rebuild](#fall-to-rebuild), §9.6.4): notes absent from the authoritative manifest are NOT resurrected, and local-only notes fall to a [keep-both conflict](#keep-both-conflict-resolution) copy rather than silently re-appearing. The structural defence against a server-driven resurrection past horizon-GC. Phase 2.
+
+Used in: `spec/sync-protocol.md` §11
 
 ### **favorites** &nbsp; 📦 *Product*
 
@@ -754,6 +766,12 @@ An AEAD that commits to its key, in the sense that no two distinct keys can decr
 
 Used in: `spec/protocol.md` §5.1
 Reference: Chan & Rogaway 2022.
+
+### **keep-both conflict resolution** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync resolution rule for **note bodies**: when two devices concurrently edit the same note (detected by the push compare-and-swap rejecting a stale base), **both versions are kept** — the loser is written as a conflict-marked duplicate note for the user to reconcile — rather than silently picking a last-writer-wins winner (which would destroy an edit the server can't even see, A1). The paranoid Standard-Notes posture: no silent data loss. Distinct from the **singleton** resolution (post-decrypt field/set merge per `protocol.md` §9.5.2) and the **`vault.meta`** bespoke merge (preserves the recovery-side wrapped `root_key`, §9.3). Pure LWW on bodies is forbidden. Phase 2.
+
+Used in: `spec/sync-protocol.md` §10
 
 ### **keymap** &nbsp; 📦 *Product*
 
@@ -1043,6 +1061,12 @@ Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `v
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
+### **per-blob sync-meta** &nbsp; 📋 *Protocol*
+
+The small, server-visible descriptor a Phase 2 [pull](#sync-cursor) returns for each changed content blob: `(uuid, version, content_nonce, size)`. The client uses it to decide what to fetch — `content_nonce` is the decryption-free staleness discriminator (§9.6.4), `version` the server's opaque per-note counter (AS6), `size` the AS17 quota unit. It exposes nothing the server doesn't already hold (the [vault head](#vault-head) commits the same `content_nonce`s); the client never trusts it for integrity — that is the head's job. Phase 2.
+
+Used in: `spec/sync-protocol.md` §8
+
 ### **property** &nbsp; 📦 *Product*
 
 A typed `key → value` pair derived from a note's YAML [frontmatter](#frontmatter) body by the Saved Views property-index (MYND-271). Every arbitrary frontmatter key is read and coerced to exactly one Myne type — `string` / `number` / `date` / `list` / `checkbox` — by the canonical value-typing ruleset (`spec/markdown-dialect.md` §3.6.4); the property-index is the **single type authority** for the Saved Views epic (sibling features consume its typing, never redefine it). Tags (`#tag` ∪ frontmatter `tags:`) and the `folder:` value are queryable alongside properties as pseudo-properties. The parse is read-only and non-mutating (the `.myn` file stays source of truth); the typed values live in the derived [vault.indices](#vaultindices) / `MYI1` cache. A [saved view](#saved-view) filters and sorts on properties.
@@ -1260,6 +1284,12 @@ An encrypted previous version of a note, captured automatically as the note is e
 
 Used in: `spec/protocol.md` §9.1; `threat-model.md` §7; `decisions.md` 2026-06-08
 
+### **soft-retire** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync state a device enters when its cursor falls behind the [tombstone horizon](#tombstone-horizon) (it has been offline / silent too long to participate in the per-device-ack [tombstone](#tombstone-horizon) GC). A soft-retired device is dropped from the "must-ack" set so its absence can't pin tombstones forever; on return it cannot resume incrementally and must run a [full-reconcile](#full-reconcile). Reuses the AS16 device-retirement mechanism (also needed for revocation) rather than inventing new state. Distinct from a hard device revocation (per-device token iptal). Phase 2.
+
+Used in: `spec/sync-protocol.md` §11
+
 ### **Source mode** &nbsp; 📦 *Product*
 
 The raw-markdown [view mode](#view-mode) of a note tab (MYND-299): the [decoration layer](#decoration-layer) is emptied, so the editor shows the exact on-disk markdown with no rendering — headings keep their `#`s, links show their brackets, nothing is hidden. Because §6 C1 guarantees the editor buffer is byte-identical to the stored `.myn`, Source mode displays exactly the stored bytes. It is editable (unlike [Reading view](#reading-view)) — the writer's surface for inspecting or hand-editing raw syntax. Reached via the command palette or the bottom-bar [view-mode switcher](#view-mode), **not** a default chord (the secondary live ↔ source toggle is deliberately chord-free; `Mod-Shift-E` is reserved for Edit ⇄ Reading). Contrast live preview (cursor-aware reveal) and [Reading view](#reading-view) (rendered, read-only). See also [view mode](#view-mode), [Reading view](#reading-view).
@@ -1281,6 +1311,18 @@ An [`MYA1`](#mya1) blob present on disk at `attachments/<attachment-id-hex>` who
 Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships malicious code. Myne's mitigations are hash-pinned lockfiles, minimal direct-dependency surface, dependency-review at update time, and `cargo-vet`/`cargo-audit` in CI. Status: Best-effort — cannot fully defend against a determined attacker in the dependency graph, but the Tauri/Cargo dependency tree is materially smaller than Electron/npm would be.
 
 Used in: `threat-model.md` §1 (A8), §7
+
+### **sync cursor** &nbsp; 📋 *Protocol*
+
+The Phase 2 opaque, per-device **monotone position** marking how far a device has pulled. A pull sends the cursor and receives the [per-blob sync-meta](#per-blob-sync-meta) for everything changed since; the cursor then advances. It carries **no wall-clock** (clock/order authority is the [version vector](#version-vector-vv), §4.1 Pin 4) — it is a catch-up bookmark, not a security primitive. Persisted device-locally alongside (but separate from) the [vault head](#vault-head) baseline. Phase 2.
+
+Used in: `spec/sync-protocol.md` §8
+
+### **sync taxonomy** &nbsp; 📋 *Protocol*
+
+The Phase 2 four-class partition of a vault's artefacts by sync disposition: **authoritative-data** (notes, snapshots, `vault.prefs`, `vault.dictionary`, attachments + `vault.attachments` — SYNC), **identity** (`vault.meta` — SYNC, bespoke merge), **rebuildable-cache** (`vault.search`, `vault.indices` — re-derived locally via the §9.6.4 reconcile, NEVER synced), **device-local** (`vault.workspace`, `vault.quickunlock`, `vault.head-state` — NEVER synced). Governed by the invariant **sync members ⊆ backup members**: sync membership is the authoritative-vs-derivable cut of the `protocol.md` §9.11.3 backup allowlist, not a separate list. Phase 2.
+
+Used in: `spec/sync-protocol.md` §9
 
 ### **tag browser** &nbsp; 📦 *Product*
 
@@ -1356,6 +1398,12 @@ Used in: `threat-model.md`
 Trust-on-first-use: how a freshly enrolled or reset device adopts its first [vault head](#vault-head). [Fork-consistency](#fork-consistency) via version-vector dominance is a **continuity** guarantee — it only protects a device that already holds a persisted last-seen baseline. A device with no baseline has nothing to compare against, so it takes the server-served head on faith after verifying its MAC (the MAC proves "a `root_key` holder authored this", **not** "this is the latest, unforked head") — the same model as Signal/Matrix key TOFU. The "first device" is not cryptographically special; "has-a-baseline-or-not" is (a reset device is also a TOFU client). The only hardening is an out-of-band [bootstrap-fingerprint](#bootstrap-fingerprint) compared at the device-approval gate. Phase 2.
 
 Used in: `spec/sync-protocol.md` (vault head); `threat-model.md` §7
+
+### **tombstone horizon** &nbsp; 📋 *Protocol*
+
+The Phase 2 bound on how long a deletion [tombstone](#deleted-attachment-tombstone) is retained before garbage collection. A deletion is a `deleted`-marked new encrypted version (carried in the [vault head](#vault-head) manifest until GC, §4.2), not a bare "absent on disk → drop". A tombstone is collected once **every horizon-active device's [sync cursor](#sync-cursor) has acked past** the delete-version; a device that falls behind the horizon is [soft-retired](#soft-retire) and must [full-reconcile](#full-reconcile) on return. The horizon is **month-scale (90–180 days)**, not days — cost is asymmetric (an over-long tombstone is a tiny meta record; too short forces a full-resync). Prevents the Cassandra-zombie resurrection a bare grace-drop would allow. Phase 2.
+
+Used in: `spec/sync-protocol.md` §11
 
 ### **traffic analysis** &nbsp; ⚠️ *Threat*
 
