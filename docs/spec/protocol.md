@@ -1750,9 +1750,9 @@ Items deliberately not addressed by this specification. Each entry names where i
 
 | Item | Where it lives |
 |---|---|
-| Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2 sync server; `sync-protocol.md` (TBD) |
-| Sync wire format, conflict resolution, version vectors | Phase 2; `sync-protocol.md` (TBD) |
-| Cross-device synchronization of `vault.prefs` (carried alongside `vault.meta` + `notes/*.myn` as the v0.1 vault-artifact trio) | Phase 2; `sync-protocol.md` (TBD) |
+| Server-side authentication protocol (`serverPassword` is derived but not transmitted in v0.1) | Phase 2; mechanism deferred per §11.1 (MYND-420); server surface in `server-protocol.md` |
+| Sync wire format, conflict resolution, version vectors | Phase 2; `sync-protocol.md` §8–§11 (fork-consistency vault head §1–§7) |
+| Cross-device synchronization of `vault.prefs` (carried alongside `vault.meta` + `notes/*.myn` as the v0.1 vault-artifact trio) | Phase 2; `sync-protocol.md` §9 (taxonomy) + §10 (conflict merge) |
 | Multi-device coordination, device key management | Phase 2+; `appname-v005` adopts MLS; `protocol-v005-roadmap.md` (TBD) |
 | Inter-user note sharing, prekey bundles, per-recipient wrapping | Phase 4+; `protocol-v005-roadmap.md` (TBD) |
 | Real-time collaborative editing, CRDT integration | Phase 4+; `protocol-v005-roadmap.md` (TBD) |

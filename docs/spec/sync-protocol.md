@@ -269,3 +269,105 @@ The last-seen head (§5.1) is persisted **device-locally** in the `MYH1` `vault.
 - **Device-local, never synced, never backed up.** The baseline MUST NOT live on the server — a server-held baseline would let the server roll *it* back too, defeating §5 entirely. It is structurally excluded from sync by the closed sync-allowlist's **default-deny** (it is simply not an allowlisted member, not a special-cased exclusion) and from backup by the §9.11.3 allowlist (a restored baseline would be stale → the restored vault re-bootstraps via §6 TOFU).
 - **Stores the full wire-head TIP only**, re-verifying the head's own `vault-head-mac` on load (no separate at-rest MAC, no KEK — the head carries no vault plaintext the sync server doesn't already see). Written every accepted-pull and every authored-push.
 - **Anti-rollback of the baseline itself is bounded, not absolute.** Lowering the on-disk baseline to force acceptance of a server rollback requires a **conjunction** — local-disk-write **and** a colluding malicious server; neither alone suffices (disk-write-only: an honest server still serves the real, dominating tip; server-rollback-only: an intact baseline rejects it). Impact is bounded to stale *own* data (never forged or decrypted), and the in-session RAM baseline only advances. Accepted for v0.1 and recorded in `threat-model.md` §7; a hardware monotonic counter is the v005 closure (`protocol.md` §9.15).
+
+---
+
+## 8. Sync wire protocol
+
+The vault head (§2–§7) is the integrity spine; this section is the transport that moves blobs and heads between a device and the server. The model is **whole-blob replication** — every Myne blob is an AEAD whole-file unit (`protocol.md` §9), so there is no field-level diffing or server-side merge. Real-time co-editing and a CRDT note-type are Phase 4 (`protocol.md` §11.2); they would arrive as a new major note-type beside the v0.1 blob, not as an extension here.
+
+### 8.1 Endpoints
+
+Two core operations:
+
+- **pull(cursor) → (changed[], new_cursor)** — the server returns, for every content blob changed since `cursor`, a **per-blob sync-meta** record and advances the cursor:
+  ```
+  sync_meta = { uuid (16 B), version (server opaque counter, §2 server-protocol), content_nonce (24 B), size (bytes) }
+  ```
+  The client compares each `content_nonce` to its local copy (the §9.6.4 decryption-free staleness signal) and decides which blobs to actually download. The server also returns the current vault head (the client verifies it per §5). `version` is the server's opaque per-note counter (AS6), `size` the AS17 quota unit; neither is trusted for integrity — the head is.
+- **push(changed_blobs, new_head)** — the client uploads changed blobs plus the new vault head. The push is a **compare-and-swap**: the head's `prev_head_hash` (§4.3) is the CAS token; the server accepts iff its current-head pointer matches, then atomically advances. A stale base → a 409-like reject (§10).
+
+### 8.2 Cursor
+
+The **sync cursor** is an opaque, per-device, monotone position (a catch-up bookmark). It carries **no wall-clock** — ordering authority is the version vector (§4.1), never the cursor (Pin 4). It is persisted device-locally alongside, but separate from, the `MYH1` head baseline (§7) and the rebuildable caches (it is sync-transport state, owned by the sync engine, not the head).
+
+### 8.3 Change notification — contentless poke
+
+A device learns "something changed, come pull" via a **contentless poke**: a signal with **literally zero payload** — no note-id, no version, no count, no cursor (any of those would leak which/what/how-much to the server or a network observer, A13).
+
+- **Polling is the privacy-default baseline.** A device polls on an interval; it appears "online" only at poll time. Desktop and mobile share this baseline.
+- **The poke (over SSE) is an opt-in low-latency layer.** An open SSE connection gives the untrusted server a continuous presence signal (A13), so it is opt-in; a max-privacy device stays on polling. The arrival + timing of a push is intrinsic A13 (accepted); the poke adds no payload on top.
+
+### 8.4 Robustness
+
+- **Idempotent push** — the CAS (§8.1) plus content-addressing makes a retried push a no-op rather than a duplicate.
+- **Certificate pinning** — the client pins the server certificate (A4 MitM); the channel is authenticated to a session (the auth mechanism is MYND-420, referenced in `server-protocol.md`).
+- **Deferred (not v1):** real-time WebSocket co-edit (Phase 4) and contentless mobile-wake push (Phase 3) — both are documented forward paths, not part of this wire spec.
+
+---
+
+## 9. Sync taxonomy
+
+Not every vault artefact syncs. The **sync taxonomy** partitions them into four classes, and the membership is governed by one invariant so it is never re-litigated:
+
+> **Invariant — sync members ⊆ backup members.** A blob syncs only if it is in the `protocol.md` §9.11.3 backup allowlist *and* is authoritative (not a rebuildable cache, not device-local). Sync membership is the authoritative-vs-derivable cut of that allowlist; it is not a separate list a future change can drift.
+
+| Class | Members | Disposition |
+|---|---|---|
+| **1 — Authoritative data** | `.myn` notes, `snapshots/`, `vault.prefs`, `vault.dictionary`, attachment blobs, `vault.attachments` catalog | **SYNC.** Merge per §10 (bodies = keep-both; prefs/dictionary/catalog = field/set merge). |
+| **2 — Identity** | `vault.meta` | **SYNC**, with the §10 bespoke merge that preserves the recovery-side wrapped `root_key` (`protocol.md` §9.3). |
+| **3 — Rebuildable cache** | `vault.search` (`MYS1`), `vault.indices` (`MYI1`) | **NEVER synced — re-derived locally** from the notes via the §9.6.4 `content_nonce` reconcile. Syncing them would be redundant, create a spurious conflict class, and still require a reconcile; cold-start is bounded (first build once per device, delta thereafter). |
+| **4 — Device-local** | `vault.workspace` (`MYW1`), `vault.quickunlock` (`MYQ1`), `vault.head-state` (`MYH1`, §7) | **NEVER synced.** `vault.workspace` is a privacy choice (graceful-exit/coalesced writes would turn at-rest mtime into a server-visible active-edit-timing channel — A13); `vault.quickunlock` is a security MUST-NOT (it wraps a device-hardware-bound copy of `root_key`); `vault.head-state` is each device's own rollback baseline. |
+
+### 9.1 "Continue where you left off"
+
+Resuming the last-open note across devices is **not** done by syncing `vault.workspace` (class 4 — that would leak active-edit timing). Instead it is an **opt-in single field `last_active_note` (note-id only)** that rides the already-synced `vault.prefs` (class 1), following the precedent that the `active_workspace` pointer lives in `vault.prefs` because prefs crash-survives. The leak is bounded to a note-id plus the prefs write cadence; it stays opt-in and coalesced. The `MYW1`-never-sync invariant is preserved.
+
+---
+
+## 10. Conflict model
+
+The server **cannot** decrypt or merge (A1, TB5), so all conflict resolution is **client-side and mandatory**. Detection is the push compare-and-swap (§8.1): a client pushes against a base, and a stale base is **rejected (409-like)**, forcing the loser to pull, resolve, and re-push. Resolution then differs by artefact class (§9):
+
+### 10.1 Note bodies — keep-both
+
+A concurrent edit to the same note resolves by **keeping both versions**: the losing version is written as a **conflict-marked duplicate note** for the user to reconcile. **Pure last-writer-wins on a note body is forbidden** — it would silently destroy an edit the server can't see. (At the head level, the two concurrent heads are version-vector-incomparable and the loser authors a merge head, §5.3; at the content level, the conflicting note becomes a duplicate.) UX for grouping conflict copies is a client concern (out of scope here).
+
+### 10.2 Singletons — post-decrypt field/set merge
+
+Structured singletons merge **field-by-field after decryption**, following `protocol.md` §9.5.2 **exactly** — do not re-derive the taxonomy here, cite it:
+
+- **Set-union** (sorted, deduplicated): `deliberate_folders`, `hidden_bar_items`.
+- **Sequence-LWW-on-whole** (the whole ordered list is replaced, never per-element merged): `item_order`, `favorites`, `view_order`.
+- **Scalar LWW**: every remaining `vault.prefs` field (`screen_capture_protection`, `label`, `theme`, `auto_lock_seconds`, `custom_theme`, the `daily_*` / `editor_*` fields, `active_workspace`, `editor_default_view_mode`, `editor_layout`, the `editor_focus_*` flags, and the §9.1 `last_active_note`).
+
+`vault.dictionary` merges as a **set-union** of its word sets (conflict-free); the `vault.attachments` catalog merges **per-entry by attachment-id** (entries are immutable, content-addressed).
+
+### 10.3 `vault.meta` — bespoke merge
+
+`vault.meta` (class 2) is **not** field-merged. It carries two independently-wrapped copies of `root_key` (password-side and recovery-side, `protocol.md` §9.3). A concurrent change on one device (e.g. a password change rewrapping the password-side copy) must **preserve the recovery-side wrapped key** — a naive LWW would let one device's `vault.meta` strand recovery on another. The merge takes the newest password-side wrap while keeping a valid recovery-side wrap, and the KDF-params/`account_number_hash`/`items_key_id` invariants (which must agree across devices) are validated, not overwritten. (`root_key` is a single per-vault random value, not password-derived; every device holds the *same* `root_key` by unwrapping the same synced `vault.meta`, so the merge only ever reconciles the *wraps* of one shared key — never two different keys.)
+
+---
+
+## 11. Deletion & tombstone horizon-GC
+
+### 11.1 Deletion is a tombstone version, not an absence
+
+A note deletion is a **`deleted`-marked new encrypted version** — a fresh `.myn` version with its own `content_nonce`, carried in the vault-head manifest until garbage-collected (§4.2). It is **not** "absent on disk → drop": the §9.6.4 local-reconcile rule (a manifest entry absent from disk → delete it locally) is **overridden for sync**, because under sync, "absent" is ambiguous between "deleted elsewhere" and "not yet pulled here". Without an explicit tombstone, a device that was offline at delete time would treat the deletion as a missed write and **resurrect** the note (the Cassandra-zombie failure). The tombstone is the same nature as Myne's existing `trashed:` / `archived:` managed-frontmatter pattern: a marked version, the opaque version counter advancing, the server never learning the "deleted" meaning (AS6 / zero-knowledge preserved).
+
+### 11.2 Hybrid horizon-GC
+
+A tombstone is garbage-collected by **one rule**: it is dropped once **every device counted active within the horizon has acked it** — its sync cursor (§8.2) has advanced past the delete-version. This is the per-device-cursor-ack discipline, not a bare grace-period drop.
+
+- A device that falls behind the horizon is dropped from the must-ack set — **soft-retired** (reusing the AS16 device-retirement mechanism that revocation needs anyway, so this is not new machinery).
+- A soft-retired device that returns **cannot resume incrementally**: it must run a **full-reconcile** against the authoritative manifest (§11.3). Its local-only notes do not silently resurrect — they fall to a §10 keep-both conflict copy.
+- The **horizon is month-scale (90–180 days)**, not days. The cost is asymmetric: an over-long tombstone is a tiny `(uuid, final_version, tombstone_marker)` meta record; too short a horizon forces a full-resync. In the common case (all devices online within the window) a tombstone is collected well before the horizon via the per-device acks; the horizon only bites an abandoned device.
+
+### 11.3 Server-side reclamation (two layers)
+
+Two distinct layers, so the server never learns "deleted":
+
+1. **Resurrection-proof, client-visible** — the `deleted`-marked version (§11.1); a device "acks" by advancing its cursor past it.
+2. **Storage reclamation** — past the horizon, the server may drop the ciphertext body and keep only `(note_uuid, final_version, tombstone_marker)`. The server learns only that a uuid reached a final version, never that it means "deleted" (AS6 preserved).
+
+Post-GC (the uuid fully purged from the manifest), a returning-past-horizon device is in **full-reconcile** mode (§11.2) and will not resurrect a vanished note — so resurrection is head-protected pre-GC (§4.2) and full-reconcile-protected post-GC. A malicious server's attempt to *withhold* a tombstone (hide a deletion) is the §5.5 withholding case: caught in-band if it is the requesting device's own deletion, best-effort otherwise.
