@@ -101,6 +101,17 @@ Four pure-Rust deps for the full-text search engine. None is crypto (the RustCry
 
 **Why postcard over the existing `serde_json` (the "don't add a JSON serializer when serde_json covers" rule):** the MYND-29 Task 9 benchmark showed `serde_json` inflated the at-rest `vault.search` blob to ~5× the indexed text and dominated warm-unlock latency, breaking the §9.6 blob-size + blob-load budgets; postcard (binary, varint, no field names) holds the blob under ~1× text and the decode under budget. `serde_json` remains the serializer for the small, schema-evolving, byte-stable-vector `vault.prefs` blob (canonical JSON, §9.5.2) — the two blobs use different encodings by deliberate design. So this is not "a second JSON serializer"; it is a compact binary serializer for a distinct, size-sensitive payload.
 
+### Attachment text extraction (MYND-328) — `src-tauri/Cargo.toml`
+
+Two pure-Rust deps so search can index the text inside attachments (PDF / Word / text-like). Neither is crypto (extraction consumes already-decrypted attachment plaintext; the result is sealed by the existing `MYE1`/`protocol` codec) nor telemetry; both are leaf-use, command-path only (`plugins/attachments/extract.rs`), permissive-licensed. PDF reuses the `lopdf` already present (`Document::extract_text`, **zero new deps**) and text-like files use std UTF-8 — so DOCX is the only format needing new crates.
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `zip` | 2 (`default-features = false`, `deflate`) | Unpack `word/document.xml` from a `.docx` (an OOXML zip) | `flate2`/`miniz_oxide`/`crc32fast`/`zopfli` — small, pure-Rust; most already in-tree | MIT | `decisions.md` 2026-06-19 (attachment-content-search); Task 3 |
+| `quick-xml` | 0.37 | Stream the `<w:t>` runs out of `word/document.xml` (paragraph-separated) | `memchr` — already in-tree | MIT | `decisions.md` 2026-06-19; Task 3 |
+
+**Why not `pdf-extract` / `docx-rs` (the heavier obvious choices):** the MYND-328 dependency spike measured `pdf-extract` at **+61** transitive crates including a **duplicate `lopdf` 0.36** alongside the repo's 0.41 (a single-lockfile / minimal-surface violation), and `docx-rs` at **+44**. Reusing the in-tree `lopdf` for PDF + `zip`/`quick-xml` + ~50 LOC for DOCX gets the same extraction with a fraction of the surface. Trade-off accepted: `lopdf::extract_text` is weaker than `pdf-extract` on exotic-font PDFs, acceptable for search indexing (re-derivable, `extractor_version`-gated, §9.15) and revisitable without a format change.
+
 ### Graph view (MYND-197) — `package.json`
 
 One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypto (consumes already-decrypted in-RAM index data); not telemetry; lazy-loaded (out of the initial bundle, off the crypto/IPC path). Chosen over Cytoscape.js because the Envelope-A scale target shrinks the need to "force-simulation only" and the render/interaction is hand-rolled (clears "The bar" Q1).

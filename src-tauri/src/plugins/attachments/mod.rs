@@ -43,10 +43,12 @@
 
 pub mod commands;
 pub mod error;
+pub mod extract;
 pub mod reconcile;
 pub mod reconcile_commands;
 pub mod scheme;
 pub mod sniff;
+pub mod text_cache;
 pub mod voice;
 
 pub use reconcile::AttachmentRefsState;

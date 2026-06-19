@@ -222,6 +222,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
 | `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
 | `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.13) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
+| `"myne.v0.1 attachment-text-key"` | KEK for the per-attachment extracted-text blobs (§9.15, `MYE1`) | Active when an attachment's extracted text is cached (MYND-328). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. One KEK for all attachment-text blobs; per-blob separation comes from the `attachment_id` AAD binding (§9.15.3). |
 | (future v005 contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
@@ -867,12 +868,17 @@ Offset  Size       Field                  Description
 ------  ---------  ---------------------  -------------------------------------
 0       4 bytes    magic                  ASCII "MYS1"
 4       1 byte     protocol_version       0x01 for this specification
-5       1 byte     index_format_version   0x01 = the v0.1 inner-plaintext format
-                                          (§9.6.2). Distinct from protocol_version:
-                                          a future engine / serialization change
-                                          bumps THIS byte so an old decoder rejects
-                                          the blob and falls to rebuild (§9.6.4)
-                                          rather than mis-parsing it.
+5       1 byte     index_format_version   0x01 = the v0.1 codec inner-plaintext format
+                                          (§9.6.2). Distinct from protocol_version: a
+                                          future ENGINE / codec-serialization change bumps
+                                          THIS byte. The inner snapshot's own schema is
+                                          the desktop's concern (it carries an
+                                          attachment-text extractor_version, §9.6.2/§9.6.4,
+                                          §9.15) and evolves without bumping this byte —
+                                          an older snapshot simply fails to decode and is
+                                          rebuilt. A bumped byte makes an old decoder reject
+                                          the blob and fall
+                                          to rebuild (§9.6.4) rather than mis-parsing it.
 6       24 bytes   search_nonce           192-bit random nonce used to encrypt the
                                           inner plaintext under search_index_key.
 30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the
@@ -890,12 +896,13 @@ Magic + `protocol_version` + `index_format_version` MUST all be checked **before
 
 #### 9.6.2 Inner plaintext (engine-opaque snapshot)
 
-The inner plaintext is an **`index_format_version`-tagged opaque payload**: this specification does NOT fix its internal structure, because the search engine is a client-implementation choice this layer must not constrain. For `index_format_version 0x01` the payload is a [postcard](https://docs.rs/postcard)-serialized snapshot of two parts:
+The inner plaintext is an **`index_format_version`-tagged opaque payload**: this specification does NOT fix its internal structure, because the search engine is a client-implementation choice this layer must not constrain. For `index_format_version 0x01` the payload is a [postcard](https://docs.rs/postcard)-serialized snapshot of three parts:
 
-1. a **staleness manifest** — a map `note_id → content_nonce` recording, for each indexed note, the `.myn` `content_nonce` (§9.2) observed when it was indexed; and
-2. the **serialized inverted index** — the v0.1 custom BM25 inverted index (postings, per-document metadata, per-note detected language).
+1. a **staleness manifest** — a map `note_id → content_nonce` recording, for each indexed note, the `.myn` `content_nonce` (§9.2) observed when it was indexed;
+2. the **serialized inverted index** — the v0.1 custom BM25 inverted index (postings, per-document metadata, per-note detected language); and
+3. the **`extractor_version`** (MYND-328) — the attachment-text extractor generation (§9.15) whose output is folded into the indexed note bodies, a trailing `u8`. A snapshot whose `extractor_version` differs from the client's current value (or, for a pre-MYND-328 snapshot, is absent — which manifests as a postcard decode failure since the format is non-self-describing) is rejected → rebuild (§9.6.4).
 
-Both ride INSIDE the AEAD envelope by necessity: the manifest holds `note_id`s + `content_nonce`s, and the index holds plaintext-derived terms + titles — all confidential vault content (`note_id` / `content_nonce` are per-note correlation tags; terms/titles are note plaintext). None may appear in the cleartext header. Because the payload is engine-opaque, a v0.1 client that ships a different engine — or merely changes the serialization — bumps `index_format_version`; older decoders reject and rebuild.
+Both ride INSIDE the AEAD envelope by necessity: the manifest holds `note_id`s + `content_nonce`s, and the index holds plaintext-derived terms + titles — all confidential vault content (`note_id` / `content_nonce` are per-note correlation tags; terms/titles are note plaintext). None may appear in the cleartext header. Because the payload is engine-opaque, a v0.1 client that ships a different **index engine / postings encoding** bumps `index_format_version` so older decoders reject the envelope and rebuild. An *additive* evolution of the snapshot struct itself — such as the MYND-328 trailing `extractor_version` field — does **not** bump the byte: postcard is non-self-describing, so an older snapshot that lacks the field simply fails to decode and is rebuilt (the §9.6.4 fall-to-rebuild path), and the byte continues to denote "the v0.1 codec inner-plaintext format". The byte tracks the codec/engine format; the snapshot's own additive schema versioning is the desktop's concern (the `extractor_version`, §9.6.4).
 
 > **Why postcard, not the canonical JSON of §9.5.2.** `vault.prefs` is a handful of small fields where JSON's schema-evolution ergonomics and byte-stable golden vectors matter. The search index is large (megabytes at 10k notes) and is never cross-validated field-by-field; the MYND-29 benchmark showed canonical JSON inflated the blob to ~5× the indexed text and dominated warm-unlock latency, whereas postcard (varint, no field names) holds it under ~1× text. The two blobs deliberately use different inner encodings (`../decisions.md` 2026-05-31 — "Encrypted search index").
 
@@ -918,7 +925,9 @@ AAD_search_index_blob =
 - For each on-disk note: if its current `content_nonce` equals the manifest's recorded value → **unchanged**, skip (no decrypt). If it differs from, or is absent in, the manifest → **changed / new**, decrypt that note and re-index it. A note in the manifest but absent from disk → **deleted**, drop it.
 - The reconciled result is identical to a full rebuild of the same corpus (this equivalence is the load-bearing correctness property: a diff bug must never silently produce a different index than a rebuild).
 
-**Fall-to-rebuild** is the fallback when incremental reconcile is impossible or untrusted: `vault.search` absent, magic / version mismatch, AEAD verification failure, or an unreadable manifest. The client then rebuilds the index from scratch by decrypting every `.myn`. The `content_nonce` is NOT a security signal — it is only an optimization hint; a rebuild never trusts the cache. Because rebuild always recovers the correct index, `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more.
+The v0.1 inner snapshot additionally records the **`extractor_version`** (§9.15) the attachment-text fold was built under (a trailing field of the engine-opaque payload, so a pre-attachment-search snapshot that lacks it simply fails to decode → rebuild). A stored `extractor_version` that differs from the client's current value triggers a **rebuild** even when every `content_nonce` matches — so an improved extractor (or the future OCR layer, §11 / MYND-441) re-folds attachment text rather than serving stale tokens. It is the inner-schema analogue of the `index_format_version` reject-and-rebuild, scoped to attachment-derived content and owned by the desktop codec rather than the protocol envelope byte.
+
+**Fall-to-rebuild** is the fallback when incremental reconcile is impossible or untrusted: `vault.search` absent, magic / version mismatch, AEAD verification failure, an unreadable manifest, or a mismatched/absent snapshot `extractor_version`. The client then rebuilds the index from scratch by decrypting every `.myn` (and re-reading attachment-text caches, §9.15). The `content_nonce` is NOT a security signal — it is only an optimization hint; a rebuild never trusts the cache. Because rebuild always recovers the correct index, `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more.
 
 #### 9.6.5 Residency, size cap, and fall-back semantic
 
@@ -1610,6 +1619,137 @@ quick-unlock is strictly weaker than the hardware-bound biometric path and is do
 as such. A v0.1 client MUST reject `MYQ5` and any unregistered magic; a v005 client MUST
 refuse `MYQ1` (§10.4).
 
+### 9.15 Extracted-attachment-text blob (`attachments-text/<id>`, `MYE1`)
+
+Each attachment whose text has been extracted gets a per-attachment **extracted-text
+cache blob** at `<vault-root>/attachments-text/<attachment-id-hex>` — one file per
+attachment, named by the lowercase-hex `attachment_id` (§9.9), mirroring the
+`attachments/<attachment-id-hex>` layout of the `MYA1` blob it derives from (MYND-328).
+It holds the on-device text extracted from PDF / Word (`.docx`) / text-like (`.txt` /
+`.md` / `.csv`) attachments, fed into the search index (§9.6) so a note becomes findable
+by the text inside its embedded attachments. Image OCR and scanned (text-layer-less) PDFs
+are **out of scope for v0.1** and deferred to MYND-441, which reuses this blob unchanged
+(see "extractor_version" below). The blob is AEAD-encrypted under `attachment_text_key =
+DeriveSubkey(root_key, "attachment-text-key")` (§3.2 + §3.4).
+
+Extracted text is **AS3-Sensitive** derived plaintext of user content; storing it as
+local app state would leak it to a filesystem adversary (A4/A7), so it rides inside the
+AEAD envelope like `vault.search`. Like the search index, this blob is a **rebuildable
+cache** — it can always be regenerated by re-extracting from the source `MYA1` blob — so
+it carries no integrity-of-content burden (§9.15.4). The blob is **payload-agnostic at
+the protocol layer**, exactly like `vault.search` (§9.6.2) and `vault.dictionary`
+(§9.13): this spec fixes the crypto framing (magic, version, AEAD, AAD) — the
+load-bearing part — while the inner extracted-text serialization is the client's concern,
+tagged by an `extractor_version` byte.
+
+#### 9.15.1 On-disk layout
+
+All multi-byte integers are big-endian.
+
+```
+Offset  Size       Field                  Description
+------  ---------  ---------------------  -------------------------------------
+0       4 bytes    magic                  ASCII "MYE1"
+4       1 byte     protocol_version       0x01 for this specification
+5       1 byte     extractor_version      0x01 = the v0.1 baseline extractor set
+                                          (PDF text-layer, DOCX OOXML text, text-like
+                                          UTF-8; §9.15.2). Distinct from protocol_version:
+                                          a changed extractor set (better extraction, or
+                                          the future OCR layer §11/MYND-441) bumps THIS
+                                          byte so a lower stored value triggers re-extraction
+                                          + index rebuild (§9.6.4) rather than serving stale
+                                          text.
+6       24 bytes   text_nonce             192-bit random nonce (OS CSPRNG) for the inner
+                                          AEAD under attachment_text_key.
+30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the inner
+                                          ciphertext followed by the 32-byte CTX tag.
+34      M bytes    ciphertext             Inner plaintext (§9.15.2), AEAD-encrypted under
+                                          attachment_text_key with text_nonce, then the
+                                          32-byte CTX commitment tag T' (§5.1). AAD binding
+                                          in §9.15.3.
+```
+
+The 34-byte header is identical in shape to `vault.search` (§9.6.1) / `vault.dictionary`
+(§9.13.1) — offset 5 carries `extractor_version` (the extracted-text serialization +
+extractor generation may evolve independently of the protocol version). The
+`attachment_id` is **not** a header field: the file name carries it and the AAD binds it
+cryptographically (§9.15.3), so a blob cannot be served for the wrong attachment. No
+public `attachment_text_key_id` and no public `account_number_hash` byte: both bind
+cryptographically without consuming header bytes, exactly as for `vault.search`. Magic +
+`protocol_version` + `extractor_version` MUST all be checked **before** any decryption
+(the magic-byte-before-decrypt discipline of §9.2 / §9.3 / §9.6.1).
+
+#### 9.15.2 Inner plaintext (`extractor_version 0x01`)
+
+A [postcard](https://docs.rs/postcard)-serialized struct:
+
+- `status` — one of `ok` (text extracted), `empty` (supported format but no extractable
+  text, e.g. a scanned PDF with no text layer), `unsupported` (format not handled in this
+  extractor generation), or `failed` (extraction errored — corrupt / password-protected).
+- `source_format` — the format the extractor dispatched on (`pdf` / `docx` / `text`).
+- `text` — the extracted text, **NFC-normalized**, empty unless `status = ok`.
+- `char_count` — `u32` length of `text` before any truncation.
+- `truncated` — `bool`, set when extraction hit the `MAX_EXTRACTED_TEXT_LEN` cap (§9.15.4).
+
+The whole struct rests INSIDE the AEAD envelope by necessity — the text is confidential
+vault content; none may appear in the cleartext header. Postcard (not the canonical JSON
+of §9.5.2) for the same reason as `vault.search` / `vault.dictionary`: the payload is
+unbounded user-generated content and is never cross-validated field-by-field. All four
+`status` values (including the negative ones) are persisted so a rebuild does **not**
+retry extraction that already failed/was-unsupported — until `extractor_version` bumps.
+
+#### 9.15.3 AAD construction
+
+`AAD_attachment_text_blob` mirrors `AAD_search_index_blob` / `AAD_personal_dictionary_blob`
+with role string `"attachment-text-blob"`, plus the two bindings that make a per-attachment
+cache safe — `attachment_id` and `extractor_version`:
+
+```text
+"myne.v0.1|"                            10 bytes  (AAD prefix, §5.2)
+0x01                                     1 byte   (protocol_version)
+u16_be(20) || "attachment-text-blob"    22 bytes  (length-prefixed role)
+account_number_hash                     16 bytes  (vault identity, §9.3 offset 6)
+attachment_id                           32 bytes  (binds blob to its specific attachment)
+extractor_version                        1 byte   (binds the extractor generation)
+```
+
+Total 82 bytes. `account_number_hash` (NOT `items_key_id`) binds vault identity —
+`attachment_text_key` derives directly from `root_key` via `"myne.v0.1
+attachment-text-key"`, independent of the `items_key` lineage (so it survives a v005
+epoch rotation, same rationale as prefs/search/dictionary). The `attachment_id` binding
+is what makes one KEK safe across all attachment-text blobs: a blob sealed for attachment
+A fails AEAD verification if served as attachment B. Binding `extractor_version` in the
+AAD (as well as the header byte) prevents a tampered header byte from being silently
+accepted. The subkey role string `"attachment-text-key"` is DISTINCT from the AAD role
+string `"attachment-text-blob"` — the same key/blob domain-separation as search.
+
+#### 9.15.4 Size cap, cache semantics, and threat class
+
+Implementations MUST reject `ciphertext_len > 4 MiB + 32`, bounding the pre-AEAD
+allocation footprint (the §9.6.5 / §9.13.4 DoS-allocation discipline). The extractor
+itself caps emitted text at `MAX_EXTRACTED_TEXT_LEN` (a client constant, ~1 MiB) and sets
+`truncated` — the 4 MiB blob ceiling is generous headroom over that cap plus postcard
+overhead.
+
+**Cache semantics.** `attachment_id` is content-addressed over the attachment plaintext
+(§9.9), so an attachment's bytes are immutable: once its text is cached at a given
+`extractor_version`, it never needs re-extraction at that version. A bump of
+`extractor_version` (improved extraction, or the future OCR layer) invalidates older
+blobs → lazy re-extraction. Read semantic is **fall-back-to-re-extract** on ANY failure
+(file absent / truncated / magic-or-version mismatch / AEAD verification failure /
+inner-parse failure): the client treats it as a cache miss and regenerates from the
+`MYA1` source, per the §9.6.4 cache discipline. The blob is therefore **non-load-bearing**
+in the same sense as `vault.search` — a disk attacker who deletes or corrupts it costs at
+most one re-extraction, never a wrong or missing security guarantee.
+
+**Lifecycle.** The blob is written eagerly at attachment import and lazily on first index
+need for pre-existing attachments. When an attachment is permanently deleted /
+garbage-collected, its `attachments-text/<id>` blob is deleted alongside the `MYA1` blob
+and the `MYC1` catalog entry, preserving cryptographic-erase semantics (§9.9).
+
+A v0.1 client MUST reject `MYE5` and any unregistered magic; a v005 client MUST refuse
+`MYE1` (§10.4).
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -1648,8 +1788,9 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
 | Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.13 | MYND-266 |
 | Quick-unlock credential (`vault.quickunlock`) | `MYQ1` | `MYQ5` | §9.14 | MYND-329 |
+| Extracted attachment text (`attachments-text/<id>`) | `MYE1` | `MYE5` | §9.15 | MYND-328 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary) use the `MY?5` v005 convention.
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text) use the `MY?5` v005 convention.
 
 ### 10.4 Migration procedure (cross-major)
 

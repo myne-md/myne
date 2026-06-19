@@ -155,6 +155,43 @@ fn read_account_number_hash(
     Ok(meta.account_number_hash)
 }
 
+/// MYND-328: build the search-index body for a note — its plaintext plus the
+/// cached extracted text of every embedded attachment — so a note (re)indexed
+/// in-session is findable by attachment content, the same fold the unlock-time
+/// rebuild applies. The single canonical home for the note-body fold; every
+/// live re-index call site (`note_create` / `note_update` /
+/// `note_write_batch_transactional` / `snapshot_restore`) routes through it, so
+/// the "re-indexing a note body folds its attachment text" contract lives once.
+///
+/// Fast path — a note with no `![[att:…]]` embeds skips the `vault.meta` read
+/// and KEK derive entirely, so the common save pays nothing. It is best-effort:
+/// any failure (locked slot, missing/invalid meta) returns the body unchanged
+/// and can never break a save.
+pub(crate) async fn fold_note_body_for_index(
+    state: &VaultRuntimeState,
+    vault_dir: &Path,
+    note_body: &str,
+) -> String {
+    if crate::plugins::attachments::reconcile::extract_att_ids(note_body).is_empty() {
+        return note_body.to_string();
+    }
+    let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
+        return note_body.to_string();
+    };
+    let Ok(account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta")) else {
+        return note_body.to_string();
+    };
+    let key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+    let mut memo = std::collections::HashMap::new();
+    crate::plugins::attachments::text_cache::fold_attachment_text(
+        note_body,
+        vault_dir,
+        &key,
+        &account_number_hash,
+        &mut memo,
+    )
+}
+
 /// Read a single `.myn` file's `content_nonce` from its header WITHOUT
 /// decrypting — only the first [`MYN_HEADER_PREFIX_FOR_NONCE`] bytes are
 /// read. `None` on any IO failure / short file / bad magic.
@@ -199,12 +236,29 @@ pub(crate) async fn hydrate_search_index_with_dir(
     state: &VaultRuntimeState,
     search: &SearchIndexState,
 ) -> Result<(), SearchSyncError> {
-    let (root_key, _vmh) = state
-        .peek_unlocked_root_key_and_hash_clone()
+    // MYND-328: also need items_key + items_key_id to decrypt MYA1 sources for
+    // the lazy backfill of attachments imported before the eager cache.
+    let (items_key, items_key_id, root_key) = state
+        .peek_unlocked_attachment_material()
         .await
         .ok_or(SearchSyncError::SlotNotUnlocked)?;
     let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
+    // MYND-328: KEK for the per-attachment extracted-text cache, folded into the
+    // indexed note bodies below. `memo` dedups cache reads across notes within
+    // this rebuild (an attachment embedded in N notes is read once — § 9.6.4).
+    let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+    let mut attachment_text_memo: std::collections::HashMap<[u8; 32], Option<String>> =
+        std::collections::HashMap::new();
+    // Catalog (content_type + filename per attachment) drives the backfill's
+    // MYA1 decrypt + extraction dispatch. Best-effort: empty on any read error.
+    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let attachment_catalog = crate::plugins::attachments::commands::read_catalog(
+        &vault_dir.join("vault.attachments"),
+        &catalog_key,
+        &account_number_hash,
+    )
+    .unwrap_or_else(|_| protocol::AttachmentsCatalog::empty());
     let notes_dir = paths::notes_dir_under(vault_dir).map_err(|_| SearchSyncError::Io)?;
 
     // Decryption-free staleness scan of the current notes dir.
@@ -229,7 +283,28 @@ pub(crate) async fn hydrate_search_index_with_dir(
         match note_read_with_dir(notes_dir.clone(), state, id.clone()).await {
             Ok(plaintext) => {
                 let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-                fetched.insert(id.clone(), (title, plaintext));
+                // MYND-328: backfill any uncached embedded attachment from its
+                // MYA1 source (pre-eager-cache attachments), then fold the cached
+                // text into the indexed body so the note is findable by the
+                // contents of its embedded files.
+                crate::plugins::attachments::text_cache::backfill_note_attachment_text(
+                    &plaintext,
+                    vault_dir,
+                    &attachment_text_key,
+                    &account_number_hash,
+                    &items_key,
+                    &items_key_id,
+                    &attachment_catalog,
+                    &mut attachment_text_memo,
+                );
+                let body = crate::plugins::attachments::text_cache::fold_attachment_text(
+                    &plaintext,
+                    vault_dir,
+                    &attachment_text_key,
+                    &account_number_hash,
+                    &mut attachment_text_memo,
+                );
+                fetched.insert(id.clone(), (title, body));
             }
             Err(_) => {
                 // Unreadable note (locked mid-hydrate / corrupt / non-UTF-8):
