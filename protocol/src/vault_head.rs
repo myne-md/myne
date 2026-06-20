@@ -273,6 +273,52 @@ pub fn compute_head_id(record: &[u8]) -> [u8; HEAD_ID_LEN] {
     id
 }
 
+/// Domain prefix for the bootstrap / fork-audit fingerprint digest (§6.3). The
+/// SAS is a function of a *domain-separated* hash of `head_id`, not the raw
+/// `head_id` — load-bearing (drift changes every displayed fingerprint).
+pub const VAULT_HEAD_FINGERPRINT_DOMAIN: &[u8] = b"myne.v0.1 vault-head-fingerprint";
+
+/// Number of Crockford-base32 characters in the SAS fingerprint (40 bits ⇒ 8
+/// chars). Displayed grouped `XXXX-XXXX` (a 9-char string incl. the dash).
+pub const HEAD_FINGERPRINT_CHARS: usize = 8;
+
+/// The deterministic `head_id → SAS-fingerprint` substrate (SYNC-17, §6.3): a
+/// short, eye-comparable code both devices show at the enrollment approval gate
+/// (MYND-425, v1) and the general fork-audit UI reuses (MYND-427, v1.x). It is
+/// **~SAS-magnitude** (40 bits, not the full 32-byte `head_id`) and **cross-impl
+/// byte-identical** — a golden vector pins it (PRIMITIVE-LEVEL review required).
+///
+/// Encoding: `digest = SHA-256(VAULT_HEAD_FINGERPRINT_DOMAIN || head_id)`; the
+/// first 40 bits of `digest` are emitted as 8 Crockford-base32 chars (the same
+/// alphabet as `account-number.md` §4, excluding I/L/O/U), grouped `XXXX-XXXX`.
+pub fn head_fingerprint(head_id: &[u8; HEAD_ID_LEN]) -> alloc::string::String {
+    use alloc::string::String;
+
+    // Crockford base32 alphabet (frozen; mirrors account_number::CROCKFORD).
+    const CROCKFORD: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+    let mut h = Sha256::new();
+    h.update(VAULT_HEAD_FINGERPRINT_DOMAIN);
+    h.update(head_id);
+    let digest = h.finalize();
+
+    // First 5 bytes = 40 bits, big-endian, split into 8 × 5-bit groups.
+    let mut acc: u64 = 0;
+    for &b in &digest[..5] {
+        acc = (acc << 8) | b as u64;
+    }
+    let mut s = String::with_capacity(HEAD_FINGERPRINT_CHARS + 1);
+    for i in 0..HEAD_FINGERPRINT_CHARS {
+        if i == 4 {
+            s.push('-');
+        }
+        let shift = 5 * (HEAD_FINGERPRINT_CHARS - 1 - i);
+        let idx = ((acc >> shift) & 0x1f) as usize;
+        s.push(CROCKFORD[idx] as char);
+    }
+    s
+}
+
 /// Parse a wire record (`head_mac_input || head_mac`), verify the MAC in
 /// constant time, and check structural well-formedness (§5.2). Returns the
 /// decoded [`VaultHead`] on success.
@@ -502,6 +548,40 @@ mod tests {
                 counter: 1,
             }],
         }
+    }
+
+    #[test]
+    fn fingerprint_is_deterministic_and_well_formed() {
+        let id = [0x42u8; HEAD_ID_LEN];
+        let fp = head_fingerprint(&id);
+        assert_eq!(
+            fp,
+            head_fingerprint(&id),
+            "fingerprint must be deterministic"
+        );
+        // Format: XXXX-XXXX (9 chars, dash at index 4, Crockford alphabet).
+        assert_eq!(fp.len(), HEAD_FINGERPRINT_CHARS + 1);
+        assert_eq!(fp.as_bytes()[4], b'-');
+        const CROCKFORD: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+        for (i, c) in fp.bytes().enumerate() {
+            if i == 4 {
+                continue;
+            }
+            assert!(
+                CROCKFORD.contains(&c),
+                "char {c:?} not in Crockford alphabet"
+            );
+        }
+    }
+
+    #[test]
+    fn fingerprint_differs_for_different_heads_and_is_not_raw_head_id() {
+        let a = head_fingerprint(&[0x01u8; HEAD_ID_LEN]);
+        let b = head_fingerprint(&[0x02u8; HEAD_ID_LEN]);
+        assert_ne!(a, b, "distinct head_ids should give distinct fingerprints");
+        // Domain separation: the fingerprint is NOT a prefix of the raw head_id hex.
+        let raw_prefix = "01010101";
+        assert_ne!(a.replace('-', ""), raw_prefix);
     }
 
     #[test]

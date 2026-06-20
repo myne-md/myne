@@ -16,6 +16,7 @@ pub mod pdf_export;
 pub mod prefs;
 pub mod quick_unlock;
 pub mod snapshots;
+pub mod sync;
 pub mod themes;
 pub mod vault_change_password;
 pub mod vault_creation;

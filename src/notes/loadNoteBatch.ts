@@ -27,6 +27,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { load as parseYaml } from "js-yaml";
 import {
   readArchivedFromFmBody,
+  readConflictFromFmBody,
+  readConflictOfFromFmBody,
   readFolderIndexFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
@@ -104,6 +106,18 @@ export type TitleRecord = {
    * `readFolderIndexFromFmBody`).
    */
   folderIndex: boolean;
+  /**
+   * Value-strict `conflict:` marker (MYND-427) — `true` iff the note is a sync
+   * conflict copy (canonical `conflict: true`). Conflict copies are kept OUT of
+   * the live sidebar/search (like trashed/template) and surfaced only in the
+   * Conflicts view. A user's own non-canonical value reads `false`.
+   */
+  conflict: boolean;
+  /**
+   * The original note UUID a conflict copy forked from (`conflict_of:`), or
+   * `null`. The Conflicts view groups copies by this value.
+   */
+  conflictOf: string | null;
   error?: NoteTitleError;
 };
 
@@ -204,6 +218,10 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // `template:`/`trashed:` — js-yaml would coerce `true` to a boolean and a
   // user's `folder_index: "true"` would not stay value-strict.
   const folderIndex = readFolderIndexFromFmBody(slice.frontmatter_bytes ?? "");
+  // `conflict:`/`conflict_of:` read value-strict from the raw FM slice (MYND-427)
+  // — same rationale as `template:` (js-yaml would coerce the boolean).
+  const conflict = readConflictFromFmBody(slice.frontmatter_bytes ?? "");
+  const conflictOf = readConflictOfFromFmBody(slice.frontmatter_bytes ?? "");
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
@@ -213,6 +231,8 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
     archived,
     template,
     folderIndex,
+    conflict,
+    conflictOf,
   };
 }
 
@@ -260,6 +280,8 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       archived: null,
       template: false,
       folderIndex: false,
+      conflict: false,
+      conflictOf: null,
       error: r.Err,
     };
   });

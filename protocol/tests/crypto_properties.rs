@@ -13,8 +13,9 @@ use proptest::prelude::*;
 use proptest::sample::Index;
 
 use protocol::{
-    decode_note, encode_new_note, encode_new_note_blob_raw, generate_account_number,
-    open_vault_head, parse_account_number, vv_dominance, Dominance, VaultHead, VvEntry,
+    compute_manifest_hash, decode_manifest, decode_note, encode_manifest, encode_new_note,
+    encode_new_note_blob_raw, generate_account_number, head_fingerprint, open_vault_head,
+    parse_account_number, vv_dominance, Dominance, ManifestEntry, VaultHead, VvEntry,
     VAULT_HEAD_FORMAT_V1,
 };
 
@@ -286,5 +287,101 @@ proptest! {
         prop_assume!(root != other);
         let sealed = head_with(account, manifest, 1, Vec::new(), &counters).seal(&root).unwrap();
         prop_assert!(open_vault_head(&other, &sealed.record).is_err());
+    }
+}
+
+/// Build a manifest from (id, content_nonce) byte fills. ids are made distinct
+/// by index so the duplicate-id guard never trips spuriously.
+fn manifest_entries(specs: &[(u8, u8)]) -> Vec<ManifestEntry> {
+    specs
+        .iter()
+        .enumerate()
+        .map(|(i, &(_id, nonce))| ManifestEntry {
+            id: [(i as u8).wrapping_add(1); 16],
+            content_nonce: [nonce; 24],
+        })
+        .collect()
+}
+
+proptest! {
+    /// Manifest encoding is deterministic and independent of input order: any
+    /// permutation of the same entry set produces byte-identical output and the
+    /// same `manifest_hash` (§4.2 — the head must commit a canonical value).
+    #[test]
+    fn prop_manifest_encoding_order_independent(
+        nonces in pvec(any::<u8>(), 1..=8),
+        perm in any::<Index>(),
+    ) {
+        let specs: Vec<(u8, u8)> = nonces.iter().map(|&n| (0u8, n)).collect();
+        let entries = manifest_entries(&specs);
+        let mut shuffled = entries.clone();
+        // Rotate by a sampled amount to get a non-trivial permutation.
+        let n = shuffled.len().max(1);
+        let k = perm.index(n);
+        shuffled.rotate_left(k % n);
+
+        prop_assert_eq!(encode_manifest(&entries).unwrap(), encode_manifest(&shuffled).unwrap());
+        prop_assert_eq!(
+            compute_manifest_hash(&entries).unwrap(),
+            compute_manifest_hash(&shuffled).unwrap()
+        );
+    }
+
+    /// Encode→decode round-trips to the canonical (sorted) entry set.
+    #[test]
+    fn prop_manifest_roundtrip(
+        nonces in pvec(any::<u8>(), 0..=8),
+    ) {
+        let specs: Vec<(u8, u8)> = nonces.iter().map(|&n| (0u8, n)).collect();
+        let mut entries = manifest_entries(&specs);
+        let bytes = encode_manifest(&entries).unwrap();
+        let decoded = decode_manifest(&bytes).unwrap();
+        entries.sort_unstable_by_key(|e| e.id);
+        prop_assert_eq!(decoded, entries);
+    }
+
+    /// Any single-byte tamper of canonical manifest bytes either fails to decode
+    /// or decodes to a different entry set — the hash the head commits is never
+    /// silently satisfied by altered bytes.
+    #[test]
+    fn prop_manifest_tamper_detectable(
+        nonces in pvec(any::<u8>(), 1..=6),
+        idx in any::<Index>(),
+        xor in 1u8..=255,
+    ) {
+        let specs: Vec<(u8, u8)> = nonces.iter().map(|&n| (0u8, n)).collect();
+        let entries = manifest_entries(&specs);
+        let bytes = encode_manifest(&entries).unwrap();
+        let pos = idx.index(bytes.len());
+        let mut tampered = bytes.clone();
+        tampered[pos] ^= xor;
+        match decode_manifest(&tampered) {
+            Err(_) => {}
+            Ok(decoded) => prop_assert_ne!(decoded, entries),
+        }
+    }
+}
+
+proptest! {
+    /// The SAS fingerprint is a deterministic function of head_id (SYNC-17,
+    /// §6.3): the same head_id always yields the same fingerprint.
+    #[test]
+    fn prop_head_fingerprint_deterministic(id in uniform32(any::<u8>())) {
+        prop_assert_eq!(head_fingerprint(&id), head_fingerprint(&id));
+        // Always the XXXX-XXXX shape (9 chars, dash at index 4).
+        let fp = head_fingerprint(&id);
+        prop_assert_eq!(fp.len(), 9);
+        prop_assert_eq!(fp.as_bytes()[4], b'-');
+    }
+
+    /// Distinct head_ids overwhelmingly give distinct fingerprints (40-bit SAS;
+    /// a collision is ~1 in 10^12, far below proptest's case count).
+    #[test]
+    fn prop_head_fingerprint_distinct(
+        a in uniform32(any::<u8>()),
+        b in uniform32(any::<u8>()),
+    ) {
+        prop_assume!(a != b);
+        prop_assert_ne!(head_fingerprint(&a), head_fingerprint(&b));
     }
 }

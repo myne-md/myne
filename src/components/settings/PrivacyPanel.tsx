@@ -15,6 +15,8 @@
 
 import type { CSSProperties } from "react";
 import { usePrefs } from "../../hooks/usePrefs";
+import { useSyncPrefs } from "../../hooks/useSyncPrefs";
+import { useLastActiveNotePref } from "../../hooks/useLastActiveNotePref";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
@@ -62,6 +64,8 @@ interface ToggleRowProps {
    * cursor is `pointer`, click fires the callback.
    */
   onToggle?: (next: boolean) => void;
+  /** Optional `data-testid` forwarded to the Switch for E2E targeting. */
+  testId?: string;
 }
 
 function ToggleRow({
@@ -71,6 +75,7 @@ function ToggleRow({
   ariaDescribedBy,
   checked,
   onToggle,
+  testId,
 }: ToggleRowProps) {
   return (
     <div style={BLOCK_STYLE}>
@@ -81,6 +86,7 @@ function ToggleRow({
           onChange={onToggle}
           ariaLabel={ariaLabel}
           ariaDescribedBy={ariaDescribedBy}
+          testId={testId}
         />
       </div>
       <p id={ariaDescribedBy} style={HELPER_STYLE}>
@@ -169,8 +175,21 @@ interface PrivacyPanelProps {
   onShowToast?: (message: string) => void;
 }
 
+// MYND-423: the real-time-sync (SSE) helper discloses the A13 presence-signal
+// tradeoff honestly. Polling is the privacy-default; opening an SSE keeps a
+// continuous connection the (untrusted) server sees as "this device is online".
+function realtimeSyncHelperText(enabled: boolean): string {
+  if (enabled) {
+    return "Changes from other devices arrive within seconds. An open real-time connection keeps you continuously visible as online to the sync server (it still cannot read your notes).";
+  }
+  return "Polling (the default): changes arrive at the next check, and the server only sees you while you check. Most private; turn on real-time sync above to trade that for lower latency.";
+}
+
 export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   const { prefs, toggleScreenCapture, setAutoLock } = usePrefs(onShowToast);
+  const { realtimeSse, setRealtimeSse } = useSyncPrefs();
+  const { enabled: lastActiveNote, setEnabled: setLastActiveNote } =
+    useLastActiveNotePref();
   return (
     <div style={PANEL_ROOT_STYLE}>
       <ToggleRow
@@ -182,6 +201,24 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
         onToggle={(next) => {
           void toggleScreenCapture(next);
         }}
+      />
+      <ToggleRow
+        label="Real-time sync"
+        ariaLabel="Real-time sync"
+        ariaDescribedBy="realtime-sync-helper"
+        helper={realtimeSyncHelperText(realtimeSse)}
+        checked={realtimeSse}
+        onToggle={setRealtimeSse}
+        testId="settings.realtime-sync-toggle"
+      />
+      <ToggleRow
+        label="Continue where you left off"
+        ariaLabel="Continue where you left off"
+        ariaDescribedBy="last-active-note-helper"
+        helper="Sync which note you had open so you can pick it up on another device. Off by default — only the note is shared, never your scroll position or open tabs."
+        checked={lastActiveNote}
+        onToggle={setLastActiveNote}
+        testId="settings.last-active-note-toggle"
       />
       <AutoLockRow
         seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}

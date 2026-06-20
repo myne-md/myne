@@ -4223,3 +4223,303 @@ fn vault_head_vectors() {
         );
     }
 }
+
+/// `manifest` (MYND-414 / SYNC-13): the canonical vault-head manifest byte
+/// encoding (`uuid → content_nonce`) + its `manifest_hash`, and the structural
+/// decode rejects. Validates `protocol::manifest` bit-for-bit against the
+/// committed golden vectors (`sync-protocol.md` §4.2).
+#[test]
+fn manifest_vectors() {
+    use protocol::{
+        compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
+        MANIFEST_ID_LEN,
+    };
+
+    let path = companion_vectors_root()
+        .join("manifest")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] manifest: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "manifest");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 5,
+        "manifest must carry at least 5 vectors; found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("manifest", cases);
+
+    fn parse_entries(case: &serde_json::Value, id: &str) -> Vec<ManifestEntry> {
+        case["input_entries"]
+            .as_array()
+            .unwrap_or_else(|| panic!("[{id}] input_entries must be an array"))
+            .iter()
+            .map(|e| ManifestEntry {
+                id: hex_decode_array::<MANIFEST_ID_LEN>(
+                    e["input_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] entry missing input_id_hex")),
+                ),
+                content_nonce: hex_decode_array::<24>(
+                    e["input_content_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] entry missing input_content_nonce_hex")),
+                ),
+            })
+            .collect()
+    }
+
+    fn err_str(e: &ManifestError) -> &'static str {
+        match e {
+            ManifestError::DuplicateId => "duplicate_id",
+            ManifestError::TooShort => "too_short",
+            ManifestError::TrailingBytes => "trailing_bytes",
+            ManifestError::DomainPrefixMismatch => "domain_prefix_mismatch",
+            ManifestError::ProtocolVersionMismatch => "protocol_version_mismatch",
+            ManifestError::FormatUnsupported => "format_unsupported",
+            ManifestError::NotCanonical => "not_canonical",
+            _ => "unknown",
+        }
+    }
+
+    let mut seen_kinds = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encode" => {
+                let entries = parse_entries(case, id);
+                let expected_bytes = hex_decode(
+                    case["expected_manifest_bytes_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_manifest_bytes_hex")),
+                );
+                let expected_hash: [u8; 32] = hex_decode_array(
+                    case["expected_manifest_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_manifest_hash_hex")),
+                );
+                let got_bytes = encode_manifest(&entries)
+                    .unwrap_or_else(|e| panic!("[{id}] encode_manifest failed: {e}"));
+                assert_eq!(
+                    hex_encode(&got_bytes),
+                    hex_encode(&expected_bytes),
+                    "[{id}] manifest bytes mismatch"
+                );
+                let got_hash = compute_manifest_hash(&entries)
+                    .unwrap_or_else(|e| panic!("[{id}] compute_manifest_hash failed: {e}"));
+                assert_eq!(got_hash, expected_hash, "[{id}] manifest_hash mismatch");
+                // Round-trip the canonical bytes back to entries.
+                assert!(
+                    decode_manifest(&got_bytes).is_ok(),
+                    "[{id}] canonical bytes must round-trip"
+                );
+            }
+            "parse_fail" => {
+                let bytes = hex_decode(
+                    case["input_manifest_bytes_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_manifest_bytes_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                match decode_manifest(&bytes) {
+                    Ok(_) => panic!("[{id}] expected parse_fail '{expected_error}', got Ok"),
+                    Err(e) => {
+                        assert_eq!(err_str(&e), expected_error, "[{id}] wrong reject variant")
+                    }
+                }
+            }
+            other => panic!("[{id}] unknown case_kind {other:?}"),
+        }
+    }
+
+    for k in ["encode", "parse_fail"] {
+        assert!(
+            seen_kinds.contains(k),
+            "manifest must cover case_kind {k:?}; saw {seen_kinds:?}"
+        );
+    }
+}
+
+/// `head-fingerprint` (SYNC-17): the deterministic `head_id → SAS` fingerprint
+/// (`protocol::head_fingerprint`) both devices eye-compare at enrollment
+/// (MYND-425) + fork-audit (MYND-427). Validates byte-for-byte against the
+/// committed golden vectors (`sync-protocol.md` §6.3).
+#[test]
+fn head_fingerprint_vectors() {
+    use protocol::head_fingerprint;
+
+    let path = companion_vectors_root()
+        .join("head-fingerprint")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] head-fingerprint: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "head-fingerprint");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 3,
+        "head-fingerprint must carry at least 3 vectors; found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("head-fingerprint", cases);
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let head_id: [u8; 32] = hex_decode_array(
+            case["input_head_id_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_head_id_hex")),
+        );
+        let expected = case["expected_fingerprint"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing expected_fingerprint"));
+        assert_eq!(
+            head_fingerprint(&head_id),
+            expected,
+            "[{id}] fingerprint mismatch"
+        );
+    }
+}
+
+/// `scram-auth` (MYND-420/425): the SCRAM-SHA-256-PLUS client proof + server
+/// signature. Validates `protocol::scram_client_proof` byte-for-byte against the
+/// shared golden vectors — the cross-impl bar with the Go server's
+/// `internal/auth/scram` (`server-protocol.md` auth; RFC 5802/7677/9266).
+#[test]
+fn scram_auth_vectors() {
+    use protocol::scram_client_proof;
+
+    let path = companion_vectors_root()
+        .join("scram-auth")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] scram-auth: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "scram-auth");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty(), "scram-auth must carry vectors");
+    assert_unique_vector_ids("scram-auth", cases);
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let secret = hex_decode(
+            case["input_secret_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_secret_hex")),
+        );
+        let salt = hex_decode(
+            case["input_salt_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_salt_hex")),
+        );
+        let iterations = case["input_iterations"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("[{id}] missing input_iterations"))
+            as u32;
+        let username = case["input_username"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing input_username"));
+        let client_nonce = case["input_client_nonce"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing input_client_nonce"));
+        let combined_nonce = case["input_combined_nonce"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing input_combined_nonce"));
+        let cbind = hex_decode(
+            case["input_cbind_data_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_cbind_data_hex")),
+        );
+
+        let out = scram_client_proof(
+            &secret,
+            &salt,
+            iterations,
+            username,
+            client_nonce,
+            combined_nonce,
+            &cbind,
+        );
+
+        let expect = |k: &str| -> String {
+            case[k]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing {k}"))
+                .to_string()
+        };
+        assert_eq!(
+            hex_encode(&out.stored_key),
+            expect("expected_stored_key_hex"),
+            "[{id}] stored_key"
+        );
+        assert_eq!(
+            hex_encode(&out.server_key),
+            expect("expected_server_key_hex"),
+            "[{id}] server_key"
+        );
+        assert_eq!(
+            hex_encode(&out.client_proof),
+            expect("expected_client_proof_hex"),
+            "[{id}] client_proof"
+        );
+        assert_eq!(
+            hex_encode(&out.server_signature),
+            expect("expected_server_signature_hex"),
+            "[{id}] server_signature"
+        );
+    }
+}
