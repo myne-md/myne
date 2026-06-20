@@ -71,7 +71,7 @@ myne/
 Read `docs/` before changing anything that touches cryptography, on-disk format, key handling, or sync. Order:
 
 1. `docs/vision.md` — phased plan, anti-features (commitments, not "maybe later")
-2. `docs/threat-model.md` — A1–A13 adversaries, AS1–AS17 assets, TB1–TB9 trust boundaries. **Normative**: marketing copy and code may not exceed its guarantees.
+2. `docs/threat-model.md` — A1–A14 adversaries, AS1–AS17 assets, TB1–TB10 trust boundaries. **Normative**: marketing copy and code may not exceed its guarantees.
 3. `docs/spec/protocol.md` — v0.1 cryptographic protocol
 4. `docs/spec/account-number.md` — 20-character Crockford-base32 + Damm-32 identifier
 5. `docs/glossary.md` — canonical terminology (~115 entries). Every new term in any doc gets a glossary entry in the same change.

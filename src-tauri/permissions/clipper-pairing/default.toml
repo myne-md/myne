@@ -1,0 +1,37 @@
+# Permissions for the in-app `clipper-pairing` Tauri plugin
+# (ext-foundation-handoff task 4, TB10). Picked up under the
+# `clipper-pairing:` ACL namespace only because `build.rs` declares this as an
+# `InlinedPlugin`. Capability files reference these as `clipper-pairing:default`
+# (or the individual `clipper-pairing:allow-*` permissions).
+#
+# These three commands are the NARROW WebView surface the in-app pairing dialog
+# drives (TB6 governs them — the stdio native-messaging host is the SEPARATE,
+# ACL-exempt ingress). The `default` bundle is the only one consumed in v0.1.
+# Like the other write-capable plugins, v0.2 multi-window MUST NOT grant
+# `allow-pairing-accept` / `allow-pairing-reject` (which mutate the token
+# registry) to any non-main window.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the clipper-pairing plugin — read the pending pairing challenge + Accept/Reject."
+permissions = [
+  "allow-pairing-pending",
+  "allow-pairing-accept",
+  "allow-pairing-reject",
+]
+
+[[permission]]
+identifier = "allow-pairing-pending"
+description = "Allow invoking clipper-pairing:pairing_pending (read-only: the current pending pairing session — the exact extension id + the numeric challenge string the user compares to the extension; None when no extension is requesting a connection; no side-effect)."
+commands.allow = ["pairing_pending"]
+
+[[permission]]
+identifier = "allow-pairing-accept"
+description = "Allow invoking clipper-pairing:pairing_accept (mints a scoped, revocable, append-only pairing token bound to the EXACT extension id of the pending session — scope ceiling create-clip + is-unlocked-status only, never read/modify/delete — appends it to the in-memory token registry, and clears the session; returns the token's bearer value for relay to the extension; never logs the token or extension id)."
+commands.allow = ["pairing_accept"]
+
+[[permission]]
+identifier = "allow-pairing-reject"
+description = "Allow invoking clipper-pairing:pairing_reject (clears the pending pairing session WITHOUT minting a token — no lingering authorization; errors NoPendingPairing when nothing was pending)."
+commands.allow = ["pairing_reject"]

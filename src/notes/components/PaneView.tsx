@@ -604,9 +604,13 @@ export function PaneView({
           return view.name.trim() === "" ? "Untitled view" : view.name;
         }}
         iconOf={(key) => {
-          const kind = parseItemKey(key).kind;
-          if (kind === "view") return "layout-grid";
-          if (kind === "graph") return "share-2";
+          const it = parseItemKey(key);
+          if (it.kind === "view") return "layout-grid";
+          if (it.kind === "graph") return "share-2";
+          // url-bookmark (SYNC-16): a note carrying an unmanaged `source:`
+          // provenance key is a clipped link-only bookmark → bookmark glyph;
+          // every ordinary note keeps the default `file-text`.
+          if (ctx.cache.get(it.id)?.hasSource === true) return "bookmark";
           return "file-text";
         }}
         activeDirty={

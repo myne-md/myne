@@ -27,6 +27,8 @@ Never add `core:default` plus a wide allowlist; prefer named, narrow permissions
 
 Current entries include `vault-creation:default` (the vault-creation flow plugin) and scoped clipboard/dialog/fs entries — see file for the full list.
 
+**The browser-clipper native-messaging host is an EXTERNAL ingress NOT governed by this ACL.** It is a separate stdio process (plus a local single-instance Unix-socket relay into the running app), so `capabilities/default.json` does not gate it. It carries its OWN untrusted-input discipline as a security-load-bearing pattern (TB10): length-prefixed framing with size caps (64 MiB ext→host / 16 MiB note body / 1 MiB reply), UTF-8 validation, no path traversal, re-sniffed MIME, a clip-handoff rate limiter, silent-to-unpaired, and the running app re-validating **every** relayed frame as hostile before any `note_create`. See `src/clipper/` + `threat-model.md` TB10 / A14. Only the WebView-side pairing commands (`clipper-pairing:default`) are ACL-governed here (TB6) — the one narrow entry the clipper added.
+
 ## Plugin pattern
 
 Multi-step flows live as Tauri plugins under `src/plugins/<flow-name>/`:

@@ -286,6 +286,60 @@ describe("loadNoteBatch — archived derivation (value-strict)", () => {
   });
 });
 
+describe("loadNoteBatch — hasSource provenance (url-bookmark / SYNC-16)", () => {
+  // The unmanaged `source:` key signals a clipped link-only bookmark; the tab
+  // strip swaps `file-text` for the `bookmark` glyph on its presence. Detection
+  // is presence, NOT value-strict — any value counts.
+  it("flags hasSource=true when a `source:` key is present (any value)", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "bm",
+          frontmatter_bytes:
+            'title: Example\nsource: https://example.com/article\nclipped: 2026-06-20\n',
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["bm"]);
+    expect(rec.hasSource).toBe(true);
+  });
+
+  it("flags hasSource=false for an ordinary note with no `source:` key", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "plain",
+          frontmatter_bytes: "title: Ordinary\nupdated: 2026-06-20T10:00:00Z\n",
+          first_h1_line: null,
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["plain"]);
+    expect(rec.hasSource).toBe(false);
+  });
+
+  it("flags hasSource=false when no frontmatter is present", async () => {
+    invokeMock.mockResolvedValueOnce([
+      {
+        Ok: {
+          note_uuid: "nofm",
+          frontmatter_bytes: null,
+          first_h1_line: "# Body only",
+        },
+      },
+    ]);
+    const [rec] = await loadNoteBatch(["nofm"]);
+    expect(rec.hasSource).toBe(false);
+  });
+
+  it("flags hasSource=false on a per-item error record", async () => {
+    invokeMock.mockResolvedValueOnce([{ Err: { kind: "CannotDecrypt" } }]);
+    const [rec] = await loadNoteBatch(["bad"]);
+    expect(rec.hasSource).toBe(false);
+  });
+});
+
 describe("loadNoteBatch — per-item error pass-through", () => {
   it("surfaces per-item Err as TitleRecord with error + null title", async () => {
     invokeMock.mockResolvedValueOnce([
