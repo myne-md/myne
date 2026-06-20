@@ -1,14 +1,19 @@
+import { useState } from "react";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
+import { JoinDeviceModal } from "../components/sync/JoinDeviceModal";
 
 interface WelcomeProps {
   onCreateVault: () => void;
   /** Fresh-install restore door (MYND-56; the user-guide UX contract). */
   onRestoreBackup: () => void;
+  /** Device-join succeeded (vault bootstrapped + unlocked) → editor (MYND-424). */
+  onJoined: (vaultId: string) => void;
 }
 
-export function Welcome({ onCreateVault, onRestoreBackup }: WelcomeProps) {
+export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomeProps) {
+  const [joinOpen, setJoinOpen] = useState(false);
   return (
     <div
       data-testid="welcome.root"
@@ -97,12 +102,29 @@ export function Welcome({ onCreateVault, onRestoreBackup }: WelcomeProps) {
           >
             Restore from backup
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setJoinOpen(true)}
+            data-testid="welcome.join-cta"
+          >
+            Add this device to an account
+          </Button>
         </div>
 
         <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 8 }}>
           v0.1 pre-alpha
         </div>
       </div>
+
+      {joinOpen && (
+        <JoinDeviceModal
+          onCancel={() => setJoinOpen(false)}
+          onJoined={(vaultId) => {
+            setJoinOpen(false);
+            onJoined(vaultId);
+          }}
+        />
+      )}
     </div>
   );
 }

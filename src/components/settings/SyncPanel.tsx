@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
+import { EndpointConfig } from "../sync/EndpointConfig";
 import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
@@ -112,6 +113,16 @@ export function SyncPanel() {
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
+      <div style={BLOCK_STYLE}>
+        <span style={LABEL_STYLE}>Sync server</span>
+        <EndpointConfig />
+        <p style={HELPER_STYLE}>
+          Enter the same server URL on every device. For a self-hosted server use
+          its <code>https://</code> address; verify the certificate fingerprint
+          matches across your devices.
+        </p>
+      </div>
+
       <div style={BLOCK_STYLE}>
         <span style={LABEL_STYLE}>Sync status</span>
         <SyncStatusIndicator />

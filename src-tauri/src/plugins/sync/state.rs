@@ -96,6 +96,12 @@ pub struct SyncState {
     /// `vault.meta` hash is a different, 32-byte value).
     #[serde(default)]
     pub account_hash_hex: Option<String>,
+    /// The canonical account-number display string — the SCRAM username. Captured
+    /// at enrollment so a still-`pending` device can re-run the handshake to
+    /// **claim its token** once an existing device approves it (no credential
+    /// re-entry needed; the unlocked `root_key` re-derives the SCRAM secret).
+    #[serde(default)]
+    pub account_display: Option<String>,
 }
 
 impl SyncState {

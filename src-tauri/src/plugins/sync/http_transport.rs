@@ -54,7 +54,7 @@ impl SyncTransport for HttpTransport {
 
 /// Parse `scheme://host[:port]` → `(scheme, host, port)`. https defaults to 443;
 /// http requires an explicit port (the loopback dev/harness convention).
-fn parse_endpoint(url: &str) -> Option<(String, String, u16)> {
+pub fn parse_endpoint(url: &str) -> Option<(String, String, u16)> {
     let (scheme, rest) = url.split_once("://")?;
     let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
     let authority = &rest[..authority_end];

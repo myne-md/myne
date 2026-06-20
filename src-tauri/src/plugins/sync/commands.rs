@@ -62,18 +62,77 @@ pub async fn sync_get_endpoint<R: Runtime>(
     read_config(&path)
 }
 
-/// Set (or clear, with `None`) the device-local sync endpoint URL. Validates the
-/// URL against the A4/TB5 policy before persisting (atomic replace).
+fn hex_lower(b: &[u8]) -> String {
+    let mut s = String::with_capacity(b.len() * 2);
+    for x in b {
+        s.push_str(&format!("{x:02x}"));
+    }
+    s
+}
+
+/// Parse a 64-char lowercase-hex cert pin into raw SHA-256 bytes.
+fn parse_pin_hex(s: &str) -> Option<[u8; 32]> {
+    if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut out = [0u8; 32];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
+/// The TOFU-stored cert pins to verify an `https` connection against. Empty for a
+/// loopback `http` endpoint or an unpinned config (the loopback path ignores it).
+fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
+    cfg.cert_pin_hex
+        .as_deref()
+        .and_then(parse_pin_hex)
+        .map(|p| vec![p])
+        .unwrap_or_default()
+}
+
+/// Set (or clear, with `None`) the sync endpoint. Validates against the A4/TB5
+/// policy, then — for an `https` endpoint — **TOFU-pins the server's leaf cert**
+/// and returns its fingerprint (lowercase SHA-256 hex) for the user to
+/// eye-compare across devices (`self-host-policy.md` §6). A loopback `http`
+/// endpoint has no TLS, so it returns `None`. Clearing drops the pin too.
 #[tauri::command]
 pub async fn sync_set_endpoint<R: Runtime>(
     app: AppHandle<R>,
     endpoint_url: Option<String>,
-) -> Result<(), SyncConfigError> {
-    if let Some(url) = endpoint_url.as_deref() {
-        validate_endpoint_url(url)?;
-    }
+) -> Result<Option<String>, SyncConfigError> {
     let path = config_path(&app)?;
-    write_config(&path, &SyncEndpointConfig { endpoint_url })
+    let Some(url) = endpoint_url else {
+        write_config(&path, &SyncEndpointConfig::default())?;
+        return Ok(None);
+    };
+    validate_endpoint_url(&url)?;
+    let (scheme, host, port) =
+        super::http_transport::parse_endpoint(&url).ok_or(SyncConfigError::InvalidUrl)?;
+    let cert_pin_hex = if scheme == "https" {
+        // Reach the server once, accept-and-record its cert, pin it (blocking).
+        let pin = tokio::task::spawn_blocking(move || {
+            super::rustls_transport::tofu_fetch_pin(&host, port)
+        })
+        .await
+        .map_err(|_| SyncConfigError::Io {
+            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+        })?
+        .map_err(|_| SyncConfigError::InvalidUrl)?; // couldn't reach / handshake
+        Some(hex_lower(&pin))
+    } else {
+        None
+    };
+    let fingerprint = cert_pin_hex.clone();
+    write_config(
+        &path,
+        &SyncEndpointConfig {
+            endpoint_url: Some(url),
+            cert_pin_hex,
+        },
+    )?;
+    Ok(fingerprint)
 }
 
 /// Derive the runtime status from the available signals. With the engine loop
@@ -110,6 +169,51 @@ pub enum CycleOutcome {
     Failed,
 }
 
+/// A still-`pending` device claims its token by re-running the SCRAM handshake
+/// under the unlocked `root_key` (the verifier is already registered). Returns
+/// the token once an existing device has approved this one, else `None` (still
+/// pending / unreachable). Stores the token device-local on success.
+#[allow(clippy::too_many_arguments)]
+async fn try_claim_token(
+    url: String,
+    pins: Vec<[u8; 32]>,
+    dir: std::path::PathBuf,
+    root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    account_hash: [u8; 16],
+    device_id: [u8; 16],
+    username: String,
+) -> Option<Vec<u8>> {
+    tokio::task::spawn_blocking(move || {
+        let transport = super::http_transport::build_transport(&url, pins).ok()?;
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let mut nonce = [0u8; 16];
+        getrandom::getrandom(&mut nonce).ok()?;
+        let mut client_nonce = String::with_capacity(32);
+        for b in &nonce {
+            client_nonce.push_str(&format!("{b:02x}"));
+        }
+        let out = enroll::enroll(
+            transport.as_ref(),
+            &account_hash,
+            &username,
+            secret.as_slice(),
+            EnrollPath::Password,
+            &client_nonce,
+            device_id,
+        )
+        .ok()?;
+        if out.approved && !out.token.is_empty() {
+            super::token_store::store_token_fallback(&dir, &out.token).ok()?;
+            Some(out.token)
+        } else {
+            None // still pending approval
+        }
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 /// Gather the active vault's sync inputs (endpoint, enrollment identity, token,
 /// `root_key`) and run one [`run_sync_cycle`](super::orchestrator::run_sync_cycle)
 /// off-thread. `allow_push=false` is a poll-driven pull-only cycle (coalescing —
@@ -119,6 +223,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let Ok(cfg) = config_path(app).and_then(|p| read_config(&p)) else {
         return CycleOutcome::Failed;
     };
+    let pins = config_pins(&cfg);
     let Some(url) = cfg.endpoint_url else {
         return CycleOutcome::Disabled;
     };
@@ -129,18 +234,40 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
         return CycleOutcome::NotReady;
     };
     let st = super::state::read_sync_state(&dir).unwrap_or_default();
-    let (Some(acct_hex), Some(dev_hex)) = (st.account_hash_hex, st.device_id_hex) else {
+    let (Some(acct_hex), Some(dev_hex)) = (st.account_hash_hex.clone(), st.device_id_hex.clone())
+    else {
         return CycleOutcome::NotReady; // not enrolled
     };
     let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
         return CycleOutcome::Failed;
     };
-    let token = match super::token_store::read_token_fallback(&dir) {
-        Ok(Some(t)) => t,
-        _ => return CycleOutcome::NotReady, // no token → not enrolled
-    };
     let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
         return CycleOutcome::NotReady; // vault locked
+    };
+    // Token: the stored per-device token, or — for a still-pending device — one
+    // claimed now if an existing device has just approved it (re-handshake under
+    // the unlocked root_key). Still pending → nothing to sync this tick.
+    let token = match super::token_store::read_token_fallback(&dir) {
+        Ok(Some(t)) => t,
+        _ => {
+            let Some(username) = st.account_display.clone() else {
+                return CycleOutcome::NotReady;
+            };
+            match try_claim_token(
+                url.clone(),
+                pins.clone(),
+                dir.clone(),
+                root_key.clone(),
+                account_hash,
+                device_id,
+                username,
+            )
+            .await
+            {
+                Some(t) => t,
+                None => return CycleOutcome::NotReady, // still pending approval
+            }
+        }
     };
 
     let mut token_hex = String::with_capacity(token.len() * 2);
@@ -150,7 +277,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let notes_dir = dir.join("notes");
 
     let res = tokio::task::spawn_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, Vec::new()).map_err(|_| ())?;
+        let transport = super::http_transport::build_transport(&url, pins).map_err(|_| ())?;
         super::orchestrator::run_sync_cycle(
             transport.as_ref(),
             &root_key,
@@ -257,8 +384,9 @@ async fn authed_transport<R: Runtime>(
     }
     let cfg_path = config_path(app).map_err(|_| SyncDeviceError::Internal)?;
     let cfg = read_config(&cfg_path).map_err(|_| SyncDeviceError::NotConfigured)?;
+    let pins = config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
-    let transport = super::http_transport::build_transport(&url, Vec::new())
+    let transport = super::http_transport::build_transport(&url, pins)
         .map_err(|_| SyncDeviceError::Transport)?;
     Ok((token_hex, transport))
 }
@@ -355,6 +483,7 @@ pub async fn sync_enroll<R: Runtime>(
         .map_err(|_| SyncDeviceError::Internal)?;
     let cfg_path = config_path(&app).map_err(|_| SyncDeviceError::Internal)?;
     let cfg = read_config(&cfg_path).map_err(|_| SyncDeviceError::NotConfigured)?;
+    let pins = config_pins(&cfg);
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
 
     let account =
@@ -367,7 +496,7 @@ pub async fn sync_enroll<R: Runtime>(
     let username = account.display.clone();
 
     let outcome = tokio::task::spawn_blocking(move || -> Result<bool, SyncDeviceError> {
-        let transport = super::http_transport::build_transport(&url, Vec::new())
+        let transport = super::http_transport::build_transport(&url, pins)
             .map_err(|_| SyncDeviceError::Transport)?;
 
         // 1. Obtain vault.meta. A returning device fetches it pre-auth from the
@@ -483,6 +612,19 @@ pub async fn sync_enroll<R: Runtime>(
         // 6. On approval: store the token, seed vault.meta to the server (so the
         //    next device can fetch it), and persist the account/device identity
         //    sync_now needs to author heads.
+        // Persist the device identity ALWAYS (even when pending), so a pending
+        // device can later claim its token by re-running the handshake under the
+        // unlocked root_key once an existing device approves it.
+        let mut st = super::state::read_sync_state(&dir).unwrap_or_default();
+        st.account_hash_hex = Some(acct_hex.clone());
+        let mut dev_hex = String::with_capacity(32);
+        for b in &device_id {
+            dev_hex.push_str(&format!("{b:02x}"));
+        }
+        st.device_id_hex = Some(dev_hex);
+        st.account_display = Some(username.clone());
+        let _ = super::state::write_sync_state(&dir, &st);
+
         if out.approved && !out.token.is_empty() {
             super::token_store::store_token_fallback(&dir, &out.token)
                 .map_err(|_| SyncDeviceError::Internal)?;
@@ -492,15 +634,6 @@ pub async fn sync_enroll<R: Runtime>(
             }
             // Best-effort seed (a returning device's meta already matches).
             let _ = enroll::put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes);
-
-            let mut st = super::state::read_sync_state(&dir).unwrap_or_default();
-            st.account_hash_hex = Some(acct_hex.clone());
-            let mut dev_hex = String::with_capacity(32);
-            for b in &device_id {
-                dev_hex.push_str(&format!("{b:02x}"));
-            }
-            st.device_id_hex = Some(dev_hex);
-            let _ = super::state::write_sync_state(&dir, &st);
         }
         Ok(out.approved)
     })
@@ -508,6 +641,163 @@ pub async fn sync_enroll<R: Runtime>(
     .map_err(|_| SyncDeviceError::Internal)??;
 
     Ok(EnrollResult { approved: outcome })
+}
+
+/// Outcome of joining an existing account on a fresh device.
+#[derive(Debug, Clone, Serialize)]
+pub struct JoinResult {
+    /// The new local vault's id — the frontend routes to its unlocked editor.
+    pub vault_id: String,
+    /// True when the device is pending approval by an existing device (the
+    /// common password-path case); false if it was approved immediately.
+    pub pending: bool,
+    /// The server cert fingerprint (https) for eye-compare, or `null` (loopback).
+    pub fingerprint: Option<String>,
+}
+
+/// **Add this device to an existing account.** On a fresh device, bootstrap the
+/// whole local vault from the server: TOFU-pin the endpoint, fetch the account's
+/// `vault.meta` pre-auth, derive `root_key` from `{account# + password}`, write
+/// the meta to a NEW local vault + unlock it, then SCRAM-enroll (password →
+/// **pending** until an existing device approves). No 24-word recovery. After
+/// approval the background loop claims the token + pulls the account's notes.
+#[tauri::command]
+pub async fn sync_join_account<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    server_url: String,
+    account_number: String,
+    password: String,
+) -> Result<JoinResult, SyncDeviceError> {
+    let password = Zeroizing::new(password);
+
+    // 1. Set + TOFU-pin the endpoint (https) before any transport use.
+    let fingerprint = sync_set_endpoint(app.clone(), Some(server_url))
+        .await
+        .map_err(|_| SyncDeviceError::NotConfigured)?;
+    let cfg = read_config(&config_path(&app).map_err(|_| SyncDeviceError::Internal)?)
+        .map_err(|_| SyncDeviceError::NotConfigured)?;
+    let pins = config_pins(&cfg);
+    let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
+
+    let account =
+        parse_account_number(account_number.trim()).map_err(|_| SyncDeviceError::BadRequest)?;
+    let account_hash = account.hash;
+    let username = account.display;
+    let acct_hex = {
+        let mut s = String::with_capacity(32);
+        for b in &account_hash {
+            s.push_str(&format!("{b:02x}"));
+        }
+        s
+    };
+
+    // 2. Fetch the account's vault.meta pre-auth (AEAD-protected — useless
+    //    without the credential, the accepted A4-equivalent exposure).
+    let url_fetch = url.clone();
+    let pins_fetch = pins.clone();
+    let acct_q = acct_hex.clone();
+    let meta_bytes: Vec<u8> =
+        tokio::task::spawn_blocking(move || -> Result<Vec<u8>, SyncDeviceError> {
+            let transport = super::http_transport::build_transport(&url_fetch, pins_fetch)
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let resp = transport
+                .request(
+                    super::transport::HttpMethod::Get,
+                    &format!("/vault.meta?account={acct_q}"),
+                    &[],
+                    None,
+                )
+                .map_err(|_| SyncDeviceError::Transport)?;
+            if resp.status != 200 {
+                return Err(SyncDeviceError::DeviceNotFound); // no such account seeded
+            }
+            Ok(resp.body)
+        })
+        .await
+        .map_err(|_| SyncDeviceError::Internal)??;
+    parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?; // must be real meta
+
+    // 3. Mint a fresh local vault, write the fetched meta, and UNLOCK it (the
+    //    normal password-unlock path derives root_key + items_key).
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let vault_id = crate::vault_registry::mint_unique_vault_id(&base);
+    let vault_dir = crate::paths::vault_dir_for_id(&app, Some(vault_id))
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let meta_path = vault_dir.join("vault.meta");
+    crate::atomic_write::atomic_write(&meta_path, &meta_bytes, false)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    crate::plugins::vault_unlock::commands::unlock_with_path(
+        (*password).clone(),
+        Some(vault_id),
+        &meta_path,
+        state.inner(),
+    )
+    .await
+    .map_err(|_| SyncDeviceError::BadRequest)?; // wrong account# / password
+
+    // 4. Register the verifier + SCRAM enroll (password → pending). The SCRAM
+    //    secret is re-derived from the now-unlocked root_key (no credential reuse).
+    let root_key = state
+        .peek_unlocked_root_key_clone()
+        .await
+        .ok_or(SyncDeviceError::Internal)?;
+    let approved = tokio::task::spawn_blocking(move || -> Result<bool, SyncDeviceError> {
+        let transport = super::http_transport::build_transport(&url, pins)
+            .map_err(|_| SyncDeviceError::Transport)?;
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        enroll::register_verifier(
+            transport.as_ref(),
+            &account_hash,
+            &username,
+            secret.as_slice(),
+        )
+        .map_err(|_| SyncDeviceError::Transport)?;
+        let device_id = enroll::generate_device_id();
+        let mut nonce = [0u8; 16];
+        getrandom::getrandom(&mut nonce).map_err(|_| SyncDeviceError::Internal)?;
+        let mut client_nonce = String::with_capacity(32);
+        for b in &nonce {
+            client_nonce.push_str(&format!("{b:02x}"));
+        }
+        let out = enroll::enroll(
+            transport.as_ref(),
+            &account_hash,
+            &username,
+            secret.as_slice(),
+            EnrollPath::Password,
+            &client_nonce,
+            device_id,
+        )
+        .map_err(|_| SyncDeviceError::Unauthenticated)?;
+
+        // Persist identity so the loop can claim the token after approval.
+        let mut st = super::state::read_sync_state(&vault_dir).unwrap_or_default();
+        st.account_hash_hex = Some(acct_hex);
+        let mut dev_hex = String::with_capacity(32);
+        for b in &device_id {
+            dev_hex.push_str(&format!("{b:02x}"));
+        }
+        st.device_id_hex = Some(dev_hex);
+        st.account_display = Some(username);
+        let _ = super::state::write_sync_state(&vault_dir, &st);
+        if out.approved && !out.token.is_empty() {
+            super::token_store::store_token_fallback(&vault_dir, &out.token)
+                .map_err(|_| SyncDeviceError::Internal)?;
+        }
+        Ok(out.approved)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)??;
+
+    Ok(JoinResult {
+        vault_id: vault_id.to_string(),
+        pending: !approved,
+        fingerprint,
+    })
 }
 
 #[cfg(test)]
