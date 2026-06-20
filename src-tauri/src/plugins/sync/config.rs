@@ -30,6 +30,12 @@ pub struct SyncEndpointConfig {
     /// Validated by [`validate_endpoint_url`] before it is ever stored.
     #[serde(default)]
     pub endpoint_url: Option<String>,
+    /// The TOFU-pinned server leaf-cert pin (SHA-256 of its DER, lowercase hex)
+    /// for an `https` endpoint — captured at `sync_set_endpoint` time and the A4
+    /// trust anchor every later connection verifies against. `None` for a
+    /// loopback `http` endpoint (no TLS) or before the endpoint is pinned.
+    #[serde(default)]
+    pub cert_pin_hex: Option<String>,
 }
 
 /// Failure surface for reading/writing/validating the endpoint config.
@@ -189,6 +195,7 @@ mod tests {
 
         let cfg = SyncEndpointConfig {
             endpoint_url: Some("https://sync.myne.md".into()),
+            cert_pin_hex: Some("ab".repeat(32)),
         };
         write_config(&path, &cfg).unwrap();
         assert_eq!(read_config(&path).unwrap(), cfg);

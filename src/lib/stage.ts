@@ -413,6 +413,13 @@ export type Action =
   | { type: "picker.create-vault" }
   /** welcome → restore-backup (fresh-install restore, user-guide UX contract). */
   | { type: "welcome.restore-backup" }
+  /**
+   * welcome → editor (MYND-424). "Add this device to an existing account":
+   * `sync_join_account` bootstrapped + UNLOCKED a fresh local vault from the
+   * server's meta, so the device lands straight in the editor (sync pending
+   * until an existing device approves). `vaultId` is the joined vault's id.
+   */
+  | { type: "welcome.join-success"; vaultId?: VaultId }
   /** picker → restore-backup ("restore an additional vault", SYNC-5 KeepBoth door). */
   | { type: "picker.restore-backup" }
   /**
@@ -446,6 +453,10 @@ export function transition(prev: Stage, action: Action): Stage {
           return { name: "create-vault", briefing: true };
         case "welcome.restore-backup":
           return { name: "restore-backup", entry: "welcome" };
+        case "welcome.join-success":
+          // Device-join bootstrapped + unlocked a fresh local vault — land in
+          // the editor directly, vault-addressed (MYND-424).
+          return { name: "editor", vaultId: action.vaultId };
         default:
           return rejectIllegal(prev, action);
       }
@@ -803,6 +814,7 @@ const LEGAL: Record<string, Stage["name"]> = {
   // `restore-backup.*` exit arms exist by design (same posture as
   // back-from-create).
   "welcome|welcome.restore-backup": "restore-backup",
+  "welcome|welcome.join-success": "editor",
   "picker|picker.restore-backup": "restore-backup",
   "unlock|unlock.restore-backup": "restore-backup",
   "editor|editor.restore-backup": "restore-backup",
@@ -844,6 +856,7 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
 ];
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
+  { type: "welcome.join-success" },
   { type: "create-vault.start" },
   { type: "create-vault.commit-success" },
   { type: "create-vault.auto-unlock-success" },

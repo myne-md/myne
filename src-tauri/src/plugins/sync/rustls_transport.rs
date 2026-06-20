@@ -96,6 +96,96 @@ pub fn cert_pin(cert_der: &[u8]) -> [u8; 32] {
     out
 }
 
+/// A **trust-on-first-use** verifier: it accepts ANY server certificate and
+/// **records** the leaf DER, so a one-shot bootstrap handshake can read back the
+/// cert to pin. Used ONLY by [`tofu_fetch_pin`]; the production transport always
+/// pins (`PinnedVerifier`). The self-host model TOFU-pins the operator's cert +
+/// shows a fingerprint for out-of-band eye-compare (`self-host-policy.md` §6).
+#[derive(Debug)]
+struct TofuVerifier {
+    captured: std::sync::Arc<std::sync::Mutex<Option<Vec<u8>>>>,
+    algs: WebPkiSupportedAlgorithms,
+}
+
+impl ServerCertVerifier for TofuVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        // TOFU: capture the leaf and accept — the caller pins it, never us.
+        if let Ok(mut slot) = self.captured.lock() {
+            *slot = Some(end_entity.as_ref().to_vec());
+        }
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls12_signature(message, cert, dss, &self.algs)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        verify_tls13_signature(message, cert, dss, &self.algs)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.algs.supported_schemes()
+    }
+}
+
+/// TOFU-fetch the server's leaf-cert pin (SHA-256 of its DER): open ONE TLS
+/// handshake to `host:port` accepting any cert, capture the leaf, return its pin.
+/// The caller persists the pin (sync-config) + surfaces the fingerprint for the
+/// user to eye-compare across devices (defeats a per-device MitM). Blocking —
+/// call from `spawn_blocking`.
+pub fn tofu_fetch_pin(host: &str, port: u16) -> Result<[u8; 32], TransportError> {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let captured = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let verifier = Arc::new(TofuVerifier {
+        captured: captured.clone(),
+        algs: provider.signature_verification_algorithms,
+    });
+    let config = ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|_| TransportError::Tls)?
+        .dangerous()
+        .with_custom_certificate_verifier(verifier)
+        .with_no_client_auth();
+    let server_name =
+        ServerName::try_from(host.to_string()).map_err(|_| TransportError::BadRequest)?;
+    let mut conn =
+        ClientConnection::new(Arc::new(config), server_name).map_err(|_| TransportError::Tls)?;
+    let mut sock = TcpStream::connect((host, port)).map_err(|_| TransportError::Network)?;
+    // Drive the handshake to completion so `verify_server_cert` fires + captures.
+    while conn.is_handshaking() {
+        let (rd, wr) = conn
+            .complete_io(&mut sock)
+            .map_err(|_| TransportError::Tls)?;
+        if rd == 0 && wr == 0 {
+            break; // no progress (peer closed mid-handshake)
+        }
+    }
+    let der = captured
+        .lock()
+        .ok()
+        .and_then(|mut s| s.take())
+        .ok_or(TransportError::Tls)?;
+    Ok(cert_pin(&der))
+}
+
 /// The raw-rustls transport: a pinned `ClientConfig` + the target host/port.
 /// One instance is the single TLS layer auth + sync share (SYNC-3).
 pub struct RustlsTransport {
@@ -237,5 +327,110 @@ mod tests {
             Err(rustls::Error::General(msg)) => assert!(msg.contains("pin mismatch")),
             other => panic!("unpinned cert must be rejected (A4), got {other:?}"),
         }
+    }
+
+    // --- real TLS round-trip: TOFU-fetch the pin, then prove pinning ----------
+
+    const TEST_CERT_DER: &[u8] = include_bytes!("test_fixtures/localhost.cert.der");
+    const TEST_KEY_DER: &[u8] = include_bytes!("test_fixtures/localhost.key.der");
+
+    /// Spawn a minimal rustls TLS server (self-signed `localhost` cert) that
+    /// accepts + handshakes `n` connections on an ephemeral port. Returns the
+    /// bound port.
+    fn spawn_tls_server(n: usize) -> u16 {
+        use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
+        use rustls::{ServerConfig, ServerConnection};
+        use std::net::TcpListener;
+
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let cert = CertificateDer::from(TEST_CERT_DER.to_vec());
+        let key = PrivatePkcs8KeyDer::from(TEST_KEY_DER.to_vec());
+        let config = ServerConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_no_client_auth()
+            .with_single_cert(vec![cert], key.into())
+            .expect("server cert + key load");
+        let config = Arc::new(config);
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for _ in 0..n {
+                let Ok((mut sock, _)) = listener.accept() else {
+                    return;
+                };
+                let mut conn = ServerConnection::new(config.clone()).unwrap();
+                // Drive the server side of the handshake; a client that drops
+                // after verifying (the pin-reject case) just closes early.
+                while conn.is_handshaking() {
+                    match conn.complete_io(&mut sock) {
+                        Ok((0, 0)) => break,
+                        Ok(_) => {}
+                        Err(_) => break,
+                    }
+                }
+            }
+        });
+        port
+    }
+
+    /// Complete ONLY a pinned TLS handshake (no app data) against `host:port`,
+    /// returning `Ok(())` iff the pin verified.
+    fn pinned_handshake(host: &str, port: u16, pin: [u8; 32]) -> Result<(), ()> {
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let verifier = Arc::new(PinnedVerifier {
+            pins: vec![pin],
+            algs: provider.signature_verification_algorithms,
+        });
+        let config = ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .dangerous()
+            .with_custom_certificate_verifier(verifier)
+            .with_no_client_auth();
+        let name = ServerName::try_from(host.to_string()).map_err(|_| ())?;
+        let mut conn = ClientConnection::new(Arc::new(config), name).map_err(|_| ())?;
+        let mut sock = TcpStream::connect((host, port)).map_err(|_| ())?;
+        while conn.is_handshaking() {
+            match conn.complete_io(&mut sock) {
+                Ok((0, 0)) => break,
+                Ok(_) => {}
+                Err(_) => return Err(()),
+            }
+        }
+        if conn.is_handshaking() {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn tofu_fetch_pins_real_cert_then_pinning_accepts_it_and_rejects_others() {
+        // Three handshakes: the TOFU fetch + the accept-pin proof + the
+        // reject-pin proof.
+        let port = spawn_tls_server(3);
+        std::thread::sleep(std::time::Duration::from_millis(100)); // let it bind
+
+        // 1. TOFU-fetch the server's pin; it must equal the cert's SHA-256.
+        let pin = tofu_fetch_pin("localhost", port).expect("TOFU fetch");
+        assert_eq!(
+            pin,
+            cert_pin(TEST_CERT_DER),
+            "TOFU captured the real leaf cert"
+        );
+
+        // 2. A pinned handshake with that exact pin succeeds (A4 accept path).
+        assert!(
+            pinned_handshake("localhost", port, pin).is_ok(),
+            "the correct pin verifies the real cert"
+        );
+
+        // 3. A pinned handshake with a wrong pin fails (A4 reject path).
+        assert!(
+            pinned_handshake("localhost", port, [0u8; 32]).is_err(),
+            "a wrong pin rejects the cert"
+        );
     }
 }

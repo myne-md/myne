@@ -63,6 +63,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_approve_device,
             commands::sync_remove_device,
             commands::sync_enroll,
+            commands::sync_join_account,
         ])
         .build()
 }

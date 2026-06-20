@@ -25,6 +25,7 @@ permissions = [
     "allow-sync-approve-device",
     "allow-sync-remove-device",
     "allow-sync-enroll",
+    "allow-sync-join-account",
 ]
 
 [[permission]]
@@ -66,3 +67,8 @@ commands.allow = ["sync_remove_device"]
 identifier = "allow-sync-enroll"
 description = "Allow invoking sync:sync_enroll (new-device enrollment: fetch vault.meta pre-auth, derive root_key from {account#+password/phrase}, SCRAM-enroll, store the per-device token)."
 commands.allow = ["sync_enroll"]
+
+[[permission]]
+identifier = "allow-sync-join-account"
+description = "Allow invoking sync:sync_join_account (add this device to an existing account: TOFU-pin the endpoint, fetch vault.meta pre-auth, bootstrap a NEW local vault from {account#+password}, unlock it, SCRAM-enroll password-path → pending). Materializes a vault dir; gated on the same A4/TB5 transport policy."
+commands.allow = ["sync_join_account"]

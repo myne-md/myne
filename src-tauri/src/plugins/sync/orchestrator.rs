@@ -292,10 +292,18 @@ mod tests {
         p.exists().then_some(p)
     }
 
-    /// Spawn an ephemeral in-memory server; return (guard, base_url).
+    /// Spawn an ephemeral in-memory server; return (guard, base_url). The
+    /// portfile dir is unique per call (process id + a counter) so concurrent
+    /// tests in the same process don't race on a shared portfile.
     fn spawn_server() -> Option<(ServerGuard, String)> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static SEQ: AtomicU64 = AtomicU64::new(0);
         let bin = server_binary()?;
-        let dir = std::env::temp_dir().join(format!("myne-orch-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "myne-orch-test-{}-{}",
+            std::process::id(),
+            SEQ.fetch_add(1, Ordering::Relaxed)
+        ));
         std::fs::create_dir_all(&dir).ok()?;
         let portfile = dir.join("port");
         let _ = std::fs::remove_file(&portfile);
@@ -462,6 +470,139 @@ mod tests {
             plaintext,
             "B decrypts A's note to the same plaintext"
         );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// The "add this device" flow: device B joins an existing account by
+    /// `{account# + password}` → server gates it **pending** (no token) → device
+    /// A approves it → B re-runs the handshake and **claims its token** → B syncs
+    /// and the owner's note lands on B. No recovery phrase. Self-skips without the
+    /// server binary.
+    #[test]
+    fn password_device_join_pending_approve_claim_then_sync() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP password_device_join_...: myne-server binary not found");
+            return;
+        };
+
+        let root_key = [0x55u8; 32];
+        let account_hash = [0x6Bu8; 16];
+        let username = "MY-JOIN-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x12u8; 32];
+        let items_key_id = [0x34u8; 16];
+
+        let dir_a = std::env::temp_dir().join(format!("myne-join-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-join-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        let mk =
+            || crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+
+        // Owner A: author a note, register the verifier, enroll (recovery →
+        // self-approve), push.
+        let note = NoteId::new_v7();
+        let note_bytes = *note.as_uuid().as_bytes();
+        let plaintext = b"note from the owner";
+        let blob = encode_new_note(&items_key, &items_key_id, &note_bytes, plaintext).unwrap();
+        crate::atomic_write::atomic_write(
+            &notes_a.join(format!("{}.myn", note.as_uuid())),
+            &blob,
+            false,
+        )
+        .unwrap();
+        let ta = mk();
+        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        let dev_a = enroll::generate_device_id();
+        let out_a = enroll::enroll(
+            ta.as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            dev_a,
+        )
+        .unwrap();
+        let tok_a = hex32(&out_a.token);
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .unwrap();
+
+        // Device B joins via PASSWORD → the server gates it pending (no token).
+        let dev_b = enroll::generate_device_id();
+        let out_b = enroll::enroll(
+            mk().as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Password,
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            dev_b,
+        )
+        .unwrap();
+        assert!(!out_b.approved, "a password device starts pending");
+        assert!(out_b.token.is_empty(), "a pending device has no token yet");
+
+        // Owner A approves B.
+        crate::plugins::sync::devices::approve_device(ta.as_ref(), &tok_a, &dev_b).unwrap();
+
+        // B CLAIMS its token by re-running the handshake with the same device_id.
+        let out_b2 = enroll::enroll(
+            mk().as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Password,
+            "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            dev_b,
+        )
+        .unwrap();
+        assert!(
+            out_b2.approved,
+            "an approved device claims its token on re-enroll"
+        );
+        assert!(!out_b2.token.is_empty());
+        let tok_b = hex32(&out_b2.token);
+
+        // B syncs → the owner's note lands on B's disk, decrypting to the same text.
+        let pull = run_sync_cycle(
+            mk().as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B sync after join");
+        assert_eq!(pull.pulled, 1, "B pulled the owner's note after joining");
+        let b_path = notes_b.join(format!("{}.myn", note.as_uuid()));
+        assert!(
+            b_path.exists(),
+            "the note materialized on the joined device"
+        );
+        let decrypted = decode_note(
+            &std::fs::read(&b_path).unwrap(),
+            &note_bytes,
+            &items_key,
+            &items_key_id,
+        )
+        .unwrap();
+        assert_eq!(decrypted.plaintext(), plaintext);
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();
