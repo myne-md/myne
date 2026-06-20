@@ -28,6 +28,11 @@ pub struct DeviceEntry {
     pub approved: bool,
     /// True once retired (removed).
     pub retired: bool,
+    /// True for the device this client is running on (the roster the server
+    /// returns never sets it — `sync_list_devices` marks it client-side by
+    /// matching the locally-stored `device_id`). Lets the UI badge "This device".
+    #[serde(default)]
+    pub is_current: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -397,11 +397,23 @@ pub async fn sync_list_devices<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<DeviceEntry>, SyncDeviceError> {
+    // The locally-stored device_id identifies which roster entry is "this
+    // device" (the server roster never marks it — it cannot know which client is
+    // asking). Read it before consuming `state` in `authed_transport`.
+    let current_device = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .ok()
+        .and_then(|dir| super::state::read_sync_state(&dir).ok())
+        .and_then(|st| st.device_id_hex);
     let (token, transport) = authed_transport(&app, state.inner()).await?;
-    tokio::task::spawn_blocking(move || devices::list_devices(transport.as_ref(), &token))
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?
-        .map_err(SyncDeviceError::from_mgmt)
+    let mut roster =
+        tokio::task::spawn_blocking(move || devices::list_devices(transport.as_ref(), &token))
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .map_err(SyncDeviceError::from_mgmt)?;
+    for d in &mut roster {
+        d.is_current = Some(&d.device_id_hex) == current_device.as_ref();
+    }
+    Ok(roster)
 }
 
 /// Approve a pending device (the existing unlocked device authorizes it).

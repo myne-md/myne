@@ -44,6 +44,17 @@ const BTN: CSSProperties = {
   color: "var(--fg-1)",
 };
 
+const BADGE: CSSProperties = {
+  marginLeft: "var(--space-2)",
+  padding: "0 var(--space-1)",
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--accent-fg, var(--fg-2))",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  whiteSpace: "nowrap",
+};
+
 /** A short, stable display name from the device_id (until editable names land). */
 function shortName(d: DeviceEntry): string {
   return `Device ${d.device_id_hex.slice(0, 6)}`;
@@ -93,17 +104,30 @@ export function DeviceManagementPanel() {
           <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>No devices synced yet.</div>
         ) : (
           approved.map((d) => (
-            <div key={d.device_id_hex} style={ROW} data-testid="sync.device-row" data-device-id={d.device_id_hex}>
-              <span>{shortName(d)}</span>
-              <button
-                type="button"
-                style={BTN}
-                disabled={busy}
-                onClick={() => void remove(d.device_id_hex)}
-                data-testid="sync.remove-device"
-              >
-                Remove
-              </button>
+            <div key={d.device_id_hex} style={ROW} data-testid="sync.device-row" data-device-id={d.device_id_hex} data-current={d.is_current ? "true" : "false"}>
+              <span>
+                {shortName(d)}
+                {d.is_current && (
+                  <span style={BADGE} data-testid="sync.this-device">
+                    This device
+                  </span>
+                )}
+              </span>
+              {d.is_current ? (
+                <span style={{ color: "var(--fg-3)", fontSize: "var(--text-xs)" }}>
+                  Synced here
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  style={BTN}
+                  disabled={busy}
+                  onClick={() => void remove(d.device_id_hex)}
+                  data-testid="sync.remove-device"
+                >
+                  Remove
+                </button>
+              )}
             </div>
           ))
         )}
