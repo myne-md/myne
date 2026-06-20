@@ -24,6 +24,8 @@ pub enum HttpMethod {
     Get,
     /// Push / write-side requests.
     Post,
+    /// Idempotent upload (the `vault.meta` enrollment-bootstrap seed).
+    Put,
 }
 
 /// A transport response: the HTTP status and the opaque body bytes.
@@ -99,6 +101,7 @@ impl FakeTransport {
         let m = match method {
             HttpMethod::Get => "GET",
             HttpMethod::Post => "POST",
+            HttpMethod::Put => "PUT",
         };
         alloc_format(m, path)
     }

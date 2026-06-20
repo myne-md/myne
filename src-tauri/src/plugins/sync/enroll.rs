@@ -133,6 +133,73 @@ pub fn generate_device_id() -> [u8; 16] {
     id
 }
 
+/// The `POST /auth/register` request (mirrors the Go `registerReq`).
+#[derive(Debug, Clone, Serialize)]
+struct RegisterReq<'a> {
+    account_hash_hex: &'a str,
+    username: &'a str,
+    salt_hex: &'a str,
+    iterations: u32,
+    stored_key_hex: &'a str,
+    server_key_hex: &'a str,
+}
+
+/// PBKDF2 iteration count for the SCRAM verifier. The real password-stretching
+/// is the Argon2id that produced `root_key`; `secret` here is already a derived
+/// subkey, so a modest count suffices (the server stores it and echoes it back
+/// on every `/auth/scram/init`).
+pub const SCRAM_REGISTER_ITERATIONS: u32 = 4096;
+
+/// Upload the account's SCRAM verifier (`POST /auth/register`, first-write only).
+/// **Idempotent:** a 409 `already_registered` is treated as success — another
+/// device registered first, and its stored salt is what every later handshake
+/// fetches from `/auth/scram/init`. The salt is freshly CSPRNG-generated; only
+/// the first writer's salt is stored. `stored_key`/`server_key` are functions of
+/// `(secret, salt, iterations)` ONLY (independent of the SCRAM nonces), so empty
+/// nonces are passed to `scram_client_proof` here.
+pub fn register_verifier(
+    transport: &dyn SyncTransport,
+    account_hash: &[u8; 16],
+    username: &str,
+    secret: &[u8],
+) -> Result<(), EnrollError> {
+    let mut salt = [0u8; 16];
+    getrandom::getrandom(&mut salt).map_err(|_| EnrollError::BadResponse)?;
+    let iterations = SCRAM_REGISTER_ITERATIONS;
+    let v = scram_client_proof(secret, &salt, iterations, username, "", "", &[]);
+    let body = serde_json::to_vec(&RegisterReq {
+        account_hash_hex: &hex_encode(account_hash),
+        username,
+        salt_hex: &hex_encode(&salt),
+        iterations,
+        stored_key_hex: &hex_encode(&v.stored_key),
+        server_key_hex: &hex_encode(&v.server_key),
+    })
+    .map_err(|_| EnrollError::BadResponse)?;
+    let resp = transport.request(HttpMethod::Post, "/auth/register", &body, None)?;
+    match resp.status {
+        200 | 409 => Ok(()), // 409 already_registered → idempotent success
+        401 => Err(EnrollError::Unauthenticated),
+        _ => Err(EnrollError::BadResponse),
+    }
+}
+
+/// Seed the account's `vault.meta` on the server (`PUT /vault.meta`, authed) so a
+/// new device can fetch it pre-auth at enrollment. The body is the raw
+/// (AEAD-protected, credential-gated) meta bytes — opaque to the blind server.
+pub fn put_vault_meta(
+    transport: &dyn SyncTransport,
+    token: &str,
+    meta_bytes: &[u8],
+) -> Result<(), EnrollError> {
+    let resp = transport.request(HttpMethod::Put, "/vault.meta", meta_bytes, Some(token))?;
+    match resp.status {
+        200 => Ok(()),
+        401 => Err(EnrollError::Unauthenticated),
+        _ => Err(EnrollError::BadResponse),
+    }
+}
+
 /// Run the SCRAM enrollment handshake for a freshly-generated `device_id`.
 /// `secret` is the server-auth subkey; `client_nonce` SHOULD be CSPRNG (the
 /// caller supplies it so the flow stays deterministic + testable).

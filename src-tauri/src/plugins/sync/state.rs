@@ -61,6 +61,17 @@ pub struct VvObservation {
     pub version_vector: Vec<VvEntryDto>,
 }
 
+/// The last-synced state of one content blob (the per-blob CAS bookkeeping the
+/// orchestrator needs): the server `version` (the push CAS base) and the
+/// `content_nonce` that version carries (the change-detection discriminator).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlobSyncState {
+    /// The server's opaque per-blob version (the next push's `base_version`).
+    pub version: u64,
+    /// The 24-byte `content_nonce` of that synced revision, lowercase hex.
+    pub content_nonce_hex: String,
+}
+
 /// The device-local sync state persisted at `<vault_root>/sync-state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SyncState {
@@ -71,6 +82,20 @@ pub struct SyncState {
     /// The bounded VV-observation log (oldest first).
     #[serde(default)]
     pub vv_log: Vec<VvObservation>,
+    /// Per-blob CAS bookkeeping (`blob_id_hex` → last-synced version + nonce).
+    /// Lets the orchestrator pick each push's `base_version` and detect which
+    /// local notes changed since the last sync. Server-visible metadata only.
+    #[serde(default)]
+    pub blobs: std::collections::BTreeMap<String, BlobSyncState>,
+    /// This device's 16-byte VV-actor `device_id` (lowercase hex), captured at
+    /// enrollment so a later `sync_now` can author heads under the right actor.
+    #[serde(default)]
+    pub device_id_hex: Option<String>,
+    /// The account's 16-byte `account_number_hash` (lowercase hex), captured at
+    /// enrollment so head authoring binds the right account (the on-disk
+    /// `vault.meta` hash is a different, 32-byte value).
+    #[serde(default)]
+    pub account_hash_hex: Option<String>,
 }
 
 impl SyncState {
@@ -200,6 +225,7 @@ mod tests {
         let mut st = SyncState {
             cursor: 42,
             vv_log: Vec::new(),
+            ..SyncState::default()
         };
         st.record_observation(
             &[0x01; 32],

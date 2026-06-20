@@ -18,6 +18,7 @@ pub(crate) fn build_http_request(
     let verb = match method {
         HttpMethod::Get => "GET",
         HttpMethod::Post => "POST",
+        HttpMethod::Put => "PUT",
     };
     let mut head = String::new();
     head.push_str(&format!("{verb} {path} HTTP/1.1\r\n"));
