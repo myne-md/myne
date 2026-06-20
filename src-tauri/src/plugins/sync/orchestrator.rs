@@ -18,6 +18,7 @@
 //! `spawn_blocking`. `vault_root` is where the device-local sync files live
 //! (`sync-state.json`, `vault.head-state`); `notes_dir` is `<vault_root>/notes`.
 
+use super::conflict::{plan_note_keep_both, ConflictCopyPlan};
 use super::engine::{self, PullError, PushBlob, PushError};
 use super::state::{
     read_head_baseline, read_sync_state, write_head_baseline, write_sync_state, BlobSyncState,
@@ -38,6 +39,12 @@ pub struct SyncSummary {
     pub head_advanced: bool,
     /// The advanced pull cursor.
     pub cursor: u64,
+    /// Notes the server advanced concurrently with an unpushed local edit (a true
+    /// keep-both conflict). They are EXCLUDED from this push — pushing a stale
+    /// `base_version` loses the CAS and would wedge the whole batch — and surfaced
+    /// here so the notes layer can materialize the remote revision as a conflict
+    /// copy (the original local edit is never overwritten or lost).
+    pub conflicts: Vec<ConflictCopyPlan>,
 }
 
 /// Sync-cycle failures.
@@ -133,9 +140,40 @@ pub fn run_sync_cycle(
     )
     .map_err(SyncCycleError::Pull)?;
 
+    // --- reconcile the synced baseline (self-heal) ---
+    // For every blob the server reports that we already hold locally, adopt the
+    // server's (version, nonce) as our synced baseline IF we have none recorded.
+    // A prior corrupted cycle (the chunked push-response parse bug) could leave
+    // `state.blobs` empty even though the server already holds our blobs; without
+    // this every locally-held blob re-pushes at base_version 0 and the server CAS
+    // rejects it (409). `or_insert` never clobbers a baseline we already hold.
+    for m in &page.all_metas {
+        if local.contains_key(&m.id) {
+            state
+                .blobs
+                .entry(hex(&m.id))
+                .or_insert_with(|| BlobSyncState {
+                    version: m.version,
+                    content_nonce_hex: hex(&m.content_nonce),
+                });
+        }
+    }
+
     // --- apply remote changes: download + write each changed blob to disk ---
     let mut pulled = 0;
     for c in &page.changed {
+        // Skip a locally-dirty blob: our on-disk copy diverges from the synced
+        // baseline, so this is an unpushed local edit (or a genuine conflict) and
+        // downloading the server's copy would clobber it. The push phase below
+        // sends it; a real concurrent edit surfaces later via keep-both.
+        let baseline_nonce = state
+            .blobs
+            .get(&hex(&c.id))
+            .map(|b| b.content_nonce_hex.clone());
+        let local_nonce = local.get(&c.id).map(|n| hex(n));
+        if baseline_nonce.is_some() && baseline_nonce != local_nonce {
+            continue;
+        }
         let bytes = engine::download_blob(transport, token, &c.id).map_err(SyncCycleError::Pull)?;
         std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
         crate::atomic_write::atomic_write(&blob_path(notes_dir, &c.id), &bytes, true)
@@ -159,7 +197,16 @@ pub fn run_sync_cycle(
     // and fire only after the local-change window elapses (loop_control), so a
     // poll never opens a high-resolution edit-timing channel (resolution-blur).
     let local2 = local_manifest(notes_dir);
+    // The server's current (version, nonce) for every blob it reported — used to
+    // tell a clean local edit (server still at our base) from a true conflict
+    // (server advanced this blob past our synced baseline).
+    let server_meta: HashMap<[u8; 16], (u64, [u8; 24])> = page
+        .all_metas
+        .iter()
+        .map(|m| (m.id, (m.version, m.content_nonce)))
+        .collect();
     let mut to_push: Vec<PushBlob> = Vec::new();
+    let mut conflicts: Vec<ConflictCopyPlan> = Vec::new();
     if allow_push {
         for (id, nonce) in &local2 {
             let id_hex = hex(id);
@@ -167,6 +214,19 @@ pub fn run_sync_cycle(
             let synced = state.blobs.get(&id_hex);
             if synced.map(|b| b.content_nonce_hex.as_str()) == Some(nonce_hex.as_str()) {
                 continue; // already in sync
+            }
+            // True conflict: this note is locally dirty AND the server advanced it
+            // past our synced baseline (a concurrent remote edit). Pushing a stale
+            // base_version loses the blob CAS (BlobStale) and — because the push is
+            // one atomic batch — wedges every OTHER note too. Exclude it and record
+            // a keep-both plan; the local edit stays on disk untouched (no loss).
+            if let Some(b) = synced {
+                if let Some((server_version, remote_nonce)) = server_meta.get(id) {
+                    if *server_version > b.version {
+                        conflicts.push(plan_note_keep_both(id, *remote_nonce));
+                        continue;
+                    }
+                }
             }
             let ciphertext =
                 std::fs::read(blob_path(notes_dir, id)).map_err(|_| SyncCycleError::Io)?;
@@ -259,6 +319,7 @@ pub fn run_sync_cycle(
         pushed,
         head_advanced,
         cursor: state.cursor,
+        conflicts,
     })
 }
 
@@ -310,6 +371,13 @@ mod tests {
         let child = std::process::Command::new(&bin)
             .env("MYNE_SERVER_ADDR", "127.0.0.1:0")
             .env("MYNE_SERVER_PORTFILE", &portfile)
+            // Integration tests exercise sync correctness, not abuse throttling —
+            // lift the per-account rate limit so a multi-hundred-blob cycle isn't
+            // confounded by 429s (the default 256-burst would fail any >256-blob
+            // pull in a single cycle; see the large-vault test + the separate
+            // rate-limit-vs-initial-sync finding).
+            .env("MYNE_RATELIMIT_BURST", "1000000")
+            .env("MYNE_RATELIMIT_REFILL", "1000000")
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn()
@@ -603,6 +671,808 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decrypted.plaintext(), plaintext);
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// Regression: a device that holds the account's blobs locally but whose
+    /// synced baseline (`state.blobs`) was lost — the chunked push-response parse
+    /// bug left it empty even though the server stored the blobs — must SELF-HEAL
+    /// from the pull roster and push only the genuinely-edited blob (NOT re-push
+    /// everything at base_version 0, which the server CAS rejects 409), and must
+    /// not let the pull clobber the unpushed local edit with the server's copy.
+    #[test]
+    fn empty_baseline_self_heals_and_local_edit_pushes() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP empty_baseline_self_heals: myne-server binary not found");
+            return;
+        };
+
+        let root_key = [0x33u8; 32];
+        let account_hash = [0x44u8; 16];
+        let username = "MY-HEAL-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x13u8; 32];
+        let items_key_id = [0x37u8; 16];
+
+        let dir_a = std::env::temp_dir().join(format!("myne-heal-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-heal-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        let note = NoteId::new_v7();
+        let note_bytes = *note.as_uuid().as_bytes();
+        let fname = format!("{}.myn", note.as_uuid());
+
+        // Device A authors a note and pushes it (server stores it at version 1).
+        let blob_v1 = encode_new_note(&items_key, &items_key_id, &note_bytes, b"original").unwrap();
+        crate::atomic_write::atomic_write(&notes_a.join(&fname), &blob_v1, false).unwrap();
+        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        let dev_a = enroll::generate_device_id();
+        let out_a = enroll::enroll(
+            ta.as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            dev_a,
+        )
+        .unwrap();
+        let tok_a = hex32(&out_a.token);
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A initial push");
+
+        // Corruption: clear A's synced baseline — exactly what the chunked
+        // push-response parse bug produced (server got the blob, A never recorded
+        // it). Device identity + cursor are kept.
+        let mut st = crate::plugins::sync::state::read_sync_state(&dir_a).unwrap();
+        assert!(
+            !st.blobs.is_empty(),
+            "baseline populated by the initial push"
+        );
+        st.blobs.clear();
+        crate::plugins::sync::state::write_sync_state(&dir_a, &st).unwrap();
+
+        // A edits the note locally (a fresh content_nonce).
+        let blob_v2 =
+            encode_new_note(&items_key, &items_key_id, &note_bytes, b"edited body").unwrap();
+        crate::atomic_write::atomic_write(&notes_a.join(&fname), &blob_v2, true).unwrap();
+
+        // A syncs: self-heal the baseline + push the edit (no 409), and do NOT
+        // clobber the local edit with the server's v1.
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A heal + push edit");
+        let a_after = std::fs::read(notes_a.join(&fname)).unwrap();
+        let a_dec = decode_note(&a_after, &note_bytes, &items_key, &items_key_id).unwrap();
+        assert_eq!(
+            a_dec.plaintext(),
+            b"edited body",
+            "A's local edit survived (not clobbered by the pull)"
+        );
+
+        // Device B pulls the edit fresh → proves the edit actually propagated.
+        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let dev_b = enroll::generate_device_id();
+        let out_b = enroll::enroll(
+            tb.as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            dev_b,
+        )
+        .unwrap();
+        let tok_b = hex32(&out_b.token);
+        let pull = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull");
+        assert_eq!(pull.pulled, 1, "B pulled the edited note");
+        let b_blob = std::fs::read(notes_b.join(&fname)).unwrap();
+        let b_dec = decode_note(&b_blob, &note_bytes, &items_key, &items_key_id).unwrap();
+        assert_eq!(
+            b_dec.plaintext(),
+            b"edited body",
+            "B sees A's edit (v2 propagated end-to-end)"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// Enroll a device via the recovery path (self-approves). `register` runs the
+    /// one-time SCRAM verifier registration (call it true on the first device).
+    fn enroll_device(
+        url: &str,
+        account_hash: &[u8; 16],
+        username: &str,
+        secret: &[u8],
+        nonce: &str,
+        register: bool,
+    ) -> (Box<dyn SyncTransport>, [u8; 16], String) {
+        let t = crate::plugins::sync::http_transport::build_transport(url, Vec::new()).unwrap();
+        if register {
+            enroll::register_verifier(t.as_ref(), account_hash, username, secret).unwrap();
+        }
+        let dev = enroll::generate_device_id();
+        let out = enroll::enroll(
+            t.as_ref(),
+            account_hash,
+            username,
+            secret,
+            EnrollPath::Recovery,
+            nonce,
+            dev,
+        )
+        .unwrap();
+        let tok = hex32(&out.token);
+        (t, dev, tok)
+    }
+
+    fn write_note(
+        notes_dir: &std::path::Path,
+        ik: &[u8; 32],
+        iki: &[u8; 16],
+        id: &NoteId,
+        body: &[u8],
+        replace: bool,
+    ) {
+        let nb = *id.as_uuid().as_bytes();
+        let blob = encode_new_note(ik, iki, &nb, body).unwrap();
+        crate::atomic_write::atomic_write(
+            &notes_dir.join(format!("{}.myn", id.as_uuid())),
+            &blob,
+            replace,
+        )
+        .unwrap();
+    }
+
+    fn read_note(
+        notes_dir: &std::path::Path,
+        ik: &[u8; 32],
+        iki: &[u8; 16],
+        id: &NoteId,
+    ) -> Option<Vec<u8>> {
+        let nb = *id.as_uuid().as_bytes();
+        let blob = std::fs::read(notes_dir.join(format!("{}.myn", id.as_uuid()))).ok()?;
+        Some(decode_note(&blob, &nb, ik, iki).ok()?.plaintext().to_vec())
+    }
+
+    /// The user's real shape: a vault larger than the server page size (300 notes
+    /// against the 256-blob page) replicates fully to a fresh device across
+    /// multiple pull pages. Guards the cursor-drain loop + reconcile at scale.
+    #[test]
+    fn large_vault_300_notes_replicates_across_pages() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP large_vault_300: server binary not found");
+            return;
+        };
+        let root_key = [0x71u8; 32];
+        let account_hash = [0x72u8; 16];
+        let username = "MY-LARGE-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x73u8; 32];
+        let items_key_id = [0x74u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-large-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-large-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        let mut ids = Vec::new();
+        for i in 0..300u32 {
+            let note = NoteId::new_v7();
+            write_note(
+                &notes_a,
+                &items_key,
+                &items_key_id,
+                &note,
+                format!("note {i}").as_bytes(),
+                false,
+            );
+            ids.push(note);
+        }
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        let push = run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push 300");
+        assert_eq!(push.pushed, 300, "A pushed all 300 notes in one cycle");
+
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        let pull = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull 300");
+        assert_eq!(pull.pulled, 300, "B pulled all 300 notes across pages");
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &ids[0]).as_deref(),
+            Some(&b"note 0"[..])
+        );
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &ids[299]).as_deref(),
+            Some(&b"note 299"[..])
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// An offline delete propagates to a device that was up-to-date before the
+    /// delete: with an intact baseline the pull correctly DOWNLOADS the deletion
+    /// (not treated as a local edit), so the note does not resurrect.
+    #[test]
+    fn offline_delete_propagates_with_intact_baseline() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP offline_delete: server binary not found");
+            return;
+        };
+        let root_key = [0x61u8; 32];
+        let account_hash = [0x62u8; 16];
+        let username = "MY-DEL-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x63u8; 32];
+        let items_key_id = [0x64u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-del-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-del-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        let note = NoteId::new_v7();
+
+        // A authors X "live", pushes; B syncs (B now holds X live, baseline intact).
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &note,
+            b"live body",
+            false,
+        );
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push live");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B initial pull");
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &note).as_deref(),
+            Some(&b"live body"[..]),
+            "B has the live note"
+        );
+
+        // A "deletes" X (the tombstone re-encrypts the blob with the deleted marker
+        // → a fresh content_nonce). A pushes.
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &note,
+            b"deleted: 2026-06-21T00:00:00Z",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push delete");
+
+        // B syncs: must DOWNLOAD the deletion (B never edited → not locally dirty).
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull delete");
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &note).as_deref(),
+            Some(&b"deleted: 2026-06-21T00:00:00Z"[..]),
+            "the deletion propagated to B (no resurrection)"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// Concurrent same-note edit must NOT wedge the vault. Device B edits X (which
+    /// A also edited + pushed) AND adds an unrelated note Y, then syncs. B's cycle
+    /// succeeds: the X conflict is surfaced + EXCLUDED from the push (so it can't
+    /// fail the atomic batch CAS), Y pushes regardless, and B's local X edit is
+    /// left untouched. Both revisions survive (B's edit on B, A's edit on the
+    /// server) — no silent loss, no wedge. The auto-materialization of the remote
+    /// revision as a conflict copy is the follow-up below.
+    #[test]
+    fn concurrent_edit_no_wedge_and_surfaces_conflict() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP concurrent_no_wedge: server binary not found");
+            return;
+        };
+        let root_key = [0x81u8; 32];
+        let account_hash = [0x82u8; 16];
+        let username = "MY-CONFLICT-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x83u8; 32];
+        let items_key_id = [0x84u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-conf-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-conf-B-{}", std::process::id()));
+        let dir_c = std::env::temp_dir().join(format!("myne-conf-C-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        let notes_c = dir_c.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        std::fs::create_dir_all(&notes_c).unwrap();
+        let x = NoteId::new_v7();
+
+        // Both devices reach a synced baseline of X.
+        write_note(&notes_a, &items_key, &items_key_id, &x, b"base", false);
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push base");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull base");
+
+        // A edits X and pushes (server X advances). B edits X offline AND adds a
+        // fresh note Y, then syncs.
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from A",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push edit");
+        write_note(
+            &notes_b,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from B",
+            true,
+        );
+        let y = NoteId::new_v7();
+        write_note(
+            &notes_b,
+            &items_key,
+            &items_key_id,
+            &y,
+            b"unrelated note",
+            false,
+        );
+        let summary = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B sync must succeed despite the conflict (no wedge)");
+
+        assert_eq!(summary.conflicts.len(), 1, "the X conflict is surfaced");
+        assert_eq!(
+            summary.conflicts[0].conflict_of_hex,
+            hex(x.as_uuid().as_bytes()),
+            "conflict names X"
+        );
+        assert!(
+            summary.pushed >= 1,
+            "the unrelated note Y pushed despite the conflict (no wedge)"
+        );
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from B"[..]),
+            "B's X edit untouched"
+        );
+
+        // Y reached the server and A's X edit is preserved there — no revision lost.
+        let (tc, dev_c, tok_c) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            false,
+        );
+        run_sync_cycle(
+            tc.as_ref(),
+            &root_key,
+            account_hash,
+            dev_c,
+            &tok_c,
+            &notes_c,
+            &dir_c,
+            true,
+        )
+        .expect("C pull");
+        assert_eq!(
+            read_note(&notes_c, &items_key, &items_key_id, &y).as_deref(),
+            Some(&b"unrelated note"[..]),
+            "Y synced through to C"
+        );
+        assert_eq!(
+            read_note(&notes_c, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from A"[..]),
+            "A's X edit preserved on the server"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+        std::fs::remove_dir_all(&dir_c).ok();
+    }
+
+    /// FOLLOW-UP (keep-both auto-materialization). After a concurrent edit the
+    /// remote revision should be auto-materialized on B as a conflict copy — a new
+    /// note carrying `conflict_of: X` — so B holds BOTH its own edit and a copy of
+    /// A's. The engine already SURFACES the `ConflictCopyPlan` (see the test
+    /// above); the TS notes layer (`createConflictCopy` over `surgery.ts`) does not
+    /// yet execute it. Un-ignore when that wiring lands (MYND-427).
+    #[test]
+    #[ignore = "FOLLOW-UP: ConflictCopyPlan is surfaced but the notes layer does not yet materialize the keep-both copy"]
+    fn concurrent_same_note_edit_materializes_keep_both_copy() {
+        let Some((_guard, url)) = spawn_server() else {
+            return;
+        };
+        let root_key = [0x91u8; 32];
+        let account_hash = [0x92u8; 16];
+        let username = "MY-KEEPBOTH-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x93u8; 32];
+        let items_key_id = [0x94u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-kb-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-kb-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        let x = NoteId::new_v7();
+
+        write_note(&notes_a, &items_key, &items_key_id, &x, b"base", false);
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push base");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull base");
+
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from A",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push edit");
+        write_note(
+            &notes_b,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from B",
+            true,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B sync");
+
+        // Keep-both: B holds its own edit at X AND a materialized conflict copy of
+        // A's edit (a second note). Fails until the notes layer executes the plan.
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from B"[..])
+        );
+        let count = std::fs::read_dir(&notes_b).unwrap().count();
+        assert!(
+            count >= 2,
+            "a conflict copy of A's edit was materialized alongside B's note"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A device whose token is revoked mid-life fails its next cycle cleanly with
+    /// `Unauthenticated` (not a corrupt-state commit), and a held local edit
+    /// survives untouched so a re-enrolled device can still push it. Real
+    /// multi-device "remove this device" flow.
+    #[test]
+    fn revoked_token_fails_cycle_cleanly_without_losing_local_edit() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP revoked_token: server binary not found");
+            return;
+        };
+        let root_key = [0xa1u8; 32];
+        let account_hash = [0xa2u8; 16];
+        let username = "MY-REVOKE-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0xa3u8; 32];
+        let items_key_id = [0xa4u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-rev-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-rev-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        // A (owner) enrolls + pushes a note; B enrolls (self-approves via recovery)
+        // and syncs once so it holds a valid token + the note.
+        let note = NoteId::new_v7();
+        write_note(&notes_a, &items_key, &items_key_id, &note, b"shared", false);
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B initial sync");
+
+        // The owner revokes B. B makes a local edit, then tries to sync with its
+        // now-dead token.
+        crate::plugins::sync::devices::revoke_device(ta.as_ref(), &tok_a, &dev_b)
+            .expect("owner revokes B");
+        write_note(
+            &notes_b,
+            &items_key,
+            &items_key_id,
+            &note,
+            b"B unsynced edit",
+            true,
+        );
+        let err = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect_err("revoked token must fail the cycle");
+        assert!(
+            matches!(
+                err,
+                SyncCycleError::Pull(PullError::Unauthenticated)
+                    | SyncCycleError::Push(PushError::Unauthenticated)
+            ),
+            "clean Unauthenticated, got {err:?}"
+        );
+        // The local edit is untouched — nothing was lost to the failed cycle.
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &note).as_deref(),
+            Some(&b"B unsynced edit"[..])
+        );
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();

@@ -112,6 +112,12 @@ pub struct PullPage {
     pub head: Option<VerifiedHead>,
     /// Blobs whose `content_nonce` differs from the local manifest.
     pub changed: Vec<ChangedBlob>,
+    /// **Every** blob the server reported this page (the full roster, regardless
+    /// of whether it matches the local manifest). The caller reconciles its
+    /// synced-baseline (`state.blobs`) from this — without it a baseline that a
+    /// prior corrupted cycle failed to record can never self-heal, and every
+    /// locally-held blob re-pushes at `base_version 0` (server CAS → 409).
+    pub all_metas: Vec<ChangedBlob>,
 }
 
 /// Pull-path failures.
@@ -216,24 +222,28 @@ pub fn pull_page(
     };
 
     let mut changed = Vec::new();
+    let mut all_metas = Vec::new();
     for m in &wire.metas {
         let id = hex_to_array::<16>(&m.uuid_hex).ok_or(PullError::BadResponse)?;
         let content_nonce =
             hex_to_array::<24>(&m.content_nonce_hex).ok_or(PullError::BadResponse)?;
+        let blob = ChangedBlob {
+            id,
+            content_nonce,
+            version: m.version,
+            size: m.size,
+        };
         if local.get(&id) != Some(&content_nonce) {
-            changed.push(ChangedBlob {
-                id,
-                content_nonce,
-                version: m.version,
-                size: m.size,
-            });
+            changed.push(blob.clone());
         }
+        all_metas.push(blob);
     }
 
     Ok(PullPage {
         next_cursor: wire.next_cursor,
         head,
         changed,
+        all_metas,
     })
 }
 
@@ -250,12 +260,16 @@ pub fn pull_to_stable(
 ) -> Result<PullPage, PullError> {
     let mut cursor = start_cursor;
     let mut acc: HashMap<[u8; 16], ChangedBlob> = HashMap::new();
+    let mut acc_all: HashMap<[u8; 16], ChangedBlob> = HashMap::new();
     let mut latest_head: Option<VerifiedHead> = None;
 
     loop {
         let page = pull_page(transport, root_key, token, baseline_vv, cursor, local)?;
         for c in page.changed {
             acc.insert(c.id, c);
+        }
+        for m in page.all_metas {
+            acc_all.insert(m.id, m);
         }
         if page.head.is_some() {
             latest_head = page.head;
@@ -270,10 +284,13 @@ pub fn pull_to_stable(
 
     let mut changed: Vec<ChangedBlob> = acc.into_values().collect();
     changed.sort_by_key(|a| a.id);
+    let mut all_metas: Vec<ChangedBlob> = acc_all.into_values().collect();
+    all_metas.sort_by_key(|a| a.id);
     Ok(PullPage {
         next_cursor: cursor,
         head: latest_head,
         changed,
+        all_metas,
     })
 }
 
