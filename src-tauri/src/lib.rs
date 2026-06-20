@@ -186,6 +186,13 @@ pub fn run() {
             // to one flush interval; the next unlock reconciles the delta.
             // Managed state above must exist first (the timer reads it).
             plugins::notes::search_sync::spawn_periodic_flush_timer(app.handle().clone());
+            // MYND-424 task 9: the background sync loop (polling-default +
+            // coalesced-push, decision B). Unlock-gated; no-op until a vault is
+            // Unlocked AND a sync endpoint is configured + the device enrolled.
+            // The local-change signal must be managed first (the loop + the
+            // notes lifecycle both read it).
+            app.manage(plugins::sync::loop_control::SyncLocalChange::default());
+            plugins::sync::loop_control::spawn_sync_loop(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())

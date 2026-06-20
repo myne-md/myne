@@ -38,6 +38,7 @@ pub mod http_codec;
 pub mod http_transport;
 pub mod integrity;
 pub mod loop_control;
+pub mod orchestrator;
 pub mod reconcile;
 pub mod reconcile_policy;
 pub mod rustls_transport;

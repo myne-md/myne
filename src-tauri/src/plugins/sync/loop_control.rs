@@ -133,6 +133,86 @@ impl SyncScheduler {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Runtime glue (task 9): the tokio task that drives the scheduler. The decision
+// logic above is pure + unit-tested; this is the thin "spawn / timer / Slot read
+// / transport call" layer the module doc promised, mirroring `auto_lock`.
+// ---------------------------------------------------------------------------
+
+use std::sync::atomic::{AtomicU64, Ordering};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
+
+/// Device-local "a note changed" signal: the note-save path bumps it, the sync
+/// loop reads it to mark the scheduler dirty (the coalesced-push trigger). A
+/// monotone counter — the loop only cares whether it advanced since last tick.
+#[derive(Default)]
+pub struct SyncLocalChange(AtomicU64);
+
+impl SyncLocalChange {
+    /// Note-save calls this after a successful write (soft dependency via
+    /// `app.try_state` — a no-op when the sync plugin isn't registered).
+    pub fn bump(&self) {
+        self.0.fetch_add(1, Ordering::Relaxed);
+    }
+    fn get(&self) -> u64 {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+
+/// Base loop cadence — a fine tick so the scheduler's logical clock advances; the
+/// scheduler itself enforces the poll interval + the coalescing window.
+const LOOP_TICK_MS: u64 = 1_000;
+
+/// Spawn the background sync loop (wired in `lib.rs` setup, exactly like
+/// `auto_lock::spawn_idle_lock_timer`). Unlock-gated. Polling-default +
+/// coalesced-push per the MYND-424 grill (decision B); the SSE-opt-in
+/// (`/sync/poke`) listener is a thin follow-up. Emits `sync://changed` (with the
+/// pulled count) when a cycle writes incoming notes to disk, so the UI reloads.
+pub fn spawn_sync_loop<R: Runtime>(app: AppHandle<R>) {
+    tauri::async_runtime::spawn(async move {
+        let start = std::time::Instant::now();
+        let mut sched = SyncScheduler::new(0, DEFAULT_POLL_INTERVAL_MS, DEFAULT_COALESCE_WINDOW_MS);
+        let mut last_change_seen = 0u64;
+        let mut ticker = tokio::time::interval(std::time::Duration::from_millis(LOOP_TICK_MS));
+        loop {
+            ticker.tick().await;
+            let now = start.elapsed().as_millis() as u64;
+
+            // Unlock gate (active_vault_id is Some only for an Unlocked slot).
+            let unlocked =
+                match app.try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>() {
+                    Some(state) => state.active_vault_id().await.is_some(),
+                    None => false,
+                };
+            sched.set_unlocked(unlocked);
+
+            // A local note change starts the coalescing window (push trigger).
+            if let Some(sig) = app.try_state::<SyncLocalChange>() {
+                let c = sig.get();
+                if c != last_change_seen {
+                    last_change_seen = c;
+                    sched.on_local_change(now);
+                }
+            }
+
+            let action = sched.tick(now);
+            if action == SyncAction::Idle {
+                continue;
+            }
+            let allow_push = matches!(action, SyncAction::Push | SyncAction::PullAndPush);
+
+            if let super::commands::CycleOutcome::Ran(summary) =
+                super::commands::run_active_cycle(&app, allow_push).await
+            {
+                if summary.pulled > 0 {
+                    // Pulled notes are on disk now — tell the UI to reload.
+                    let _ = app.emit("sync://changed", summary.pulled);
+                }
+            }
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

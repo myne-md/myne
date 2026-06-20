@@ -766,6 +766,38 @@ function EditorChrome({
     return () => window.removeEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
   }, []);
 
+  // MYND-424: the background sync loop emits `sync://changed` after writing
+  // pulled notes to disk. Reload the sidebar + the open note so incoming edits
+  // from another device appear without a manual refresh. Subscribe ONCE (the
+  // ref keeps the handler on the latest selection context); no-op outside Tauri.
+  const syncCtxRef = useRef(ctx);
+  syncCtxRef.current = ctx;
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen("sync://changed", () => {
+          if (cancelled) return;
+          void noteList()
+            .then((ids) => syncCtxRef.current.refreshAll(ids))
+            .then(() => syncCtxRef.current.reloadOpenNote())
+            .catch(() => {
+              /* the next sync tick / manual refresh catches up */
+            });
+        });
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri (browser dev shim) → no sync events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, []);
+
   // MYND-166 selection bridges — two one-way syncs that never loop
   // (A only fires for a note open in NO pane; B only mirrors):
   //  A) a selection arriving via a non-pane path (a freshly-created note,

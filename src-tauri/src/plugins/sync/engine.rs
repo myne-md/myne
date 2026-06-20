@@ -21,11 +21,11 @@
 //! The cursor ack is server-side (the server `AckCursor`s on each pull); the
 //! client just advances its stored cursor to `next_cursor`.
 //!
-//! NOTE (cross-repo gap): `download_blob` issues `GET /sync/blob?id=<hex>`, but
-//! `myne-server` (MYND-421) shipped `/sync/pull` + `/sync/push` only — the store
-//! has `GetBlob` but no HTTP route exposes it. The `/sync/blob` GET handler is a
-//! pushpull amendment that MUST land before the MYND-428 two-device smoke canary
-//! replicates a note end-to-end. Flagged in progress.md.
+//! `download_blob` issues `GET /sync/blob?id=<hex>`; `myne-server` serves that
+//! route (`internal/syncapi` `handleBlob`, backed by `store.GetBlob`). The full
+//! pull→download→write→push cycle is driven by [`super::orchestrator`] and
+//! proven end-to-end against the real server by
+//! `orchestrator::tests::two_devices_replicate_a_note`.
 
 use super::transport::{HttpMethod, SyncTransport, TransportError};
 use base64::engine::general_purpose::STANDARD as B64;

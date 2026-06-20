@@ -96,13 +96,95 @@ pub async fn sync_status<R: Runtime>(
     derive_status(&app)
 }
 
-/// Request an immediate sync ("sync now" affordance, task 10). Returns the
-/// resulting status. Honest no-op while unconfigured / before the engine loop is
-/// wired over a real transport (R3-blocked) — it returns `Idle` so the UI shows
-/// a brief active state and settles; the live pull/push fires once task 2 lands.
+/// Outcome of one orchestrated sync cycle, shared by `sync_now` (manual) and the
+/// background loop (`loop_control`). Honest "not ready" states (locked /
+/// unenrolled) are distinct from a genuine transport/protocol failure.
+pub enum CycleOutcome {
+    /// No endpoint configured — sync is off.
+    Disabled,
+    /// Configured, but the vault is locked or this device is not enrolled.
+    NotReady,
+    /// One cycle ran; carries what it moved (pulled / pushed counts).
+    Ran(super::orchestrator::SyncSummary),
+    /// A transport / protocol failure.
+    Failed,
+}
+
+/// Gather the active vault's sync inputs (endpoint, enrollment identity, token,
+/// `root_key`) and run one [`run_sync_cycle`](super::orchestrator::run_sync_cycle)
+/// off-thread. `allow_push=false` is a poll-driven pull-only cycle (coalescing —
+/// see `loop_control`); `true` also pushes pending local changes. Used by both
+/// the `sync_now` command and the background loop, so the gathering lives once.
+pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) -> CycleOutcome {
+    let Ok(cfg) = config_path(app).and_then(|p| read_config(&p)) else {
+        return CycleOutcome::Failed;
+    };
+    let Some(url) = cfg.endpoint_url else {
+        return CycleOutcome::Disabled;
+    };
+    let Some(state) = app.try_state::<VaultRuntimeState>() else {
+        return CycleOutcome::NotReady;
+    };
+    let Ok(dir) = crate::paths::active_vault_root_io(app, state.active_vault_id().await) else {
+        return CycleOutcome::NotReady;
+    };
+    let st = super::state::read_sync_state(&dir).unwrap_or_default();
+    let (Some(acct_hex), Some(dev_hex)) = (st.account_hash_hex, st.device_id_hex) else {
+        return CycleOutcome::NotReady; // not enrolled
+    };
+    let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
+        return CycleOutcome::Failed;
+    };
+    let token = match super::token_store::read_token_fallback(&dir) {
+        Ok(Some(t)) => t,
+        _ => return CycleOutcome::NotReady, // no token → not enrolled
+    };
+    let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
+        return CycleOutcome::NotReady; // vault locked
+    };
+
+    let mut token_hex = String::with_capacity(token.len() * 2);
+    for b in &token {
+        token_hex.push_str(&format!("{b:02x}"));
+    }
+    let notes_dir = dir.join("notes");
+
+    let res = tokio::task::spawn_blocking(move || {
+        let transport = super::http_transport::build_transport(&url, Vec::new()).map_err(|_| ())?;
+        super::orchestrator::run_sync_cycle(
+            transport.as_ref(),
+            &root_key,
+            account_hash,
+            device_id,
+            &token_hex,
+            &notes_dir,
+            &dir,
+            allow_push,
+        )
+        .map_err(|_| ())
+    })
+    .await;
+
+    match res {
+        Ok(Ok(summary)) => CycleOutcome::Ran(summary),
+        _ => CycleOutcome::Failed,
+    }
+}
+
+/// Request an immediate sync ("sync now" affordance, task 10). Runs one real
+/// full cycle (pull head-verify + rollback-reject → download → write to disk →
+/// push local changes under a fresh head → persist). Returns the resulting
+/// status — `Disabled`/`Idle` for the honest not-ready states, `Error` only on a
+/// genuine transport/protocol failure.
 #[tauri::command]
 pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus, SyncConfigError> {
-    derive_status(&app)
+    Ok(match run_active_cycle(&app, true).await {
+        CycleOutcome::Disabled => SyncRuntimeStatus::Disabled,
+        CycleOutcome::NotReady | CycleOutcome::Ran(_) => SyncRuntimeStatus::Idle,
+        CycleOutcome::Failed => SyncRuntimeStatus::Error {
+            detail: "sync_failed".into(),
+        },
+    })
 }
 
 // --- Device management commands (MYND-425 tasks 7/8) ---
@@ -288,7 +370,10 @@ pub async fn sync_enroll<R: Runtime>(
         let transport = super::http_transport::build_transport(&url, Vec::new())
             .map_err(|_| SyncDeviceError::Transport)?;
 
-        // 1. Fetch vault.meta pre-auth (by account_number_hash).
+        // 1. Obtain vault.meta. A returning device fetches it pre-auth from the
+        //    server; the FIRST device (the owner enabling sync) has no server
+        //    copy yet (404) and falls back to its local vault.meta — which it
+        //    seeds to the server after enrolling (step 6).
         let acct_hex = {
             let mut s = String::with_capacity(32);
             for b in &account.hash {
@@ -304,10 +389,12 @@ pub async fn sync_enroll<R: Runtime>(
                 None,
             )
             .map_err(|_| SyncDeviceError::Transport)?;
-        if meta_resp.status != 200 {
-            return Err(SyncDeviceError::Transport);
-        }
-        let meta = parse_vault_meta(&meta_resp.body).map_err(|_| SyncDeviceError::Internal)?;
+        let meta_bytes: Vec<u8> = match meta_resp.status {
+            200 => meta_resp.body,
+            404 => std::fs::read(dir.join("vault.meta")).map_err(|_| SyncDeviceError::Transport)?,
+            _ => return Err(SyncDeviceError::Transport),
+        };
+        let meta = parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
 
         // 2. Derive root_key from the credential + the meta salts.
         let root_key: Zeroizing<[u8; AEAD_KEY_LEN]> = match path {
@@ -358,8 +445,22 @@ pub async fn sync_enroll<R: Runtime>(
             }
         };
 
-        // 3. ServerAuth secret + SCRAM enroll.
+        // 3. ServerAuth secret.
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+        // 4. Register the SCRAM verifier (idempotent — a 409 already_registered
+        //    is success; the first device's stored salt is what every later
+        //    handshake reuses). Keyed on the canonical `account.hash` (the same
+        //    value the server namespaces on), so register + enroll agree.
+        enroll::register_verifier(
+            transport.as_ref(),
+            &account.hash,
+            &username,
+            secret.as_slice(),
+        )
+        .map_err(|_| SyncDeviceError::Transport)?;
+
+        // 5. SCRAM enroll.
         let device_id = enroll::generate_device_id();
         let mut nonce_bytes = [0u8; 16];
         getrandom::getrandom(&mut nonce_bytes).map_err(|_| SyncDeviceError::Internal)?;
@@ -370,7 +471,7 @@ pub async fn sync_enroll<R: Runtime>(
 
         let out = enroll::enroll(
             transport.as_ref(),
-            &meta.account_number_hash,
+            &account.hash,
             &username,
             secret.as_slice(),
             path,
@@ -379,10 +480,27 @@ pub async fn sync_enroll<R: Runtime>(
         )
         .map_err(|_| SyncDeviceError::Unauthenticated)?;
 
-        // 4. Store the token (device-local fallback) when approved.
+        // 6. On approval: store the token, seed vault.meta to the server (so the
+        //    next device can fetch it), and persist the account/device identity
+        //    sync_now needs to author heads.
         if out.approved && !out.token.is_empty() {
             super::token_store::store_token_fallback(&dir, &out.token)
                 .map_err(|_| SyncDeviceError::Internal)?;
+            let mut token_hex = String::with_capacity(out.token.len() * 2);
+            for b in &out.token {
+                token_hex.push_str(&format!("{b:02x}"));
+            }
+            // Best-effort seed (a returning device's meta already matches).
+            let _ = enroll::put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes);
+
+            let mut st = super::state::read_sync_state(&dir).unwrap_or_default();
+            st.account_hash_hex = Some(acct_hex.clone());
+            let mut dev_hex = String::with_capacity(32);
+            for b in &device_id {
+                dev_hex.push_str(&format!("{b:02x}"));
+            }
+            st.device_id_hex = Some(dev_hex);
+            let _ = super::state::write_sync_state(&dir, &st);
         }
         Ok(out.approved)
     })
