@@ -47,6 +47,8 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
+import { SyncStatusIndicator } from "../components/sync/SyncStatusIndicator";
+import { SyncBanners } from "../components/sync/SyncBanners";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
@@ -1140,6 +1142,10 @@ function EditorChrome({
           visible until then. No confirm-discard dialog — the flush is
           automatic. */}
       {switching && <SwitchingOverlay />}
+      {/* Sync banners (MYND-426 reconcile / MYND-427 integrity), above the
+          three-pane row. Non-blocking + dismissable; renders nothing while sync
+          is off (the common case). */}
+      <SyncBanners />
       {/* No separate top bar (MYND-166): the editor content fills from the top
           and each top pane's tab strip rises into the OS title-bar row,
           Obsidian-style. The sidebar toggles float in the top corners below
@@ -2643,9 +2649,7 @@ function BottomBar({
         padding: "0 12px",
       }}
     >
-      {!isHidden("sync-status") && (
-        <span style={STATUS_TEXT_STYLE}>Local-only · not synced</span>
-      )}
+      {!isHidden("sync-status") && <SyncStatusIndicator />}
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {!hideSaveStatus && !isHidden("save-status") && (

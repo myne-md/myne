@@ -332,6 +332,28 @@ fn main() {
                     "add_to_personal_dictionary",
                     "ignore_word_in_vault",
                 ]),
+            )
+            .plugin(
+                "sync",
+                // MYND-424 (Phase 2 client sync engine, SYNC-15). Task 3 ships
+                // the device-local endpoint-config pair (SYNC-14):
+                // `sync_get_endpoint` + `sync_set_endpoint`. Later tasks (and
+                // MYND-425/426/427) add data-plane commands to this same plugin,
+                // each gated on an authenticated session — deny-by-default. The
+                // InlinedPlugin mirror is load-bearing per the `vault-creation`
+                // note above; keep it lock-stepped with
+                // `permissions/sync/default.toml` or the ACL resolver never
+                // authorizes the `plugin:sync|<cmd>` invoke.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "sync_get_endpoint",
+                    "sync_set_endpoint",
+                    "sync_status",
+                    "sync_now",
+                    "sync_list_devices",
+                    "sync_approve_device",
+                    "sync_remove_device",
+                    "sync_enroll",
+                ]),
             ),
     )
     .unwrap();

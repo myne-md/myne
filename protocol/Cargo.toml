@@ -8,6 +8,13 @@ description = "Myne v0.1 cryptographic protocol primitives (no_std + alloc)"
 
 [dependencies]
 hkdf = { version = "0.12", default-features = false }
+# SCRAM-SHA-256-PLUS client (MYND-425): PBKDF2-HMAC-SHA256 is the RFC 5802/7677
+# mandated SCRAM KDF. RustCrypto crate (closed-stack discipline — hand-rolling a
+# KDF is forbidden); matches the Go server's crypto/pbkdf2. no_std + alloc.
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+# base64 for the SCRAM AuthMessage (s= salt + c= channel-binding fields, RFC
+# 5802). Serialization only, not crypto; no_std + alloc; already workspace-locked.
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
 chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
 chacha20 = { version = "0.9", default-features = false }

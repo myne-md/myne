@@ -114,3 +114,58 @@ export const EXPORT_PLAIN_TEXT_SENTENCE =
 /** Scheduled-backup failure toast — the quiet, non-silent failure alert. */
 export const BACKUP_SCHEDULE_FAILED_TOAST =
   "Automatic backup failed. Check your backup folder in Settings → Storage.";
+
+// Device removal honesty (MYND-425). "Remove device" revokes a per-device sync
+// token — it stops the server from serving that device — but it does NOT
+// cryptographically lock out a device that already holds root_key (an attacker
+// with the vault file + the password/phrase is unaffected, threat-model no-FS
+// note). The copy MUST say what removal does and does not do, and MUST NEVER
+// imply a cryptographic lockout. E2E asserts these by FULL-literal equality
+// (SYNC-8); changing either is a decisions.md event, not a copy edit.
+
+/** Short confirm line for the Remove-device action. */
+export const REMOVE_DEVICE_CONFIRM =
+  "Remove this device from sync?";
+
+/** The honest "what it does / what it doesn't do" disclosure (expandable). It
+ *  is deliberately two plain sentences: the effect (sync stops) and the limit
+ *  (no cryptographic lockout) — never collapsed, never overstated. */
+export const REMOVE_DEVICE_DISCLOSURE =
+  "Removing this device revokes its sync access, so the server stops syncing to it. It does not lock a device that already has your vault and password — removal is not a remote wipe.";
+
+// Sync integrity alert (MYND-427 task 2). When the engine's head-verify fails to
+// extend the last-seen head (a rollback or a withheld/omitted update), the client
+// raises a hard, honest integrity alert (SuspicionBanner-class) — NEVER silently
+// accepted. The copy is load-bearing honesty: it says the problem is *possible*
+// (head-verify catches rollback/non-extension, but a perfectly-consistent
+// withholding is not generally detectable — the threat-model no-general-detection
+// note), it never claims Myne detects all tampering, and it reassures that local
+// notes are safe. E2E asserts it by FULL-literal equality (SYNC-8); changing it is
+// a decisions.md event, not a copy edit.
+
+/** The hard integrity-alert banner shown on a rollback / non-extending head. */
+export const SYNC_INTEGRITY_ALERT =
+  "Possible sync integrity problem: the server may have sent out-of-date or altered sync data, which Myne did not accept. Your local notes are safe. If this keeps happening, verify your devices.";
+
+// Device-enrollment copy (MYND-425 task 5). The add-device flow proves account
+// ownership with {account# + password OR 24-word phrase}; a wrong credential and
+// a wrong account number both fail at the same AEAD-open step, so the failure copy
+// MUST be a single non-distinguishing message — exactly the unlock/recovery
+// discipline above (collapsing to "wrong password" alone would leak that the
+// account number was valid). The pending message must be honest about the
+// approval gate (the server holds the device until an already-trusted device
+// approves it — Myne cannot sync until then). E2E asserts these by FULL-literal
+// equality (SYNC-8); changing any is a decisions.md event, not a copy edit.
+
+/** Non-distinguishing enroll failure — covers wrong account#, wrong credential,
+ *  or a missing/corrupt vault.meta on the server, with one message. */
+export const ENROLL_NON_DISTINGUISHING_BANNER =
+  "Account number, password, or recovery phrase is incorrect. Please try again.";
+
+/** Honest enroll-pending notice — the device is held by the approval gate. */
+export const ENROLL_PENDING_NOTICE =
+  "This device is waiting for approval. Approve it from a device that already has access to start syncing.";
+
+/** Enroll success — the device was approved and a sync token issued. */
+export const ENROLL_APPROVED_NOTICE =
+  "This device is now connected and syncing.";

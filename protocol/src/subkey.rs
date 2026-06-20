@@ -39,6 +39,8 @@
 //! | [`SubkeyRole::SessionStateKey`]        | `session-state-key`       |
 //! | [`SubkeyRole::PersonalDictKey`]        | `personal-dictionary-key` |
 //! | [`SubkeyRole::VaultIndicesKey`]        | `vault-indices-key`       |
+//! | [`SubkeyRole::VaultHeadMac`]           | `vault-head-mac`          |
+//! | [`SubkeyRole::ServerAuth`]             | `server-auth`             |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -116,6 +118,12 @@ const ROLE_STR_VAULT_INDICES_KEY: &[u8] = b"vault-indices-key";
 /// Load-bearing: drift silently changes every head MAC.
 const ROLE_STR_VAULT_HEAD_MAC: &[u8] = b"vault-head-mac";
 
+/// Registered role string for the Phase 2 server-authentication secret
+/// (`protocol.md` §3.4 + §11.1; MYND-420). `secret = HKDF(root_key, "server-auth")`
+/// is a 256-bit high-entropy SCRAM-SHA-256-PLUS credential proven at device-enroll
+/// (never transmitted). Derived but unused until sync auth ships. NOT a blob KEK.
+const ROLE_STR_SERVER_AUTH: &[u8] = b"server-auth";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -173,6 +181,13 @@ pub enum SubkeyRole {
     /// (like the reserved `server-auth` material). NOT a blob KEK; distinct from
     /// every other role so the head MAC is domain-separated.
     VaultHeadMac,
+    /// Phase 2 server-authentication secret (`protocol.md` §3.4 + §11.1; MYND-420).
+    /// `secret = HKDF(root_key, "server-auth")` — a 256-bit high-entropy credential
+    /// proven to the sync server via SCRAM-SHA-256-PLUS at device-enroll and NEVER
+    /// transmitted (the server stores only a StoredKey/ServerKey verifier). Derived
+    /// but unused until sync auth ships. NOT a blob KEK; domain-separated from every
+    /// other role.
+    ServerAuth,
 }
 
 impl SubkeyRole {
@@ -190,6 +205,7 @@ impl SubkeyRole {
             SubkeyRole::PersonalDictKey => ROLE_STR_PERSONAL_DICT_KEY,
             SubkeyRole::VaultIndicesKey => ROLE_STR_VAULT_INDICES_KEY,
             SubkeyRole::VaultHeadMac => ROLE_STR_VAULT_HEAD_MAC,
+            SubkeyRole::ServerAuth => ROLE_STR_SERVER_AUTH,
         }
     }
 }
@@ -308,6 +324,25 @@ mod tests {
         assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::PrefsKey));
         assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
         assert_ne!(*dict, *derive_subkey(&root, SubkeyRole::SessionStateKey));
+    }
+
+    #[test]
+    fn server_auth_role_string_matches_spec_registry() {
+        // MYND-420 registry entry "myne.v0.1 server-auth" (§3.4 + §11.1). The
+        // SCRAM-SHA-256-PLUS credential secret is HKDF(root_key, "server-auth");
+        // drift silently breaks server authentication.
+        assert_eq!(SubkeyRole::ServerAuth.role_str(), b"server-auth");
+    }
+
+    #[test]
+    fn server_auth_is_distinct_from_other_roles() {
+        // The server-auth secret must be domain-separated from every blob KEK and
+        // from the vault-head MAC key (a server-auth leak must not imply any other).
+        let root = [0u8; 32];
+        let sa = derive_subkey(&root, SubkeyRole::ServerAuth);
+        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::VaultHeadMac));
+        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+        assert_ne!(*sa, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
     }
 
     #[test]
@@ -558,6 +593,7 @@ mod tests {
                 SubkeyRole::PersonalDictKey => "personal-dictionary-key",
                 SubkeyRole::VaultIndicesKey => "vault-indices-key",
                 SubkeyRole::VaultHeadMac => "vault-head-mac",
+                SubkeyRole::ServerAuth => "server-auth",
             }
         }
 

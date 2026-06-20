@@ -58,11 +58,13 @@ pub(crate) mod canonical_json;
 pub mod dictionary_blob;
 pub mod error;
 pub mod kdf;
+pub mod manifest;
 pub mod password_policy;
 pub mod phrase;
 pub mod prefs;
 pub mod quick_unlock_blob;
 pub mod saved_view;
+pub mod scram;
 pub mod search_blob;
 pub mod subkey;
 pub mod template;
@@ -109,6 +111,11 @@ pub use kdf::{
     derive_password_wrap_key, derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
     ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
 };
+pub use manifest::{
+    compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
+    MANIFEST_DOMAIN_PREFIX, MANIFEST_FORMAT_V1, MANIFEST_HASH_LEN, MANIFEST_ID_LEN,
+    MANIFEST_PROTOCOL_VERSION,
+};
 pub use password_policy::{validate_min_length, MIN_PASSWORD_LEN};
 pub use phrase::{
     generate_recovery_phrase, normalize_user_phrase, RecoveryPhrase, RECOVERY_PHRASE_ENTROPY_BYTES,
@@ -124,6 +131,9 @@ pub use saved_view::{
     parse_saved_views_array, FilterNode, PropertyOp, SavedView, SavedViewParseError, SortDirection,
     ViewSort, ViewType,
 };
+pub use scram::{
+    scram_client_final_message, scram_client_proof, ScramClientOutput, SCRAM_CBIND_NAME,
+};
 pub use search_blob::{
     decode_search_index_blob, encode_search_index_blob, encode_search_index_blob_raw,
     SearchBlobError, MAX_SEARCH_INDEX_PLAINTEXT_LEN, SEARCH_BLOB_ACCOUNT_HASH_LEN,
@@ -138,9 +148,10 @@ pub use types::{
     MIN_KDF_M_KIB, MIN_KDF_P, MIN_KDF_T,
 };
 pub use vault_head::{
-    compute_head_id, compute_vault_head_mac, decode_head_state, encode_head_state, open_vault_head,
-    vv_dominance, Dominance, SealedHead, VaultHead, VaultHeadError, VvEntry, DEVICE_ID_LEN,
-    HEAD_ID_LEN, HEAD_MAC_LEN, VAULT_HEAD_ACCOUNT_HASH_LEN, VAULT_HEAD_DOMAIN_PREFIX,
+    compute_head_id, compute_vault_head_mac, decode_head_state, encode_head_state,
+    head_fingerprint, open_vault_head, vv_dominance, Dominance, SealedHead, VaultHead,
+    VaultHeadError, VvEntry, DEVICE_ID_LEN, HEAD_FINGERPRINT_CHARS, HEAD_ID_LEN, HEAD_MAC_LEN,
+    VAULT_HEAD_ACCOUNT_HASH_LEN, VAULT_HEAD_DOMAIN_PREFIX, VAULT_HEAD_FINGERPRINT_DOMAIN,
     VAULT_HEAD_FORMAT_V1, VAULT_HEAD_MANIFEST_HASH_LEN, VAULT_HEAD_PROTOCOL_VERSION,
     VAULT_HEAD_STATE_MAGIC,
 };

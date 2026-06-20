@@ -139,6 +139,8 @@ export function applyOptimisticCreate(
     archived: null,
     template: false,
     folderIndex: false,
+    conflict: false,
+    conflictOf: null,
   });
 }
 
@@ -165,12 +167,38 @@ export function liveCache(
     if (
       record.trashed == null &&
       record.archived == null &&
-      record.template !== true
+      record.template !== true &&
+      record.conflict !== true
     ) {
       live.set(id, record);
     }
   }
   return live;
+}
+
+/** Conflict copies grouped by the original UUID they forked from (MYND-427).
+ * The Conflicts view renders these — kept out of the live sidebar (above). */
+export function conflictRecordsByOriginal(
+  cache: ReadonlyMap<NoteId, TitleRecord>,
+): Map<string, TitleRecord[]> {
+  const groups = new Map<string, TitleRecord[]>();
+  for (const record of cache.values()) {
+    if (record.conflict !== true) continue;
+    const key = record.conflictOf ?? "(unknown)";
+    const list = groups.get(key) ?? [];
+    list.push(record);
+    groups.set(key, list);
+  }
+  return groups;
+}
+
+/** Total conflict-copy count — the Conflicts entry-point badge (MYND-427). */
+export function conflictCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
+  let n = 0;
+  for (const record of cache.values()) {
+    if (record.conflict === true) n += 1;
+  }
+  return n;
 }
 
 /**
@@ -186,7 +214,11 @@ export function resolverCache(
 ): Map<NoteId, TitleRecord> {
   const out = new Map<NoteId, TitleRecord>();
   for (const [id, record] of cache) {
-    if (record.trashed == null && record.template !== true) out.set(id, record);
+    // Conflict copies are excluded from the resolver too (MYND-427): a transient
+    // keep-both copy must not become a backlink target / graph node until reconciled.
+    if (record.trashed == null && record.template !== true && record.conflict !== true) {
+      out.set(id, record);
+    }
   }
   return out;
 }

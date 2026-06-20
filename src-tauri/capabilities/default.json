@@ -25,6 +25,7 @@
     "themes:default",
     "notes:default",
     "snapshots:default",
+    "sync:default",
     "vault-indices:default",
     "attachments:default",
     "importer:default",
