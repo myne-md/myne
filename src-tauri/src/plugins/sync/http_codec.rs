@@ -36,18 +36,84 @@ pub(crate) fn build_http_request(
     out
 }
 
-/// Parse an HTTP/1.1 response into `(status, body)`: status line + header block
-/// + body (everything after the blank line; `Connection: close` ⇒ read-to-EOF).
+/// Parse an HTTP/1.1 response into `(status, body)` (status line, then headers,
+/// then body). The body is framed by, in precedence order: `Transfer-Encoding:
+/// chunked` (de-chunked here — RFC 7230 §3.3.1 requires every HTTP/1.1 recipient
+/// to parse it), else `Content-Length` (exactly N bytes), else read-to-EOF
+/// (`Connection: close`, the original assumption). A reverse proxy (e.g. Caddy)
+/// in front of the Go server streams responses over ~2 KiB chunked — the dev
+/// loopback path talks to the Go server directly with `Content-Length`, so the
+/// chunked path is production-only and was the cause of large `/sync/pull` and
+/// `/sync/blob` bodies arriving JSON-corrupted (chunk-size markers inline).
 pub(crate) fn parse_http_response(raw: &[u8]) -> Option<TransportResponse> {
     let sep = find_subslice(raw, b"\r\n\r\n")?;
     let head = &raw[..sep];
-    let body = raw[sep + 4..].to_vec();
+    let raw_body = &raw[sep + 4..];
     let first_line_end = find_subslice(head, b"\r\n").unwrap_or(head.len());
     let status_line = core::str::from_utf8(&head[..first_line_end]).ok()?;
     let mut parts = status_line.split(' ');
     let _http = parts.next()?;
     let status: u16 = parts.next()?.parse().ok()?;
+
+    // Scan the header lines (case-insensitive) for the body framing.
+    let header_block = core::str::from_utf8(head).ok()?;
+    let mut chunked = false;
+    let mut content_length: Option<usize> = None;
+    for line in header_block.split("\r\n").skip(1) {
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
+        let name = name.trim().to_ascii_lowercase();
+        let value = value.trim();
+        if name == "transfer-encoding" && value.to_ascii_lowercase().contains("chunked") {
+            chunked = true;
+        } else if name == "content-length" {
+            content_length = value.parse::<usize>().ok();
+        }
+    }
+
+    let body = if chunked {
+        dechunk(raw_body)?
+    } else if let Some(n) = content_length {
+        // Exactly N bytes; a short read (incomplete response) is a parse failure.
+        if raw_body.len() < n {
+            return None;
+        }
+        raw_body[..n].to_vec()
+    } else {
+        raw_body.to_vec()
+    };
     Some(TransportResponse { status, body })
+}
+
+/// Decode an HTTP/1.1 chunked transfer-coded body (RFC 7230 §4.1): a sequence of
+/// `<hex-size>[;ext]\r\n<data>\r\n` chunks terminated by a `0\r\n` chunk. Chunk
+/// extensions and trailers are ignored. Returns `None` on any malformed framing
+/// (a truncated chunk, a non-hex size, a missing CRLF) rather than guessing.
+fn dechunk(mut data: &[u8]) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    loop {
+        let line_end = find_subslice(data, b"\r\n")?;
+        let size_line = core::str::from_utf8(&data[..line_end]).ok()?;
+        // Strip any chunk extension (everything after the first ';').
+        let size_str = size_line.split(';').next()?.trim();
+        let size = usize::from_str_radix(size_str, 16).ok()?;
+        data = &data[line_end + 2..];
+        if size == 0 {
+            break; // last chunk — trailers + final CRLF are ignored
+        }
+        if data.len() < size {
+            return None;
+        }
+        out.extend_from_slice(&data[..size]);
+        data = &data[size..];
+        // Each chunk's data is followed by a CRLF.
+        if data.len() < 2 || &data[..2] != b"\r\n" {
+            return None;
+        }
+        data = &data[2..];
+    }
+    Some(out)
 }
 
 pub(crate) fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -97,5 +163,39 @@ mod tests {
     #[test]
     fn parse_rejects_garbage() {
         assert!(parse_http_response(b"not http").is_none());
+    }
+
+    #[test]
+    fn parse_dechunks_transfer_encoding_chunked() {
+        // The exact shape a reverse proxy (Caddy) emits for a >2 KiB body: two
+        // data chunks + the terminating zero chunk. Pre-fix this surfaced the
+        // chunk-size markers inline and corrupted the JSON.
+        let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n\
+                    a\r\n{\"metas\":[\r\n4\r\n1,2]\r\n0\r\n\r\n";
+        let resp = parse_http_response(raw).unwrap();
+        assert_eq!(resp.status, 200);
+        assert_eq!(resp.body, b"{\"metas\":[1,2]");
+    }
+
+    #[test]
+    fn parse_honors_content_length_exactly() {
+        // Content-Length bounds the body even if extra bytes trail (keep-alive).
+        let raw = b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\n{\"x\":1}trailing-garbage";
+        let resp = parse_http_response(raw).unwrap();
+        assert_eq!(resp.body, b"{\"x\":1}");
+    }
+
+    #[test]
+    fn parse_chunked_is_case_insensitive() {
+        let raw = b"HTTP/1.1 200 OK\r\nTRANSFER-ENCODING: Chunked\r\n\r\n3\r\nabc\r\n0\r\n\r\n";
+        let resp = parse_http_response(raw).unwrap();
+        assert_eq!(resp.body, b"abc");
+    }
+
+    #[test]
+    fn parse_rejects_truncated_chunk() {
+        // Size says 9 bytes but only 3 follow → malformed, not a silent partial.
+        let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n9\r\nabc";
+        assert!(parse_http_response(raw).is_none());
     }
 }
