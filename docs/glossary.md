@@ -210,6 +210,12 @@ Links between notes that are queryable from both endpoints — opening a note sh
 
 Used in: `vision.md` Phase 1 Scope
 
+### **bookmark note** &nbsp; 📦 *Product*
+
+A content-light `.myn` note created by the [browser clipper](#browser-clipper) holding a source URL (bare autolink) + title + `source:` / `clipped:` frontmatter; no page body. Participates in tags / backlinks / graph / saved views as an ordinary note. Re-clipping a URL creates an independent note (no dedup detection in v1).
+
+Used in: `browser-extension` epic, MYND-447
+
 ### **BIP-39** &nbsp; 🏗️ *Construction* (deep entry, *Myne-divergent*)
 
 *(Aliases: mnemonic phrase encoding. Myne-divergent: yes — encoding only.)*
@@ -231,6 +237,14 @@ A modern hash function and KDF with strong parallelism characteristics. **Not us
 
 Used in: `decisions.md` (Deferred #2 rationale)
 Reference: https://github.com/C2SP/C2SP/blob/main/BLAKE3.md
+
+### **browser clipper** &nbsp; 📦 *Product*
+
+*(Alias: clipper extension.)*
+
+Myne's **keyless** browser extension (`browser-extension` epic, MYND-442) that captures a web article / selection or a page URL, converts it to [D1 markdown](#myne-markdown-dialect-d1), and hands it to the desktop core over a [native-messaging host](#native-messaging-host) bridge to be encrypted into the vault. Holds no key; runs outside TB2; saves to the vault root with no capture-time folder/tag selection; never reads or decrypts the vault. Ships in the separate `myne-extension` companion repo.
+
+Used in: `browser-extension` epic, MYND-442
 
 ### **bug bounty** &nbsp; 🛠️ *Tooling*
 
@@ -256,6 +270,18 @@ Reference: RFC 8439.
 A single keyboard-shortcut combination, e.g. `Mod-Shift-g` (hotkeys epic, MYND-304). Myne's canonical chord string is CodeMirror-`KeyBinding.key`-compatible: a `-`-separated sequence of modifier tokens followed by one logical key, using the cross-platform `Mod` token (Cmd on macOS, Ctrl elsewhere) and the layout-respecting *logical* key (what the user sees on the key, not the physical `code`); single-character keys are lowercased. Stored NFC-normalized inside `vault.prefs` (the `keymap` field). See **keymap**, **key binding**.
 
 Used in: `spec/protocol.md` §9.5.2
+
+### **clip** &nbsp; 📦 *Product*
+
+A captured web article or selection written into the vault as an ordinary [`.myn`](#myn-file) note by the [browser clipper](#browser-clipper). Authored content emitted as canonical [D1](#myne-markdown-dialect-d1) by the [clip serializer](#clip-serializer); images imported as [`MYA1`](#mya1) attachments; saved to the vault root.
+
+### **clip serializer** &nbsp; 🛠️ *Tooling*
+
+*(Alias: D1 clip serializer.)*
+
+The desktop-side `@lezer/markdown`-tree → canonical-D1 emitter that normalizes a clip's Defuddle-produced markdown to Myne's exact dialect — the **first markdown serializer in the codebase** (the dialect layer was previously parse-and-project only). Faithful tables / code / math with safe-degrade (never emits broken markdown).
+
+Used in: MYND-444
 
 ### **code-signed releases** &nbsp; 🛠️ *Tooling*
 
@@ -475,6 +501,10 @@ Used in: `spec/protocol.md` §3.1, §9.3
 A one-shot, user-initiated operation that decrypts user content and writes it as ordinary **unencrypted** files to a destination the user explicitly chose via the OS file dialog — per-note markdown, the whole-vault markdown tree, attachment files, a rendered PDF, standalone HTML, or stripped plain text (HTML + plain text added by MYND-340). Export is the portability path ("you walk away with your files", `vision.md`): the markdown forms write the stored plaintext **verbatim** (frontmatter included; the only sanctioned mutation is the attachments-mode embed rewrite, `markdown-dialect.md` §6 — HTML's image-sidecar `src` rewrite is the same sanctioned-transform class). PDF/HTML/plain-text are **lossy projections**, not byte-stable round-trips of the source. Terminology wall: an export is never a [vault backup file](#vault-backup-file) (that stays exactly as encrypted as the vault) and never a snapshot (version history). Threat-model framing: a deliberate plaintext crossing of TB3 under user authority — the artifact is outside Myne's protection from the moment it is written (`threat-model.md` §3 TB3, §5). There is no plaintext *mode*: no watch, mirror, or export-on-save exists.
 
 Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 2026-06-11 (export suite)
+
+### **extension pairing token** &nbsp; 🗝️ *Key/identifier*
+
+A scoped, revocable, **append-only** credential (create-clip + is-unlocked-status only — never a vault key) issued to the [browser clipper](#browser-clipper) after an in-app Accept/Reject + numeric-challenge handshake bound to the exact extension ID. Crossing [TB10](#native-messaging-host) requires it; a compromised token cannot read, modify, or delete notes. The short numeric code compared during this handshake is the **pairing challenge** (a.k.a. numeric challenge): a 6-digit nonce drawn from the core CSPRNG, shown identically in the in-app pairing dialog and the extension so the user confirms both endpoints share one pairing attempt — a human-comparison value, never a key. The registry of issued/revoked tokens persists encrypted at rest in the [vault.prefs](#vaultprefs) prefs-family blob (`decisions.md` 2026-06-20) so pairing survives a restart and revocation is durable.
 
 ### **extractor version** &nbsp; 📋 *Protocol*
 
@@ -845,6 +875,10 @@ Used in: `spec/protocol.md` §3.1, §7.4
 A non-repeating value used with a key in an encryption scheme. Myne nonces are 192-bit random values from the OS CSPRNG, drawn fresh for each AEAD call and stored alongside the ciphertext on disk. The 192-bit width makes random-nonce collisions negligible at any realistic vault size, removing the operational burden of nonce uniqueness tracking.
 
 Used in: `spec/protocol.md` §5.3
+
+### **native-messaging host** &nbsp; 📋 *Protocol*
+
+The small Rust stdio host in the Tauri core that receives a keyless clip handoff from the [browser clipper](#browser-clipper) and pipes it into the existing `note_create` / `attachment_import` pipeline. Allowlists the exact extension ID and treats every handed-off byte as hostile input (size caps, UTF-8 validation, no path traversal, re-sniffed MIME, rate limits). Defines trust boundary TB10.
 
 ### **note template** &nbsp; 📦 *Product*
 

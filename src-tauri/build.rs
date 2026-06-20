@@ -332,6 +332,25 @@ fn main() {
                     "add_to_personal_dictionary",
                     "ignore_word_in_vault",
                 ]),
+            )
+            .plugin(
+                "clipper-pairing",
+                // ext-foundation-handoff task 4 (TB10): the browser-extension
+                // pairing dialog's NARROW WebView IPC surface — pairing_pending
+                // (read the challenge), pairing_accept (mint a scoped revocable
+                // token bound to the exact extension id), pairing_reject (clear
+                // the session, no lingering auth). The stdio native-messaging
+                // host is the SEPARATE, ACL-exempt ingress; these three are
+                // ordinary WebView→Rust IPC and TB6 governs them. InlinedPlugin
+                // mirror load-bearing per the vault-creation note above; keep it
+                // lock-stepped with `permissions/clipper-pairing/default.toml`
+                // or the ACL resolver never authorizes the
+                // `plugin:clipper-pairing|<cmd>` invoke.
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "pairing_pending",
+                    "pairing_accept",
+                    "pairing_reject",
+                ]),
             ),
     )
     .unwrap();

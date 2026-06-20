@@ -16,6 +16,7 @@ import {
   type SuspicionReason,
   type VaultId,
 } from "./lib/stage";
+import { PairingDialog } from "./components/PairingDialog";
 import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { switchVault } from "./lib/vault-switch";
@@ -362,6 +363,11 @@ function App() {
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {screen}
       </div>
+      {/* Browser-extension pairing prompt (ext-foundation-handoff task 4,
+          TB10). Mounted globally so a connect request from the extension
+          surfaces over whatever stage is showing; renders nothing unless the
+          core has a pending pairing session. */}
+      <PairingDialog />
     </div>
   );
 }

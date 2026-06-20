@@ -2,6 +2,15 @@ mod atomic_write;
 mod auto_lock;
 mod backup_container;
 mod backup_schedule;
+// `clipper` — the keyless browser↔desktop native-messaging host (TB10,
+// `ext-foundation-handoff`). An EXTERNAL stdio ingress NOT governed by the
+// Tauri capability ACL (TB6); it carries its own untrusted-input
+// discipline (size caps / UTF-8 / no path traversal / MIME re-sniff / rate
+// limit / silent-to-unpaired). Host mode is selected by the
+// `--native-messaging-host` argv flag and runs a thin stdio loop INSTEAD
+// of the WebView (`run_native_messaging_host_if_requested` below, called
+// from `main.rs` before the Tauri app builds).
+mod clipper;
 mod export_naming;
 mod io_failure_kind;
 mod note_txn;
@@ -30,6 +39,133 @@ mod vault_migration;
 // create path) carries its own per-item `#[cfg_attr(not(test), allow(dead_code))]`.
 mod vault_registry;
 mod vault_sweep;
+
+/// Host-mode entry: if the process was launched by a browser with the
+/// `--native-messaging-host` flag, run the keyless native-messaging stdio
+/// loop and return `true` (the caller then exits WITHOUT building the
+/// Tauri WebView). Otherwise return `false` and the normal app launch
+/// proceeds.
+///
+/// This is the desktop side of the browser↔desktop clip channel (TB10).
+/// The loop is deliberately thin — per-message processing
+/// (framing + validation + caps + rate limit + silent-to-unpaired) lives
+/// in [`clipper::host`]; this function only selects host mode and drives
+/// the loop over the real stdin/stdout.
+///
+/// Task-6 scope (the tracer bullet): the host process is now a **thin,
+/// untrusted relay**. It does NOT validate, compose, or write — it forwards
+/// each ext→host frame over the local IPC socket to the running app (the
+/// key-holder) and relays the app's reply back to stdout. The app
+/// re-validates every forwarded frame as untrusted input
+/// ([`clipper::ingest`]) before any write.
+///
+/// ## The relay mechanism + its security properties
+///
+/// - **Single-app-instance** is the already-vendored
+///   `tauri-plugin-single-instance` (registered in [`run`], MYND-22): exactly
+///   one app process owns the vault, so there is exactly one relay listener.
+/// - **The local IPC channel** is a **Unix domain socket** under the app-data
+///   dir (`<app_data_dir>/clipper.sock`) with **owner-only (0600)** perms —
+///   NOT a TCP port. It is local-only (unreachable from the network) and
+///   owner-only (a different OS user cannot connect). On a platform without a
+///   Unix socket (Windows) the host has no relay target and exits cleanly (the
+///   extension then sees "open Myne to clip" — task 8); the named-pipe arm is
+///   a documented seam (see [`clipper::relay`]).
+/// - **The app re-validates every forwarded frame as UNTRUSTED input** — the
+///   host relaying a frame is NOT evidence it was authorized. The app
+///   re-decodes the envelope, re-checks the token against the REAL registry,
+///   re-enforces the caps + rate limit, then composes the note and calls the
+///   EXISTING `note_create`. A frame that does not validate app-side is
+///   silently ignored.
+///
+/// If the socket is unreachable (the desktop app is not running), the host
+/// exits cleanly — the extension's honest "open Myne to clip" failure (task 8)
+/// is driven by the absent reply, never a fake success.
+#[cfg(desktop)]
+pub fn run_native_messaging_host_if_requested() -> bool {
+    if !clipper::host::is_host_mode(std::env::args().skip(1)) {
+        return false;
+    }
+    #[cfg(unix)]
+    run_host_relay();
+    true
+}
+
+/// The Unix host-mode relay pump: connect to the running app's local IPC
+/// socket and forward stdin↔stdout frames over it. Resolving the app-data dir
+/// in host mode uses the SAME app identity the running app uses, so both
+/// processes agree on the socket path without an out-of-band rendezvous.
+///
+/// A connect failure (app not running / socket absent) ends cleanly: the host
+/// writes nothing and exits, and the extension surfaces the honest
+/// host-unreachable state (task 8).
+#[cfg(all(desktop, unix))]
+fn run_host_relay() {
+    // Resolve the app-data dir from the bundle identifier the SAME way the
+    // running app does. `tauri::generate_context!` is only available inside
+    // `run`; in host mode we resolve via the platform dirs using the bundle id
+    // from the Tauri config at compile time.
+    let Some(app_data_dir) = host_mode_app_data_dir() else {
+        return;
+    };
+    let socket = clipper::relay::socket_path(&app_data_dir);
+    let Ok(app_stream) = std::os::unix::net::UnixStream::connect(&socket) else {
+        // App not running (no listener) → exit cleanly; the extension shows the
+        // honest "open Myne to clip" state (task 8). No fake success.
+        return;
+    };
+    let mut app_writer = app_stream;
+    let Ok(mut app_reader) = app_writer.try_clone() else {
+        return;
+    };
+    let stdin = std::io::stdin();
+    let stdout = std::io::stdout();
+    let mut host_reader = stdin.lock();
+    let mut host_writer = stdout.lock();
+    let _ = clipper::relay::forward_stdio_over_socket(
+        &mut host_reader,
+        &mut host_writer,
+        &mut app_reader,
+        &mut app_writer,
+    );
+}
+
+/// Resolve `<app_data_dir>` in host mode (no `AppHandle` yet).
+///
+/// The bundle identifier is `md.myne.desktop` (`tauri.conf.json`); the
+/// per-platform app-data dir is derived with the same convention Tauri uses so
+/// the host and the running app resolve the SAME `clipper.sock` path. Uses
+/// `dirs`-free std env probing to avoid a new dependency.
+#[cfg(all(desktop, unix))]
+fn host_mode_app_data_dir() -> Option<std::path::PathBuf> {
+    const BUNDLE_ID: &str = "md.myne.desktop";
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var_os("HOME")?;
+        Some(
+            std::path::PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+                .join(BUNDLE_ID),
+        )
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // XDG: $XDG_DATA_HOME or ~/.local/share, then the bundle id.
+        if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
+            if !xdg.is_empty() {
+                return Some(std::path::PathBuf::from(xdg).join(BUNDLE_ID));
+            }
+        }
+        let home = std::env::var_os("HOME")?;
+        Some(
+            std::path::PathBuf::from(home)
+                .join(".local")
+                .join("share")
+                .join(BUNDLE_ID),
+        )
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -87,6 +223,12 @@ pub fn run() {
         .plugin(plugins::importer::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
+        // ext-foundation-handoff task 4: the browser-extension pairing
+        // dialog's narrow Accept/Reject IPC surface (TB6-governed; the
+        // stdio host is the separate, ACL-exempt ingress). Manages the
+        // PairingState singleton (pending session + in-memory token
+        // registry; task 7 persists it).
+        .plugin(plugins::clipper_pairing::init())
         // MYND-262: offline spell-check engine (spellbook). Binds spell_check +
         // add/ignore commands; SpellState is managed in setup below.
         .plugin(spell::init())
@@ -185,6 +327,17 @@ pub fn run() {
             // to one flush interval; the next unlock reconciles the delta.
             // Managed state above must exist first (the timer reads it).
             plugins::notes::search_sync::spawn_periodic_flush_timer(app.handle().clone());
+            // ext-foundation-handoff task 6: the host↔app relay listener. Binds
+            // the owner-only (0600) Unix-domain-socket under the app-data dir
+            // and serves the keyless clip ingest on a background thread. The
+            // browser-launched native-messaging host (a SEPARATE OS process)
+            // connects to this socket and forwards frames; the app
+            // re-validates every forwarded frame as untrusted input
+            // (`clipper::ingest`) before composing the note + calling the
+            // EXISTING `note_create`. Unix-only here; the Windows named-pipe arm
+            // is a documented seam (`clipper::relay`).
+            #[cfg(unix)]
+            clipper::relay_app::spawn_relay_listener(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
