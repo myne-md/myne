@@ -10,6 +10,8 @@ export interface DeviceEntry {
   device_id_hex: string;
   approved: boolean;
   retired: boolean;
+  /** True for the device this client is running on (marked by the backend). */
+  is_current: boolean;
 }
 
 /** A serialized `SyncDeviceError` from the plugin. */
@@ -46,22 +48,30 @@ export function useDevices(): DevicesHook {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const refresh = useCallback(async () => {
-    setBusy(true);
+  // `silent` poll loads don't toggle `busy` (no button flicker) and swallow
+  // transient errors / keep the last-good roster — only an explicit refresh or
+  // action surfaces failure. The background poll is what makes a newly-joined
+  // device appear without reopening Settings (MYND-425 follow-up).
+  const load = useCallback(async (silent: boolean) => {
+    if (!silent) setBusy(true);
     try {
       const roster = await invoke<DeviceEntry[]>("plugin:sync|sync_list_devices");
       setDevices(roster);
       setError(null);
     } catch (e) {
-      setError(errKind(e));
+      if (!silent) setError(errKind(e));
     } finally {
-      setBusy(false);
+      if (!silent) setBusy(false);
     }
   }, []);
 
+  const refresh = useCallback(() => load(false), [load]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void load(false);
+    const id = setInterval(() => void load(true), 4000);
+    return () => clearInterval(id);
+  }, [load]);
 
   const approve = useCallback(
     async (deviceIdHex: string) => {
