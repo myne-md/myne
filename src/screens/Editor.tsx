@@ -1016,12 +1016,21 @@ function EditorChrome({
         const w = getCurrentWebviewWindow();
         unlisten = await w.onCloseRequested(async (event) => {
           if (cancelled) return;
-          // Stop the default close; we'll close manually after flush.
+          // Stop the default close; we terminate manually after the flush.
           event.preventDefault();
           await flushAll();
           await persistWorkspace();
           await persistVaultIndices();
-          await w.close();
+          // `destroy()`, NOT `close()`: the capability ACL grants
+          // `core:window:allow-destroy` but deliberately NOT `allow-close`
+          // (TB6 surface — see lib/app-window.ts). `close()` rejects under the
+          // permission system, so the window would never close. On Windows the
+          // title-bar X is the only quit affordance (no macOS Cmd+Q →
+          // RunEvent::ExitRequested path), so that left the app unclosable while
+          // unlocked. `destroy()` is non-cancellable and won't re-fire this
+          // handler; destroying the last window still raises ExitRequested, so
+          // the Rust-side search-index persist on exit still runs.
+          await w.destroy();
         });
       } catch {
         // Not running inside Tauri (e.g., `pnpm dev` browser shim) →
