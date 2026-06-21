@@ -45,6 +45,9 @@ pub struct SyncSummary {
     /// here so the notes layer can materialize the remote revision as a conflict
     /// copy (the original local edit is never overwritten or lost).
     pub conflicts: Vec<ConflictCopyPlan>,
+    /// Deletions pushed this cycle WITH the tombstone flag set (the server marks
+    /// them for horizon-GC). Driven by the notes-layer `sync_mark_tombstone` queue.
+    pub tombstones_pushed: usize,
 }
 
 /// Sync-cycle failures.
@@ -177,6 +180,62 @@ pub fn resolve_conflict(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycle
     let _ = std::fs::remove_file(dir.join(format!("{id_hex}.myn")));
     let _ = std::fs::remove_file(meta_path);
     Ok(())
+}
+
+/// The device-local "these versions are deletions" queue: note ids (32-hex) the
+/// notes layer tombstoned (`sync_mark_tombstone`), so the next push sets the
+/// server's tombstone flag (horizon-GC). The engine can't read the encrypted
+/// `deleted:` field itself, so the dialect-aware notes layer is the source of
+/// truth — that also keeps a live note from ever being flagged (no false-positive
+/// → no GC of live data). `<vault>/pending-tombstones`, newline-separated.
+fn pending_tombstones_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("pending-tombstones")
+}
+
+/// Read the pending-tombstone id set (absent → empty).
+fn read_pending_tombstones(vault_root: &Path) -> std::collections::HashSet<String> {
+    std::fs::read_to_string(pending_tombstones_path(vault_root))
+        .map(|s| {
+            s.lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Queue a note id (32-hex) as a tombstone for the next push. Idempotent.
+pub fn add_pending_tombstone(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycleError> {
+    let mut set = read_pending_tombstones(vault_root);
+    set.insert(id_hex.to_string());
+    write_pending_tombstones(vault_root, &set)
+}
+
+/// Drop ids from the pending-tombstone queue (after they were pushed-with-flag).
+fn clear_pending_tombstones(vault_root: &Path, drop: &[String]) -> Result<(), SyncCycleError> {
+    if drop.is_empty() {
+        return Ok(());
+    }
+    let mut set = read_pending_tombstones(vault_root);
+    for d in drop {
+        set.remove(d);
+    }
+    write_pending_tombstones(vault_root, &set)
+}
+
+fn write_pending_tombstones(
+    vault_root: &Path,
+    set: &std::collections::HashSet<String>,
+) -> Result<(), SyncCycleError> {
+    let mut ids: Vec<&String> = set.iter().collect();
+    ids.sort();
+    let body = ids
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    crate::atomic_write::atomic_write(&pending_tombstones_path(vault_root), body.as_bytes(), true)
+        .map_err(|_| SyncCycleError::Io)
 }
 
 /// The engine's `local` manifest (raw 16-byte id → 24-byte content_nonce), read
@@ -322,6 +381,7 @@ pub fn run_sync_cycle(
         .iter()
         .map(|m| (m.id, (m.version, m.content_nonce)))
         .collect();
+    let pending_tombstones = read_pending_tombstones(vault_root);
     let mut to_push: Vec<PushBlob> = Vec::new();
     let mut conflicts: Vec<ConflictCopyPlan> = Vec::new();
     if allow_push {
@@ -366,13 +426,17 @@ pub fn run_sync_cycle(
                 base_version: synced.map(|b| b.version).unwrap_or(0),
                 content_nonce: *nonce,
                 ciphertext,
-                tombstone: false,
+                // A deletion the notes layer queued → flag it so the server marks
+                // it for horizon-GC (the `deleted:` field still propagates either
+                // way; the flag only governs server-side reclamation).
+                tombstone: pending_tombstones.contains(&id_hex),
             });
         }
     }
 
     let mut pushed = 0;
     let mut head_advanced = false;
+    let mut tombstones_pushed = 0;
 
     if !to_push.is_empty() {
         // Author a linear-advance head over the current (post-pull) head: bump
@@ -435,6 +499,15 @@ pub fn run_sync_cycle(
         }
         pushed = outcome.results.len();
         head_advanced = outcome.head_id.is_some();
+        // The queued tombstones are now flagged on the server → drop them from the
+        // device-local queue so they aren't re-flagged every cycle.
+        let pushed_tombstones: Vec<String> = to_push
+            .iter()
+            .filter(|b| b.tombstone)
+            .map(|b| hex(&b.id))
+            .collect();
+        tombstones_pushed = pushed_tombstones.len();
+        let _ = clear_pending_tombstones(vault_root, &pushed_tombstones);
         write_head_baseline(vault_root, &sealed).map_err(|_| SyncCycleError::Io)?;
         state.record_observation(&sealed.head_id, &version_vector);
     } else if let Some(vh) = &page.head {
@@ -451,6 +524,7 @@ pub fn run_sync_cycle(
         head_advanced,
         cursor: state.cursor,
         conflicts,
+        tombstones_pushed,
     })
 }
 
@@ -1807,6 +1881,121 @@ mod tests {
         assert_eq!(
             pull.pulled, 150,
             "all 150 notes pulled in one cycle via backoff"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A queued tombstone (the notes layer's `sync_mark_tombstone`) is pushed WITH
+    /// the server tombstone flag set, then dropped from the device-local queue; the
+    /// deletion still propagates to a second device.
+    #[test]
+    fn queued_tombstone_pushes_with_flag_then_clears() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP tombstone_flag: server binary not found");
+            return;
+        };
+        let root_key = [0xc1u8; 32];
+        let account_hash = [0xc2u8; 16];
+        let username = "MY-TOMB-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0xc3u8; 32];
+        let items_key_id = [0xc4u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-tomb-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-tomb-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        let x = NoteId::new_v7();
+
+        // A authors X live + pushes; B syncs (holds the live note).
+        write_note(&notes_a, &items_key, &items_key_id, &x, b"live body", false);
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push live");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B initial sync");
+
+        // The notes layer tombstones X: queue it + write the deleted version.
+        let x_hex = hex(x.as_uuid().as_bytes());
+        add_pending_tombstone(&dir_a, &x_hex).expect("queue tombstone");
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"deleted: 2026-06-21T00:00:00Z",
+            true,
+        );
+
+        let s = run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push tombstone");
+        assert_eq!(s.tombstones_pushed, 1, "X pushed with the tombstone flag");
+        assert!(
+            read_pending_tombstones(&dir_a).is_empty(),
+            "the queue cleared after the flagged push"
+        );
+
+        // The deletion propagates to B.
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull deletion");
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"deleted: 2026-06-21T00:00:00Z"[..]),
+            "B sees the deletion"
         );
 
         std::fs::remove_dir_all(&dir_a).ok();
