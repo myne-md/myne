@@ -98,6 +98,87 @@ fn download_blob_backoff(
     engine::download_blob(transport, token, id)
 }
 
+/// The device-local conflict-staging dir: a downloaded *remote* revision of a note
+/// that lost a concurrent-edit race, held until the notes layer materializes it as
+/// a keep-both copy (`conflict_of:`). The local edit is never touched.
+fn conflict_staging_dir(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("conflicts")
+}
+
+/// Persist a conflicting remote revision: `conflicts/<id>.myn` (the ciphertext the
+/// notes layer decrypts to build the copy) + `conflicts/<id>.meta` (`<version>\n
+/// <nonce-hex>`, the baseline [`resolve_conflict`] adopts).
+fn stage_conflict(
+    vault_root: &Path,
+    id: &[u8; 16],
+    version: u64,
+    content_nonce: &[u8; 24],
+    ciphertext: &[u8],
+) -> Result<(), SyncCycleError> {
+    let dir = conflict_staging_dir(vault_root);
+    std::fs::create_dir_all(&dir).map_err(|_| SyncCycleError::Io)?;
+    let id_hex = hex(id);
+    crate::atomic_write::atomic_write(&dir.join(format!("{id_hex}.myn")), ciphertext, true)
+        .map_err(|_| SyncCycleError::Io)?;
+    let meta = format!("{version}\n{}", hex(content_nonce));
+    crate::atomic_write::atomic_write(&dir.join(format!("{id_hex}.meta")), meta.as_bytes(), true)
+        .map_err(|_| SyncCycleError::Io)?;
+    Ok(())
+}
+
+/// The note ids (16-byte, hex) with a staged conflicting remote revision awaiting
+/// keep-both materialization by the notes layer.
+pub fn list_pending_conflicts(vault_root: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(conflict_staging_dir(vault_root)) {
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|x| x.to_str()) == Some("myn") {
+                if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                    out.push(stem.to_string());
+                }
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Read a staged conflicting remote revision's ciphertext (the notes layer
+/// decrypts it to build the keep-both copy). `None` if nothing is staged.
+pub fn read_staged_conflict_blob(vault_root: &Path, id_hex: &str) -> Option<Vec<u8>> {
+    std::fs::read(conflict_staging_dir(vault_root).join(format!("{id_hex}.myn"))).ok()
+}
+
+/// Finish a keep-both resolution: adopt the staged remote revision's (version,
+/// nonce) as the synced baseline for the note — so the untouched local edit now
+/// pushes as a clean linear advance over it — then clear the staging. Idempotent;
+/// a missing staging is a no-op.
+pub fn resolve_conflict(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycleError> {
+    let dir = conflict_staging_dir(vault_root);
+    let meta_path = dir.join(format!("{id_hex}.meta"));
+    if let Ok(meta) = std::fs::read_to_string(&meta_path) {
+        let mut lines = meta.lines();
+        let version: u64 = lines
+            .next()
+            .and_then(|s| s.parse().ok())
+            .ok_or(SyncCycleError::Io)?;
+        let nonce_hex = lines.next().unwrap_or("").to_string();
+        let mut state = read_sync_state(vault_root).map_err(|_| SyncCycleError::Io)?;
+        state.blobs.insert(
+            id_hex.to_string(),
+            BlobSyncState {
+                version,
+                content_nonce_hex: nonce_hex,
+            },
+        );
+        write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
+    }
+    let _ = std::fs::remove_file(dir.join(format!("{id_hex}.myn")));
+    let _ = std::fs::remove_file(meta_path);
+    Ok(())
+}
+
 /// The engine's `local` manifest (raw 16-byte id → 24-byte content_nonce), read
 /// decryption-free from the on-disk notes dir. Converts the notes-domain
 /// [`NonceManifest`](crate::search::persist::NonceManifest) String keys to the
@@ -259,6 +340,20 @@ pub fn run_sync_cycle(
             if let Some(b) = synced {
                 if let Some((server_version, remote_nonce)) = server_meta.get(id) {
                     if *server_version > b.version {
+                        // Stage the remote revision (download it once) so the notes
+                        // layer can materialize a keep-both copy of it; the local
+                        // edit stays on disk untouched. `resolve_conflict` later
+                        // adopts this version as the baseline so the local edit then
+                        // pushes as a clean linear advance.
+                        if let Ok(remote_bytes) = download_blob_backoff(transport, token, id) {
+                            let _ = stage_conflict(
+                                vault_root,
+                                id,
+                                *server_version,
+                                remote_nonce,
+                                &remote_bytes,
+                            );
+                        }
                         conflicts.push(plan_note_keep_both(id, *remote_nonce));
                         continue;
                     }
@@ -1288,16 +1383,15 @@ mod tests {
         std::fs::remove_dir_all(&dir_c).ok();
     }
 
-    /// FOLLOW-UP (keep-both auto-materialization). After a concurrent edit the
-    /// remote revision should be auto-materialized on B as a conflict copy — a new
-    /// note carrying `conflict_of: X` — so B holds BOTH its own edit and a copy of
-    /// A's. The engine already SURFACES the `ConflictCopyPlan` (see the test
-    /// above); the TS notes layer (`createConflictCopy` over `surgery.ts`) does not
-    /// yet execute it. Un-ignore when that wiring lands (MYND-427).
+    /// Full keep-both: after a concurrent edit, B materializes A's revision as a
+    /// conflict copy (a new note) and keeps its own edit at X — both survive and
+    /// converge to a third device. The engine stages A's blob + surfaces the plan;
+    /// the test plays the notes layer's part (decrypt the staged blob → create the
+    /// copy → resolve_conflict adopts the baseline). End-to-end through `C`.
     #[test]
-    #[ignore = "FOLLOW-UP: ConflictCopyPlan is surfaced but the notes layer does not yet materialize the keep-both copy"]
     fn concurrent_same_note_edit_materializes_keep_both_copy() {
         let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP keep_both: server binary not found");
             return;
         };
         let root_key = [0x91u8; 32];
@@ -1308,12 +1402,16 @@ mod tests {
         let items_key_id = [0x94u8; 16];
         let dir_a = std::env::temp_dir().join(format!("myne-kb-A-{}", std::process::id()));
         let dir_b = std::env::temp_dir().join(format!("myne-kb-B-{}", std::process::id()));
+        let dir_c = std::env::temp_dir().join(format!("myne-kb-C-{}", std::process::id()));
         let notes_a = dir_a.join("notes");
         let notes_b = dir_b.join("notes");
+        let notes_c = dir_c.join("notes");
         std::fs::create_dir_all(&notes_a).unwrap();
         std::fs::create_dir_all(&notes_b).unwrap();
+        std::fs::create_dir_all(&notes_c).unwrap();
         let x = NoteId::new_v7();
 
+        // Both reach a synced baseline of X; A edits + pushes; B edits offline.
         write_note(&notes_a, &items_key, &items_key_id, &x, b"base", false);
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
@@ -1353,7 +1451,6 @@ mod tests {
             true,
         )
         .expect("B pull base");
-
         write_note(
             &notes_a,
             &items_key,
@@ -1381,7 +1478,9 @@ mod tests {
             b"edit from B",
             true,
         );
-        run_sync_cycle(
+
+        // B's conflict cycle: A's revision is staged + surfaced; X is excluded.
+        let s1 = run_sync_cycle(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1391,22 +1490,88 @@ mod tests {
             &dir_b,
             true,
         )
-        .expect("B sync");
+        .expect("B conflict cycle");
+        assert_eq!(s1.conflicts.len(), 1, "conflict surfaced");
+        let x_hex = hex(x.as_uuid().as_bytes());
+        assert_eq!(
+            list_pending_conflicts(&dir_b),
+            vec![x_hex.clone()],
+            "A's revision staged"
+        );
 
-        // Keep-both: B holds its own edit at X AND a materialized conflict copy of
-        // A's edit (a second note). Fails until the notes layer executes the plan.
+        // --- the notes layer's part (TS `createConflictCopy` + resolve) ---
+        let staged = read_staged_conflict_blob(&dir_b, &x_hex).expect("staged blob");
+        let remote_body = decode_note(&staged, x.as_uuid().as_bytes(), &items_key, &items_key_id)
+            .unwrap()
+            .plaintext()
+            .to_vec();
+        assert_eq!(
+            remote_body, b"edit from A",
+            "staged remote revision decrypts to A's edit"
+        );
+        // Materialize the copy as a new note (TS adds the conflict_of frontmatter;
+        // the engine flow only needs both bodies to survive + converge).
+        let z = NoteId::new_v7();
+        write_note(&notes_b, &items_key, &items_key_id, &z, &remote_body, false);
+        resolve_conflict(&dir_b, &x_hex).expect("resolve");
+        assert!(
+            list_pending_conflicts(&dir_b).is_empty(),
+            "staging cleared after resolve"
+        );
+
+        // B re-syncs: X (edit-B) now pushes as a clean linear advance + the copy Z.
+        let s2 = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B push resolved");
+        assert!(s2.conflicts.is_empty(), "no conflict after resolution");
         assert_eq!(
             read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
-            Some(&b"edit from B"[..])
+            Some(&b"edit from B"[..]),
+            "B keeps its own edit at X"
         );
-        let count = std::fs::read_dir(&notes_b).unwrap().count();
-        assert!(
-            count >= 2,
-            "a conflict copy of A's edit was materialized alongside B's note"
+
+        // A third device sees BOTH revisions — neither edit was lost.
+        let (tc, dev_c, tok_c) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            false,
+        );
+        run_sync_cycle(
+            tc.as_ref(),
+            &root_key,
+            account_hash,
+            dev_c,
+            &tok_c,
+            &notes_c,
+            &dir_c,
+            true,
+        )
+        .expect("C pull");
+        assert_eq!(
+            read_note(&notes_c, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from B"[..]),
+            "C sees X = B's edit"
+        );
+        assert_eq!(
+            read_note(&notes_c, &items_key, &items_key_id, &z).as_deref(),
+            Some(&b"edit from A"[..]),
+            "C sees the keep-both copy = A's edit"
         );
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();
+        std::fs::remove_dir_all(&dir_c).ok();
     }
 
     /// A device whose token is revoked mid-life fails its next cycle cleanly with

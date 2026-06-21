@@ -24,6 +24,9 @@ permissions = [
     "allow-sync-list-devices",
     "allow-sync-approve-device",
     "allow-sync-remove-device",
+    "allow-sync-pending-conflicts",
+    "allow-sync-take-conflict",
+    "allow-sync-resolve-conflict",
     "allow-sync-enroll",
     "allow-sync-join-account",
 ]
@@ -62,6 +65,21 @@ commands.allow = ["sync_approve_device"]
 identifier = "allow-sync-remove-device"
 description = "Allow invoking sync:sync_remove_device (authed: revoke a device's token, POST /auth/devices/revoke; device_id untouched, SYNC-2)."
 commands.allow = ["sync_remove_device"]
+
+[[permission]]
+identifier = "allow-sync-pending-conflicts"
+description = "Allow invoking sync:sync_pending_conflicts (list the note ids with a staged conflicting remote revision awaiting keep-both materialization). No vault-blob access beyond the device-local conflicts staging dir."
+commands.allow = ["sync_pending_conflicts"]
+
+[[permission]]
+identifier = "allow-sync-take-conflict"
+description = "Allow invoking sync:sync_take_conflict (decrypt a staged conflicting remote revision to its plaintext body so the notes layer can materialize a keep-both copy; requires the unlocked vault's items_key)."
+commands.allow = ["sync_take_conflict"]
+
+[[permission]]
+identifier = "allow-sync-resolve-conflict"
+description = "Allow invoking sync:sync_resolve_conflict (adopt the staged remote revision as the synced baseline + clear staging, so the local edit pushes as a linear advance)."
+commands.allow = ["sync_resolve_conflict"]
 
 [[permission]]
 identifier = "allow-sync-enroll"

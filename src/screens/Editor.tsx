@@ -42,6 +42,7 @@ import {
 import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
 import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
+import { useConflictMaterializer } from "../hooks/useConflictMaterializer";
 import type { KeybindEntry } from "../commands/keybindEngine";
 import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
@@ -470,6 +471,16 @@ function EditorChrome({
 }: EditorChromeProps) {
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  // Keep-both (MYND-427): drain the sync engine's staged concurrent-edit
+  // conflicts → materialize each remote revision as a `conflict_of:` copy →
+  // refresh the sidebar so it appears. Both edits survive; nothing is lost.
+  useConflictMaterializer(
+    useCallback(() => {
+      void noteList()
+        .then((ids) => ctx.refreshAll(ids))
+        .catch(() => {});
+    }, [ctx]),
+  );
   // Plain-message sink for the pre-existing string consumers (Settings,
   // backup export, importer); the export flow goes through the structured
   // `showExportToast` below so success can carry its reveal action.

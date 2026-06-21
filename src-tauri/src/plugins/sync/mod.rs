@@ -62,6 +62,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_list_devices,
             commands::sync_approve_device,
             commands::sync_remove_device,
+            commands::sync_pending_conflicts,
+            commands::sync_take_conflict,
+            commands::sync_resolve_conflict,
             commands::sync_enroll,
             commands::sync_join_account,
         ])
