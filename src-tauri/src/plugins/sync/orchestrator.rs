@@ -22,10 +22,11 @@ use super::conflict::{plan_note_keep_both, ConflictCopyPlan};
 use super::engine::{self, PullError, PushBlob, PushError};
 use super::state::{
     read_head_baseline, read_sync_state, write_head_baseline, write_sync_state, BlobSyncState,
+    SyncState,
 };
 use super::transport::SyncTransport;
 use protocol::{compute_manifest_hash, ManifestEntry, VaultHead, VvEntry, VAULT_HEAD_FORMAT_V1};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// What one sync cycle did (surfaced to the status indicator + tests).
@@ -264,10 +265,30 @@ fn manifest_entries(local: &HashMap<[u8; 16], [u8; 24]>) -> Vec<ManifestEntry> {
         .collect()
 }
 
+/// Upper bound on the pull→push attempts in one [`run_sync_cycle`] (the initial
+/// attempt + retries). A lost-CAS 409 triggers a full-reconcile retry; the bound
+/// stops a structurally-unrecoverable 409 (or an actively-racing peer) from looping
+/// forever — the next cycle simply re-attempts from the persisted cursor.
+const MAX_PUSH_ATTEMPTS: usize = 3;
+
 /// Run one full sync cycle against the configured server. `account_number_hash`
 /// and `device_id` are the 16-byte values captured at enrollment (the head binds
 /// the account; the VV-actor is this device). Idempotent: a no-change cycle is a
 /// cheap pull that writes nothing.
+///
+/// **409 (lost-CAS) recovery.** A push can lose a compare-and-set two ways:
+/// `BlobStale` (a blob's `base_version` fell behind the server) or `HeadStale`
+/// (another device advanced the head between our pull and our push). Either is
+/// retried with a **full-reconcile** pull (`from_cursor = 0`) so the next attempt
+/// sees the *complete* server roster + current head: a blob that advanced past our
+/// baseline but now sits OUTSIDE the normal `ChangedSince(cursor)` window is then
+/// re-detected as a conflict (excluded), and a moved head is re-pulled so we
+/// re-author a valid linear advance over it — instead of re-pushing a stale
+/// `base_version` forever, which wedges the whole atomic push batch (a single
+/// blob's CAS failure aborts the server's batch before it commits, so an innocent
+/// sibling note can never get through either). Bounded by [`MAX_PUSH_ATTEMPTS`].
+/// The device-local sync state is persisted only on a fully successful attempt, so
+/// a failed retry never leaks a half-advanced cursor onto disk.
 // The arguments are each a distinct, independent input to the cycle (the
 // transport, the two keys/ids, the token, the two paths, the push gate); bundling
 // them into a struct would not aid clarity at this single orchestrator entry.
@@ -292,6 +313,64 @@ pub fn run_sync_cycle(
         .unwrap_or_default();
     let baseline_seq = baseline_head.as_ref().map(|h| h.seq).unwrap_or(0);
 
+    // Drive one attempt; on a lost-CAS 409 re-attempt with a full reconcile (see the
+    // fn doc). `state` carries across attempts (its baselines/staged conflicts learnt
+    // on attempt N help attempt N+1); it is persisted by the caller only on success.
+    let mut from_cursor = state.cursor;
+    let mut attempt = 0usize;
+    loop {
+        attempt += 1;
+        match sync_cycle_attempt(
+            transport,
+            root_key,
+            account_number_hash,
+            device_id,
+            token,
+            notes_dir,
+            vault_root,
+            allow_push,
+            &mut state,
+            &baseline_vv,
+            baseline_seq,
+            from_cursor,
+        ) {
+            Ok(summary) => {
+                // Persist the advanced cursor + per-blob CAS state ONLY on success,
+                // so a failed retry never leaves a half-advanced cursor on disk.
+                write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
+                return Ok(summary);
+            }
+            Err(SyncCycleError::Push(PushError::BlobStale | PushError::HeadStale))
+                if attempt < MAX_PUSH_ATTEMPTS =>
+            {
+                // Full reconcile on the retry so the stale blob / moved head re-enters
+                // the roster and is handled (excluded as a conflict / re-authored over).
+                from_cursor = 0;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+/// One pull→reconcile→detect→push attempt. Factored out of [`run_sync_cycle`] so a
+/// lost-CAS 409 can re-run it with a full-reconcile cursor (`from_cursor = 0`).
+/// Mutates `state` in place (cursor + per-blob baselines + VV log) but does NOT
+/// persist `sync-state.json` — the caller persists on success only.
+#[allow(clippy::too_many_arguments)]
+fn sync_cycle_attempt(
+    transport: &dyn SyncTransport,
+    root_key: &[u8; 32],
+    account_number_hash: [u8; 16],
+    device_id: [u8; 16],
+    token: &str,
+    notes_dir: &Path,
+    vault_root: &Path,
+    allow_push: bool,
+    state: &mut SyncState,
+    baseline_vv: &[VvEntry],
+    baseline_seq: u64,
+    from_cursor: u64,
+) -> Result<SyncSummary, SyncCycleError> {
     // --- PULL (head verify + rollback rejection happen inside) ---
     // A `cursor_expired` (410) means the server GC'd past our stored cursor: reset
     // to a full reconcile from 0 and re-pull ONCE. The baseline self-heal below
@@ -302,15 +381,15 @@ pub fn run_sync_cycle(
         transport,
         root_key,
         token,
-        &baseline_vv,
-        state.cursor,
+        baseline_vv,
+        from_cursor,
         &local,
     ) {
         Ok(p) => p,
         Err(PullError::CursorExpired) => {
             state.cursor = 0;
-            write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
-            engine::pull_to_stable(transport, root_key, token, &baseline_vv, 0, &local)
+            write_sync_state(vault_root, state).map_err(|_| SyncCycleError::Io)?;
+            engine::pull_to_stable(transport, root_key, token, baseline_vv, 0, &local)
                 .map_err(SyncCycleError::Pull)?
         }
         Err(e) => return Err(SyncCycleError::Pull(e)),
@@ -382,6 +461,20 @@ pub fn run_sync_cycle(
         .map(|m| (m.id, (m.version, m.content_nonce)))
         .collect();
     let pending_tombstones = read_pending_tombstones(vault_root);
+    // Notes whose remote revision is already staged as an unresolved keep-both
+    // conflict (`conflicts/<id>.myn`, awaiting materialization). Their synced
+    // baseline is, by construction, behind the server — so pushing them would lose
+    // the blob CAS (409 blob_stale) and wedge the whole atomic batch. They MUST stay
+    // excluded until `resolve_conflict` adopts the remote as the baseline; only then
+    // does the untouched local edit push as a clean linear advance. This also closes
+    // the cursor-window gap: a conflict first detected while the blob was in the pull
+    // window (`server_meta` below) stays excluded after the cursor advances past it,
+    // instead of silently re-pushing the stale base_version. The durable staging dir
+    // — not this transient summary — is the materialization source (the notes layer
+    // reads it via `list_pending_conflicts`), so an excluded blob is NOT re-surfaced
+    // in `conflicts` here (re-surfacing every cycle would re-materialize duplicates).
+    let pending_conflicts: HashSet<String> =
+        list_pending_conflicts(vault_root).into_iter().collect();
     let mut to_push: Vec<PushBlob> = Vec::new();
     let mut conflicts: Vec<ConflictCopyPlan> = Vec::new();
     if allow_push {
@@ -391,6 +484,10 @@ pub fn run_sync_cycle(
             let synced = state.blobs.get(&id_hex);
             if synced.map(|b| b.content_nonce_hex.as_str()) == Some(nonce_hex.as_str()) {
                 continue; // already in sync
+            }
+            // Unresolved staged conflict (see above): never push, never re-stage.
+            if pending_conflicts.contains(&id_hex) {
+                continue;
             }
             // True conflict: this note is locally dirty AND the server advanced it
             // past our synced baseline (a concurrent remote edit). Pushing a stale
@@ -447,7 +544,7 @@ pub fn run_sync_cycle(
             .head
             .as_ref()
             .map(|h| h.head.version_vector.clone())
-            .unwrap_or(baseline_vv);
+            .unwrap_or_else(|| baseline_vv.to_vec());
         let mut vv_map: HashMap<[u8; 16], u64> =
             base_vv.iter().map(|e| (e.device_id, e.counter)).collect();
         *vv_map.entry(device_id).or_insert(0) += 1;
@@ -517,7 +614,9 @@ pub fn run_sync_cycle(
         write_head_baseline(vault_root, &sealed).map_err(|_| SyncCycleError::Io)?;
     }
 
-    write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
+    // NOTE: `sync-state.json` is persisted by `run_sync_cycle` on success only (so a
+    // failed 409 retry never leaves a half-advanced cursor on disk). The 410-recovery
+    // branch above is the one in-attempt write — a deliberate checkpoint of `cursor=0`.
     Ok(SyncSummary {
         pulled,
         pushed,
@@ -1996,6 +2095,367 @@ mod tests {
             read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
             Some(&b"deleted: 2026-06-21T00:00:00Z"[..]),
             "B sees the deletion"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// Regression (the Windows→Mac sync wedge): a conflict detected in an EARLIER
+    /// cycle (while the blob was in the pull window) must STAY excluded from the push
+    /// after the cursor advances past it. Otherwise the next local edit re-pushes the
+    /// note at its now-stale `base_version`, the server CAS 409s, and — because the
+    /// push is one atomic batch — the whole batch wedges, so an innocent sibling note
+    /// can never reach the server either. The fix excludes any note whose remote
+    /// revision is still staged as an unresolved keep-both conflict.
+    #[test]
+    fn staged_conflict_stays_excluded_and_sibling_pushes_after_cursor_advance() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP staged_conflict_stays_excluded: server binary not found");
+            return;
+        };
+        let root_key = [0x91u8; 32];
+        let account_hash = [0x92u8; 16];
+        let username = "MY-WEDGE-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x93u8; 32];
+        let items_key_id = [0x94u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-wedge-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-wedge-B-{}", std::process::id()));
+        let dir_c = std::env::temp_dir().join(format!("myne-wedge-C-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        let notes_c = dir_c.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        std::fs::create_dir_all(&notes_c).unwrap();
+        let x = NoteId::new_v7();
+        let x_hex = hex(x.as_uuid().as_bytes());
+
+        // A authors X, pushes; B pulls X to a synced baseline (v1).
+        write_note(&notes_a, &items_key, &items_key_id, &x, b"base", false);
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push base");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull base");
+
+        // A edits X and pushes (server X→v2, change-seq advances past X). B edits X
+        // offline (concurrent) — it has NOT yet pulled A's revision.
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from A",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push edit");
+        write_note(
+            &notes_b,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from B",
+            true,
+        );
+
+        // B cycle #1: pulls A's X@v2 (in window) → conflict detected, staged, and
+        // excluded. B's cursor advances PAST X's change-seq. Nothing pushes (X is the
+        // only dirty note), and the conflict is left UNRESOLVED (no materialization).
+        let s1 = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B cycle 1 surfaces the conflict without wedging");
+        assert_eq!(s1.conflicts.len(), 1, "cycle 1 surfaces the X conflict");
+        assert_eq!(
+            s1.pushed, 0,
+            "nothing pushed in cycle 1 (X is the only dirty note)"
+        );
+        assert!(
+            list_pending_conflicts(&dir_b).contains(&x_hex),
+            "X is staged pending after cycle 1"
+        );
+
+        // B now edits an innocent sibling note Y.
+        let y = NoteId::new_v7();
+        write_note(
+            &notes_b,
+            &items_key,
+            &items_key_id,
+            &y,
+            b"innocent sibling",
+            false,
+        );
+
+        // B cycle #2: X is now OUTSIDE the pull window (the cursor advanced past it in
+        // cycle 1). Before the fix, X would be re-pushed at its stale base_version →
+        // 409 blob_stale → the whole batch (including Y) wedges and the cycle errors.
+        // The fix excludes the still-staged X, so Y pushes cleanly and the cycle is Ok.
+        let s2 = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B cycle 2 must NOT wedge — the staged conflict is excluded, Y pushes");
+        assert!(
+            s2.pushed >= 1,
+            "the innocent sibling Y pushed despite the unresolved conflict"
+        );
+
+        // B's local X edit is untouched, and X stays a pending conflict until resolved.
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from B"[..]),
+            "B's X edit untouched (never overwritten by the conflicting remote)"
+        );
+        assert!(
+            list_pending_conflicts(&dir_b).contains(&x_hex),
+            "X stays a pending conflict until the keep-both is resolved"
+        );
+
+        // Y reached the server (a fresh device C pulls it); A's X@v2 is preserved.
+        let (tc, dev_c, tok_c) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            false,
+        );
+        run_sync_cycle(
+            tc.as_ref(),
+            &root_key,
+            account_hash,
+            dev_c,
+            &tok_c,
+            &notes_c,
+            &dir_c,
+            true,
+        )
+        .expect("C pull");
+        assert_eq!(
+            read_note(&notes_c, &items_key, &items_key_id, &y).as_deref(),
+            Some(&b"innocent sibling"[..]),
+            "Y synced through to C (no wedge)"
+        );
+        assert_eq!(
+            read_note(&notes_c, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from A"[..]),
+            "A's X edit preserved on the server"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+        std::fs::remove_dir_all(&dir_c).ok();
+    }
+
+    /// Regression: the reactive lost-CAS recovery. A push that 409s `blob_stale` for
+    /// a blob that is NOT a pre-staged conflict and sits OUTSIDE the cursor window
+    /// (a baseline that fell behind the server — the partial-commit / corrupted-state
+    /// class) must NOT propagate the error and wedge forever. The cycle re-pulls a
+    /// full reconcile, re-detects the blob as a conflict against the now-complete
+    /// roster, excludes it, and succeeds.
+    #[test]
+    fn blob_stale_recovers_via_full_reconcile_retry() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP blob_stale_recovers: server binary not found");
+            return;
+        };
+        let root_key = [0xA1u8; 32];
+        let account_hash = [0xA2u8; 16];
+        let username = "MY-RETRY-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0xA3u8; 32];
+        let items_key_id = [0xA4u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-retry-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-retry-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+        let x = NoteId::new_v7();
+        let x_hex = hex(x.as_uuid().as_bytes());
+
+        // A authors X, pushes (v1). B pulls X to a clean baseline (v1).
+        write_note(&notes_a, &items_key, &items_key_id, &x, b"base", false);
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push base");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull base");
+
+        // A edits X → v2 (server change-seq advances past X). B pulls it cleanly (B
+        // has NOT edited X, so no conflict): B's baseline → v2, cursor past X.
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from A",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push v2");
+        run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B pull v2");
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from A"[..]),
+            "B holds A's v2 before the corruption"
+        );
+
+        // Corrupt B's recorded baseline for X back to v1 WITHOUT staging a conflict —
+        // simulating a baseline that fell behind the server while X sits outside the
+        // cursor window (the partial-commit / chunked-parse class of desync).
+        let mut st = crate::plugins::sync::state::read_sync_state(&dir_b).unwrap();
+        st.blobs
+            .get_mut(&x_hex)
+            .expect("B has a baseline for X")
+            .version = 1;
+        crate::plugins::sync::state::write_sync_state(&dir_b, &st).unwrap();
+
+        // B edits X locally → dirty over the corrupted v1 baseline. On push B sends
+        // X@base_version=1; the server is at v2 → 409 blob_stale. Without the reactive
+        // retry the cycle would error; with it, the full-reconcile retry re-detects X
+        // as a conflict (server v2 > baseline v1), excludes it, and the cycle is Ok.
+        write_note(
+            &notes_b,
+            &items_key,
+            &items_key_id,
+            &x,
+            b"edit from B",
+            true,
+        );
+        let s = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B cycle recovers from the 409 instead of wedging");
+        assert_eq!(
+            s.pushed, 0,
+            "X (the only dirty note) is excluded, nothing pushes"
+        );
+        assert!(
+            list_pending_conflicts(&dir_b).contains(&x_hex),
+            "the recovery staged X as a conflict"
+        );
+        assert_eq!(
+            read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
+            Some(&b"edit from B"[..]),
+            "B's local X edit survived the recovery (never clobbered)"
         );
 
         std::fs::remove_dir_all(&dir_a).ok();
