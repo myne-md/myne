@@ -74,6 +74,30 @@ fn blob_path(notes_dir: &Path, id: &[u8; 16]) -> std::path::PathBuf {
     notes_dir.join(format!("{uuid}.myn"))
 }
 
+/// Download a blob, transparently backing off + retrying on the server's
+/// per-account rate limit (429). A fresh device pulling a large vault otherwise
+/// hits the burst cap mid-cycle and fails the whole pull; the backoff lets the
+/// token bucket refill so the initial sync completes in one pass instead of
+/// erroring out and relying on many full retry cycles. The cap bounds the total
+/// wait so a genuinely throttled account still fails (rather than hangs).
+fn download_blob_backoff(
+    transport: &dyn SyncTransport,
+    token: &str,
+    id: &[u8; 16],
+) -> Result<Vec<u8>, PullError> {
+    let mut delay_ms = 250u64;
+    for _ in 0..6 {
+        match engine::download_blob(transport, token, id) {
+            Err(PullError::RateLimited) => {
+                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                delay_ms = (delay_ms * 2).min(2000);
+            }
+            other => return other,
+        }
+    }
+    engine::download_blob(transport, token, id)
+}
+
 /// The engine's `local` manifest (raw 16-byte id → 24-byte content_nonce), read
 /// decryption-free from the on-disk notes dir. Converts the notes-domain
 /// [`NonceManifest`](crate::search::persist::NonceManifest) String keys to the
@@ -129,16 +153,28 @@ pub fn run_sync_cycle(
     let baseline_seq = baseline_head.as_ref().map(|h| h.seq).unwrap_or(0);
 
     // --- PULL (head verify + rollback rejection happen inside) ---
+    // A `cursor_expired` (410) means the server GC'd past our stored cursor: reset
+    // to a full reconcile from 0 and re-pull ONCE. The baseline self-heal below
+    // re-establishes per-blob versions, so a long-offline device recovers instead
+    // of looping on 410 forever (MYND-426 task 8).
     let local = local_manifest(notes_dir);
-    let page = engine::pull_to_stable(
+    let page = match engine::pull_to_stable(
         transport,
         root_key,
         token,
         &baseline_vv,
         state.cursor,
         &local,
-    )
-    .map_err(SyncCycleError::Pull)?;
+    ) {
+        Ok(p) => p,
+        Err(PullError::CursorExpired) => {
+            state.cursor = 0;
+            write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
+            engine::pull_to_stable(transport, root_key, token, &baseline_vv, 0, &local)
+                .map_err(SyncCycleError::Pull)?
+        }
+        Err(e) => return Err(SyncCycleError::Pull(e)),
+    };
 
     // --- reconcile the synced baseline (self-heal) ---
     // For every blob the server reports that we already hold locally, adopt the
@@ -174,7 +210,7 @@ pub fn run_sync_cycle(
         if baseline_nonce.is_some() && baseline_nonce != local_nonce {
             continue;
         }
-        let bytes = engine::download_blob(transport, token, &c.id).map_err(SyncCycleError::Pull)?;
+        let bytes = download_blob_backoff(transport, token, &c.id).map_err(SyncCycleError::Pull)?;
         std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
         crate::atomic_write::atomic_write(&blob_path(notes_dir, &c.id), &bytes, true)
             .map_err(|_| SyncCycleError::Io)?;
@@ -357,6 +393,13 @@ mod tests {
     /// portfile dir is unique per call (process id + a counter) so concurrent
     /// tests in the same process don't race on a shared portfile.
     fn spawn_server() -> Option<(ServerGuard, String)> {
+        // Integration tests exercise sync correctness, not abuse throttling — lift
+        // the per-account rate limit so a multi-hundred-blob cycle isn't confounded
+        // by 429s. The rate-limit backoff test overrides with a low burst.
+        spawn_server_env("1000000", "1000000")
+    }
+
+    fn spawn_server_env(burst: &str, refill: &str) -> Option<(ServerGuard, String)> {
         use std::sync::atomic::{AtomicU64, Ordering};
         static SEQ: AtomicU64 = AtomicU64::new(0);
         let bin = server_binary()?;
@@ -371,13 +414,8 @@ mod tests {
         let child = std::process::Command::new(&bin)
             .env("MYNE_SERVER_ADDR", "127.0.0.1:0")
             .env("MYNE_SERVER_PORTFILE", &portfile)
-            // Integration tests exercise sync correctness, not abuse throttling —
-            // lift the per-account rate limit so a multi-hundred-blob cycle isn't
-            // confounded by 429s (the default 256-burst would fail any >256-blob
-            // pull in a single cycle; see the large-vault test + the separate
-            // rate-limit-vs-initial-sync finding).
-            .env("MYNE_RATELIMIT_BURST", "1000000")
-            .env("MYNE_RATELIMIT_REFILL", "1000000")
+            .env("MYNE_RATELIMIT_BURST", burst)
+            .env("MYNE_RATELIMIT_REFILL", refill)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn()
@@ -1472,6 +1510,138 @@ mod tests {
         assert_eq!(
             read_note(&notes_b, &items_key, &items_key_id, &note).as_deref(),
             Some(&b"B unsynced edit"[..])
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A `cursor_expired` (410) — the server GC'd past the device's stored cursor —
+    /// resets the cursor to 0 and re-pulls a full reconcile, instead of looping on
+    /// 410 forever. Driven with a fake transport: the first pull (stale cursor)
+    /// 410s, the from-0 re-pull succeeds.
+    #[test]
+    fn cursor_expired_resets_and_full_reconciles() {
+        use crate::plugins::sync::state::{write_sync_state, SyncState};
+        use crate::plugins::sync::transport::{FakeTransport, HttpMethod};
+
+        let dir = std::env::temp_dir().join(format!("myne-cursor-{}", std::process::id()));
+        let notes = dir.join("notes");
+        std::fs::create_dir_all(&notes).unwrap();
+        // Persist a stale cursor the server will reject.
+        let st = SyncState {
+            cursor: 5,
+            ..Default::default()
+        };
+        write_sync_state(&dir, &st).unwrap();
+
+        let fake = FakeTransport::new();
+        fake.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=5",
+            410,
+            br#"{"error_code":"cursor_expired"}"#.to_vec(),
+        );
+        fake.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            br#"{"metas":[],"next_cursor":0}"#.to_vec(),
+        );
+
+        let summary = run_sync_cycle(
+            &fake, &[0u8; 32], [0u8; 16], [0u8; 16], "tok", &notes, &dir, true,
+        )
+        .expect("the cycle recovers from cursor_expired");
+        assert_eq!(summary.cursor, 0, "cursor reset to a full reconcile");
+        // The recovery re-pull from 0 actually happened.
+        let pulled_from_0 = fake
+            .requests()
+            .iter()
+            .any(|(m, p, _, _)| *m == HttpMethod::Get && p == "/sync/pull?cursor=0");
+        assert!(pulled_from_0, "re-pulled from cursor 0 after the 410");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A fresh device pulling a vault larger than the server's rate-limit burst
+    /// completes its initial sync in ONE cycle: the blob-download backoff absorbs
+    /// the 429s (token-bucket refill) instead of failing the whole pull. Uses a
+    /// deliberately low burst so the backoff path is exercised.
+    #[test]
+    fn large_initial_sync_backs_off_through_rate_limit() {
+        let Some((_guard, url)) = spawn_server_env("100", "100000") else {
+            eprintln!("SKIP rate_limit_backoff: server binary not found");
+            return;
+        };
+        let root_key = [0xb1u8; 32];
+        let account_hash = [0xb2u8; 16];
+        let username = "MY-RL-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0xb3u8; 32];
+        let items_key_id = [0xb4u8; 16];
+        let dir_a = std::env::temp_dir().join(format!("myne-rl-A-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-rl-B-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        // 150 notes > the 100-blob burst → B's download loop will hit 429s.
+        let mut ids = Vec::new();
+        for i in 0..150u32 {
+            let note = NoteId::new_v7();
+            write_note(
+                &notes_a,
+                &items_key,
+                &items_key_id,
+                &note,
+                format!("n{i}").as_bytes(),
+                false,
+            );
+            ids.push(note);
+        }
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push 150");
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        let pull = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B initial sync completes despite the rate limit (backoff)");
+        assert_eq!(
+            pull.pulled, 150,
+            "all 150 notes pulled in one cycle via backoff"
         );
 
         std::fs::remove_dir_all(&dir_a).ok();
