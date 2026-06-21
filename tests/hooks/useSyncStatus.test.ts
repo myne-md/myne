@@ -16,6 +16,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
 }));
 
+// The hook listens for `sync://enrollment-changed`; stub it to a no-op unlistener.
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(() => {})),
+}));
+
 import { useSyncStatus } from "../../src/hooks/useSyncStatus";
 
 // Mirrors the (unexported) `STATUS_POLL_MS` constant in the hook.
@@ -51,6 +56,8 @@ describe("useSyncStatus — mount read + mapped status", () => {
   it("maps each source-defined status verbatim", async () => {
     const cases = [
       { state: "disabled" },
+      { state: "not_enrolled" },
+      { state: "pending" },
       { state: "idle" },
       { state: "syncing" },
       { state: "error", detail: "boom" },

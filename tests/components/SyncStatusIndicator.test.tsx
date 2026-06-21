@@ -18,6 +18,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
 }));
 
+// The hook listens for `sync://enrollment-changed`; stub it to a no-op unlistener.
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(() => {})),
+}));
+
 import { SyncStatusIndicator } from "../../src/components/sync/SyncStatusIndicator";
 import type { SyncStatus } from "../../src/hooks/useSyncStatus";
 
@@ -52,6 +57,33 @@ describe("SyncStatusIndicator — status variants", () => {
     );
     expect(screen.getByTestId("sync.status-label").textContent).toBe("Sync off");
     // No endpoint configured → nothing to trigger; the button is omitted.
+    expect(screen.queryByTestId("sync.sync-now")).toBeNull();
+  });
+
+  it("not_enrolled renders 'Not enrolled' and HIDES the Sync now affordance", async () => {
+    statusFixture({ state: "not_enrolled" });
+    render(<SyncStatusIndicator />);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("sync.status-indicator").getAttribute("data-sync-state"),
+      ).toBe("not_enrolled"),
+    );
+    expect(screen.getByTestId("sync.status-label").textContent).toBe("Not enrolled");
+    // A not-enrolled device cannot sync → the button is omitted (else clicking it
+    // would map NotReady→Idle and flash a false "Synced").
+    expect(screen.queryByTestId("sync.sync-now")).toBeNull();
+  });
+
+  it("pending renders 'Awaiting approval' and HIDES the Sync now affordance", async () => {
+    statusFixture({ state: "pending" });
+    render(<SyncStatusIndicator />);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("sync.status-indicator").getAttribute("data-sync-state"),
+      ).toBe("pending"),
+    );
+    expect(screen.getByTestId("sync.status-label").textContent).toBe("Awaiting approval");
+    // A pending device cannot manually sync until approved → no button.
     expect(screen.queryByTestId("sync.sync-now")).toBeNull();
   });
 

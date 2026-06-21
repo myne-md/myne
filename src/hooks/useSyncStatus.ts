@@ -11,10 +11,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 /** The runtime sync status (mirrors the Rust `SyncRuntimeStatus`). */
 export type SyncStatus =
   | { state: "disabled" }
+  | { state: "not_enrolled" }
+  | { state: "pending" }
   | { state: "idle" }
   | { state: "syncing" }
   | { state: "error"; detail: string }
@@ -56,9 +59,17 @@ export function useSyncStatus(): SyncStatusHook {
     };
     tick();
     timer = setInterval(tick, STATUS_POLL_MS);
+    // Re-read immediately when enrollment changes (e.g. a local reset) so the
+    // indicator does not lag a whole poll interval behind the device panel.
+    let unlisten: (() => void) | undefined;
+    void listen("sync://enrollment-changed", tick).then((fn) => {
+      if (mounted.current) unlisten = fn;
+      else fn();
+    });
     return () => {
       mounted.current = false;
       if (timer) clearInterval(timer);
+      unlisten?.();
     };
   }, []);
 

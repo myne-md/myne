@@ -20,6 +20,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
 }));
 
+// The hook listens for `sync://enrollment-changed`; stub it to a no-op unlistener.
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(() => {})),
+}));
+
 import { useDevices, type DeviceEntry } from "../../src/hooks/useDevices";
 
 // A roster fixture covering the three roster shapes the hook filters on:
@@ -195,5 +200,70 @@ describe("useDevices — error surface", () => {
     });
     const { result } = renderHook(() => useDevices());
     await waitFor(() => expect(result.current.error).toBe("Internal"));
+  });
+});
+
+describe("useDevices — resetLocal", () => {
+  it("invokes sync_reset_local (no payload), then refreshes the roster, and clears busy", async () => {
+    const { result } = renderHook(() => useDevices());
+    await waitFor(() => expect(result.current.devices).toEqual(ROSTER));
+    invokeMock.mockClear();
+
+    await act(async () => {
+      await result.current.resetLocal();
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith("plugin:sync|sync_reset_local");
+    // A successful reset re-reads the roster (the recovery refresh).
+    expect(invokeMock).toHaveBeenCalledWith("plugin:sync|sync_list_devices");
+    // Success path clears busy — it relies on refresh()'s finally (no explicit clear).
+    expect(result.current.busy).toBe(false);
+  });
+
+  it("holds busy across an in-flight reset and drops it once the refresh settles", async () => {
+    const { result } = renderHook(() => useDevices());
+    await waitFor(() => expect(result.current.busy).toBe(false));
+
+    let release: () => void = () => {};
+    const gate = new Promise<void>((res) => {
+      release = res;
+    });
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:sync|sync_reset_local") {
+        await gate;
+        return undefined;
+      }
+      if (cmd === "plugin:sync|sync_list_devices") return ROSTER;
+      return undefined;
+    });
+
+    let p: Promise<void> = Promise.resolve();
+    act(() => {
+      p = result.current.resetLocal();
+    });
+    await waitFor(() => expect(result.current.busy).toBe(true));
+    await act(async () => {
+      release();
+      await p;
+    });
+    await waitFor(() => expect(result.current.busy).toBe(false));
+  });
+
+  it("sets the error kind and clears busy when reset rejects", async () => {
+    const { result } = renderHook(() => useDevices());
+    await waitFor(() => expect(result.current.devices).toEqual(ROSTER));
+
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:sync|sync_reset_local") throw { kind: "Internal" };
+      if (cmd === "plugin:sync|sync_list_devices") return ROSTER;
+      return undefined;
+    });
+
+    await act(async () => {
+      await result.current.resetLocal();
+    });
+
+    expect(result.current.error).toBe("Internal");
+    expect(result.current.busy).toBe(false);
   });
 });

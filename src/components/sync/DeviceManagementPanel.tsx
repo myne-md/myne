@@ -61,16 +61,67 @@ function shortName(d: DeviceEntry): string {
 }
 
 export function DeviceManagementPanel() {
-  const { devices, pending, error, busy, approve, remove } = useDevices();
+  const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
+  // This device, if the roster came back marking it retired — it was removed from
+  // another device. It is filtered out of `approved`/`pending`, so without this it
+  // would vanish silently; surface it with the reset+re-add recovery instead.
+  const retiredSelf = (devices ?? []).find((d) => d.is_current && d.retired);
 
   return (
     <div style={ROOT} data-testid="sync.device-management">
-      {error && (
-        <div data-testid="sync.device-error" style={{ color: "var(--danger)", fontSize: "var(--text-sm)" }}>
-          Couldn’t reach sync ({error}).
+      {error === "NotEnrolled" ? (
+        <div
+          data-testid="sync.device-not-enrolled"
+          style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}
+        >
+          This device isn’t connected yet. If you just added it, wait for approval from
+          another device; otherwise add it with the “Add a device” form above.
         </div>
-      )}
+      ) : error ? (
+        <div
+          data-testid="sync.device-error"
+          style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--danger)", fontSize: "var(--text-sm)" }}
+        >
+          <span>Couldn’t reach sync ({error}).</span>
+          {error === "Unauthenticated" ? (
+            // A rejected credential (e.g. this device was removed elsewhere) — a local
+            // reset is the actual remedy.
+            <button
+              type="button"
+              style={BTN}
+              disabled={busy}
+              onClick={() => void resetLocal()}
+              data-testid="sync.reset-local"
+            >
+              Reset sync on this device
+            </button>
+          ) : (
+            // A transport failure — NOT a reason to wipe the baseline. The likely cause
+            // (server moved / certificate changed) is fixed by re-pinning the endpoint.
+            <span style={{ color: "var(--fg-3)" }} data-testid="sync.transport-hint">
+              If the server moved or its certificate changed, re-enter the server URL
+              under “Sync server” above to re-trust it.
+            </span>
+          )}
+        </div>
+      ) : retiredSelf ? (
+        <div
+          data-testid="sync.device-retired-self"
+          style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--danger)", fontSize: "var(--text-sm)" }}
+        >
+          <span>This device was removed from your account on another device.</span>
+          <button
+            type="button"
+            style={BTN}
+            disabled={busy}
+            onClick={() => void resetLocal()}
+            data-testid="sync.reset-local"
+          >
+            Reset and re-add this device
+          </button>
+        </div>
+      ) : null}
 
       {pending.length > 0 && (
         <div data-testid="sync.pending-devices">
@@ -99,7 +150,12 @@ export function DeviceManagementPanel() {
       <div>
         <div style={SECTION_LABEL}>Your devices</div>
         {devices === null ? (
-          <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>Loading…</div>
+          // Only "Loading…" while genuinely loading. When the roster failed (e.g. this
+          // device is not enrolled) `devices` stays null with an error set above — show
+          // nothing here rather than spinning on "Loading…" forever.
+          error ? null : (
+            <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>Loading…</div>
+          )
         ) : approved.length === 0 ? (
           <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>No devices synced yet.</div>
         ) : (
