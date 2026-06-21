@@ -53,7 +53,11 @@ import {
   splitTableRow,
   type TableGrid,
 } from "../editor/decorations/table-model";
-import { normalizeParagraphWhitespace } from "./clip/escape";
+import {
+  escapeLinkTitle,
+  formatLinkDestination,
+  normalizeParagraphWhitespace,
+} from "./clip/escape";
 import {
   type BlockMathRange,
   collectCodeRanges,
@@ -919,12 +923,14 @@ function renderLink(ctx: Ctx, node: SyntaxNode): string {
   if (url !== null) {
     // Inline link: emit canonically, preserving a title if present.
     const rawTitle = childText(ctx, node, "LinkTitle");
+    const dest = formatLinkDestination(url);
     if (rawTitle !== null && rawTitle.length >= 2) {
-      // LinkTitle includes its surrounding quotes; canonicalize to `"…"`.
-      const inner = rawTitle.slice(1, -1);
-      return `[${text}](${url.trim()} "${inner}")`;
+      // LinkTitle includes its surrounding quotes; canonicalize to `"…"`,
+      // escaping any embedded quote/backslash so the title cannot close early.
+      const inner = escapeLinkTitle(rawTitle.slice(1, -1));
+      return `[${text}](${dest} "${inner}")`;
     }
-    return `[${text}](${url.trim()})`;
+    return `[${text}](${dest})`;
   }
 
   // Reference link → inline normalization. The label is the explicit
@@ -938,7 +944,7 @@ function renderLink(ctx: Ctx, node: SyntaxNode): string {
       : foldLabel(rawLabel);
   const target = ctx.refs.get(folded);
   if (target === undefined) return slice(ctx, node); // dangling → literal
-  return `[${text}](${target})`;
+  return `[${text}](${formatLinkDestination(target)})`;
 }
 
 /**

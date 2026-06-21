@@ -6729,4 +6729,39 @@ mod tests {
         // §9.5.5 fall-back-to-defaults yields an empty paired-extensions set.
         assert!(PrefsView::default().paired_extensions.is_empty());
     }
+
+    #[test]
+    fn prefs_view_serde_serialization_omits_token_value() {
+        // H1 regression: `prefs_read` returns `PrefsView` to the WebView via
+        // serde. The bearer `token_value` must NEVER cross that IPC boundary
+        // (`#[serde(skip_serializing)]` on `PairedExtension.token_value`); a
+        // WebView that could read it would replay it to the 0600 relay and mint
+        // clips without the pairing dialog. The Settings UI gets ids/timestamps
+        // through the dedicated `pairing_list_paired` command, not `prefs_read`.
+        // (On-disk persistence is hand-rolled canonical JSON and is unaffected —
+        // `paired_extensions_round_trip_through_blob` covers that direction.)
+        let view = PrefsView {
+            paired_extensions: alloc::vec![sample_paired(
+                "ext-a",
+                "SECRET-bearer-token-must-not-leak",
+                false,
+            )],
+            ..PrefsView::default()
+        };
+        let json = serde_json::to_string(&view).expect("PrefsView serializes");
+        assert!(
+            !json.contains("token_value"),
+            "prefs_read JSON must not carry the token_value key: {json}"
+        );
+        assert!(
+            !json.contains("SECRET-bearer-token-must-not-leak"),
+            "prefs_read JSON must not carry the bearer secret value: {json}"
+        );
+        // We skip ONLY the bearer secret — the non-secret record fields still
+        // serialize (so this is a confinement fix, not a blanket field removal).
+        assert!(
+            json.contains("ext-a"),
+            "non-secret extension_id should still serialize: {json}"
+        );
+    }
 }

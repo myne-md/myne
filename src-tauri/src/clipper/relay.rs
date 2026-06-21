@@ -66,8 +66,21 @@ use std::time::Instant;
 use super::envelope::{self, VaultStatusSource};
 use super::framing::{self, FrameError};
 use super::ingest::{ingest_relayed_frame, ClipAssembler, IngestOutcome, PairingDispatcher};
-use super::rate_limit::RateLimiter;
+use super::rate_limit::SharedRateLimiter;
 use super::token::TokenRegistry;
+
+/// How long the host waits for the app's reply frame before giving up (X2).
+///
+/// Must EXCEED the app's `relay_app::DISPATCH_TIMEOUT` (30 s): the app can park
+/// up to that long while the WebView assembles a clip, then ALWAYS replies
+/// (`accepted` / `error` / `locked`), so a legitimate clip is never cut off. The
+/// slack bounds the OTHER case — when the app SILENTLY ignores an unpaired /
+/// invalid / revoked frame (`IngestOutcome::SilentlyIgnored`) it neither replies
+/// nor closes, so an unbounded read on the host's socket would hang **forever**,
+/// stranding the host process and (until its own timeout) the extension. With
+/// this bound the silent path yields a timed read and the host pump exits
+/// cleanly; the extension sees the disconnect and surfaces an honest outcome.
+pub const HOST_APP_REPLY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(40);
 
 /// The basename of the local IPC socket inside the app-data dir.
 ///
@@ -104,7 +117,7 @@ pub fn serve_connection<R: Read, W: Write>(
     writer: &mut W,
     registry: &TokenRegistry,
     status: &dyn VaultStatusSource,
-    limiter: &mut RateLimiter,
+    limiter: &SharedRateLimiter,
     assembler: &dyn ClipAssembler,
     pairing: &dyn PairingDispatcher,
 ) -> std::io::Result<()> {
@@ -167,15 +180,23 @@ pub fn serve_connection<R: Read, W: Write>(
 #[cfg(unix)]
 pub fn bind_listener(path: &Path) -> std::io::Result<std::os::unix::net::UnixListener> {
     use std::os::unix::fs::PermissionsExt;
-    // A stale socket file (previous unclean exit) would make `bind` fail with
-    // AddrInUse; best-effort remove it first. A non-socket file at the path is
-    // an anomaly — remove it too so the listener can bind (the app owns its
+    // Bind at a sibling TEMP path, lock it to 0600, then atomically rename it
+    // into place. `UnixListener::bind` creates the socket node with umask-default
+    // perms, so a bind-at-`path`-then-chmod sequence leaves a window where a
+    // same-host peer could connect before the chmod lands (the bind→chmod
+    // TOCTOU). Binding at a temp name closes it deterministically: a client
+    // connects via `path`, which only ever appears already at 0600 — the rename
+    // preserves the inode's perms, and the bound listener fd keeps serving across
+    // the rename (the pathname is just the rendezvous address).
+    let tmp = path.with_extension("sock.tmp");
+    let _ = std::fs::remove_file(&tmp);
+    // A stale socket / non-socket anomaly at the final path (previous unclean
+    // exit) — remove it so the rename can replace it (the app owns its
     // app_data_dir).
     let _ = std::fs::remove_file(path);
-    let listener = std::os::unix::net::UnixListener::bind(path)?;
-    // Owner-only: only the OS user running the app can connect. Set BEFORE the
-    // first accept so the window where the socket is world-reachable is zero.
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    let listener = std::os::unix::net::UnixListener::bind(&tmp)?;
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
+    std::fs::rename(&tmp, path)?;
     Ok(listener)
 }
 
@@ -220,9 +241,12 @@ where
         }
         app_writer.flush()?;
         // Read the app's reply frame (if any). The app stays SILENT for an
-        // unpaired/invalid frame, so a reply is not guaranteed — but the host
-        // cannot block forever waiting for one. We attempt one read; a clean
-        // EOF (the app served the connection and closed) ends the pump.
+        // unpaired/invalid/revoked frame (it neither replies nor closes), so a
+        // reply is NOT guaranteed and the host must not block forever. The
+        // production wiring (`lib.rs::run_host_relay`) sets a read timeout
+        // (`HOST_APP_REPLY_TIMEOUT`, > the app's dispatch budget) on this socket,
+        // so a silent app yields a timed read here → the `Err(e)` arm ends the
+        // pump cleanly. A clean EOF (the app served + closed) also ends it.
         match framing::read_frame(app_reader) {
             Ok(reply) => {
                 if let Err(e) = framing::write_frame(host_writer, &reply) {
@@ -355,7 +379,7 @@ mod tests {
     fn serve_connection_writes_a_note_and_replies_accepted_for_a_valid_clip() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::default();
 
         let wire = framed(&clip_envelope(&token, "# Clip\n\nbody"));
@@ -366,7 +390,7 @@ mod tests {
             &mut writer,
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
         )
@@ -393,7 +417,7 @@ mod tests {
         // forwarded the frame).
         let reg = TokenRegistry::new(); // nothing issued
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::default();
 
         let wire = framed(&clip_envelope("garbage-token", "body"));
@@ -404,7 +428,7 @@ mod tests {
             &mut writer,
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
         )
@@ -418,7 +442,7 @@ mod tests {
     fn serve_connection_replies_locked_when_the_vault_is_locked() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Locked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::default();
 
         let wire = framed(&clip_envelope(&token, "body"));
@@ -429,7 +453,7 @@ mod tests {
             &mut writer,
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
         )
@@ -447,7 +471,7 @@ mod tests {
         // Two clips of the same page over one connection → two writes (SYNC-16).
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::default();
 
         let mut wire = framed(&clip_envelope(&token, "body one"));
@@ -459,7 +483,7 @@ mod tests {
             &mut writer,
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
         )
@@ -476,7 +500,7 @@ mod tests {
     fn serve_connection_does_not_panic_on_a_truncated_frame() {
         let (reg, _token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::default();
 
         // Prefix declares 1000 bytes, only a few present → Truncated; serve
@@ -490,7 +514,7 @@ mod tests {
             &mut writer,
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
         )
@@ -611,7 +635,7 @@ mod tests {
         // number of notes written.
         let server = thread::spawn(move || {
             let status = StaticVaultStatus(VaultStatus::Unlocked);
-            let mut limiter = RateLimiter::default();
+            let limiter = SharedRateLimiter::default();
             let assembler = RecordingAssembler::default();
             let (mut stream, _addr) = listener.accept().expect("accept");
             let mut read_half = stream.try_clone().expect("clone");
@@ -620,7 +644,7 @@ mod tests {
                 &mut stream,
                 &reg,
                 &status,
-                &mut limiter,
+                &limiter,
                 &assembler,
                 &NeverPairing,
             )

@@ -22,9 +22,15 @@
 //! the limiter — rate-limiting is the LAST gate before a write, so a
 //! flood of malformed frames cannot exhaust a legitimate sender's budget.
 //!
-//! This is the standalone limiter primitive + its tests; the host loop
-//! (task 4+) owns one instance and calls [`RateLimiter::check`] just
-//! before composing the `note_create` call.
+//! This is the standalone limiter primitive + its tests. The relay listener
+//! owns ONE process-global [`SharedRateLimiter`] (created before the accept
+//! loop, shared by `Arc` across every connection thread) and calls
+//! [`RateLimiter::check`] just before composing the `note_create` call — so the
+//! budget spans ALL native-messaging connections. A *per-connection* limiter
+//! would reset on every host-process reconnect, letting a compromised build
+//! (A14) obtain a fresh full budget per connection; the shared wrapper closes
+//! that bypass while `check` locks only for the brief decision (never across a
+//! connection's blocking dispatch), so per-connection concurrency is preserved.
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline" — the
 //! limiter holds only counts + timestamps, never any note content.
@@ -126,6 +132,48 @@ impl Default for RateLimiter {
     }
 }
 
+/// Process-global, thread-safe wrapper around a single [`RateLimiter`].
+///
+/// The fixed-window budget must span ALL native-messaging connections rather
+/// than resetting per connection. Native messaging spawns a fresh host process
+/// — hence a fresh Unix-socket connection — per dispatch pattern, so a
+/// per-connection limiter handed every reconnect a brand-new full budget,
+/// defeating the A14 flood bound the limiter exists to enforce. The relay
+/// listener constructs ONE `SharedRateLimiter` before its accept loop and
+/// shares it (via `Arc`) with every connection thread.
+///
+/// [`check`](Self::check) locks the inner mutex ONLY for the brief decision —
+/// never across a connection's blocking dispatch (which can park up to the
+/// 30 s dispatch timeout) — so the shared budget does not serialize concurrent
+/// connections. A poisoned lock fails CLOSED (`Throttled`): a panic mid-update
+/// must never open the floodgate.
+#[derive(Debug, Default)]
+pub struct SharedRateLimiter {
+    inner: std::sync::Mutex<RateLimiter>,
+}
+
+impl SharedRateLimiter {
+    /// Construct from explicit parameters. Test-only: production always uses
+    /// [`SharedRateLimiter::default`] (the documented 60/60 s cadence); a
+    /// custom-cadence constructor compiled into the shipping binary would be
+    /// dead code, so it is gated to test builds.
+    #[cfg(test)]
+    pub fn new(max_per_window: u32, window: Duration) -> Self {
+        SharedRateLimiter {
+            inner: std::sync::Mutex::new(RateLimiter::new(max_per_window, window)),
+        }
+    }
+
+    /// Check (and, if allowed, record) a handoff at `now`, holding the lock
+    /// only for the decision. A poisoned lock fails closed (`Throttled`).
+    pub fn check(&self, now: Instant) -> RateDecision {
+        match self.inner.lock() {
+            Ok(mut limiter) => limiter.check(now),
+            Err(_) => RateDecision::Throttled,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +249,27 @@ mod tests {
         }
         // One over → throttled.
         assert_eq!(rl.check(t0), RateDecision::Throttled);
+    }
+
+    #[test]
+    fn shared_limiter_budget_spans_connections() {
+        use std::sync::Arc;
+        // Regression (H2): the budget is process-GLOBAL, not per-connection.
+        // Two `Arc` handles stand in for two connection threads; the second
+        // "connection" counts against the first's budget and does NOT get a
+        // fresh window — a host-process reconnect cannot reset the flood cap.
+        let shared = Arc::new(SharedRateLimiter::new(2, Duration::from_secs(60)));
+        let conn_a = Arc::clone(&shared);
+        let conn_b = Arc::clone(&shared);
+        let t0 = Instant::now();
+        assert_eq!(conn_a.check(t0), RateDecision::Allowed);
+        assert_eq!(conn_a.check(t0), RateDecision::Allowed);
+        // conn_b shares conn_a's now-exhausted budget.
+        assert_eq!(conn_b.check(t0), RateDecision::Throttled);
+        // And it stays throttled within the same window.
+        assert_eq!(
+            conn_a.check(t0 + Duration::from_secs(59)),
+            RateDecision::Throttled
+        );
     }
 }

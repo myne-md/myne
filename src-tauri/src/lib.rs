@@ -118,6 +118,11 @@ fn run_host_relay() {
     let Ok(mut app_reader) = app_writer.try_clone() else {
         return;
     };
+    // Bound the wait for the app's reply (X2): a silently-ignored
+    // unpaired/invalid/revoked frame gets neither a reply nor a close, so an
+    // unbounded read would hang the host forever. The timeout exceeds the app's
+    // dispatch budget, so a legitimate clip still receives its reply.
+    let _ = app_reader.set_read_timeout(Some(clipper::relay::HOST_APP_REPLY_TIMEOUT));
     let stdin = std::io::stdin();
     let stdout = std::io::stdout();
     let mut host_reader = stdin.lock();

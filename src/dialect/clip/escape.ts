@@ -14,6 +14,74 @@
 // deliberately minimal here and extended construct-by-construct.
 
 /**
+ * Format an inline-link destination so it never breaks the `(...)` it sits in.
+ *
+ * CommonMark forbids ASCII spaces / control chars and UNBALANCED parens in a
+ * *bare* destination; either would make `[text](url)` re-parse to something other
+ * than the intended link (a round-trip / safe-degrade violation). When the URL
+ * would be unsafe bare we wrap it in `<...>` (which permits spaces + parens). The
+ * pathological case where the URL itself contains `<`, `>`, or a newline (so the
+ * `<...>` form is unusable) percent-encodes those breakers so the bare form stays
+ * valid. A clean URL is returned verbatim (trimmed), so existing emissions are
+ * unchanged.
+ */
+export function formatLinkDestination(url: string): string {
+  let u = url.trim();
+  // The parser may hand the destination bare OR already `<...>`-wrapped; strip
+  // to the inner first so re-emission is IDEMPOTENT regardless of which arrived.
+  if (u.length >= 2 && u.startsWith("<") && u.endsWith(">")) {
+    u = u.slice(1, -1);
+  }
+  const needsWrap = /[\s\u0000-\u001f]/u.test(u) || !parensBalanced(u);
+  if (!needsWrap) return u;
+  if (!/[<>\n\r]/u.test(u)) return `<${u}>`;
+  // Cannot use the angle-bracket form — encode the bare-breaking bytes instead.
+  return u.replace(/[\s<>]/gu, (c) => encodeURIComponent(c));
+}
+
+/** True when every `(` in `s` has a matching later `)` and vice-versa. */
+function parensBalanced(s: string): boolean {
+  let depth = 0;
+  for (const ch of s) {
+    if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      depth--;
+      if (depth < 0) return false;
+    }
+  }
+  return depth === 0;
+}
+
+/**
+ * Escape a link/image TITLE for the `"..."` form: a literal `"` would close the
+ * title early and a trailing `\` would escape the closing quote, so both are
+ * backslash-escaped (backslash first, so the quote's escape is not re-escaped).
+ * The serializer always emits the double-quoted title form, so this is the only
+ * delimiter that needs escaping.
+ */
+export function escapeLinkTitle(title: string): string {
+  // Escape a bare double-quote (it would close the `"..."` title early) while
+  // PRESERVING any existing `\X` escape pair verbatim — so a title taken from a
+  // `"..."` source (already carrying `\"`) is not double-escaped and the emit is
+  // idempotent, while a literal `"` from a '...'/(...)-delimited source IS
+  // escaped. A character scan (not a backslash-regex) keeps this unambiguous.
+  let out = "";
+  for (let i = 0; i < title.length; i++) {
+    const ch = title[i];
+    if (ch === "\\") {
+      out += ch + (title[i + 1] ?? "");
+      i++;
+    } else if (ch === '"') {
+      out += '\\"';
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/**
  * Collapse a paragraph's internal whitespace to the canonical authored shape:
  * runs of spaces/tabs collapse to a single space and hard-wrapped soft line
  * breaks (a lone `\n` inside a paragraph) join to a single space. Leading and

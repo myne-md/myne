@@ -127,6 +127,11 @@ export function PairingDialog() {
 
   const onAccept = useCallback(
     async (requestId?: string | null) => {
+      // Re-entry guard: a rapid double-click must mint exactly once. The
+      // `disabled={working}` prop only blocks clicks AFTER React re-renders, so
+      // two synchronous clicks would otherwise both call `pairingAccept`. The
+      // ref flips synchronously, so the second call returns before minting.
+      if (busyRef.current) return;
       busyRef.current = true;
       setState({ phase: "working" });
       try {
@@ -151,6 +156,8 @@ export function PairingDialog() {
   );
 
   const onReject = useCallback(async (requestId?: string | null) => {
+    // Re-entry guard (see onAccept): a double-click must reject exactly once.
+    if (busyRef.current) return;
     busyRef.current = true;
     setState({ phase: "working" });
     try {

@@ -271,3 +271,71 @@ describe("validateClipEnvelope — all-clean pass-through (AC5)", () => {
     expect("tags" in env).toBe(false);
   });
 });
+
+describe("validateClipEnvelope — sourceUrl scheme allow-list (X4)", () => {
+  it("rejects a javascript: scheme", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "javascript:alert(1)";
+    expect(expectErr(validateClipEnvelope(raw))).toBe("MalformedSourceUrl");
+  });
+
+  it("rejects a data: scheme", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "data:text/html,<script>1</script>";
+    expect(expectErr(validateClipEnvelope(raw))).toBe("MalformedSourceUrl");
+  });
+
+  it("rejects a file: scheme (no local-path provenance leak)", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "file:///Users/secret/notes.txt";
+    expect(expectErr(validateClipEnvelope(raw))).toBe("MalformedSourceUrl");
+  });
+
+  it("rejects a vbscript: scheme", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "vbscript:msgbox(1)";
+    expect(expectErr(validateClipEnvelope(raw))).toBe("MalformedSourceUrl");
+  });
+
+  it("rejects an unparseable / relative URL", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "not a url /../etc/passwd";
+    expect(expectErr(validateClipEnvelope(raw))).toBe("MalformedSourceUrl");
+  });
+
+  it("rejects an over-long URL (bloat bound)", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl =
+      "https://example.com/" + "a".repeat(9000);
+    expect(expectErr(validateClipEnvelope(raw))).toBe("MalformedSourceUrl");
+  });
+
+  it("rejects a lone surrogate in the URL", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "https://example.com/\ud800";
+    expect(expectErr(validateClipEnvelope(raw))).toBe("MalformedSourceUrl");
+  });
+
+  it("accepts an ordinary https URL", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl =
+      "https://example.com/article?id=42#frag";
+    expect(expectOk(validateClipEnvelope(raw)).sourceUrl).toBe(
+      "https://example.com/article?id=42#frag",
+    );
+  });
+
+  it("accepts an http URL", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "http://example.org/p";
+    expect(expectOk(validateClipEnvelope(raw)).sourceUrl).toBe(
+      "http://example.org/p",
+    );
+  });
+
+  it("accepts an empty sourceUrl (no provenance)", () => {
+    const raw = cleanRaw();
+    (raw as { sourceUrl: string }).sourceUrl = "";
+    expect(expectOk(validateClipEnvelope(raw)).sourceUrl).toBe("");
+  });
+});
