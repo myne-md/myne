@@ -41,20 +41,41 @@ use tauri::{Manager, Runtime};
 
 /// Construct the `clipper-pairing` plugin.
 ///
-/// Binds the three pairing-dialog commands and initializes the
-/// [`state::PairingState`] singleton (pending session + in-memory token
-/// registry). The plugin name in the ACL namespace is `clipper-pairing`
-/// (kebab-case — matches `permissions/clipper-pairing/default.toml` and the
-/// `build.rs` `InlinedPlugin` mirror).
+/// Binds the pairing-dialog commands plus `clip_dispatch_complete` (the
+/// WebView→Rust reply seam for the host↔relay clip-assembly handoff) and
+/// `pairing_dispatch_complete` (the WebView→Rust reply seam for the host↔relay
+/// PAIRING handshake — Accept/Reject + the minted token) — both live on this
+/// plugin to minimize ACL churn, since both are the same browser-extension
+/// surface. Initializes the [`state::PairingState`] singleton (pending session +
+/// in-memory token registry), the
+/// [`crate::clipper::relay_app::ClipDispatchRegistry`] (the in-flight
+/// clip-dispatch reply channels the relay thread blocks on), and the
+/// [`crate::clipper::relay_app::PairingDispatchRegistry`] (the in-flight
+/// pairing-dispatch reply channels). The plugin name in the ACL namespace is
+/// `clipper-pairing` (kebab-case — matches
+/// `permissions/clipper-pairing/default.toml` and the `build.rs` `InlinedPlugin`
+/// mirror).
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("clipper-pairing")
         .invoke_handler(tauri::generate_handler![
             commands::pairing_pending,
             commands::pairing_accept,
             commands::pairing_reject,
+            commands::pairing_revoke,
+            commands::pairing_list_paired,
+            crate::clipper::relay_app::clip_dispatch_complete,
+            crate::clipper::relay_app::pairing_dispatch_complete,
         ])
         .setup(|app, _api| {
             app.manage(state::PairingState::default());
+            // The relay thread (`clipper::relay_app::spawn_relay_listener`)
+            // inserts an in-flight dispatch under a fresh request id and blocks
+            // on it; `clip_dispatch_complete` delivers the WebView's outcome.
+            app.manage(crate::clipper::relay_app::ClipDispatchRegistry::default());
+            // The same relay thread inserts an in-flight PAIRING dispatch under a
+            // fresh request id and blocks on it; `pairing_dispatch_complete`
+            // delivers the WebView pairing dialog's Accept/Reject outcome.
+            app.manage(crate::clipper::relay_app::PairingDispatchRegistry::default());
             Ok(())
         })
         .build()

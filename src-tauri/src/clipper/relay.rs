@@ -40,15 +40,16 @@
 //!    decoded the envelope, checked the token, enforced the caps, or honoured
 //!    the rate limit. [`super::ingest::ingest_relayed_frame`] re-decodes the
 //!    envelope, re-checks the token against the REAL registry, re-enforces the
-//!    note-body cap (on the decoded AND the composed string), and re-enforces
-//!    the rate limit — app-side, authoritatively — before any write. A
-//!    compromised or spoofed host gains nothing: a frame that does not validate
-//!    app-side is silently ignored (no write, no reply).
+//!    note-body cap on the decoded body, and re-enforces the rate limit —
+//!    app-side, authoritatively — before forwarding the validated envelope to
+//!    the WebView for assembly. A compromised or spoofed host gains nothing: a
+//!    frame that does not validate app-side is silently ignored (no assembly,
+//!    no reply).
 //!
 //! ## Testability
 //!
 //! The keyed app-side path ([`serve_connection`]) is generic over
-//! `Read`/`Write`, so the full decode→re-validate→compose→write→reply loop is
+//! `Read`/`Write`, so the full decode→re-validate→forward→reply loop is
 //! unit-tested in-process over an in-memory pipe — no OS socket needed. The
 //! socket plumbing ([`bind_listener`], [`forward_stdio_over_socket`]) is the
 //! thin OS layer on top, covered by a Unix-only integration test where the
@@ -64,7 +65,7 @@ use std::time::Instant;
 
 use super::envelope::{self, VaultStatusSource};
 use super::framing::{self, FrameError};
-use super::ingest::{ingest_relayed_frame, IngestOutcome, NoteWriter};
+use super::ingest::{ingest_relayed_frame, ClipAssembler, IngestOutcome, PairingDispatcher};
 use super::rate_limit::RateLimiter;
 use super::token::TokenRegistry;
 
@@ -84,10 +85,10 @@ pub fn socket_path(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join(SOCKET_BASENAME)
 }
 
-/// Serve one relayed connection app-side: read frames, re-validate + compose +
-/// write each one through the keyed ingest path, and write the reply frame
-/// back. Loops until the peer (the host) disconnects (clean EOF) or a framing
-/// error ends the stream.
+/// Serve one relayed connection app-side: read frames, re-validate + forward
+/// each one through the keyed ingest path, and write the reply frame back.
+/// Loops until the peer (the host) disconnects (clean EOF) or a framing error
+/// ends the stream.
 ///
 /// This is the **security-load-bearing app-side handler**, generic over
 /// `Read`/`Write` so it is exercised end-to-end over an in-memory pipe in unit
@@ -104,7 +105,8 @@ pub fn serve_connection<R: Read, W: Write>(
     registry: &TokenRegistry,
     status: &dyn VaultStatusSource,
     limiter: &mut RateLimiter,
-    note_writer: &dyn NoteWriter,
+    assembler: &dyn ClipAssembler,
+    pairing: &dyn PairingDispatcher,
 ) -> std::io::Result<()> {
     loop {
         match framing::read_frame(reader) {
@@ -114,7 +116,8 @@ pub fn serve_connection<R: Read, W: Write>(
                     registry,
                     status,
                     limiter,
-                    note_writer,
+                    assembler,
+                    pairing,
                     Instant::now(),
                 );
                 match outcome {
@@ -247,13 +250,30 @@ mod tests {
     const EXT: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     #[derive(Default)]
-    struct RecordingWriter {
-        writes: RefCell<Vec<String>>,
+    struct RecordingAssembler {
+        assembled: RefCell<Vec<crate::clipper::envelope::HandoffEnvelope>>,
     }
-    impl NoteWriter for RecordingWriter {
-        fn write_clip_note(&self, plaintext: String) -> Result<String, &'static str> {
-            self.writes.borrow_mut().push(plaintext);
-            Ok(format!("note-{}", self.writes.borrow().len()))
+    impl ClipAssembler for RecordingAssembler {
+        fn assemble(
+            &self,
+            env: &crate::clipper::envelope::HandoffEnvelope,
+        ) -> crate::clipper::ingest::AssembleOutcome {
+            self.assembled.borrow_mut().push(env.clone());
+            crate::clipper::ingest::AssembleOutcome::Accepted
+        }
+    }
+
+    /// A [`PairingDispatcher`] that PANICS if dispatched — the clip + status
+    /// serve-connection tests must NEVER route pairing (pairing routes BEFORE
+    /// the token gate in `ingest_relayed_frame`, so a clip/status frame must
+    /// never reach it).
+    struct NeverPairing;
+    impl PairingDispatcher for NeverPairing {
+        fn begin_pair(&self, _extension_id: &str) -> crate::clipper::ingest::BeginPairOutcome {
+            panic!("a clip / status serve_connection must never dispatch pairing");
+        }
+        fn await_pair(&self, _extension_id: &str) -> crate::clipper::ingest::PairDispatchOutcome {
+            panic!("a clip / status serve_connection must never dispatch pairing");
         }
     }
 
@@ -274,16 +294,28 @@ mod tests {
     struct ShortSock(PathBuf);
     impl ShortSock {
         fn new() -> Self {
-            // A short, unlikely-to-collide name (nanos + pid, both small).
+            // A short, UNIQUE name. `nanos` alone can repeat when parallel tests
+            // call this within one coarse clock tick (macOS `SystemTime`
+            // resolution), which races two sockets onto the same path — a later
+            // `std::fs::write`/`bind` then hits the other test's socket with
+            // `EOPNOTSUPP`. A per-process monotonic counter makes every path
+            // unique regardless of clock granularity.
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static SEQ: AtomicU64 = AtomicU64::new(0);
             let n = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
-            let path = std::env::temp_dir().join(format!("myn{}.sock", n % 100_000_000));
+            let name = format!(
+                "myn{}_{}.sock",
+                n % 100_000_000,
+                SEQ.fetch_add(1, Ordering::Relaxed)
+            );
+            let path = std::env::temp_dir().join(&name);
             // On macOS temp_dir() can itself be long; fall back to /tmp which is
             // short and always present on the Unix CI/dev targets.
             let path = if path.as_os_str().len() > 90 {
-                PathBuf::from(format!("/tmp/myn{}.sock", n % 100_000_000))
+                PathBuf::from(format!("/tmp/{name}"))
             } else {
                 path
             };
@@ -324,7 +356,7 @@ mod tests {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
         let mut limiter = RateLimiter::default();
-        let note_writer = RecordingWriter::default();
+        let assembler = RecordingAssembler::default();
 
         let wire = framed(&clip_envelope(&token, "# Clip\n\nbody"));
         let mut reader = Cursor::new(wire);
@@ -335,13 +367,18 @@ mod tests {
             &reg,
             &status,
             &mut limiter,
-            &note_writer,
+            &assembler,
+            &NeverPairing,
         )
         .unwrap();
 
-        // A note was written through the keyed path.
-        assert_eq!(note_writer.writes.borrow().len(), 1);
-        assert!(note_writer.writes.borrow()[0].contains("source: https://example.com/a"));
+        // An envelope was forwarded for assembly through the keyed path,
+        // carrying the provenance the WebView composes from.
+        assert_eq!(assembler.assembled.borrow().len(), 1);
+        assert_eq!(
+            assembler.assembled.borrow()[0].source_url.as_deref(),
+            Some("https://example.com/a")
+        );
         // The reply frame is `accepted` with a confirm token.
         let mut rcur = Cursor::new(writer);
         let reply_body = framing::read_frame(&mut rcur).expect("a reply frame");
@@ -357,7 +394,7 @@ mod tests {
         let reg = TokenRegistry::new(); // nothing issued
         let status = StaticVaultStatus(VaultStatus::Unlocked);
         let mut limiter = RateLimiter::default();
-        let note_writer = RecordingWriter::default();
+        let assembler = RecordingAssembler::default();
 
         let wire = framed(&clip_envelope("garbage-token", "body"));
         let mut reader = Cursor::new(wire);
@@ -368,11 +405,12 @@ mod tests {
             &reg,
             &status,
             &mut limiter,
-            &note_writer,
+            &assembler,
+            &NeverPairing,
         )
         .unwrap();
 
-        assert_eq!(note_writer.writes.borrow().len(), 0, "no note written");
+        assert_eq!(assembler.assembled.borrow().len(), 0, "no note written");
         assert!(writer.is_empty(), "no reply written to an unpaired caller");
     }
 
@@ -381,7 +419,7 @@ mod tests {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Locked);
         let mut limiter = RateLimiter::default();
-        let note_writer = RecordingWriter::default();
+        let assembler = RecordingAssembler::default();
 
         let wire = framed(&clip_envelope(&token, "body"));
         let mut reader = Cursor::new(wire);
@@ -392,11 +430,12 @@ mod tests {
             &reg,
             &status,
             &mut limiter,
-            &note_writer,
+            &assembler,
+            &NeverPairing,
         )
         .unwrap();
 
-        assert_eq!(note_writer.writes.borrow().len(), 0, "locked → no write");
+        assert_eq!(assembler.assembled.borrow().len(), 0, "locked → no write");
         let mut rcur = Cursor::new(writer);
         let reply_body = framing::read_frame(&mut rcur).expect("a reply frame");
         let reply: HostReply = serde_json::from_slice(&reply_body).unwrap();
@@ -409,7 +448,7 @@ mod tests {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
         let mut limiter = RateLimiter::default();
-        let note_writer = RecordingWriter::default();
+        let assembler = RecordingAssembler::default();
 
         let mut wire = framed(&clip_envelope(&token, "body one"));
         wire.extend_from_slice(&framed(&clip_envelope(&token, "body two")));
@@ -421,12 +460,13 @@ mod tests {
             &reg,
             &status,
             &mut limiter,
-            &note_writer,
+            &assembler,
+            &NeverPairing,
         )
         .unwrap();
 
         assert_eq!(
-            note_writer.writes.borrow().len(),
+            assembler.assembled.borrow().len(),
             2,
             "two clips → two notes"
         );
@@ -437,7 +477,7 @@ mod tests {
         let (reg, _token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
         let mut limiter = RateLimiter::default();
-        let note_writer = RecordingWriter::default();
+        let assembler = RecordingAssembler::default();
 
         // Prefix declares 1000 bytes, only a few present → Truncated; serve
         // ends cleanly.
@@ -451,10 +491,11 @@ mod tests {
             &reg,
             &status,
             &mut limiter,
-            &note_writer,
+            &assembler,
+            &NeverPairing,
         )
         .unwrap();
-        assert_eq!(note_writer.writes.borrow().len(), 0);
+        assert_eq!(assembler.assembled.borrow().len(), 0);
     }
 
     // ---- forward_stdio_over_socket: the host-side pump ------------------
@@ -571,7 +612,7 @@ mod tests {
         let server = thread::spawn(move || {
             let status = StaticVaultStatus(VaultStatus::Unlocked);
             let mut limiter = RateLimiter::default();
-            let note_writer = RecordingWriter::default();
+            let assembler = RecordingAssembler::default();
             let (mut stream, _addr) = listener.accept().expect("accept");
             let mut read_half = stream.try_clone().expect("clone");
             serve_connection(
@@ -580,10 +621,11 @@ mod tests {
                 &reg,
                 &status,
                 &mut limiter,
-                &note_writer,
+                &assembler,
+                &NeverPairing,
             )
             .expect("serve");
-            tx.send(note_writer.writes.borrow().len()).unwrap();
+            tx.send(assembler.assembled.borrow().len()).unwrap();
         });
 
         // Host side: connect, send one clip frame, read the reply.

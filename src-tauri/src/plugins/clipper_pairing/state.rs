@@ -46,6 +46,15 @@ pub struct PendingPairing {
     /// The numeric challenge shown in BOTH the in-app dialog and the
     /// extension; the user compares them before accepting.
     pub challenge: PairingChallenge,
+    /// The relay's opaque correlation id for the in-flight `Pair` dispatch
+    /// this session belongs to (set when the session is opened by the
+    /// relay-driven [`PairingState::begin_pairing_with_request`]). The
+    /// WebView dialog reads this back out via `pairing_pending` and echoes it
+    /// to `pairing_dispatch_complete` so the blocked relay thread is woken on
+    /// the RIGHT channel. `None` for sessions opened without a relay round-trip
+    /// (the state-layer tests). The id is an opaque relay tag, NOT a
+    /// vault-stable correlation tag — safe to surface.
+    pub request_id: Option<String>,
 }
 
 /// The Tauri-managed pairing state singleton.
@@ -66,21 +75,44 @@ impl PairingState {
     /// connect request wins). Returns the challenge so the caller can surface
     /// it to the dialog.
     ///
-    /// **Task-5 seam:** the host process triggers this on a connect request
-    /// (it knows the connecting extension id from the native-host manifest's
-    /// allowlisted origin) so the dialog has a session to show. Exercised by
-    /// this module's tests now; wired by the host's connect path in task 5 —
-    /// hence `allow(dead_code)` in the non-test library until then.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// The `request_id`-less convenience over [`begin_pairing_with_request`]
+    /// (delegates with `None`). Production always carries the relay's
+    /// `request_id` (so the dialog can wake the right blocked relay thread), so
+    /// this short form is exercised only by this crate's tests — hence
+    /// `#[cfg(test)]`. The relay's [`crate::clipper::relay_app::PairingDispatch`]
+    /// uses [`begin_pairing_with_request`] directly.
+    ///
+    /// [`begin_pairing_with_request`]: PairingState::begin_pairing_with_request
+    #[cfg(test)]
     pub fn begin_pairing(
         &self,
         extension_id: impl Into<String>,
+    ) -> Result<PairingChallenge, ChallengeError> {
+        self.begin_pairing_with_request(extension_id, None)
+    }
+
+    /// Open a pending pairing session for `extension_id`, generating a fresh
+    /// CSPRNG challenge, and bind the relay's opaque `request_id` so the WebView
+    /// can echo it back to `pairing_dispatch_complete` (waking the right blocked
+    /// relay thread). Supersedes any unresolved prior session (the latest
+    /// connect request wins). Returns the challenge so the caller can surface it
+    /// to the dialog.
+    ///
+    /// This is the relay-driven entry: [`crate::clipper::relay_app::PairingDispatch`]
+    /// is its first production caller — it mints the `request_id`, registers a
+    /// one-shot reply channel under it, then opens the session here so the dialog
+    /// reads the same `request_id` back out of `pairing_pending`.
+    pub fn begin_pairing_with_request(
+        &self,
+        extension_id: impl Into<String>,
+        request_id: Option<String>,
     ) -> Result<PairingChallenge, ChallengeError> {
         let challenge = PairingChallenge::generate()?;
         let mut inner = self.inner.lock().expect("pairing state mutex poisoned");
         inner.pending = Some(PendingPairing {
             extension_id: extension_id.into(),
             challenge,
+            request_id,
         });
         Ok(challenge)
     }
@@ -123,10 +155,8 @@ impl PairingState {
     /// exposed now so the gate's revoke path is testable). Returns the count
     /// revoked.
     ///
-    /// **Task-7 seam:** the Settings "Connected extensions → Revoke" command
-    /// calls this. Exercised by this module's tests now; wired to a
-    /// `#[command]` in task 7 — `allow(dead_code)` until then.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// **Task-7 (landed):** the Settings "Connected extensions → Revoke" command
+    /// (`commands::pairing_revoke`) calls this.
     pub fn revoke_extension(&self, extension_id: &str) -> usize {
         let mut inner = self.inner.lock().expect("pairing state mutex poisoned");
         inner.registry.revoke_extension(extension_id)
@@ -135,9 +165,10 @@ impl PairingState {
     /// A clone of the current registry (task-7 persist seam — snapshot to the
     /// encrypted blob after every issue / revoke).
     ///
-    /// **Task-7 seam:** persist the snapshot to the prefs-family blob.
-    /// Exercised by tests now; `allow(dead_code)` until task 7 wires it.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// **Task-7 (landed):** persisted to the prefs-family blob by
+    /// `commands::pairing_accept` / `pairing_revoke` (via
+    /// `prefs::commands::persist_paired_extensions_with_dir`); also read by
+    /// `commands::pairing_list_paired`.
     pub fn registry_snapshot(&self) -> TokenRegistry {
         self.inner
             .lock()
@@ -149,9 +180,8 @@ impl PairingState {
     /// Replace the registry wholesale (task-7 load seam — hydrate from the
     /// decrypted blob at unlock).
     ///
-    /// **Task-7 seam:** hydrate from the decrypted prefs-family blob at
-    /// unlock. Exercised by tests now; `allow(dead_code)` until task 7.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// **Task-7 (landed):** hydrated from the decrypted prefs-family blob at
+    /// unlock by `vault_unlock::commands::apply_persisted_prefs`.
     pub fn replace_registry(&self, registry: TokenRegistry) {
         let mut inner = self.inner.lock().expect("pairing state mutex poisoned");
         inner.registry = registry;

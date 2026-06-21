@@ -341,6 +341,16 @@ pub fn process_envelope(
                 VaultStatus::Unlocked => HandoffOutcome::Accepted,
             }
         }
+        HandoffKind::PairBegin | HandoffKind::PairAwait => {
+            // Pairing (the two-phase `PairBegin`/`PairAwait`) is an APP-side flow
+            // — it needs the in-app Accept dialog + the token registry, and routes
+            // BEFORE the token gate (the caller is unpaired).
+            // The PRODUCTION path [`super::ingest::ingest_relayed_frame`] owns it.
+            // This host-process validation primitive does NOT dispatch pairing; a
+            // pairing kind reaching here is silent (no oracle), exactly as the
+            // gate-first ordering already yields for an unpaired caller.
+            HandoffOutcome::SilentlyIgnored
+        }
     }
 }
 

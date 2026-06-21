@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   pairingAccept,
+  pairingDispatchComplete,
   pairingPending,
   pairingReject,
   type PendingPairing,
@@ -124,27 +125,41 @@ export function PairingDialog() {
     return () => window.clearInterval(id);
   }, [poll]);
 
-  const onAccept = useCallback(async () => {
-    busyRef.current = true;
-    setState({ phase: "working" });
-    try {
-      await pairingAccept();
-      setState({ phase: "idle" });
-    } catch {
-      // Mint failure (CSPRNG) leaves the session intact — re-poll picks it
-      // back up so a retry is non-destructive.
-      setState({ phase: "idle" });
-    } finally {
-      busyRef.current = false;
-      void poll();
-    }
-  }, [poll]);
+  const onAccept = useCallback(
+    async (requestId?: string | null) => {
+      busyRef.current = true;
+      setState({ phase: "working" });
+      try {
+        // Mint the scoped token (desktop-authoritative). When the session was
+        // opened by the relay (`requestId` present), deliver the token to the
+        // blocked relay thread so it replies `paired` to the extension.
+        const token = await pairingAccept();
+        if (requestId) {
+          await pairingDispatchComplete(requestId, "accepted", token);
+        }
+        setState({ phase: "idle" });
+      } catch {
+        // Mint failure (CSPRNG) leaves the session intact — re-poll picks it
+        // back up so a retry is non-destructive. The relay times out honestly.
+        setState({ phase: "idle" });
+      } finally {
+        busyRef.current = false;
+        void poll();
+      }
+    },
+    [poll],
+  );
 
-  const onReject = useCallback(async () => {
+  const onReject = useCallback(async (requestId?: string | null) => {
     busyRef.current = true;
     setState({ phase: "working" });
     try {
       await pairingReject();
+      // Tell the blocked relay the user declined → it replies an honest error
+      // to the extension (never a fake pairing). Best-effort if it timed out.
+      if (requestId) {
+        await pairingDispatchComplete(requestId, "rejected");
+      }
     } catch {
       // No pending session to reject — fall through to the rejected ack.
     } finally {
@@ -205,7 +220,7 @@ export function PairingDialog() {
             style={BTN_BASE}
             data-testid="pairing.reject"
             disabled={working}
-            onClick={() => void onReject()}
+            onClick={() => void onReject(pending.request_id)}
           >
             Reject
           </button>
@@ -219,7 +234,7 @@ export function PairingDialog() {
             }}
             data-testid="pairing.accept"
             disabled={working}
-            onClick={() => void onAccept()}
+            onClick={() => void onAccept(pending.request_id)}
           >
             Accept
           </button>

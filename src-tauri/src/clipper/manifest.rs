@@ -13,7 +13,7 @@
 //!   process cannot forge a `chrome-extension://` origin to the browser's
 //!   native-messaging dispatcher).
 //! - **Firefox** (Gecko): `allowed_extensions`, an array of extension IDs
-//!   (the gecko `id`, here the real `extension@myne.md`).
+//!   (the gecko `id`, here the real `clipper@myne.md`).
 //!
 //! Both dialects share `name`, `description`, `path`, and
 //! `"type": "stdio"`. We emit BOTH key sets in one struct and serialize
@@ -75,8 +75,8 @@ pub const HOST_DESCRIPTION: &str = "Myne keyless web-clipper native-messaging ho
 
 /// The Firefox extension ID to allowlist — the real gecko `id` pinned in
 /// the extension's `manifest.json`
-/// (`myne-extension/src/manifest.json` → `browser_specific_settings.gecko.id`).
-pub const FIREFOX_EXTENSION_ID: &str = "extension@myne.md";
+/// (`myne-clipper/src/manifest.json` → `browser_specific_settings.gecko.id`).
+pub const FIREFOX_EXTENSION_ID: &str = "clipper@myne.md";
 
 /// The Chromium extension ID to allowlist.
 ///
@@ -214,17 +214,17 @@ mod tests {
         let m = firefox_manifest("/Applications/Myne.app/Contents/MacOS/myne");
         assert_eq!(m.name, HOST_NAME);
         assert_eq!(m.host_type, "stdio");
-        assert_eq!(m.allowed_extensions, vec!["extension@myne.md".to_string()]);
+        assert_eq!(m.allowed_extensions, vec!["clipper@myne.md".to_string()]);
     }
 
     #[test]
     fn firefox_id_matches_the_extension_manifest_gecko_id() {
         // Load-bearing cross-repo agreement: the allowlisted Firefox ID
         // MUST equal the extension's `browser_specific_settings.gecko.id`
-        // (`myne-extension/src/manifest.json`). If the extension's gecko
+        // (`myne-clipper/src/manifest.json`). If the extension's gecko
         // id ever changes, this constant must change in lock-step or
         // Firefox will refuse the connection.
-        assert_eq!(FIREFOX_EXTENSION_ID, "extension@myne.md");
+        assert_eq!(FIREFOX_EXTENSION_ID, "clipper@myne.md");
     }
 
     #[test]
@@ -248,7 +248,7 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
         assert_eq!(parsed["name"], "md.myne.clipper");
         assert_eq!(parsed["type"], "stdio");
-        assert_eq!(parsed["allowed_extensions"][0], "extension@myne.md");
+        assert_eq!(parsed["allowed_extensions"][0], "clipper@myne.md");
         // The Firefox dialect must NOT carry the Chromium key (Firefox's
         // strict parser rejects unknown keys).
         assert!(parsed.get("allowed_origins").is_none());

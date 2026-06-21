@@ -4,21 +4,26 @@
 # `InlinedPlugin`. Capability files reference these as `clipper-pairing:default`
 # (or the individual `clipper-pairing:allow-*` permissions).
 #
-# These three commands are the NARROW WebView surface the in-app pairing dialog
-# drives (TB6 governs them — the stdio native-messaging host is the SEPARATE,
-# ACL-exempt ingress). The `default` bundle is the only one consumed in v0.1.
-# Like the other write-capable plugins, v0.2 multi-window MUST NOT grant
-# `allow-pairing-accept` / `allow-pairing-reject` (which mutate the token
-# registry) to any non-main window.
+# These commands are the NARROW WebView surface the in-app pairing dialog +
+# Settings "Connected extensions" screen drive (TB6 governs them — the stdio
+# native-messaging host is the SEPARATE, ACL-exempt ingress). The `default`
+# bundle is the only one consumed in v0.1. Like the other write-capable plugins,
+# v0.2 multi-window MUST NOT grant `allow-pairing-accept` / `allow-pairing-reject`
+# / `allow-pairing-revoke` (which mutate + persist the token registry) to any
+# non-main window.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the clipper-pairing plugin — read the pending pairing challenge + Accept/Reject."
+description = "Default permission set for the clipper-pairing plugin — read the pending pairing challenge + Accept/Reject/Revoke + list paired extensions + deliver a dispatched clip's assembly outcome."
 permissions = [
   "allow-pairing-pending",
   "allow-pairing-accept",
   "allow-pairing-reject",
+  "allow-pairing-revoke",
+  "allow-pairing-list-paired",
+  "allow-clip-dispatch-complete",
+  "allow-pairing-dispatch-complete",
 ]
 
 [[permission]]
@@ -35,3 +40,23 @@ commands.allow = ["pairing_accept"]
 identifier = "allow-pairing-reject"
 description = "Allow invoking clipper-pairing:pairing_reject (clears the pending pairing session WITHOUT minting a token — no lingering authorization; errors NoPendingPairing when nothing was pending)."
 commands.allow = ["pairing_reject"]
+
+[[permission]]
+identifier = "allow-pairing-revoke"
+description = "Allow invoking clipper-pairing:pairing_revoke (desktop-authoritative immediate revoke of every live pairing token bound to an extension id — flips the in-memory registry's revoked flag so the next clip from that extension fails validation for free — then PERSISTS the registry to the encrypted prefs-family blob so the revocation is durable across restart; idempotent for an extension with no live token; never logs the extension id or any token value)."
+commands.allow = ["pairing_revoke"]
+
+[[permission]]
+identifier = "allow-pairing-list-paired"
+description = "Allow invoking clipper-pairing:pairing_list_paired (read-only: the DISTINCT extension ids that currently hold a live pairing token, sorted, for the Settings 'Connected extensions' list; surfaces only extension ids, never token values; no side-effect)."
+commands.allow = ["pairing_list_paired"]
+
+[[permission]]
+identifier = "allow-clip-dispatch-complete"
+description = "Allow invoking clipper-pairing:clip_dispatch_complete (delivers a host↔relay clip dispatch's tiny assembly outcome — one of accepted/locked/error — back to the blocked relay thread, keyed by the relay's opaque request id; the WebView keeps the note id + media counts local, so no decrypted-vault state crosses back; never logs the request id contents or any clip body)."
+commands.allow = ["clip_dispatch_complete"]
+
+[[permission]]
+identifier = "allow-pairing-dispatch-complete"
+description = "Allow invoking clipper-pairing:pairing_dispatch_complete (delivers a host↔relay PAIRING handshake's tiny outcome — accepted (carrying the WebView-minted scoped token) or rejected — back to the blocked relay thread, keyed by the relay's opaque request id; an accept with no usable token fails closed to an error rather than a fake pairing; never logs the token value, the extension id, or the challenge)."
+commands.allow = ["pairing_dispatch_complete"]

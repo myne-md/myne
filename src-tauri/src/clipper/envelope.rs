@@ -82,6 +82,19 @@ pub enum HandoffKind {
     /// `Slot::Unlocked` / `Slot::Locked` state. Exposes no vault content,
     /// no structure (AS3/AS5) — only the unlocked/locked boolean.
     IsUnlockedStatus,
+    /// Phase 1 of the two-phase pairing handshake (SYNC-6): open the pending
+    /// session + show the in-app Accept dialog, foreground Myne, and relay the
+    /// numeric CHALLENGE back ([`HostReply::Challenge`]) so the extension can
+    /// display it for the user to compare against the dialog BEFORE approving.
+    /// Carries an empty `token` (the caller is unpaired). Routed BEFORE the token
+    /// gate. A locked vault replies [`HostReply::Locked`] (unlock first).
+    PairBegin,
+    /// Phase 2 of the two-phase pairing handshake: block for the user's
+    /// Accept/Reject on the pending session that [`HandoffKind::PairBegin`]
+    /// opened, and relay the minted token in [`HostReply::Paired`] (or an error
+    /// on Reject / timeout). Carries an empty `token`. Routed BEFORE the token
+    /// gate. No new dialog is shown — it awaits the one `PairBegin` raised.
+    PairAwait,
 }
 
 /// How a clip was captured (SYNC-10 `capture_kind`).
@@ -340,6 +353,27 @@ pub enum HostReply {
     /// `chrome.storage` clip buffer — SYNC-1a). NOT a silent retry, NOT a
     /// fake success.
     Locked,
+    /// A pairing request was ACCEPTED by the user: the app minted a scoped,
+    /// revocable token bound to the exact extension id and the host relays it
+    /// here (SYNC-6, desktop-authoritative). The `token` is a CREDENTIAL — not a
+    /// key, decrypts nothing, scoped to `create-clip` + `is-unlocked-status`
+    /// only — that the extension presents on every later handoff. It is the
+    /// SOLE reply variant that carries a token, and only on an explicit user
+    /// Accept; a Reject / timeout is a bounded `Error`, never `Paired`.
+    Paired {
+        /// The app-minted scoped pairing token (hex). A vault-stable correlation
+        /// tag — NEVER logged (see ../../CLAUDE.md secret-handling DENY list).
+        token: String,
+    },
+    /// Phase-1 pairing reply (SYNC-6, two-phase handshake): the app opened the
+    /// pending session and relays the numeric CHALLENGE the user compares against
+    /// the in-app Accept dialog. NOT a token — the token only crosses in
+    /// [`HostReply::Paired`] after the user Accepts (phase 2, `PairAwait`). A
+    /// human-comparison nonce, safe to display; gates nothing, carries no secret.
+    Challenge {
+        /// The zero-padded numeric challenge display string (e.g. `"481920"`).
+        code: String,
+    },
 }
 
 impl HostReply {
@@ -363,13 +397,30 @@ impl HostReply {
         HostReply::Locked
     }
 
+    /// The `paired` reply (SYNC-6) carrying the app-minted scoped token. Used
+    /// ONLY on an explicit user Accept; a Reject / timeout is a bounded `error`.
+    pub fn paired(token: impl Into<String>) -> Self {
+        HostReply::Paired {
+            token: token.into(),
+        }
+    }
+
+    /// The `challenge` reply (SYNC-6 phase 1) carrying the numeric comparison
+    /// code the extension displays. A human-comparison nonce, never a secret.
+    pub fn challenge(code: impl Into<String>) -> Self {
+        HostReply::Challenge { code: code.into() }
+    }
+
     /// The bounded status label for tracing (never the confirm token / reason
-    /// body — those are emitted only as part of the wire reply, never logged).
+    /// body / PAIRING TOKEN — those are emitted only as part of the wire reply,
+    /// never logged).
     pub fn status_label(&self) -> &'static str {
         match self {
             HostReply::Accepted { .. } => "accepted",
             HostReply::Error { .. } => "error",
             HostReply::Locked => "locked",
+            HostReply::Paired { .. } => "paired",
+            HostReply::Challenge { .. } => "challenge",
         }
     }
 }
@@ -445,6 +496,49 @@ mod tests {
         assert!(env.markdown_body.is_empty());
         assert_eq!(env.extension_id, "");
         assert_eq!(env.token, "");
+    }
+
+    #[test]
+    fn decodes_a_minimal_pair_begin_envelope_with_empty_token() {
+        // A pairing BOOTSTRAP request (phase 1): version + kind + extension_id,
+        // and an EMPTY token (the caller is unpaired — it has none yet). Every
+        // clip field defaults (no body, no provenance).
+        let json = format!(
+            r#"{{ "version": 1, "kind": "pair-begin", "extension_id": "{EXT}", "token": "" }}"#
+        );
+        let env = decode_envelope(&json).expect("pair-begin envelope decodes");
+        assert_eq!(env.kind, HandoffKind::PairBegin);
+        assert_eq!(env.extension_id, EXT);
+        assert_eq!(env.token, "", "a pair request carries no token yet");
+    }
+
+    #[test]
+    fn the_retired_single_shot_pair_kind_is_now_rejected() {
+        // The legacy single-shot `kind: "pair"` was replaced by the two-phase
+        // `pair-begin` / `pair-await`. With the enum variant removed, serde now
+        // rejects an old `"pair"` frame outright — the ingest path treats that as
+        // a malformed envelope (silent), the same no-action outcome as before.
+        let json =
+            format!(r#"{{ "version": 1, "kind": "pair", "extension_id": "{EXT}", "token": "" }}"#);
+        assert!(
+            decode_envelope(&json).is_err(),
+            "the retired \"pair\" kind is rejected"
+        );
+    }
+
+    #[test]
+    fn paired_reply_encodes_with_token_and_labels_paired() {
+        // The token-carrying reply (SYNC-6, desktop-authoritative). status_label
+        // is the bounded `"paired"` (never the token itself).
+        let reply = HostReply::paired("deadbeefcafe0123");
+        assert_eq!(reply.status_label(), "paired");
+        let bytes = encode_reply(&reply).expect("paired reply encodes");
+        let s = String::from_utf8(bytes).expect("utf8 reply");
+        assert!(s.contains(r#""status":"paired""#), "tagged status: {s}");
+        assert!(
+            s.contains(r#""token":"deadbeefcafe0123""#),
+            "carries token: {s}"
+        );
     }
 
     // ---- SYNC-15: folder null / tags empty by default ------------------
