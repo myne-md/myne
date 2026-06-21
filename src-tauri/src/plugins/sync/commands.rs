@@ -446,6 +446,74 @@ pub async fn sync_remove_device<R: Runtime>(
         .map_err(SyncDeviceError::from_mgmt)
 }
 
+// --- Keep-both conflict materialization (MYND-427) ---
+//
+// When two devices edit the same note concurrently, `run_sync_cycle` stages the
+// remote revision under `<vault>/conflicts/<id>.myn` and surfaces it; the local
+// edit stays untouched. The notes layer drives the three commands below to
+// finish the keep-both: list the pending conflicts, decrypt each remote revision
+// to its plaintext (to materialize a `conflict_of:` copy via `note_create`), then
+// resolve — adopting the remote as the synced baseline so the local edit pushes
+// as a clean linear advance. No edit is ever lost or silently overwritten.
+
+/// List the note ids (hex) with a staged conflicting remote revision awaiting
+/// keep-both materialization.
+#[tauri::command]
+pub async fn sync_pending_conflicts<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<String>, SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    Ok(super::orchestrator::list_pending_conflicts(&dir))
+}
+
+/// Decrypt a staged conflicting remote revision to its plaintext body, so the
+/// notes layer can materialize it as a keep-both copy. The body is the user's
+/// note plaintext (same secret class as `note_read`) — never logged. See the
+/// repo `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+#[tauri::command]
+pub async fn sync_take_conflict<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    original_id_hex: String,
+) -> Result<String, SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let id = hex16(&original_id_hex).ok_or(SyncDeviceError::BadRequest)?;
+    let blob = super::orchestrator::read_staged_conflict_blob(&dir, &original_id_hex)
+        .ok_or(SyncDeviceError::BadRequest)?;
+    let (items_key, items_key_id, _root) = state
+        .peek_unlocked_attachment_material()
+        .await
+        .ok_or(SyncDeviceError::Internal)?;
+    tokio::task::spawn_blocking(move || {
+        let decrypted = protocol::decode_note(&blob, &id, &items_key, &items_key_id)
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let body = String::from_utf8(decrypted.plaintext().to_vec())
+            .map_err(|_| SyncDeviceError::Internal)?;
+        drop(decrypted);
+        Ok::<String, SyncDeviceError>(body)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?
+}
+
+/// Finish a keep-both resolution: adopt the staged remote revision as the synced
+/// baseline (the untouched local edit then pushes as a linear advance) + clear
+/// the staging. Idempotent.
+#[tauri::command]
+pub async fn sync_resolve_conflict<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    original_id_hex: String,
+) -> Result<(), SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    super::orchestrator::resolve_conflict(&dir, &original_id_hex)
+        .map_err(|_| SyncDeviceError::Internal)
+}
+
 // --- Enrollment command (MYND-425 task 5; bootstrap resolved) ---
 //
 // New-device enrollment: fetch vault.meta (pre-auth, by account_number_hash) →
