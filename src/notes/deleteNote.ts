@@ -44,6 +44,17 @@ export async function tombstoneNote(noteId: string): Promise<void> {
     new Date().toISOString(),
   );
   await noteUpdate(noteId, decoder.decode(tombstoned));
+  // Tell the sync engine this new version is a deletion, so the next push sets
+  // the server tombstone flag (horizon-GC reclaims the ciphertext after other
+  // devices have had time to pull it). Best-effort: the `deleted:` field already
+  // propagates the deletion regardless; the flag only governs server reclamation.
+  try {
+    await invoke("plugin:sync|sync_mark_tombstone", {
+      noteIdHex: noteId.replace(/-/g, ""),
+    });
+  } catch {
+    // Sync not configured / command unavailable — the deletion still propagates.
+  }
 }
 
 /** True when a sync endpoint is configured (the under-sync reroute predicate). */

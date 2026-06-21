@@ -514,6 +514,24 @@ pub async fn sync_resolve_conflict<R: Runtime>(
         .map_err(|_| SyncDeviceError::Internal)
 }
 
+/// Queue a deletion (note id, 32-hex) so the next push sets its server-side
+/// tombstone flag (horizon-GC). The dialect-aware notes layer calls this from the
+/// tombstone path — it knows the version is genuinely a deletion, so a LIVE note
+/// is never flagged (no false-positive → the server never GCs live data). No
+/// vault-blob access; only the device-local pending-tombstone queue is touched.
+#[tauri::command]
+pub async fn sync_mark_tombstone<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id_hex: String,
+) -> Result<(), SyncDeviceError> {
+    let _ = hex16(&note_id_hex).ok_or(SyncDeviceError::BadRequest)?;
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    super::orchestrator::add_pending_tombstone(&dir, &note_id_hex)
+        .map_err(|_| SyncDeviceError::Internal)
+}
+
 // --- Enrollment command (MYND-425 task 5; bootstrap resolved) ---
 //
 // New-device enrollment: fetch vault.meta (pre-auth, by account_number_hash) →

@@ -65,6 +65,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_pending_conflicts,
             commands::sync_take_conflict,
             commands::sync_resolve_conflict,
+            commands::sync_mark_tombstone,
             commands::sync_enroll,
             commands::sync_join_account,
         ])

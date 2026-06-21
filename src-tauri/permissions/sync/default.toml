@@ -27,6 +27,7 @@ permissions = [
     "allow-sync-pending-conflicts",
     "allow-sync-take-conflict",
     "allow-sync-resolve-conflict",
+    "allow-sync-mark-tombstone",
     "allow-sync-enroll",
     "allow-sync-join-account",
 ]
@@ -80,6 +81,11 @@ commands.allow = ["sync_take_conflict"]
 identifier = "allow-sync-resolve-conflict"
 description = "Allow invoking sync:sync_resolve_conflict (adopt the staged remote revision as the synced baseline + clear staging, so the local edit pushes as a linear advance)."
 commands.allow = ["sync_resolve_conflict"]
+
+[[permission]]
+identifier = "allow-sync-mark-tombstone"
+description = "Allow invoking sync:sync_mark_tombstone (queue a deletion's note id so the next push sets the server tombstone flag for horizon-GC). Touches only the device-local pending-tombstone queue; no vault-blob access."
+commands.allow = ["sync_mark_tombstone"]
 
 [[permission]]
 identifier = "allow-sync-enroll"
