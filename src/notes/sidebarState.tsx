@@ -139,6 +139,7 @@ export function applyOptimisticCreate(
     archived: null,
     template: false,
     folderIndex: false,
+    hasSource: false,
   });
 }
 
