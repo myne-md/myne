@@ -29,7 +29,7 @@
 // concern (already gated by `clipper/envelope.rs` + `clipper/token.rs`) and are
 // intentionally absent here.
 //
-// WHAT THIS GATE ENFORCES (the four boundary rules)
+// WHAT THIS GATE ENFORCES (the five boundary rules)
 // -------------------------------------------------
 //   1. PATH TRAVERSAL — each per-image `filename` is a single, harmless path
 //      component. Defense-in-depth: the attachment store content-addresses by
@@ -51,6 +51,14 @@
 //   4. CLIP DATE — normalized to an RFC 3339 string for the provenance
 //      frontmatter (`clipped:`, SYNC-14, composed downstream). A malformed
 //      value is rejected.
+//   5. SOURCE URL — the A14-controlled provenance URL flows verbatim into the
+//      `source:` / `url:` frontmatter of the clip note, so it must be
+//      RENDER-SAFE: a scheme ALLOW-LIST (http / https only) keeps a
+//      `javascript:` / `data:` / `file:` / `vbscript:` URL out of a clickable
+//      frontmatter link (the exact A14 "render-safe clip notes only" boundary),
+//      with a length cap (bloat) + UTF-8 well-formedness (like rule 2). The
+//      empty string is allowed (no provenance). YAML-escaping downstream stops
+//      STRUCTURE injection but NOT a malicious scheme — that is this rule's job.
 //
 // PURE + TOTAL: no React, no IPC, no I/O. A `RawClipEnvelope` in → a typed
 // discriminated-union result out. Never throws on hostile input — every failure
@@ -145,12 +153,18 @@ export interface ValidatedClipEnvelope {
  *     {@link CaptureKind} set.
  *   - `"MalformedClipDate"`        — `clipDate` did not parse to a valid
  *     instant.
+ *   - `"MalformedSourceUrl"`       — `sourceUrl` is non-empty but is not a
+ *     parseable http(s) URL within the length cap (a disallowed scheme such as
+ *     `javascript:` / `data:` / `file:`, an unparseable/relative value, an
+ *     over-long value, or a lone surrogate). Keeps an A14-controlled URL
+ *     render-safe in the provenance frontmatter.
  */
 export type ClipEnvelopeRejection =
   | "PathTraversal"
   | "InvalidPlaintextEncoding"
   | "UnrecognizedCaptureKind"
-  | "MalformedClipDate";
+  | "MalformedClipDate"
+  | "MalformedSourceUrl";
 
 /**
  * The structured result of the boundary gate — a discriminated union matching
@@ -273,13 +287,52 @@ function isCaptureKind(value: string): value is CaptureKind {
 }
 
 /**
+ * The largest accepted `sourceUrl` length (UTF-16 code units). Generous enough
+ * for any real page URL (incl. long query strings / data-bearing paths) while
+ * bounding a hostile bloat that would inflate the note body.
+ */
+const MAX_SOURCE_URL_LEN = 8192;
+
+/**
+ * Validate the provenance `sourceUrl` crossing TB10 (A14-controlled). It flows
+ * verbatim into the `source:` / `url:` frontmatter, so it must be RENDER-SAFE.
+ *
+ * Returns `true` for the empty string (no provenance — the composer omits the
+ * field) or for a parseable absolute URL whose scheme is `http:` / `https:`
+ * within {@link MAX_SOURCE_URL_LEN} and well-formed Unicode; `false` for a
+ * disallowed scheme (`javascript:` / `data:` / `file:` / `vbscript:` / …), an
+ * unparseable or relative value, an over-long value, or a lone surrogate.
+ * Downstream YAML escaping prevents structure injection but NOT a malicious
+ * scheme rendered as a clickable link — this allow-list is that defense.
+ */
+function isSafeSourceUrl(url: string): boolean {
+  if (url === "") {
+    return true; // no provenance — harmless, composer omits the field
+  }
+  if (url.length > MAX_SOURCE_URL_LEN) {
+    return false;
+  }
+  if (!isWellFormedUnicode(url)) {
+    return false;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false; // not a parseable absolute URL (relative / garbage)
+  }
+  return parsed.protocol === "http:" || parsed.protocol === "https:";
+}
+
+/**
  * THE boundary gate — validate a raw, hostile {@link RawClipEnvelope} into a
  * {@link ValidatedClipEnvelope}, or a typed {@link ClipEnvelopeRejection}.
  *
  * This is the single ingress-validation chokepoint for desktop clip ingest:
  * every later desktop-ingest task assumes the envelope it receives passed here.
  * The order of checks is deliberate (each is independent; the first failure
- * short-circuits) — capture-kind, UTF-8, clip-date, then every image filename.
+ * short-circuits) — capture-kind, UTF-8, clip-date, sourceUrl, then every image
+ * filename.
  *
  * Pure + total: never throws on hostile input. Returns
  * `{ kind: "ok", envelope }` only when ALL boundary rules pass; otherwise
@@ -307,7 +360,13 @@ export function validateClipEnvelope(raw: RawClipEnvelope): ClipEnvelopeResult {
     return { kind: "err", reason: "MalformedClipDate" };
   }
 
-  // 4. Every per-image filename must be a harmless single path component.
+  // 4. sourceUrl must be empty or a render-safe http(s) URL (scheme allow-list
+  //    + length cap + well-formedness) — it lands in provenance frontmatter.
+  if (!isSafeSourceUrl(raw.sourceUrl)) {
+    return { kind: "err", reason: "MalformedSourceUrl" };
+  }
+
+  // 5. Every per-image filename must be a harmless single path component.
   for (const image of raw.imageBytes) {
     if (!isSafeFilename(image.filename)) {
       return { kind: "err", reason: "PathTraversal" };

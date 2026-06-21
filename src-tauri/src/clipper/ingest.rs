@@ -67,7 +67,7 @@ use super::envelope::{
     self, HandoffEnvelope, HandoffKind, HostReply, VaultStatus, VaultStatusSource,
 };
 use super::host::PairingGate;
-use super::rate_limit::{RateDecision, RateLimiter};
+use super::rate_limit::{RateDecision, SharedRateLimiter};
 use super::token::{RegistryGate, TokenRegistry};
 use super::validation;
 
@@ -220,7 +220,7 @@ pub fn ingest_relayed_frame(
     body: &[u8],
     registry: &TokenRegistry,
     status: &dyn VaultStatusSource,
-    limiter: &mut RateLimiter,
+    limiter: &SharedRateLimiter,
     assembler: &dyn ClipAssembler,
     pairing: &dyn PairingDispatcher,
     now: Instant,
@@ -338,7 +338,7 @@ pub fn ingest_relayed_frame(
 /// phase 1 — that is phase 2 (`PairAwait`).
 fn ingest_pair_begin(
     envelope: &HandoffEnvelope,
-    limiter: &mut RateLimiter,
+    limiter: &SharedRateLimiter,
     pairing: &dyn PairingDispatcher,
     now: Instant,
 ) -> IngestOutcome {
@@ -553,13 +553,13 @@ mod tests {
     fn valid_clip_with_unlocked_vault_forwards_the_envelope_and_replies_accepted() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let outcome = ingest_relayed_frame(
             &clip_envelope(&token, "# Clip\n\nbody", Some("https://example.com/a")),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -589,7 +589,7 @@ mod tests {
     fn clipping_the_same_page_twice_forwards_two_independent_envelopes() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let frame = clip_envelope(
             &token,
@@ -601,7 +601,7 @@ mod tests {
             &frame,
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -610,7 +610,7 @@ mod tests {
             &frame,
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -635,14 +635,14 @@ mod tests {
     fn body_over_the_note_cap_replies_error_not_forwarded() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let big = "a".repeat(super::super::MAX_NOTE_BODY + 1);
         let outcome = ingest_relayed_frame(
             &clip_envelope(&token, &big, None),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -668,14 +668,14 @@ mod tests {
         // longer composes.
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let body = "a".repeat(super::super::MAX_NOTE_BODY);
         let outcome = ingest_relayed_frame(
             &clip_envelope(&token, &body, Some("https://x.test")),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -697,13 +697,13 @@ mod tests {
     fn an_invalid_token_is_silently_ignored_no_assembly() {
         let reg = TokenRegistry::new(); // nothing issued
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let outcome = ingest_relayed_frame(
             &clip_envelope("garbage-token", "body", None),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -722,13 +722,13 @@ mod tests {
         let value = token.value().to_string();
         reg.revoke_extension(EXT);
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let outcome = ingest_relayed_frame(
             &clip_envelope(&value, "body", None),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -741,7 +741,7 @@ mod tests {
     fn a_malformed_frame_is_silently_ignored_no_panic_no_assembly() {
         let (reg, _token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         for body in [
             &b"not json"[..],
@@ -753,7 +753,7 @@ mod tests {
                 body,
                 &reg,
                 &status,
-                &mut limiter,
+                &limiter,
                 &assembler,
                 &NeverPairing,
                 Instant::now(),
@@ -769,13 +769,13 @@ mod tests {
     fn a_locked_vault_replies_locked_and_assembles_nothing() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Locked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let outcome = ingest_relayed_frame(
             &clip_envelope(&token, "body", None),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -794,7 +794,7 @@ mod tests {
     fn over_rate_limit_replies_error_and_assembles_nothing_for_the_throttled_frame() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::new(1, Duration::from_secs(60));
+        let limiter = SharedRateLimiter::new(1, Duration::from_secs(60));
         let now = Instant::now();
         let assembler = RecordingAssembler::new();
         // First clip consumes the single-slot budget → forwarded.
@@ -802,7 +802,7 @@ mod tests {
             &clip_envelope(&token, "a", None),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             now,
@@ -817,7 +817,7 @@ mod tests {
             &clip_envelope(&token, "b", None),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             now,
@@ -841,13 +841,13 @@ mod tests {
     fn an_assembly_failure_replies_error_never_a_fake_success() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::failing("clip_dispatch_timeout");
         let outcome = ingest_relayed_frame(
             &clip_envelope(&token, "body", None),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -868,13 +868,13 @@ mod tests {
     fn status_query_unlocked_replies_accepted_no_assembly() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let outcome = ingest_relayed_frame(
             &status_envelope(&token),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -890,13 +890,13 @@ mod tests {
     fn status_query_locked_replies_locked() {
         let (reg, token) = paired_registry();
         let status = StaticVaultStatus(VaultStatus::Locked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let outcome = ingest_relayed_frame(
             &status_envelope(&token),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &NeverPairing,
             Instant::now(),
@@ -913,14 +913,14 @@ mod tests {
         // no clip is assembled.
         let reg = TokenRegistry::new(); // nothing issued — caller is UNPAIRED
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::new(PairDispatchOutcome::Paired("unused".to_string()));
         let outcome = ingest_relayed_frame(
             &pair_begin_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             Instant::now(),
@@ -941,14 +941,14 @@ mod tests {
         // replies `paired` carrying it. No clip is assembled.
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::new(PairDispatchOutcome::Paired("scopedtoken123".to_string()));
         let outcome = ingest_relayed_frame(
             &pair_await_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             Instant::now(),
@@ -970,7 +970,7 @@ mod tests {
         // phases — the user's Accept is the gate, NOT a token.
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
 
         let begin = StubPairing::new(PairDispatchOutcome::Paired("t".to_string()));
@@ -978,7 +978,7 @@ mod tests {
             &pair_begin_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &begin,
             Instant::now(),
@@ -993,7 +993,7 @@ mod tests {
             &pair_await_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &await_,
             Instant::now(),
@@ -1010,14 +1010,14 @@ mod tests {
         // the extension prompts the user to unlock (then re-pair).
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Locked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::with_begin(BeginPairOutcome::Locked);
         let outcome = ingest_relayed_frame(
             &pair_begin_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             Instant::now(),
@@ -1029,14 +1029,14 @@ mod tests {
     fn a_rejected_pair_await_replies_error_pairing_rejected() {
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::new(PairDispatchOutcome::Rejected);
         let outcome = ingest_relayed_frame(
             &pair_await_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             Instant::now(),
@@ -1053,14 +1053,14 @@ mod tests {
     fn a_pair_await_error_surfaces_its_closed_label() {
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::new(PairDispatchOutcome::Error("pairing_timeout"));
         let outcome = ingest_relayed_frame(
             &pair_await_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             Instant::now(),
@@ -1077,14 +1077,14 @@ mod tests {
     fn a_pair_begin_with_an_empty_extension_id_is_silent_no_dispatch() {
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::default();
+        let limiter = SharedRateLimiter::default();
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::new(PairDispatchOutcome::Paired("t".to_string()));
         let outcome = ingest_relayed_frame(
             &pair_begin_envelope(""), // unidentifiable caller
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             Instant::now(),
@@ -1100,7 +1100,7 @@ mod tests {
         // raises a dialog) is rate-limited.
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::new(1, Duration::from_secs(60));
+        let limiter = SharedRateLimiter::new(1, Duration::from_secs(60));
         let now = Instant::now();
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::new(PairDispatchOutcome::Paired("t".to_string()));
@@ -1109,7 +1109,7 @@ mod tests {
             &pair_begin_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             now,
@@ -1124,7 +1124,7 @@ mod tests {
             &pair_begin_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             now,
@@ -1140,14 +1140,14 @@ mod tests {
         // limiter, pair-await still dispatches and replies.
         let reg = TokenRegistry::new();
         let status = StaticVaultStatus(VaultStatus::Unlocked);
-        let mut limiter = RateLimiter::new(0, Duration::from_secs(60)); // no budget
+        let limiter = SharedRateLimiter::new(0, Duration::from_secs(60)); // no budget
         let assembler = RecordingAssembler::new();
         let pairing = StubPairing::new(PairDispatchOutcome::Paired("t".to_string()));
         let outcome = ingest_relayed_frame(
             &pair_await_envelope(EXT),
             &reg,
             &status,
-            &mut limiter,
+            &limiter,
             &assembler,
             &pairing,
             Instant::now(),

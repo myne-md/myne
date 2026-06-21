@@ -56,6 +56,19 @@ pub struct PairedExtension {
     pub extension_id: String,
     /// The opaque bearer value (hex of 32 CSPRNG bytes). Vault-stable
     /// correlation tag — never logged.
+    ///
+    /// `#[serde(skip_serializing)]`: the bearer secret must never cross the
+    /// WebView IPC boundary. `PrefsView` derives `Serialize` and `prefs_read`
+    /// returns it to the WebView, so without this skip every `prefs_read` would
+    /// hand the full live token registry to JS (a credential-confinement break —
+    /// a WebView compromise could replay the bearer value to the 0600 relay and
+    /// mint clips, bypassing the pairing dialog). The hand-rolled canonical-JSON
+    /// disk codec (`encode_record_into`) writes `token_value` explicitly and the
+    /// hand-rolled decoder reads it, so on-disk persistence is unaffected; the
+    /// Settings UI gets `extension_id` + `paired_at` via the dedicated
+    /// `pairing_list_paired` command, never through `prefs_read`. Skip applies to
+    /// serialization only — `Deserialize` still reads the key when present.
+    #[serde(skip_serializing)]
     pub token_value: String,
     /// Whether this record has been revoked. A revoked record never validates.
     pub revoked: bool,

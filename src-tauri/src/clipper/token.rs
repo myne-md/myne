@@ -68,8 +68,21 @@
 #![cfg_attr(not(test), allow(dead_code))]
 
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 
 use super::host::PairingGate;
+
+/// Constant-time equality for the bearer token VALUE (32-byte CSPRNG secret, hex).
+///
+/// The `extension_id` is non-secret and is compared ordinarily; only the token
+/// value is a guessable secret, so its comparison must not leak a byte-by-byte
+/// timing oracle — the codebase's crypto discipline (`subtle::ConstantTimeEq`,
+/// as used for AEAD tag verification in `protocol::aead`). A length mismatch
+/// short-circuits to `false` (the length is not the secret; both legitimate
+/// values are 64 hex chars).
+fn token_value_ct_eq(a: &str, b: &str) -> bool {
+    a.as_bytes().ct_eq(b.as_bytes()).into()
+}
 
 /// Number of decimal digits in a [`PairingChallenge`].
 ///
@@ -403,9 +416,13 @@ impl TokenRegistry {
     /// mismatch, ID mismatch) → [`TokenValidation::Missing`]. The host
     /// collapses everything but `Valid` to silence.
     pub fn validate(&self, extension_id: &str, token_value: &str) -> TokenValidation {
-        // A live, fully-matching record wins outright.
+        // A live, fully-matching record wins outright. The non-secret
+        // extension_id is matched first (ordinary ==); the secret token value is
+        // compared in constant time.
         if self.records.iter().any(|r| {
-            !r.revoked && r.token.value() == token_value && r.token.extension_id() == extension_id
+            !r.revoked
+                && r.token.extension_id() == extension_id
+                && token_value_ct_eq(r.token.value(), token_value)
         }) {
             return TokenValidation::Valid;
         }
@@ -413,7 +430,9 @@ impl TokenRegistry {
         // Revoked — distinct from never-issued, though the host treats both
         // as silence.
         if self.records.iter().any(|r| {
-            r.revoked && r.token.value() == token_value && r.token.extension_id() == extension_id
+            r.revoked
+                && r.token.extension_id() == extension_id
+                && token_value_ct_eq(r.token.value(), token_value)
         }) {
             return TokenValidation::Revoked;
         }

@@ -99,6 +99,34 @@ pub const PAIRING_DISPATCH_EVENT: &str = "pairing://dispatch";
 // entirely for the common no-wikilink clip; see `resolveClipWikilinks`.)
 const DISPATCH_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Max concurrent clipper connection threads (M3). Each accepted connection is
+/// served on its own thread that can block up to [`DISPATCH_TIMEOUT`]; without a
+/// bound, a same-UID peer (the A14 / TB10 local attacker that can open the 0600
+/// socket) could spawn thousands of connections to exhaust threads + memory.
+/// Beyond this cap a new connection is DROPPED (closed immediately) rather than
+/// queued — the legitimate clipper opens one short-lived connection per user
+/// gesture, far under this ceiling.
+const MAX_CONCURRENT_CONNECTIONS: usize = 16;
+
+/// Idle read timeout on an accepted connection (M3). A peer that connects then
+/// sends nothing — or stalls between frames — would otherwise pin its thread
+/// until it disconnects. The legitimate flow sends a frame immediately and the
+/// connection is short-lived, so this generous bound only reaps a stalled or
+/// hostile peer. Distinct from [`DISPATCH_TIMEOUT`], which bounds the WebView
+/// assembly wait (an in-process channel recv), not a socket read.
+const CONNECTION_READ_IDLE: Duration = Duration::from_secs(60);
+
+/// Decrements the active-connection counter when a connection thread ends —
+/// including on an early return or a panic (Drop runs regardless), so a slot is
+/// never leaked. Pairs with the `fetch_add` admission check at accept (M3).
+struct ActiveConnGuard(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl Drop for ActiveConnGuard {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+}
+
 /// The tiny outcome the WebView reports back for a dispatched clip.
 ///
 /// `Locked` is included for completeness — the primary locked short-circuit is
@@ -749,6 +777,23 @@ pub fn spawn_relay_listener<R: Runtime>(app: AppHandle<R>) {
             };
             tracing::debug!(stage = "clip_relay_listen", event = "listening");
 
+            // ONE process-global rate limiter, shared by every connection
+            // thread (H2). The fixed-window flood budget must span ALL
+            // connections: native messaging reconnects a fresh host process
+            // (hence a fresh socket connection) per dispatch, so a
+            // per-connection limiter handed each reconnect a brand-new full
+            // budget — defeating the A14 flood bound the limiter exists to
+            // enforce. `SharedRateLimiter::check` locks only for the brief
+            // decision (never across the blocking dispatch), so a shared budget
+            // does not serialize concurrent connections.
+            let rate_limiter =
+                std::sync::Arc::new(super::rate_limit::SharedRateLimiter::default());
+
+            // Active-connection counter for admission control (M3): bound the
+            // number of concurrent connection threads so a hostile same-UID peer
+            // cannot exhaust threads/memory by opening connections en masse.
+            let active = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+
             // Serve each connection on its OWN thread. A `serve_connection`
             // BLOCKS — up to the dispatch timeout while the WebView assembles a
             // clip, and until the extension disconnects between frames — so a
@@ -769,11 +814,31 @@ pub fn spawn_relay_listener<R: Runtime>(app: AppHandle<R>) {
                         continue;
                     }
                 };
+                // Admission control (M3): claim a slot, or drop the connection if
+                // we are at the concurrency ceiling. `fetch_add` returns the prior
+                // count; if that already met the cap we are over capacity, so give
+                // the slot back and close the stream (the peer can retry).
+                if active.fetch_add(1, std::sync::atomic::Ordering::AcqRel)
+                    >= MAX_CONCURRENT_CONNECTIONS
+                {
+                    active.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+                    tracing::debug!(stage = "clip_relay_accept", event = "over_capacity");
+                    drop(stream); // close immediately — no thread spawned
+                    continue;
+                }
                 let app = app.clone();
+                let rate_limiter = std::sync::Arc::clone(&rate_limiter);
+                let active = std::sync::Arc::clone(&active);
                 let _ = std::thread::Builder::new()
                     .name("clipper-conn".into())
                     .spawn(move || {
+                        // Release the admission slot when this thread ends (any path).
+                        let _conn_guard = ActiveConnGuard(active);
                         let mut stream = stream;
+                        // Idle read timeout (M3): a peer that sends nothing must not
+                        // pin this thread. Set before the try_clone so the read half
+                        // shares it (SO_RCVTIMEO is per-socket).
+                        let _ = stream.set_read_timeout(Some(CONNECTION_READ_IDLE));
                         // A fresh registry snapshot per connection so a just-minted
                         // / just-revoked token is honoured immediately.
                         let registry = match app
@@ -782,8 +847,6 @@ pub fn spawn_relay_listener<R: Runtime>(app: AppHandle<R>) {
                             Some(s) => s.registry_snapshot(),
                             None => super::token::TokenRegistry::new(), // empty ⇒ silent
                         };
-                        // A per-connection rate limiter (the app-side authoritative one).
-                        let mut limiter = super::rate_limit::RateLimiter::default();
                         // Cheap per-connection app-handle wrappers (just hold the handle).
                         let status = AppVaultStatus::new(app.clone());
                         let assembler = ClipDispatch::new(app.clone());
@@ -802,7 +865,7 @@ pub fn spawn_relay_listener<R: Runtime>(app: AppHandle<R>) {
                             &mut stream,
                             &registry,
                             &status,
-                            &mut limiter,
+                            &rate_limiter,
                             &assembler,
                             &pairing,
                         ) {

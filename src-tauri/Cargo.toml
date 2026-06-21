@@ -29,6 +29,10 @@ uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
 getrandom = "0.2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
+# Constant-time comparison for the clipper pairing-token bearer value
+# (`clipper::token::TokenRegistry::validate`) — same blessed RustCrypto primitive
+# the protocol crate uses for AEAD tag verification; already in the shared lock.
+subtle = { version = "2", default-features = false }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
 # `tracing` for structured ops-side logging (stage tags + bounded
 # variant-name fields only; see src-tauri/CLAUDE.md
