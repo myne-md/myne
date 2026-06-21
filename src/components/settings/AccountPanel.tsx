@@ -40,6 +40,7 @@ import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
 import { changePassword } from "../../lib/vault-change-password";
 import { prefsRead, setVaultLabel } from "../../lib/prefs";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
+import { ConnectedExtensions } from "./ConnectedExtensions";
 import {
   deleteVault,
   mapDeleteVaultError,
@@ -599,6 +600,10 @@ export function AccountPanel({
             Save
           </button>
         </div>
+      </section>
+
+      <section style={SECTION_STYLE}>
+        <ConnectedExtensions />
       </section>
 
       <hr style={DIVIDER_STYLE} aria-hidden="true" />

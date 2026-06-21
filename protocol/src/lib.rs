@@ -59,6 +59,7 @@ pub(crate) mod canonical_json;
 pub mod dictionary_blob;
 pub mod error;
 pub mod kdf;
+pub mod paired_extension;
 pub mod password_policy;
 pub mod phrase;
 pub mod prefs;
@@ -114,6 +115,10 @@ pub use error::ProtocolError;
 pub use kdf::{
     derive_password_wrap_key, derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
     ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
+};
+pub use paired_extension::{
+    canonical_encode_paired_extensions, parse_paired_extensions_array, PairedExtension,
+    PairedExtensionParseError,
 };
 pub use password_policy::{validate_min_length, MIN_PASSWORD_LEN};
 pub use phrase::{

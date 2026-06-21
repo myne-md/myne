@@ -137,6 +137,7 @@ import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary
 import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
 import { CenterViewProvider, type CenterView } from "./centerView";
 import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
+import { ClipDispatchListener } from "../clip/ClipDispatchListener";
 import { PaneTree } from "../notes/components/PaneTree";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
 import type { PaneReadout } from "../notes/components/PaneView";
@@ -1586,6 +1587,26 @@ function EditorChrome({
         }}
       />
       <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
+      {/* Browser-extension clip dispatch listener (desktop-ingest, MYND-442,
+          TB10). Mounted here — inside the workspace providers — so the success
+          notice's "view" affordance opens the newly-clipped note via the
+          workspace note-open. */}
+      <ClipDispatchListener
+        onViewNote={(id) => {
+          void ctx.open(id as NoteId).catch(() => {
+            /* note-open failure surfaces via sidebar UX */
+          });
+        }}
+        onNoteCreated={() => {
+          // A clip sealed a new note — reload the sidebar so it appears live
+          // (same note_list → refreshAll path the boot + "+ New Note" use).
+          void noteList()
+            .then((ids) => ctx.refreshAll(ids))
+            .catch(() => {
+              /* sidebar stays as-is until the next refresh — non-fatal */
+            });
+        }}
+      />
       <WorkspaceHotkeys
         focusActive={focusActive}
         onToggleFocus={toggleFocus}

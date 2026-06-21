@@ -104,6 +104,13 @@ export const ICON_PATHS: Record<string, string> = {
   // "archived" badge. Lucide `archive` (the box-with-lid glyph).
   archive:
     '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  // Bookmark (url-bookmark, SYNC-16) — the per-note tab glyph for a note that
+  // carries a `source:` provenance frontmatter key (a clipped link-only
+  // bookmark), replacing the default `file-text`. Lucide `bookmark` stroke
+  // path, verbatim. (Distinct from the `bookmark` entry in
+  // `src/notes/folderIcons.ts`, which is a user-assignable FOLDER category glyph.)
+  bookmark:
+    '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
 };
 
 export type IconName = keyof typeof ICON_PATHS;
