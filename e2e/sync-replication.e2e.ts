@@ -14,10 +14,16 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { harnessSupported } from "./support/session";
-import { startSyncServer, syncServerSupported } from "./support/sync-server";
+import { type AppSession, harnessSupported } from "./support/session";
+import {
+  type EphemeralServer,
+  startSyncServer,
+  syncServerSupported,
+} from "./support/sync-server";
 import { launchDevice, syncConfigSeed, withTwoDevices } from "./support/multi-device";
+import type { Session } from "./support/webdriver";
 import { seedVault } from "./support/fixtures";
+import { patchDeletedField, patchFrontmatterField } from "../src/dialect";
 import {
   closeSettings,
   createNote,
@@ -146,7 +152,176 @@ describeCanary("two-device sync canary (MYND-428)", () => {
       await srv.teardown();
     }
   });
+
+  it("keep-both: concurrent edits to the same note both survive on B", async () => {
+    const srv = await startSyncServer();
+    try {
+      const { a, b, noteId, teardown } = await setupTwoSyncedDevices(srv);
+      try {
+        const idHex = noteId.replace(/-/g, "");
+        // Concurrent edits: A and B change the SAME synced note to different
+        // content (deterministic note_update IPC, no flaky editor typing).
+        await ipcOk(a.session, "plugin:notes|note_update", { noteId, plaintext: "A edit keepboth" });
+        await ipcOk(b.session, "plugin:notes|note_update", { noteId, plaintext: "B edit keepboth" });
+        // A pushes first; B's push then loses the blob CAS, so the engine STAGES
+        // A's remote revision (no wedge) instead of dropping an edit.
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+        await ipcOk(b.session, "plugin:sync|sync_now", {});
+        // Drive the keep-both materialization exactly as `useConflictMaterializer`
+        // does — its `sync://changed` hook only fires off the 30s background loop,
+        // so we run its real command chain (+ the real dialect copy-builder)
+        // deterministically here.
+        const pending = (await ipcOk(b.session, "plugin:sync|sync_pending_conflicts", {})) as string[];
+        expect(pending).toContain(idHex);
+        const remoteBody = (await ipcOk(b.session, "plugin:sync|sync_take_conflict", { originalIdHex: idHex })) as string;
+        expect(remoteBody).toContain("A edit keepboth");
+        await ipcOk(b.session, "plugin:notes|note_create", { plaintext: buildConflictCopy(remoteBody, noteId) });
+        await ipcOk(b.session, "plugin:sync|sync_resolve_conflict", { originalIdHex: idHex });
+        // Both revisions survive on B: its own edit at X + a conflict copy of A's.
+        expect(noteBlobCount(b.appDataDir)).toBe(2);
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
+
+  it("tombstone: a deletion on A propagates to B", async () => {
+    const srv = await startSyncServer();
+    try {
+      const { a, b, noteId, teardown } = await setupTwoSyncedDevices(srv);
+      try {
+        const idHex = noteId.replace(/-/g, "");
+        // B sees the live note (no deleted: marker yet).
+        const before = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+        expect(before).not.toContain("deleted:");
+        // A deletes it via the real tombstone path: write a `deleted:` field (the
+        // same dialect surgery `tombstoneNote` uses) + queue the tombstone flag.
+        const current = (await ipcOk(a.session, "plugin:notes|note_read", { noteId })) as string;
+        const tombstoned = new TextDecoder().decode(
+          patchDeletedField(new TextEncoder().encode(current), "2026-06-21T00:00:00Z"),
+        );
+        await ipcOk(a.session, "plugin:notes|note_update", { noteId, plaintext: tombstoned });
+        await ipcOk(a.session, "plugin:sync|sync_mark_tombstone", { noteIdHex: idHex }, 5_000);
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+        // B pulls the deletion → its copy now carries the `deleted:` marker.
+        let propagated = false;
+        for (let i = 0; i < 12 && !propagated; i++) {
+          await ipcOk(b.session, "plugin:sync|sync_now", {});
+          await new Promise((r) => setTimeout(r, 1500));
+          const body = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+          propagated = body.includes("deleted:");
+        }
+        expect(propagated, "the deletion replicated to B").toBe(true);
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
 });
+
+/** Page-seat IPC that unwraps the result (throws on `err`, returns `ok`). */
+async function ipcOk(
+  session: Session,
+  cmd: string,
+  args: Record<string, unknown> = {},
+  timeoutMs = 20_000,
+): Promise<unknown> {
+  const r = await pageSeatInvoke(session, cmd, args, timeoutMs);
+  if (r.err !== undefined) throw new Error(`${cmd} failed: ${JSON.stringify(r.err)}`);
+  return r.ok;
+}
+
+/** Build a keep-both conflict copy's content (remote body + the managed conflict
+ *  frontmatter) — the same composition as `src/notes/conflictCopy.ts`. */
+function buildConflictCopy(remoteBody: string, originalUuid: string): string {
+  const enc = new TextEncoder();
+  const withConflict = patchFrontmatterField(enc.encode(remoteBody), "conflict", "true");
+  const withBoth = patchFrontmatterField(withConflict, "conflict_of", originalUuid);
+  return new TextDecoder().decode(withBoth);
+}
+
+/** Boot A (seeded vault) + B, enroll A, write+push one note, B joins + is
+ *  approved + pulls it — the shared "two synced devices, one replicated note"
+ *  precondition. Returns both devices, the synced note id, and a teardown. */
+async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
+  a: AppSession;
+  b: AppSession;
+  noteId: string;
+  teardown: () => Promise<void>;
+}> {
+  let account = "";
+  let password = "";
+  const a = await launchDevice(0, {
+    seedConfig: syncConfigSeed(srv.url),
+    seed: (appDataDir) => {
+      const v = seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
+      account = v.account;
+      password = v.password;
+    },
+  });
+  try {
+    const b = await launchDevice(1, { seedConfig: syncConfigSeed(srv.url) });
+    try {
+      // A: unlock → enroll (self-approves) → create a note → push.
+      await unlockToEditor(a.session, password);
+      await dismissImporterOffer(a.session);
+      await openSettings(a.session);
+      await (await a.session.byTestId("settings.tab-sync")).click();
+      await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
+      await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
+      await (await a.session.byTestId("sync.enroll.submit")).click();
+      await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+      await closeSettings(a.session);
+      await createNote(a.session, "SyncedNote");
+      await new Promise((r) => setTimeout(r, 1500));
+      await ipcOk(a.session, "plugin:sync|sync_now", {});
+      const ids = (await ipcOk(a.session, "plugin:notes|note_list", {})) as string[];
+      const noteId = ids[0];
+
+      // B: join (account# + password) → editor (pending).
+      await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
+      await (await b.session.byTestId("welcome.join-cta")).click();
+      await b.session.byTestId("join.modal");
+      await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
+      await (await b.session.byTestId("join.account-input")).sendKeys(account);
+      await (await b.session.byTestId("join.password-input")).sendKeys(password);
+      await (await b.session.byTestId("join.submit")).click();
+      await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
+      await dismissImporterOffer(b.session);
+
+      // A: approve B.
+      await openSettings(a.session);
+      await (await a.session.byTestId("settings.tab-sync")).click();
+      await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
+      await closeSettings(a.session);
+
+      // B: pull until A's note replicates.
+      let replicated = false;
+      for (let i = 0; i < 12 && !replicated; i++) {
+        await ipcOk(b.session, "plugin:sync|sync_now", {});
+        await new Promise((r) => setTimeout(r, 1500));
+        replicated = noteBlobCount(b.appDataDir) >= 1;
+      }
+      if (!replicated) throw new Error("setup: A's note never replicated to B");
+
+      const teardown = async () => {
+        await b.teardown();
+        await a.teardown();
+      };
+      return { a, b, noteId, teardown };
+    } catch (e) {
+      await b.teardown();
+      throw e;
+    }
+  } catch (e) {
+    await a.teardown();
+    throw e;
+  }
+}
 
 /** Count `.myn` note blobs across every vault under a device's app-data dir. */
 function noteBlobCount(appDataDir: string): number {
