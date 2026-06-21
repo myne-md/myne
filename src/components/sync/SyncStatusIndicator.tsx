@@ -54,6 +54,10 @@ function present(status: SyncStatus | null): Presentation {
   switch (status.state) {
     case "disabled":
       return { dotColor: "var(--fg-3)", label: "Sync off" };
+    case "not_enrolled":
+      return { dotColor: "var(--fg-3)", label: "Not enrolled" };
+    case "pending":
+      return { dotColor: "var(--accent)", label: "Awaiting approval" };
     case "idle":
       return { dotColor: "var(--success)", label: "Synced" };
     case "syncing":
@@ -74,7 +78,13 @@ function present(status: SyncStatus | null): Presentation {
 export function SyncStatusIndicator() {
   const { status, syncNow, busy } = useSyncStatus();
   const { dotColor, label } = present(status);
-  const disabled = status?.state === "disabled";
+  // Hide "Sync now" when there is nothing to trigger: no endpoint (disabled) OR this
+  // device is not enrolled — a cycle there returns NotReady (→ not_enrolled), not a
+  // real sync, so the button would be a false promise (and would flash "Synced").
+  const hideSyncNow =
+    status?.state === "disabled" ||
+    status?.state === "not_enrolled" ||
+    status?.state === "pending";
 
   return (
     <div style={ROOT_STYLE} data-testid="sync.status-indicator" data-sync-state={status?.state ?? "loading"}>
@@ -82,7 +92,7 @@ export function SyncStatusIndicator() {
       <span style={LABEL_STYLE} data-testid="sync.status-label">
         {label}
       </span>
-      {!disabled && (
+      {!hideSyncNow && (
         <button
           type="button"
           style={{ ...BUTTON_STYLE, opacity: busy ? 0.6 : 1 }}

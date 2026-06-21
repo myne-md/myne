@@ -14,7 +14,7 @@ use super::config::{
 };
 use serde::Serialize;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// The runtime sync status surfaced to the UI (MYND-424 task 10). The live
 /// `syncing` / `error` / `conflicts` states light up once the engine loop is
@@ -25,6 +25,16 @@ use tauri::{AppHandle, Manager, Runtime};
 pub enum SyncRuntimeStatus {
     /// No endpoint configured — sync is off.
     Disabled,
+    /// Endpoint configured, but THIS device has no device-local token — it is not
+    /// enrolled and cannot sync until it is added. Distinct from `Disabled` (no
+    /// endpoint) and from `Idle` (enrolled, nothing in flight); reporting `Idle` here
+    /// would falsely show "Synced" for a device that cannot sync.
+    NotEnrolled,
+    /// Configured + enrolled but still awaiting approval by an existing device. The
+    /// device identity IS persisted (it will claim its token once approved), so this
+    /// is distinct from `NotEnrolled` (never added) — the UI says "Awaiting approval",
+    /// not "add this device".
+    Pending,
     /// Configured and idle (no sync in flight).
     Idle,
     /// A pull/push is in flight.
@@ -135,24 +145,54 @@ pub async fn sync_set_endpoint<R: Runtime>(
     Ok(fingerprint)
 }
 
-/// Derive the runtime status from the available signals. With the engine loop
-/// not yet live over a real transport (task 2, R3-blocked), the honest status is
-/// `Disabled` when unconfigured, else `Idle`. When the loop lands, this reads the
-/// engine's in-flight / error / conflict-count state instead.
-fn derive_status<R: Runtime>(app: &AppHandle<R>) -> Result<SyncRuntimeStatus, SyncConfigError> {
-    let cfg = read_config(&config_path(app)?)?;
-    Ok(match cfg.endpoint_url {
-        None => SyncRuntimeStatus::Disabled,
-        Some(_) => SyncRuntimeStatus::Idle,
-    })
+/// Pure endpoint+token+identity → status mapping (unit-testable; the `#[tauri::command]`
+/// glue that resolves the endpoint and reads the device-local token + persisted
+/// identity calls this). No endpoint → `Disabled` (the rest is irrelevant); endpoint +
+/// token → `Idle`; endpoint + no token + a persisted enrollment identity → `Pending`
+/// (added, awaiting approval); endpoint + no token + no identity → `NotEnrolled`.
+fn status_from(
+    endpoint_present: bool,
+    token_present: bool,
+    identity_present: bool,
+) -> SyncRuntimeStatus {
+    match (endpoint_present, token_present, identity_present) {
+        (false, _, _) => SyncRuntimeStatus::Disabled,
+        (true, true, _) => SyncRuntimeStatus::Idle,
+        (true, false, true) => SyncRuntimeStatus::Pending,
+        (true, false, false) => SyncRuntimeStatus::NotEnrolled,
+    }
 }
 
-/// Report the current sync status for the status indicator (task 10).
+/// Report the current sync status for the status indicator (task 10), derived honestly:
+/// no endpoint → `Disabled`; endpoint set but no device-local token → `NotEnrolled`
+/// (cannot sync); a persisted enrollment identity without a token → `Pending` (awaiting
+/// approval); else `Idle`. (`Syncing`/`Error`/`Conflicts` light up once the engine loop
+/// is wired over a real transport.) The enrollment check keeps the indicator consistent
+/// with the device panel — without it a configured-but-unenrolled device reads "Synced".
 #[tauri::command]
 pub async fn sync_status<R: Runtime>(
     app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
 ) -> Result<SyncRuntimeStatus, SyncConfigError> {
-    derive_status(&app)
+    let cfg = read_config(&config_path(&app)?)?;
+    let (token_present, identity_present) =
+        match crate::paths::active_vault_root_io(&app, state.active_vault_id().await) {
+            Ok(dir) => {
+                let token = matches!(super::token_store::read_token_fallback(&dir), Ok(Some(_)));
+                // A pending device persists its identity (device_id) even before its
+                // token is issued, so identity-without-token = awaiting approval.
+                let identity = super::state::read_sync_state(&dir)
+                    .map(|s| s.device_id_hex.is_some())
+                    .unwrap_or(false);
+                (token, identity)
+            }
+            Err(_) => (false, false),
+        };
+    Ok(status_from(
+        cfg.endpoint_url.is_some(),
+        token_present,
+        identity_present,
+    ))
 }
 
 /// Outcome of one orchestrated sync cycle, shared by `sync_now` (manual) and the
@@ -307,7 +347,12 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
 pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus, SyncConfigError> {
     Ok(match run_active_cycle(&app, true).await {
         CycleOutcome::Disabled => SyncRuntimeStatus::Disabled,
-        CycleOutcome::NotReady | CycleOutcome::Ran(_) => SyncRuntimeStatus::Idle,
+        // NotReady (locked / not enrolled) must NOT collapse into Idle — reporting
+        // "Synced" for a device that cannot sync is the exact dishonesty the status
+        // fix removed; clicking "Sync now" on an unenrolled device would otherwise
+        // flip the dot to green. Only a genuine Ran is Idle.
+        CycleOutcome::NotReady => SyncRuntimeStatus::NotEnrolled,
+        CycleOutcome::Ran(_) => SyncRuntimeStatus::Idle,
         CycleOutcome::Failed => SyncRuntimeStatus::Error {
             detail: "sync_failed".into(),
         },
@@ -455,6 +500,32 @@ pub async fn sync_remove_device<R: Runtime>(
 // to its plaintext (to materialize a `conflict_of:` copy via `note_create`), then
 // resolve — adopting the remote as the synced baseline so the local edit pushes
 // as a clean linear advance. No edit is ever lost or silently overwritten.
+
+/// Reset this device's sync enrollment locally: clear the device-local token + the
+/// sync baseline (`sync-state.json` + `vault.head-state`) for the active vault,
+/// returning it to a clean "not enrolled, unsynced" state. This is the in-app recovery
+/// when the token is stale/rejected — the device was removed from another device, or
+/// the server's auth state was reset — so the panel no longer loops on Unauthenticated
+/// / NotEnrolled with no way forward. After reset, re-add the device via the enroll
+/// form. It NEVER touches `notes/`, attachments, or `vault.meta`, and never calls the
+/// server (a rejected token cannot authenticate a server-side remove); the server-side
+/// device row, if any, is reaped by the existing approval/retire path. The client reads
+/// token + state from disk per operation, so the effect is immediate (no app restart).
+#[tauri::command]
+pub async fn sync_reset_local<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<(), SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    super::token_store::clear_token_fallback(&dir).map_err(|_| SyncDeviceError::Internal)?;
+    super::state::clear_device_local_sync(&dir).map_err(|_| SyncDeviceError::Internal)?;
+    // Nudge both the status indicator and the device roster to re-read immediately —
+    // they poll independently (5s / 4s), so without this they would disagree (one still
+    // "Synced") for up to a poll interval after the reset.
+    let _ = app.emit("sync://enrollment-changed", ());
+    Ok(())
+}
 
 /// List the note ids (hex) with a staged conflicting remote revision awaiting
 /// keep-both materialization.
@@ -901,6 +972,28 @@ pub async fn sync_join_account<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn status_from_maps_endpoint_token_identity_to_status() {
+        // No endpoint → Disabled regardless of token/identity. (The regression the
+        // status fix removed: the old stub returned Idle/"Synced" whenever an endpoint
+        // existed, ignoring enrollment entirely.)
+        assert_eq!(
+            status_from(false, false, false),
+            SyncRuntimeStatus::Disabled
+        );
+        assert_eq!(status_from(false, true, true), SyncRuntimeStatus::Disabled);
+        // Endpoint + token → Idle (token presence dominates identity).
+        assert_eq!(status_from(true, true, false), SyncRuntimeStatus::Idle);
+        assert_eq!(status_from(true, true, true), SyncRuntimeStatus::Idle);
+        // Endpoint + no token + persisted identity → Pending (added, awaiting approval).
+        assert_eq!(status_from(true, false, true), SyncRuntimeStatus::Pending);
+        // Endpoint + no token + no identity → NotEnrolled (never added).
+        assert_eq!(
+            status_from(true, false, false),
+            SyncRuntimeStatus::NotEnrolled
+        );
+    }
 
     #[test]
     fn hex16_accepts_valid_lowercase() {

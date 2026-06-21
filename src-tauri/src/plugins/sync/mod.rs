@@ -68,6 +68,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_mark_tombstone,
             commands::sync_enroll,
             commands::sync_join_account,
+            commands::sync_reset_local,
         ])
         .build()
 }

@@ -4,14 +4,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 /** One device in the roster (mirrors the Rust `DeviceEntry`). */
 export interface DeviceEntry {
   device_id_hex: string;
   approved: boolean;
   retired: boolean;
-  /** True for the device this client is running on (marked by the backend). */
-  is_current: boolean;
+  /** True for the device this client is running on (marked by the backend). Optional
+   *  to mirror the Rust `#[serde(default)]` — a roster row may arrive without it. */
+  is_current?: boolean;
 }
 
 /** A serialized `SyncDeviceError` from the plugin. */
@@ -34,6 +36,10 @@ export interface DevicesHook {
   approve: (deviceIdHex: string) => Promise<void>;
   /** Remove (revoke) a device. */
   remove: (deviceIdHex: string) => Promise<void>;
+  /** Reset THIS device's local sync enrollment — clear its stale per-device token +
+   *  sync baseline so it can be re-added. The recovery path when the token is rejected
+   *  (Unauthenticated / NotEnrolled). Never touches notes; makes no server call. */
+  resetLocal: () => Promise<void>;
 }
 
 function errKind(e: unknown): string {
@@ -70,7 +76,19 @@ export function useDevices(): DevicesHook {
   useEffect(() => {
     void load(false);
     const id = setInterval(() => void load(true), 4000);
-    return () => clearInterval(id);
+    // Re-read immediately on a local enrollment change (e.g. reset) so the roster
+    // does not lag its 4s poll behind the status indicator.
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void listen("sync://enrollment-changed", () => void load(false)).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      unlisten?.();
+    };
   }, [load]);
 
   const approve = useCallback(
@@ -101,7 +119,18 @@ export function useDevices(): DevicesHook {
     [refresh],
   );
 
+  const resetLocal = useCallback(async () => {
+    setBusy(true);
+    try {
+      await invoke("plugin:sync|sync_reset_local");
+      await refresh();
+    } catch (e) {
+      setError(errKind(e));
+      setBusy(false);
+    }
+  }, [refresh]);
+
   const pending = (devices ?? []).filter((d) => !d.approved && !d.retired);
 
-  return { devices, pending, error, busy, refresh, approve, remove };
+  return { devices, pending, error, busy, refresh, approve, remove, resetLocal };
 }

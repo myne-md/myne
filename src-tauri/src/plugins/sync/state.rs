@@ -147,6 +147,37 @@ pub fn read_sync_state(dir: &Path) -> Result<SyncState, SyncConfigError> {
     }
 }
 
+/// Remove the device-local sync baseline files (`sync-state.json` + `vault.head-state`)
+/// for a vault — the "reset sync on this device" primitive. Idempotent (absent files
+/// are fine). NEVER touches `notes/`, attachments, or `vault.meta`: it only drops the
+/// device-local sync bookkeeping so the vault returns to a clean unsynced state and the
+/// next sync re-bootstraps the baseline (BootstrapTofu) from the server.
+pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
+    for f in DEVICE_LOCAL_SYNC_FILES {
+        match std::fs::remove_file(dir.join(f)) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    // Also drop the orchestrator-owned device-local sync artifacts so a reset is a
+    // genuinely clean slate — else stale deletion intent and stale conflict copies
+    // (keyed to the OLD enrollment's baseline) survive into the next sync cycle after
+    // re-enroll. Names mirror orchestrator.rs (`pending-tombstones` file + `conflicts/`
+    // staging dir); neither holds note plaintext.
+    match std::fs::remove_file(dir.join("pending-tombstones")) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    match std::fs::remove_dir_all(dir.join("conflicts")) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    Ok(())
+}
+
 /// Persist the sync state to `<dir>/sync-state.json` (atomic replace).
 pub fn write_sync_state(dir: &Path, state: &SyncState) -> Result<(), SyncConfigError> {
     let path = dir.join(SYNC_STATE_FILE);
@@ -307,5 +338,46 @@ mod tests {
                 "unexpected device-local file {f}"
             );
         }
+    }
+
+    #[test]
+    fn clear_device_local_sync_removes_all_sync_artifacts_keeps_notes() {
+        let dir = std::env::temp_dir().join(format!("myne-clearsync-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("conflicts")).unwrap();
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+        // Every device-local sync artifact a reset must clear.
+        for f in DEVICE_LOCAL_SYNC_FILES {
+            std::fs::write(dir.join(f), b"x").unwrap();
+        }
+        std::fs::write(dir.join("pending-tombstones"), b"id1\nid2").unwrap();
+        std::fs::write(dir.join("conflicts").join("abc.myn"), b"staged").unwrap();
+        // User data the reset must NEVER touch.
+        std::fs::write(dir.join("notes").join("keep.myn"), b"note").unwrap();
+        std::fs::write(dir.join("vault.meta"), b"meta").unwrap();
+
+        clear_device_local_sync(&dir).unwrap();
+
+        for f in DEVICE_LOCAL_SYNC_FILES {
+            assert!(!dir.join(f).exists(), "{f} must be removed by reset");
+        }
+        assert!(
+            !dir.join("pending-tombstones").exists(),
+            "pending-tombstones queue must be cleared (else stale deletion intent survives)"
+        );
+        assert!(
+            !dir.join("conflicts").exists(),
+            "conflicts/ staging dir must be cleared (else stale conflict copies survive)"
+        );
+        assert!(
+            dir.join("notes").join("keep.myn").exists(),
+            "reset must NEVER touch notes"
+        );
+        assert!(
+            dir.join("vault.meta").exists(),
+            "reset must NEVER touch vault.meta"
+        );
+        // Idempotent on already-absent artifacts.
+        clear_device_local_sync(&dir).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

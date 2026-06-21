@@ -30,6 +30,7 @@ permissions = [
     "allow-sync-mark-tombstone",
     "allow-sync-enroll",
     "allow-sync-join-account",
+    "allow-sync-reset-local",
 ]
 
 [[permission]]
@@ -96,3 +97,8 @@ commands.allow = ["sync_enroll"]
 identifier = "allow-sync-join-account"
 description = "Allow invoking sync:sync_join_account (add this device to an existing account: TOFU-pin the endpoint, fetch vault.meta pre-auth, bootstrap a NEW local vault from {account#+password}, unlock it, SCRAM-enroll password-path → pending). Materializes a vault dir; gated on the same A4/TB5 transport policy."
 commands.allow = ["sync_join_account"]
+
+[[permission]]
+identifier = "allow-sync-reset-local"
+description = "Allow invoking sync:sync_reset_local (reset this device's sync enrollment locally: clear the device-local per-device token + sync baseline (sync-state.json + vault.head-state) for the active vault so a stale/rejected token can be re-enrolled). NEVER touches notes/attachments/vault.meta and makes no server call."
+commands.allow = ["sync_reset_local"]
