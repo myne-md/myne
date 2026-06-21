@@ -1,104 +1,100 @@
+<p align="center"><img src=".github/banner.png" alt="Myne" width="100%"></p>
+
 # Myne
 
-> Open-source, end-to-end-encrypted markdown notes — local-first, with optional zero-knowledge sync. Plain markdown files after decryption, backlinks and graph as first-class features, no email at signup.
+> You write. No one else reads. Hosted or self-hosted.
 
-This is the **main repository** for the Myne project. It holds the desktop client (Tauri + Vite + React + Rust) and will hold the canonical Rust crypto protocol crate when its implementation begins. The complete v0.1 specification, threat model, and decisions log are already here under [`docs/`](docs/).
+This is the main repository of the [Myne](https://github.com/myne-md/myne) project — an end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge sync. It holds three things: the Tauri 2 + Vite + React + TypeScript desktop client ([`src/`](src/), [`src-tauri/`](src-tauri/)), the Rust cryptographic protocol crate ([`protocol/`](protocol/)), and the canonical v0.1 specification, threat model, and decisions log ([`docs/`](docs/)). The browser-clipper native host and clip pipeline also live here ([`src-tauri/src/clipper/`](src-tauri/src/clipper), [`src/clip/`](src/clip)).
+
+The companion repos (server, web, mobile, website, ops, agents, clipper extension, test vectors) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
+
+## What Myne commits to
+
+- **End-to-end encrypted, no opt-out.** Note content, titles, folder structure, timestamps, and attachments stay encrypted at rest and in transit. There is no plaintext mode.
+- **Plain markdown after decryption.** No proprietary block format. If Myne disappears, your files are already in the format every editor understands.
+- **No email at signup, no email recovery.** A 20-character Crockford-base32 account number with a Damm-32 check character identifies you ([`docs/spec/account-number.md`](docs/spec/account-number.md)). Recovery is a BIP-39 24-word phrase. Lose both password and phrase and the data is unrecoverable — by design.
+- **Argon2id (`m=256 MiB, t=3, p=2`)** for password stretching, with parameters bound into the AEAD AAD to defeat downgrade attacks.
+- **XChaCha20-Poly1305 with a CTX commitment** for every AEAD operation, closing partitioning-oracle attacks.
+- **Same protocol for hosted sync and self-host.** Both sit on the same trust boundary (TB5). Self-hosting changes the operator, not the security model.
+
+The threat model is normative: marketing copy and code may not exceed its guarantees.
 
 ## Status
 
-**Pre-alpha.** No implementation has shipped yet. The v0.1 specification is complete; the Tauri desktop client (Phase 1) scaffold has just been initialised — Tauri 2 + Vite + React + TypeScript on the UI, Rust core in [`src-tauri/`](src-tauri/). See [`docs/vision.md`](docs/vision.md) for the phased plan.
+**Pre-alpha.** No release has shipped, the on-disk format is still pre-1.0, and v0.1 and the future v005 major are forward-incompatible by design. That said, the desktop client is well past scaffold stage. What concretely exists in this repo today:
 
-## What v0.1 commits to
+- **Protocol crate ([`protocol/`](protocol/))** — `#![no_std]` + `alloc`, built on the RustCrypto stack with no custom primitives. Implements account numbers, KDF, AEAD, subkey derivation, BIP-39 recovery, and the full set of encrypted blob families (per-note, vault metadata, prefs, search, workspace, indices, attachments + catalog, backup container, personal dictionary, quick-unlock, attachment-text). Covered by a large unit, property-based, and attack test suite.
+- **Desktop core ([`src-tauri/`](src-tauri/))** — Tauri 2 host with atomic writes, auto-lock, snapshot/backup, vault registry and migration, on-device search and spell-check, screen-capture protection, and the browser-clipper native-messaging host. Capability ACLs live under [`src-tauri/capabilities/`](src-tauri/capabilities).
+- **UI ([`src/`](src/))** — React 19 vault onboarding/unlock/recovery flows, a CodeMirror 6 markdown editor (reading/source modes, folding, find-and-replace, multi-cursor, wikilinks, tags), graph view, attachments, saved views, and export (TXT/HTML/PDF).
+- **Specs ([`docs/`](docs/))** — complete v0.1 protocol, threat model, account-number spec, ~115-entry glossary, and an append-only decisions log.
+- **E2E suite ([`e2e/`](e2e/))** — 50+ scenarios driving the production binary via tauri-driver. A new user-facing flow ships with its E2E coverage.
 
-- **End-to-end encrypted** by default. No plaintext mode. Every byte — note content, titles, folder structure, timestamps, attachments — stays encrypted at rest and in transit.
-- **Plain markdown after decryption.** No proprietary block format. If Myne disappears, your files are already in the format every editor understands.
-- **No email at signup.** A 20-character Crockford-base32 account number with a Damm-32 check digit replaces email. See [`docs/spec/account-number.md`](docs/spec/account-number.md).
-- **BIP-39 24-word recovery phrase.** Hard zero-knowledge: lose both password and phrase, the data is unrecoverable. We cannot help. Email recovery will not be added.
-- **Argon2id `m=256 MiB, t=3, p=2`** for password stretching, with parameters bound into AAD to defeat downgrade attacks.
-- **XChaCha20-Poly1305 + CTX commitment** for every AEAD operation. Defeats partitioning-oracle attacks (Len–Grubbs–Ristenpart, USENIX 2021).
-- **Forward-incompatible major versions.** v005 will be a separate closed spec; cross-major migration is explicit and one-way.
-- **Same protocol for hosted sync and self-host.** No closed-source server. Self-hosting changes the operator, not the security model.
-
-## Supported platforms
-
-- **macOS** — all Tauri 2-supported versions; full screen-capture protection (window invisible to OS screen-recording and screenshot APIs).
-- **Windows** — Windows 10 build 19041+ (May 2020 Update) recommended for full screen-capture protection. Older Windows 10 builds install and run, but the screen-capture exclusion API silently no-ops.
-- **Linux** (X11 + Wayland) — installs and runs; screen-capture protection unavailable in v0.1 (no portable API). Tracked for additive support in a future release.
-
-See [`docs/threat-model.md`](docs/threat-model.md) §7 for the canonical limitations record.
-
-## Documentation
-
-All specifications live under [`docs/`](docs/):
-
-- [`docs/vision.md`](docs/vision.md) — project vision, target user, success criteria, anti-features
-- [`docs/threat-model.md`](docs/threat-model.md) — 13 adversary classes, 17 assets, 9 trust boundaries. **Read this first.**
-- [`docs/spec/protocol.md`](docs/spec/protocol.md) — v0.1 cryptographic protocol
-- [`docs/spec/account-number.md`](docs/spec/account-number.md) — account-number format and validation
-- [`docs/glossary.md`](docs/glossary.md) — ~115 entries covering primitives, constructions, project-specific keys
-- [`docs/decisions.md`](docs/decisions.md) — running log of every architectural decision
-
-The threat model is normative for what users may rely on; marketing copy must not exceed its guarantees.
+Planned and not yet in this repo: a tagged release, signed reproducible builds, and the server-backed sync described in [`docs/vision.md`](docs/vision.md). Sync, the server, and the other clients live in their own companion repos (below).
 
 ## Repository layout
 
 ```
 myne/
-├── docs/                ← specifications, vision, threat-model, glossary, decisions
-├── src/                 ← React UI (Phase 1 desktop client front-end)
-├── src-tauri/           ← Tauri 2 + Rust desktop core (Phase 1)
+├── docs/                ← specs, threat model, glossary, decisions log
+├── src/                 ← React UI (Tauri WebView)
+│   └── clip/            ← clip assembly + dispatch (clipper-paired)
+├── src-tauri/           ← Tauri 2 + Rust desktop core
+│   ├── capabilities/    ← Tauri capability ACLs (security-load-bearing)
+│   └── src/clipper/     ← browser-clipper native-messaging host
+├── protocol/            ← Rust cryptographic protocol crate (no_std + alloc)
+├── e2e/                 ← tauri-driver end-to-end scenarios + fixture-gen
+├── tests/              ← Vitest unit/integration specs
 ├── public/              ← static assets bundled into the WebView
-├── protocol/            ← Rust crypto protocol crate (Phase 1; lands when crate implementation begins)
-├── workspace/           ← scripts for cloning siblings & cross-repo operations
-├── index.html
-├── package.json         ← pnpm + Vite + React + TS toolchain
-├── vite.config.ts
-├── tsconfig.json
-├── tsconfig.node.json
-├── .nvmrc               ← pinned Node version (reproducible builds)
-├── LICENSE
-└── README.md
+├── workspace/           ← multi-repo helper scripts + manifest
+├── Cargo.toml           ← workspace root (src-tauri, protocol, e2e/fixture-gen)
+├── Cargo.lock           ← single shared lockfile (audit anchor)
+├── rust-toolchain.toml  ← pinned Rust toolchain
+└── package.json         ← pnpm + Vite + React + TS toolchain
 ```
 
-The desktop client lives at the repository root, not in an `apps/` subfolder, because mobile, web, and website clients all live in dedicated companion repos (see below) — a one-child `apps/desktop/` would just be unnecessary nesting. The Rust crypto protocol crate, when its implementation begins, lands as a sibling Cargo workspace member at `protocol/`. Together with `src-tauri/`, they share a single root `Cargo.lock` for a single auditable lockfile per the threat model's hash-pinning commitment.
+The desktop client lives at the repo root, not under `apps/`, because mobile, web, server, and website each live in a dedicated companion repo — a one-child `apps/desktop/` would be needless nesting. `src-tauri/`, `protocol/`, and `e2e/fixture-gen/` are members of one Cargo workspace sharing a single root `Cargo.lock` so there is exactly one auditable lockfile.
 
-`docs/`, `workspace/`, the Tauri scaffold, and pinned toolchain files exist today; `protocol/` lands when crate implementation begins.
+## Development
+
+Pinned toolchains: Node ([`.nvmrc`](.nvmrc)), Rust ([`rust-toolchain.toml`](rust-toolchain.toml)). `pnpm` is the canonical package manager; do not bypass the pinning.
+
+```bash
+pnpm install            # install JS toolchain
+pnpm tauri dev          # full Tauri dev (Vite on :1420 + Rust core)
+pnpm dev                # Vite only (strictPort — fails if 1420 is taken)
+pnpm tauri build        # production desktop bundle
+
+pnpm test               # Vitest unit/integration suite
+pnpm test:e2e           # tauri-driver end-to-end scenarios
+cargo test -p protocol  # protocol crate tests
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+Git hooks are managed by [lefthook](https://github.com/evilmartians/lefthook) ([`lefthook.yml`](lefthook.yml)) — one-time `brew install lefthook && lefthook install` per clone. `pre-commit` runs the fast lint set; `pre-push` runs the full battery (clippy, `cargo test`, `pnpm build`). CI is the remote gate.
+
+Read [`docs/`](docs/) before changing anything that touches cryptography, the on-disk format, key handling, or sync. Start with [`docs/threat-model.md`](docs/threat-model.md), then [`docs/spec/protocol.md`](docs/spec/protocol.md).
 
 ## Companion repositories
 
-The full Myne project spans multiple repos under the [`myne-md`](https://github.com/myne-md) GitHub organization. The main repo (this one) holds the desktop client + protocol crate + specifications. Deployment-specific code lives in companion repos that, when cloned via `workspace/setup.sh`, live as nested directories inside this one.
+The full project spans several repos under the [`myne-md`](https://github.com/myne-md) organization. Clone the companions into this directory via [`workspace/setup.sh`](workspace/setup.sh) (the main repo's `.gitignore` excludes them so they do not show as untracked).
 
 | Repo | What it is |
 |---|---|
-| [`myne-test-vectors`](https://github.com/myne-md/myne-test-vectors) | Language-agnostic JSON test vectors for the protocol |
-| [`myne-server`](https://github.com/myne-md/myne-server) | Go sync server (Phase 2) |
-| [`myne-web`](https://github.com/myne-md/myne-web) | Next.js web client (Phase 3) |
-| [`myne-mobile`](https://github.com/myne-md/myne-mobile) | React Native iOS + Android (Phase 3) |
+| [`myne-server`](https://github.com/myne-md/myne-server) | Zero-knowledge sync server — the TB5 trust boundary, identical hosted and self-hosted |
+| [`myne-web`](https://github.com/myne-md/myne-web) | Web client |
+| [`myne-mobile`](https://github.com/myne-md/myne-mobile) | iOS + Android client |
+| [`myne-clipper`](https://github.com/myne-md/myne-clipper) | Browser-extension clipper — the paired channel that talks to this repo's native host |
 | [`myne-website`](https://github.com/myne-md/myne-website) | Marketing site (myne.md) |
-| [`myne-ops`](https://github.com/myne-md/myne-ops) | Internal ops & infrastructure (private) |
-| [`myne-agents`](https://github.com/myne-md/myne-agents) | Internal AI / agent definitions and tooling (private) |
+| [`myne-test-vectors`](https://github.com/myne-md/myne-test-vectors) | Language-agnostic vectors that pin byte-level cross-implementation agreement on the protocol |
+| [`myne-ops`](https://github.com/myne-md/myne-ops) | Internal operations and infrastructure |
+| [`myne-agents`](https://github.com/myne-md/myne-agents) | Internal tooling and agent definitions |
 
-## Setting up a local dev workspace
+Each companion is a separate GitHub repo with its own license and CLAUDE.md — never commit changes to them through this repo.
 
-```bash
-gh repo clone myne-md/myne
-cd myne
-./workspace/setup.sh
-```
+## Security
 
-`setup.sh` clones every companion repo (`myne-test-vectors`, `myne-server`, `myne-web`, `myne-mobile`, `myne-website`, `myne-ops`, `myne-agents`) **into** this `myne/` directory as nested folders. The main repo's `.gitignore` excludes them so they do not show up as untracked.
-
-Daily commands:
-
-- `./workspace/pull-all.sh` — `git pull --ff-only` across the main repo and every nested companion
-- `./workspace/status-all.sh` — one-line `git status` summary per repo
-
-See [`workspace/README.md`](workspace/README.md) for the full layout and command reference.
-
-## Contributing
-
-Until Phase 1 implementation begins, the most productive contribution is review of the spec and threat model — open an issue if you find an inconsistency, an unstated assumption, or an attack class the threat model misses. Once code lands, contribution flow will be documented here.
+Cryptography questions and vulnerability reports: see [`SECURITY.md`](SECURITY.md). The threat model ([`docs/threat-model.md`](docs/threat-model.md)) is the canonical record of adversaries, assets, trust boundaries, and limitations.
 
 ## License
 
-Currently CC0 (this repo holds documentation only). When Phase 1 application code lands, the repo will move to **AGPL-3.0** with the `docs/` subtree retaining CC0 (or a similarly permissive content license) so the specification remains maximally reusable for independent implementations. The licensing transition will be recorded in [`docs/decisions.md`](docs/decisions.md) when it happens.
+Application code (the desktop client and the [`protocol/`](protocol/) crate) is **AGPL-3.0-or-later**, as declared in the crate manifests. The [`docs/`](docs/) subtree stays under a permissive content license (currently CC0, the license at the repo root) so the specification remains reusable for independent implementations. The licensing transition is recorded in [`docs/decisions.md`](docs/decisions.md).
