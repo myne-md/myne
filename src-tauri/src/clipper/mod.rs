@@ -74,7 +74,6 @@
 //!   (the cross-process seam this task flagged; see `envelope`'s
 //!   "Cross-process state access" note).
 
-pub mod compose;
 pub mod envelope;
 pub mod framing;
 pub mod host;

@@ -114,3 +114,73 @@ export const EXPORT_PLAIN_TEXT_SENTENCE =
 /** Scheduled-backup failure toast — the quiet, non-silent failure alert. */
 export const BACKUP_SCHEDULE_FAILED_TOAST =
   "Automatic backup failed. Check your backup folder in Settings → Storage.";
+
+// Browser-extension clip success notice (desktop-ingest task 7, MYND-442). A
+// clip lands at the vault ROOT (SYNC-15) and the user keeps working — the
+// notice is a non-blocking toast with a "view" affordance that opens the new
+// note. The copy is load-bearing: E2E asserts the message + action label + each
+// omitted-tally line by FULL-literal equality, so the strings live here as the
+// single source. The tally renders PROMINENTLY (one labelled line per omitted
+// media class) because a single clip losing its hero image is surprising — far
+// more so than a per-type loss inside a bulk import.
+
+/** The clip success notice's primary line — the clip landed at the vault root. */
+export const CLIP_NOTICE_ROOT_MESSAGE = "Clipped to your vault root.";
+
+/** The label of the clip notice's "view" affordance (opens the new note). */
+export const CLIP_NOTICE_VIEW_ACTION = "View";
+
+/** The display label for each omitted media class in the clip tally. Keyed on
+ *  the user-meaningful media class (`src/notes/import/media.ts`); the value is
+ *  the singular noun the tally line uses (pluralised by `clipOmittedTallyLine`
+ *  when the count is >1). */
+const CLIP_OMITTED_CLASS_NOUN: Record<string, string> = {
+  image: "image",
+  pdf: "PDF",
+  audio: "audio file",
+  video: "video",
+  other: "attachment",
+};
+
+/** Render one prominent omitted-by-type tally line (e.g. "1 image omitted",
+ *  "3 PDFs omitted"). Load-bearing: E2E asserts the rendered line by literal
+ *  equality, so the wording lives here. The count is always ≥1 (the builder
+ *  emits a line only for a non-zero class). */
+export function clipOmittedTallyLine(mediaClass: string, count: number): string {
+  const noun = CLIP_OMITTED_CLASS_NOUN[mediaClass] ?? "attachment";
+  const plural = count === 1 ? noun : pluraliseOmittedNoun(noun);
+  return `${count} ${plural} omitted`;
+}
+
+/** Pluralise an omitted-class noun. "PDF" → "PDFs", "audio file" → "audio
+ *  files" (the head noun pluralises), everything else gets a trailing "s". */
+function pluraliseOmittedNoun(noun: string): string {
+  if (noun === "audio file") return "audio files";
+  return `${noun}s`;
+}
+
+// Connected-extensions Settings section (ext-foundation-handoff task 7,
+// MYND-443). Settings → Account lists the live (non-revoked) paired browser
+// extensions with a per-row Revoke. Revoke is desktop-authoritative, immediate
+// + durable — the re-pair hint states the consequence plainly (the extension
+// must pair again to reconnect). E2E asserts these literals by full equality,
+// so they live here as the single source.
+
+/** Section title for the connected-extensions list (Settings → Account). */
+export const CONNECTED_EXTENSIONS_TITLE = "Connected extensions";
+
+/** Helper line under the section title — what a paired extension is. */
+export const CONNECTED_EXTENSIONS_HELPER =
+  "Browser extensions you have paired with this vault. Revoking one disconnects it immediately.";
+
+/** Empty state — no extension has been paired yet (the start-empty case). */
+export const CONNECTED_EXTENSIONS_EMPTY = "No connected extensions.";
+
+/** The per-row Revoke action label. */
+export const CONNECTED_EXTENSIONS_REVOKE_LABEL = "Revoke";
+
+/** The one-line consequence hint shown after the list — revoke is durable and
+ *  the extension must pair again to reconnect (the re-pair itself is the
+ *  extension's side, out of scope for this UI). */
+export const CONNECTED_EXTENSIONS_REPAIR_HINT =
+  "A revoked extension must pair again to reconnect.";

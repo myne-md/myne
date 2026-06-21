@@ -21,7 +21,19 @@ export interface PendingPairing {
   extension_id: string;
   /** The zero-padded numeric challenge the user compares to the extension. */
   challenge: string;
+  /**
+   * The relay correlation id when this session was opened by an incoming `pair`
+   * handoff over the native-messaging relay (a relay thread is blocked waiting
+   * for the Accept/Reject outcome under this id). `null` for a session not
+   * opened by the relay. When present, the dialog MUST call
+   * `pairingDispatchComplete` so the relay can reply the minted token back to
+   * the extension.
+   */
+  request_id?: string | null;
 }
+
+/** The user's pairing decision the dialog reports back to the blocked relay. */
+export type PairingDecision = "accepted" | "rejected";
 
 /** Mirrors `plugins::clipper_pairing::error::PairingError` (closed `kind`). */
 export type PairingError =
@@ -51,4 +63,68 @@ export async function pairingAccept(): Promise<string> {
  */
 export async function pairingReject(): Promise<void> {
   await invoke("plugin:clipper-pairing|pairing_reject");
+}
+
+/**
+ * Report the user's pairing decision back to the BLOCKED RELAY THREAD waiting
+ * under `requestId` (the relay then replies the token — or a reject error — to
+ * the extension over the native-messaging channel). Call this ONLY when the
+ * pending session carried a `request_id` (i.e. it was opened by the relay).
+ *
+ * On `"accepted"` pass the token `pairingAccept` minted; the relay fails closed
+ * (replies an error, never a fake pairing) if the token is missing/empty. On
+ * `"rejected"` omit the token. Best-effort: a stale/no-pending id is a no-op
+ * Rust-side (the relay may have already timed out) — never surfaces an error.
+ */
+export async function pairingDispatchComplete(
+  requestId: string,
+  outcome: PairingDecision,
+  token?: string,
+): Promise<void> {
+  await invoke("plugin:clipper-pairing|pairing_dispatch_complete", {
+    requestId,
+    outcome,
+    token: token ?? null,
+  });
+}
+
+/**
+ * One live (non-revoked) paired extension. Mirrors the Rust
+ * `plugins::clipper_pairing::commands::PairedExtensionView` — the extension id
+ * ONLY, never the token's bearer value (task 7, MYND-443). The connected-
+ * extensions Settings section renders these and offers a per-row Revoke.
+ */
+export interface PairedExtension {
+  /** The exact extension id that holds a live pairing token. */
+  extensionId: string;
+  /** Unix seconds when the pairing was issued (the Accept time), or `null` for a
+   *  record from before this field existed. The "connected when" line; never a
+   *  token value. */
+  pairedAt: number | null;
+}
+
+/**
+ * List the currently paired (live, non-revoked) browser extensions. Each entry
+ * carries the extension id + its issue time — never a token value. Used by the
+ * "Connected extensions" Settings section.
+ */
+export async function listPairedExtensions(): Promise<PairedExtension[]> {
+  const rows =
+    (await invoke<{ extension_id: string; paired_at: number | null }[]>(
+      "plugin:clipper-pairing|pairing_list_paired",
+    )) ?? [];
+  return rows.map((r) => ({
+    extensionId: r.extension_id,
+    pairedAt: r.paired_at ?? null,
+  }));
+}
+
+/**
+ * Revoke a paired extension — desktop-authoritative, immediate + durable. The
+ * extension must re-pair to reconnect (its side handles the re-pair prompt;
+ * out of scope here). Tauri auto-converts the camelCase arg to the Rust
+ * `extension_id` snake_case parameter.
+ */
+export async function revokePairedExtension(extensionId: string): Promise<void> {
+  await invoke("plugin:clipper-pairing|pairing_revoke", { extensionId });
 }

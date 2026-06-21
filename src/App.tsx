@@ -368,6 +368,13 @@ function App() {
           surfaces over whatever stage is showing; renders nothing unless the
           core has a pending pairing session. */}
       <PairingDialog />
+      {/* The browser-extension clip dispatch listener (desktop-ingest, MYND-442,
+          TB10) is NOT mounted here. It lives inside `Editor.tsx` — within the
+          workspace providers — so the success notice's "view" affordance can
+          open the newly-clipped note via the workspace note-open. Clips only
+          land when the vault is unlocked (the Rust relay short-circuits a locked
+          vault before emitting), i.e. exactly when the Editor is mounted, so the
+          listener never needs to exist pre-unlock. */}
     </div>
   );
 }

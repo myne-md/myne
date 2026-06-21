@@ -26,6 +26,13 @@ pub enum PairingError {
     /// generic "could not pair, try again" and the session is left intact so a
     /// retry is non-destructive.
     CsprngUnavailable,
+    /// The pairing-token registry could not be persisted to the encrypted
+    /// prefs-family blob (MYND-443 task 7) — the vault was not unlocked, the
+    /// `vault.meta` could not be read, or the prefs write failed. The in-memory
+    /// registry change (issue / revoke) still holds for this session; the next
+    /// pairing change re-attempts the durable write. Carries no token value, no
+    /// extension id, no path — the dialog surfaces a generic "couldn't save".
+    PersistFailed,
 }
 
 impl PairingError {
@@ -41,6 +48,7 @@ impl PairingError {
         match self {
             PairingError::NoPendingPairing => "no_pending_pairing",
             PairingError::CsprngUnavailable => "csprng_unavailable",
+            PairingError::PersistFailed => "persist_failed",
         }
     }
 }

@@ -221,6 +221,50 @@ pub(crate) async fn record_last_backup_at_with_dir(
     Ok(())
 }
 
+/// Internal (non-IPC) setter: persist the browser-clipper pairing-token
+/// registry snapshot to the `paired_extensions` prefs field (MYND-443,
+/// `ext-foundation-handoff` task 7). Same write discipline as every IPC setter
+/// (per-plugin write mutex + SYNC-6 hold guard). The caller passes the full
+/// desired record set (`registry.to_paired_extensions()`); the codec sorts +
+/// canonicalizes on encode. Called after a successful `pairing_accept` (a token
+/// was issued) and after a revoke, so pairing survives a restart and a
+/// revocation is durable.
+///
+/// Logs the record COUNT only — a token value + an extension id are vault-stable
+/// correlation tags (see ../../CLAUDE.md "Secret-handling logging discipline").
+/// The token VALUES never reach the log surface.
+pub(crate) async fn persist_paired_extensions_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    records: Vec<protocol::PairedExtension>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = records.len();
+    prefs.paired_extensions = records;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — never a token value / extension id (AS-low correlation tags).
+    tracing::info!(event = "prefs_written", field = "paired_extensions", count);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated per-field setter for the
 /// `screen_capture_protection` toggle. Acquires the per-plugin write
 /// mutex, executes a read-modify-write under it, then **after** the
@@ -1890,6 +1934,7 @@ mod tests {
                     editor_text_size: None,
                     label: None,
                     last_backup_at: None,
+                    paired_extensions: Vec::new(),
                     spell_enabled: None,
                     spell_languages: Vec::new(),
                     saved_views: Vec::new(),
@@ -2342,6 +2387,72 @@ mod tests {
             assert_eq!(view.saved_views.len(), 2);
             // The pre-existing screen_capture default is untouched.
             assert!(view.screen_capture_protection);
+        });
+    }
+
+    #[test]
+    fn paired_extensions_persist_and_read_round_trip_valid_and_revoked() {
+        // MYND-443 task 7 acceptance — the FULL persistence path through the
+        // encrypted prefs blob: issue → snapshot → persist to vault.prefs →
+        // re-read → hydrate a fresh registry → token still valid; revoke →
+        // persist → re-read → hydrate → RegistryGate rejects it.
+        use crate::clipper::token::{RegistryGate, TokenRegistry, TokenValidation};
+        const EXT: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4c).await;
+
+            // Issue a token, snapshot to records, persist through the prefs path.
+            let mut reg = TokenRegistry::new();
+            let token = reg.issue(EXT).unwrap();
+            persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
+                .await
+                .expect("persist issued");
+
+            // Simulate a restart: re-read prefs from disk, hydrate a fresh
+            // registry — the token survives and still validates.
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(view.paired_extensions.len(), 1);
+            let restored = TokenRegistry::from_paired_extensions(&view.paired_extensions);
+            assert_eq!(
+                restored.validate(EXT, token.value()),
+                TokenValidation::Valid
+            );
+
+            // Revoke, persist, re-read, hydrate — the gate now rejects it
+            // (durable revocation across the restart boundary).
+            reg.revoke_extension(EXT);
+            persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
+                .await
+                .expect("persist revoked");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let restored = TokenRegistry::from_paired_extensions(&view.paired_extensions);
+            let gate = RegistryGate::new(&restored, EXT, token.value());
+            // The gate's closed outcome is Revoked → not paired (the host maps
+            // everything but Valid to silence).
+            assert_eq!(gate.validation(), TokenValidation::Revoked);
+            assert_ne!(gate.validation(), TokenValidation::Valid);
+
+            // The pre-existing screen_capture default rode along untouched.
+            assert!(view.screen_capture_protection);
+        });
+    }
+
+    #[test]
+    fn paired_extensions_persist_rejects_when_slot_empty() {
+        // The persist setter is Slot::Unlocked-gated like every other prefs
+        // writer — a locked vault cannot mutate the registry on disk.
+        use crate::clipper::token::TokenRegistry;
+        const EXT: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-paired-locked").expect("scoped tempdir");
+            seed_real_vault_meta(tmp.path(), 0x4d);
+            let state = VaultRuntimeState::default(); // never unlocked
+            let mut reg = TokenRegistry::new();
+            reg.issue(EXT).unwrap();
+            let result =
+                persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
+                    .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
 

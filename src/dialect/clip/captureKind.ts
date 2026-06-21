@@ -24,8 +24,8 @@
 // --------------------------------------------------
 // The envelope shape is owned by sub-feature 1
 // (`src-tauri/src/clipper/envelope.rs` — the Rust `HandoffEnvelope` /
-// `CaptureKind`; mirrored extension-side in `myne-extension/src/content/capture.ts`
-// + `myne-extension/src/background/clip.ts`). This module MIRRORS, never
+// `CaptureKind`; mirrored extension-side in `myne-clipper/src/content/capture.ts`
+// + `myne-clipper/src/background/clip.ts`). This module MIRRORS, never
 // re-invents, the serialization-relevant subset of those fields:
 //
 //   envelope (snake_case, wire)   →  ClipInput (camelCase, this contract)
@@ -100,9 +100,9 @@ export const CAPTURE_KINDS = [
  * BOUNDARY ALIGNMENT (the extension's `nothing_to_clip`). This is the desktop
  * SERIALIZER-side analogue of the extension's capture-side
  * `{ status: "error"; reason: "nothing_to_clip" }`
- * (`myne-extension/src/background/clip.ts` — returned when `captureActiveTab()`
+ * (`myne-clipper/src/background/clip.ts` — returned when `captureActiveTab()`
  * finds nothing). Both feed the popup's "nothing was saved" body
- * (`myne-extension/src/popup/copy.ts`, sub-feature 4): the extension signals it
+ * (`myne-clipper/src/popup/copy.ts`, sub-feature 4): the extension signals it
  * when the in-page capture yields nothing; THIS signals it when a body did reach
  * the desktop but carries no extractable content. The exact wording + lock/
  * unlocked gating are sub-feature 4's UX — this slice only makes the outcome

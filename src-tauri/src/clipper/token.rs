@@ -250,6 +250,25 @@ impl PairingToken {
     pub fn authorizes(&self, scope: TokenScope) -> bool {
         self.scope.contains(&scope)
     }
+
+    /// Reconstruct a token from its two persisted scalars (the bearer `value`
+    /// and the bound `extension_id`), re-applying the full append-only scope
+    /// ceiling.
+    ///
+    /// Used by [`TokenRegistry::from_paired_extensions`] to hydrate the registry
+    /// from the decrypted `vault.prefs` blob (`ext-foundation-handoff` task 7,
+    /// MYND-443). The scope is **never** read from disk — it is structurally
+    /// fixed here, so a tampered/replayed record can never carry a wider grant
+    /// (`threat-model.md` § 7 local-prefs-replay): the on-disk form has no place
+    /// to express read/modify/delete, and this constructor only ever grants the
+    /// ceiling.
+    pub fn from_parts(extension_id: impl Into<String>, value: impl Into<String>) -> Self {
+        PairingToken {
+            value: value.into(),
+            extension_id: extension_id.into(),
+            scope: TokenScope::CEILING.to_vec(),
+        }
+    }
 }
 
 /// One row in the [`TokenRegistry`]: an issued token plus its revocation
@@ -259,6 +278,21 @@ impl PairingToken {
 struct TokenRecord {
     token: PairingToken,
     revoked: bool,
+    /// Unix seconds when this token was issued (the in-app Accept time), or
+    /// `None` for a record hydrated from a pre-feature persisted form. Display
+    /// metadata for the Connected-extensions list; never part of validation.
+    #[serde(default)]
+    paired_at: Option<u64>,
+}
+
+/// Current Unix time in whole seconds, or `None` if the clock predates the epoch
+/// (never in practice). The pairing timestamp is user-meaningful display
+/// metadata, so coarse second granularity is intentional.
+fn now_unix_secs() -> Option<u64> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_secs())
 }
 
 /// The desktop's authoritative record of issued / revoked pairing tokens.
@@ -318,6 +352,7 @@ impl TokenRegistry {
         self.records.push(TokenRecord {
             token: token.clone(),
             revoked: false,
+            paired_at: now_unix_secs(),
         });
         Ok(token)
     }
@@ -328,6 +363,7 @@ impl TokenRegistry {
         self.records.push(TokenRecord {
             token,
             revoked: false,
+            paired_at: now_unix_secs(),
         });
     }
 
@@ -390,6 +426,79 @@ impl TokenRegistry {
         self.records
             .iter()
             .any(|r| !r.revoked && r.token.extension_id() == extension_id)
+    }
+
+    /// The DISTINCT extension ids that currently have at least one live
+    /// (issued, non-revoked) token — the Settings "Connected extensions" list
+    /// (task 7, MYND-443). De-duplicated (a re-pair appends a fresh record, so
+    /// an extension can hold more than one live token) and sorted for a stable
+    /// UI order. Extension ids are AS-low correlation tags but **not** the token
+    /// value — safe to surface to the WebView list command.
+    pub fn live_extension_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .records
+            .iter()
+            .filter(|r| !r.revoked)
+            .map(|r| r.token.extension_id().to_string())
+            .collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
+    /// The live (non-revoked) extensions paired with this vault, each with its
+    /// issue time (`None` for a pre-feature record). Sorted + deduped by
+    /// extension id — there is at most one live record per extension (a re-pair
+    /// revokes the old and appends a new live one), so the dedup is defensive.
+    /// Drives the Connected-extensions list (extension id + "connected when").
+    pub fn live_paired(&self) -> Vec<(String, Option<u64>)> {
+        let mut out: Vec<(String, Option<u64>)> = self
+            .records
+            .iter()
+            .filter(|r| !r.revoked)
+            .map(|r| (r.token.extension_id().to_string(), r.paired_at))
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out.dedup_by(|a, b| a.0 == b.0);
+        out
+    }
+
+    /// Project the registry to its on-disk record form — the
+    /// [`protocol::PairedExtension`] array the `vault.prefs` `paired_extensions`
+    /// field carries (task-7 persist seam, MYND-443). Lossless against
+    /// [`Self::from_paired_extensions`]: the three persisted scalars
+    /// (`extension_id`, `token_value`, `revoked`) fully determine an equal
+    /// registry, because every token's scope is the structural ceiling and is
+    /// re-applied on load. The scope is deliberately NOT exported (it cannot be
+    /// anything other than the ceiling).
+    pub fn to_paired_extensions(&self) -> Vec<protocol::PairedExtension> {
+        self.records
+            .iter()
+            .map(|r| protocol::PairedExtension {
+                extension_id: r.token.extension_id().to_string(),
+                token_value: r.token.value().to_string(),
+                revoked: r.revoked,
+                paired_at: r.paired_at,
+            })
+            .collect()
+    }
+
+    /// Hydrate a registry from its on-disk record form (task-7 load seam,
+    /// MYND-443) — the inverse of [`Self::to_paired_extensions`]. Each record's
+    /// token is reconstructed via [`PairingToken::from_parts`], which re-applies
+    /// the full append-only scope ceiling; the on-disk form never carries a
+    /// scope, so a tampered/replayed blob can never widen a grant.
+    pub fn from_paired_extensions(records: &[protocol::PairedExtension]) -> Self {
+        TokenRegistry {
+            records: records
+                .iter()
+                .map(|r| TokenRecord {
+                    token: PairingToken::from_parts(r.extension_id.clone(), r.token_value.clone()),
+                    revoked: r.revoked,
+                    paired_at: r.paired_at,
+                })
+                .collect(),
+        }
     }
 }
 
@@ -693,6 +802,78 @@ mod tests {
         let revoked_gate = RegistryGate::new(&reg, EXT_A, t.value());
         assert!(!revoked_gate.is_paired());
         assert_eq!(revoked_gate.validation(), TokenValidation::Revoked);
+    }
+
+    // ---- on-disk PairedExtension projection (task-7 persistence seam) ---
+
+    #[test]
+    fn paired_extensions_round_trip_preserves_valid_and_revoked() {
+        // The exact persistence path: issue → snapshot to PairedExtension →
+        // hydrate a fresh registry → token still valid; a revoked record stays
+        // revoked across the round-trip.
+        let mut reg = TokenRegistry::new();
+        let live = reg.issue(EXT_A).unwrap();
+        let dead = reg.issue(EXT_B).unwrap();
+        reg.revoke_extension(EXT_B);
+
+        let records = reg.to_paired_extensions();
+        let restored = TokenRegistry::from_paired_extensions(&records);
+
+        // The restored registry is byte-for-byte the same logical registry.
+        assert_eq!(restored, reg);
+        // A live token still validates; the revoked one stays dead.
+        assert_eq!(
+            restored.validate(EXT_A, live.value()),
+            TokenValidation::Valid
+        );
+        assert_eq!(
+            restored.validate(EXT_B, dead.value()),
+            TokenValidation::Revoked
+        );
+        assert!(restored.has_live_token(EXT_A));
+        assert!(!restored.has_live_token(EXT_B));
+    }
+
+    #[test]
+    fn paired_extensions_round_trip_via_registry_gate_rejects_revoked() {
+        // The gate (the host's authority) must reject a revoked token after a
+        // persist+load cycle — the durable-revocation acceptance criterion.
+        let mut reg = TokenRegistry::new();
+        let t = reg.issue(EXT_A).unwrap();
+        reg.revoke_extension(EXT_A);
+
+        let restored = TokenRegistry::from_paired_extensions(&reg.to_paired_extensions());
+        let gate = RegistryGate::new(&restored, EXT_A, t.value());
+        assert!(!gate.is_paired());
+        assert_eq!(gate.validation(), TokenValidation::Revoked);
+    }
+
+    #[test]
+    fn restored_token_carries_the_full_scope_ceiling() {
+        // The scope is never persisted — from_parts re-applies the ceiling, so a
+        // restored token authorizes exactly create-clip + is-unlocked-status and
+        // nothing wider (the structural append-only guarantee survives a reload).
+        let mut reg = TokenRegistry::new();
+        reg.issue(EXT_A).unwrap();
+        let restored = TokenRegistry::from_paired_extensions(&reg.to_paired_extensions());
+        let rec = &restored.records[0];
+        assert!(rec.token.authorizes(TokenScope::CreateClip));
+        assert!(rec.token.authorizes(TokenScope::IsUnlockedStatus));
+        assert_eq!(rec.token.scope().len(), 2);
+    }
+
+    #[test]
+    fn live_extension_ids_are_distinct_and_sorted() {
+        let mut reg = TokenRegistry::new();
+        reg.issue(EXT_B).unwrap();
+        reg.issue(EXT_A).unwrap();
+        reg.issue(EXT_A).unwrap(); // a re-pair: a second live token for EXT_A
+        let revoked = reg.issue("cccccccccccccccccccccccccccccccc").unwrap();
+        reg.revoke_value(revoked.value());
+
+        let ids = reg.live_extension_ids();
+        // Sorted, de-duplicated, and the fully-revoked extension is excluded.
+        assert_eq!(ids, vec![EXT_A.to_string(), EXT_B.to_string()]);
     }
 
     // ---- registry is round-trippable (task-7 persistence seam) ---------

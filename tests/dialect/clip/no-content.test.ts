@@ -8,7 +8,7 @@
 // public `serializeClip` entry, DISTINCT from a valid-but-short clip.
 //
 // Boundary alignment: the no-content outcome is the desktop-serializer analogue
-// of the extension's `error.reason === "nothing_to_clip"` (myne-extension/src/
+// of the extension's `error.reason === "nothing_to_clip"` (myne-clipper/src/
 // background/clip.ts) — the popup (sub-feature 4) renders its "nothing was
 // saved" body from either signal. This slice does NOT own the popup wording
 // (sub-feature 4's UX) or the lock/unlocked gating (sub-features 1/4) — only the

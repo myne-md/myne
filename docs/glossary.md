@@ -242,7 +242,7 @@ Reference: https://github.com/C2SP/C2SP/blob/main/BLAKE3.md
 
 *(Alias: clipper extension.)*
 
-Myne's **keyless** browser extension (`browser-extension` epic, MYND-442) that captures a web article / selection or a page URL, converts it to [D1 markdown](#myne-markdown-dialect-d1), and hands it to the desktop core over a [native-messaging host](#native-messaging-host) bridge to be encrypted into the vault. Holds no key; runs outside TB2; saves to the vault root with no capture-time folder/tag selection; never reads or decrypts the vault. Ships in the separate `myne-extension` companion repo.
+Myne's **keyless** browser extension (`browser-extension` epic, MYND-442) that captures a web article / selection or a page URL, converts it to [D1 markdown](#myne-markdown-dialect-d1), and hands it to the desktop core over a [native-messaging host](#native-messaging-host) bridge to be encrypted into the vault. Holds no key; runs outside TB2; saves to the vault root with no capture-time folder/tag selection; never reads or decrypts the vault. Ships in the separate `myne-clipper` companion repo.
 
 Used in: `browser-extension` epic, MYND-442
 
