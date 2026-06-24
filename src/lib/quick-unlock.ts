@@ -19,9 +19,17 @@ import { invoke } from "@tauri-apps/api/core";
 
 /** Mirror of the Rust `QuickUnlockStatus` (`commands.rs`). */
 export interface QuickUnlockStatus {
+  /** A credential blob exists on disk. Settings uses this for "Configured via PIN". */
   configured: boolean;
   /** `"pin"` | `"biometric"` when configured, else null. */
   method: "pin" | "biometric" | null;
+  /**
+   * Quick-unlock can be redeemed *right now* — `configured` AND a full
+   * master-password unlock has happened this process session (the spring-loaded
+   * gate). `false` on a cold start, so the Unlock screen hides the PIN field
+   * rather than offer a credential that would fail `RequiresFullPassword`.
+   */
+  available: boolean;
 }
 
 /**

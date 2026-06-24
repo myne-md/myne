@@ -6,10 +6,13 @@
 // always present as the escape hatch — this component never replaces it, so
 // the (security-critical) password path is untouched.
 //
-// Spring-loaded gate: on a fresh process (app restart) the backend returns
-// `RequiresFullPassword` until one full-password unlock has happened this
-// session. This component self-hides on that (and on `AttemptsExhausted` /
-// `NotConfigured`) so the user simply uses the password form below.
+// Spring-loaded gate: on a fresh process (app restart) quick-unlock is
+// suppressed until one full-password unlock has happened this session. The
+// status call reports `available: false` in that window, so this component
+// stays hidden on a cold start and the user simply types their password — the
+// PIN field returns after the first full unlock + an auto-lock in the same
+// session. The `RequiresFullPassword` / `AttemptsExhausted` / `NotConfigured`
+// error self-hide below is the redeem-time backstop for the same states.
 //
 // ⚠️ Touch ID is HARDWARE-UNVERIFIED (see `quick_unlock/macos.rs`).
 
@@ -85,7 +88,12 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
     quickUnlockStatus(vaultId)
       .then((s) => {
         if (!alive) return;
-        if (s.configured && (s.method === "pin" || s.method === "biometric")) {
+        // `available` (not `configured`) gates the affordance: on a cold start
+        // the credential exists but the spring-loaded session gate is closed,
+        // so redeeming would fail `RequiresFullPassword`. Hiding here means a
+        // fresh launch shows only the password form — the PIN field returns
+        // after the first full unlock + an auto-lock in the same session.
+        if (s.available && (s.method === "pin" || s.method === "biometric")) {
           setMethod(s.method);
         } else {
           setHidden(true);

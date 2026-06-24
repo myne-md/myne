@@ -8,20 +8,26 @@
 // UNVERIFIED (see `src-tauri/.../quick_unlock/macos.rs`); its surrounding logic
 // is covered by the Rust `cargo test` provider/command suites with a mock.
 //
-// Spring-loaded note: this scenario locks WITHIN the same app session (via the
-// editor Lock CTA), so the backend's `full_unlock_this_session` gate is open
-// (the earlier `unlockToEditor` opened it) and quick-unlock is permitted. The
-// restart case (gate closed → RequiresFullPassword → affordance self-hides) is
-// a process-restart story pinned by the Rust command units, not driven here.
+// Spring-loaded gate, two stories:
+//   qu1 locks WITHIN the same app session (via the editor Lock CTA), so the
+//     `full_unlock_this_session` gate is open (the earlier `unlockToEditor`
+//     opened it) and the PIN affordance IS offered.
+//   qu2 drives the COLD START: a fresh process has no full unlock yet, so the
+//     gate is closed, `quick_unlock_status` reports `available: false`, and the
+//     PIN field must NOT appear on the Unlock screen even though the credential
+//     is on disk — the user must type their master password. Reproduces the
+//     "PIN screen shown on first launch" bug (status now mirrors the redeem
+//     gate). A genuine restart is a second process, so qu2 runs two launches
+//     that share the vault dir.
 //
 // Precondition: exactly 1 vault (weak KDF — unlock reads params from vault.meta).
 //
-// ⚠️ AUTHORED, PENDING CONTAINER VERIFICATION. The data-testid pass is shipped
-// and typecheck-clean (`pnpm build`); this scenario has NOT yet been run 3×
-// green in the Linux tauri-driver container (`./scripts/e2e-local.sh`) — that
-// is the remaining definition-of-done step (the harness is Linux-only and was
-// unavailable when this landed). Run it before relying on it as a gate.
+// Verified 3× green in the Linux tauri-driver container (`./scripts/e2e-local.sh`,
+// 2026-06-24). The PIN-setup completion wait (`configurePinInSettings`) is the
+// load-bearing de-flake: reading the always-present status text the instant the
+// element is found races the async Argon2id setup and failed ~1 in 3.
 
+import { cpSync, rmSync } from "node:fs";
 import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
@@ -31,9 +37,35 @@ import {
   closeSettings,
   unlockToEditor,
 } from "./support/flows";
+import { testIdSelector, type Session } from "./support/webdriver";
 
 const PIN = "135790";
 const WRONG_PIN = "024680";
+
+/**
+ * Configure a PIN in Settings → Privacy from an unlocked editor.
+ *
+ * The setup runs Argon2id off the UI thread, then `refresh()` re-reads the
+ * status — only when that lands does `configured` flip true, the "Set PIN"
+ * button unmount, and the helper text become "Configured via PIN". Waiting for
+ * the button to disappear is the deterministic completion signal; reading the
+ * status text the instant the (always-present) status element is found races
+ * that async setup and flakes (~1 in 3).
+ */
+async function configurePinInSettings(s: Session): Promise<void> {
+  await openSettings(s, "privacy");
+  await (await s.byTestId("settings.quick-unlock-toggle")).click();
+  // Toggling on reveals the PIN setup row.
+  await (await s.byTestId("settings.quick-unlock-pin-input")).replaceText(PIN);
+  await (await s.byTestId("settings.quick-unlock-setup-pin")).click();
+  // Setup complete → the setup row unmounts. Now the status text is settled.
+  await s.waitForGone(testIdSelector("settings.quick-unlock-setup-pin"));
+  const status = await s.byTestId("settings.quick-unlock-status");
+  if (!(await status.textContent()).includes("Configured via PIN")) {
+    throw new Error("quick-unlock status did not report PIN configured");
+  }
+  await closeSettings(s);
+}
 
 describeE2E("qu1 PIN quick-unlock round-trip (MYND-329)", () => {
   // Precondition: exactly 1 vault (weak KDF).
@@ -53,17 +85,7 @@ describeE2E("qu1 PIN quick-unlock round-trip (MYND-329)", () => {
         await dismissImporterOffer(s);
 
         // ---- Configure a PIN in Settings → Privacy --------------------------
-        await openSettings(s, "privacy");
-        await (await s.byTestId("settings.quick-unlock-toggle")).click();
-        // Toggling on reveals the PIN setup row.
-        await (await s.byTestId("settings.quick-unlock-pin-input")).replaceText(PIN);
-        await (await s.byTestId("settings.quick-unlock-setup-pin")).click();
-        // The status helper now reports the configured method.
-        const status = await s.waitForElement('[data-testid="settings.quick-unlock-status"]');
-        if (!(await status.textContent()).includes("Configured via PIN")) {
-          throw new Error("quick-unlock status did not report PIN configured");
-        }
-        await closeSettings(s);
+        await configurePinInSettings(s);
 
         // ---- Lock the vault (same session → spring-loaded gate open) --------
         await (await s.byTestId("editor.lock-cta")).click();
@@ -84,5 +106,80 @@ describeE2E("qu1 PIN quick-unlock round-trip (MYND-329)", () => {
         await s.byTestId("editor.lock-cta", { timeoutMs: 15_000 });
       },
     );
+  });
+});
+
+describeE2E("qu2 PIN quick-unlock hidden on a cold start (MYND-329)", () => {
+  // Precondition: exactly 1 vault (weak KDF). Two launches share one vault dir.
+  // Launch 1 configures a PIN (which opens the spring-loaded session gate, but
+  // that gate is process-local). Launch 2 boots a SEPARATE process from a copy
+  // of that vault dir — the credential is on disk, but no full unlock has
+  // happened this session, so the gate is closed and the PIN field must stay
+  // hidden. The master password is still the way in.
+  it("does not offer the PIN on a fresh launch; the password still unlocks", async () => {
+    let password = "";
+    let warmAppDataDir = "";
+    let warmDataHome = "";
+
+    // ---- Launch 1: configure a PIN, then quit -----------------------------
+    await scenario(
+      "qu2-warm-configure",
+      {
+        // Keep the dir on teardown so launch 2 can copy the configured vault
+        // (incl. the freshly-written vault.quickunlock credential).
+        keepDataDir: true,
+        seed: (dir) => {
+          const v = seedVault(dir);
+          password = v.password;
+        },
+      },
+      async (app) => {
+        const s = app.session;
+        warmAppDataDir = app.appDataDir;
+        warmDataHome = app.dataHome;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await configurePinInSettings(s);
+      },
+    );
+
+    // ---- Launch 2: genuine cold start from a copy of the configured vault --
+    try {
+      await scenario(
+        "qu2-cold-start",
+        {
+          seed: (dir) => {
+            // `dir` is launch 2's empty appDataDir. Lay launch 1's vault tree
+            // (vault.meta + vault.quickunlock + …) into it. The app resolves
+            // every path from app_data_dir at runtime, so relocating the tree
+            // to a new absolute home is transparent.
+            cpSync(warmAppDataDir, dir, { recursive: true });
+          },
+        },
+        async (app) => {
+          const s = app.session;
+          // Single vault → boot lands straight on the Unlock screen. Waiting for
+          // the password field confirms the screen has settled; the Unlock
+          // screen (and QuickUnlockEntry's status probe) mounts during boot, so
+          // by the time this find returns the `quick_unlock_status` IPC has long
+          // resolved — a regression that mounts the PIN field would already be
+          // present and fail the waitForGone below.
+          await s.byTestId("unlock.password-input");
+
+          // The bug: on a cold start the gate is closed, status reports
+          // `available: false`, and the PIN affordance must NOT appear.
+          await s.waitForGone(testIdSelector("unlock.quick-pin-input"));
+          await s.waitForGone(testIdSelector("unlock.quick-unlock"));
+
+          // The master password is the escape hatch and still unlocks. (qu1
+          // already covers the positive side — the PIN returns after a full
+          // unlock + a same-session relock.)
+          await unlockToEditor(s, password);
+        },
+      );
+    } finally {
+      // Launch 1 kept its data dir; reap it now.
+      if (warmDataHome) rmSync(warmDataHome, { recursive: true, force: true });
+    }
   });
 });
