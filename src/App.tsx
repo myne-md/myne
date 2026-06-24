@@ -272,6 +272,11 @@ function App() {
           <Unlock
             initialStatus={stage.initialStatus}
             vaultId={stage.vaultId}
+            // Back-to-picker affordance, shown only when this unlock was
+            // reached by picking a row on the ≥2-vault picker (MYND-204
+            // follow-up: the picker → unlock hop was one-way). Absent on every
+            // other entry path — there is no picker to return to.
+            onBack={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}

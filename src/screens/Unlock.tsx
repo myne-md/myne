@@ -80,6 +80,15 @@ interface UnlockProps {
    */
   vaultId?: VaultId;
   onUnlocked: () => void;
+  /**
+   * Back-to-picker affordance. Provided by App.tsx ONLY when the unlock was
+   * reached from the ≥2-vault picker (`Stage.unlock.fromPicker`). When present,
+   * a "Choose a different vault" link renders in idle mode and dispatches
+   * `unlock.back-to-picker` → `picker`, so a mis-picked vault is recoverable.
+   * `undefined` on every other entry path (no picker to return to) → the link
+   * is not rendered.
+   */
+  onBack?: () => void;
   /** Cold-start recovery entry. Dispatched by the "Recovery phrase ile
    *  aç" link in idle mode. App.tsx sends `unlock.start-recovery` →
    *  Stage transitions to `recover(phrase-entry)`. */
@@ -290,6 +299,25 @@ const DELETE_VAULT_LINK_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
+// Neutral ghost back link to the vault picker. Placed at the top of the
+// card, left-aligned with a leading chevron — a navigational affordance
+// distinct from the accent recovery link and the danger delete link below
+// the form, so it doesn't compete with the primary Unlock CTA.
+const BACK_LINK_STYLE: CSSProperties = {
+  background: "transparent",
+  border: 0,
+  padding: 0,
+  alignSelf: "flex-start",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--fg-2)",
+  cursor: "pointer",
+};
+
 const RECOVER_LINK_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
@@ -325,6 +353,7 @@ export function Unlock({
   initialStatus,
   vaultId,
   onUnlocked,
+  onBack,
   onStartRecovery,
   onResumeRecovery,
   onDeleteVaultSuccess,
@@ -517,6 +546,21 @@ export function Unlock({
 
   return (
     <CenteredCard>
+      {/* Back to the ≥2-vault picker — only when the screen was reached by
+          picking a row (App passes `onBack` iff `Stage.unlock.fromPicker`).
+          Suppressed during `decrypting` so an in-flight unlock isn't
+          abandoned mid-IPC. */}
+      {onBack && !decrypting && (
+        <button
+          type="button"
+          onClick={onBack}
+          style={BACK_LINK_STYLE}
+          data-testid="unlock.back-to-picker"
+        >
+          <span aria-hidden="true">←</span>
+          <span>Choose a different vault</span>
+        </button>
+      )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
       <h1 style={CARD_TITLE_STYLE}>Unlock your vault.</h1>
       <p style={CARD_BODY_STYLE}>Enter your password to continue.</p>
