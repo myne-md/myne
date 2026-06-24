@@ -181,6 +181,21 @@ export type Stage =
        * transition table is unaffected.
        */
       vaultId?: VaultId;
+      /**
+       * Set ONLY by the `picker.select-vault` transition — marks an unlock
+       * screen the user reached by picking a row on the ≥2-vault picker. When
+       * true, `<Unlock>` renders a "Choose a different vault" back affordance
+       * (dispatching `unlock.back-to-picker` → `picker`) so a mis-selected
+       * vault is recoverable without quitting the app. EVERY other path to
+       * `unlock` (single-vault boot, editor lock, vault switch, recovery
+       * cancel, create-vault fallback, change-password force-relock) leaves it
+       * falsy — those entries have no picker to return to (a single-vault user
+       * never saw one; the switch / lock / relock paths already tore down or
+       * own the active vault). Like `suspicionReason` / `vaultId`, it is
+       * payload (not part of the `name` discriminator), so the `LEGAL`
+       * transition table is unaffected.
+       */
+      fromPicker?: boolean;
     }
   | {
       name: "editor";
@@ -402,6 +417,18 @@ export type Action =
    */
   | { type: "picker.select-vault"; vaultId: VaultId }
   /**
+   * unlock → picker. Dispatched by the "Choose a different vault" back
+   * affordance `<Unlock>` renders ONLY when it was reached from the picker
+   * (the `unlock` Stage's `fromPicker` payload is set). Returns the user to
+   * the ≥2-vault selection surface so a mis-picked vault is recoverable
+   * without quitting (MYND-204 follow-up — the picker → unlock hop was
+   * previously one-way). No side effect: picking a row never unlocked
+   * anything (the vault-addressed `unlock` IPC only fires on password submit),
+   * so there is nothing to tear down on the way back. The picker re-fetches
+   * its own list on mount, so the returned surface is always current.
+   */
+  | { type: "unlock.back-to-picker" }
+  /**
    * picker → create-vault. Dispatched by the picker's "create another"
    * affordance (MYND-204, story 6). Routes into the existing
    * vault-creation flow; under SYNC-1 creating a new vault locks the
@@ -495,6 +522,12 @@ export function transition(prev: Stage, action: Action): Stage {
           // disagrees with the actual slot at IPC time, the recover
           // screen reducer collapses the mismatch silently per Q4.
           return { name: "recover", subStep: "password-reset" };
+        case "unlock.back-to-picker":
+          // Return to the ≥2-vault picker. Reached only when the unlock was
+          // entered via `picker.select-vault` (the back affordance is gated on
+          // the `fromPicker` payload), so the picker is a meaningful
+          // destination. Payload-free: the picker re-fetches its own list.
+          return { name: "picker" };
         case "unlock.restore-backup":
           // Corrupted-vault repair door (decisions.md 2026-06-10 supersede).
           return { name: "restore-backup", entry: "corrupted" };
@@ -610,10 +643,17 @@ export function transition(prev: Stage, action: Action): Stage {
           // hop). Carrying the id on the Stage (rather than App-side
           // mutable state) keeps the targeting survivable across the React
           // re-render between dispatch and the Unlock mount.
+          //
+          // `fromPicker: true` marks this unlock as picker-reached so
+          // `<Unlock>` renders the "Choose a different vault" back affordance
+          // (`unlock.back-to-picker` → picker). It is the ONLY transition that
+          // sets the flag — every other path to unlock has no picker to
+          // return to.
           return {
             name: "unlock",
             initialStatus: { kind: "Exists" },
             vaultId: action.vaultId,
+            fromPicker: true,
           };
         case "picker.restore-backup":
           return { name: "restore-backup", entry: "picker" };
@@ -798,6 +838,7 @@ const LEGAL: Record<string, Stage["name"]> = {
   "recover|recover.complete-success": "editor",
   "recover|recover.delete-vault-success": "welcome",
   "picker|picker.select-vault": "unlock",
+  "unlock|unlock.back-to-picker": "picker",
   "picker|picker.create-vault": "create-vault",
   // Restore-from-backup entries (MYND-56). Exit is reprobe-based — no
   // `restore-backup.*` exit arms exist by design (same posture as
@@ -827,6 +868,11 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   // discriminator), so `transition` ignores it on every (Stage × Action)
   // pair — this entry confirms its presence does not change outcomes.
   { name: "unlock", initialStatus: { kind: "Exists" }, vaultId: "00000000-0000-7000-8000-00000000000a" },
+  // Coverage entry for the optional `fromPicker` payload field (picker →
+  // unlock back affordance). Payload, not the `name` discriminator — this
+  // entry confirms its presence does not change transition outcomes on any
+  // (Stage × Action) pair.
+  { name: "unlock", initialStatus: { kind: "Exists" }, fromPicker: true },
   { name: "editor" },
   // Coverage entry for the editor stage's optional `vaultId` payload
   // (MYND-219 / SYNC-17) — same payload-ignoring contract as the unlock
@@ -866,6 +912,7 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   // only inspects the resulting `Stage["name"]`, so a placeholder id
   // suffices (the legality table tracks `name` only, not payload).
   { type: "picker.select-vault", vaultId: "00000000-0000-7000-8000-000000000000" },
+  { type: "unlock.back-to-picker" },
   { type: "picker.create-vault" },
 ];
 
