@@ -22,6 +22,13 @@ import {
 import { isQuickUnlockError } from "../types/quick-unlock-error";
 
 interface QuickUnlockEntryProps {
+  /**
+   * The vault this Unlock screen targets. Threaded into every quick-unlock IPC
+   * call because no vault is unlocked here, so the backend can't infer the
+   * target from the active slot — without it, status/redeem mis-resolve to the
+   * wrong directory once more than one vault exists and the PIN field hides.
+   */
+  vaultId?: string;
   /** Called on a successful quick-unlock — same effect as a password unlock. */
   onUnlocked: () => void;
 }
@@ -66,7 +73,7 @@ const HINT_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
-export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
+export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps) {
   const [method, setMethod] = useState<Method | null>(null);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,7 +82,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
 
   useEffect(() => {
     let alive = true;
-    quickUnlockStatus()
+    quickUnlockStatus(vaultId)
       .then((s) => {
         if (!alive) return;
         if (s.configured && (s.method === "pin" || s.method === "biometric")) {
@@ -90,7 +97,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [vaultId]);
 
   function handleError(e: unknown) {
     if (isQuickUnlockError(e)) {
@@ -122,7 +129,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
     setBusy(true);
     setNote(null);
     try {
-      await quickUnlockWithPin(pin);
+      await quickUnlockWithPin(pin, vaultId);
       onUnlocked();
     } catch (e) {
       setPin("");
@@ -137,7 +144,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
     setBusy(true);
     setNote(null);
     try {
-      await quickUnlockWithBiometric();
+      await quickUnlockWithBiometric(vaultId);
       onUnlocked();
     } catch (e) {
       handleError(e);

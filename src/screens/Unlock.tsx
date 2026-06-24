@@ -523,7 +523,7 @@ export function Unlock({
       {/* Quick-unlock (PIN / Touch ID) affordance — rendered only when
           configured + usable this session; self-hides otherwise. The password
           form below stays the always-present escape hatch (MYND-329). */}
-      <QuickUnlockEntry onUnlocked={onUnlocked} />
+      <QuickUnlockEntry vaultId={vaultId} onUnlocked={onUnlocked} />
       {/* `data-vault-id` mirrors the picker-row idiom (SYNC-8): the
           vault-addressed unlock target threaded from the Stage payload,
           observable to the E2E suite (MYND-127 story 2). Absent when the

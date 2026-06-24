@@ -301,6 +301,31 @@ async fn active_dir<R: Runtime>(
         .map_err(|_| QuickUnlockError::InvalidVaultMeta)
 }
 
+/// Resolve the quick-unlock target dir for a command that may name an explicit
+/// `vault_id`.
+///
+/// The Unlock-screen commands (status / redeem) run while NO vault is
+/// `Unlocked`, so [`active_dir`]'s `active_vault_id()` is `None` and its
+/// sole-vault disk heuristic ([`crate::paths::current_vault_root_from_base`])
+/// resolves to the WRONG (legacy `vault/`) path the moment two or more vaults
+/// exist on disk — the credential blob then appears absent and the PIN field
+/// silently self-hides. The Unlock screen DOES know which locked vault it
+/// targets, so it threads that id here and we resolve `<app_data_dir>/vaults/<id>/`
+/// directly (non-creating). When no id is named (the Settings panel, where a
+/// vault IS unlocked) we keep the active-vault path.
+async fn target_dir<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &VaultRuntimeState,
+    vault_id: Option<&str>,
+) -> Result<PathBuf, QuickUnlockError> {
+    match VaultId::parse_optional(vault_id) {
+        Some(id) => {
+            crate::paths::vault_root_for_id(app, id).map_err(|_| QuickUnlockError::InvalidVaultMeta)
+        }
+        None => active_dir(app, state).await,
+    }
+}
+
 /// Configure PIN quick-unlock for the active (Unlocked) vault.
 #[tauri::command]
 pub async fn quick_unlock_setup_pin<R: Runtime>(
@@ -320,15 +345,16 @@ pub async fn quick_unlock_setup_pin<R: Runtime>(
 #[tauri::command]
 pub async fn quick_unlock_with_pin<R: Runtime>(
     pin: String,
+    vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
     let pin = Zeroizing::new(pin);
-    let dir = active_dir(&app, &state).await?;
+    let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
     let (_, meta) = read_meta(&dir)?;
-    let vault_id = crate::paths::vault_id_from_root(&dir);
+    let id = crate::paths::vault_id_from_root(&dir);
     let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
-    quick_unlock_with_dir(&dir, vault_id, &state, provider).await
+    quick_unlock_with_dir(&dir, id, &state, provider).await
 }
 
 /// Best-effort removal of the macOS biometric Keychain credential for the vault
@@ -374,20 +400,21 @@ pub async fn quick_unlock_setup_biometric<R: Runtime>(
 /// command's verification caveat.)
 #[tauri::command]
 pub async fn quick_unlock_with_biometric<R: Runtime>(
+    vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
     #[cfg(target_os = "macos")]
     {
-        let dir = active_dir(&app, &state).await?;
+        let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
         let (_, meta) = read_meta(&dir)?;
-        let vault_id = crate::paths::vault_id_from_root(&dir);
+        let id = crate::paths::vault_id_from_root(&dir);
         let provider = super::macos::MacosBiometricProvider::new(meta.account_number_hash);
-        quick_unlock_with_dir(&dir, vault_id, &state, provider).await
+        quick_unlock_with_dir(&dir, id, &state, provider).await
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (&app, &state);
+        let _ = (&app, &state, &vault_id);
         Err(QuickUnlockError::HardwareUnavailable)
     }
 }
@@ -395,10 +422,11 @@ pub async fn quick_unlock_with_biometric<R: Runtime>(
 /// Report quick-unlock status for the active vault.
 #[tauri::command]
 pub async fn quick_unlock_status<R: Runtime>(
+    vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<QuickUnlockStatus, QuickUnlockError> {
-    let dir = active_dir(&app, &state).await?;
+    let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
     Ok(status_with_dir(&dir))
 }
 

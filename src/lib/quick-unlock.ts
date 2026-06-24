@@ -24,9 +24,18 @@ export interface QuickUnlockStatus {
   method: "pin" | "biometric" | null;
 }
 
-/** Is quick-unlock configured for the active vault, and by which method? */
-export function quickUnlockStatus(): Promise<QuickUnlockStatus> {
-  return invoke<QuickUnlockStatus>("plugin:quick-unlock|quick_unlock_status");
+/**
+ * Is quick-unlock configured, and by which method?
+ *
+ * `vaultId` names the target vault explicitly. The Unlock screen MUST pass it:
+ * at that point no vault is unlocked, so the backend cannot infer the target
+ * from the active slot and its sole-vault disk fallback resolves to the wrong
+ * directory once more than one vault exists (the credential then looks absent
+ * and the PIN field self-hides). The Settings panel omits it — a vault is
+ * unlocked there, so the active-vault path is correct.
+ */
+export function quickUnlockStatus(vaultId?: string): Promise<QuickUnlockStatus> {
+  return invoke<QuickUnlockStatus>("plugin:quick-unlock|quick_unlock_status", { vaultId });
 }
 
 /**
@@ -43,8 +52,8 @@ export function quickUnlockSetupPin(pin: string): Promise<void> {
  * `QuickUnlockError` — `WrongCredential { remaining }`, `AttemptsExhausted`,
  * `RequiresFullPassword`, `NotConfigured`, …
  */
-export function quickUnlockWithPin(pin: string): Promise<void> {
-  return invoke("plugin:quick-unlock|quick_unlock_with_pin", { pin });
+export function quickUnlockWithPin(pin: string, vaultId?: string): Promise<void> {
+  return invoke("plugin:quick-unlock|quick_unlock_with_pin", { pin, vaultId });
 }
 
 /** Configure macOS Touch ID quick-unlock. `HardwareUnavailable` off macOS. */
@@ -52,9 +61,9 @@ export function quickUnlockSetupBiometric(): Promise<void> {
   return invoke("plugin:quick-unlock|quick_unlock_setup_biometric");
 }
 
-/** Attempt a macOS Touch ID quick-unlock of the active vault. */
-export function quickUnlockWithBiometric(): Promise<void> {
-  return invoke("plugin:quick-unlock|quick_unlock_with_biometric");
+/** Attempt a macOS Touch ID quick-unlock. `vaultId` — see {@link quickUnlockStatus}. */
+export function quickUnlockWithBiometric(vaultId?: string): Promise<void> {
+  return invoke("plugin:quick-unlock|quick_unlock_with_biometric", { vaultId });
 }
 
 /** Remove the device-local quick-unlock credential for the active vault. */
