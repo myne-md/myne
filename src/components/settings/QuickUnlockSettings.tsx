@@ -85,7 +85,7 @@ export function QuickUnlockSettings() {
         if (alive) setStatus(s);
       })
       .catch(() => {
-        if (alive) setStatus({ configured: false, method: null });
+        if (alive) setStatus({ configured: false, method: null, available: false });
       });
     return () => {
       alive = false;
@@ -98,7 +98,7 @@ export function QuickUnlockSettings() {
     try {
       setStatus(await quickUnlockStatus());
     } catch {
-      setStatus({ configured: false, method: null });
+      setStatus({ configured: false, method: null, available: false });
     }
   }
 
