@@ -18,6 +18,7 @@ import {
   archiveNote,
   unarchiveNote,
   bulkArchiveNotes,
+  bulkUnarchiveNotes,
 } from "../../src/notes/archiveNote";
 import { trashNote } from "../../src/notes/trashNote";
 
@@ -177,6 +178,42 @@ describe("bulkArchiveNotes — N independent best-effort archives", () => {
   it("returns an empty result for an empty input", async () => {
     const result = await bulkArchiveNotes([]);
     expect(result).toEqual({ archived: [], failed: [] });
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("bulkUnarchiveNotes — N independent best-effort restores", () => {
+  it("unarchives all notes and reports them as unarchived", async () => {
+    routeReadThenUpdate("---\narchived: 2026-06-17T09:30:00Z\n---\n\nbody");
+    const result = await bulkUnarchiveNotes(["a", "b", "c"]);
+    expect(result.unarchived.sort()).toEqual(["a", "b", "c"]);
+    expect(result.failed).toEqual([]);
+  });
+
+  it("clears the archived: field on each restored note", async () => {
+    routeReadThenUpdate("---\narchived: 2026-06-17T09:30:00Z\n---\n\n# Body");
+    await bulkUnarchiveNotes(["only"]);
+    expect(lastUpdateBody()).not.toContain("archived:");
+  });
+
+  it("reports per-note failures without aborting the rest", async () => {
+    invokeMock.mockImplementation((cmd: string, args: unknown) => {
+      const id = (args as { noteId?: string }).noteId;
+      if (cmd === "plugin:notes|note_read") {
+        if (id === "bad") return Promise.reject({ kind: "CannotDecrypt" });
+        return Promise.resolve("---\narchived: 2026-06-17T09:30:00Z\n---\n\nbody");
+      }
+      return Promise.resolve(undefined);
+    });
+    const result = await bulkUnarchiveNotes(["ok1", "bad", "ok2"]);
+    expect(result.unarchived.sort()).toEqual(["ok1", "ok2"]);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0]?.noteId).toBe("bad");
+  });
+
+  it("returns an empty result for an empty input", async () => {
+    const result = await bulkUnarchiveNotes([]);
+    expect(result).toEqual({ unarchived: [], failed: [] });
     expect(invokeMock).not.toHaveBeenCalled();
   });
 });

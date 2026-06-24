@@ -340,6 +340,21 @@ pub struct PrefsView {
     #[serde(default)]
     pub active_workspace: Option<alloc::string::String>,
 
+    /// User toggle that disables the note-archive feature (archive-disable,
+    /// MYND-…). `None` ≡ unset → the host applies the default-OFF policy
+    /// (archiving enabled — the pre-feature behaviour). Omitted entirely from
+    /// the canonical JSON when `None`, so a vault that never touched the toggle
+    /// is byte-identical to a pre-feature `vault.prefs` (existing golden vectors
+    /// unaffected — migration-less additive field on `MYP1`, the
+    /// `editor_line_numbers` precedent class). **Non-load-bearing** (a tampered /
+    /// replayed value can at worst show or hide the archive entry points; the
+    /// underlying `archived:` frontmatter surgery is untouched) — no
+    /// protective-envelope clamp. Canonical key `archive_disabled` — sorts after
+    /// `active_workspace` (`ac` < `ar`), before `auto_lock_seconds`
+    /// (`ar` < `au`).
+    #[serde(default)]
+    pub archive_disabled: Option<bool>,
+
     /// Editor three-pane layout (sidebar widths + collapsed flags,
     /// MYND-137). `None` = the user never customized the layout → the
     /// field is omitted entirely from the canonical JSON, so a vault
@@ -671,6 +686,7 @@ impl Default for PrefsView {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -827,6 +843,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if let Some(ref slot) = prefs.active_workspace {
         out.extend_from_slice(b"\"active_workspace\":");
         push_json_string(&mut out, &slot.nfc().collect::<String>());
+        out.push(b',');
+    }
+
+    // archive_disabled (canonical key 'a', AFTER active_workspace
+    // ['ar' > 'ac'] and BEFORE auto_lock_seconds ['ar' < 'au']). A bool;
+    // omitted entirely when None so a vault that never touched the archive
+    // toggle is byte-identical to a pre-feature vault.prefs (preserves existing
+    // KAT vectors).
+    if let Some(on) = prefs.archive_disabled {
+        out.extend_from_slice(b"\"archive_disabled\":");
+        out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
     }
 
@@ -1316,14 +1343,40 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         None => (None, stripped),
     };
 
-    // ---- auto_lock_seconds (optional, after active_workspace) ----
+    // ---- archive_disabled (optional, after active_workspace) ----
+    // Canonical key order is active_workspace < archive_disabled <
+    // auto_lock_seconds, so when present this field is a literal PREFIX of the
+    // post-active_workspace bytes — matched by `strip_prefix` rather than
+    // `find_subslice`, so a later folder name containing an
+    // `"archive_disabled":`-looking substring cannot fool it. The bool value
+    // MUST be followed by `,` — screen_capture_protection is mandatory and
+    // canonically last, so a further field always follows.
+    let archive_marker = b"\"archive_disabled\":";
+    let (archive_disabled, post_archive) = match post_active.strip_prefix(archive_marker) {
+        Some(after) => {
+            let (val, after_val) = if let Some(r) = after.strip_prefix(b"true") {
+                (true, r)
+            } else if let Some(r) = after.strip_prefix(b"false") {
+                (false, r)
+            } else {
+                return Err(PrefsBlobError::PlaintextParseFailed);
+            };
+            let rest = after_val
+                .strip_prefix(b",")
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            (Some(val), rest)
+        }
+        None => (None, post_active),
+    };
+
+    // ---- auto_lock_seconds (optional, after archive_disabled) ----
     // Canonical key order is auto_lock_seconds < deliberate_folders <
-    // screen_capture_protection (and after active_workspace), so when present
-    // this field is a literal PREFIX of the post-active_workspace bytes —
+    // screen_capture_protection (and after archive_disabled), so when present
+    // this field is a literal PREFIX of the post-archive_disabled bytes —
     // matched by `strip_prefix` rather than `find_subslice`, so a later folder
     // name containing a `"auto_lock_seconds":`-looking substring cannot fool it.
     let auto_marker = b"\"auto_lock_seconds\":";
-    let (auto_lock_seconds, rest) = match post_active.strip_prefix(auto_marker) {
+    let (auto_lock_seconds, rest) = match post_archive.strip_prefix(auto_marker) {
         Some(after) => {
             let (val, consumed) = parse_json_uint(after)?;
             // The integer MUST be followed by `,` — screen_capture_protection
@@ -1501,6 +1554,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         item_order,
         keymap,
         active_workspace,
+        archive_disabled,
         editor_layout,
         editor_line_numbers,
         editor_content_width,
@@ -2235,6 +2289,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -2275,6 +2330,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -2438,6 +2494,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -2480,6 +2537,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -2836,6 +2894,86 @@ mod tests {
         }
     }
 
+    // ---- archive_disabled (archive-disable, MYND-…) --------------------
+
+    #[test]
+    fn encode_omits_archive_disabled_when_none_byte_identical_to_pre_feature() {
+        // A vault that never touched the archive toggle encodes byte-identically
+        // to the bare pre-feature form (migration-less additive field — existing
+        // golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView {
+            archive_disabled: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_archive_disabled_between_active_workspace_and_auto_lock() {
+        // Canonical key order: active_workspace < archive_disabled <
+        // auto_lock_seconds (`ac` < `ar` < `au`).
+        let on = canonical_json_encode(&PrefsView {
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            on.as_slice(),
+            br#"{"archive_disabled":true,"screen_capture_protection":true}"#,
+        );
+        // The non-default `false` is persisted explicitly (Some(false) != None).
+        let off = canonical_json_encode(&PrefsView {
+            archive_disabled: Some(false),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            off.as_slice(),
+            br#"{"archive_disabled":false,"screen_capture_protection":true}"#,
+        );
+        // With active_workspace + auto_lock_seconds present, the new key sorts
+        // strictly between them.
+        let with_neighbors = canonical_json_encode(&PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-1")),
+            archive_disabled: Some(true),
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        });
+        let s = core::str::from_utf8(&with_neighbors).unwrap();
+        let aw = s.find("active_workspace").unwrap();
+        let ar = s.find("archive_disabled").unwrap();
+        let al = s.find("auto_lock_seconds").unwrap();
+        assert!(aw < ar && ar < al, "canonical order: {s}");
+    }
+
+    #[test]
+    fn archive_disabled_round_trips_through_decode() {
+        for value in [Some(true), Some(false), None] {
+            let original = PrefsView {
+                archive_disabled: value,
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded, original);
+            assert_eq!(decoded.archive_disabled, value);
+        }
+    }
+
+    #[test]
+    fn archive_disabled_round_trips_alongside_neighbors() {
+        // Exercise the strip_prefix decode path with both canonical neighbors
+        // present, so a regression in the post_active → post_archive threading
+        // (e.g. auto_lock_seconds stripping from the wrong slice) is caught.
+        let original = PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-1")),
+            archive_disabled: Some(true),
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
     // ---- active_workspace (MYND-308) -----------------------------------
 
     #[test]
@@ -3127,6 +3265,7 @@ mod tests {
             editor_line_numbers: None,
             theme: Some(ThemeChoice::Dark),
             active_workspace: None,
+            archive_disabled: None,
             editor_content_width: None,
             editor_default_view_mode: None,
             editor_focus_dim_inactive: None,
@@ -3400,6 +3539,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3447,6 +3587,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3492,6 +3633,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3536,6 +3678,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3643,6 +3786,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3715,6 +3859,7 @@ mod tests {
                 alloc::string::String::from("n2"),
             ],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3766,6 +3911,7 @@ mod tests {
                 alloc::string::String::from("zzz"),
             ],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3852,6 +3998,7 @@ mod tests {
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
             ],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3914,6 +4061,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3976,6 +4124,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4020,6 +4169,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4066,6 +4216,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4180,6 +4331,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4268,6 +4420,7 @@ mod tests {
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: Some(sample_layout()),
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4546,6 +4699,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4594,6 +4748,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4903,6 +5058,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -4944,6 +5100,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -4999,6 +5156,7 @@ mod tests {
             active_workspace: Some(alloc::string::String::from(
                 "0190a000-0000-7000-8000-0000000000ff",
             )),
+            archive_disabled: None,
             editor_layout: Some(EditorLayout {
                 left_width: 312,
                 right_width: 288,
@@ -5931,6 +6089,99 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write line_numbers prefs vector dump");
+    }
+
+    /// Generator for the `archive_disabled` (archive-disable) vector cases —
+    /// appended to the companion repo's `vault-prefs` family (per-feature
+    /// generator, keeps the originals byte-stable — the
+    /// [`emit_line_numbers_prefs_vector`] pattern):
+    ///
+    /// `cargo test -p protocol --lib emit_archive_disabled_prefs_vector -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
+    /// optional archive-disable toggle (`archive_disabled: Some(true)` → canonical
+    /// `"archive_disabled":true`). Pins the bool encoding and its canonical key
+    /// slot (after `active_workspace`, before `auto_lock_seconds`) plus the
+    /// round-trip back through the decoder. Nonce `0xA7` is a free entry in the
+    /// family's nonce registry. Omit-when-`None` keeps an untouched vault
+    /// byte-identical to a pre-feature blob (no encrypt case needed for that —
+    /// `encrypt-default` already pins the bare form).
+    #[test]
+    #[ignore]
+    fn emit_archive_disabled_prefs_vector() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xA7; AEAD_NONCE_LEN];
+        let prefs = PrefsView {
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"archive_disabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "canonical plaintext must place archive_disabled before screen_capture_protection as a bare bool",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode archive_disabled");
+        // Round-trip self-validation.
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+        assert_eq!(decoded.archive_disabled, Some(true));
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin archive_disabled prefs vectors (archive-disable)---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-archive-disabled\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-archive-disabled (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!("input_blob_hex: {}\n", hex_lower(&blob)));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"archive_disabled\": true, \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str("---end archive_disabled prefs vectors---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_archive_disabled_vector.txt",
+            dump.as_bytes(),
+        )
+        .expect("write archive_disabled prefs vector dump");
     }
 
     /// Generator for the batch editor-prefs (MYND-308 / MYND-299 / MYND-348)

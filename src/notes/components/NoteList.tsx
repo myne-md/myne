@@ -853,6 +853,13 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // archive raft); memoized on cache identity like `trashCount`.
   const [archiveOpen, setArchiveOpen] = useState(false);
   const archiveCount = useMemo(() => archivedCount(ctx.cache), [ctx.cache]);
+  // Archive-feature disable toggle (archive-disable, MYND-…): when on, the
+  // archive entry points (footer button, context-menu actions) are hidden. The
+  // viewer footer stays available while any archived note still exists so a note
+  // can never be stranded — but disabling auto-empties the archive, so in the
+  // normal flow `archiveCount` is already 0. `viewsPrefs` is nonce-aware, so the
+  // toggle re-renders these surfaces live.
+  const archiveDisabled = viewsPrefs.archive_disabled ?? false;
 
   // F2 global keymap → enter inline-rename on the selected row.
   useEffect(() => {
@@ -967,19 +974,21 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
             <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
           )}
         </button>
-        <button
-          type="button"
-          style={FOOTER_ENTRY_STYLE}
-          data-testid="notes.archive-open"
-          onClick={() => setArchiveOpen(true)}
-          title="Open the archive"
-        >
-          <Icon name="archive" size={15} />
-          <span>Archive</span>
-          {archiveCount > 0 && (
-            <span style={TRASH_COUNT_BADGE_STYLE}>{archiveCount}</span>
-          )}
-        </button>
+        {(!archiveDisabled || archiveCount > 0) && (
+          <button
+            type="button"
+            style={FOOTER_ENTRY_STYLE}
+            data-testid="notes.archive-open"
+            onClick={() => setArchiveOpen(true)}
+            title="Open the archive"
+          >
+            <Icon name="archive" size={15} />
+            <span>Archive</span>
+            {archiveCount > 0 && (
+              <span style={TRASH_COUNT_BADGE_STYLE}>{archiveCount}</span>
+            )}
+          </button>
+        )}
       </div>
       <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
       <ArchivePanel open={archiveOpen} onClose={() => setArchiveOpen(false)} />
@@ -1143,6 +1152,12 @@ function PopulatedList({
   showTimestamps: boolean;
 }) {
   const ctx = useSelectedNote();
+  // Archive-feature disable toggle (archive-disable, MYND-…): hides the archive
+  // context-menu actions when on. `usePrefs` is nonce-aware, so flipping the
+  // Settings toggle re-renders the menu live. (Read here rather than threaded as
+  // a prop — same independent-`usePrefs` pattern as the parent sidebar list.)
+  const { prefs: rowPrefs } = usePrefs();
+  const archiveDisabled = rowPrefs.archive_disabled ?? false;
   // SYNC-9 exclusive active-state (MYND-164): opening a note from the sidebar
   // returns the center pane to the editor. The `selectedId`-keyed effect in
   // Editor.tsx covers note-to-note switches; this explicit reset also handles
@@ -1609,11 +1624,16 @@ function PopulatedList({
           label: `Move ${selCount} notes to…`,
           onSelect: () => setMoveTarget({ x: menu.x, y: menu.y }),
         },
-        {
-          id: "bulk-archive",
-          label: `Arşivle ${selCount} not`,
-          onSelect: () => void handleBulkArchive(),
-        },
+        // Archiving disabled → no "archive these" entry (the feature is hidden).
+        ...(archiveDisabled
+          ? []
+          : [
+              {
+                id: "bulk-archive",
+                label: `Arşivle ${selCount} not`,
+                onSelect: () => void handleBulkArchive(),
+              },
+            ]),
         {
           id: "bulk-delete",
           label: `Delete ${selCount} notes`,
@@ -1739,13 +1759,18 @@ function PopulatedList({
             ),
           ),
       },
-      {
-        // Archive (MYND-331): pull the note out of the working set into the
-        // indefinite-retention Archive section. Near Delete, but not destructive.
-        id: "archive",
-        label: "Arşivle",
-        onSelect: () => void handleArchive(menu.id),
-      },
+      // Archive (MYND-331): pull the note out of the working set into the
+      // indefinite-retention Archive section. Near Delete, but not destructive.
+      // Hidden entirely when archiving is disabled (archive-disable, MYND-…).
+      ...(archiveDisabled
+        ? []
+        : [
+            {
+              id: "archive",
+              label: "Arşivle",
+              onSelect: () => void handleArchive(menu.id),
+            },
+          ]),
       {
         id: "delete",
         label: "Delete",
@@ -1760,6 +1785,7 @@ function PopulatedList({
     handleArchive,
     handleBulkDelete,
     handleBulkArchive,
+    archiveDisabled,
     fm,
     favSet,
     openNote,

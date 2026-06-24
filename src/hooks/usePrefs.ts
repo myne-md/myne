@@ -60,6 +60,7 @@ const DEFAULT_PREFS: PrefsView = {
   editor_line_spacing: null,
   editor_text_size: null,
   editor_line_numbers: null,
+  archive_disabled: null,
   theme: null,
   folder_icons: {},
   hidden_bar_items: [],
