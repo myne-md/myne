@@ -201,6 +201,12 @@ pub fn run() {
         use tauri::Manager;
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.unminimize();
+            // `show()` is load-bearing, not redundant with `unminimize()`:
+            // auto-lock on idle calls `window.hide()` (orderOut on macOS), which
+            // leaves the window HIDDEN rather than minimized. `unminimize()` is a
+            // no-op on a hidden window, so without `show()` the window stays
+            // invisible after a re-launch. See `auto_lock::hide_window`.
+            let _ = window.show();
             let _ = window.set_focus();
         }
     }));
@@ -354,6 +360,23 @@ pub fn run() {
             // since-last-flush delta), so any failure here is swallowed. The
             // brief `block_on` is acceptable on the exit path (the run
             // callback is the main event-loop thread, not a tokio worker).
+            // macOS: clicking the dock icon (or File → New Window) while the app
+            // has no visible window fires `Reopen`, NOT the single-instance
+            // callback (no new process is spawned). After auto-lock on idle hides
+            // the window (`auto_lock::hide_window` → `orderOut`), this is the only
+            // path that brings the (locked) unlock screen back. Without it the
+            // window stays hidden and the app looks frozen in the dock. Re-show +
+            // focus the existing main window; screen-capture protection is already
+            // re-applied at the lock site, so no plaintext is re-exposed.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                use tauri::Manager;
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.unminimize();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 use tauri::Manager;
                 if let Some(state) =
