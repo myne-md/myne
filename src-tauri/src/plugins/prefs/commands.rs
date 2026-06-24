@@ -426,6 +426,59 @@ pub(crate) async fn set_editor_line_numbers_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `archive_disabled` toggle (archive-disable,
+/// MYND-…). Read-modify-write under the per-plugin write mutex; no native
+/// side-effect (like `set_editor_line_numbers`). Always persists an explicit
+/// `Some(enabled)` — the default-OFF policy (archiving enabled) is a host
+/// read-time concern, not a stored value. Non-load-bearing → no clamp. The
+/// auto-unarchive of existing archived notes when the toggle flips ON is a
+/// WebView-side orchestration concern (runs before this setter); this command
+/// only persists the flag.
+#[tauri::command]
+pub async fn set_archive_disabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_archive_disabled_with_dir(&dir, state.inner(), enabled).await
+}
+
+/// Testable core of [`set_archive_disabled`].
+pub(crate) async fn set_archive_disabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.archive_disabled = Some(enabled);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "archive_disabled",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `active_workspace` slot id (MYND-308) —
 /// the workspace slot the editor restores on unlock, or `None` to clear back to
 /// the host default. Read-modify-write under the per-plugin write mutex; no
@@ -1923,6 +1976,7 @@ mod tests {
                     item_order: Vec::new(),
                     keymap: Default::default(),
                     active_workspace: None,
+                    archive_disabled: None,
                     editor_layout: None,
                     editor_line_numbers: None,
                     editor_content_width: None,
@@ -2842,6 +2896,52 @@ mod tests {
                 .await
                 .expect("read after off");
             assert_eq!(view.editor_line_numbers, Some(false));
+        });
+    }
+
+    // ---- archive_disabled setter (archive-disable, MYND-…) ------------
+
+    #[test]
+    fn set_archive_disabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-archive-disabled-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_archive_disabled_with_dir(tmp.path(), &state, true).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn archive_disabled_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x47).await;
+
+            // Default (no write yet) reads back as `None` (host default-OFF —
+            // archiving enabled).
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read default");
+            assert_eq!(view.archive_disabled, None);
+
+            // Turn ON persists (disk-first) + round-trips.
+            set_archive_disabled_with_dir(tmp.path(), &state, true)
+                .await
+                .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after on");
+            assert_eq!(view.archive_disabled, Some(true));
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Turn OFF overwrites (explicit Some(false), not back to None).
+            set_archive_disabled_with_dir(tmp.path(), &state, false)
+                .await
+                .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after off");
+            assert_eq!(view.archive_disabled, Some(false));
         });
     }
 

@@ -28,8 +28,10 @@ import { deleteNote } from "./deleteNote";
 import {
   archiveNote,
   bulkArchiveNotes,
+  bulkUnarchiveNotes,
   unarchiveNote,
   type BulkArchiveResult,
+  type BulkUnarchiveResult,
 } from "./archiveNote";
 import { duplicateNote } from "./duplicateNote";
 import { emptyTrash, type EmptyTrashResult } from "./emptyTrash";
@@ -673,6 +675,9 @@ export type UseSelectedNoteReturn = {
   unarchiveWithRollback: (id: NoteId) => Promise<void>;
   /** Archive every id at once (MYND-367 bulk archive); optimistic + rollback. */
   bulkArchiveWithSync: (ids: readonly NoteId[]) => Promise<BulkArchiveResult>;
+  bulkUnarchiveWithSync: (
+    ids: readonly NoteId[],
+  ) => Promise<BulkUnarchiveResult>;
   /** Permanently delete every id (empty trash); drops purged ids from the cache. */
   emptyTrashWithSync: (ids: readonly NoteId[]) => Promise<EmptyTrashResult>;
   /** Soft-trash every id at once (e.g. a non-empty folder delete); optimistic + rollback. */
@@ -1089,6 +1094,44 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
+  // Unarchive every id in `ids` at once — the bulk restore behind the
+  // "disable archiving" settings toggle, which empties the Archive so no note
+  // is left inaccessible once its entry points are hidden. Optimistically clears
+  // the `archived:` marker on all rows (they re-enter the live tree at once),
+  // restores them best-effort via `bulkUnarchiveNotes`, refreshes the survivors,
+  // and rolls back any that failed. Inverse twin of `bulkArchiveWithSync`.
+  const bulkUnarchiveWithSync = useCallback(
+    async (ids: readonly NoteId[]): Promise<BulkUnarchiveResult> => {
+      if (ids.length === 0) return { unarchived: [], failed: [] };
+      const snapshots = new Map<NoteId, ArchivedFlagSnapshot>();
+      setState((prev) => {
+        let next = prev;
+        for (const id of ids) {
+          const result = applyOptimisticArchivedFlag(next, id, null);
+          snapshots.set(id, result.snapshot);
+          next = result.next;
+        }
+        return next;
+      });
+      const result = await bulkUnarchiveNotes([...ids]);
+      if (result.failed.length > 0) {
+        setState((prev) => {
+          let next = prev;
+          for (const { noteId } of result.failed) {
+            const snap = snapshots.get(noteId);
+            if (snap !== undefined) {
+              next = rollbackOptimisticArchivedFlag(next, noteId, snap);
+            }
+          }
+          return next;
+        });
+      }
+      await Promise.allSettled(result.unarchived.map((id) => refreshOne(id)));
+      return result;
+    },
+    [refreshOne],
+  );
+
   // Move every id to `folder` (or root) at once (MYND-367 bulk move). Best-
   // effort via `bulkMoveNotes` (folder-move is not correctness-critical, Q4) —
   // no optimistic pre-write is needed (a move only relocates rows within the
@@ -1144,6 +1187,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       archiveWithRollback,
       unarchiveWithRollback,
       bulkArchiveWithSync,
+      bulkUnarchiveWithSync,
       emptyTrashWithSync,
       bulkTrashWithSync,
       bulkMoveWithSync,
@@ -1170,6 +1214,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       archiveWithRollback,
       unarchiveWithRollback,
       bulkArchiveWithSync,
+      bulkUnarchiveWithSync,
       emptyTrashWithSync,
       bulkTrashWithSync,
       bulkMoveWithSync,
