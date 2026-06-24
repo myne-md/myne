@@ -1586,7 +1586,6 @@ function EditorChrome({
           handleDeleteWorkspace();
         }}
       />
-      <CommandPaletteHotkey onToggle={() => setPaletteOpen((v) => !v)} />
       {/* Browser-extension clip dispatch listener (desktop-ingest, MYND-442,
           TB10). Mounted here — inside the workspace providers — so the success
           notice's "view" affordance opens the newly-clipped note via the
@@ -1611,6 +1610,7 @@ function EditorChrome({
         focusActive={focusActive}
         onToggleFocus={toggleFocus}
         onExitFocus={exitFocus}
+        onTogglePalette={() => setPaletteOpen((v) => !v)}
       />
       <NoteExportModal
         open={exportPreflight !== null}
@@ -2045,47 +2045,6 @@ function CommandPaletteHost({
 }
 
 /**
- * Global window-level keydown listener for the unified command palette
- * (MYND-86 + MYND-40). Sits outside the editor's CM6 keymap so it works
- * regardless of which pane has focus (sidebar, settings rail, etc.).
- *
- * `Cmd/Ctrl+K` and `Cmd/Ctrl+P` BOTH toggle the same palette — it shows
- * commands + note search together, so there is no separate mode to enter.
- * `preventDefault` (which fires for both) also suppresses the WebView's native
- * Print dialog on Cmd+P.
- */
-function CommandPaletteHotkey({ onToggle }: { onToggle: () => void }) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (e.key !== "k" && e.key !== "K" && e.key !== "p" && e.key !== "P") {
-        return;
-      }
-      // Skip when typing inside an input or contenteditable field whose
-      // intent is to capture all keystrokes (e.g., rename input, URL
-      // overlay input). Editor's contentDOM IS contenteditable but the
-      // palette should still open from there — special-case by checking
-      // for the `.cm-content` class.
-      const target = e.target as HTMLElement | null;
-      if (target !== null) {
-        const tag = target.tagName.toLowerCase();
-        if (
-          (tag === "input" || tag === "textarea") &&
-          !target.classList.contains("cm-content")
-        ) {
-          return;
-        }
-      }
-      e.preventDefault();
-      onToggle();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onToggle]);
-  return null;
-}
-
-/**
  * Initial-boot sidebar refresh: `note_list` → chunked `loadNoteBatch`
  * → cache populate. Runs once on mount inside the provider tree.
  *
@@ -2161,10 +2120,12 @@ function WorkspaceHotkeys({
   focusActive,
   onToggleFocus,
   onExitFocus,
+  onTogglePalette,
 }: {
   focusActive: boolean;
   onToggleFocus: () => void;
   onExitFocus: () => void;
+  onTogglePalette: () => void;
 }) {
   const ws = useWorkspace();
   const ctx = useSelectedNote();
@@ -2219,8 +2180,14 @@ function WorkspaceHotkeys({
       },
       // focus-mode (MYND-348): distraction-free toggle (default Mod-Shift-f).
       { id: "view.toggle-focus", scope: {}, run: () => onToggleFocus() },
+      // command-palette (MYND-86 + MYND-40): default Mod-k / Mod-p, both toggle
+      // the same unified palette. `scope: {}` reproduces the old hardcoded
+      // listener's gate exactly — stands down in plain inputs (rename/search),
+      // stays live inside the CM6 editor surface. The dispatcher's preventDefault
+      // also suppresses the WebView's native Print dialog on Cmd+P.
+      { id: "palette.toggle", scope: {}, run: () => onTogglePalette() },
     ];
-  }, [ws, ctx, onToggleFocus]);
+  }, [ws, ctx, onToggleFocus, onTogglePalette]);
 
   useKeybindDispatcher({
     entries,

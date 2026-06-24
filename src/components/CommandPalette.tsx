@@ -1,7 +1,9 @@
 // Global command palette modal — MYND-86 + MYND-40.
 //
-// Keyboard-first entry point. `Cmd/Ctrl+K` or `Cmd/Ctrl+P` opens it (both toggle
-// the same palette). As you type, results appear in two fixed sections:
+// Keyboard-first entry point. The `palette.toggle` command opens it — default
+// `Cmd/Ctrl+K` or `Cmd/Ctrl+P` (both toggle the same palette), rebindable via
+// Settings → Hotkeys like any other window command. As you type, results appear
+// in two fixed sections:
 // COMMANDS (the typed action registry, frontend fuzzy — instant) and NOTES
 // (backend full-text `note_search`, BM25, debounced). Arrow keys navigate across
 // both sections, Enter runs the highlighted row (run a command / open a note),

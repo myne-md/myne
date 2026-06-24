@@ -39,6 +39,11 @@ export interface BindableCommand {
 // Order within the array is the in-group display order.
 export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   // General
+  // command-palette (MYND-86 + MYND-40): the unified palette toggle. Cmd/Ctrl+K
+  // and Cmd/Ctrl+P both open the same palette by default — two conventional
+  // chords (command-palette vs quick-open) folded onto one command. Rebindable
+  // like any other window command (was a hardcoded window listener before).
+  { id: "palette.toggle", label: "Open command palette", group: "General", defaultBindings: ["Mod-k", "Mod-p"], rebindable: true },
   { id: "app.open-settings", label: "Open settings", group: "General", defaultBindings: ["Mod-,"], rebindable: true },
 
   // Notes
