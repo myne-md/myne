@@ -368,4 +368,248 @@ mod tests {
         recover_pending_rename(d.path()).unwrap();
         assert_eq!(read(&d.path().join("a.myn")).as_deref(), Some(&b"AAA"[..]));
     }
+
+    // ---- cross-impl conformance vectors (companion repo) --------------
+
+    /// One rename-journal recovery scenario: a directory snapshot
+    /// (`files`) and the expected snapshot after `recover_pending_rename`.
+    struct RjScenario {
+        slug: &'static str,
+        kind: &'static str,
+        desc: &'static str,
+        /// `(name, content)` — `.rename-journal` (empty) is the marker;
+        /// `*.myn.tmp` are staged blobs; `*.myn` are committed blobs.
+        files: &'static [(&'static str, &'static [u8])],
+    }
+
+    const RJ_SCENARIOS: &[RjScenario] = &[
+        RjScenario {
+            slug: "roll-forward-marker-present",
+            kind: "roll_forward",
+            desc: "The marker is durable, so every staged .myn.tmp is rolled FORWARD to .myn and the marker is cleared. A pre-existing committed .myn is untouched.",
+            files: &[
+                (".rename-journal", b""),
+                ("a.myn.tmp", b"NEW-A"),
+                ("b.myn.tmp", b"NEW-B"),
+                ("c.myn", b"OLD-C"),
+            ],
+        },
+        RjScenario {
+            slug: "roll-forward-replaces-existing",
+            kind: "roll_forward",
+            desc: "Roll-forward replaces a pre-existing committed .myn with its staged .myn.tmp content (the in-place note-update path).",
+            files: &[
+                (".rename-journal", b""),
+                ("a.myn.tmp", b"NEW-A"),
+                ("a.myn", b"OLD-A"),
+            ],
+        },
+        RjScenario {
+            slug: "roll-back-no-marker",
+            kind: "roll_back",
+            desc: "Without the marker the crash happened before the durability fence, so every staged .myn.tmp is rolled BACK (deleted) and the pre-existing committed .myn survives.",
+            files: &[
+                ("a.myn.tmp", b"NEW-A"),
+                ("b.myn.tmp", b"NEW-B"),
+                ("c.myn", b"OLD-C"),
+            ],
+        },
+        RjScenario {
+            slug: "noop-clean-dir",
+            kind: "noop",
+            desc: "A clean directory (no marker, no .tmp) is unchanged by recovery.",
+            files: &[("a.myn", b"AAA"), ("b.myn", b"BBB")],
+        },
+    ];
+
+    fn hex_lower(bytes: &[u8]) -> String {
+        let mut s = String::with_capacity(bytes.len() * 2);
+        for b in bytes {
+            s.push_str(&format!("{b:02x}"));
+        }
+        s
+    }
+
+    /// Snapshot a directory as a name-sorted `[(name, bytes)]` list. The
+    /// rename journal has no inherent file order (POSIX `readdir` is
+    /// unordered), so the snapshot is a SET keyed by name.
+    fn snapshot_dir(dir: &Path) -> Vec<(String, Vec<u8>)> {
+        let mut out: Vec<(String, Vec<u8>)> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| {
+                let p = e.unwrap().path();
+                let name = p.file_name().unwrap().to_string_lossy().into_owned();
+                (name, std::fs::read(&p).unwrap())
+            })
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
+    }
+
+    fn files_to_json(files: &[(String, Vec<u8>)]) -> serde_json::Value {
+        serde_json::Value::Array(
+            files
+                .iter()
+                .map(|(name, bytes)| {
+                    serde_json::json!({ "name": name, "content_hex": hex_lower(bytes) })
+                })
+                .collect(),
+        )
+    }
+
+    /// Emits `myne-test-vectors/vectors/rename-journal/v0.1/cases.json` to
+    /// `/tmp/myne_rename_journal_vectors.json`. `#[ignore]` — regenerating
+    /// vectors is a deliberate act. Run with:
+    /// `cargo test -p myne-desktop --lib emit_rename_journal_vectors_for_paste -- --ignored`
+    ///
+    /// Pins `recover_pending_rename` (the §9.12 rename-journal crash-recovery
+    /// state machine) as an fs-state conformance fixture: a directory snapshot
+    /// → the snapshot after recovery. Self-validating at mint (each emitted
+    /// expected snapshot is the live recovery output; recovery is re-run to
+    /// confirm idempotency).
+    #[test]
+    #[ignore]
+    fn emit_rename_journal_vectors_for_paste() {
+        let mut cases = Vec::new();
+        for sc in RJ_SCENARIOS {
+            let d = ScopedTempDir::new("gen-rj").unwrap();
+            let dir = d.path();
+            for (name, content) in sc.files {
+                std::fs::write(dir.join(name), content).unwrap();
+            }
+            recover_pending_rename(dir).unwrap();
+            let recovered = snapshot_dir(dir);
+            // Idempotency self-check: a second recovery is a fixed point.
+            recover_pending_rename(dir).unwrap();
+            assert_eq!(
+                snapshot_dir(dir),
+                recovered,
+                "[{}] recovery is not idempotent",
+                sc.slug
+            );
+
+            let input: Vec<(String, Vec<u8>)> = sc
+                .files
+                .iter()
+                .map(|(n, b)| ((*n).to_string(), b.to_vec()))
+                .collect();
+            let mut input_sorted = input.clone();
+            input_sorted.sort_by(|a, b| a.0.cmp(&b.0));
+
+            cases.push(serde_json::json!({
+                "vector_id": format!("rename-journal/v0.1/{}", sc.slug),
+                "description": sc.desc,
+                "case_kind": sc.kind,
+                "input_dir_files": files_to_json(&input_sorted),
+                "expected_dir_files": files_to_json(&recovered),
+            }));
+        }
+
+        let doc = serde_json::json!({
+            "schema": "rename-journal",
+            "protocol_version": "v0.1",
+            "spec_section": "protocol.md §9.12 (transactional multi-note rename — the rename journal)",
+            "description": "Pins note_txn::recover_pending_rename — the §9.12 rename-journal crash-recovery state machine — as an fs-state conformance fixture. NOT a byte-output codec: the .rename-journal marker is content-free and POSIX readdir is unordered, so each case pins a directory SNAPSHOT (a name-sorted set of {name, content_hex}) before and after recovery. The marker's presence is the only durability signal: present → roll FORWARD (every *.myn.tmp renamed to *.myn, marker cleared); absent → roll BACK (every *.myn.tmp deleted). A port materializes input_dir_files in a fresh directory, runs its recovery, and asserts the resulting set equals expected_dir_files. Generator + runner live in src-tauri/src/note_txn.rs (the codec is std/fs-bound, like backup-container). Cases generated by `cargo test -p myne-desktop --lib emit_rename_journal_vectors_for_paste -- --ignored`.",
+            "cases": cases,
+        });
+        std::fs::write(
+            "/tmp/myne_rename_journal_vectors.json",
+            serde_json::to_string_pretty(&doc).unwrap() + "\n",
+        )
+        .unwrap();
+        eprintln!("[ok] wrote /tmp/myne_rename_journal_vectors.json");
+    }
+
+    #[test]
+    fn rename_journal_vectors() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("myne-test-vectors")
+            .join("vectors")
+            .join("rename-journal")
+            .join("v0.1")
+            .join("cases.json");
+        if !path.exists() {
+            eprintln!(
+                "[skip] rename-journal: companion repo fixture not present at {}",
+                path.display()
+            );
+            return;
+        }
+
+        let raw = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let doc: serde_json::Value =
+            serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        assert_eq!(doc["schema"], "rename-journal");
+        assert_eq!(doc["protocol_version"], "v0.1");
+
+        let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+        assert!(
+            !cases.is_empty(),
+            "rename-journal must have at least one case"
+        );
+
+        let hex_decode = |s: &str| -> Vec<u8> {
+            assert!(s.len().is_multiple_of(2), "hex length must be even");
+            (0..s.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("ascii hex"))
+                .collect()
+        };
+        let materialize = |dir: &Path, files: &serde_json::Value| {
+            for f in files.as_array().expect("dir_files must be an array") {
+                let name = f["name"].as_str().expect("file name string");
+                let content = hex_decode(f["content_hex"].as_str().expect("content_hex string"));
+                std::fs::write(dir.join(name), content).expect("materialize file");
+            }
+        };
+        let expected_set = |files: &serde_json::Value| -> Vec<(String, Vec<u8>)> {
+            let mut v: Vec<(String, Vec<u8>)> = files
+                .as_array()
+                .expect("dir_files must be an array")
+                .iter()
+                .map(|f| {
+                    (
+                        f["name"].as_str().expect("name").to_string(),
+                        hex_decode(f["content_hex"].as_str().expect("content_hex")),
+                    )
+                })
+                .collect();
+            v.sort_by(|a, b| a.0.cmp(&b.0));
+            v
+        };
+
+        let mut seen_kinds = std::collections::HashSet::new();
+        for case in cases {
+            let id = case["vector_id"].as_str().expect("vector_id string");
+            seen_kinds.insert(
+                case["case_kind"]
+                    .as_str()
+                    .expect("case_kind string")
+                    .to_string(),
+            );
+
+            let d = ScopedTempDir::new("rj-vec").unwrap();
+            let dir = d.path();
+            materialize(dir, &case["input_dir_files"]);
+            recover_pending_rename(dir).unwrap_or_else(|e| panic!("[{id}] recovery failed: {e}"));
+            let got = snapshot_dir(dir);
+            let want = expected_set(&case["expected_dir_files"]);
+            assert_eq!(
+                got, want,
+                "[{id}] post-recovery directory snapshot mismatch"
+            );
+
+            // Idempotency: a second recovery leaves the snapshot unchanged.
+            recover_pending_rename(dir).unwrap();
+            assert_eq!(snapshot_dir(dir), want, "[{id}] recovery is not idempotent");
+        }
+        for kind in ["roll_forward", "roll_back", "noop"] {
+            assert!(
+                seen_kinds.contains(kind),
+                "rename-journal missing every case of case_kind '{kind}' — coverage regression"
+            );
+        }
+    }
 }
