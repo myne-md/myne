@@ -4300,3 +4300,177 @@ fn note_template_vectors() {
         "note-template vectors must include the single-pass pin (a render case whose ctx value contains a {{{{token}}}} shape that stays literal)"
     );
 }
+
+#[test]
+fn saved_view_vectors() {
+    use protocol::{canonical_encode_saved_views, parse_saved_views_array, SavedViewParseError};
+
+    let path = companion_vectors_root()
+        .join("saved-view")
+        .join("v0.1")
+        .join("cases.json");
+    if !path.exists() {
+        eprintln!(
+            "[skip] saved-view: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    assert_eq!(doc["schema"], "saved-view");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty(), "saved-view must have at least one case");
+    assert_unique_vector_ids("saved-view", cases);
+
+    // Mirror of `saved_view::tests::vector_error_str`. `SavedViewParseError` is
+    // `#[non_exhaustive]`, so across the crate boundary this match needs a
+    // catch-all — a new variant lands a vector string here and in the generator.
+    fn err_str(e: &SavedViewParseError) -> &'static str {
+        match e {
+            SavedViewParseError::Malformed => "malformed",
+            SavedViewParseError::MissingField => "missing_field",
+            SavedViewParseError::WrongType => "wrong_type",
+            SavedViewParseError::Unrepresentable => "unrepresentable",
+            other => panic!("unmapped SavedViewParseError variant {other:?} — extend err_str"),
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        let input = hex_decode(field(case, id, "input_bytes_utf8_hex"));
+        match kind {
+            "parse_ok" => {
+                seen.insert("parse_ok");
+                let (views, consumed) = parse_saved_views_array(&input)
+                    .unwrap_or_else(|e| panic!("[{id}] parse_ok input did not parse: {e:?}"));
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+                assert_eq!(
+                    hex_encode(&canonical_encode_saved_views(&views)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch"
+                );
+            }
+            "parse_fail" => {
+                seen.insert("parse_fail");
+                let got = parse_saved_views_array(&input)
+                    .expect_err(&format!("[{id}] parse_fail input parsed Ok"));
+                assert_eq!(
+                    err_str(&got),
+                    field(case, id, "expected_error"),
+                    "[{id}] error variant mismatch"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+    for kind in ["parse_ok", "parse_fail"] {
+        assert!(
+            seen.contains(kind),
+            "saved-view missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+}
+
+#[test]
+fn paired_extension_vectors() {
+    use protocol::{
+        canonical_encode_paired_extensions, parse_paired_extensions_array,
+        PairedExtensionParseError,
+    };
+
+    let path = companion_vectors_root()
+        .join("paired-extension")
+        .join("v0.1")
+        .join("cases.json");
+    if !path.exists() {
+        eprintln!(
+            "[skip] paired-extension: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    assert_eq!(doc["schema"], "paired-extension");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "paired-extension must have at least one case"
+    );
+    assert_unique_vector_ids("paired-extension", cases);
+
+    fn err_str(e: &PairedExtensionParseError) -> &'static str {
+        match e {
+            PairedExtensionParseError::Malformed => "malformed",
+            PairedExtensionParseError::MissingField => "missing_field",
+            PairedExtensionParseError::WrongType => "wrong_type",
+            other => {
+                panic!("unmapped PairedExtensionParseError variant {other:?} — extend err_str")
+            }
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        let input = hex_decode(field(case, id, "input_bytes_utf8_hex"));
+        match kind {
+            "parse_ok" => {
+                seen.insert("parse_ok");
+                let (records, consumed) = parse_paired_extensions_array(&input)
+                    .unwrap_or_else(|e| panic!("[{id}] parse_ok input did not parse: {e:?}"));
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+                assert_eq!(
+                    hex_encode(&canonical_encode_paired_extensions(&records)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch"
+                );
+            }
+            "parse_fail" => {
+                seen.insert("parse_fail");
+                let got = parse_paired_extensions_array(&input)
+                    .expect_err(&format!("[{id}] parse_fail input parsed Ok"));
+                assert_eq!(
+                    err_str(&got),
+                    field(case, id, "expected_error"),
+                    "[{id}] error variant mismatch"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+    for kind in ["parse_ok", "parse_fail"] {
+        assert!(
+            seen.contains(kind),
+            "paired-extension missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+}
