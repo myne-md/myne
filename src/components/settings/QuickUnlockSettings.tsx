@@ -208,19 +208,6 @@ export function QuickUnlockSettings() {
         </div>
       )}
 
-      {configured && (
-        <div style={ACTIONS_STYLE}>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void onDisable()}
-            data-testid="settings.quick-unlock-disable"
-          >
-            Turn off
-          </Button>
-        </div>
-      )}
-
       {error && (
         <p style={{ ...HELPER_STYLE, color: "var(--danger, #c0392b)" }} role="alert">
           {error}
