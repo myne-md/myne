@@ -197,6 +197,10 @@ export function TabStrip({
       onDrop={handleDrop}
     >
       <div
+        // Transparent to the a11y tree so the `role="tab"` children below are
+        // owned directly by the `role="tablist"` parent — without this the
+        // generic wrapper breaks axe's `aria-required-children` (MYND-93).
+        role="presentation"
         style={
           stacked
             ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative

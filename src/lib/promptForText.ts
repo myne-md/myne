@@ -10,6 +10,7 @@
 // commands (MYND-308), kept generic so other text prompts can reuse it.
 
 import i18n from "../i18n";
+import { trapFocus } from "./imperative-focus-trap";
 
 /** Options for {@link promptForText}. */
 export interface PromptForTextOptions {
@@ -44,9 +45,11 @@ export function promptForText(
 
   return new Promise<string | null>((resolve) => {
     let settled = false;
+    let releaseTrap: (() => void) | null = null;
     const finish = (value: string | null) => {
       if (settled) return;
       settled = true;
+      releaseTrap?.();
       document.removeEventListener("keydown", onKey, true);
       backdrop.remove();
       resolve(value);
@@ -171,7 +174,8 @@ export function promptForText(
     document.body.append(backdrop);
 
     document.addEventListener("keydown", onKey, true);
-    input.focus();
+    // Trap + restore focus (MYND-93); initial focus is the input, then select.
+    releaseTrap = trapFocus(dialog, { initialFocus: input });
     input.select();
   });
 }

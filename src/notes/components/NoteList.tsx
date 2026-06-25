@@ -86,6 +86,7 @@ import {
 } from "./useFolderManagement";
 import { Icon } from "../../components/primitives/Icon";
 import { useCenterView } from "../../screens/centerView";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 /**
  * Compute the adjacent note to select after deleting `victimId` from
@@ -1160,6 +1161,9 @@ function PopulatedList({
 }) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  // Trap + restore focus while the case-merge confirm dialog is open (MYND-93).
+  const caseMergeDialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(caseMergeDialogRef, { enabled: fm.caseMerge !== null });
   // Archive-feature disable toggle (archive-disable, MYND-…): hides the archive
   // context-menu actions when on. `usePrefs` is nonce-aware, so flipping the
   // Settings toggle re-renders the menu live. (Read here rather than threaded as
@@ -2144,7 +2148,7 @@ function PopulatedList({
         </div>
       )}
       {fm.caseMerge !== null && (
-        <div style={CASE_MERGE_STYLE} role="alertdialog">
+        <div ref={caseMergeDialogRef} style={CASE_MERGE_STYLE} role="alertdialog">
           <div>
             {t("notes.list.caseMergeBody", {
               name: fm.caseMerge.existingDisplay,

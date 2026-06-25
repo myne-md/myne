@@ -11,8 +11,9 @@
 // Design canon: Penpot "4 — Desktop UI Kit",
 // `screen------importer — onboarding-offer (MYND-53)`.
 
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 
@@ -40,6 +41,9 @@ export function ImporterOnboardingOffer({
   onDismiss,
 }: ImporterOnboardingOfferProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -66,6 +70,7 @@ export function ImporterOnboardingOffer({
       }}
     >
       <div
+        ref={dialogRef}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 440,

@@ -10,6 +10,7 @@
 // the caller (`convert.ts`) applies the rewrite only on `confirm`.
 
 import i18n from "../../i18n";
+import { trapFocus } from "../../lib/imperative-focus-trap";
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 
 /** One line in the preview: a proposed rewrite, or a skipped ref. */
@@ -103,7 +104,9 @@ export function showDiffPreview(
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
 
+    let releaseTrap: (() => void) | null = null;
     const cleanup = (confirmed: boolean): void => {
+      releaseTrap?.();
       document.removeEventListener("keydown", onKey, true);
       backdrop.remove();
       resolve({ confirmed });
@@ -125,6 +128,9 @@ export function showDiffPreview(
     commitBtn.addEventListener("click", () => cleanup(true));
 
     // Focus the safe default (Cancel when nothing to commit, else Convert).
-    (rewriteCount === 0 ? cancelBtn : commitBtn).focus();
+    // Trap + restore focus (MYND-93).
+    releaseTrap = trapFocus(modal, {
+      initialFocus: rewriteCount === 0 ? cancelBtn : commitBtn,
+    });
   });
 }

@@ -21,6 +21,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import i18n from "../../i18n";
 import type { NoteId } from "../sidebarState";
 import { noteRead } from "../readNote";
@@ -250,6 +251,9 @@ export function SnapshotsPanel({
   onRestored,
 }: SnapshotsPanelProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
   const [snaps, setSnaps] = useState<SnapshotMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
@@ -355,6 +359,7 @@ export function SnapshotsPanel({
   return (
     <div style={BACKDROP_STYLE} onClick={handleBackdrop} role="presentation">
       <div
+        ref={dialogRef}
         style={PANEL_STYLE}
         role="dialog"
         aria-modal="true"

@@ -15,8 +15,9 @@
 // deliberately NO toggle — exclusions aren't optional (product decision:
 // embedded PDFs are never carried into the generated PDF).
 
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
 import {
   EXPORT_PDF_EXCLUSION_SENTENCE,
@@ -60,6 +61,9 @@ export function NotePdfExportNotice({
   onConfirm,
 }: NotePdfExportNoticeProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -84,7 +88,7 @@ export function NotePdfExportNotice({
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div style={CARD_STYLE} data-testid="export.pdf-notice">
+      <div ref={dialogRef} style={CARD_STYLE} data-testid="export.pdf-notice">
         <h2 id="note-pdf-export-title" style={TITLE_STYLE}>
           {t("export.pdf.title")}
         </h2>

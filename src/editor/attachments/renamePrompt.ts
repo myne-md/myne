@@ -9,6 +9,7 @@
 // when cancelled.
 
 import i18n from "../../i18n";
+import { trapFocus } from "../../lib/imperative-focus-trap";
 
 /** Open the rename prompt seeded with `currentValue`. Resolves to the entered
  *  value (Rename / Enter) or `null` (Cancel / Esc / backdrop). No-op without a
@@ -18,9 +19,11 @@ export function promptForName(currentValue: string): Promise<string | null> {
 
   return new Promise<string | null>((resolve) => {
     let settled = false;
+    let releaseTrap: (() => void) | null = null;
     const finish = (value: string | null) => {
       if (settled) return;
       settled = true;
+      releaseTrap?.();
       document.removeEventListener("keydown", onKey, true);
       backdrop.remove();
       resolve(value);
@@ -140,7 +143,8 @@ export function promptForName(currentValue: string): Promise<string | null> {
     document.body.append(backdrop);
 
     document.addEventListener("keydown", onKey, true);
-    input.focus();
+    // Trap + restore focus (MYND-93).
+    releaseTrap = trapFocus(dialog, { initialFocus: input });
     input.select();
   });
 }

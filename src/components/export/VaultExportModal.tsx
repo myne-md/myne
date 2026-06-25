@@ -44,6 +44,7 @@ import {
   SUB_PANEL_STYLE,
   TITLE_STYLE,
 } from "./NoteExportModal";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { VAULT_EXPORT_PLAIN_TREE_SENTENCE } from "../../lib/load-bearing-copy";
 import { vaultExportCancel, vaultExportMarkdown } from "../../notes/vaultExport";
 import {
@@ -261,6 +262,9 @@ export function VaultExportModal({
   // StrictMode-safe single-flight: `start` reads the latest state from a
   // ref so the callback identity stays stable across renders.
   const stateRef = useRef(state);
+  // Trap + restore focus while open so `aria-modal="true"` is truthful (MYND-93).
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, { enabled: open });
   stateRef.current = state;
   const start = useCallback(() => {
     const s = stateRef.current;
@@ -302,7 +306,7 @@ export function VaultExportModal({
         if (e.target === e.currentTarget && casualDismiss) onClose();
       }}
     >
-      <div style={VAULT_CARD_STYLE} data-testid="vault-export.modal">
+      <div ref={modalRef} style={VAULT_CARD_STYLE} data-testid="vault-export.modal">
         {state.phase === "setup" && (
           <>
             <h2 id="vault-export-title" style={TITLE_STYLE}>

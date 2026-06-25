@@ -20,6 +20,7 @@ import {
 } from "./convert";
 import type { ByteRange } from "../../dialect/types";
 import i18n from "../../i18n";
+import { trapFocus } from "../../lib/imperative-focus-trap";
 
 interface Rewrite {
   readonly byteRange: ByteRange;
@@ -162,7 +163,9 @@ export function showWikilinkConvertPreview(
       return out;
     };
 
+    let releaseTrap: (() => void) | null = null;
     const cleanup = (confirmed: boolean): void => {
+      releaseTrap?.();
       document.removeEventListener("keydown", onKey, true);
       backdrop.remove();
       resolve({ confirmed, rewrites: confirmed ? buildRewrites() : [] });
@@ -184,7 +187,10 @@ export function showWikilinkConvertPreview(
     commitBtn.addEventListener("click", () => {
       if (!commitBtn.disabled) cleanup(true);
     });
-    (rewriteableCount === 0 ? cancelBtn : commitBtn).focus();
+    // Trap + restore focus (MYND-93).
+    releaseTrap = trapFocus(modal, {
+      initialFocus: rewriteableCount === 0 ? cancelBtn : commitBtn,
+    });
   });
 }
 

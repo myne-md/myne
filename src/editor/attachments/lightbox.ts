@@ -16,6 +16,7 @@
 // replaces the first (and tears down any open PDF reader first).
 
 import i18n from "../../i18n";
+import { trapFocus } from "../../lib/imperative-focus-trap";
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 import { mountPdfScroller } from "./pdf-reader";
 import { exportAttachment } from "./fileCardActions";
@@ -66,12 +67,15 @@ export interface LightboxOptions {
 
 let activeBackdrop: HTMLDivElement | null = null;
 let activeOnKey: ((e: KeyboardEvent) => void) | null = null;
+let activeReleaseTrap: (() => void) | null = null;
 // Cleanup for an open PDF reader (task.destroy + observer disconnect). Null for
 // image mode / when nothing is open.
 let activePdfCleanup: (() => void) | null = null;
 
 /** Tear down any open lightbox (Esc / backdrop click / replace / test cleanup). */
 export function dismissAttachmentLightbox(): void {
+  activeReleaseTrap?.();
+  activeReleaseTrap = null;
   if (activeOnKey !== null && typeof document !== "undefined") {
     document.removeEventListener("keydown", activeOnKey, true);
     activeOnKey = null;
@@ -196,6 +200,9 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   };
   activeOnKey = onKey;
   document.addEventListener("keydown", onKey, true);
+
+  // Trap + restore focus (MYND-93).
+  activeReleaseTrap = trapFocus(backdrop, { initialFocus: closeBtn });
 
   backdrop.addEventListener("mousedown", (e) => {
     // Click on the dimmed backdrop (not the image itself) closes the preview.

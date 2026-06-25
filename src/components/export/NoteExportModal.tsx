@@ -21,8 +21,9 @@
 // (`NotePdfExportNotice.tsx`, MYND-255; `VaultExportModal.tsx`, MYND-211,
 // which widens the card to 480) — one modal skin, three surfaces.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
 import {
   EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL,
@@ -119,6 +120,9 @@ export function NoteExportModal({
   onConfirm,
 }: NoteExportModalProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
   // Opt-in default (the backend command is the "opt-in attachments-
   // included export"): the toggle starts OFF on every open.
   const [include, setInclude] = useState(false);
@@ -150,7 +154,7 @@ export function NoteExportModal({
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div style={CARD_STYLE} data-testid="export.modal">
+      <div ref={dialogRef} style={CARD_STYLE} data-testid="export.modal">
         <h2 id="note-export-title" style={TITLE_STYLE}>
           {t("export.note.modal.title")}
         </h2>

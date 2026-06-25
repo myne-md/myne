@@ -27,6 +27,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import { AppearancePanel } from "./settings/AppearancePanel";
@@ -232,6 +233,10 @@ export function SettingsModal({
   const { t } = useTranslation();
   const [selected, setSelected] = useState<PanelId>("account");
   const [childInFlight, setChildInFlight] = useState(false);
+  // Carve-out modal: trap focus directly (not via ModalShell, which would
+  // strip the rail's arrow-key nav + in-flight dismiss gating). MYND-93.
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, { enabled: open });
   const itemRefs = useRef<Record<PanelId, HTMLButtonElement | null>>({
     account: null,
     privacy: null,
@@ -328,7 +333,11 @@ export function SettingsModal({
       style={BACKDROP_STYLE}
       onClick={handleBackdropClick}
     >
-      <div style={MODAL_STYLE} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={modalRef}
+        style={MODAL_STYLE}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={HEADER_STYLE}>
           <h2 id="settings-modal-title" style={TITLE_STYLE}>
             {t("settings.shell.title")}
