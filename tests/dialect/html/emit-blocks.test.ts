@@ -5,6 +5,7 @@
 // tables, horizontal rules, definition lists, indented code.
 
 import { describe, expect, it } from "vitest";
+import i18n from "../../../src/i18n";
 import { emitNoteHtml } from "../../../src/dialect/html/emitNoteHtml";
 import { CALLOUT_HTML_TYPES } from "../../../src/dialect/html/callout-types";
 
@@ -124,7 +125,7 @@ describe("blockquotes + callouts", () => {
         `<div class="callout callout-${type} callout-tone-${def.tone}">`,
       );
       expect(html).toContain(
-        `<p class="callout-title">${def.label}</p>`,
+        `<p class="callout-title">${i18n.t(def.labelKey)}</p>`,
       );
     }
   });

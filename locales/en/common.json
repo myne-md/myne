@@ -758,6 +758,7 @@
   },
   "export": {
     "note": {
+      "documentTitleFallback": "Note",
       "errors": {
         "attachmentCorrupt": "An attachment referenced by this note could not be read, so nothing was exported.",
         "attachmentMissing": "An attachment referenced by this note is missing, so nothing was exported.",
