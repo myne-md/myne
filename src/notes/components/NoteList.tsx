@@ -19,6 +19,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
 import {
@@ -481,6 +482,7 @@ type BuilderState =
 const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 
 export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {}) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   // SYNC-9: opening a note via keyboard nav (Enter) also returns the center
   // pane to the editor — covers the Enter-on-already-selected edge the
@@ -934,7 +936,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         <ViewSettings
           title={
             viewSettings.name.trim() === ""
-              ? "View settings"
+              ? t("notes.list.viewSettingsTitle")
               : viewSettings.name
           }
           initial={{
@@ -949,7 +951,11 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       )}
       {builder !== null && (
         <FilterBuilder
-          title={builder.mode === "edit" ? "Edit filter" : "New view"}
+          title={
+            builder.mode === "edit"
+              ? t("notes.list.editFilterTitle")
+              : t("notes.list.newViewTitle")
+          }
           initialDraft={
             builder.mode === "edit" ? (builder.draft ?? EMPTY_DRAFT) : EMPTY_DRAFT
           }
@@ -966,10 +972,10 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           style={FOOTER_ENTRY_STYLE}
           data-testid="notes.trash-open"
           onClick={() => setTrashOpen(true)}
-          title="Open the trash"
+          title={t("notes.list.openTrash")}
         >
           <Icon name="trash-2" size={15} />
-          <span>Trash</span>
+          <span>{t("notes.list.trash")}</span>
           {trashCount > 0 && (
             <span style={TRASH_COUNT_BADGE_STYLE}>{trashCount}</span>
           )}
@@ -980,10 +986,10 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
             style={FOOTER_ENTRY_STYLE}
             data-testid="notes.archive-open"
             onClick={() => setArchiveOpen(true)}
-            title="Open the archive"
+            title={t("notes.list.openArchive")}
           >
             <Icon name="archive" size={15} />
-            <span>Archive</span>
+            <span>{t("notes.list.archive")}</span>
             {archiveCount > 0 && (
               <span style={TRASH_COUNT_BADGE_STYLE}>{archiveCount}</span>
             )}
@@ -1005,29 +1011,30 @@ function EmptyState({
   fm: FolderManagement;
   onNewFromTemplate?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div style={LIST_OUTER_STYLE}>
       <div style={HEADER_ROW_STYLE}>
         <div style={HEADER_LEAD_STYLE}>
-          <div style={SECTION_HEADING_STYLE}>Notes</div>
+          <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
           <IconButton
             icon="folder-plus"
-            label="New folder"
+            label={t("notes.list.newFolder")}
             testId="notes.new-folder"
             onClick={() => fm.startNewFolder("")}
           />
           <IconButton
             icon="file-plus"
-            label="New note"
+            label={t("notes.list.newNote")}
             testId="notes.create"
             onClick={onCreate}
           />
           {onNewFromTemplate && (
             <IconButton
               icon="chevron-down"
-              label="New note from template…"
+              label={t("notes.list.newNoteFromTemplate")}
               onClick={onNewFromTemplate}
             />
           )}
@@ -1041,9 +1048,9 @@ function EmptyState({
         />
       )}
       <div style={EMPTY_WRAPPER_STYLE}>
-        <div style={EMPTY_COPY_STYLE}>No notes yet.</div>
+        <div style={EMPTY_COPY_STYLE}>{t("notes.list.emptyState")}</div>
         <button type="button" onClick={onCreate} style={EMPTY_CTA_STYLE}>
-          + Create your first note
+          {t("notes.list.createFirstNote")}
         </button>
       </div>
     </div>
@@ -1151,6 +1158,7 @@ function PopulatedList({
    *  `<NoteRow>` (tree + Favorites) via `renderNoteRow`. */
   showTimestamps: boolean;
 }) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   // Archive-feature disable toggle (archive-disable, MYND-…): hides the archive
   // context-menu actions when on. `usePrefs` is nonce-aware, so flipping the
@@ -1374,14 +1382,14 @@ function PopulatedList({
       } catch (err) {
         // Rollback already restored the row inside trashWithRollback; surface
         // a non-blocking error so the user knows it didn't take.
-        setTrashError("Couldn't move the note to Trash.");
+        setTrashError(t("notes.list.trashSingleError"));
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
           console.warn("[NoteList] trashWithRollback failed:", err);
         }
       }
     },
-    [ctx, navIds],
+    [ctx, navIds, t],
   );
 
   // Archive a single note (MYND-331): optimistically pull it from the live tree
@@ -1406,14 +1414,14 @@ function PopulatedList({
           }
         }
       } catch (err) {
-        setTrashError("Couldn't archive the note.");
+        setTrashError(t("notes.list.archiveSingleError"));
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
           console.warn("[NoteList] archiveWithRollback failed:", err);
         }
       }
     },
-    [ctx, navIds],
+    [ctx, navIds, t],
   );
 
   // "Undo" on the trash toast → restore the just-trashed note.
@@ -1541,14 +1549,14 @@ function PopulatedList({
         }
       }
     } catch (err) {
-      setTrashError("Couldn't move the notes to Trash.");
+      setTrashError(t("notes.list.trashBulkError"));
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.warn("[NoteList] bulkTrashWithSync failed:", err);
       }
     }
     ctx.clearMultiSelection();
-  }, [ctx, navIds]);
+  }, [ctx, navIds, t]);
 
   // Bulk archive (MYND-331 / MYND-367): archive the whole multi-selection
   // (recoverable from the Archive section), then collapse the set. If the OPEN
@@ -1575,14 +1583,14 @@ function PopulatedList({
         }
       }
     } catch (err) {
-      setTrashError("Couldn't archive the notes.");
+      setTrashError(t("notes.list.archiveBulkError"));
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.warn("[NoteList] bulkArchiveWithSync failed:", err);
       }
     }
     ctx.clearMultiSelection();
-  }, [ctx, navIds]);
+  }, [ctx, navIds, t]);
 
   // "Undo" on the bulk-trash toast → restore every just-trashed note.
   const handleUndoBulk = useCallback(() => {
@@ -1600,7 +1608,7 @@ function PopulatedList({
     () => [
       {
         id: "__vault_root__",
-        label: "Vault root",
+        label: t("notes.list.vaultRoot"),
         onSelect: () => void runBulkMove(null),
       },
       ...folderOptions.map((o) => ({
@@ -1609,7 +1617,7 @@ function PopulatedList({
         onSelect: () => void runBulkMove(o.path),
       })),
     ],
-    [folderOptions, runBulkMove],
+    [folderOptions, runBulkMove, t],
   );
 
   const menuItems: ContextMenuItem[] = useMemo(() => {
@@ -1621,7 +1629,7 @@ function PopulatedList({
       return [
         {
           id: "bulk-move",
-          label: `Move ${selCount} notes to…`,
+          label: t("notes.list.bulkMove", { count: selCount }),
           onSelect: () => setMoveTarget({ x: menu.x, y: menu.y }),
         },
         // Archiving disabled → no "archive these" entry (the feature is hidden).
@@ -1630,13 +1638,13 @@ function PopulatedList({
           : [
               {
                 id: "bulk-archive",
-                label: `Arşivle ${selCount} not`,
+                label: t("notes.list.bulkArchive", { count: selCount }),
                 onSelect: () => void handleBulkArchive(),
               },
             ]),
         {
           id: "bulk-delete",
-          label: `Delete ${selCount} notes`,
+          label: t("notes.list.bulkDelete", { count: selCount }),
           destructive: true,
           onSelect: () => void handleBulkDelete(),
         },
@@ -1645,31 +1653,31 @@ function PopulatedList({
     return [
       {
         id: "open-in-new-tab",
-        label: "Open in new tab",
+        label: t("notes.list.openInNewTab"),
         onSelect: () => openNote(menu.id, { newTab: true }),
       },
       {
         id: "open-to-side",
-        label: "Open to the side",
+        label: t("notes.list.openToSide"),
         onSelect: () => openNote(menu.id, { toSide: true }),
       },
       {
         id: "rename",
-        label: "Rename",
+        label: t("notes.list.rename"),
         onSelect: () => ctx.startRename(menu.id),
       },
       {
         // Clone the note in place (MYND-332) — new id + "(kopya)" title;
         // the copy opens in the focused pane.
         id: "duplicate",
-        label: "Duplicate",
+        label: t("notes.list.duplicate"),
         onSelect: () => void ctx.duplicateAndOpen(menu.id),
       },
       {
         id: "favorite",
         label: favSet.has(menu.id)
-          ? "Remove from favorites"
-          : "Add to favorites",
+          ? t("notes.list.removeFromFavorites")
+          : t("notes.list.addToFavorites"),
         onSelect: () => fm.toggleFavorite(menu.id),
       },
       // Folder note (MYND-370): only for a note that lives IN a folder — a
@@ -1681,21 +1689,21 @@ function PopulatedList({
           ? [
               {
                 id: "note.unset-index",
-                label: "Remove as folder note",
+                label: t("notes.list.removeAsFolderNote"),
                 onSelect: () => void handleUnsetIndex(menu.id),
               },
             ]
           : [
               {
                 id: "note.set-index",
-                label: "Set as folder note",
+                label: t("notes.list.setAsFolderNote"),
                 onSelect: () => void handleSetIndex(menu.id),
               },
             ]
         : []),
       {
         id: "color",
-        label: "Color…",
+        label: t("notes.list.color"),
         onSelect: () =>
           setDecoPopover({
             x: menu.x,
@@ -1708,7 +1716,7 @@ function PopulatedList({
         // Per-note plaintext egress (MYND-116) — live tree note rows only;
         // Trash / Templates surfaces deliberately don't carry it.
         id: "export-markdown",
-        label: "Export as Markdown…",
+        label: t("notes.list.exportMarkdown"),
         onSelect: () =>
           void runNoteExportFlow(
             noteExportOptions(
@@ -1722,7 +1730,7 @@ function PopulatedList({
         // Sibling PDF egress (MYND-255) — same export group, same shared-
         // flow discipline (runNotePdfExportFlow is the palette's flow too).
         id: "export-pdf",
-        label: "Export as PDF…",
+        label: t("notes.list.exportPdf"),
         onSelect: () =>
           void runNotePdfExportFlow(
             noteExportOptions(
@@ -1736,7 +1744,7 @@ function PopulatedList({
         // Sibling HTML egress (MYND-340) — same export group, same shared-
         // flow discipline (runNoteHtmlExportFlow is the palette's flow too).
         id: "export-html",
-        label: "Export as HTML…",
+        label: t("notes.list.exportHtml"),
         onSelect: () =>
           void runNoteHtmlExportFlow(
             noteExportOptions(
@@ -1749,7 +1757,7 @@ function PopulatedList({
       {
         // Sibling plain-text egress (MYND-340).
         id: "export-txt",
-        label: "Export as Plain Text…",
+        label: t("notes.list.exportTxt"),
         onSelect: () =>
           void runNoteTxtExportFlow(
             noteExportOptions(
@@ -1767,13 +1775,13 @@ function PopulatedList({
         : [
             {
               id: "archive",
-              label: "Arşivle",
+              label: t("notes.list.archiveNote"),
               onSelect: () => void handleArchive(menu.id),
             },
           ]),
       {
         id: "delete",
-        label: "Delete",
+        label: t("notes.list.delete"),
         destructive: true,
         onSelect: () => void handleTrash(menu.id),
       },
@@ -1793,6 +1801,7 @@ function PopulatedList({
     folderIndexRoles,
     handleSetIndex,
     handleUnsetIndex,
+    t,
   ]);
 
   // Folder context-menu items (right-click a folder row).
@@ -1801,32 +1810,36 @@ function PopulatedList({
     const node = menuPos?.node;
     if (node === undefined || menuPos === null) return [];
     return [
-      { id: "rename", label: "Rename", onSelect: () => fm.startRenameFolder(node) },
+      {
+        id: "rename",
+        label: t("notes.list.rename"),
+        onSelect: () => fm.startRenameFolder(node),
+      },
       {
         id: "new-note",
-        label: "New note here",
+        label: t("notes.list.newNoteHere"),
         onSelect: () => fm.newNoteHere(node.path),
       },
       // Folder note (MYND-370): open the existing index, or create one.
       node.indexNoteId !== null
         ? {
             id: "folder.open-index",
-            label: "Open folder note",
+            label: t("notes.list.openFolderNote"),
             onSelect: () => handleOpenIndexNote(node.indexNoteId as string),
           }
         : {
             id: "folder.create-index",
-            label: "Create folder note",
+            label: t("notes.list.createFolderNote"),
             onSelect: () => void handleCreateFolderNote(node.path),
           },
       {
         id: "new-subfolder",
-        label: "New subfolder",
+        label: t("notes.list.newSubfolder"),
         onSelect: () => fm.startNewFolder(node.path),
       },
       {
         id: "color",
-        label: "Customize…",
+        label: t("notes.list.customize"),
         onSelect: () =>
           setDecoPopover({
             x: menuPos.x,
@@ -1837,20 +1850,24 @@ function PopulatedList({
       },
       {
         id: "delete",
-        label: "Delete",
+        label: t("notes.list.delete"),
         destructive: true,
         onSelect: () => void fm.deleteFolderAction(node),
       },
     ];
-  }, [fm, handleOpenIndexNote, handleCreateFolderNote]);
+  }, [fm, handleOpenIndexNote, handleCreateFolderNote, t]);
 
   // Background (root-level) context-menu items — Story F2.
   const bgMenuItems: ContextMenuItem[] = useMemo(
     () => [
-      { id: "new-folder", label: "New folder", onSelect: () => fm.startNewFolder("") },
-      { id: "new-note", label: "New note", onSelect: onCreate },
+      {
+        id: "new-folder",
+        label: t("notes.list.newFolder"),
+        onSelect: () => fm.startNewFolder(""),
+      },
+      { id: "new-note", label: t("notes.list.newNoteMenu"), onSelect: onCreate },
     ],
-    [fm, onCreate],
+    [fm, onCreate, t],
   );
 
   // Delete/Backspace keyboard trigger on the selected row.
@@ -1915,7 +1932,9 @@ function PopulatedList({
           }}
         >
           <div style={FAV_HEADER_STYLE}>
-            <div style={SECTION_HEADING_STYLE}>Favorites</div>
+            <div style={SECTION_HEADING_STYLE}>
+              {t("notes.list.favoritesHeading")}
+            </div>
           </div>
           {favRows.map((row) => {
             if (row.kind !== "note") return null;
@@ -1958,25 +1977,25 @@ function PopulatedList({
       )}
       <div style={HEADER_ROW_STYLE}>
         <div style={HEADER_LEAD_STYLE}>
-          <div style={SECTION_HEADING_STYLE}>Notes</div>
+          <div style={SECTION_HEADING_STYLE}>{t("notes.list.notesHeading")}</div>
         </div>
         <div style={HEADER_ACTIONS_STYLE}>
           <IconButton
             icon="folder-plus"
-            label="New folder"
+            label={t("notes.list.newFolder")}
             testId="notes.new-folder"
             onClick={() => fm.startNewFolder("")}
           />
           <IconButton
             icon="file-plus"
-            label="New note (⌘N)"
+            label={t("notes.list.newNoteShortcut")}
             testId="notes.create"
             onClick={onCreate}
           />
           {onNewFromTemplate && (
             <IconButton
               icon="chevron-down"
-              label="New note from template…"
+              label={t("notes.list.newNoteFromTemplate")}
               onClick={onNewFromTemplate}
             />
           )}
@@ -2127,8 +2146,9 @@ function PopulatedList({
       {fm.caseMerge !== null && (
         <div style={CASE_MERGE_STYLE} role="alertdialog">
           <div>
-            A folder named “{fm.caseMerge.existingDisplay}” already exists.
-            These will merge — rename one to keep them separate?
+            {t("notes.list.caseMergeBody", {
+              name: fm.caseMerge.existingDisplay,
+            })}
           </div>
           <div style={CASE_MERGE_ACTIONS_STYLE}>
             <button
@@ -2136,26 +2156,27 @@ function PopulatedList({
               style={HEADER_BUTTON_STYLE}
               onClick={fm.cancelCaseMerge}
             >
-              Rename
+              {t("notes.list.rename")}
             </button>
             <button
               type="button"
               style={{ ...HEADER_BUTTON_STYLE, color: "var(--fg-1)" }}
               onClick={fm.confirmCaseMerge}
             >
-              Merge anyway
+              {t("notes.list.mergeAnyway")}
             </button>
           </div>
         </div>
       )}
       {fm.confirmFolderDelete !== null && (
         <DeleteConfirmModal
-          title="Delete this folder?"
-          body={`“${fm.confirmFolderDelete.node.name}” and its ${fm.confirmFolderDelete.noteCount} note${
-            fm.confirmFolderDelete.noteCount === 1 ? "" : "s"
-          }`}
-          warning="The notes move to Trash — you can restore them later."
-          confirmLabel="Delete folder"
+          title={t("notes.list.deleteFolderTitle")}
+          body={t("notes.list.deleteFolderBody", {
+            name: fm.confirmFolderDelete.node.name,
+            count: fm.confirmFolderDelete.noteCount,
+          })}
+          warning={t("notes.list.deleteFolderWarning")}
+          confirmLabel={t("notes.list.deleteFolderConfirm")}
           onCancel={fm.cancelFolderDelete}
           onConfirm={fm.confirmFolderDeleteAction}
         />
@@ -2211,20 +2232,20 @@ function PopulatedList({
         />
       )}
       <Toast
-        message={undoToast === null ? null : "Note moved to Trash"}
+        message={undoToast === null ? null : t("notes.list.noteMovedToTrash")}
         onDone={() => setUndoToast(null)}
         durationMs={6000}
-        action={{ label: "Undo", onAction: handleUndoTrash }}
+        action={{ label: t("notes.list.undo"), onAction: handleUndoTrash }}
       />
       <Toast
         message={
           bulkUndo === null
             ? null
-            : `${bulkUndo.length} note${bulkUndo.length === 1 ? "" : "s"} moved to Trash`
+            : t("notes.list.notesMovedToTrash", { count: bulkUndo.length })
         }
         onDone={() => setBulkUndo(null)}
         durationMs={6000}
-        action={{ label: "Undo", onAction: handleUndoBulk }}
+        action={{ label: t("notes.list.undo"), onAction: handleUndoBulk }}
       />
       <Toast message={trashError} onDone={() => setTrashError(null)} />
     </div>
@@ -2239,6 +2260,7 @@ function PopulatedList({
  * isolated NoteList render (tests) rather than crashing.
  */
 function AttachmentsNavEntry() {
+  const { t } = useTranslation();
   const { view, setView } = useCenterView();
   const active = view === "attachments";
   return (
@@ -2251,11 +2273,11 @@ function AttachmentsNavEntry() {
         fontWeight: active ? 600 : 400,
       }}
       onClick={() => setView("attachments")}
-      title="Open attachments"
+      title={t("notes.list.openAttachments")}
       aria-current={active ? "page" : undefined}
     >
       <Icon name="paperclip" size={15} />
-      <span>Attachments</span>
+      <span>{t("notes.list.attachments")}</span>
     </button>
   );
 }
@@ -2271,6 +2293,7 @@ function NewFolderInput({
   onCommit: (name: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     ref.current?.focus();
@@ -2286,7 +2309,11 @@ function NewFolderInput({
         ref={ref}
         type="text"
         data-testid="notes.new-folder-input"
-        placeholder={parentPath === "" ? "New folder" : `New folder in ${parentPath}`}
+        placeholder={
+          parentPath === ""
+            ? t("notes.list.newFolderPlaceholder")
+            : t("notes.list.newFolderInPlaceholder", { path: parentPath })
+        }
         style={NEW_FOLDER_INPUT_STYLE}
         onContextMenu={(e) => e.stopPropagation()}
         onKeyDown={(e) => {

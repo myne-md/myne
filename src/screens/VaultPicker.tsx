@@ -35,6 +35,8 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { Spinner } from "../components/Spinner";
@@ -82,10 +84,15 @@ function reducer(state: PickerState, action: PickerAction): PickerState {
  * (`label !== null`, cached from a this-session unlock, SYNC-3); otherwise
  * the neutral fallback "Vault N", N being the row's 1-based position in the
  * last-unlock-ordered list (SYNC-7). The position-based fallback avoids
- * surfacing any vault-identifying string for never-unlocked vaults.
+ * surfacing any vault-identifying string for never-unlocked vaults. The
+ * fallback string is resolved through the caller's `t` so it stays reactive.
  */
-function rowLabel(vault: VaultSummary, index: number): string {
-  return vault.label ?? `Vault ${index + 1}`;
+function rowLabel(
+  vault: VaultSummary,
+  index: number,
+  t: TFunction,
+): string {
+  return vault.label ?? t("vaultPicker.vaultFallback", { n: index + 1 });
 }
 
 // ── Card chrome ──────────────────────────────────────────────────────────
@@ -261,6 +268,7 @@ const CREATE_LINK_STYLE: CSSProperties = {
 
 /** Card chrome shared by every render state (loading / failed / loaded). */
 function PickerCard({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   return (
     <div style={ROOT_STYLE} data-testid="picker.root">
       <div style={CARD_STYLE}>
@@ -268,7 +276,7 @@ function PickerCard({ children }: { children: ReactNode }) {
           <MyneMark size={36} />
           <span style={WORDMARK_STYLE}>Myne</span>
         </div>
-        <h1 style={HEADING_STYLE}>Choose a vault</h1>
+        <h1 style={HEADING_STYLE}>{t("vaultPicker.heading")}</h1>
         {children}
       </div>
     </div>
@@ -318,19 +326,20 @@ function CreateAnother({
   onClick: () => void;
   onRestoreBackup: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <hr style={DIVIDER_STYLE} />
       <PickerActionLink
         onClick={onClick}
         icon="plus"
-        label="Create another vault"
+        label={t("vaultPicker.createAnother")}
         testId="picker.create-cta"
       />
       <PickerActionLink
         onClick={onRestoreBackup}
         icon="arrow-down"
-        label="Restore from backup"
+        label={t("vaultPicker.restoreFromBackup")}
         testId="picker.restore-cta"
       />
     </>
@@ -382,14 +391,15 @@ function VaultRow({
  * shared `formatRelativeTime` helper (sidebar/BottomBar) for one honest,
  * coarse format; a never-unlocked vault shows nothing here.
  */
-function lastUnlockText(lastUnlock: number | null): string {
+function lastUnlockText(lastUnlock: number | null, t: TFunction): string {
   if (lastUnlock == null) return "";
   const rel = formatRelativeTime(new Date(lastUnlock));
-  return rel === "" ? "" : `opened ${rel}`;
+  return rel === "" ? "" : t("vaultPicker.openedRelative", { rel });
 }
 
 export function VaultPicker({ onSelect, onCreateAnother,
   onRestoreBackup }: VaultPickerProps) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
@@ -426,7 +436,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
           }}
         >
           <Spinner size={14} style={{ borderWidth: 2 }} />
-          <span style={SUBLINE_STYLE}>Loading your vaults…</span>
+          <span style={SUBLINE_STYLE}>{t("vaultPicker.loading")}</span>
         </div>
       </PickerCard>
     );
@@ -438,7 +448,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
     // the create path so the user is never stranded.
     return (
       <PickerCard>
-        <p style={SUBLINE_STYLE}>No vaults could be loaded right now.</p>
+        <p style={SUBLINE_STYLE}>{t("vaultPicker.noneLoaded")}</p>
         <CreateAnother onClick={onCreateAnother} onRestoreBackup={onRestoreBackup} />
       </PickerCard>
     );
@@ -446,16 +456,14 @@ export function VaultPicker({ onSelect, onCreateAnother,
 
   return (
     <PickerCard>
-      <p style={SUBLINE_STYLE}>
-        You have more than one vault on this device. Pick one to unlock.
-      </p>
+      <p style={SUBLINE_STYLE}>{t("vaultPicker.subline")}</p>
       <div style={LIST_STYLE}>
         {state.vaults.map((vault, index) => (
           <VaultRow
             key={vault.id}
             vault={vault}
-            label={rowLabel(vault, index)}
-            meta={lastUnlockText(vault.last_unlock)}
+            label={rowLabel(vault, index, t)}
+            meta={lastUnlockText(vault.last_unlock, t)}
             onSelect={onSelect}
           />
         ))}

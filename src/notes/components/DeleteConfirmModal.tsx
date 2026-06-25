@@ -20,6 +20,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 // Shared modal backdrop envelope — also imported by `<TrashPanel>` so the two
 // trash-related modals don't re-declare the same fixed-inset dim layer.
@@ -120,6 +121,7 @@ export type DeleteConfirmModalProps = {
 };
 
 export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
+  const { t } = useTranslation();
   const { noteTitle, title, body, warning, confirmLabel, onCancel, onConfirm } =
     props;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
@@ -151,7 +153,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
 
   const displayTitle =
     noteTitle === null || noteTitle === undefined || noteTitle.trim() === ""
-      ? "Untitled"
+      ? t("notes.deleteConfirm.untitled")
       : noteTitle;
   const bodyLine = body ?? `“${displayTitle}”`;
 
@@ -164,12 +166,14 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
         aria-describedby="delete-confirm-body"
       >
         <h2 id="delete-confirm-title" style={TITLE_STYLE}>
-          {title ?? "Delete this note?"}
+          {title ?? t("notes.deleteConfirm.title")}
         </h2>
         <p id="delete-confirm-body" style={BODY_TITLE_STYLE}>
           {bodyLine}
         </p>
-        <p style={BODY_WARNING_STYLE}>{warning ?? "This cannot be undone."}</p>
+        <p style={BODY_WARNING_STYLE}>
+          {warning ?? t("notes.deleteConfirm.warning")}
+        </p>
         <div style={BUTTON_ROW_STYLE}>
           <button
             ref={cancelRef}
@@ -178,7 +182,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             onClick={onCancel}
             style={CANCEL_BUTTON_STYLE}
           >
-            Cancel
+            {t("notes.deleteConfirm.cancel")}
           </button>
           <button
             type="button"
@@ -186,7 +190,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             onClick={onConfirm}
             style={DELETE_BUTTON_STYLE}
           >
-            {confirmLabel ?? "Delete"}
+            {confirmLabel ?? t("notes.deleteConfirm.delete")}
           </button>
         </div>
       </div>

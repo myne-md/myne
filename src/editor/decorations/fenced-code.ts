@@ -48,6 +48,7 @@ import {
 import { QUOTE_BAR_STEP, quoteBarBackgroundCss } from "./blockquote";
 import { resolveCodeLanguage } from "../code-languages";
 import { codeHighlightStyle } from "../code-highlight";
+import i18n from "../../i18n";
 
 /** Number of `Blockquote` ancestors above this fence (0 = top-level). > 0 routes
  *  the away-state render to `CodeInQuoteWidget` (a contained block widget that
@@ -112,7 +113,7 @@ function makeCopyButton(source: string): HTMLButtonElement {
   const copy = document.createElement("button");
   copy.className = "cm-code-copy";
   copy.type = "button";
-  copy.setAttribute("aria-label", "Copy code");
+  copy.setAttribute("aria-label", i18n.t("editor.codeBlock.copyCode"));
   copy.appendChild(makeCopyIcon("copy"));
   copy.addEventListener("click", (event) => {
     event.preventDefault();
@@ -309,7 +310,7 @@ function badgeLabel(state: EditorState, node: { node: import("@lezer/common").Sy
   const infoNode = node.node.getChild("CodeInfo");
   const info = infoNode ? state.doc.sliceString(infoNode.from, infoNode.to) : "";
   const lang = resolveCodeLanguage(info);
-  return (lang ? lang.name : info.trim()) || "code";
+  return (lang ? lang.name : info.trim()) || i18n.t("editor.codeBlock.defaultBadge");
 }
 
 /**

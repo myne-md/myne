@@ -20,6 +20,7 @@
 // chained step the summary points the user at).
 
 import { useEffect, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "../components/primitives/Button";
 import { CenteredCard } from "../components/primitives/CenteredCard";
@@ -52,6 +53,7 @@ type RestoreState =
   | { step: "error"; message: string };
 
 export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<RestoreState>({ step: "pick" });
 
   // Progress subscription lives for the screen's lifetime; payloads are
@@ -107,7 +109,8 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
     }
   }
 
-  const backLabel = entry === "settings" ? "Back" : "Cancel";
+  const backLabel =
+    entry === "settings" ? t("restore.backLabel") : t("restore.cancelLabel");
 
   return (
     <CenteredCard>
@@ -123,20 +126,20 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
             color: "var(--fg-display)",
           }}
         >
-          Restore from backup
+          {t("restore.title")}
         </div>
 
         {state.step === "pick" && (
           <>
             <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
-              Pick a <code>.myne-backup</code> file. The backup is verified
-              before anything is restored; the restored vault unlocks with
-              that vault's password or recovery phrase — exactly like unlock.
+              <Trans
+                i18nKey="restore.pick.body"
+                components={{ code: <code /> }}
+              />
               {entry === "corrupted" && (
                 <>
                   {" "}
-                  Your current vault is not touched: the backup is restored as
-                  a separate vault first.
+                  {t("restore.pick.corruptedSuffix")}
                 </>
               )}
             </div>
@@ -146,7 +149,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 onClick={() => void pickFile()}
                 data-testid="restore.pick-file"
               >
-                Choose backup file…
+                {t("restore.pick.chooseFile")}
               </Button>
               <Button variant="secondary" onClick={onExit} data-testid="restore.back">
                 {backLabel}
@@ -162,10 +165,16 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
               style={{ fontSize: 14, color: "var(--fg-2)" }}
             >
               {state.progress === null
-                ? "Verifying backup…"
+                ? t("restore.working.verifying")
                 : state.progress.phase === "verify"
-                  ? `Verifying backup… ${state.progress.done} of ${state.progress.total}`
-                  : `Restoring… ${state.progress.done} of ${state.progress.total}`}
+                  ? t("restore.working.verifyingProgress", {
+                      done: state.progress.done,
+                      total: state.progress.total,
+                    })
+                  : t("restore.working.restoringProgress", {
+                      done: state.progress.done,
+                      total: state.progress.total,
+                    })}
             </div>
             <div>
               <Button
@@ -173,7 +182,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 onClick={() => void backupCancel()}
                 data-testid="restore.cancel"
               >
-                Cancel
+                {t("restore.working.cancel")}
               </Button>
             </div>
           </>
@@ -185,12 +194,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
               data-testid="restore.collision"
               style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}
             >
-              A vault from this backup already exists on this device. You can
-              keep both — the restored copy appears as a separate vault in
-              your vault list — or restore now and then remove the existing
-              vault from the vault list yourself (removal asks you to type
-              DELETE, and only makes sense after you confirm the restored
-              vault opens).
+              {t("restore.collision.body")}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <Button
@@ -200,7 +204,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 }
                 data-testid="restore.keep-both"
               >
-                Keep both
+                {t("restore.collision.keepBoth")}
               </Button>
               <Button
                 variant="secondary"
@@ -211,7 +215,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 }
                 data-testid="restore.replace-existing"
               >
-                Restore, then replace existing…
+                {t("restore.collision.replaceExisting")}
               </Button>
               <Button variant="secondary" onClick={onExit}>
                 {backLabel}
@@ -226,10 +230,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
               data-testid="restore.damaged"
               style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}
             >
-              The backup file is damaged, so nothing was restored. If this is
-              the only copy you have, salvage can restore the intact notes and
-              list exactly what could not be read — the result is always
-              labeled as a partial restore.
+              {t("restore.damaged.body")}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <Button
@@ -237,10 +238,10 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 onClick={() => void runRestore(state.source, { salvage: true })}
                 data-testid="restore.salvage"
               >
-                Salvage intact notes…
+                {t("restore.damaged.salvage")}
               </Button>
               <Button variant="secondary" onClick={onExit}>
-                Close
+                {t("restore.damaged.close")}
               </Button>
             </div>
           </>
@@ -254,18 +255,27 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
             >
               <div style={{ color: "var(--fg-1)", fontWeight: 600 }}>
                 {state.outcome.skipped.length > 0
-                  ? `Restored partially — ${state.outcome.skipped.length} item${state.outcome.skipped.length === 1 ? "" : "s"} could not be read.`
-                  : "Vault restored."}
+                  ? t("restore.summary.partialHeader", {
+                      count: state.outcome.skipped.length,
+                    })
+                  : t("restore.summary.restored")}
               </div>
-              <div>Notes: {state.outcome.notes}</div>
-              <div>Version history entries: {state.outcome.snapshots}</div>
-              <div>Attachments: {state.outcome.attachments}</div>
+              <div>
+                {t("restore.summary.notes", { n: state.outcome.notes })}
+              </div>
+              <div>
+                {t("restore.summary.versionHistory", {
+                  n: state.outcome.snapshots,
+                })}
+              </div>
+              <div>
+                {t("restore.summary.attachments", {
+                  n: state.outcome.attachments,
+                })}
+              </div>
               {state.outcome.collided_vault_id !== null && (
                 <div style={{ marginTop: 8 }}>
-                  The previously existing copy of this vault is still in your
-                  vault list. Once you confirm the restored vault opens, you
-                  can remove the old one from the vault list (it will ask you
-                  to type DELETE).
+                  {t("restore.summary.collidedNote")}
                 </div>
               )}
               {state.outcome.skipped.length > 0 && (
@@ -295,7 +305,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 onClick={onExit}
                 data-testid="restore.done"
               >
-                Open vault list
+                {t("restore.summary.openVaultList")}
               </Button>
             </div>
           </>
@@ -311,7 +321,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <Button variant="secondary" onClick={() => setState({ step: "pick" })}>
-                Try another file
+                {t("restore.error.tryAnotherFile")}
               </Button>
               <Button variant="secondary" onClick={onExit}>
                 {backLabel}

@@ -19,6 +19,7 @@
 // is committed, no progress to discard.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { appDataDir, join } from "@tauri-apps/api/path";
@@ -48,6 +49,7 @@ interface ReadyStepProps {
 }
 
 export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStepProps) {
+  const { t } = useTranslation();
   // First-backup CTA (MYND-56 task 7, B13(b)): inline and non-blocking —
   // the user is at peak recovery-mindset (phrase just written down), and a
   // fresh vault's backup is a second copy of vault.meta (the credential
@@ -61,11 +63,13 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
     setBackupState("saving");
     try {
       const suggested = await backupDefaultFilename().catch(
-        () => "Myne backup.myne-backup",
+        () => t("vaultCreation.ready.backupDefaultFilename"),
       );
       const destination = await saveFileDialog({
         defaultPath: suggested,
-        filters: [{ name: "Myne backup", extensions: ["myne-backup"] }],
+        filters: [
+          { name: t("vaultCreation.ready.backupFilterName"), extensions: ["myne-backup"] },
+        ],
       });
       if (typeof destination !== "string") {
         setBackupState("idle"); // dialog dismissed — nothing started
@@ -101,7 +105,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
         <Icon name="circle-check" size={36} />
       </div>
 
-      <StepHeading centered>Your vault is ready.</StepHeading>
+      <StepHeading centered>{t("vaultCreation.ready.heading")}</StepHeading>
 
       <div
         style={{
@@ -112,9 +116,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           maxWidth: 360,
         }}
       >
-        Myne wrote your vault to your application data folder. Your master
-        password and recovery phrase are the only way back in — make sure
-        both are saved somewhere safe.
+        {t("vaultCreation.ready.body")}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -125,7 +127,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           disabled={pending}
           data-testid="create.ready-show-folder"
         >
-          Show vault folder
+          {t("vaultCreation.ready.showFolder")}
         </Button>
         <Button
           variant="secondary"
@@ -134,10 +136,10 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           data-testid="create.ready-backup-now"
         >
           {backupState === "saving"
-            ? "Backing up…"
+            ? t("vaultCreation.ready.backingUp")
             : backupState === "done"
-              ? "Backed up ✓"
-              : "Back up this vault now"}
+              ? t("vaultCreation.ready.backedUp")
+              : t("vaultCreation.ready.backUpNow")}
         </Button>
         <Button
           variant="primary"
@@ -145,7 +147,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           disabled={pending}
           data-testid="create.ready-done"
         >
-          {pending ? "Decrypting…" : "Done"}
+          {pending ? t("vaultCreation.ready.decrypting") : t("vaultCreation.ready.done")}
         </Button>
       </div>
       {backupState === "error" && (
@@ -153,8 +155,7 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
           data-testid="create.ready-backup-error"
           style={{ fontSize: 13, color: "var(--fg-2)", textAlign: "center" }}
         >
-          Backup didn't complete — no file was left behind. You can back up
-          any time from Settings → Storage.
+          {t("vaultCreation.ready.backupError")}
         </div>
       )}
     </StepLayout>

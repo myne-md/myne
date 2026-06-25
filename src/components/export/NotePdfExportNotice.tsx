@@ -16,6 +16,7 @@
 // embedded PDFs are never carried into the generated PDF).
 
 import { useEffect, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../primitives/Button";
 import {
   EXPORT_PDF_EXCLUSION_SENTENCE,
@@ -58,6 +59,7 @@ export function NotePdfExportNotice({
   onCancel,
   onConfirm,
 }: NotePdfExportNoticeProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -84,7 +86,7 @@ export function NotePdfExportNotice({
     >
       <div style={CARD_STYLE} data-testid="export.pdf-notice">
         <h2 id="note-pdf-export-title" style={TITLE_STYLE}>
-          Export as PDF
+          {t("export.pdf.title")}
         </h2>
         <p style={SENTENCE_STYLE}>{EXPORT_PDF_PLAIN_SENTENCE}</p>
         <p style={SENTENCE_STYLE}>{EXPORT_PDF_EXCLUSION_SENTENCE}</p>
@@ -102,7 +104,7 @@ export function NotePdfExportNotice({
             onClick={onCancel}
             data-testid="export.pdf-cancel"
           >
-            Cancel
+            {t("export.pdf.cancel")}
           </Button>
           <Button
             variant="primary"
@@ -110,7 +112,7 @@ export function NotePdfExportNotice({
             onClick={onConfirm}
             data-testid="export.pdf-confirm"
           >
-            Continue…
+            {t("export.pdf.continue")}
           </Button>
         </div>
       </div>

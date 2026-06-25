@@ -33,6 +33,7 @@
 // V8 cleanup here is best-effort.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { Button } from "../primitives/Button";
 import { PasswordChangeForm } from "../PasswordChangeForm";
@@ -49,6 +50,7 @@ import {
 } from "../../lib/vault-delete";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { StageVaultStatus, SuspicionReason } from "../../lib/stage";
+import i18n from "../../i18n";
 
 interface AccountPanelProps {
   /**
@@ -241,15 +243,15 @@ function mapChangePasswordError(
 ): string | null {
   switch (e.kind) {
     case "InvalidCredentialOrVault":
-      return "Wrong current password or vault file is corrupted.";
+      return i18n.t("settings.account.changePasswordError.invalidCredentialOrVault");
     case "SamePasswordRejected":
-      return "New password matches the current one.";
+      return i18n.t("settings.account.changePasswordError.samePasswordRejected");
     case "WeakNewPassword":
-      return "New password must be at least 12 characters.";
+      return i18n.t("settings.account.changePasswordError.weakNewPassword");
     case "IoError":
-      return "Disk error, please try again.";
+      return i18n.t("settings.account.changePasswordError.ioError");
     case "JoinFailure":
-      return "Something went wrong, please try again.";
+      return i18n.t("settings.account.changePasswordError.joinFailure");
     case "InvalidVaultMeta":
     case "VaultMetaChangedExternally":
     case "VaultLockedDuringChange":
@@ -275,6 +277,7 @@ export function AccountPanel({
   onInFlightChange,
   onForceRelock,
 }: AccountPanelProps) {
+  const { t } = useTranslation();
   const [view, setView] = useState<View>("idle");
   const [inFlight, setInFlight] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -527,53 +530,47 @@ export function AccountPanel({
   return (
     <div style={ROOT_STYLE}>
       <section style={SECTION_STYLE}>
-        <h3 style={SECTION_HEADING_STYLE}>Argon2id parameters</h3>
+        <h3 style={SECTION_HEADING_STYLE}>{t("settings.account.argon2idHeading")}</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <div style={KV_ROW_STYLE}>
-            <span style={KV_LABEL_STYLE}>Memory cost</span>
+            <span style={KV_LABEL_STYLE}>{t("settings.account.memoryCost")}</span>
             <span style={KV_VALUE_STYLE}>256 MiB</span>
           </div>
           <div style={KV_ROW_STYLE}>
-            <span style={KV_LABEL_STYLE}>Time cost</span>
+            <span style={KV_LABEL_STYLE}>{t("settings.account.timeCost")}</span>
             <span style={KV_VALUE_STYLE}>3</span>
           </div>
           <div style={KV_ROW_STYLE}>
-            <span style={KV_LABEL_STYLE}>Parallelism</span>
+            <span style={KV_LABEL_STYLE}>{t("settings.account.parallelism")}</span>
             <span style={KV_VALUE_STYLE}>2</span>
           </div>
         </div>
       </section>
 
       <section style={SECTION_STYLE}>
-        <h3 style={SECTION_HEADING_STYLE}>Change password</h3>
-        <p style={HELPER_TEXT_STYLE}>
-          Rotate your master password while keeping the same vault.
-          Recovery phrase stays the same.
-        </p>
+        <h3 style={SECTION_HEADING_STYLE}>{t("settings.account.changePasswordHeading")}</h3>
+        <p style={HELPER_TEXT_STYLE}>{t("settings.account.changePasswordHelper")}</p>
         <div>
           <Button
             variant="primary"
             data-testid="settings.change-password-cta"
             onClick={() => setView("change-password")}
           >
-            Change password
+            {t("settings.account.changePasswordButton")}
           </Button>
         </div>
       </section>
 
       <section style={SECTION_STYLE}>
-        <h3 style={LABEL_EYEBROW_STYLE}>VAULT LABEL</h3>
-        <p style={LABEL_HELPER_STYLE}>
-          A name for this vault shown in the in-app switcher. Stored encrypted
-          inside the vault; never leaves your device in plaintext.
-        </p>
+        <h3 style={LABEL_EYEBROW_STYLE}>{t("settings.account.vaultLabelEyebrow")}</h3>
+        <p style={LABEL_HELPER_STYLE}>{t("settings.account.vaultLabelHelper")}</p>
         <div style={LABEL_INPUT_ROW_STYLE}>
           <input
             className="vault-label-input"
             data-testid="settings.label-input"
             type="text"
             value={labelDraft}
-            placeholder="Add a label…"
+            placeholder={t("settings.account.vaultLabelPlaceholder")}
             autoComplete="off"
             autoCapitalize="off"
             autoCorrect="off"
@@ -597,7 +594,7 @@ export function AccountPanel({
             disabled={labelSaveDisabled}
             style={labelSaveButtonStyle(labelSaveDisabled)}
           >
-            Save
+            {t("settings.account.vaultLabelSave")}
           </button>
         </div>
       </section>
@@ -609,11 +606,8 @@ export function AccountPanel({
       <hr style={DIVIDER_STYLE} aria-hidden="true" />
 
       <section style={SECTION_STYLE}>
-        <h3 style={DANGER_HEADING_STYLE}>Danger zone</h3>
-        <p style={HELPER_TEXT_MUTED_STYLE}>
-          Permanently delete this vault and all notes. Cannot be undone.
-          Recovery phrase will not restore the vault.
-        </p>
+        <h3 style={DANGER_HEADING_STYLE}>{t("settings.account.dangerZoneHeading")}</h3>
+        <p style={HELPER_TEXT_MUTED_STYLE}>{t("settings.account.dangerZoneHelper")}</p>
         <div>
           <Button
             variant="danger"
@@ -622,7 +616,7 @@ export function AccountPanel({
               setView("delete-vault");
             }}
           >
-            Delete vault…
+            {t("settings.account.deleteVaultButton")}
           </Button>
         </div>
       </section>

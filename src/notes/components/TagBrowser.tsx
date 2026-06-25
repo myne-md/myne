@@ -14,6 +14,7 @@
 // `ctx.open` navigation (SYNC-6); reader-surface card conventions (SYNC-4).
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import { foldSegment } from "../../dialect/folderPath";
 import { useIndexNonce } from "../indexNonce";
@@ -58,6 +59,7 @@ export function TagBrowser({
    *  `#tag` chip's entry point (#3). Raw tag string; folded here. */
   seedTagKey?: string | null;
 }) {
+  const { t } = useTranslation();
   const notes = useResolverNotes();
   const ctx = useSelectedNote();
   const indexNonce = useIndexNonce();
@@ -165,7 +167,7 @@ export function TagBrowser({
   return (
     <ModalShell
       open={open}
-      title="Tags"
+      title={t("notes.tagBrowser.title")}
       labelId="tag-browser-title"
       onClose={onClose}
       width={width}
@@ -191,7 +193,7 @@ export function TagBrowser({
             data-testid="tags.search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tags…"
+            placeholder={t("notes.tagBrowser.searchPlaceholder")}
             autoFocus
             style={{
               flex: 1,
@@ -223,10 +225,12 @@ export function TagBrowser({
           }}
         >
           {allRows.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--fg-3)" }}>No tags yet.</span>
+            <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
+              {t("notes.tagBrowser.noTagsYet")}
+            </span>
           ) : chips.length === 0 ? (
             <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
-              No tags match “{query}”.
+              {t("notes.tagBrowser.noTagsMatch", { query })}
             </span>
           ) : (
             chips.map((r) => (
@@ -238,7 +242,7 @@ export function TagBrowser({
                 aria-pressed={selected.has(r.key)}
                 onClick={() => toggleSelected(r.key)}
                 style={{ ...tagPillStyle(selected.has(r.key)), cursor: "pointer" }}
-                title={`${r.subtreeCount} ${r.subtreeCount === 1 ? "note" : "notes"}`}
+                title={t("notes.tagBrowser.noteCount", { count: r.subtreeCount })}
               >
                 {`#${r.display}`}
                 <span
@@ -265,7 +269,7 @@ export function TagBrowser({
             padding: "10px 16px 6px",
           }}
         >
-          <span style={SECTION_HEADING_STYLE}>Notes</span>
+          <span style={SECTION_HEADING_STYLE}>{t("notes.tagBrowser.notes")}</span>
           {hasSelection && (
             <>
               <span data-testid="tags.count" style={{ fontSize: 12, color: "var(--fg-3)" }}>
@@ -289,7 +293,7 @@ export function TagBrowser({
                     cursor: "pointer",
                   }}
                 >
-                  Save as view
+                  {t("notes.tagBrowser.saveAsView")}
                 </button>
               )}
               <button
@@ -305,7 +309,7 @@ export function TagBrowser({
                   cursor: "pointer",
                 }}
               >
-                Clear
+                {t("notes.tagBrowser.clear")}
               </button>
             </>
           )}
@@ -332,7 +336,7 @@ export function TagBrowser({
                 if (e.key === "Enter") onSaveAsView();
                 else if (e.key === "Escape") setSavingName(null);
               }}
-              placeholder="View name"
+              placeholder={t("notes.tagBrowser.viewNamePlaceholder")}
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -360,7 +364,7 @@ export function TagBrowser({
                 cursor: "pointer",
               }}
             >
-              Save
+              {t("notes.tagBrowser.save")}
             </button>
             <button
               type="button"
@@ -374,7 +378,7 @@ export function TagBrowser({
                 cursor: "pointer",
               }}
             >
-              Cancel
+              {t("notes.tagBrowser.cancel")}
             </button>
           </div>
         )}
@@ -392,11 +396,11 @@ export function TagBrowser({
           }}
         >
           {!hasSelection ? (
-            <div style={MESSAGE_STYLE}>Pick a tag to filter.</div>
+            <div style={MESSAGE_STYLE}>{t("notes.tagBrowser.pickTag")}</div>
           ) : result === null ? (
-            <div style={MESSAGE_STYLE}>Filtering…</div>
+            <div style={MESSAGE_STYLE}>{t("notes.tagBrowser.filtering")}</div>
           ) : result.count === 0 ? (
-            <div style={MESSAGE_STYLE}>No notes for this filter.</div>
+            <div style={MESSAGE_STYLE}>{t("notes.tagBrowser.noNotesForFilter")}</div>
           ) : (
             result.rows.map((r) => (
               <button
@@ -407,7 +411,7 @@ export function TagBrowser({
                 style={SIDEBAR_CARD_STYLE}
               >
                 <span style={{ fontSize: 13, fontWeight: 500, color: "var(--accent)" }}>
-                  {r.title ?? "Untitled"}
+                  {r.title ?? t("notes.tagBrowser.untitled")}
                 </span>
                 {mode === "or" && r.matchedKeys.length > 0 && (
                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8 }}>
@@ -443,6 +447,7 @@ function ModeToggle({
   mode: FilterMode;
   onChange: (m: FilterMode) => void;
 }) {
+  const { t } = useTranslation();
   const seg = (m: FilterMode): CSSProperties => ({
     fontSize: 12,
     fontWeight: mode === m ? 600 : 500,
@@ -456,7 +461,7 @@ function ModeToggle({
   return (
     <div
       role="group"
-      aria-label="Combine tags with"
+      aria-label={t("notes.tagBrowser.combineTagsWith")}
       style={{
         display: "inline-flex",
         padding: 2,
@@ -473,7 +478,7 @@ function ModeToggle({
         onClick={() => onChange("and")}
         style={seg("and")}
       >
-        All
+        {t("notes.tagBrowser.modeAll")}
       </button>
       <button
         type="button"
@@ -482,7 +487,7 @@ function ModeToggle({
         onClick={() => onChange("or")}
         style={seg("or")}
       >
-        Any
+        {t("notes.tagBrowser.modeAny")}
       </button>
     </div>
   );

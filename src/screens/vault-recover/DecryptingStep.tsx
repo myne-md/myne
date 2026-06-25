@@ -9,16 +9,18 @@
 // documents the silent-swallow risk if vault_lock arrives
 // mid-Argon2id).
 
+import { useTranslation } from "react-i18next";
 import { BlockingProgressStep } from "../../components/BlockingProgressStep";
 
 export function DecryptingStep() {
+  const { t } = useTranslation();
   return (
     <BlockingProgressStep
-      eyebrow="RECOVERY · DECRYPTING"
-      heading="Decrypting your vault"
-      subCaption="Working… Argon2id m=256 MiB, t=3, p=2"
-      caption="This takes a moment."
-      footerHint="If this takes longer than 30 seconds, close the window and try again."
+      eyebrow={t("vaultRecover.decrypting.eyebrow")}
+      heading={t("vaultRecover.decrypting.heading")}
+      subCaption={t("vaultRecover.decrypting.subCaption")}
+      caption={t("vaultRecover.decrypting.caption")}
+      footerHint={t("vaultRecover.decrypting.footerHint")}
       testId="recover.decrypting"
     />
   );

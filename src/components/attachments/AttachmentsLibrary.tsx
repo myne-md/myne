@@ -25,6 +25,7 @@ import {
   type CSSProperties,
   type RefObject,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -61,19 +62,23 @@ type ViewMode = "grid" | "list";
 type SortKey = "created-desc" | "created-asc" | "name-asc" | "name-desc";
 type TypeFilter = "all" | AttachmentKind;
 
-const TYPE_FILTER_OPTIONS: readonly SelectOption<TypeFilter>[] = [
-  { value: "all", label: "All types" },
-  { value: "image", label: "Images" },
-  { value: "pdf", label: "PDFs" },
-  { value: "audio", label: "Audio" },
-  { value: "other", label: "Other" },
+// Label keys (NOT resolved labels) — resolved with `t()` at render time inside
+// the component so a language switch updates the option text. Keeping the
+// `value`/`labelKey` pairs at module scope (only the i18n KEY, never the
+// resolved string) avoids freezing the boot language.
+const TYPE_FILTER_OPTION_KEYS: readonly { value: TypeFilter; labelKey: string }[] = [
+  { value: "all", labelKey: "attachments.library.typeFilter.all" },
+  { value: "image", labelKey: "attachments.library.typeFilter.image" },
+  { value: "pdf", labelKey: "attachments.library.typeFilter.pdf" },
+  { value: "audio", labelKey: "attachments.library.typeFilter.audio" },
+  { value: "other", labelKey: "attachments.library.typeFilter.other" },
 ];
 
-const SORT_OPTIONS: readonly SelectOption<SortKey>[] = [
-  { value: "created-desc", label: "Newest first" },
-  { value: "created-asc", label: "Oldest first" },
-  { value: "name-asc", label: "Name A–Z" },
-  { value: "name-desc", label: "Name Z–A" },
+const SORT_OPTION_KEYS: readonly { value: SortKey; labelKey: string }[] = [
+  { value: "created-desc", labelKey: "attachments.library.sort.createdDesc" },
+  { value: "created-asc", labelKey: "attachments.library.sort.createdAsc" },
+  { value: "name-asc", labelKey: "attachments.library.sort.nameAsc" },
+  { value: "name-desc", labelKey: "attachments.library.sort.nameDesc" },
 ];
 
 interface AttachmentsLibraryProps {
@@ -228,7 +233,17 @@ const CLEAN_NOTICE_STYLE: CSSProperties = {
 };
 
 export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
+  // Resolve the option labels at render time (reactive to language switch).
+  const typeFilterOptions: readonly SelectOption<TypeFilter>[] = useMemo(
+    () => TYPE_FILTER_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
+    [t],
+  );
+  const sortOptions: readonly SelectOption<SortKey>[] = useMemo(
+    () => SORT_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
+    [t],
+  );
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
@@ -311,10 +326,10 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       const picked = await openFileDialog({
         multiple: false,
         directory: false,
-        title: "Import attachment",
+        title: t("attachments.library.importDialogTitle"),
         filters: [
           {
-            name: "Supported files",
+            name: t("attachments.library.supportedFilesFilter"),
             extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"],
           },
         ],
@@ -331,7 +346,7 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     } finally {
       setImporting(false);
     }
-  }, [refresh]);
+  }, [refresh, t]);
 
   const handlePreview = useCallback((entry: CatalogEntry) => {
     // PDF → scrollable multi-page reader; image/SVG → image lightbox (MYND-164).
@@ -392,16 +407,16 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     try {
       const unused = await attachmentUnusedList();
       if (unused.length === 0) {
-        setCleanNotice("No unused attachments to clean.");
+        setCleanNotice(t("attachments.library.noUnusedNotice"));
       } else {
         setCleanupTarget(unused);
       }
     } catch {
-      setCleanNotice("Couldn't check for unused attachments. Try again.");
+      setCleanNotice(t("attachments.library.checkUnusedFailedNotice"));
     } finally {
       setCheckingUnused(false);
     }
-  }, []);
+  }, [t]);
 
   const handleCleanConfirm = useCallback(
     async (ids: string[]): Promise<CleanResult> => {
@@ -415,8 +430,8 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   // Auto-dismiss the transient clean-up notice (2.5 s, matching Toast).
   useEffect(() => {
     if (cleanNotice === null) return;
-    const t = setTimeout(() => setCleanNotice(null), 2500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setCleanNotice(null), 2500);
+    return () => clearTimeout(timer);
   }, [cleanNotice]);
 
   const handleJump = useCallback(
@@ -477,7 +492,7 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       }}
     >
       <div style={TOOLBAR_STYLE}>
-        <span style={TITLE_STYLE}>Attachments</span>
+        <span style={TITLE_STYLE}>{t("attachments.library.title")}</span>
         <div
           style={
             searchFocused
@@ -500,23 +515,23 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
-            placeholder="Search by filename"
-            aria-label="Search attachments by filename"
+            placeholder={t("attachments.library.searchPlaceholder")}
+            aria-label={t("attachments.library.searchAriaLabel")}
             style={SEARCH_INPUT_STYLE}
           />
         </div>
         <div style={CONTROLS_GROUP_STYLE}>
           <Select
             value={typeFilter}
-            options={TYPE_FILTER_OPTIONS}
+            options={typeFilterOptions}
             onChange={setTypeFilter}
-            aria-label="Filter by type"
+            aria-label={t("attachments.library.filterAriaLabel")}
           />
           <Select
             value={sort}
-            options={SORT_OPTIONS}
+            options={sortOptions}
             onChange={setSort}
-            aria-label="Sort attachments"
+            aria-label={t("attachments.library.sortAriaLabel")}
           />
           <ViewToggleButton view={view} onToggle={() => setView((v) => (v === "grid" ? "list" : "grid"))} />
           <Button
@@ -525,9 +540,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
             onClick={() => void handleCleanUnused()}
             disabled={checkingUnused || importing}
             data-testid="attachments.clean-unused-cta"
-            title="Delete attachments not used in any note"
+            title={t("attachments.library.cleanUnusedTitle")}
           >
-            {checkingUnused ? "Checking…" : "Clean unused"}
+            {checkingUnused
+              ? t("attachments.library.checking")
+              : t("attachments.library.cleanUnused")}
           </Button>
           <Button
             variant="secondary"
@@ -535,14 +552,14 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
             onClick={() => void handleImport()}
             disabled={importing}
           >
-            {importing ? "Importing…" : "Import"}
+            {importing ? t("attachments.library.importing") : t("attachments.library.import")}
           </Button>
         </div>
       </div>
 
       <div style={SCROLL_STYLE}>
         {isLoading ? (
-          <div style={CENTER_MESSAGE_STYLE}>Decrypting attachments…</div>
+          <div style={CENTER_MESSAGE_STYLE}>{t("attachments.library.decrypting")}</div>
         ) : isEmpty ? (
           <EmptyState
             loadError={loadError}
@@ -550,7 +567,7 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
             onImport={() => void handleImport()}
           />
         ) : isNoMatch ? (
-          <div style={CENTER_MESSAGE_STYLE}>No attachments match your search.</div>
+          <div style={CENTER_MESSAGE_STYLE}>{t("attachments.library.noMatch")}</div>
         ) : view === "grid" ? (
           <div style={GRID_STYLE}>
             {visible.map((entry) => (
@@ -613,7 +630,11 @@ function ViewToggleButton({
   view: ViewMode;
   onToggle: () => void;
 }) {
-  const label = view === "grid" ? "List view" : "Grid view";
+  const { t } = useTranslation();
+  const label =
+    view === "grid"
+      ? t("attachments.library.listView")
+      : t("attachments.library.gridView");
   return (
     <button
       type="button"
@@ -644,22 +665,25 @@ function EmptyState({
   importing: boolean;
   onImport: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div style={CENTER_MESSAGE_STYLE}>
       <Icon name="paperclip" size={28} />
       <div style={{ fontSize: 14, color: "var(--fg-2)" }}>
         {loadError
-          ? "Couldn't read the attachments catalog."
-          : "No attachments yet."}
+          ? t("attachments.library.emptyLoadError")
+          : t("attachments.library.emptyNoAttachments")}
       </div>
-      <div>Import a file to keep it in your vault.</div>
+      <div>{t("attachments.library.emptyImportHint")}</div>
       <Button
         variant="secondary"
         icon="download"
         onClick={onImport}
         disabled={importing}
       >
-        {importing ? "Importing…" : "Import a file"}
+        {importing
+          ? t("attachments.library.importing")
+          : t("attachments.library.importFile")}
       </Button>
     </div>
   );
@@ -766,6 +790,7 @@ function UsedInNotes({
   onClose: () => void;
   onJump: (id: NoteId) => void;
 }) {
+  const { t } = useTranslation();
   const [noteIds, setNoteIds] = useState<string[] | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -804,8 +829,8 @@ function UsedInNotes({
         disabled={noteIds === null}
       >
         {noteIds === null
-          ? "…"
-          : `Used in ${n} ${n === 1 ? "note" : "notes"}`}
+          ? t("attachments.library.usedInLoading")
+          : t("attachments.library.usedInCount", { count: n })}
       </button>
       {open && noteIds !== null && (
         <UsedInNotesPopover
@@ -1001,24 +1026,36 @@ function ItemMenu({
   onStartRename: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const items: ItemMenuEntry[] = [
     ...(previewable
-      ? [{ id: "preview", label: "Preview", onSelect: onPreview }]
+      ? [
+          {
+            id: "preview",
+            label: t("attachments.library.menuPreview"),
+            onSelect: onPreview,
+          },
+        ]
       : []),
-    { id: "export", label: "Export", onSelect: onExport },
-    { id: "rename", label: "Rename", onSelect: onStartRename },
-    { id: "delete", label: "Delete", destructive: true, onSelect: onDelete },
+    { id: "export", label: t("attachments.library.menuExport"), onSelect: onExport },
+    { id: "rename", label: t("attachments.library.menuRename"), onSelect: onStartRename },
+    {
+      id: "delete",
+      label: t("attachments.library.menuDelete"),
+      destructive: true,
+      onSelect: onDelete,
+    },
   ];
   return (
     <>
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Attachment actions"
+        aria-label={t("attachments.library.actionsAriaLabel")}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Actions"
+        title={t("attachments.library.actionsTitle")}
         data-testid="attachments.actions-trigger"
         style={MENU_TRIGGER_STYLE}
         onClick={(e) => {
@@ -1093,6 +1130,7 @@ function ThumbnailWithPreview({
   onPreview: () => void;
   showPreview: boolean;
 }) {
+  const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
   const kind = kindOf(entry.content_type);
   const previewable = showPreview && (kind === "image" || kind === "pdf");
@@ -1111,8 +1149,8 @@ function ThumbnailWithPreview({
       {previewable && hovering && (
         <button
           type="button"
-          aria-label="Preview attachment"
-          title="Preview"
+          aria-label={t("attachments.library.previewAttachment")}
+          title={t("attachments.library.preview")}
           style={PREVIEW_OVERLAY_BTN_STYLE}
           onClick={(e) => {
             e.stopPropagation();
@@ -1275,14 +1313,15 @@ const LIST_HEADER_STYLE: CSSProperties = {
 };
 
 function ListHeader() {
+  const { t } = useTranslation();
   return (
     <div style={LIST_HEADER_STYLE}>
       <span />
-      <span>Name</span>
-      <span>Type</span>
-      <span>Size</span>
-      <span>Created</span>
-      <span>Used in</span>
+      <span>{t("attachments.library.colName")}</span>
+      <span>{t("attachments.library.colType")}</span>
+      <span>{t("attachments.library.colSize")}</span>
+      <span>{t("attachments.library.colCreated")}</span>
+      <span>{t("attachments.library.colUsedIn")}</span>
       <span />
     </div>
   );

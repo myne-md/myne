@@ -39,6 +39,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
 import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
@@ -193,25 +194,25 @@ const COALESCED_FLUSH_POLL_MS = 30_000;
  * `EditorChrome` maps over this list to build its checkable items. Ids are a
  * closed, non-secret UI vocabulary persisted in `vault.prefs.hidden_bar_items`.
  */
-const BAR_ITEMS: ReadonlyArray<{ id: string; label: string }> = [
-  { id: "sync-status", label: "Sync status" },
-  { id: "save-status", label: "Save status" },
-  { id: "view-mode", label: "View mode" },
-  { id: "workspace", label: "Workspace" },
-  { id: "tags", label: "Tags" },
-  { id: "views", label: "Views" },
-  { id: "graph", label: "Graph" },
-  { id: "settings", label: "Settings" },
-  { id: "lock", label: "Lock" },
-  { id: "word-count", label: "Word count" },
+const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
+  { id: "sync-status", labelKey: "editor.chrome.barItems.syncStatus" },
+  { id: "save-status", labelKey: "editor.chrome.barItems.saveStatus" },
+  { id: "view-mode", labelKey: "editor.chrome.barItems.viewMode" },
+  { id: "workspace", labelKey: "editor.chrome.barItems.workspace" },
+  { id: "tags", labelKey: "editor.chrome.barItems.tags" },
+  { id: "views", labelKey: "editor.chrome.barItems.views" },
+  { id: "graph", labelKey: "editor.chrome.barItems.graph" },
+  { id: "settings", labelKey: "editor.chrome.barItems.settings" },
+  { id: "lock", labelKey: "editor.chrome.barItems.lock" },
+  { id: "word-count", labelKey: "editor.chrome.barItems.wordCount" },
 ];
 
-/** reading-source-modes (MYND-299): short labels for the BottomBar view-mode
- *  switcher. */
-const VIEW_MODE_LABEL: Record<ViewMode, string> = {
-  live: "Live",
-  reading: "Reading",
-  source: "Source",
+/** reading-source-modes (MYND-299): short i18n keys for the BottomBar view-mode
+ *  switcher labels (resolved with t() at the render consumer to stay reactive). */
+const VIEW_MODE_LABEL_KEY: Record<ViewMode, string> = {
+  live: "editor.chrome.viewMode.live",
+  reading: "editor.chrome.viewMode.reading",
+  source: "editor.chrome.viewMode.source",
 };
 /** The switcher click cycles live → reading → source → live. */
 const NEXT_VIEW_MODE: Record<ViewMode, ViewMode> = {
@@ -467,6 +468,7 @@ function EditorChrome({
   toast,
   setToast,
 }: EditorChromeProps) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
   // Plain-message sink for the pre-existing string consumers (Settings,
@@ -581,9 +583,16 @@ function EditorChrome({
   const handleImported = useCallback(
     (result: ImportResult) => {
       const skipped =
-        result.skippedExisting > 0 ? ` · ${result.skippedExisting} skipped` : "";
+        result.skippedExisting > 0
+          ? t("editor.chrome.import.skippedSuffix", {
+              count: result.skippedExisting,
+            })
+          : "";
       showToastMessage(
-        `Imported ${result.imported} ${result.imported === 1 ? "note" : "notes"}${skipped}`,
+        t("editor.chrome.import.imported", {
+          count: result.imported,
+          skipped,
+        }),
       );
       // Repopulate the sidebar so the imported notes appear immediately.
       void noteList()
@@ -592,7 +601,7 @@ function EditorChrome({
           /* sidebar stays as-is until the next refresh — non-fatal */
         });
     },
-    [ctx, showToastMessage],
+    [ctx, showToastMessage, t],
   );
 
   // Cmd/Ctrl+Shift+G opens the whole-vault graph tab (MYND-198, SYNC-7) — the
@@ -707,33 +716,46 @@ function EditorChrome({
     const picked = await openDialog({
       multiple: false,
       directory: false,
-      filters: [{ name: "Obsidian Base", extensions: ["base"] }],
+      filters: [
+        {
+          name: t("editor.chrome.baseImport.fileFilterName"),
+          extensions: ["base"],
+        },
+      ],
     });
     if (picked === null) return; // cancelled — no toast
     try {
       // The root-confining directory split lives in importBase (sealed seam).
       const tally = await importBaseFilePath(picked);
-      let message = `Imported ${tally.importedViews} view(s)`;
+      let message = t("editor.chrome.baseImport.imported", {
+        count: tally.importedViews,
+      });
       if (tally.skippedViews > 0) {
-        message += ` · ${tally.skippedViews} skipped`;
+        message += t("editor.chrome.baseImport.skippedSuffix", {
+          count: tally.skippedViews,
+        });
       }
       if (tally.droppedUnsupportedFilters > 0) {
-        message += ` · ${tally.droppedUnsupportedFilters} filters dropped`;
+        message += t("editor.chrome.baseImport.droppedFiltersSuffix", {
+          count: tally.droppedUnsupportedFilters,
+        });
       }
       setToast({ message });
     } catch (e) {
       if (e instanceof BaseParseError) {
-        setToast({ message: "Not a valid .base file." });
+        setToast({ message: t("editor.chrome.baseImport.notValid") });
       } else if (e instanceof BaseImportPersistError) {
         // Count-only (SYNC-12) — never surface the failed view's name in copy.
         setToast({
-          message: `Import stopped after ${e.persistedCount} view(s).`,
+          message: t("editor.chrome.baseImport.stoppedAfter", {
+            count: e.persistedCount,
+          }),
         });
       } else {
-        setToast({ message: "Import failed." });
+        setToast({ message: t("editor.chrome.baseImport.failed") });
       }
     }
-  }, [setToast]);
+  }, [setToast, t]);
 
   // MYND-170 (SYNC-9) exclusive active-state: selecting a note in the sidebar
   // (from ANY source — row click, keyboard nav, command palette, favorites,
@@ -1052,28 +1074,28 @@ function EditorChrome({
   const handleSaveWorkspaceAs = useCallback(() => {
     void (async () => {
       const name = await promptForText({
-        title: "Save workspace as",
-        confirmLabel: "Save",
-        placeholder: "Workspace name",
+        title: t("editor.chrome.workspacePrompt.saveAsTitle"),
+        confirmLabel: t("editor.chrome.workspacePrompt.saveConfirm"),
+        placeholder: t("editor.chrome.workspacePrompt.namePlaceholder"),
         testIdPrefix: "workspace-prompt",
       });
       if (name !== null) saveWorkspaceAs(name);
     })();
-  }, [saveWorkspaceAs]);
+  }, [saveWorkspaceAs, t]);
   const handleRenameWorkspace = useCallback(() => {
     const snapshot = ws.workspacesSnapshot();
     const active = snapshot.slots.find((s) => s.id === snapshot.activeId);
     if (active === undefined) return;
     void (async () => {
       const name = await promptForText({
-        title: "Rename workspace",
+        title: t("editor.chrome.workspacePrompt.renameTitle"),
         initialValue: active.name,
-        confirmLabel: "Rename",
+        confirmLabel: t("editor.chrome.workspacePrompt.renameConfirm"),
         testIdPrefix: "workspace-prompt",
       });
       if (name !== null) renameWorkspace(active.id, name);
     })();
-  }, [ws, renameWorkspace]);
+  }, [ws, renameWorkspace, t]);
   // Rename a SPECIFIC slot (the per-row pencil in the bottom-bar switcher) — vs
   // handleRenameWorkspace which renames the active slot (the palette command).
   const handleRenameWorkspaceById = useCallback(
@@ -1082,15 +1104,15 @@ function EditorChrome({
       if (slot === undefined) return;
       void (async () => {
         const name = await promptForText({
-          title: "Rename workspace",
+          title: t("editor.chrome.workspacePrompt.renameTitle"),
           initialValue: slot.name,
-          confirmLabel: "Rename",
+          confirmLabel: t("editor.chrome.workspacePrompt.renameConfirm"),
           testIdPrefix: "workspace-prompt",
         });
         if (name !== null) renameWorkspace(id, name);
       })();
     },
-    [ws, renameWorkspace],
+    [ws, renameWorkspace, t],
   );
   const handleSwitchWorkspaceCycle = useCallback(() => {
     // Palette switch (no inline picker): cycle to the next slot in order.
@@ -1170,7 +1192,7 @@ function EditorChrome({
           containerRef={rowRef}
           onResize={layout.setLeftWidth}
           onToggleCollapse={layout.toggleLeftCollapsed}
-          resizeLabel="Resize notes sidebar"
+          resizeLabel={t("editor.chrome.resizeNotesSidebar")}
         >
             <div style={SIDEBAR_COLUMN_STYLE}>
               {/* Traffic-light + left-toggle clearance row. The floated toggle
@@ -1242,7 +1264,7 @@ function EditorChrome({
             containerRef={rowRef}
             onResize={layout.setRightWidth}
             onToggleCollapse={layout.toggleRightCollapsed}
-            resizeLabel="Resize backlinks sidebar"
+            resizeLabel={t("editor.chrome.resizeBacklinksSidebar")}
           >
             <RightSidebar />
           </SidebarPane>
@@ -1338,7 +1360,7 @@ function EditorChrome({
           items={BAR_ITEMS.map(
             (it): ContextMenuItem => ({
               id: it.id,
-              label: it.label,
+              label: t(it.labelKey),
               checked: !hiddenBarItems.includes(it.id),
               closeOnSelect: false,
               onSelect: () =>
@@ -1751,6 +1773,7 @@ function TitleBarToggle({
    *  must not persist a manual flip the responsive override imposed). */
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const icon =
     side === "left"
       ? collapsed
@@ -1759,9 +1782,14 @@ function TitleBarToggle({
       : collapsed
         ? "panel-right"
         : "panel-right-close";
-  const label = `${collapsed ? "Show" : "Hide"} ${
-    side === "left" ? "notes" : "backlinks"
-  } sidebar`;
+  const label =
+    side === "left"
+      ? collapsed
+        ? t("editor.chrome.sidebarToggle.showNotes")
+        : t("editor.chrome.sidebarToggle.hideNotes")
+      : collapsed
+        ? t("editor.chrome.sidebarToggle.showBacklinks")
+        : t("editor.chrome.sidebarToggle.hideBacklinks");
   return (
     <button
       type="button"
@@ -1800,7 +1828,11 @@ function TitleBarNavButton({
   onClick: () => void;
   disabled: boolean;
 }) {
-  const label = direction === "back" ? "Go back" : "Go forward";
+  const { t } = useTranslation();
+  const label =
+    direction === "back"
+      ? t("editor.chrome.nav.goBack")
+      : t("editor.chrome.nav.goForward");
   return (
     <button
       type="button"
@@ -1891,6 +1923,7 @@ function CommandPaletteHost({
   onRenameWorkspace,
   onDeleteWorkspace,
 }: CommandPaletteHostProps) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
   // set (authoritative note_list + loadNoteBatch, not the partial sidebar cache).
@@ -1943,7 +1976,7 @@ function CommandPaletteHost({
         .filter((r) => r.trashed === null && r.template !== true)
         .map((r) => r.noteUuid);
       if (candidates.length === 0) {
-        showAttachmentToast("No notes to open.");
+        showAttachmentToast(t("editor.chrome.noNotesToOpen"));
         return;
       }
       if (candidates.length > 1 && ctx.selectedId !== null) {
@@ -1958,7 +1991,7 @@ function CommandPaletteHost({
         console.warn("[Editor] open random note failed:", err);
       }
     }
-  }, [ctx]);
+  }, [ctx, t]);
   const commandCtx: CommandContext = useMemo(
     () => ({
       stageName: "editor",
@@ -2253,6 +2286,7 @@ function WorkspaceHotkeys({
  * any note's save/rename/move re-queries; the reference-equal bail guards renders.
  */
 function RightSidebar() {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   const notes = useResolverNotes();
   const indexNonce = useIndexNonce();
@@ -2326,10 +2360,12 @@ function RightSidebar() {
         gap: 8,
       }}
     >
-      <div style={SECTION_HEADING_STYLE}>Linked from {rows.length}</div>
+      <div style={SECTION_HEADING_STYLE}>
+        {t("editor.chrome.backlinks.linkedFrom", { count: rows.length })}
+      </div>
       {rows.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
-          No backlinks yet.
+          {t("editor.chrome.backlinks.empty")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -2345,7 +2381,7 @@ function RightSidebar() {
               <span
                 style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}
               >
-                {row.sourceTitle ?? "Untitled"}
+                {row.sourceTitle ?? t("editor.chrome.backlinks.untitled")}
               </span>
               {row.count > 1 && (
                 <span
@@ -2360,7 +2396,7 @@ function RightSidebar() {
               {ctx.cache.get(row.sourceUuid)?.archived != null && (
                 <span
                   data-testid="editor.backlink-archived-badge"
-                  title="Archived"
+                  title={t("editor.chrome.backlinks.archivedBadge")}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -2501,6 +2537,7 @@ function SidebarPane({
  * itself, but the semantics (saving during lock) stay the same.
  */
 function SwitchingOverlay() {
+  const { t } = useTranslation();
   return (
     <div
       role="status"
@@ -2523,7 +2560,7 @@ function SwitchingOverlay() {
       }}
     >
       <Spinner size={16} style={{ borderWidth: 2 }} />
-      <span>Saving…</span>
+      <span>{t("editor.chrome.switchingOverlay.saving")}</span>
     </div>
   );
 }
@@ -2609,6 +2646,7 @@ function BottomBar({
   hiddenItems,
   onContextMenu,
 }: BottomBarProps) {
+  const { t } = useTranslation();
   const handleLockClick = () => {
     void onLockFlushed().catch(() => {
       /* lock flush failures already routed through saveStatus */
@@ -2632,7 +2670,9 @@ function BottomBar({
       }}
     >
       {!isHidden("sync-status") && (
-        <span style={STATUS_TEXT_STYLE}>Local-only · not synced</span>
+        <span style={STATUS_TEXT_STYLE}>
+          {t("editor.chrome.bottomBar.syncStatus")}
+        </span>
       )}
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -2654,10 +2694,12 @@ function BottomBar({
           <button
             type="button"
             onClick={onCycleViewMode}
-            aria-label="Cycle view mode"
+            aria-label={t("editor.chrome.bottomBar.cycleViewMode")}
             data-testid="editor.view-mode-cta"
             data-view-mode={viewMode}
-            title={`View mode: ${VIEW_MODE_LABEL[viewMode]} (click to cycle)`}
+            title={t("editor.chrome.bottomBar.viewModeTitle", {
+              mode: t(VIEW_MODE_LABEL_KEY[viewMode]),
+            })}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2673,17 +2715,17 @@ function BottomBar({
               fontWeight: 500,
             }}
           >
-            {VIEW_MODE_LABEL[viewMode]}
+            {t(VIEW_MODE_LABEL_KEY[viewMode])}
           </button>
         )}
         {showPreview && onTogglePreview && (
           <button
             type="button"
             onClick={onTogglePreview}
-            aria-label="Toggle side-by-side preview"
+            aria-label={t("editor.chrome.bottomBar.togglePreview")}
             aria-pressed={previewActive}
             data-testid="editor.preview-companion-toggle"
-            title="Toggle side-by-side preview"
+            title={t("editor.chrome.bottomBar.togglePreview")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2703,9 +2745,9 @@ function BottomBar({
           <button
             type="button"
             onClick={onShowTags}
-            aria-label="Browse tags"
+            aria-label={t("editor.chrome.bottomBar.browseTags")}
             data-testid="editor.tags-cta"
-            title="Tags"
+            title={t("editor.chrome.bottomBar.tagsTitle")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2725,9 +2767,9 @@ function BottomBar({
           <button
             type="button"
             onClick={onShowViews}
-            aria-label="Browse views"
+            aria-label={t("editor.chrome.bottomBar.browseViews")}
             data-testid="editor.views-cta"
-            title="Views"
+            title={t("editor.chrome.bottomBar.viewsTitle")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2748,8 +2790,8 @@ function BottomBar({
             type="button"
             data-testid="editor.graph-button"
             onClick={onShowGraph}
-            aria-label="Show graph view"
-            title="Graph (⌘⇧G)"
+            aria-label={t("editor.chrome.bottomBar.showGraph")}
+            title={t("editor.chrome.bottomBar.graphTitle")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2769,9 +2811,9 @@ function BottomBar({
           <button
             type="button"
             onClick={onOpenSettings}
-            aria-label="Open settings"
+            aria-label={t("editor.chrome.bottomBar.openSettings")}
             data-testid="editor.settings-cta"
-            title="Settings (⌘,)"
+            title={t("editor.chrome.bottomBar.settingsTitle")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -2791,7 +2833,7 @@ function BottomBar({
           <button
             type="button"
             onClick={handleLockClick}
-            aria-label="Lock vault"
+            aria-label={t("editor.chrome.bottomBar.lockVault")}
             data-testid="editor.lock-cta"
             style={{
               display: "flex",
@@ -2809,7 +2851,7 @@ function BottomBar({
             }}
           >
             <Icon name="lock" size={12} />
-            <span>Lock</span>
+            <span>{t("editor.chrome.bottomBar.lock")}</span>
           </button>
         )}
         {(() => {
@@ -2825,18 +2867,28 @@ function BottomBar({
               data-testid="editor.doc-stats"
               data-scope={isSel ? "selection" : "document"}
               title={
-                `${shown.characters} characters · ${shown.words} words · ` +
-                `${shown.spaces} spaces · ${shown.paragraphs} ` +
-                `${shown.paragraphs === 1 ? "paragraph" : "paragraphs"}` +
-                `${isSel ? " (selection)" : ""}`
+                t("editor.chrome.bottomBar.docStats.title", {
+                  characters: shown.characters,
+                  words: shown.words,
+                  spaces: shown.spaces,
+                  count: shown.paragraphs,
+                }) +
+                (isSel
+                  ? t("editor.chrome.bottomBar.docStats.titleSelectionSuffix")
+                  : "")
               }
               style={{
                 ...STATUS_TEXT_STYLE,
                 fontFamily: "var(--font-mono)",
               }}
             >
-              {shown.words} {shown.words === 1 ? "word" : "words"} · {shown.characters} chars
-              {isSel ? " (sel)" : ""}
+              {t("editor.chrome.bottomBar.docStats.summary", {
+                characters: shown.characters,
+                count: shown.words,
+              })}
+              {isSel
+                ? t("editor.chrome.bottomBar.docStats.summarySelectionSuffix")
+                : ""}
             </span>
           );
         })()}
@@ -2867,6 +2919,7 @@ function WorkspaceSwitcherControl({
   onSaveAs?: () => void;
   onRename?: (id: SlotId) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   // Close on outside click / Esc while open.
@@ -2889,7 +2942,7 @@ function WorkspaceSwitcherControl({
   }, [open]);
 
   const active = slots.find((s) => s.id === activeId);
-  const activeName = active?.name ?? "Workspace";
+  const activeName = active?.name ?? t("editor.chrome.workspaceSwitcher.defaultName");
 
   return (
     <div
@@ -2903,9 +2956,11 @@ function WorkspaceSwitcherControl({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Switch workspace"
+        aria-label={t("editor.chrome.workspaceSwitcher.switchLabel")}
         data-testid="editor.workspace-switcher.toggle"
-        title={`Workspace: ${activeName}`}
+        title={t("editor.chrome.workspaceSwitcher.toggleTitle", {
+          name: activeName,
+        })}
         style={{
           display: "flex",
           alignItems: "center",
@@ -3009,10 +3064,12 @@ function WorkspaceSwitcherControl({
                 {onRename !== undefined && (
                   <button
                     type="button"
-                    aria-label={`Rename workspace ${s.name}`}
+                    aria-label={t("editor.chrome.workspaceSwitcher.renameItemLabel", {
+                      name: s.name,
+                    })}
                     data-testid="editor.workspace-switcher.rename"
                     data-workspace-id={s.id}
-                    title="Rename workspace"
+                    title={t("editor.chrome.workspaceSwitcher.renameTitle")}
                     onClick={() => {
                       setOpen(false);
                       onRename(s.id);
@@ -3072,7 +3129,7 @@ function WorkspaceSwitcherControl({
                 <span style={{ width: 14, flexShrink: 0, color: "var(--fg-3)" }}>
                   <Icon name="plus" size={12} />
                 </span>
-                <span>Save current as…</span>
+                <span>{t("editor.chrome.workspaceSwitcher.saveCurrentAs")}</span>
               </button>
             </>
           )}

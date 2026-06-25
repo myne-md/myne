@@ -49,6 +49,7 @@
 //      as blank white stripes with NO console error. A dropped page re-renders
 //      (slightly softer, never blank) when it re-intersects.
 
+import i18n from "../../i18n";
 import {
   fetchPdfBytes,
   loadPdfJs,
@@ -144,7 +145,7 @@ export function mountPdfScroller(
   // Show the "Loading…" chip immediately — the container stays laid out.
   const loading = document.createElement("div");
   loading.className = LOADING_CLASS;
-  loading.textContent = "Loading…";
+  loading.textContent = i18n.t("editor.attachment.pdf.loading");
   container.replaceChildren(loading);
 
   void (async () => {

@@ -18,6 +18,7 @@ import {
   type CSSProperties,
   type MouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../primitives/Icon";
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { renderPdfFirstPage } from "../../editor/attachments/pdf-render";
@@ -79,6 +80,7 @@ const AUDIO_BTN_STYLE: CSSProperties = {
  * propagation so it never triggers the tile's jump/preview affordance.
  */
 function AudioThumbnail({ id, filename }: { id: string; filename: string }) {
+  const { t } = useTranslation();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -104,7 +106,7 @@ function AudioThumbnail({ id, filename }: { id: string; filename: string }) {
   };
 
   return (
-    <div style={AUDIO_WRAP_STYLE} aria-label={`Audio: ${filename}`}>
+    <div style={AUDIO_WRAP_STYLE} aria-label={t("attachments.thumbnail.audioLabel", { filename })}>
       <audio
         ref={audioRef}
         src={attachmentUrl(id)}
@@ -115,7 +117,7 @@ function AudioThumbnail({ id, filename }: { id: string; filename: string }) {
       <button
         type="button"
         onClick={toggle}
-        aria-label={playing ? "Pause" : "Play"}
+        aria-label={playing ? t("attachments.thumbnail.pause") : t("attachments.thumbnail.play")}
         style={AUDIO_BTN_STYLE}
       >
         <Icon name={playing ? "pause" : "play"} size={18} />
@@ -142,6 +144,7 @@ function FileIcon({ size, label }: { size: number; label: string }) {
  * (e.g., the tile scrolls out of a long grid) via the AbortController.
  */
 function PdfThumbnail({ id, size }: { id: string; size: number }) {
+  const { t } = useTranslation();
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   // Keep the resolved width stable per mount; the grid box is square-ish but a
@@ -172,8 +175,9 @@ function PdfThumbnail({ id, size }: { id: string; size: number }) {
   // Until the first page resolves (`src === null`) OR on any failure, show the
   // generic PDF icon — it's both the rendering placeholder (replaced in place
   // the moment the page rasterizes) and the terminal failure fallback.
-  if (failed || src === null) return <FileIcon size={size} label="PDF document" />;
-  return <img src={src} alt="PDF first page" style={IMG_STYLE} />;
+  if (failed || src === null)
+    return <FileIcon size={size} label={t("attachments.thumbnail.pdfDocument")} />;
+  return <img src={src} alt={t("attachments.thumbnail.pdfFirstPage")} style={IMG_STYLE} />;
 }
 
 export function AttachmentThumbnail({
@@ -182,6 +186,7 @@ export function AttachmentThumbnail({
   filename,
   size,
 }: AttachmentThumbnailProps) {
+  const { t } = useTranslation();
   const kind = kindOf(contentType);
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -207,5 +212,5 @@ export function AttachmentThumbnail({
   }
 
   // Non-image / image that failed to load → generic file icon.
-  return <FileIcon size={size} label="File" />;
+  return <FileIcon size={size} label={t("attachments.thumbnail.file")} />;
 }

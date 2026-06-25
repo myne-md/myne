@@ -8,6 +8,7 @@
 // `tests/backup/backup-ui.test.ts` pins non-empty copy per variant at
 // runtime.
 
+import i18n from "../i18n";
 import type {
   BackupExportError,
   BackupRestoreError,
@@ -17,25 +18,25 @@ import type {
 export function exportErrorMessage(e: BackupExportError): string {
   switch (e.kind) {
     case "VaultNotFound":
-      return "No vault found to back up.";
+      return i18n.t("backup.errors.export.vaultNotFound");
     case "InvalidDestination":
-      return "That destination folder is not usable.";
+      return i18n.t("backup.errors.export.invalidDestination");
     case "MemberTooLarge":
-      return "A file in this vault is larger than the backup format allows.";
+      return i18n.t("backup.errors.export.memberTooLarge");
     case "VerifyFailed":
-      return "The written backup did not verify, so it was discarded. Try again — on different media if it repeats.";
+      return i18n.t("backup.errors.export.verifyFailed");
     case "AuthOperationInProgress":
-      return "Another vault operation is in progress. Wait for it to finish, then try again.";
+      return i18n.t("backup.errors.export.authOperationInProgress");
     case "Cancelled":
-      return "Backup cancelled. No file was left behind.";
+      return i18n.t("backup.errors.export.cancelled");
     case "Io":
       return e.detail.io_error_kind === "NoSpace"
-        ? "Not enough space at the destination."
+        ? i18n.t("backup.errors.export.ioNoSpace")
         : e.detail.io_error_kind === "PermissionDenied"
-          ? "No permission to write at the destination."
-          : "Could not write the backup file.";
+          ? i18n.t("backup.errors.export.ioPermissionDenied")
+          : i18n.t("backup.errors.export.ioGeneric");
     case "JoinFailure":
-      return "Backup failed unexpectedly. No file was left behind.";
+      return i18n.t("backup.errors.export.joinFailure");
   }
 }
 
@@ -44,26 +45,26 @@ export function exportErrorMessage(e: BackupExportError): string {
 export function restoreErrorMessage(e: BackupRestoreError): string {
   switch (e.kind) {
     case "NotABackupFile":
-      return "This file is not a Myne backup.";
+      return i18n.t("backup.errors.restore.notABackupFile");
     case "FutureVersionBackup":
-      return "This backup was made by a newer version of Myne. Update Myne, then restore it.";
+      return i18n.t("backup.errors.restore.futureVersionBackup");
     case "DamagedBackup":
-      return "The backup file is damaged.";
+      return i18n.t("backup.errors.restore.damagedBackup");
     case "MissingVaultMeta":
-      return "This backup is missing its vault metadata and cannot be restored.";
+      return i18n.t("backup.errors.restore.missingVaultMeta");
     case "InvalidVaultMeta":
-      return "This backup's vault metadata is unreadable, so restoring it could not produce a working vault.";
+      return i18n.t("backup.errors.restore.invalidVaultMeta");
     case "VaultAlreadyExists":
-      return "A vault from this backup already exists on this device.";
+      return i18n.t("backup.errors.restore.vaultAlreadyExists");
     case "AuthOperationInProgress":
-      return "Another vault operation is in progress. Wait for it to finish, then try again.";
+      return i18n.t("backup.errors.restore.authOperationInProgress");
     case "Cancelled":
-      return "Restore cancelled. Nothing was changed.";
+      return i18n.t("backup.errors.restore.cancelled");
     case "Io":
       return e.detail.io_error_kind === "PermissionDenied"
-        ? "No permission to read the backup file."
-        : "Could not read the backup file.";
+        ? i18n.t("backup.errors.restore.ioPermissionDenied")
+        : i18n.t("backup.errors.restore.ioGeneric");
     case "JoinFailure":
-      return "Restore failed unexpectedly. Nothing was changed.";
+      return i18n.t("backup.errors.restore.joinFailure");
   }
 }

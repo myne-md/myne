@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   isValidBindableChord,
   captureChordFromEvent,
-  INVALID_CHORD_REASON,
+  invalidChordReason,
 } from "../../src/commands/capture";
 
 describe("isValidBindableChord", () => {
@@ -40,7 +40,7 @@ describe("captureChordFromEvent", () => {
 
   it("rejects a bare key with the invalid-chord reason", () => {
     const r = captureChordFromEvent({ key: "a" }, true);
-    expect(r).toEqual({ ok: false, reason: INVALID_CHORD_REASON });
+    expect(r).toEqual({ ok: false, reason: invalidChordReason() });
   });
 
   it("treats a bare modifier as 'still capturing' (empty reason, not invalid copy)", () => {

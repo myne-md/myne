@@ -10,15 +10,19 @@
 // picks up the new default (open tabs keep their per-tab mode).
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { Segmented } from "../primitives/Segmented";
 import { prefsRead, setEditorDefaultViewMode } from "../../lib/prefs";
 import { asViewMode, type ViewMode } from "../../editor/view-mode";
 
-const OPTIONS = [
-  { value: "live", label: "Live preview" },
-  { value: "reading", label: "Reading" },
-  { value: "source", label: "Source" },
+// Option values paired with their i18n label keys. Labels resolve with `t(...)`
+// at render time — storing resolved strings at module scope would freeze the
+// boot language.
+const OPTION_KEYS = [
+  { value: "live", labelKey: "settings.viewMode.optionLive" },
+  { value: "reading", labelKey: "settings.viewMode.optionReading" },
+  { value: "source", labelKey: "settings.viewMode.optionSource" },
 ] as const;
 
 const ERROR_STYLE: CSSProperties = {
@@ -29,6 +33,7 @@ const ERROR_STYLE: CSSProperties = {
 };
 
 export function DefaultViewModeSettings() {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<ViewMode>("live");
   const [error, setError] = useState<string | null>(null);
 
@@ -57,21 +62,26 @@ export function DefaultViewModeSettings() {
       setError(null);
     } catch {
       setMode(prev); // rollback
-      setError("Could not save the default view mode.");
+      setError(t("settings.viewMode.errorSave"));
     }
   }
+
+  const options = OPTION_KEYS.map((o) => ({
+    value: o.value,
+    label: t(o.labelKey),
+  }));
 
   return (
     <>
       <ControlBlock
-        label="Default view mode"
-        helper="How a note opens: Live preview (default), read-only Reading, or raw Source. Toggle a note with ⇧⌘E."
+        label={t("settings.viewMode.label")}
+        helper={t("settings.viewMode.helper")}
         control={
           <Segmented
-            options={OPTIONS}
+            options={options}
             value={mode}
             onChange={(v) => void choose(v as ViewMode)}
-            ariaLabel="Default view mode"
+            ariaLabel={t("settings.viewMode.label")}
             testId="settings.default-view-mode"
           />
         }

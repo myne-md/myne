@@ -9,6 +9,7 @@
 // editor re-reads and reconfigures its focus extensions live (no remount).
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import {
   prefsRead,
@@ -36,6 +37,7 @@ const ERROR_STYLE: CSSProperties = {
 };
 
 export function FocusModeSettings() {
+  const { t } = useTranslation();
   const [typewriter, setTypewriter] = useState(true);
   const [dim, setDim] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function FocusModeSettings() {
       setError(null);
     } catch {
       setTypewriter(prev);
-      setError("Could not save the focus-mode setting.");
+      setError(t("settings.focusMode.saveError"));
     }
   }
 
@@ -77,43 +79,43 @@ export function FocusModeSettings() {
       setError(null);
     } catch {
       setDim(prev);
-      setError("Could not save the focus-mode setting.");
+      setError(t("settings.focusMode.saveError"));
     }
   }
 
   return (
     <>
       <ControlBlock
-        label="Focus mode · typewriter scroll"
-        helper="In focus mode (⇧⌘F), keep the active line vertically centered as you type."
+        label={t("settings.focusMode.typewriterLabel")}
+        helper={t("settings.focusMode.typewriterHelper")}
         control={
           <button
             type="button"
             role="switch"
             aria-checked={typewriter}
-            aria-label="Typewriter scroll"
+            aria-label={t("settings.focusMode.typewriterAria")}
             data-testid="settings.focus-typewriter"
             onClick={() => void toggleTypewriter(!typewriter)}
             style={TOGGLE_STYLE}
           >
-            {typewriter ? "On" : "Off"}
+            {typewriter ? t("settings.focusMode.on") : t("settings.focusMode.off")}
           </button>
         }
       />
       <ControlBlock
-        label="Focus mode · dim inactive lines"
-        helper="In focus mode (⇧⌘F), dim every line except the one you're editing."
+        label={t("settings.focusMode.dimLabel")}
+        helper={t("settings.focusMode.dimHelper")}
         control={
           <button
             type="button"
             role="switch"
             aria-checked={dim}
-            aria-label="Dim inactive lines"
+            aria-label={t("settings.focusMode.dimAria")}
             data-testid="settings.focus-dim"
             onClick={() => void toggleDim(!dim)}
             style={TOGGLE_STYLE}
           >
-            {dim ? "On" : "Off"}
+            {dim ? t("settings.focusMode.on") : t("settings.focusMode.off")}
           </button>
         }
       />

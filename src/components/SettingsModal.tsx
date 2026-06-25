@@ -25,6 +25,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
@@ -51,17 +52,19 @@ type PanelId =
 
 interface PanelMeta {
   id: PanelId;
-  label: string;
+  /** i18n leaf under `settings.shell.panels.*` — resolved at render time so a
+   *  language switch re-labels the rail (never frozen at module load). */
+  labelKey: string;
 }
 
 const PANELS: readonly PanelMeta[] = [
-  { id: "account", label: "Account" },
-  { id: "privacy", label: "Privacy" },
-  { id: "editor", label: "Editor" },
-  { id: "hotkeys", label: "Hotkeys" },
-  { id: "appearance", label: "Appearance" },
-  { id: "storage", label: "Storage" },
-  { id: "about", label: "About" },
+  { id: "account", labelKey: "settings.shell.panels.account" },
+  { id: "privacy", labelKey: "settings.shell.panels.privacy" },
+  { id: "editor", labelKey: "settings.shell.panels.editor" },
+  { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys" },
+  { id: "appearance", labelKey: "settings.shell.panels.appearance" },
+  { id: "storage", labelKey: "settings.shell.panels.storage" },
+  { id: "about", labelKey: "settings.shell.panels.about" },
 ];
 
 interface SettingsModalProps {
@@ -226,6 +229,7 @@ export function SettingsModal({
   onDeleteVaultSuccess,
   onImportObsidian,
 }: SettingsModalProps) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<PanelId>("account");
   const [childInFlight, setChildInFlight] = useState(false);
   const itemRefs = useRef<Record<PanelId, HTMLButtonElement | null>>({
@@ -291,7 +295,7 @@ export function SettingsModal({
     account: (
       <AccountPanel
         onChangePasswordSuccess={() => {
-          onShowToast?.("Password updated");
+          onShowToast?.(t("settings.shell.passwordUpdatedToast"));
           onClose();
         }}
         onDeleteVaultSuccess={onDeleteVaultSuccess}
@@ -327,11 +331,11 @@ export function SettingsModal({
       <div style={MODAL_STYLE} onClick={(e) => e.stopPropagation()}>
         <div style={HEADER_STYLE}>
           <h2 id="settings-modal-title" style={TITLE_STYLE}>
-            Settings
+            {t("settings.shell.title")}
           </h2>
           <button
             type="button"
-            aria-label="Close settings"
+            aria-label={t("settings.shell.closeLabel")}
             data-testid="settings.close"
             onClick={onClose}
             disabled={childInFlight}
@@ -347,7 +351,7 @@ export function SettingsModal({
 
         <div style={BODY_STYLE}>
           <nav
-            aria-label="Settings panels"
+            aria-label={t("settings.shell.navLabel")}
             role="tablist"
             aria-orientation="vertical"
             style={RAIL_STYLE}
@@ -373,7 +377,7 @@ export function SettingsModal({
                     isSelected ? RAIL_ITEM_SELECTED_STYLE : RAIL_ITEM_BASE_STYLE
                   }
                 >
-                  {panel.label}
+                  {t(panel.labelKey)}
                 </button>
               );
             })}

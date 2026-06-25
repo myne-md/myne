@@ -18,6 +18,7 @@
 // Spec: protocol.md § 7 (BIP-39 24-word, English wordlist) + § 7.5.
 
 import { useEffect, useMemo, useRef, type Dispatch } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import {
@@ -40,6 +41,7 @@ export function PhraseStep({
   dispatch,
   onCancelSession,
 }: PhraseStepProps) {
+  const { t } = useTranslation();
   // Re-blur when the user Cmd-Tabs or the OS hides the window.
   useEffect(() => {
     const onBlur = () => dispatch({ type: "PHRASE_HIDDEN" });
@@ -69,13 +71,11 @@ export function PhraseStep({
 
   return (
     <StepLayout width={600}>
-      <StepEyebrow icon="key-round">Step 2 of 4 — recovery phrase</StepEyebrow>
-      <StepHeading>Write down these 24 words.</StepHeading>
+      <StepEyebrow icon="key-round">{t("vaultCreation.phrase.eyebrow")}</StepEyebrow>
+      <StepHeading>{t("vaultCreation.phrase.heading")}</StepHeading>
 
       <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
-        This phrase, together with your password, is the only way to recover
-        your vault. Store it offline — paper, password manager, hardware
-        wallet. Treat it like cash.
+        {t("vaultCreation.phrase.intro")}
       </div>
 
       <div style={{ position: "relative" }}>
@@ -158,7 +158,7 @@ export function PhraseStep({
               }}
             >
               <Icon name="eye" size={14} />
-              Reveal phrase
+              {t("vaultCreation.phrase.reveal")}
             </span>
           </button>
         )}
@@ -166,10 +166,10 @@ export function PhraseStep({
 
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Button variant="ghost" icon="copy" onClick={handleCopy}>
-          Copy
+          {t("vaultCreation.phrase.copy")}
         </Button>
         <Button variant="ghost" icon="download" onClick={handleSave}>
-          Save as file
+          {t("vaultCreation.phrase.saveAsFile")}
         </Button>
       </div>
 
@@ -180,7 +180,7 @@ export function PhraseStep({
           icon="arrow-left"
           data-testid="create.phrase-back"
         >
-          Back
+          {t("vaultCreation.phrase.back")}
         </Button>
         <div style={{ flex: 1 }} />
         <Button
@@ -188,7 +188,7 @@ export function PhraseStep({
           onClick={() => dispatch({ type: "PHRASE_ACKED" })}
           data-testid="create.phrase-continue"
         >
-          I've saved this — confirm phrase
+          {t("vaultCreation.phrase.continue")}
         </Button>
       </div>
     </StepLayout>

@@ -12,6 +12,8 @@
 // EXCLUDED (grill Q2); Ctrl+Tab is shown as a fixed row (literal-Ctrl, not in the
 // rebindable keymap — see keybind-engine task 4).
 
+import i18n from "../i18n";
+
 export type BindGroup =
   | "General"
   | "Notes"
@@ -43,52 +45,52 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   // and Cmd/Ctrl+P both open the same palette by default — two conventional
   // chords (command-palette vs quick-open) folded onto one command. Rebindable
   // like any other window command (was a hardcoded window listener before).
-  { id: "palette.toggle", label: "Open command palette", group: "General", defaultBindings: ["Mod-k", "Mod-p"], rebindable: true },
-  { id: "app.open-settings", label: "Open settings", group: "General", defaultBindings: ["Mod-,"], rebindable: true },
+  { id: "palette.toggle", get label() { return i18n.t("commands.hotkeys.command.paletteToggle"); }, group: "General", defaultBindings: ["Mod-k", "Mod-p"], rebindable: true },
+  { id: "app.open-settings", get label() { return i18n.t("commands.hotkeys.command.openSettings"); }, group: "General", defaultBindings: ["Mod-,"], rebindable: true },
 
   // Notes
-  { id: "note.new-tab", label: "New note", group: "Notes", defaultBindings: ["Mod-t"], rebindable: true },
+  { id: "note.new-tab", get label() { return i18n.t("commands.hotkeys.command.newNote"); }, group: "Notes", defaultBindings: ["Mod-t"], rebindable: true },
 
   // Panes & Tabs
-  { id: "pane.close-tab", label: "Close tab", group: "Panes & Tabs", defaultBindings: ["Mod-w"], rebindable: true },
-  { id: "pane.split-row", label: "Split pane (right)", group: "Panes & Tabs", defaultBindings: ["Mod-\\"], rebindable: true },
-  { id: "pane.split-column", label: "Split pane (down)", group: "Panes & Tabs", defaultBindings: ["Mod-Shift-\\"], rebindable: true },
-  { id: "pane.focus-next", label: "Focus next pane", group: "Panes & Tabs", defaultBindings: ["Mod-Alt-ArrowRight", "Mod-Alt-ArrowDown"], rebindable: true },
-  { id: "pane.focus-prev", label: "Focus previous pane", group: "Panes & Tabs", defaultBindings: ["Mod-Alt-ArrowLeft", "Mod-Alt-ArrowUp"], rebindable: true },
-  { id: "pane.cycle-tab", label: "Cycle tabs", group: "Panes & Tabs", defaultBindings: ["Ctrl-Tab"], rebindable: false },
+  { id: "pane.close-tab", get label() { return i18n.t("commands.hotkeys.command.closeTab"); }, group: "Panes & Tabs", defaultBindings: ["Mod-w"], rebindable: true },
+  { id: "pane.split-row", get label() { return i18n.t("commands.hotkeys.command.splitPaneRight"); }, group: "Panes & Tabs", defaultBindings: ["Mod-\\"], rebindable: true },
+  { id: "pane.split-column", get label() { return i18n.t("commands.hotkeys.command.splitPaneDown"); }, group: "Panes & Tabs", defaultBindings: ["Mod-Shift-\\"], rebindable: true },
+  { id: "pane.focus-next", get label() { return i18n.t("commands.hotkeys.command.focusNextPane"); }, group: "Panes & Tabs", defaultBindings: ["Mod-Alt-ArrowRight", "Mod-Alt-ArrowDown"], rebindable: true },
+  { id: "pane.focus-prev", get label() { return i18n.t("commands.hotkeys.command.focusPrevPane"); }, group: "Panes & Tabs", defaultBindings: ["Mod-Alt-ArrowLeft", "Mod-Alt-ArrowUp"], rebindable: true },
+  { id: "pane.cycle-tab", get label() { return i18n.t("commands.hotkeys.command.cycleTabs"); }, group: "Panes & Tabs", defaultBindings: ["Ctrl-Tab"], rebindable: false },
 
   // Navigation
-  { id: "nav.back", label: "Navigate back", group: "Navigation", defaultBindings: ["Mod-["], rebindable: true },
-  { id: "nav.forward", label: "Navigate forward", group: "Navigation", defaultBindings: ["Mod-]"], rebindable: true },
+  { id: "nav.back", get label() { return i18n.t("commands.hotkeys.command.navigateBack"); }, group: "Navigation", defaultBindings: ["Mod-["], rebindable: true },
+  { id: "nav.forward", get label() { return i18n.t("commands.hotkeys.command.navigateForward"); }, group: "Navigation", defaultBindings: ["Mod-]"], rebindable: true },
 
   // View
-  { id: "graph.show", label: "Show graph view", group: "View", defaultBindings: ["Mod-Shift-g"], rebindable: true },
+  { id: "graph.show", get label() { return i18n.t("commands.hotkeys.command.showGraphView"); }, group: "View", defaultBindings: ["Mod-Shift-g"], rebindable: true },
   // reading-source-modes (MYND-299): Edit⇄Reading default Mod-Shift-e (inline-code
   // keeps Mod-e); the secondary live↔source toggle ships with NO default chord.
-  { id: "view.toggle-reading", label: "Toggle reading view", group: "View", defaultBindings: ["Mod-Shift-e"], rebindable: true },
-  { id: "view.toggle-source", label: "Toggle source mode", group: "View", defaultBindings: [], rebindable: true },
+  { id: "view.toggle-reading", get label() { return i18n.t("commands.hotkeys.command.toggleReadingView"); }, group: "View", defaultBindings: ["Mod-Shift-e"], rebindable: true },
+  { id: "view.toggle-source", get label() { return i18n.t("commands.hotkeys.command.toggleSourceMode"); }, group: "View", defaultBindings: [], rebindable: true },
   // focus-mode (MYND-348): distraction-free toggle, default Mod-Shift-f.
-  { id: "view.toggle-focus", label: "Toggle focus mode", group: "View", defaultBindings: ["Mod-Shift-f"], rebindable: true },
+  { id: "view.toggle-focus", get label() { return i18n.t("commands.hotkeys.command.toggleFocusMode"); }, group: "View", defaultBindings: ["Mod-Shift-f"], rebindable: true },
   // named-workspaces (MYND-308): no default chord (rebindable only).
-  { id: "workspace.save-as", label: "Save workspace as", group: "View", defaultBindings: [], rebindable: true },
-  { id: "workspace.switch", label: "Switch workspace", group: "View", defaultBindings: [], rebindable: true },
-  { id: "workspace.rename", label: "Rename workspace", group: "View", defaultBindings: [], rebindable: true },
-  { id: "workspace.delete", label: "Delete workspace", group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.save-as", get label() { return i18n.t("commands.hotkeys.command.saveWorkspaceAs"); }, group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.switch", get label() { return i18n.t("commands.hotkeys.command.switchWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.rename", get label() { return i18n.t("commands.hotkeys.command.renameWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.delete", get label() { return i18n.t("commands.hotkeys.command.deleteWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
 
   // Editor formatting (CodeMirror-owned, SYNC-9 — fixed, not rebindable yet)
-  { id: "editor.bold", label: "Bold", group: "Editor formatting", defaultBindings: ["Mod-b"], rebindable: false },
-  { id: "editor.italic", label: "Italic", group: "Editor formatting", defaultBindings: ["Mod-i"], rebindable: false },
-  { id: "editor.code", label: "Inline code", group: "Editor formatting", defaultBindings: ["Mod-e"], rebindable: false },
-  { id: "editor.cycle-heading", label: "Cycle heading level", group: "Editor formatting", defaultBindings: ["Mod-Shift-h"], rebindable: false },
-  { id: "editor.ordered-list", label: "Toggle numbered list", group: "Editor formatting", defaultBindings: ["Mod-Shift-7"], rebindable: false },
-  { id: "editor.bullet-list", label: "Toggle bullet list", group: "Editor formatting", defaultBindings: ["Mod-Shift-8"], rebindable: false },
-  { id: "editor.task-list", label: "Toggle task list", group: "Editor formatting", defaultBindings: ["Mod-Shift-m"], rebindable: false },
-  { id: "editor.wikilink", label: "Insert wikilink", group: "Editor formatting", defaultBindings: ["Mod-Shift-l"], rebindable: false },
-  { id: "editor.select-all", label: "Select all (scoped)", group: "Editor formatting", defaultBindings: ["Mod-a"], rebindable: false },
+  { id: "editor.bold", get label() { return i18n.t("commands.hotkeys.command.bold"); }, group: "Editor formatting", defaultBindings: ["Mod-b"], rebindable: false },
+  { id: "editor.italic", get label() { return i18n.t("commands.hotkeys.command.italic"); }, group: "Editor formatting", defaultBindings: ["Mod-i"], rebindable: false },
+  { id: "editor.code", get label() { return i18n.t("commands.hotkeys.command.inlineCode"); }, group: "Editor formatting", defaultBindings: ["Mod-e"], rebindable: false },
+  { id: "editor.cycle-heading", get label() { return i18n.t("commands.hotkeys.command.cycleHeadingLevel"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-h"], rebindable: false },
+  { id: "editor.ordered-list", get label() { return i18n.t("commands.hotkeys.command.toggleNumberedList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-7"], rebindable: false },
+  { id: "editor.bullet-list", get label() { return i18n.t("commands.hotkeys.command.toggleBulletList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-8"], rebindable: false },
+  { id: "editor.task-list", get label() { return i18n.t("commands.hotkeys.command.toggleTaskList"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-m"], rebindable: false },
+  { id: "editor.wikilink", get label() { return i18n.t("commands.hotkeys.command.insertWikilink"); }, group: "Editor formatting", defaultBindings: ["Mod-Shift-l"], rebindable: false },
+  { id: "editor.select-all", get label() { return i18n.t("commands.hotkeys.command.selectAllScoped"); }, group: "Editor formatting", defaultBindings: ["Mod-a"], rebindable: false },
   // Heading/list folding (MYND-300) — CodeMirror-owned chords, fixed like the
   // other editor-formatting rows (SYNC-9). Per-fold is the gutter click.
-  { id: "editor.fold-all", label: "Fold all", group: "Editor formatting", defaultBindings: ["Mod-Alt-["], rebindable: false },
-  { id: "editor.unfold-all", label: "Unfold all", group: "Editor formatting", defaultBindings: ["Mod-Alt-]"], rebindable: false },
+  { id: "editor.fold-all", get label() { return i18n.t("commands.hotkeys.command.foldAll"); }, group: "Editor formatting", defaultBindings: ["Mod-Alt-["], rebindable: false },
+  { id: "editor.unfold-all", get label() { return i18n.t("commands.hotkeys.command.unfoldAll"); }, group: "Editor formatting", defaultBindings: ["Mod-Alt-]"], rebindable: false },
 ];
 
 /** The display groups in panel order. */

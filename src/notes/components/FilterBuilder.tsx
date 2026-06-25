@@ -14,6 +14,7 @@
 // tasks 4/6.
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
@@ -143,20 +144,6 @@ export interface FilterBuilderProps {
 
 const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 
-const COMBINATOR_OPTIONS: readonly SelectOption<"and" | "or">[] = [
-  { value: "and", label: "all" },
-  { value: "or", label: "any" },
-];
-const TYPE_OPTIONS: readonly SelectOption<ConditionType>[] = [
-  { value: "tag", label: "Tag" },
-  { value: "folder", label: "Folder" },
-  { value: "search", label: "Search" },
-];
-const NEGATE_OPTIONS: readonly SelectOption<"is" | "not">[] = [
-  { value: "is", label: "is" },
-  { value: "not", label: "is not" },
-];
-
 const newCondition = (): DraftCondition => ({ type: "tag", value: "", negated: false });
 
 export function FilterBuilder({
@@ -167,6 +154,20 @@ export function FilterBuilder({
   onCancel,
   onSave,
 }: FilterBuilderProps) {
+  const { t } = useTranslation();
+  const COMBINATOR_OPTIONS: readonly SelectOption<"and" | "or">[] = [
+    { value: "and", label: t("notes.filterBuilder.combinator.all") },
+    { value: "or", label: t("notes.filterBuilder.combinator.any") },
+  ];
+  const TYPE_OPTIONS: readonly SelectOption<ConditionType>[] = [
+    { value: "tag", label: t("notes.filterBuilder.type.tag") },
+    { value: "folder", label: t("notes.filterBuilder.type.folder") },
+    { value: "search", label: t("notes.filterBuilder.type.search") },
+  ];
+  const NEGATE_OPTIONS: readonly SelectOption<"is" | "not">[] = [
+    { value: "is", label: t("notes.filterBuilder.negate.is") },
+    { value: "not", label: t("notes.filterBuilder.negate.isNot") },
+  ];
   const [draft, setDraft] = useState<FilterDraft>(initialDraft);
   const [tagOptions, setTagOptions] = useState<TagRow[]>([]);
   // An unrepresentable filter (`representable === false`) opens read-only. The
@@ -265,13 +266,13 @@ export function FilterBuilder({
       onClose={onCancel}
       width={580}
       height={560}
-      closeLabel="Cancel"
+      closeLabel={t("notes.filterBuilder.cancel")}
     >
       <div data-testid="view-filter.modal" style={BODY_STYLE}>
         {!editable && (
           <div data-testid="view-filter.unrepresentable" style={EMPTY_HINT_STYLE}>
             <p style={{ margin: "0 0 var(--space-3)" }}>
-              This filter was made with an advanced editor and can't be edited here.
+              {t("notes.filterBuilder.unrepresentable")}
             </p>
             <Button
               variant="secondary"
@@ -281,26 +282,26 @@ export function FilterBuilder({
                 setReplacing(true);
               }}
             >
-              Replace filter
+              {t("notes.filterBuilder.replaceFilter")}
             </Button>
           </div>
         )}
         {editable && draft.groups.length > 1 && (
           <div style={COMBINATOR_LABEL_STYLE}>
-            <span>Match</span>
+            <span>{t("notes.filterBuilder.match")}</span>
             <SearchableSelect
               testId="view-filter.top-combinator"
               options={COMBINATOR_OPTIONS}
               selected={[draft.combinator]}
               onChange={(next) => setTopCombinator(next[0] ?? "and")}
             />
-            <span>of the groups:</span>
+            <span>{t("notes.filterBuilder.ofTheGroups")}</span>
           </div>
         )}
 
         {editable && !hasConditions && (
           <div data-testid="view-filter.empty" style={EMPTY_HINT_STYLE}>
-            No conditions yet — this view shows all pages.
+            {t("notes.filterBuilder.noConditions")}
           </div>
         )}
 
@@ -309,7 +310,7 @@ export function FilterBuilder({
           <div key={gi} data-testid="view-filter.group" data-index={gi} style={GROUP_STYLE}>
             {group.conditions.length > 1 && (
               <div style={COMBINATOR_LABEL_STYLE}>
-                <span>Match</span>
+                <span>{t("notes.filterBuilder.match")}</span>
                 <SearchableSelect
                   testId="view-filter.group-combinator"
                   options={COMBINATOR_OPTIONS}
@@ -318,7 +319,7 @@ export function FilterBuilder({
                     mutateGroup(gi, (g) => ({ ...g, combinator: next[0] ?? "and" }))
                   }
                 />
-                <span>of:</span>
+                <span>{t("notes.filterBuilder.of")}</span>
               </div>
             )}
 
@@ -353,7 +354,7 @@ export function FilterBuilder({
                     type="text"
                     data-testid="view-filter.condition-value"
                     value={cond.value}
-                    placeholder="search text"
+                    placeholder={t("notes.filterBuilder.searchTextPlaceholder")}
                     onChange={(e) => mutateCondition(gi, ci, (c) => ({ ...c, value: e.target.value }))}
                     style={{ flex: "1 1 auto", minWidth: 0 }}
                   />
@@ -365,19 +366,23 @@ export function FilterBuilder({
                     onChange={(next) =>
                       mutateCondition(gi, ci, (c) => ({ ...c, value: next[0] ?? "" }))
                     }
-                    placeholder={cond.type === "tag" ? "select a tag…" : "select a folder…"}
+                    placeholder={
+                      cond.type === "tag"
+                        ? t("notes.filterBuilder.selectTagPlaceholder")
+                        : t("notes.filterBuilder.selectFolderPlaceholder")
+                    }
                   />
                 )}
 
                 {isUnresolved(cond) && (
                   <span data-testid="view-filter.unresolved" style={BADGE_STYLE}>
-                    unresolved
+                    {t("notes.filterBuilder.unresolved")}
                   </span>
                 )}
 
                 <button
                   type="button"
-                  aria-label="Remove condition"
+                  aria-label={t("notes.filterBuilder.removeCondition")}
                   data-testid="view-filter.remove-condition"
                   onClick={() => removeCondition(gi, ci)}
                   style={ICON_BTN_STYLE}
@@ -394,7 +399,7 @@ export function FilterBuilder({
                 data-testid="view-filter.add-condition"
                 onClick={() => addCondition(gi)}
               >
-                Add condition
+                {t("notes.filterBuilder.addCondition")}
               </Button>
             </div>
           </div>
@@ -408,7 +413,9 @@ export function FilterBuilder({
               data-testid={hasGroups ? "view-filter.add-group" : "view-filter.add-condition-first"}
               onClick={addGroup}
             >
-              {hasGroups ? "Add filter group" : "Add condition"}
+              {hasGroups
+                ? t("notes.filterBuilder.addFilterGroup")
+                : t("notes.filterBuilder.addCondition")}
             </Button>
           </div>
         )}
@@ -417,11 +424,11 @@ export function FilterBuilder({
       <div style={FOOTER_STYLE}>
         {editable && (
           <span data-testid="view-filter.count" style={COUNT_STYLE}>
-            {count === null ? "…" : `${count} ${count === 1 ? "note" : "notes"}`}
+            {count === null ? "…" : t("notes.filterBuilder.noteCount", { count })}
           </span>
         )}
         <Button variant="ghost" data-testid="view-filter.cancel" onClick={onCancel}>
-          Cancel
+          {t("notes.filterBuilder.cancel")}
         </Button>
         <Button
           variant="primary"
@@ -429,7 +436,7 @@ export function FilterBuilder({
           disabled={!editable}
           onClick={() => onSave(sanitizeDraft(draft))}
         >
-          Save
+          {t("notes.filterBuilder.save")}
         </Button>
       </div>
     </ModalShell>

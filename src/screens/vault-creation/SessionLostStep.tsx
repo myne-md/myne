@@ -11,6 +11,7 @@
 //   - No eyebrow (this is an error endpoint, not a numbered step).
 
 import type { Dispatch } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { StepHeading, StepLayout } from "./step-shell";
@@ -22,6 +23,7 @@ interface SessionLostStepProps {
 }
 
 export function SessionLostStep({ error, dispatch }: SessionLostStepProps) {
+  const { t } = useTranslation();
   return (
     <StepLayout align="center">
       <div style={{ color: "var(--warning)" }}>
@@ -48,7 +50,7 @@ export function SessionLostStep({ error, dispatch }: SessionLostStepProps) {
         style={{ marginTop: 12 }}
         data-testid="create.session-lost-start-over"
       >
-        Start over
+        {t("vaultCreation.sessionLost.startOver")}
       </Button>
     </StepLayout>
   );

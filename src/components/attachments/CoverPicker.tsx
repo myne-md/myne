@@ -22,6 +22,7 @@ import {
   type CSSProperties,
   type DragEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { ModalShell } from "../primitives/ModalShell";
 import { Button } from "../primitives/Button";
@@ -120,6 +121,7 @@ export function CoverPicker({
   onPick,
   onRemove,
 }: CoverPickerProps) {
+  const { t } = useTranslation();
   // `null` = loading; `[]` = loaded-but-empty.
   const [images, setImages] = useState<CatalogEntry[] | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -177,12 +179,12 @@ export function CoverPicker({
   return (
     <ModalShell
       open={open}
-      title="Choose a cover image"
+      title={t("attachments.coverPicker.title")}
       onClose={onClose}
       labelId="cover-picker-title"
       width={560}
       height={560}
-      closeLabel="Close"
+      closeLabel={t("attachments.coverPicker.close")}
     >
       <div style={TOOLBAR_STYLE}>
         <Button
@@ -192,7 +194,7 @@ export function CoverPicker({
           disabled={busy}
           onClick={() => void handleUpload()}
         >
-          Upload
+          {t("attachments.coverPicker.upload")}
         </Button>
         {hasCover && (
           <Button
@@ -200,7 +202,7 @@ export function CoverPicker({
             data-testid="cover-picker.remove"
             onClick={onRemove}
           >
-            Remove cover
+            {t("attachments.coverPicker.removeCover")}
           </Button>
         )}
       </div>
@@ -216,12 +218,12 @@ export function CoverPicker({
         onDrop={(e) => void handleDrop(e)}
       >
         {dragging ? (
-          <div style={DROP_HINT_STYLE}>Drop an image to use it as the cover.</div>
+          <div style={DROP_HINT_STYLE}>{t("attachments.coverPicker.dropHint")}</div>
         ) : images === null ? (
-          <div style={STATE_STYLE}>Loading…</div>
+          <div style={STATE_STYLE}>{t("attachments.coverPicker.loading")}</div>
         ) : images.length === 0 ? (
           <div style={STATE_STYLE} data-testid="cover-picker.empty">
-            No images in this vault yet. Upload one or drag an image here.
+            {t("attachments.coverPicker.empty")}
           </div>
         ) : (
           <div style={GRID_STYLE}>

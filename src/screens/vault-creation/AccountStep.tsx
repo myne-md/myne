@@ -23,6 +23,7 @@
 // Spec: account-number.md § 7 (bearer-token semantics, "treat like cash").
 
 import { useEffect, useRef, useState, type Dispatch } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
@@ -48,6 +49,7 @@ export function AccountStep({
   error,
   dispatch,
 }: AccountStepProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -76,11 +78,11 @@ export function AccountStep({
 
   return (
     <StepLayout width={480}>
-      <StepEyebrow icon="id-card">Step 4 of 4 — account number</StepEyebrow>
-      <StepHeading>Save your account number.</StepHeading>
+      <StepEyebrow icon="id-card">{t("vaultCreation.account.eyebrow")}</StepEyebrow>
+      <StepHeading>{t("vaultCreation.account.heading")}</StepHeading>
 
       <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
-        This is your bearer token — treat it like cash.
+        {t("vaultCreation.account.intro")}
       </div>
 
       {error && error.displayMode === "inline" && (
@@ -107,18 +109,17 @@ export function AccountStep({
 
       <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--fg-2)" }}>
         <strong style={{ color: "var(--danger)" }}>
-          This is shown only once.
+          {t("vaultCreation.account.shownOnceEmphasis")}
         </strong>{" "}
-        Save it now — Myne cannot recover it for you. Required to register for
-        sync later.
+        {t("vaultCreation.account.shownOnceBody")}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Button variant="ghost" icon="copy" onClick={handleCopy}>
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("vaultCreation.account.copied") : t("vaultCreation.account.copy")}
         </Button>
         <Button variant="ghost" icon="download" onClick={handleSave}>
-          Save as file
+          {t("vaultCreation.account.saveAsFile")}
         </Button>
       </div>
 
@@ -144,7 +145,7 @@ export function AccountStep({
           data-testid="create.account-ack"
         />
         <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg-1)" }}>
-          I have saved my account number where I can find it later.
+          {t("vaultCreation.account.ackLabel")}
         </div>
       </label>
 
@@ -156,7 +157,7 @@ export function AccountStep({
           disabled={committing}
           data-testid="create.account-back"
         >
-          Back
+          {t("vaultCreation.account.back")}
         </Button>
         <div style={{ flex: 1 }} />
         <Button
@@ -174,7 +175,9 @@ export function AccountStep({
               }}
             />
           )}
-          {committing ? "Saving…" : "Create vault"}
+          {committing
+            ? t("vaultCreation.account.committing")
+            : t("vaultCreation.account.commit")}
         </Button>
       </div>
     </StepLayout>

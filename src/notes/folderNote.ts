@@ -20,6 +20,7 @@ import {
   patchTitleField,
 } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
+import i18n from "../i18n";
 import { noteCreate } from "./createNote";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
@@ -76,7 +77,7 @@ export async function unsetFolderIndex(noteId: string): Promise<void> {
  *  segment (e.g. `"Projects/Myne/"` → `"Myne"`), or `"Index"` for a root-level
  *  create with no segment. */
 function folderNoteTitle(folder: string | null): string {
-  if (folder === null) return "Index";
+  if (folder === null) return i18n.t("notes.folderNote.defaultTitle");
   const segs = folder.split("/").filter((s) => s.length > 0);
-  return segs[segs.length - 1] ?? "Index";
+  return segs[segs.length - 1] ?? i18n.t("notes.folderNote.defaultTitle");
 }

@@ -29,6 +29,7 @@ import {
   addToPersonalDictionary,
   ignoreWordInVault,
 } from "../../lib/spell";
+import i18n from "../../i18n";
 
 /** Max suggestions shown (SYNC-14); the engine returns more, the UI caps. */
 export const MAX_SUGGESTIONS = 5;
@@ -49,9 +50,9 @@ export function buildMenuItems(suggestions: string[]): MenuItem[] {
   const items: MenuItem[] = suggestions
     .slice(0, MAX_SUGGESTIONS)
     .map((label) => ({ kind: "suggestion", label }) as MenuItem);
-  items.push({ kind: "action", action: "add", label: "Add to dictionary" });
-  items.push({ kind: "action", action: "ignore-vault", label: "Ignore in this vault" });
-  items.push({ kind: "action", action: "ignore-session", label: "Ignore this session" });
+  items.push({ kind: "action", action: "add", label: i18n.t("editor.spell.menu.addToDictionary") });
+  items.push({ kind: "action", action: "ignore-vault", label: i18n.t("editor.spell.menu.ignoreInVault") });
+  items.push({ kind: "action", action: "ignore-session", label: i18n.t("editor.spell.menu.ignoreThisSession") });
   return items;
 }
 
@@ -107,7 +108,7 @@ const correctionMenuPlugin = ViewPlugin.fromClass(
       if (noSuggestions) {
         const empty = document.createElement("div");
         empty.className = `${ROW_CLASS} cm-spell-menu-empty`;
-        empty.textContent = "No suggestions";
+        empty.textContent = i18n.t("editor.spell.menu.noSuggestions");
         el.appendChild(empty);
       }
 

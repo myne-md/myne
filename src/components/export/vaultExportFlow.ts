@@ -15,9 +15,10 @@
 // DENY-list discipline) — and the datestamp keeps repeated exports from
 // tripping `DestinationAlreadyExists`.
 
+import i18n from "../../i18n";
 import { deriveFolderTree, type FolderNode } from "../../notes/folderTree";
 import { vaultExportErrorMessage } from "../../lib/vault-export-errors";
-import { EXPORT_FALLBACK_MESSAGE } from "../../lib/note-export-errors";
+import { exportFallbackMessage } from "../../lib/note-export-errors";
 import type {
   VaultExportError,
   VaultExportProgress,
@@ -244,7 +245,7 @@ export function vaultExportReducer(
         error:
           event.error?.kind === "Cancelled"
             ? null
-            : vaultExportErrorMessage(event.error) ?? EXPORT_FALLBACK_MESSAGE,
+            : vaultExportErrorMessage(event.error) ?? exportFallbackMessage(),
       };
     }
     case "succeeded":
@@ -260,10 +261,20 @@ export function vaultExportReducer(
 // ---- formatting ------------------------------------------------------------
 
 /** Mono counts line of the running phase: `"42 / 128 notes"` /
- *  `"3 / 14 attachments"`; `"Preparing…"` before the first event. */
+ *  `"3 / 14 attachments"`; `"Preparing…"` before the first event.
+ *  i18n resolved at CALL time (a render-time builder) so a language
+ *  switch is reflected — never frozen at module load. */
 export function formatRunningCounts(p: VaultExportProgress | null): string {
-  if (p === null || p.total === 0) return "Preparing…";
-  return `${p.done} / ${p.total} ${p.phase}`;
+  if (p === null || p.total === 0) return i18n.t("export.vault.flow.preparing");
+  const phaseNoun =
+    p.phase === "attachments"
+      ? i18n.t("export.vault.flow.phaseAttachments")
+      : i18n.t("export.vault.flow.phaseNotes");
+  return i18n.t("export.vault.flow.runningCounts", {
+    done: p.done,
+    total: p.total,
+    phase: phaseNoun,
+  });
 }
 
 /** Fill fraction (0..1) of the thin progress bar. */
@@ -272,13 +283,13 @@ export function progressFraction(p: VaultExportProgress | null): number {
   return Math.min(1, p.done / p.total);
 }
 
-/** Summary counts line: `"128 notes · 14 attachments · 9 folders"`. */
+/** Summary counts line: `"128 notes · 14 attachments · 9 folders"`.
+ *  i18n resolved at CALL time (render-time builder) — never module-frozen. */
 export function formatSummaryCounts(s: VaultExportSummary): string {
-  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   return [
-    unit(s.notes, "note"),
-    unit(s.attachments, "attachment"),
-    unit(s.folders, "folder"),
+    i18n.t("export.vault.flow.countNotes", { count: s.notes }),
+    i18n.t("export.vault.flow.countAttachments", { count: s.attachments }),
+    i18n.t("export.vault.flow.countFolders", { count: s.folders }),
   ].join(" · ");
 }
 
@@ -288,14 +299,19 @@ export function formatSummaryCounts(s: VaultExportSummary): string {
  * importer's transparency-line precedent).
  */
 export function formatExclusionsLine(s: VaultExportSummary): string | null {
+  // i18n resolved at CALL time (render-time builder) — never module-frozen.
   if (s.excluded_trashed > 0) {
-    const noun = s.excluded_trashed === 1 ? "trashed note" : "trashed notes";
     // The "version history" clause appears only when snapshots actually
     // existed and were excluded — honesty copy never over-claims.
     return s.excluded_snapshots > 0
-      ? `${s.excluded_trashed} ${noun} and version history not included.`
-      : `${s.excluded_trashed} ${noun} not included.`;
+      ? i18n.t("export.vault.flow.exclusionsTrashedAndHistory", {
+          count: s.excluded_trashed,
+        })
+      : i18n.t("export.vault.flow.exclusionsTrashed", {
+          count: s.excluded_trashed,
+        });
   }
-  if (s.excluded_snapshots > 0) return "Version history not included.";
+  if (s.excluded_snapshots > 0)
+    return i18n.t("export.vault.flow.exclusionsHistory");
   return null;
 }

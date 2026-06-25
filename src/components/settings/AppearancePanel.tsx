@@ -25,6 +25,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { LanguageSelect } from "./LanguageSelect";
 import { Switch } from "../primitives/Switch";
@@ -110,16 +111,18 @@ const ERROR_STYLE: CSSProperties = {
 };
 
 // `value: "system"` maps to a `null` theme on the wire (clears the field).
+// `labelKey` holds the i18n key (resolved at render, not import) so a language
+// switch re-labels the segments without freezing the boot language.
 interface ThemeOption {
   value: "light" | "dark" | "amoled" | "system";
-  label: string;
+  labelKey: string;
 }
 
 const THEMES: readonly ThemeOption[] = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "amoled", label: "AMOLED" },
-  { value: "system", label: "System" },
+  { value: "light", labelKey: "settings.appearance.theme.light" },
+  { value: "dark", labelKey: "settings.appearance.theme.dark" },
+  { value: "amoled", labelKey: "settings.appearance.theme.amoled" },
+  { value: "system", labelKey: "settings.appearance.theme.system" },
 ];
 
 /** Map the stored `theme` (light | dark | amoled | null) to the selected segment. */
@@ -133,6 +136,7 @@ function wireValue(value: ThemeOption["value"]): ThemeChoice | null {
 }
 
 export function AppearancePanel() {
+  const { t } = useTranslation();
   // Default is "system" — it matches the `None ≡ system` storage default, so a
   // fresh vault (no theme chosen) shows "System" selected, not a misleading
   // "Light". The stored value loads on mount.
@@ -196,7 +200,7 @@ export function AppearancePanel() {
       setActiveCustom(null);
       applyTheme(theme); // also clears any applied custom CSS vars
     } catch {
-      setError("Couldn't save theme. Please try again.");
+      setError(t("settings.appearance.themeSaveError"));
     }
   }
 
@@ -210,7 +214,7 @@ export function AppearancePanel() {
       await setShowNoteTimestamps(next);
     } catch {
       setShowTimestamps(!next);
-      setTsError("Couldn't save preference. Please try again.");
+      setTsError(t("settings.appearance.timestampsSaveError"));
     }
   }
 
@@ -219,11 +223,15 @@ export function AppearancePanel() {
       <LanguageSelect />
 
       <ControlBlock
-        label="Theme"
-        helper="Switch between light and dark themes, or follow the system preference."
+        label={t("settings.appearance.themeLabel")}
+        helper={t("settings.appearance.themeHelper")}
         control={
           <div>
-            <div role="radiogroup" aria-label="Theme" style={SEGMENTED_STYLE}>
+            <div
+              role="radiogroup"
+              aria-label={t("settings.appearance.themeLabel")}
+              style={SEGMENTED_STYLE}
+            >
               <span
                 aria-hidden="true"
                 style={{
@@ -232,8 +240,8 @@ export function AppearancePanel() {
                   transform: `translateX(${thumb.left}px)`,
                 }}
               />
-              {THEMES.map((t, idx) => (
-                <Fragment key={t.value}>
+              {THEMES.map((opt, idx) => (
+                <Fragment key={opt.value}>
                   {idx > 0 && (
                     <span aria-hidden="true" style={SEGMENT_DIVIDER_STYLE} />
                   )}
@@ -243,17 +251,19 @@ export function AppearancePanel() {
                     }}
                     type="button"
                     role="radio"
-                    aria-checked={t.value === selected}
-                    aria-label={`${t.label} theme`}
-                    data-testid={`settings.theme-${t.value}`}
-                    onClick={() => void choose(t.value)}
+                    aria-checked={opt.value === selected}
+                    aria-label={t("settings.appearance.themeOptionAria", {
+                      label: t(opt.labelKey),
+                    })}
+                    data-testid={`settings.theme-${opt.value}`}
+                    onClick={() => void choose(opt.value)}
                     style={
-                      t.value === selected
+                      opt.value === selected
                         ? SEGMENT_SELECTED_STYLE
                         : SEGMENT_BASE_STYLE
                     }
                   >
-                    {t.label}
+                    {t(opt.labelKey)}
                   </button>
                 </Fragment>
               ))}
@@ -269,17 +279,17 @@ export function AppearancePanel() {
 
       <div style={BLOCK_STYLE}>
         <div style={TOGGLE_ROW_STYLE}>
-          <span style={LABEL_STYLE}>Show edit times</span>
+          <span style={LABEL_STYLE}>{t("settings.appearance.showEditTimesLabel")}</span>
           <Switch
             checked={showTimestamps}
             onChange={(next) => void toggleTimestamps(next)}
-            ariaLabel="Show edit times in sidebar"
+            ariaLabel={t("settings.appearance.showEditTimesAria")}
             ariaDescribedBy="note-timestamps-helper"
             testId="settings.note-timestamps-toggle"
           />
         </div>
         <p id="note-timestamps-helper" style={HELPER_STYLE}>
-          Display each note's last-edited time beneath its title in the sidebar.
+          {t("settings.appearance.showEditTimesHelper")}
         </p>
         {tsError && (
           <p role="alert" style={ERROR_STYLE}>

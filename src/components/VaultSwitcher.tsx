@@ -31,6 +31,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { listVaults, orderByLastUnlock } from "../lib/vault-list";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
@@ -254,6 +255,7 @@ export function VaultSwitcher({
   onCreateAnother,
   switching,
 }: VaultSwitcherProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   // Open/close is animated (fade + slide), so the menu must outlive `open` by
   // one transition on close. `mounted` keeps the menu in the DOM while the
@@ -398,8 +400,8 @@ export function VaultSwitcher({
 
   const chipLabel =
     activeId !== null
-      ? ordered[0].label ?? "Vault 1"
-      : "Vault";
+      ? ordered[0].label ?? t("vaultSwitcher.vaultFallback", { n: 1 })
+      : t("vaultSwitcher.chipFallback");
 
   return (
     <div style={{ position: "relative", width: "100%" }} ref={containerRef}>
@@ -413,7 +415,7 @@ export function VaultSwitcher({
         onMouseLeave={(e) => {
           if (!open) e.currentTarget.style.background = "transparent";
         }}
-        aria-label="Switch vault"
+        aria-label={t("vaultSwitcher.switchVaultLabel")}
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="switcher.chip"
@@ -454,7 +456,7 @@ export function VaultSwitcher({
           {ordered.map((v, i) => {
             const isActive = v.id === activeId;
             const isFallback = v.label == null;
-            const name = v.label ?? `Vault ${i + 1}`;
+            const name = v.label ?? t("vaultSwitcher.vaultFallback", { n: i + 1 });
             const isSaving = switching && pendingId === v.id;
             const isHover = hoveredId === v.id && !isActive;
             const rowState: "active" | "hover" | "rest" = isActive
@@ -463,7 +465,7 @@ export function VaultSwitcher({
                 ? "hover"
                 : "rest";
             const caption = isSaving
-              ? "switching…"
+              ? t("vaultSwitcher.switching")
               : v.last_unlock !== null
                 ? formatRelativeTime(new Date(v.last_unlock))
                 : "";
@@ -540,7 +542,7 @@ export function VaultSwitcher({
             data-testid="switcher.create-cta"
           >
             <Icon name="plus" size={16} style={{ flexShrink: 0 }} />
-            <span>Create another vault</span>
+            <span>{t("vaultSwitcher.createAnother")}</span>
           </button>
         </div>
       )}

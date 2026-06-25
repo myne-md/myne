@@ -28,6 +28,7 @@ import {
   useRef,
   type CSSProperties,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -199,6 +200,7 @@ export function VaultExportModal({
   onClose,
   folders,
 }: VaultExportModalProps) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(
     vaultExportReducer,
     undefined,
@@ -248,13 +250,13 @@ export function VaultExportModal({
       const picked = await openDialog({
         directory: true,
         multiple: false,
-        title: "Choose where to put the export",
+        title: t("export.vault.chooseDestinationDialogTitle"),
       });
       if (typeof picked === "string") dispatch({ type: "pick-dir", dir: picked });
     } catch {
       // Picker failure (cancel / unavailable) → keep the prior selection.
     }
-  }, []);
+  }, [t]);
 
   // StrictMode-safe single-flight: `start` reads the latest state from a
   // ref so the callback identity stays stable across renders.
@@ -304,7 +306,7 @@ export function VaultExportModal({
         {state.phase === "setup" && (
           <>
             <h2 id="vault-export-title" style={TITLE_STYLE}>
-              Export vault as Markdown
+              {t("export.vault.setup.title")}
             </h2>
             <p
               style={SENTENCE_STYLE}
@@ -316,7 +318,9 @@ export function VaultExportModal({
             <div
               style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
             >
-              <span style={FIELD_LABEL_STYLE}>Destination</span>
+              <span style={FIELD_LABEL_STYLE}>
+                {t("export.vault.setup.destinationLabel")}
+              </span>
               <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
                 <code
                   style={{
@@ -329,7 +333,7 @@ export function VaultExportModal({
                   {/* LRM guard: the rtl-truncation trick must not reorder
                       leading punctuation of the path itself. */}
                   {destination === null
-                    ? "No folder chosen"
+                    ? t("export.vault.setup.noFolderChosen")
                     : `\u200E${destination}`}
                 </code>
                 <Button
@@ -337,7 +341,7 @@ export function VaultExportModal({
                   onClick={() => void chooseDestination()}
                   data-testid="vault-export.choose-destination"
                 >
-                  Choose…
+                  {t("export.vault.setup.choose")}
                 </Button>
               </div>
             </div>
@@ -345,16 +349,18 @@ export function VaultExportModal({
             <div
               style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}
             >
-              <span style={FIELD_LABEL_STYLE}>Scope</span>
+              <span style={FIELD_LABEL_STYLE}>
+                {t("export.vault.setup.scopeLabel")}
+              </span>
               <RadioRow
                 checked={state.scope.kind === "whole"}
-                label="Whole vault"
+                label={t("export.vault.setup.scopeWhole")}
                 testId="vault-export.scope-whole"
                 onSelect={() => dispatch({ type: "scope-whole" })}
               />
               <RadioRow
                 checked={state.scope.kind === "folder"}
-                label="One folder"
+                label={t("export.vault.setup.scopeFolder")}
                 testId="vault-export.scope-folder"
                 onSelect={() => dispatch({ type: "scope-folder" })}
               />
@@ -366,12 +372,14 @@ export function VaultExportModal({
                   }
                 }}
                 disabled={state.scope.kind !== "folder" || folders.length === 0}
-                aria-label="Folder to export"
+                aria-label={t("export.vault.setup.folderSelectAriaLabel")}
                 style={FOLDER_SELECT_STYLE}
                 data-testid="vault-export.scope-folder-select"
               >
                 <option value="">
-                  {folders.length === 0 ? "No folders in this vault" : "Choose a folder…"}
+                  {folders.length === 0
+                    ? t("export.vault.setup.noFoldersInVault")
+                    : t("export.vault.setup.chooseFolder")}
                 </option>
                 {folders.map((path) => (
                   <option key={path} value={path}>
@@ -393,7 +401,7 @@ export function VaultExportModal({
                 onClick={onClose}
                 data-testid="vault-export.cancel"
               >
-                Cancel
+                {t("export.vault.setup.cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -401,7 +409,7 @@ export function VaultExportModal({
                 disabled={!canStart(state)}
                 data-testid="vault-export.confirm"
               >
-                Export…
+                {t("export.vault.setup.export")}
               </Button>
             </div>
           </>
@@ -410,7 +418,7 @@ export function VaultExportModal({
         {state.phase === "running" && (
           <>
             <h2 id="vault-export-title" style={TITLE_STYLE}>
-              Exporting…
+              {t("export.vault.running.title")}
             </h2>
             <div
               style={{ ...MONO, fontSize: 13, color: "var(--fg-1)" }}
@@ -436,7 +444,9 @@ export function VaultExportModal({
                 disabled={state.cancelling}
                 data-testid="vault-export.cancel"
               >
-                {state.cancelling ? "Cancelling…" : "Cancel"}
+                {state.cancelling
+                  ? t("export.vault.running.cancelling")
+                  : t("export.vault.running.cancel")}
               </Button>
             </div>
           </>
@@ -445,7 +455,7 @@ export function VaultExportModal({
         {state.phase === "summary" && (
           <>
             <h2 id="vault-export-title" style={TITLE_STYLE}>
-              Export complete
+              {t("export.vault.summary.title")}
             </h2>
             <div style={SUB_PANEL_STYLE} data-testid="vault-export.summary">
               <span style={{ fontSize: 13, color: "var(--fg-1)" }}>
@@ -470,14 +480,14 @@ export function VaultExportModal({
                 }}
                 data-testid="vault-export.show-in-folder"
               >
-                Show in folder
+                {t("export.vault.summary.showInFolder")}
               </Button>
               <Button
                 variant="primary"
                 onClick={onClose}
                 data-testid="vault-export.done"
               >
-                Done
+                {t("export.vault.summary.done")}
               </Button>
             </div>
           </>

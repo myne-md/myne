@@ -16,6 +16,7 @@
 // `usePrefs`) re-reads and shows/hides the Archive button live (no remount).
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { prefsRead, setArchiveDisabled } from "../../lib/prefs";
 import { archivedRecords, useSelectedNote } from "../../notes/sidebarState";
@@ -40,6 +41,7 @@ const ERROR_STYLE: CSSProperties = {
 };
 
 export function ArchiveSettings() {
+  const { t } = useTranslation();
   // `enabled` tracks whether ARCHIVING is on (the user-facing polarity), which is
   // the inverse of the stored `archive_disabled` flag.
   const [enabled, setEnabled] = useState(true);
@@ -80,26 +82,26 @@ export function ArchiveSettings() {
       setError(null);
     } catch {
       setEnabled(prev); // rollback
-      setError("Could not update the archiving setting.");
+      setError(t("settings.archive.saveError"));
     }
   }
 
   return (
     <>
       <ControlBlock
-        label="Archiving"
-        helper="Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder and hides the archive controls."
+        label={t("settings.archive.label")}
+        helper={t("settings.archive.helper")}
         control={
           <button
             type="button"
             role="switch"
             aria-checked={enabled}
-            aria-label="Archiving"
+            aria-label={t("settings.archive.label")}
             data-testid="settings.archive-disabled"
             onClick={() => void toggle(!enabled)}
             style={TOGGLE_STYLE}
           >
-            {enabled ? "On" : "Off"}
+            {enabled ? t("settings.archive.on") : t("settings.archive.off")}
           </button>
         }
       />

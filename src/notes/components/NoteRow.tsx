@@ -27,6 +27,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type { TitleRecord } from "../loadNoteBatch";
 import { uuidv7Ms } from "../sidebarState";
 import { ColorDot } from "./ColorDot";
@@ -263,6 +264,7 @@ const renameInputStyle: CSSProperties = {
 // ─── Component ────────────────────────────────────────────────────
 
 export function NoteRow(props: NoteRowProps) {
+  const { t } = useTranslation();
   const {
     record,
     selected,
@@ -402,8 +404,16 @@ export function NoteRow(props: NoteRowProps) {
               e.stopPropagation();
               onToggleFavorite(record.noteUuid);
             }}
-            aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-            title={favorited ? "Remove from favorites" : "Add to favorites"}
+            aria-label={
+              favorited
+                ? t("notes.row.removeFromFavorites")
+                : t("notes.row.addToFavorites")
+            }
+            title={
+              favorited
+                ? t("notes.row.removeFromFavorites")
+                : t("notes.row.addToFavorites")
+            }
           >
             <StarIcon filled={favorited} />
           </button>
@@ -432,6 +442,7 @@ function TitleLine({
   isIndexNote?: boolean;
   indexConflict?: boolean;
 }) {
+  const { t } = useTranslation();
   const dot = <ColorDot slot={colorSlot} style={{ marginRight: 6, verticalAlign: "middle" }} />;
   // Trailing markers (MYND-370) — the index badge on the folder's index note,
   // and the muted conflict dot on a claimant that lost the tiebreak. Both are
@@ -443,8 +454,8 @@ function TitleLine({
         <span
           style={indexBadgeStyle}
           data-testid="notes.row-folder-index-badge"
-          title="Folder note — this folder's index"
-          aria-label="Folder note"
+          title={t("notes.row.folderIndexBadgeTitle")}
+          aria-label={t("notes.row.folderIndexBadgeLabel")}
         >
           <Icon name="book-open" size={12} />
         </span>
@@ -453,18 +464,18 @@ function TitleLine({
         <span
           style={indexConflictStyle}
           data-testid="notes.folder-index-conflict"
-          title="This folder already has an index note"
-          aria-label="Folder already has an index note"
+          title={t("notes.row.folderIndexConflictTitle")}
+          aria-label={t("notes.row.folderIndexConflictLabel")}
         />
       )}
     </>
   );
   if (record.error !== undefined) {
     return (
-      <div style={titleUntitledStyle} title="Couldn't load this note">
+      <div style={titleUntitledStyle} title={t("notes.row.loadError")}>
         {dot}
         <span style={errorIndicatorStyle} aria-hidden="true" />
-        Untitled
+        {t("notes.row.untitled")}
         {markers}
       </div>
     );
@@ -473,7 +484,7 @@ function TitleLine({
     return (
       <div style={titleUntitledStyle}>
         {dot}
-        Untitled
+        {t("notes.row.untitled")}
         {markers}
       </div>
     );
@@ -500,6 +511,7 @@ type NoteRowRenameInputProps = {
 };
 
 function NoteRowRenameInput(props: NoteRowRenameInputProps) {
+  const { t } = useTranslation();
   const { initialValue, onCommit, onCancel } = props;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const committedRef = useRef(false);
@@ -599,7 +611,7 @@ function NoteRowRenameInput(props: NoteRowRenameInputProps) {
       style={renameInputStyle}
       spellCheck={false}
       autoComplete="off"
-      aria-label="Rename note"
+      aria-label={t("notes.row.renameAriaLabel")}
     />
   );
 }

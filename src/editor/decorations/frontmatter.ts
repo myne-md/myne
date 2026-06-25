@@ -34,6 +34,7 @@ import {
   parseSimpleProperties,
   type SimpleProperty,
 } from "../frontmatter-properties";
+import i18n from "../../i18n";
 
 /**
  * Render a raw YAML scalar (as captured by `parseSimpleProperties`, i.e.
@@ -81,7 +82,7 @@ class PropertiesWidget extends WidgetType {
 
     const title = document.createElement("div");
     title.className = "cm-fm-properties-title";
-    title.textContent = "Properties";
+    title.textContent = i18n.t("editor.frontmatter.propertiesLabel");
     container.appendChild(title);
 
     const list = document.createElement("div");
@@ -98,7 +99,7 @@ class PropertiesWidget extends WidgetType {
     const addBtn = document.createElement("button");
     addBtn.type = "button";
     addBtn.className = "cm-fm-properties-add";
-    addBtn.textContent = "+ Add property";
+    addBtn.textContent = i18n.t("editor.frontmatter.addProperty");
     addBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
       this.addProperty(view);
@@ -127,10 +128,10 @@ class PropertiesWidget extends WidgetType {
     input.type = "text";
     input.className = "cm-fm-properties-name";
     input.value = displayValue;
-    input.placeholder = "Untitled";
+    input.placeholder = i18n.t("editor.frontmatter.titlePlaceholder");
     input.spellcheck = false;
     input.autocomplete = "off";
-    input.setAttribute("aria-label", "Note title");
+    input.setAttribute("aria-label", i18n.t("editor.frontmatter.titleAriaLabel"));
 
     input.addEventListener("change", () => {
       this.commitTitle(view, input, displayValue);

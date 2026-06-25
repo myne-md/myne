@@ -54,6 +54,7 @@ import {
   type FootnoteModel,
 } from "./footnote-collector";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
+import i18n from "../../i18n";
 
 // --- 0. Shared model field ------------------------------------------------
 //
@@ -306,7 +307,7 @@ class FootnoteListWidget extends WidgetType {
 
     const heading = document.createElement("div");
     heading.className = "cm-footnote-list-heading";
-    heading.textContent = "Footnotes"; // textContent — never innerHTML (TB2)
+    heading.textContent = i18n.t("editor.footnote.heading"); // textContent — never innerHTML (TB2)
     root.appendChild(heading);
 
     const list = document.createElement("ol");
@@ -337,7 +338,7 @@ class FootnoteListWidget extends WidgetType {
       if (entry.unreferenced) {
         const badge = document.createElement("span");
         badge.className = "cm-footnote-item-badge";
-        badge.textContent = "unreferenced";
+        badge.textContent = i18n.t("editor.footnote.unreferenced");
         body.appendChild(badge);
       } else if (this.model.referenceFirst.has(entry.identifier)) {
         // Back-affordance (↩) to the originating reference. The click handler

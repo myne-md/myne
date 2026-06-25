@@ -6,20 +6,21 @@
 // the switch via `assertNever`. Wire to keep banner copy aligned
 // across both surfaces; drift would silently weaken consistency.
 
+import i18n from "../i18n";
 import type { IoFailureKind } from "./stage";
 
 export function ioBanner(kind: IoFailureKind): string {
   switch (kind) {
     case "PermissionDenied":
-      return "No permission to access the vault file. Check file permissions.";
+      return i18n.t("vault.ioBanner.permissionDenied");
     case "NotFound":
       // Defensive — `vault_unlock` / `vault_recover_with_phrase`
       // special-case NotFound to a dedicated `VaultNotFound` variant;
       // this branch is unreachable in practice when the caller
       // discriminates.
-      return "Vault file not found. Please restart the app.";
+      return i18n.t("vault.ioBanner.notFound");
     case "NoSpace":
     case "Other":
-      return "Cannot read the vault file.";
+      return i18n.t("vault.ioBanner.cannotRead");
   }
 }

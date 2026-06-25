@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import {
   vaultResidueScan,
@@ -99,6 +100,7 @@ export function RepairResidueBanner() {
 }
 
 function BannerBody({ phase }: { phase: Phase }) {
+  const { t } = useTranslation();
   const Title = ({ children }: { children: string }) => (
     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>
       {children}
@@ -110,43 +112,49 @@ function BannerBody({ phase }: { phase: Phase }) {
     </div>
   );
 
-  const plural = (n: number) => (n === 1 ? "" : "s");
-
   switch (phase.kind) {
     case "found":
       return (
         <>
-          <Title>Leftover files from an incomplete deletion</Title>
-          <Body>{`${phase.count} leftover file${plural(phase.count)} from a previous deletion that didn't finish. They're already unreadable — you won't lose anything recoverable.`}</Body>
+          <Title>{t("welcome.repairResidue.foundTitle")}</Title>
+          <Body>
+            {t("welcome.repairResidue.foundBody", { count: phase.count })}
+          </Body>
         </>
       );
     case "confirming":
     case "sweeping":
       return (
         <>
-          <Title>Clean up leftover files?</Title>
-          <Body>{`${phase.count} file${plural(phase.count)} will be removed. They're already unreadable; nothing recoverable is lost.`}</Body>
+          <Title>{t("welcome.repairResidue.confirmTitle")}</Title>
+          <Body>
+            {t("welcome.repairResidue.confirmBody", { count: phase.count })}
+          </Body>
         </>
       );
     case "done":
       return (
         <>
-          <Title>Cleaned up</Title>
-          <Body>{`Removed ${phase.removed} leftover file${plural(phase.removed)}. You can create a new vault now.`}</Body>
+          <Title>{t("welcome.repairResidue.doneTitle")}</Title>
+          <Body>
+            {t("welcome.repairResidue.doneBody", { count: phase.removed })}
+          </Body>
         </>
       );
     case "partial":
       return (
         <>
-          <Title>Some files couldn't be removed</Title>
-          <Body>{`${phase.remaining} file${plural(phase.remaining)} may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.`}</Body>
+          <Title>{t("welcome.repairResidue.partialTitle")}</Title>
+          <Body>
+            {t("welcome.repairResidue.partialBody", { count: phase.remaining })}
+          </Body>
         </>
       );
     case "error":
       return (
         <>
-          <Title>Cleanup failed</Title>
-          <Body>Something went wrong. Close the app and try again.</Body>
+          <Title>{t("welcome.repairResidue.errorTitle")}</Title>
+          <Body>{t("welcome.repairResidue.errorBody")}</Body>
         </>
       );
   }
@@ -163,12 +171,13 @@ function BannerActions({
   onConfirm: (count: number) => void;
   onCancel: (count: number) => void;
 }) {
+  const { t } = useTranslation();
   switch (phase.kind) {
     case "found":
       return (
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <Button variant="secondary" onClick={() => onRequestConfirm(phase.count)}>
-            Clean up
+            {t("welcome.repairResidue.cleanUp")}
           </Button>
         </div>
       );
@@ -178,10 +187,12 @@ function BannerActions({
       return (
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <Button variant="ghost" disabled={busy} onClick={() => onCancel(phase.count)}>
-            Cancel
+            {t("welcome.repairResidue.cancel")}
           </Button>
           <Button variant="secondary" disabled={busy} onClick={() => onConfirm(phase.count)}>
-            {busy ? "Cleaning up…" : "Clean up"}
+            {busy
+              ? t("welcome.repairResidue.cleaningUp")
+              : t("welcome.repairResidue.cleanUp")}
           </Button>
         </div>
       );

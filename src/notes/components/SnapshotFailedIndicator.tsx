@@ -7,6 +7,7 @@
 // safe — only version history may be incomplete. No overclaiming.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 
 /** Backend event name — mirror of `SNAPSHOT_WRITE_FAILED_EVENT` (Rust). */
@@ -49,6 +50,7 @@ const DISMISS_STYLE: CSSProperties = {
 };
 
 export function SnapshotFailedIndicator() {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -71,16 +73,13 @@ export function SnapshotFailedIndicator() {
 
   return (
     <div role="status" aria-live="polite" style={ROOT_STYLE}>
-      <span style={MSG_STYLE}>
-        Couldn’t save a snapshot — your note is saved, but its version history
-        may be incomplete (the disk may be full).
-      </span>
+      <span style={MSG_STYLE}>{t("notes.snapshotFailed.message")}</span>
       <button
         type="button"
         style={DISMISS_STYLE}
         onClick={() => setVisible(false)}
       >
-        Dismiss
+        {t("notes.snapshotFailed.dismiss")}
       </button>
     </div>
   );

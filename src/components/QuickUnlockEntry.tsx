@@ -17,6 +17,7 @@
 // ⚠️ Touch ID is HARDWARE-UNVERIFIED (see `quick_unlock/macos.rs`).
 
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import {
   quickUnlockStatus,
   quickUnlockWithBiometric,
@@ -77,6 +78,7 @@ const HINT_STYLE: CSSProperties = {
 };
 
 export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps) {
+  const { t } = useTranslation();
   const [method, setMethod] = useState<Method | null>(null);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -118,17 +120,21 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
           setHidden(true);
           return;
         case "WrongCredential":
-          setNote(`Incorrect. ${e.detail.remaining} attempt(s) left.`);
+          setNote(
+            t("unlock.quickUnlock.wrongCredential", {
+              remaining: e.detail.remaining,
+            }),
+          );
           return;
         case "Cancelled":
           setNote(null);
           return;
         default:
-          setNote("Quick unlock failed. Use your password.");
+          setNote(t("unlock.quickUnlock.failed"));
           return;
       }
     }
-    setNote("Quick unlock failed. Use your password.");
+    setNote(t("unlock.quickUnlock.failed"));
   }
 
   async function attemptPin(ev: FormEvent) {
@@ -173,7 +179,7 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
           style={BTN_STYLE}
           data-testid="unlock.quick-touchid"
         >
-          Unlock with Touch ID
+          {t("unlock.quickUnlock.unlockWithTouchId")}
         </button>
       ) : (
         <form
@@ -183,12 +189,12 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
           <input
             type="password"
             inputMode="numeric"
-            placeholder="PIN"
+            placeholder={t("unlock.quickUnlock.pinPlaceholder")}
             value={pin}
             onChange={(e) => setPin(e.currentTarget.value)}
             disabled={busy}
             autoComplete="off"
-            aria-label="Quick-unlock PIN"
+            aria-label={t("unlock.quickUnlock.pinAriaLabel")}
             style={INPUT_STYLE}
             data-testid="unlock.quick-pin-input"
           />
@@ -198,7 +204,7 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
             style={BTN_STYLE}
             data-testid="unlock.quick-pin-submit"
           >
-            Unlock with PIN
+            {t("unlock.quickUnlock.unlockWithPin")}
           </button>
         </form>
       )}
@@ -207,7 +213,7 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
           {note}
         </p>
       )}
-      <p style={HINT_STYLE}>or use your password below</p>
+      <p style={HINT_STYLE}>{t("unlock.quickUnlock.usePasswordBelow")}</p>
     </div>
   );
 }

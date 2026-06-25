@@ -20,6 +20,7 @@
 // (empty acknowledgements) on re-entry is correct.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
@@ -43,32 +44,31 @@ interface BriefingStatement {
   ackLabel: string;
 }
 
-const STATEMENTS: readonly BriefingStatement[] = [
-  {
-    id: "no-store",
-    statement: "Your password unlocks your vault. We don't store it.",
-    why: "Your password is the input to the key that decrypts your notes. It never leaves this device, and nothing on our servers can reproduce it. That's what keeps your notes private — and why we can't reset it for you.",
-    ackLabel: "I understand Myne can't recover my password.",
-  },
-  {
-    id: "phrase-backup",
-    statement: "Your recovery phrase is your only backup.",
-    // Embeds the shared normative sentence (stated plainly, once) between
-    // a lead-in and the practical advice.
-    why: `If you forget your password, the 24-word recovery phrase is the one way back in. ${LOST_BOTH_SECRETS_SENTENCE} Write the phrase down and keep it somewhere safe.`,
-    ackLabel: "I understand my recovery phrase is the only backup.",
-  },
-  {
-    id: "no-email",
-    statement: "There is no email recovery. There never will be.",
-    why: "We never ask for your email, so there's no reset link and no account for support to unlock. This isn't a missing feature — it's the guarantee. Email recovery would mean we could read your notes, and Myne is built so we can't.",
-    ackLabel: "I understand there is no email recovery.",
-  },
-];
+/** Stable statement ids — the `data-ack-id` E2E discriminator + local-state
+ *  keys. NOT user-facing; the copy is resolved per-render via i18n keyed on
+ *  these ids so a language switch re-renders the labels. */
+const STATEMENT_IDS = ["no-store", "phrase-backup", "no-email"] as const;
 
 export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
+  const { t } = useTranslation();
   const [acked, setAcked] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  // Resolved at render time (never frozen at import) so switching language
+  // re-renders the briefing copy. The `phrase-backup` "Why?" embeds the
+  // load-bearing `LOST_BOTH_SECRETS_SENTENCE` verbatim via interpolation —
+  // the sentence itself is never translated (privacy property).
+  const STATEMENTS: readonly BriefingStatement[] = STATEMENT_IDS.map((id) => ({
+    id,
+    statement: t(`vaultCreation.briefing.statements.${id}.statement`),
+    why:
+      id === "phrase-backup"
+        ? t(`vaultCreation.briefing.statements.${id}.why`, {
+            lostBothSecrets: LOST_BOTH_SECRETS_SENTENCE,
+          })
+        : t(`vaultCreation.briefing.statements.${id}.why`),
+    ackLabel: t(`vaultCreation.briefing.statements.${id}.ackLabel`),
+  }));
 
   const allAcknowledged = STATEMENTS.every((s) => acked[s.id]);
 
@@ -79,13 +79,12 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
           alarm glyph would read as a warning, which the tone forbids.
           Doubles as the step's mount marker (`create.briefing`). */}
       <StepEyebrow testId="create.briefing">
-        Before you create your vault
+        {t("vaultCreation.briefing.eyebrow")}
       </StepEyebrow>
-      <StepHeading>Before you create your vault</StepHeading>
+      <StepHeading>{t("vaultCreation.briefing.heading")}</StepHeading>
 
       <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
-        Myne encrypts your notes so that only you can open them. Three things
-        follow from that — read them, then continue.
+        {t("vaultCreation.briefing.intro")}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -138,7 +137,7 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
                   fontWeight: 500,
                 }}
               >
-                Why?
+                {t("vaultCreation.briefing.why")}
                 <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
               </button>
 
@@ -188,7 +187,7 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
           icon="arrow-left"
           data-testid="create.briefing-back"
         >
-          Back
+          {t("vaultCreation.briefing.back")}
         </Button>
         <div style={{ flex: 1 }} />
         <Button
@@ -197,7 +196,7 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
           disabled={!allAcknowledged}
           data-testid="create.briefing-continue"
         >
-          Continue to vault creation
+          {t("vaultCreation.briefing.continue")}
         </Button>
       </div>
     </StepLayout>

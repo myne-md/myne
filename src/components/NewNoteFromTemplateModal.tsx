@@ -22,6 +22,8 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { ModalShell } from "./primitives/ModalShell";
@@ -112,8 +114,8 @@ const LOADING_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
 };
 
-function displayName(rec: TitleRecord): string {
-  return rec.title?.trim() || "Untitled template";
+function displayName(rec: TitleRecord, t: TFunction): string {
+  return rec.title?.trim() || t("notes.newFromTemplate.untitledTemplate");
 }
 
 type Step =
@@ -126,6 +128,7 @@ export function NewNoteFromTemplateModal({
   onBlankNote,
   onCreateFromTemplate,
 }: NewNoteFromTemplateModalProps) {
+  const { t } = useTranslation();
   const [templates, setTemplates] = useState<TitleRecord[] | null>(null);
   const [step, setStep] = useState<Step>({ kind: "pick" });
   const [name, setName] = useState("");
@@ -149,14 +152,17 @@ export function NewNoteFromTemplateModal({
     }
   }, [step]);
 
-  const pickTemplate = useCallback((rec: TitleRecord) => {
-    setName("");
-    setStep({
-      kind: "name",
-      templateId: rec.noteUuid as NoteId,
-      templateName: displayName(rec),
-    });
-  }, []);
+  const pickTemplate = useCallback(
+    (rec: TitleRecord) => {
+      setName("");
+      setStep({
+        kind: "name",
+        templateId: rec.noteUuid as NoteId,
+        templateName: displayName(rec, t),
+      });
+    },
+    [t],
+  );
 
   const confirmName = useCallback(() => {
     if (step.kind !== "name") return;
@@ -174,17 +180,23 @@ export function NewNoteFromTemplateModal({
   return (
     <ModalShell
       open={open}
-      title={step.kind === "name" ? "Name this note" : "New note from template"}
+      title={
+        step.kind === "name"
+          ? t("notes.newFromTemplate.nameStepTitle")
+          : t("notes.newFromTemplate.pickStepTitle")
+      }
       onClose={onClose}
       labelId="new-from-template-title"
       width={480}
     >
       {templates === null ? (
-        <div style={LOADING_STYLE}>Loading…</div>
+        <div style={LOADING_STYLE}>{t("notes.newFromTemplate.loading")}</div>
       ) : step.kind === "name" ? (
         <div style={NAME_STEP_STYLE}>
           <label htmlFor="new-from-template-name" style={LABEL_STYLE}>
-            Name for the note (from “{step.templateName}”)
+            {t("notes.newFromTemplate.nameLabel", {
+              templateName: step.templateName,
+            })}
           </label>
           <input
             id="new-from-template-name"
@@ -198,36 +210,40 @@ export function NewNoteFromTemplateModal({
                 confirmName();
               }
             }}
-            placeholder="Untitled"
+            placeholder={t("notes.newFromTemplate.namePlaceholder")}
             style={INPUT_STYLE}
           />
           <div style={ACTIONS_STYLE}>
             <Button variant="ghost" onClick={() => setStep({ kind: "pick" })}>
-              Back
+              {t("notes.newFromTemplate.back")}
             </Button>
             <Button
               variant="primary"
               onClick={confirmName}
               disabled={name.trim() === ""}
             >
-              Create note
+              {t("notes.newFromTemplate.createNote")}
             </Button>
           </div>
         </div>
       ) : templates.length === 0 ? (
         // Zero-templates degrade — offer only the blank path, never dead-end.
         <>
-          <p style={HINT_STYLE}>You haven’t created any templates yet.</p>
+          <p style={HINT_STYLE}>{t("notes.newFromTemplate.emptyState")}</p>
           <div style={{ padding: "var(--space-4) var(--space-5) var(--space-5)" }}>
             <Button variant="secondary" icon="file-plus" onClick={chooseBlank}>
-              Blank note
+              {t("notes.newFromTemplate.blankNote")}
             </Button>
           </div>
         </>
       ) : (
-        <div role="list" aria-label="Templates" style={LIST_STYLE}>
+        <div
+          role="list"
+          aria-label={t("notes.newFromTemplate.listLabel")}
+          style={LIST_STYLE}
+        >
           {templates.map((rec) => {
-            const templateName = displayName(rec);
+            const templateName = displayName(rec, t);
             return (
               <button
                 key={rec.noteUuid}

@@ -12,6 +12,7 @@
 // Penpot frame + visual review is a follow-up (no MCP pairing this pass).
 
 import { useMemo, useState, useEffect, useRef, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import { fuzzyFilter } from "../../commands/fuzzy";
 import { formatChord } from "../../commands/chord";
@@ -115,7 +116,20 @@ const CAPTURE_INPUT_STYLE: CSSProperties = {
 const WARN_STYLE: CSSProperties = { fontSize: "var(--text-xs, 11px)", color: "var(--warn, #b45309)" };
 const RESET_ALL_STYLE: CSSProperties = { ...ICON_BTN_STYLE, color: "var(--fg-2)", alignSelf: "flex-start" };
 
+// Map each panel-local display group (a typed BindGroup identifier, also used as
+// a filter discriminator + data-group attribute) to its translation key. The
+// group value stays English in the catalog; only the heading text is localised.
+const GROUP_LABEL_KEY: Record<BindGroup, string> = {
+  General: "settings.hotkeys.group.general",
+  Notes: "settings.hotkeys.group.notes",
+  "Panes & Tabs": "settings.hotkeys.group.panesTabs",
+  Navigation: "settings.hotkeys.group.navigation",
+  View: "settings.hotkeys.group.view",
+  "Editor formatting": "settings.hotkeys.group.editorFormatting",
+};
+
 export function HotkeysPanel() {
+  const { t } = useTranslation();
   const { prefs, setKeymapBinding } = usePrefs();
   const overrides = prefs.keymap;
   const [query, setQuery] = useState("");
@@ -171,7 +185,7 @@ export function HotkeysPanel() {
       const otherLabels = others
         .map((id) => BINDABLE_COMMANDS.find((c) => c.id === id)?.label ?? id)
         .join(", ");
-      setWarning(`Already used by ${otherLabels} — added anyway.`);
+      setWarning(t("settings.hotkeys.warnAlreadyUsed", { commands: otherLabels }));
     } else {
       setWarning(null);
     }
@@ -195,16 +209,13 @@ export function HotkeysPanel() {
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="hotkeys.panel">
-      <p style={HELPER_STYLE}>
-        View and change keyboard shortcuts. Editor formatting and the tab-cycle
-        shortcut are fixed.
-      </p>
+      <p style={HELPER_STYLE}>{t("settings.hotkeys.helper")}</p>
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search shortcuts…"
-        aria-label="Search shortcuts"
+        placeholder={t("settings.hotkeys.searchPlaceholder")}
+        aria-label={t("settings.hotkeys.searchAriaLabel")}
         style={SEARCH_INPUT_STYLE}
         data-testid="hotkeys.search"
       />
@@ -215,12 +226,12 @@ export function HotkeysPanel() {
       )}
       {confirmResetAll ? (
         <span style={WARN_STYLE} data-testid="hotkeys.reset-all-confirm">
-          Reset every custom shortcut to its default?{" "}
+          {t("settings.hotkeys.resetAllConfirm")}{" "}
           <button style={ICON_BTN_STYLE} data-testid="hotkeys.reset-all-yes" onClick={resetAll}>
-            Reset all
+            {t("settings.hotkeys.resetAllYes")}
           </button>
           <button style={ICON_BTN_STYLE} onClick={() => setConfirmResetAll(false)}>
-            Cancel
+            {t("settings.hotkeys.cancel")}
           </button>
         </span>
       ) : (
@@ -229,7 +240,7 @@ export function HotkeysPanel() {
           data-testid="hotkeys.reset-all"
           onClick={() => setConfirmResetAll(true)}
         >
-          Reset all hotkeys…
+          {t("settings.hotkeys.resetAll")}
         </button>
       )}
       {BIND_GROUPS.map((group: BindGroup) => {
@@ -237,7 +248,7 @@ export function HotkeysPanel() {
         if (rows.length === 0) return null;
         return (
           <div key={group} data-testid="hotkeys.group" data-group={group}>
-            <h3 style={GROUP_HEADING_STYLE}>{group}</h3>
+            <h3 style={GROUP_HEADING_STYLE}>{t(GROUP_LABEL_KEY[group])}</h3>
             {rows.map((cmd) => {
               const effective = effectiveChords(cmd.id, DEFAULTS, overrides);
               const overridden = overrides[cmd.id] !== undefined;
@@ -255,18 +266,20 @@ export function HotkeysPanel() {
                       <span
                         style={{ ...WARN_STYLE, marginLeft: "var(--space-2)" }}
                         data-testid="hotkeys.conflict-indicator"
-                        title={`Also used by ${conflicts[cmd.id]
-                          .map((id) => BINDABLE_COMMANDS.find((c) => c.id === id)?.label ?? id)
-                          .join(", ")}`}
+                        title={t("settings.hotkeys.conflictTitle", {
+                          commands: conflicts[cmd.id]
+                            .map((id) => BINDABLE_COMMANDS.find((c) => c.id === id)?.label ?? id)
+                            .join(", "),
+                        })}
                       >
-                        ⚠ conflict
+                        {t("settings.hotkeys.conflictIndicator")}
                       </span>
                     )}
                   </span>
                   <span style={CHIPS_WRAP_STYLE}>
                     {effective.length === 0 && (
                       <span style={NOT_SET_STYLE} data-testid="hotkeys.binding-empty">
-                        Not set
+                        {t("settings.hotkeys.notSet")}
                       </span>
                     )}
                     {effective.map((chord) => (
@@ -275,7 +288,9 @@ export function HotkeysPanel() {
                         {cmd.rebindable && (
                           <button
                             style={ICON_BTN_STYLE}
-                            aria-label={`Remove ${formatChord(chord)}`}
+                            aria-label={t("settings.hotkeys.removeBindingAria", {
+                              chord: formatChord(chord),
+                            })}
                             data-testid="hotkeys.remove-binding"
                             onClick={() => removeChord(cmd, chord)}
                           >
@@ -284,13 +299,15 @@ export function HotkeysPanel() {
                         )}
                       </kbd>
                     ))}
-                    {!cmd.rebindable && <span style={FIXED_TAG_STYLE}>fixed</span>}
+                    {!cmd.rebindable && (
+                      <span style={FIXED_TAG_STYLE}>{t("settings.hotkeys.fixed")}</span>
+                    )}
                     {cmd.rebindable &&
                       (capturingId === cmd.id ? (
                         <input
                           ref={captureRef}
                           readOnly
-                          value="Press a key…"
+                          value={t("settings.hotkeys.capturePrompt")}
                           style={CAPTURE_INPUT_STYLE}
                           data-testid="hotkeys.capture-input"
                           onKeyDown={onCaptureKeyDown(cmd)}
@@ -301,7 +318,9 @@ export function HotkeysPanel() {
                           <button
                             style={ICON_BTN_STYLE}
                             data-testid="hotkeys.add-binding"
-                            aria-label={`Add a shortcut for ${cmd.label}`}
+                            aria-label={t("settings.hotkeys.addBindingAria", {
+                              command: cmd.label,
+                            })}
                             onClick={() => {
                               setWarning(null);
                               setCapturingId(cmd.id);
@@ -313,7 +332,9 @@ export function HotkeysPanel() {
                             <button
                               style={ICON_BTN_STYLE}
                               data-testid="hotkeys.reset"
-                              aria-label={`Restore default for ${cmd.label}`}
+                              aria-label={t("settings.hotkeys.restoreDefaultAria", {
+                                command: cmd.label,
+                              })}
                               onClick={() => commit(cmd, null)}
                             >
                               ↺
