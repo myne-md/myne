@@ -1,1867 +1,1975 @@
 {
   "attachments": {
     "cleanUnused": {
-      "cancel": "",
-      "cleaning": "",
-      "close": "",
-      "completeTitle": "",
-      "deleteCta_other": "",
-      "error": "",
-      "intro_other": "",
-      "summaryFreed": "",
-      "summaryPeriod": "",
-      "summaryRemoved_other": "",
-      "summarySkipped_other": "",
-      "title": "",
-      "willBeReclaimed": ""
+      "cancel": "이름 *",
+      "cleaning": "청소 ..",
+      "close": "뚱 베어",
+      "completeTitle": "회사 소개",
+      "deleteCta": "삭제 {{count}} 사용하지 않는",
+      "error": "청소할 수 없습니다. 몇몇 노트는 읽을 수 없습니다 — 아무것도 삭제되었습니다.",
+      "intro_other": "이 {{count}} 첨부 파일은 메모에 사용되지 않습니다. 그들을 삭제 영구 하 고 undone 수 없습니다.",
+      "summaryFreed": " · 무료 {{size}}",
+      "summaryPeriod": "·.",
+      "summaryRemoved_other": "제거 {{count}} 첨부 파일",
+      "summarySkipped": " · {{count}} 건너뛰기 (지금 사용)",
+      "title": "깨끗한 사용하지 않는 첨부 파일",
+      "willBeReclaimed": "{{size}}가 재발견됩니다."
     },
     "coverPicker": {
-      "close": "",
-      "dropHint": "",
-      "empty": "",
-      "loading": "",
-      "removeCover": "",
-      "title": "",
-      "upload": ""
+      "close": "뚱 베어",
+      "dropHint": "커버로 사용할 이미지를 드롭합니다.",
+      "empty": "이 vault에 이미지가 아직 없습니다. 이미지 업로드.",
+      "loading": "로드 중 ..",
+      "removeCover": "덮개 제거",
+      "title": "덮개 이미지를 선택하십시오",
+      "upload": "제품정보"
     },
     "deleteDialog": {
-      "cancel": "",
-      "confirmPrompt": "",
-      "delete": "",
-      "deleting": "",
-      "error": "",
-      "notUsed": "",
-      "stillUsed_other": "",
-      "title": "",
-      "untitled": ""
+      "cancel": "이름 *",
+      "confirmPrompt": "영구적으로 이 첨부 파일을 삭제? 이것은 undone일 수 없습니다.",
+      "delete": "기타 제품",
+      "deleting": "관련 기사",
+      "error": "첨부 파일을 삭제할 수 없습니다. 다시 시도하십시오.",
+      "notUsed": "어떤 메모에서 사용되지 않습니다.",
+      "stillUsed_other": "그것은 여전히 {{count}} 노트에 사용됩니다. 내장 된 묘비를 떠난다",
+      "title": "파일 삭제",
+      "untitled": "이름 *"
     },
     "library": {
-      "actionsAriaLabel": "",
-      "actionsTitle": "",
-      "checking": "",
-      "checkUnusedFailedNotice": "",
-      "cleanUnused": "",
-      "cleanUnusedTitle": "",
-      "colCreated": "",
-      "colName": "",
-      "colSize": "",
-      "colType": "",
-      "colUsedIn": "",
-      "decrypting": "",
-      "emptyImportHint": "",
-      "emptyLoadError": "",
-      "emptyNoAttachments": "",
-      "filterAriaLabel": "",
-      "gridView": "",
-      "import": "",
-      "importDialogTitle": "",
-      "importFile": "",
-      "importing": "",
-      "listView": "",
-      "menuDelete": "",
-      "menuExport": "",
-      "menuPreview": "",
-      "menuRename": "",
-      "noMatch": "",
-      "noUnusedNotice": "",
-      "preview": "",
-      "previewAttachment": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "sortAriaLabel": "",
-      "supportedFilesFilter": "",
-      "title": "",
-      "usedInCount_other": "",
-      "usedInLoading": ""
+      "actionsAriaLabel": "첨부 작업",
+      "actionsTitle": "팟캐스트",
+      "checkUnusedFailedNotice": "사용되지 않은 첨부 파일을 확인할 수 없습니다. 다시 시도하십시오.",
+      "checking": "여행 정보",
+      "cleanUnused": "깨끗하지 않는",
+      "cleanUnusedTitle": "어떤 메모에서 사용하지 않는 첨부 파일을 삭제",
+      "colCreated": "이름 *",
+      "colName": "이름 *",
+      "colSize": "크기 (mm)",
+      "colType": "제품정보",
+      "colUsedIn": "에서 사용",
+      "decrypting": "파일 암호화 ..",
+      "emptyImportHint": "Vault에 보관할 파일 가져 오기.",
+      "emptyLoadError": "첨부 파일을 읽지 못했습니다.",
+      "emptyNoAttachments": "아직 첨부 없음.",
+      "filterAriaLabel": "필터 유형",
+      "gridView": "그리드 뷰",
+      "import": "제품정보",
+      "importDialogTitle": "Import 첨부 파일",
+      "importFile": "파일 가져 오기",
+      "importing": "수입 ..",
+      "listView": "공지사항",
+      "menuDelete": "기타 제품",
+      "menuExport": "수출입",
+      "menuPreview": "다운로드",
+      "menuRename": "이름 *",
+      "noMatch": "첨부 파일이 검색되지 않습니다.",
+      "noUnusedNotice": "청소에 사용하지 않는 첨부 파일 없음.",
+      "preview": "다운로드",
+      "previewAttachment": "미리보기 첨부",
+      "searchAriaLabel": "Filename에 의한 첨부 파일 검색",
+      "searchPlaceholder": "파일명 검색",
+      "sort": {
+        "createdAsc": "가장 먼저",
+        "createdDesc": "가장 새로운",
+        "nameAsc": "이름 A-Z",
+        "nameDesc": "이름 Z–A"
+      },
+      "sortAriaLabel": "정렬 첨부",
+      "supportedFilesFilter": "지원된 파일",
+      "title": "첨부파일",
+      "typeFilter": {
+        "all": "모든 유형",
+        "audio": "언어: 영어",
+        "image": "이미지",
+        "other": "이름 *",
+        "pdf": "PDF 파일"
+      },
+      "usedInCount_other": "{{count}} 노트 사용",
+      "usedInLoading": "·"
     },
     "thumbnail": {
-      "audioLabel": "",
-      "file": "",
-      "pause": "",
-      "pdfDocument": "",
-      "pdfFirstPage": "",
-      "play": ""
+      "audioLabel": "오디오: {{filename}}",
+      "file": "파일 형식",
+      "pause": "팟캐스트",
+      "pdfDocument": "PDF 문서",
+      "pdfFirstPage": "PDF의 첫 페이지",
+      "play": "뚱 베어"
     },
     "usedInNotesPopover": {
-      "empty": "",
-      "untitled": ""
+      "empty": "어떤 메모에서 사용되지 않습니다.",
+      "untitled": "이름 *"
     }
   },
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "invalidDestination": "",
-        "ioGeneric": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "memberTooLarge": "",
-        "vaultNotFound": "",
-        "verifyFailed": ""
+        "authOperationInProgress": "또 다른 vault 작업이 진행 중입니다. 끝내기 위하여 그것을 기다리십시오, 그 후에 다시 시도하십시오.",
+        "cancelled": "백업 취소. 파일이 뒤에 남아 있지 않았습니다.",
+        "invalidDestination": "그 대상 폴더는 쓸모가 없습니다.",
+        "ioGeneric": "백업 파일을 작성할 수 없습니다.",
+        "ioNoSpace": "목적지에 충분한 공간.",
+        "ioPermissionDenied": "목적지에 쓰기 권한이 없습니다.",
+        "joinFailure": "백업은 예기치 않게 실패했습니다. 파일이 뒤에 남아 있지 않았습니다.",
+        "memberTooLarge": "이 vault의 파일은 백업 형식보다 더 커집니다.",
+        "vaultNotFound": "Vault가 다시 찾을 수 없습니다.",
+        "verifyFailed": "기록 된 백업은 확인되지 않았으므로 discarded되었습니다. 다시 시도 - 반복하면 다른 미디어에."
       },
       "restore": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "damagedBackup": "",
-        "futureVersionBackup": "",
-        "invalidVaultMeta": "",
-        "ioGeneric": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "missingVaultMeta": "",
-        "notABackupFile": "",
-        "vaultAlreadyExists": ""
+        "authOperationInProgress": "또 다른 vault 작업이 진행 중입니다. 끝내기 위하여 그것을 기다리십시오, 그 후에 다시 시도하십시오.",
+        "cancelled": "자주 묻는 질문 변경되지 않았습니다.",
+        "damagedBackup": "백업 파일이 손상됩니다.",
+        "futureVersionBackup": "이 백업은 Myne의 새로운 버전에 의해 만들어졌습니다. Myne 업데이트, 다음 복원.",
+        "invalidVaultMeta": "이 백업의 vault 메타 데이터는 읽을 수 있으므로 나머지는 작업 결함을 생산할 수 없습니다.",
+        "ioGeneric": "백업 파일을 읽을 수 없습니다.",
+        "ioPermissionDenied": "백업 파일을 읽는 권한이 없습니다.",
+        "joinFailure": "즉시 복원. 변경되지 않았습니다.",
+        "missingVaultMeta": "이 백업은 vault 메타 데이터가 누락되어 복원 할 수 없습니다.",
+        "notABackupFile": "이 파일은 Myne 백업이 아닙니다.",
+        "vaultAlreadyExists": "이 백업에서 vault는 이미이 장치에 존재합니다."
       }
     },
     "export": {
-      "cancel": "",
-      "close": "",
-      "copying": "",
-      "preparing": "",
-      "successToast": "",
-      "title": "",
-      "verifying": ""
+      "cancel": "이름 *",
+      "close": "뚱 베어",
+      "copying": "{{done}}의 복사 {{total}} ..",
+      "preparing": "지원하다",
+      "successToast": "백업 확인 및 저장.",
+      "title": "맨 위로 vault",
+      "verifying": "{{done}}의 검증 {{total}} .."
     }
   },
   "clipper": {
     "pairing": {
-      "accept": "",
-      "close": "",
-      "codeAriaLabel": "",
-      "intro": "",
-      "reject": "",
-      "rejected": "",
-      "title": ""
+      "accept": "이름 *",
+      "close": "뚱 베어",
+      "codeAriaLabel": "페어링 코드",
+      "intro": "이 코드는 확장에 표시된 하나의 일치를 확인, 다음 쌍을 허용.",
+      "reject": "관련 제품",
+      "rejected": "관련 제품.",
+      "title": "브라우저 확장은 연결하려는"
     }
   },
   "commandPalette": {
-    "archivedBadge": "",
-    "archivedBadgeTitle": "",
-    "dialogLabel": "",
-    "matchedInBody": "",
-    "noMatches": "",
-    "searchPlaceholder": "",
-    "sectionCommands": "",
-    "sectionNotes": "",
-    "untitledNote": ""
+    "archivedBadge": "- 연혁",
+    "archivedBadgeTitle": "관련 기사",
+    "dialogLabel": "명령 팔레트",
+    "matchedInBody": "↳ 몸에 일치",
+    "noMatches": "인기 상품",
+    "searchPlaceholder": "메모를 검색하거나 명령을 실행 — Esc to dismiss",
+    "sectionCommands": "이름 *",
+    "sectionNotes": "지원하다",
+    "untitledNote": "이름 *"
   },
   "commands": {
     "actions": {
       "backupVault": {
-        "label": ""
+        "label": "백업 vault .."
       },
       "category": {
-        "app": "",
-        "editor": "",
-        "vault": "",
-        "view": ""
+        "app": "앱 다운로드",
+        "editor": "한국어",
+        "vault": "볼트",
+        "view": "(주)"
       },
       "convertWikilinks": {
-        "label": ""
+        "label": "이 메모에서 가져온 wikilinks 변환 .."
       },
       "deleteWorkspace": {
-        "label": ""
+        "label": "작업 공간 삭제.."
       },
       "exportNoteHtml": {
-        "label": ""
+        "label": "HTML로 내보내기 노트 .."
       },
       "exportNoteMarkdown": {
-        "label": ""
+        "label": "Markdown으로 내보내기 노트 .."
       },
       "exportNotePdf": {
-        "label": ""
+        "label": "PDF로 내보내기 메모 .."
       },
       "exportNoteTxt": {
-        "label": ""
+        "label": "일반 텍스트로 내보내기 메모 .."
       },
       "exportVaultMarkdown": {
-        "label": ""
+        "label": "Markdown으로 수출 볼트 .."
       },
       "foldAll": {
-        "label": ""
+        "label": "모든 새"
       },
       "importBaseView": {
-        "label": ""
+        "label": "가져오기 .base 보기.."
       },
       "importObsidian": {
-        "label": ""
+        "label": "수입 Obsidian 볼트 .."
       },
       "lockVault": {
-        "label": ""
+        "label": "자물쇠 vault"
       },
       "manageTemplates": {
-        "label": ""
+        "label": "템플릿 관리.."
       },
       "newNoteFromTemplate": {
-        "label": ""
+        "label": "템플릿의 새로운 노트 .."
       },
       "openAttachments": {
-        "label": ""
+        "label": "첨부 파일 열기 .."
       },
       "openSettings": {
-        "label": ""
+        "label": "설정 열기 .."
       },
       "openSnapshots": {
-        "label": ""
+        "label": "스냅 샷 .."
       },
       "openTodayNote": {
-        "label": ""
+        "label": "오늘의 메모 열기"
       },
       "randomNote": {
-        "label": ""
+        "label": "랜덤 노트"
       },
       "renameWorkspace": {
-        "label": ""
+        "label": "이름 workspace.."
       },
       "saveWorkspaceAs": {
-        "label": ""
+        "label": "작업 공간 저장 .."
       },
       "showGraph": {
-        "label": ""
+        "label": "그래프보기 .."
       },
       "showTags": {
-        "label": ""
+        "label": "태그 탐색 .."
       },
       "showViews": {
-        "label": ""
+        "label": "탐색 .."
       },
       "switchWorkspace": {
-        "label": ""
+        "label": "스위치 작업 공간 .."
       },
       "toggleFocus": {
-        "label": ""
+        "label": "토글 초점 모드"
       },
       "toggleLeftSidebar": {
-        "label": ""
+        "label": "토글 노트 sidebar"
       },
       "toggleReading": {
-        "label": ""
+        "label": "관련 링크"
       },
       "toggleRightSidebar": {
-        "label": ""
+        "label": "백링크 사이드바"
       },
       "toggleSource": {
-        "label": ""
+        "label": "소스 모드"
       },
       "toggleStackedTabs": {
-        "label": ""
+        "label": "토글 스태킹 탭"
       },
       "unfoldAll": {
-        "label": ""
+        "label": "모든 것"
       }
     },
     "hotkeys": {
       "command": {
-        "bold": "",
-        "closeTab": "",
-        "cycleHeadingLevel": "",
-        "cycleTabs": "",
-        "deleteWorkspace": "",
-        "focusNextPane": "",
-        "focusPrevPane": "",
-        "foldAll": "",
-        "inlineCode": "",
-        "insertWikilink": "",
-        "italic": "",
-        "navigateBack": "",
-        "navigateForward": "",
-        "newNote": "",
-        "openSettings": "",
-        "paletteToggle": "",
-        "renameWorkspace": "",
-        "saveWorkspaceAs": "",
-        "selectAllScoped": "",
-        "showGraphView": "",
-        "splitPaneDown": "",
-        "splitPaneRight": "",
-        "switchWorkspace": "",
-        "toggleBulletList": "",
-        "toggleFocusMode": "",
-        "toggleNumberedList": "",
-        "toggleReadingView": "",
-        "toggleSourceMode": "",
-        "toggleTaskList": "",
-        "unfoldAll": ""
+        "bold": "지원하다",
+        "closeTab": "닫기 탭",
+        "cycleHeadingLevel": "주기 heading 수준",
+        "cycleTabs": "사이클 탭",
+        "deleteWorkspace": "작업 공간 삭제",
+        "focusNextPane": "다음 pane 초점",
+        "focusPrevPane": "초점 이전 pane",
+        "foldAll": "모든 새",
+        "inlineCode": "Inline 코드",
+        "insertWikilink": "삽입 wikilink",
+        "italic": "인기 카테고리",
+        "navigateBack": "Navigate 뒤로",
+        "navigateForward": "찾아오시는 길",
+        "newNote": "새 소식",
+        "openSettings": "설정 열기",
+        "paletteToggle": "명령 팔레트 열기",
+        "renameWorkspace": "Workspace 이름",
+        "saveWorkspaceAs": "작업 공간 저장",
+        "selectAllScoped": "모든 선택 (스코프)",
+        "showGraphView": "그래프보기",
+        "splitPaneDown": "분할 팬 (down)",
+        "splitPaneRight": "분할 팬 (right)",
+        "switchWorkspace": "스위치 작업 공간",
+        "toggleBulletList": "관련 링크",
+        "toggleFocusMode": "토글 초점 모드",
+        "toggleNumberedList": "비밀번호",
+        "toggleReadingView": "관련 링크",
+        "toggleSourceMode": "소스 모드",
+        "toggleTaskList": "작업 목록",
+        "unfoldAll": "모든 것"
       }
     },
     "rebind": {
-      "invalidChordReason": ""
+      "invalidChordReason": "Modifier (⌘, Ctrl 또는 Alt)를 추가하십시오. - 자체의 키가 단축 될 수 없습니다."
     }
   },
   "common": {
     "prompt": {
-      "cancel": "",
-      "confirmDefault": ""
+      "cancel": "이름 *",
+      "confirmDefault": "이름 *"
     },
     "spinner": {
-      "loadingLabel": ""
+      "loadingLabel": "제품정보"
     }
   },
   "editor": {
     "attachment": {
       "actions": {
-        "exported": "",
-        "exportFailed": "",
-        "renamed": "",
-        "renameFailed": "",
-        "saveDialogFailed": ""
+        "exportFailed": "{{filename}}를 수출할 수 없습니다.",
+        "exported": "수출 {{filename}}.",
+        "renameFailed": "첨부 파일을 이름을 변경할 수 없습니다.",
+        "renamed": "{{name}}로 이름 변경.",
+        "saveDialogFailed": "Save 대화 상자를 열 수 없습니다."
       },
       "convert": {
-        "cancel": "",
-        "confirm": "",
-        "skipped": "",
-        "subtitle_other": "",
-        "subtitleEmpty": "",
-        "title": ""
+        "cancel": "이름 *",
+        "confirm": "지원하다",
+        "skipped": "건너뛰기 — {{note}}",
+        "subtitleEmpty": "변환 할 수없는 - 소스 파일이 해결되지 않았습니다.",
+        "subtitle_other": "{{count}} 참조가 되겠습니다. 커밋하기 전에 검토.",
+        "title": "수입된 첨부 파일을 변환"
       },
       "convertCommand": {
-        "pickerSourceFilter": ""
+        "pickerSourceFilter": "첨부파일"
       },
       "convertCore": {
-        "converted_other": "",
-        "noneToConvert": "",
+        "converted": "{{count}} 변환",
+        "noneToConvert": "이 메모에서 변환 할 수입 된 첨부 파일 없음.",
         "skipNote": {
-          "failed": "",
-          "locked": "",
-          "notFound": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "수입 실패",
+          "locked": "vault 잠금",
+          "notFound": "찾을 수 없음",
+          "tooLarge": "너무 크다 (최대 64 MiB)",
+          "unsupported": "지원되는 유형"
         },
-        "skippedSuffix_other": ""
+        "skippedSuffix": " · {{count}} 건너뛰기"
       },
       "fileKind": {
-        "generic": "",
+        "generic": "파일 형식",
         "label": {
-          "archive": "",
-          "audio": "",
-          "cHeader": "",
-          "cppSource": "",
-          "cSource": "",
-          "css": "",
-          "csv": "",
-          "document": "",
-          "ebook": "",
-          "go": "",
-          "html": "",
-          "image": "",
-          "java": "",
-          "javascript": "",
-          "json": "",
-          "keynote": "",
-          "log": "",
-          "markdown": "",
-          "numbers": "",
-          "pages": "",
-          "pdf": "",
-          "presentation": "",
-          "python": "",
-          "richText": "",
-          "rust": "",
-          "shell": "",
-          "spreadsheet": "",
-          "svg": "",
-          "text": "",
-          "toml": "",
-          "tsv": "",
-          "typescript": "",
-          "video": "",
-          "word": "",
-          "xml": "",
-          "yaml": ""
+          "archive": "- 연혁",
+          "audio": "언어: 영어",
+          "cHeader": "C 헤더",
+          "cSource": "C 소스",
+          "cppSource": "C++ 소스",
+          "css": "사이트맵",
+          "csv": "CSV 파일",
+          "document": "회사연혁",
+          "ebook": "전자 책",
+          "go": "기타",
+          "html": "HTML 지원",
+          "image": "(주)",
+          "java": "다운로드",
+          "javascript": "·",
+          "json": "구글 +",
+          "keynote": "주요연혁",
+          "log": "로그 파일",
+          "markdown": "연락처",
+          "numbers": "번호 스프레드 시트",
+          "pages": "페이지 문서",
+          "pdf": "PDF 파일",
+          "presentation": "주요연혁",
+          "python": "프로젝트",
+          "richText": "풍부한 텍스트 문서",
+          "rust": "뚱 베어",
+          "shell": "Shell 스크립트",
+          "spreadsheet": "스프레드시트",
+          "svg": "SVG 이미지",
+          "text": "텍스트 문서",
+          "toml": "TOML 정보",
+          "tsv": "사이트맵",
+          "typescript": "유형Script",
+          "video": "(주)",
+          "word": "Word 문서",
+          "xml": "사이트맵",
+          "yaml": "사이트맵"
         },
-        "unknown": ""
+        "unknown": "{{ext}} 파일"
       },
       "lightbox": {
-        "close": "",
-        "export": "",
-        "exportAria": "",
-        "imagePreview": "",
-        "pdfFallback": "",
-        "pdfPreview": ""
+        "close": "닫기 미리보기",
+        "export": "수출입",
+        "exportAria": "수출입",
+        "imagePreview": "이미지 미리보기",
+        "pdfFallback": "PDF 파일",
+        "pdfPreview": "PDF 미리보기"
       },
       "menu": {
-        "actionsAria": ""
+        "actionsAria": "첨부 작업"
       },
       "pdf": {
-        "loading": ""
+        "loading": "로드 중 .."
       },
       "picker": {
-        "openFailed": ""
+        "openFailed": "파일을 열 수 없습니다."
       },
       "progress": {
-        "encrypting": "",
-        "importing": "",
-        "loading": ""
+        "encrypting": "암호화 ..",
+        "importing": "수입 ..",
+        "loading": "로드 중 .."
       },
       "recording": {
-        "barAria": "",
-        "cancel": "",
-        "noAudio": "",
-        "saving": "",
-        "stop": ""
+        "barAria": "녹음 음성 메모",
+        "cancel": "이름 *",
+        "noAudio": "오디오 감지 없음 - 마이크를 확인하십시오.",
+        "saving": "저장..",
+        "stop": "기타"
       },
       "rename": {
-        "cancel": "",
-        "confirm": "",
-        "title": ""
+        "cancel": "이름 *",
+        "confirm": "이름 *",
+        "title": "이름 첨부"
       },
       "summary": {
-        "added_other": "",
+        "added": "{{count}} 추가",
         "reason": {
-          "failed": "",
-          "locked": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "실패한",
+          "locked": "vault 잠금",
+          "tooLarge": "너무 큰",
+          "unsupported": "지원되는 유형"
         },
-        "skipped_other": ""
+        "skipped": "{{count}} 건너뛰기: {{noun}}"
       },
       "voice": {
         "startError": {
-          "alreadyRecording": "",
-          "captureFailed": "",
-          "generic": "",
-          "locked": "",
-          "noInputDevice": ""
+          "alreadyRecording": "기록은 이미 진행 중입니다.",
+          "captureFailed": "녹화를 시작할 수 없습니다. – 시스템 설정에서 마이크 액세스를 확인합니다.",
+          "generic": "녹화를 시작할 수 없습니다.",
+          "locked": "음성 메모를 녹음하기 위해 vault를 잠금 해제하십시오.",
+          "noInputDevice": "마이크가 없습니다. 한 번 연결하고 다시 시도하십시오."
         },
         "stopError": {
-          "captureFailed": "",
-          "emptyRecording": "",
-          "generic": "",
-          "silentRecording": ""
+          "captureFailed": "녹음 실패 — 마이크를 확인합니다.",
+          "emptyRecording": "아무것도 기록했다.",
+          "generic": "녹화를 저장할 수 없습니다.",
+          "silentRecording": "녹음은 침묵하고 버려진 - 마이크를 확인하십시오."
         }
       },
       "widget": {
         "audio": {
-          "pause": "",
-          "play": "",
-          "seek": ""
+          "pause": "팟캐스트",
+          "play": "뚱 베어",
+          "seek": "사이트맵"
         },
         "menu": {
-          "export": "",
-          "remove": "",
-          "rename": "",
-          "reveal": ""
+          "export": "수출입",
+          "remove": "기타 제품",
+          "rename": "이름 *",
+          "reveal": "본문 바로가기"
         },
-        "pdfFallback": "",
+        "pdfFallback": "PDF 파일",
         "tombstone": {
-          "brokenAria": "",
-          "brokenLabel": "",
-          "deletedAria": "",
-          "deletedLabel": ""
+          "brokenAria": "브로큰 부착 참고: {{filename}}",
+          "brokenLabel": "뚱 베어",
+          "deletedAria": "삭제 된 첨부 파일 : {{filename}}",
+          "deletedLabel": "이름 *"
         },
-        "urlImageFallback": ""
+        "urlImageFallback": "제품정보"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "(주)",
+        "bug": "버그 수정",
+        "caution": "주 메뉴",
+        "danger": "뚱 베어",
+        "done": "한국어",
+        "error": "계정 정보",
+        "example": "이름 *",
+        "failure": "실패",
+        "faq": "제품 정보",
+        "hint": "힌트",
+        "important": "주요 특징",
+        "info": "- 한국어",
+        "missing": "뚱 베어",
+        "note": "* 이름",
+        "question": "* 이름",
+        "quote": "주요 시장",
+        "success": "지원하다",
+        "tip": "뚱 베어",
+        "todo": "으로",
+        "warning": "제품정보"
       }
     },
     "chrome": {
       "backlinks": {
-        "archivedBadge": "",
-        "empty": "",
-        "linkedFrom_other": "",
-        "untitled": ""
+        "archivedBadge": "관련 기사",
+        "empty": "아직 링크가 없습니다.",
+        "linkedFrom": "{{count}} 링크",
+        "untitled": "이름 *"
+      },
+      "barItems": {
+        "graph": "파일 형식",
+        "lock": "기타 제품",
+        "saveStatus": "저장 상태",
+        "settings": "지원하다",
+        "syncStatus": "Sync 상태",
+        "tags": "이름 *",
+        "viewMode": "모드 보기",
+        "views": "인기 있는",
+        "wordCount": "단어 수",
+        "workspace": "작업 공간"
       },
       "baseImport": {
-        "droppedFiltersSuffix_other": "",
-        "failed": "",
-        "fileFilterName": "",
-        "imported_other": "",
-        "notValid": "",
-        "skippedSuffix_other": "",
-        "stoppedAfter_other": ""
+        "droppedFiltersSuffix": " · {{count}} 필터 떨어졌다",
+        "failed": "수입 실패.",
+        "fileFilterName": "Obsidian 기초",
+        "imported": "수입 {{count}} 전망 (s)",
+        "notValid": "유효하지 .base 파일.",
+        "skippedSuffix": " · {{count}} 건너뛰기",
+        "stoppedAfter": "{{count}} 뷰 (s) 후 가져온다."
       },
       "bottomBar": {
-        "browseTags": "",
-        "browseViews": "",
-        "cycleViewMode": "",
+        "browseTags": "비밀번호",
+        "browseViews": "Browse 조회",
+        "cycleViewMode": "주기 보기 형태",
         "docStats": {
-          "summary_other": "",
-          "summarySelectionSuffix": "",
-          "title_other": "",
-          "titleSelectionSuffix": ""
+          "summarySelectionSuffix": " (젤)",
+          "summary_other": "{{count}} 단어 · {{characters}} 숯",
+          "titleSelectionSuffix": " (선택)",
+          "title_other": "{{characters}} 문자 · {{words}} 단어 · {{spaces}} 공백 · {{count}} 단락"
         },
-        "graphTitle": "",
-        "lock": "",
-        "lockVault": "",
-        "openSettings": "",
-        "settingsTitle": "",
-        "showGraph": "",
-        "syncStatus": "",
-        "tagsTitle": "",
-        "togglePreview": "",
-        "viewModeTitle": "",
-        "viewsTitle": ""
+        "graphTitle": "( )",
+        "lock": "기타 제품",
+        "lockVault": "자물쇠 vault",
+        "openSettings": "설정 열기",
+        "settingsTitle": "설정 (⌘,)",
+        "showGraph": "그래프보기",
+        "syncStatus": "Local-only · 동기화되지 않음",
+        "tagsTitle": "이름 *",
+        "togglePreview": "카테고리",
+        "viewModeTitle": "모드 보기: {{mode}} (클릭을 클릭)",
+        "viewsTitle": "인기 있는"
       },
       "import": {
-        "imported_other": "",
-        "skippedSuffix_other": ""
+        "imported_other": "수입 {{count}} 메모{{skipped}}",
+        "skippedSuffix": " · {{count}} 건너뛰기"
       },
       "nav": {
-        "goBack": "",
-        "goForward": ""
+        "goBack": "바로가기",
+        "goForward": "오시는 길"
       },
-      "noNotesToOpen": "",
-      "resizeBacklinksSidebar": "",
-      "resizeNotesSidebar": "",
+      "noNotesToOpen": "열 수 없습니다.",
+      "resizeBacklinksSidebar": "크기 backlinks sidebar",
+      "resizeNotesSidebar": "사이즈 메모 사이드바",
       "sidebarToggle": {
-        "hideBacklinks": "",
-        "hideNotes": "",
-        "showBacklinks": "",
-        "showNotes": ""
+        "hideBacklinks": "백 링크 옆바 숨기기",
+        "hideNotes": "숨기기 노트 sidebar",
+        "showBacklinks": "Backlinks 사이드 바 표시",
+        "showNotes": "표시 노트 sidebar"
       },
       "switchingOverlay": {
-        "saving": ""
+        "saving": "저장.."
       },
       "viewMode": {
-        "live": "",
-        "reading": "",
-        "source": ""
+        "live": "지원하다",
+        "reading": "이름 *",
+        "source": "이름 *"
       },
       "workspacePrompt": {
-        "namePlaceholder": "",
-        "renameConfirm": "",
-        "renameTitle": "",
-        "saveAsTitle": "",
-        "saveConfirm": ""
+        "namePlaceholder": "Workspace 이름",
+        "renameConfirm": "이름 *",
+        "renameTitle": "Workspace 이름",
+        "saveAsTitle": "작업 공간 저장",
+        "saveConfirm": "제품 정보"
       },
       "workspaceSwitcher": {
-        "defaultName": "",
-        "renameItemLabel": "",
-        "renameTitle": "",
-        "saveCurrentAs": "",
-        "switchLabel": "",
-        "toggleTitle": ""
+        "defaultName": "작업 공간",
+        "renameItemLabel": "Workspace 이름 {{name}}",
+        "renameTitle": "Workspace 이름",
+        "saveCurrentAs": "현재 저장 ..",
+        "switchLabel": "스위치 작업 공간",
+        "toggleTitle": "작업 공간: {{name}}"
       }
     },
     "codeBlock": {
-      "copyCode": "",
-      "defaultBadge": ""
+      "copyCode": "비밀번호",
+      "defaultBadge": "이름 *"
     },
     "find": {
-      "close": "",
-      "matchCase": "",
-      "matchCount": "",
-      "nextMatch": "",
-      "noMatches": "",
-      "placeholder": "",
-      "previousMatch": "",
-      "replaceAll": "",
-      "replaceAllCount": "",
-      "replaceOne": "",
-      "replacePlaceholder": "",
-      "toggleReplace": ""
+      "close": "자주 묻는 질문",
+      "matchCase": "일치 케이스",
+      "matchCount": "{{current}} 의 {{total}}",
+      "nextMatch": "다음 경기",
+      "noMatches": "인기 상품",
+      "placeholder": "자주 묻는 질문",
+      "previousMatch": "이전 경기",
+      "replaceAll": "모든 것",
+      "replaceAllCount": "모든 교체 ({{total}})",
+      "replaceOne": "기타 제품",
+      "replacePlaceholder": "관련 제품",
+      "toggleReplace": "연락처"
     },
     "folding": {
-      "clickToUnfold": "",
-      "unfold": ""
+      "clickToUnfold": "공유하기",
+      "unfold": "뚱 베어"
     },
     "footnote": {
-      "heading": "",
-      "unreferenced": ""
+      "heading": "공지사항",
+      "unreferenced": "지원하다"
     },
     "frontmatter": {
-      "addProperty": "",
-      "propertiesLabel": "",
-      "titleAriaLabel": "",
-      "titlePlaceholder": ""
+      "addProperty": "+ 속성 추가",
+      "propertiesLabel": "제품정보",
+      "titleAriaLabel": "공지사항",
+      "titlePlaceholder": "이름 *"
     },
     "mermaid": {
-      "rendering": ""
+      "rendering": "렌더링 다이어그램 .."
     },
     "slash": {
-      "attachFile": "",
-      "bulletList": "",
-      "callout": "",
-      "date": "",
-      "day": "",
-      "divider": "",
-      "heading1": "",
-      "heading2": "",
-      "heading3": "",
-      "heading4": "",
-      "heading5": "",
-      "heading6": "",
-      "link": "",
-      "now": "",
-      "numberedList": "",
-      "quote": "",
-      "table": "",
-      "time": "",
-      "todoList": "",
-      "voiceNote": "",
-      "wikiLink": ""
+      "attachFile": "첨부 파일",
+      "bulletList": "게시판 목록",
+      "callout": "전화 번호",
+      "date": "(주)",
+      "day": "(주)",
+      "divider": "디바이더",
+      "heading1": "제목 1",
+      "heading2": "헤드 2",
+      "heading3": "제목 3",
+      "heading4": "제목 4",
+      "heading5": "제목 5",
+      "heading6": "제목 6",
+      "link": "팟캐스트",
+      "now": "제품 정보",
+      "numberedList": "번호 목록",
+      "quote": "주요 시장",
+      "table": "제품정보",
+      "time": "(주)",
+      "todoList": "To-do 목록",
+      "voiceNote": "연락처",
+      "wikiLink": "Wiki 링크"
     },
     "spell": {
       "menu": {
-        "addToDictionary": "",
-        "ignoreInVault": "",
-        "ignoreThisSession": "",
-        "noSuggestions": ""
+        "addToDictionary": "Dictionary에 추가",
+        "ignoreInVault": "Ignore 에 이 vault",
+        "ignoreThisSession": "이 세션을 무시",
+        "noSuggestions": "제안 없음"
       }
     },
     "table": {
-      "addColumn": "",
-      "addRow": "",
-      "cellAriaLabel": "",
-      "deleteColumn": "",
-      "deleteRow": "",
-      "reorderColumn": "",
-      "reorderRow": ""
+      "addColumn": "오른쪽에 열을 추가",
+      "addRow": "아래 행 추가",
+      "cellAriaLabel": "테이블 셀",
+      "deleteColumn": "열 삭제",
+      "deleteRow": "행을 삭제",
+      "reorderColumn": "주문 열",
+      "reorderRow": "주문 행"
     },
     "toolbar": {
-      "apply": "",
+      "apply": "지원하다",
       "heading": {
-        "h1": "",
-        "h2": "",
-        "h3": "",
-        "h4": "",
-        "h5": "",
-        "h6": "",
-        "paragraph": ""
+        "h1": "사이트맵",
+        "h2": "사이트맵",
+        "h3": "사이트맵",
+        "h4": "사이트맵",
+        "h5": "사이트맵",
+        "h6": "사이트맵",
+        "paragraph": "관련 기사"
       },
-      "urlPlaceholder": ""
+      "highlight": {
+        "blue": "모비",
+        "green": "예시일",
+        "pink": "팸플릿",
+        "purple": "모리셔스",
+        "yellow": "스낵 바"
+      },
+      "urlPlaceholder": "페이스 링크 URL"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "한국어",
+        "narrow": "이름 *",
+        "normal": "·",
+        "wide": "제품정보"
+      },
+      "font": {
+        "mono": "팟캐스트",
+        "sans": "사이트맵"
+      },
+      "lineSpacing": {
+        "normal": "·",
+        "relaxed": "휴식",
+        "tight": "뚱 베어"
+      },
+      "textSize": {
+        "lg": "주요 특징",
+        "md": "기본 정보",
+        "sm": "제품정보",
+        "xl": "추가 큰"
+      }
     },
     "wikilink": {
       "chip": {
-        "embed": ""
+        "embed": "임베드: {{label}}"
       },
       "convert": {
-        "cancel": "",
-        "choiceClause_other": "",
-        "chooseTarget": "",
-        "convert": "",
-        "convertedToast_other": "",
-        "noneToConvert": "",
-        "nothingToConvert": "",
-        "rewriteCount_other": "",
-        "skipped": "",
-        "title": ""
+        "cancel": "이름 *",
+        "choiceClause_other": " · {{count}} 선택이 필요합니다.",
+        "chooseTarget": "선택 대상..",
+        "convert": "지원하다",
+        "convertedToast_other": "{{count}} wikilinks 변환",
+        "noneToConvert": "이 메모에서 변환 할 수입 된 wikilinks 없음.",
+        "nothingToConvert": "변환 할 수 없습니다 - 수입 된 위키 링크가 해결되지 않습니다.",
+        "rewriteCount_other": "{{count}} 링크가 되겠습니다",
+        "skipped": "건너뛰기 — {{reason}}",
+        "title": "이 메모에서 가져온 wikilinks 변환"
       },
       "convertCore": {
-        "noMatch": ""
+        "noMatch": "아니 일치"
       }
     }
   },
   "export": {
     "note": {
-      "documentTitleFallback": "",
+      "documentTitleFallback": "* 이름",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "cannotDecrypt": "",
-        "destinationUnusable": "",
-        "fallback": "",
-        "invalidAttachmentCatalog": "",
-        "invalidNoteFilename": "",
-        "invalidNoteId": "",
-        "invalidPlaintextEncoding": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "ioWriteDefault": "",
-        "noteNotFound": "",
-        "pdfCaptureFailed": "",
-        "pdfExportInProgress": "",
-        "pdfPayloadMissing": "",
-        "pdfRenderTimeout": "",
-        "pdfWindowCreateFailed": "",
-        "targetExists": "",
-        "vaultLocked": ""
+        "attachmentCorrupt": "이 주에 의해 참조 된 것은 읽을 수 없었다, 그래서 아무것도 수출되지 않았다.",
+        "attachmentMissing": "이 참고에 의해 참조 된 것은 누락되어 있지 않다.",
+        "cannotDecrypt": "이 메모는 읽을 수 없습니다.",
+        "destinationUnusable": "그 대상 폴더는 쓸모가 없습니다.",
+        "fallback": "수출은 예기치 않게 실패했습니다. 다시 시도하십시오.",
+        "invalidAttachmentCatalog": "Vault의 첨부 파일 카탈로그는 읽을 수 없었다, 그래서 아무것도 수출했다.",
+        "invalidNoteFilename": "그 파일 이름은 유용하지 않다, 그래서 아무것도 수출했다.",
+        "invalidNoteId": "이 메모는 식별 할 수 없습니다, 그래서 아무것도 수출했다.",
+        "invalidPlaintextEncoding": "이 메모의 내용이 손상되었으므로 아무 것도 수출되지 않았습니다. 백업에서 복원.",
+        "ioNoSpace": "목적지에 충분한 공간.",
+        "ioPermissionDenied": "목적지에 쓰기 권한이 없습니다.",
+        "ioWriteDefault": "수출된 파일을 쓸 수 없습니다.",
+        "noteNotFound": "더 이상 존재하지 않습니다 - 그것은 삭제 될 수 있습니다.",
+        "pdfCaptureFailed": "PDF는 생성될 수 없습니다, 그래서 아무것도 수출되지 않았습니다.",
+        "pdfExportInProgress": "PDF 수출은 이미 실행됩니다. 끝내기 위하여 그것을 기다리십시오, 그 후에 다시 시도하십시오.",
+        "pdfPayloadMissing": "수출은 중단되었다 - vault가 잠긴 경우, 잠금 해제하고 다시 시도.",
+        "pdfRenderTimeout": "참고는 렌더링 할 너무 오래 걸렸다, 그래서 아무것도 수출했다.",
+        "pdfWindowCreateFailed": "수출 창은 열릴 수 없습니다, 그래서 아무것도 수출되었습니다.",
+        "targetExists": "그 이름을 가진 파일은 목적지에 이미 존재합니다.",
+        "vaultLocked": "볼트가 잠겨 있습니다. 그것을 잠금 해제, 다음 다시 시도."
       },
       "flow": {
-        "couldNotRead": "",
-        "exportedTo": "",
-        "exportedToWithAttachments_other": "",
-        "exportedToWithImages_other": "",
-        "filterHtml": "",
-        "filterMarkdown": "",
-        "filterPdf": "",
-        "filterPlainText": "",
-        "showInFolder": ""
+        "couldNotRead": "이 메모는 읽을 수 없습니다.",
+        "exportedTo": "{{filename}}에 수출",
+        "exportedToWithAttachments_other": "{{filename}} + {{count}} 첨부 파일로 내보내기",
+        "exportedToWithImages_other": "{{filename}} + {{count}} 이미지로 내보내기",
+        "filterHtml": "HTML 지원",
+        "filterMarkdown": "연락처",
+        "filterPdf": "PDF 파일",
+        "filterPlainText": "일반 텍스트",
+        "showInFolder": "폴더에 표시"
       },
       "modal": {
-        "cancel": "",
-        "export": "",
-        "includeAttachments_other": "",
-        "title": ""
+        "cancel": "이름 *",
+        "export": "수출..",
+        "includeAttachments_other": "{{count}} 첨부 파일 포함",
+        "title": "Markdown으로 수출"
       }
     },
     "pdf": {
-      "cancel": "",
-      "continue": "",
-      "title": ""
+      "cancel": "이름 *",
+      "continue": "계속 ..",
+      "title": "PDF로 내보내기"
     },
     "vault": {
-      "chooseDestinationDialogTitle": "",
+      "chooseDestinationDialogTitle": "수출을 넣는 곳",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "cannotDecrypt": "",
-        "destinationAlreadyExists": "",
-        "destinationNotAllowed": "",
-        "invalidPlaintextEncoding": "",
-        "invalidVaultMeta": "",
-        "ioWriteDefault": "",
-        "joinFailure": "",
-        "vaultLocked": "",
-        "vaultNotFound": ""
+        "attachmentCorrupt": "참고에 의해 참조 된 것은 읽을 수 없었다, 그래서 아무것도 수출했다.",
+        "attachmentMissing": "참고에 의해 참조 된 것은 누락 된, 그래서 아무것도 수출되었다.",
+        "authOperationInProgress": "또 다른 vault 작업이 진행 중입니다. 끝내기 위하여 그것을 기다리십시오, 그 후에 다시 시도하십시오.",
+        "cancelled": "수출 취소. 해당 이용 후기에 달린 코멘트가 없습니다.",
+        "cannotDecrypt": "주의는 읽을 수 없습니다, 그래서 아무것도 수출되지 않았습니다.",
+        "destinationAlreadyExists": "그 위치에 이미 존재하는 것. 수출을 위한 신선한 장소를 선택하십시오.",
+        "destinationNotAllowed": "그 위치는 Myne의 자체 저장소에 있습니다. 외부 폴더를 선택하십시오.",
+        "invalidPlaintextEncoding": "주의 내용이 손상되었으므로 아무 것도 수출되지 않았습니다. 백업에서 복원.",
+        "invalidVaultMeta": "Vault의 메타 데이터는 읽을 수 없었다, 그래서 아무것도 수출했다.",
+        "ioWriteDefault": "수출을 쓸 수 없습니다.",
+        "joinFailure": "수출은 예기치 않게 실패했습니다. 해당 이용 후기에 달린 코멘트가 없습니다.",
+        "vaultLocked": "볼트가 잠겨 있습니다. 그것을 잠금 해제, 다음 다시 시도.",
+        "vaultNotFound": "수출에 있는 vault 없음."
       },
       "flow": {
-        "countAttachments_other": "",
-        "countFolders_other": "",
-        "countNotes_other": "",
-        "exclusionsHistory": "",
-        "exclusionsTrashed_other": "",
-        "exclusionsTrashedAndHistory_other": "",
-        "phaseAttachments": "",
-        "phaseNotes": "",
-        "preparing": "",
-        "runningCounts": ""
+        "countAttachments_other": "{{count}} 첨부 파일",
+        "countFolders_other": "{{count}} 폴더",
+        "countNotes_other": "{{count}} 노트",
+        "exclusionsHistory": "버전 역사는 포함되지 않습니다.",
+        "exclusionsTrashedAndHistory_other": "{{count}} 트레드 노트와 버전의 역사는 포함되지 않습니다.",
+        "exclusionsTrashed_other": "{{count}} 트레드 노트는 포함되지 않습니다.",
+        "phaseAttachments": "첨부파일",
+        "phaseNotes": "이름 *",
+        "preparing": "지원하다",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "",
-        "cancelling": "",
-        "title": ""
+        "cancel": "이름 *",
+        "cancelling": "관련 기사",
+        "title": "수출 .."
       },
       "setup": {
-        "cancel": "",
-        "choose": "",
-        "chooseFolder": "",
-        "destinationLabel": "",
-        "export": "",
-        "folderSelectAriaLabel": "",
-        "noFolderChosen": "",
-        "noFoldersInVault": "",
-        "scopeFolder": "",
-        "scopeLabel": "",
-        "scopeWhole": "",
-        "title": ""
+        "cancel": "이름 *",
+        "choose": "더 보기",
+        "chooseFolder": "폴더를 선택하십시오 ..",
+        "destinationLabel": "여행 정보",
+        "export": "수출..",
+        "folderSelectAriaLabel": "수출에 폴더",
+        "noFolderChosen": "선택 없음",
+        "noFoldersInVault": "이 vault에 폴더 없음",
+        "scopeFolder": "1개의 폴더",
+        "scopeLabel": "관련 상품",
+        "scopeWhole": "전체 vault",
+        "title": "Markdown로 내보내기 볼트"
       },
       "summary": {
-        "done": "",
-        "showInFolder": "",
-        "title": ""
+        "done": "한국어",
+        "showInFolder": "폴더에 표시",
+        "title": "수출 완료"
       }
     }
   },
   "failClosed": {
     "corrupted": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "백업이 있으면 복원 할 수 있습니다. - 현재 파일이 터치되지 않습니다. 백업은 별도의 볼트로 복원됩니다.",
+      "cta": "앱 닫기",
+      "title": "Vault 파일은 손상됩니다."
     },
     "invalidState": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "자주 묻는 질문.",
+      "cta": "기타 제품",
+      "title": "위험 경고."
     },
     "ioError": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "이것은 디스크 또는 파일 시스템 오류가 될 수 있습니다.",
+      "cta": "앱 닫기",
+      "title": "Vault 파일을 읽을 수 없습니다."
     },
     "permissionDenied": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "파일 권한 확인.",
+      "cta": "앱 닫기",
+      "title": "Vault 파일에 액세스 할 권한이 없습니다."
     },
-    "restoreFromBackup": ""
+    "restoreFromBackup": "백업에서 복원 .."
   },
   "notes": {
     "archive": {
-      "close": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "emptyState": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "close": "뚱 베어",
+      "countEmpty": "뚱 베어",
+      "count_other": "{{count}} 노트",
+      "delete": "기타 제품",
+      "deleteError": "그 노트를 삭제할 수 없습니다. 다시 시도하십시오.",
+      "emptyState": "아카이브가 비어 있습니다.",
+      "restore": "관련 상품",
+      "restoreError": "그 노트를 복원 할 수 없습니다. 다시 시도하십시오.",
+      "title": "- 연혁",
+      "untitled": "이름 *"
     },
     "cardMenu": {
-      "copyLink": "",
-      "open": "",
-      "openInNewTab": "",
-      "revealInFolder": ""
+      "copyLink": "관련 링크",
+      "open": "기타",
+      "openInNewTab": "새 탭에서 열기",
+      "revealInFolder": "폴더에"
     },
     "colorLabels": {
-      "clay": "",
-      "moss": "",
-      "ochre": "",
-      "plum": "",
-      "slate": "",
-      "stone": ""
+      "clay": "이름 *",
+      "moss": "사이트맵",
+      "ochre": "팟캐스트",
+      "plum": "뚱 베어",
+      "slate": "이름 *",
+      "stone": "사이트맵"
     },
     "decoration": {
-      "colorSection": "",
-      "default": "",
-      "defaultFolderIcon": "",
-      "iconSection": "",
-      "menuLabel": "",
-      "noColor": "",
-      "none": ""
+      "colorSection": "색깔: 백색",
+      "default": "기본 정보",
+      "defaultFolderIcon": "기본 폴더 아이콘",
+      "iconSection": "아이콘",
+      "menuLabel": "색깔 상표",
+      "noColor": "색깔 없음",
+      "none": "이름 *"
     },
     "deleteConfirm": {
-      "cancel": "",
-      "delete": "",
-      "title": "",
-      "untitled": "",
-      "warning": ""
+      "cancel": "이름 *",
+      "delete": "기타 제품",
+      "title": "이 메모를 삭제?",
+      "untitled": "이름 *",
+      "warning": "이것은 undone일 수 없습니다."
     },
     "filterBuilder": {
-      "addCondition": "",
-      "addFilterGroup": "",
-      "cancel": "",
+      "addCondition": "상태 추가",
+      "addFilterGroup": "필터 그룹 추가",
+      "cancel": "이름 *",
       "combinator": {
-        "all": "",
-        "any": ""
+        "all": "모든 것",
+        "any": "이름 *"
       },
-      "match": "",
+      "match": "이름 *",
       "negate": {
-        "is": "",
-        "isNot": ""
+        "is": "·",
+        "isNot": "아니다"
       },
-      "noConditions": "",
-      "noteCount_other": "",
-      "of": "",
-      "ofTheGroups": "",
-      "removeCondition": "",
-      "replaceFilter": "",
-      "save": "",
-      "searchTextPlaceholder": "",
-      "selectFolderPlaceholder": "",
-      "selectTagPlaceholder": "",
+      "noConditions": "아직 조건이 없습니다 -이 전망은 모든 페이지를 보여줍니다.",
+      "noteCount_other": "{{count}} 노트",
+      "of": "다음 것:",
+      "ofTheGroups": "그룹의:",
+      "removeCondition": "상태 제거",
+      "replaceFilter": "필터 교체",
+      "save": "제품 정보",
+      "searchTextPlaceholder": "검색 텍스트",
+      "selectFolderPlaceholder": "폴더를 선택 ..",
+      "selectTagPlaceholder": "태그를 선택 ..",
       "type": {
-        "folder": "",
-        "search": "",
-        "tag": ""
+        "folder": "뚱 베어",
+        "search": "제품정보",
+        "tag": "주요 특징"
       },
-      "unrepresentable": "",
-      "unresolved": ""
+      "unrepresentable": "이 필터는 고급 편집기로 만들어졌으며 여기에서 편집 할 수 없습니다.",
+      "unresolved": "해결되지 않음"
     },
     "folderManagement": {
-      "illegalSegment": "",
-      "tooLong": ""
+      "illegalSegment": "폴더 이름은 포함 할 수 없습니다 / \\ | # ^ [ ] 또는 공백으로 시작 / 종료.",
+      "tooLong": "그 폴더 경로는 너무 길다."
     },
     "folderNote": {
-      "defaultTitle": ""
+      "defaultTitle": "주요연혁"
     },
     "folderRow": {
-      "createFolderNote": "",
-      "empty": "",
-      "folderNote": "",
-      "openFolderNote": ""
+      "createFolderNote": "폴더 노트 만들기",
+      "empty": "한국어",
+      "folderNote": "폴더 노트",
+      "openFolderNote": "열린 폴더"
     },
     "graph": {
-      "allConnected": "",
-      "building": "",
-      "depthToggleTitle": "",
-      "filterAll": "",
-      "filterAroundNote": "",
-      "filterByTag": "",
-      "filterIsolated": "",
-      "hop": "",
-      "loading": "",
-      "noNotes": "",
-      "overCap": "",
-      "refresh": "",
-      "refreshTitle": "",
-      "tagPlaceholder": ""
+      "allConnected": "모든 것이 연결되지 않습니다 - 격리 된 노트.",
+      "building": "건물 그래프 ..",
+      "depthToggleTitle": "토글 이웃 깊이 (1 ↔ 2 hops)",
+      "filterAll": "모든 것",
+      "filterAroundNote": "이 글",
+      "filterByTag": "태그로 필터",
+      "filterIsolated": "관련 제품",
+      "hop": "{{depth}} 홉",
+      "loading": "로딩..",
+      "noNotes": "아직 그래프에 노트가 없습니다.",
+      "overCap": "이 볼트는 크다 — 전체 볼트 그래프는 캡핑된다. 태그를 필터링하거나 격리 된 노트를 보여줍니다.",
+      "refresh": "지원하다",
+      "refreshTitle": "Vault 변경 - 그래프를 재구성",
+      "tagPlaceholder": "제품 정보"
     },
     "import": {
       "base": {
-        "untitledView": ""
+        "untitledView": "공지사항"
       },
       "modal": {
-        "cancel": "",
-        "cancelledNotImported_other": "",
-        "cancelling": "",
-        "chooseFolder": "",
-        "close": "",
-        "closeAriaLabel": "",
-        "copied": "",
-        "copy": "",
-        "done": "",
-        "errorBody": "",
-        "flagDetail": "",
-        "flagKindFolder": "",
-        "flagKindTitle": "",
-        "folderPickerTitle": "",
-        "hiddenIgnoredPrefix_other": "",
-        "hiddenIgnoredSuffix": "",
-        "ifNoteExistsLabel": "",
-        "import": "",
-        "importFailed": "",
-        "importing": "",
-        "markDone": "",
-        "markedDone": "",
-        "mediaImported_other": "",
-        "mediaOmittedSuffix_other": "",
-        "needsAttention": "",
-        "needsAttentionHelp": "",
-        "noFolderChosen": "",
-        "notesImported_other": "",
-        "policyCopyHint": "",
-        "policyCopyLabel": "",
-        "policySkipHint": "",
-        "policySkipLabel": "",
-        "preexistingDetail": "",
-        "preparing": "",
-        "progressNotes": "",
-        "progressOf": "",
-        "reasonIllegalChar": "",
-        "reasonPathTooLong": "",
-        "reasonSegmentTooLong": "",
-        "scanning": "",
-        "setupIntro": "",
-        "statCancelled": "",
-        "statCanvasSkipped": "",
-        "statEmptyFoldersKept": "",
-        "statMedia": "",
-        "statOtherSkipped": "",
-        "statSkipped": "",
-        "suggestedNameAriaLabel": "",
-        "titleComplete": "",
-        "titleFailed": "",
-        "titleSetup": "",
-        "vaultFolderLabel": "",
-        "vaultRoot": ""
+        "cancel": "이름 *",
+        "cancelledNotImported": "{{count}} 수입되지 않음",
+        "cancelling": "관련 기사",
+        "chooseFolder": "폴더를 선택하십시오 ..",
+        "close": "뚱 베어",
+        "closeAriaLabel": "뚱 베어",
+        "copied": "뚱 베어",
+        "copy": "관련 기사",
+        "done": "한국어",
+        "errorBody": "수입이 완료되지 않았습니다. 이미 수입 된 모든 메모는 보관하고 보관하거나 삭제하는 것이 안전합니다.",
+        "flagDetail": "{{kind}} \"{{segment}}\" {{reason}}.",
+        "flagKindFolder": "뚱 베어",
+        "flagKindTitle": "이름 *",
+        "folderPickerTitle": "Obsidian vault 폴더를 선택하십시오",
+        "hiddenIgnoredPrefix_other": "{{count}} config / 숨겨진 항목 무시 (예를 들어. ",
+        "hiddenIgnoredSuffix": ", 도트파일).",
+        "ifNoteExistsLabel": "이미 존재하는 경우",
+        "import": "제품정보",
+        "importFailed": "수입 실패.",
+        "importing": "당신의 볼트를 가져 오기 ..",
+        "markDone": "표시 완료",
+        "markedDone": "태그됨",
+        "mediaImported": "{{count}} 수입",
+        "mediaOmittedSuffix": " · {{count}} omitted",
+        "needsAttention": "자주 묻는 질문",
+        "needsAttentionHelp": "이 노트는 변경되지 않았습니다. 제안 된 수정은 시작점입니다 - 하나를 복사 한 다음 메모를 이름을 변경하면됩니다.",
+        "noFolderChosen": "선택 없음",
+        "notesImported_other": "수입된 메모",
+        "policyCopyHint": "기존의 노트와 함께 가져옵니다.",
+        "policyCopyLabel": "비밀번호",
+        "policySkipHint": "추천 - 수입을 재 실행 결코 중복 또는 과실.",
+        "policySkipLabel": "계정 만들기",
+        "preexistingDetail": "이 메모는 이미 자신의 폴더가 있었다: “{{existing}}”, 즉 Myne 유지 - 폴더는 디스크에 sat와 다를 수 있습니다.",
+        "preparing": "지원하다",
+        "progressNotes": " 이름 *",
+        "progressOf": " 이름 * ",
+        "reasonIllegalChar": "문자 Myne은 이름을 사용할 수 없습니다",
+        "reasonPathTooLong": "폴더 + 제목 경로가 너무 길다",
+        "reasonSegmentTooLong": "이름은 Myne 보다는 더 길 수 있습니다",
+        "scanning": "당신의 볼트를 스캔 ..",
+        "setupIntro": "기존의 Obsidian vault 폴더에서 포인트 Myne. 모든 Markdown 메모는이 장치를 떠나지 않고 원본 파일이 꺼지지 않습니다.",
+        "statCancelled": "이름 *",
+        "statCanvasSkipped": ".canvas 파일 건너뛰기",
+        "statEmptyFoldersKept": "빈 폴더 유지",
+        "statMedia": "주요 특징",
+        "statOtherSkipped": "다른 파일 건너뛰기",
+        "statSkipped": "Skipped (already 존재)",
+        "suggestedNameAriaLabel": "제안 된 이름",
+        "titleComplete": "수입 완료",
+        "titleFailed": "수입 실패",
+        "titleSetup": "수입 Obsidian vault",
+        "vaultFolderLabel": "Vault 폴더",
+        "vaultRoot": "(vault 루트)"
       },
       "offer": {
-        "body": "",
-        "chooseFolder": "",
-        "laterHint": "",
-        "notNow": "",
-        "title": ""
+        "body": "Myne에 기존 노트를 가져옵니다. 각각은 수입 된 것처럼 암호화됩니다. 이 장치를 남지 않고 원본 파일은 정확히 어디에서나 유지됩니다.",
+        "chooseFolder": "폴더를 선택하십시오 ..",
+        "laterHint": "설정 → 저장에서 항상 나중에 가져올 수 있습니다.",
+        "notNow": "현재 위치",
+        "title": "Obsidian vault를 가져 오기?"
       }
     },
     "list": {
-      "addToFavorites": "",
-      "archive": "",
-      "archiveBulkError": "",
-      "archiveNote": "",
-      "archiveSingleError": "",
-      "attachments": "",
-      "bulkArchive_other": "",
-      "bulkDelete_other": "",
-      "bulkMove_other": "",
-      "caseMergeBody": "",
-      "color": "",
-      "createFirstNote": "",
-      "createFolderNote": "",
-      "customize": "",
-      "delete": "",
-      "deleteFolderBody_other": "",
-      "deleteFolderConfirm": "",
-      "deleteFolderTitle": "",
-      "deleteFolderWarning": "",
-      "duplicate": "",
-      "editFilterTitle": "",
-      "emptyState": "",
-      "exportHtml": "",
-      "exportMarkdown": "",
-      "exportPdf": "",
-      "exportTxt": "",
-      "favoritesHeading": "",
-      "mergeAnyway": "",
-      "newFolder": "",
-      "newFolderInPlaceholder": "",
-      "newFolderPlaceholder": "",
-      "newNote": "",
-      "newNoteFromTemplate": "",
-      "newNoteHere": "",
-      "newNoteMenu": "",
-      "newNoteShortcut": "",
-      "newSubfolder": "",
-      "newViewTitle": "",
-      "noteMovedToTrash": "",
-      "notesHeading": "",
-      "notesMovedToTrash_other": "",
-      "openArchive": "",
-      "openAttachments": "",
-      "openFolderNote": "",
-      "openInNewTab": "",
-      "openToSide": "",
-      "openTrash": "",
-      "removeAsFolderNote": "",
-      "removeFromFavorites": "",
-      "rename": "",
-      "setAsFolderNote": "",
-      "trash": "",
-      "trashBulkError": "",
-      "trashSingleError": "",
-      "undo": "",
-      "vaultRoot": "",
-      "viewSettingsTitle": ""
+      "addToFavorites": "자주 묻는 질문",
+      "archive": "- 연혁",
+      "archiveBulkError": "노트를 아카이브 할 수 없습니다.",
+      "archiveNote": "- 연혁",
+      "archiveSingleError": "노트를 아카이브 할 수 없습니다.",
+      "attachments": "첨부파일",
+      "bulkArchive": "아카이브 {{count}} 노트",
+      "bulkDelete": "{{count}} 메모 삭제",
+      "bulkMove": "{{count}} 메모를 이동 ..",
+      "caseMergeBody": "“{{name}}”라는 폴더가 이미 존재합니다. 이 병합 - 분리를 유지하려면 이름을 바꾸십시오?",
+      "color": "색상 ..",
+      "createFirstNote": "+ 첫 번째 메모 만들기",
+      "createFolderNote": "폴더 노트",
+      "customize": "사용자 정의 ..",
+      "delete": "기타 제품",
+      "deleteFolderBody_other": "“{{name}}”와 그 {{count}} 노트",
+      "deleteFolderConfirm": "폴더 삭제",
+      "deleteFolderTitle": "이 폴더를 삭제?",
+      "deleteFolderWarning": "메모는 Trash로 이동 - 나중에 복원 할 수 있습니다.",
+      "duplicate": "기타 제품",
+      "editFilterTitle": "필터 수정",
+      "emptyState": "아직 노트가 없습니다.",
+      "exportHtml": "HTML로 내보내기 ..",
+      "exportMarkdown": "Markdown으로 내보내기 ..",
+      "exportPdf": "PDF로 내보내기",
+      "exportTxt": "일반 텍스트로 내보내기 ..",
+      "favoritesHeading": "이름 *",
+      "mergeAnyway": "오시는 길",
+      "newFolder": "새 폴더",
+      "newFolderInPlaceholder": "{{path}}의 새로운 폴더",
+      "newFolderPlaceholder": "새 폴더",
+      "newNote": "새 소식",
+      "newNoteFromTemplate": "템플릿의 새로운 노트 ..",
+      "newNoteHere": "현재 위치",
+      "newNoteMenu": "새 소식",
+      "newNoteShortcut": "새로운 노트 (⌘N)",
+      "newSubfolder": "새로운 subfolder",
+      "newViewTitle": "새로운 전망",
+      "noteMovedToTrash": "Trash로 이동",
+      "notesHeading": "지원하다",
+      "notesMovedToTrash_other": "{{count}} 메모가 Trash로 이동",
+      "openArchive": "아카이브 열기",
+      "openAttachments": "첨부파일 열기",
+      "openFolderNote": "열린 폴더",
+      "openInNewTab": "새 탭에서 열기",
+      "openToSide": "본문 바로가기",
+      "openTrash": "Trash를 엽니 다",
+      "removeAsFolderNote": "폴더 노트로 제거",
+      "removeFromFavorites": "자주 묻는 질문",
+      "rename": "이름 *",
+      "setAsFolderNote": "폴더 노트로 설정",
+      "trash": "정보 수집",
+      "trashBulkError": "쓰레기에 노트를 이동할 수 없습니다.",
+      "trashSingleError": "쓰레기에 주의를 이동할 수 없습니다.",
+      "undo": "이름 *",
+      "vaultRoot": "Vault 루트",
+      "viewSettingsTitle": "설정 보기"
     },
     "newFromTemplate": {
-      "back": "",
-      "blankNote": "",
-      "createNote": "",
-      "emptyState": "",
-      "listLabel": "",
-      "loading": "",
-      "nameLabel": "",
-      "namePlaceholder": "",
-      "nameStepTitle": "",
-      "pickStepTitle": "",
-      "untitledTemplate": ""
+      "back": "이름 *",
+      "blankNote": "비밀번호",
+      "createNote": "계정 만들기",
+      "emptyState": "아직 템플릿을 만들지 않았습니다.",
+      "listLabel": "한국어",
+      "loading": "로드 중 ..",
+      "nameLabel": "참고 이름(“{{templateName}}”)",
+      "namePlaceholder": "이름 *",
+      "nameStepTitle": "이 글",
+      "pickStepTitle": "템플릿의 새로운 노트",
+      "untitledTemplate": "Untitled 템플릿"
     },
     "newTab": {
-      "createNote": "",
-      "noNotesMatch": "",
-      "noNotesYet": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "untitled": ""
+      "createNote": "새로운 노트 만들기",
+      "noNotesMatch": "메모 일치 없음.",
+      "noNotesYet": "아직 노트가 없습니다.",
+      "searchAriaLabel": "본문 바로가기",
+      "searchPlaceholder": "검색 노트 ..",
+      "untitled": "이름 *"
     },
     "pane": {
-      "graphTab": "",
-      "loading": "",
-      "untitledView": ""
+      "graphTab": "파일 형식",
+      "loading": "로드 중 ..",
+      "untitledView": "공지사항"
     },
     "relativeTime": {
-      "daysAgo": "",
-      "hoursAgo": "",
-      "justNow": "",
-      "minutesAgo": "",
-      "oneWeekAgo": "",
-      "weeksAgo": "",
-      "yesterday": ""
+      "daysAgo": "{{d}} 일 전",
+      "hoursAgo": "{{h}} h 전",
+      "justNow": "지금 시작",
+      "minutesAgo": "{{m}} 분 전",
+      "oneWeekAgo": "1 주 전",
+      "weeksAgo": "{{w}} 주 전",
+      "yesterday": "어제"
     },
     "row": {
-      "addToFavorites": "",
-      "folderIndexBadgeLabel": "",
-      "folderIndexBadgeTitle": "",
-      "folderIndexConflictLabel": "",
-      "folderIndexConflictTitle": "",
-      "loadError": "",
-      "removeFromFavorites": "",
-      "renameAriaLabel": "",
-      "untitled": ""
-    },
-    "savedView": {
-      "defaultName": ""
+      "addToFavorites": "자주 묻는 질문",
+      "folderIndexBadgeLabel": "Folder 참고",
+      "folderIndexBadgeTitle": "폴더 참고 — 이 폴더의 인덱스",
+      "folderIndexConflictLabel": "폴더는 이미 인덱스 노트가 있습니다",
+      "folderIndexConflictTitle": "이 폴더는 이미 인덱스 노트가 있습니다",
+      "loadError": "이 메모를로드 할 수 없습니다",
+      "removeFromFavorites": "자주 묻는 질문",
+      "renameAriaLabel": "이름 참고",
+      "untitled": "이름 *"
     },
     "saveStatus": {
-      "editing": "",
-      "editingEllipsis": "",
-      "editingTitle": "",
-      "justNow": "",
-      "retry": "",
-      "saved": "",
-      "savedRelative": "",
-      "saveFailed": "",
-      "saveFailedTitle": "",
-      "saving": "",
-      "savingEllipsis": ""
+      "editing": "관련 기사",
+      "editingEllipsis": "편집..",
+      "editingTitle": "편집 - autosave는 장갑",
+      "justNow": "지금 시작",
+      "retry": "이름 *",
+      "saveFailed": "저장 실패",
+      "saveFailedTitle": "저장 실패 — 클릭 Retry",
+      "saved": "지원하다",
+      "savedRelative": "저장 {{rel}}",
+      "saving": "제품 정보",
+      "savingEllipsis": "저장.."
+    },
+    "savedView": {
+      "defaultName": "필터 보기"
     },
     "snapshotFailed": {
-      "dismiss": "",
-      "message": ""
+      "dismiss": "뚱 베어",
+      "message": "스냅 샷을 저장할 수 없습니다 - 메모가 저장되지만 버전의 역사는 불완전 할 수 있습니다 (디스크는 풀 수 있습니다)."
     },
     "snapshots": {
-      "cancel": "",
-      "changeCount_other": "",
-      "close": "",
-      "confirmBody": "",
-      "confirmTitle": "",
-      "decrypting": "",
-      "emptyState": "",
-      "encryptedSize": "",
-      "errorCannotDecrypt": "",
-      "errorGeneric": "",
-      "errorIo": "",
-      "errorNotFound": "",
-      "errorStorageAccess": "",
-      "errorVaultLocked": "",
-      "justNow": "",
-      "listLabel": "",
-      "loading": "",
-      "restore": "",
-      "restoreCta": "",
-      "restoredStatus": "",
-      "selectPlaceholder": "",
-      "title": "",
-      "untitled": ""
+      "cancel": "이름 *",
+      "changeCount_other": "{{count}} 이 스냅샷 이후 변경",
+      "close": "뚱 베어",
+      "confirmBody": "현재 주의사항은 스냅샷으로 저장됩니다.",
+      "confirmTitle": "이 스냅 샷을 복원?",
+      "decrypting": "암호 해독 ..",
+      "emptyState": "아직 스냅샷이 없습니다. Snapshot는 7 일 동안 편집하고 보관 한대로 자동으로 저장됩니다. 그들은 암호화되고, 주의가 영구적으로 삭제 될 때 사라집니다.",
+      "encryptedSize": "암호화 · {{size}}",
+      "errorCannotDecrypt": "이 스냅 샷은 해독 할 수 없습니다.",
+      "errorGeneric": "뭔가 잘못되었습니다. 다시 시도하십시오.",
+      "errorIo": "디스크 오류가 발생했습니다. 디스크는 전체 또는 unwritable 일 수 있습니다.",
+      "errorNotFound": "그 스냅샷은 더 이상 사용할 수 없습니다.",
+      "errorStorageAccess": "Vault의 스냅 샷 스토리지에 액세스 할 수 없습니다.",
+      "errorVaultLocked": "볼트가 잠겨 있습니다. Snapshots를 볼 수 있습니다.",
+      "justNow": "지금 시작",
+      "listLabel": "Snapshot 목록",
+      "loading": "로드 중 ..",
+      "restore": "관련 상품",
+      "restoreCta": "이 스냅 샷을 복원",
+      "restoredStatus": "자주 묻는 질문 스냅 샷으로 저장 된 버전.",
+      "selectPlaceholder": "이후 변경된 내용을 미리 보기 위해 스냅샷을 선택합니다.",
+      "title": "스냅샷",
+      "untitled": "이름 *"
     },
     "tabStrip": {
-      "closeNewTab": "",
-      "closeTab": "",
-      "newTab": "",
-      "openNotes": "",
-      "pin": "",
-      "pinned": "",
-      "pinnedTitle": "",
-      "unpin": "",
-      "untitled": ""
+      "closeNewTab": "새 탭 닫기",
+      "closeTab": "닫기 {{title}}",
+      "newTab": "새 탭",
+      "openNotes": "공지사항",
+      "pin": "핀",
+      "pinned": "연락처",
+      "pinnedTitle": "Pinned — 닫기에 핀",
+      "unpin": "뚱 베어",
+      "untitled": "이름 *"
     },
     "tagBrowser": {
-      "cancel": "",
-      "clear": "",
-      "combineTagsWith": "",
-      "filtering": "",
-      "modeAll": "",
-      "modeAny": "",
-      "noNotesForFilter": "",
-      "noTagsMatch": "",
-      "noTagsYet": "",
-      "noteCount_other": "",
-      "notes": "",
-      "pickTag": "",
-      "save": "",
-      "saveAsView": "",
-      "searchPlaceholder": "",
-      "title": "",
-      "untitled": "",
-      "viewNamePlaceholder": ""
+      "cancel": "이름 *",
+      "clear": "뚱 베어",
+      "combineTagsWith": "태그를 결합",
+      "filtering": "필터링 ..",
+      "modeAll": "모든 것",
+      "modeAny": "이름 *",
+      "noNotesForFilter": "이 필터의 노트가 없습니다.",
+      "noTagsMatch": "태그 일치 \"{{query}}\".",
+      "noTagsYet": "아직 태그가 없습니다.",
+      "noteCount_other": "{{count}} 노트",
+      "notes": "지원하다",
+      "pickTag": "필터에 태그를 선택합니다.",
+      "save": "제품 정보",
+      "saveAsView": "자주 묻는 질문",
+      "searchPlaceholder": "검색 태그..",
+      "title": "이름 *",
+      "untitled": "이름 *",
+      "viewNamePlaceholder": "이름 *"
     },
     "trash": {
-      "close": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
-      "emptyConfirmBody_other": "",
-      "emptyConfirmCta": "",
-      "emptyConfirmTitle": "",
-      "emptyPartialFailure_other": "",
-      "emptyState": "",
-      "purgeConfirmCta": "",
-      "purgeConfirmTitle": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "close": "뚱 베어",
+      "countEmpty": "뚱 베어",
+      "count_other": "{{count}} 노트",
+      "delete": "기타 제품",
+      "deleteError": "그 노트를 삭제할 수 없습니다. 다시 시도하십시오.",
+      "empty": "빈 쓰레기",
+      "emptyConfirmBody_other": "{{count}} 노트는 영구적으로 삭제됩니다.",
+      "emptyConfirmCta": "빈 쓰레기",
+      "emptyConfirmTitle": "빈 쓰레기?",
+      "emptyPartialFailure_other": "{{count}} 메모가 삭제되지 않고 쓰레기에 남아있을 수 없습니다.",
+      "emptyState": "쓰레기는 비어 있습니다.",
+      "purgeConfirmCta": "영구적으로 삭제",
+      "purgeConfirmTitle": "영구적으로 삭제?",
+      "restore": "관련 상품",
+      "restoreError": "그 노트를 복원 할 수 없습니다. 다시 시도하십시오.",
+      "title": "정보 수집",
+      "untitled": "이름 *"
     },
     "unlinkedMentions": {
-      "empty": "",
-      "heading": "",
-      "link": "",
-      "linkTooltip": "",
-      "refresh": "",
-      "searching": "",
-      "thisNote": "",
-      "untitled": ""
-    },
-    "views": {
-      "cards": {
-        "changeCover": "",
-        "changeCoverImage": "",
-        "empty": "",
-        "noValue": "",
-        "setCover": "",
-        "setCoverImage": "",
-        "untitled": ""
-      },
-      "collapseViews": "",
-      "empty": "",
-      "expandViews": "",
-      "heading": "",
-      "host": {
-        "unsupported": ""
-      },
-      "menu": {
-        "deleteView": "",
-        "editFilter": "",
-        "moveDown": "",
-        "moveUp": "",
-        "rename": "",
-        "viewSettings": ""
-      },
-      "newView": "",
-      "untitledView": ""
+      "empty": "연결되지 않은 언급 없음.",
+      "heading": "링크 된 언급",
+      "link": "팟캐스트",
+      "linkTooltip": "이 언급 링크 {{title}}",
+      "refresh": "언급은 변경 될 수 있습니다 — 새로 고침",
+      "searching": "관련 기사",
+      "thisNote": "이 글",
+      "untitled": "이름 *"
     },
     "viewSettings": {
       "aspect": {
-        "default": "",
-        "fourThree": "",
-        "square": "",
-        "threeTwo": "",
-        "wide": ""
+        "default": "기본 (16:9)",
+        "fourThree": "4:3의",
+        "square": "1:1 (평)",
+        "threeTwo": "3:2의",
+        "wide": "16:9 (넓은)"
       },
-      "cancel": "",
-      "cardSize": "",
-      "cardSizeValue": "",
-      "coverImageHint": "",
-      "coverImagePlaceholder": "",
-      "coverImageProperty": "",
-      "imageAspectRatio": "",
-      "reset": "",
-      "save": ""
+      "cancel": "이름 *",
+      "cardSize": "카드 크기",
+      "cardSizeValue": "{{size}} 파일",
+      "coverImageHint": "값이 이미지인 frontmatter 속성 - 각 카드의 커버와 같이 표시됩니다. 덮개에 빈을 두십시오.",
+      "coverImagePlaceholder": "e.g. 덮개",
+      "coverImageProperty": "표지 이미지 속성",
+      "imageAspectRatio": "이미지 종횡비",
+      "reset": "지원하다",
+      "save": "제품 정보"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "변화 덮개",
+        "changeCoverImage": "변경 커버 이미지",
+        "empty": "이 전망이 일치하지 않음",
+        "noValue": "가치 없음",
+        "setCover": "연락처",
+        "setCoverImage": "설정 커버 이미지",
+        "untitled": "이름 *"
+      },
+      "collapseViews": "Collapse 조회",
+      "empty": "아직 조회 수 없습니다. 현재 참고 목록을보기로 저장합니다.",
+      "expandViews": "확대 전망",
+      "heading": "인기 있는",
+      "host": {
+        "unsupported": "이 뷰 유형은 나중에 업데이트에 도착합니다."
+      },
+      "menu": {
+        "deleteView": "관련 링크",
+        "editFilter": "필터 편집 ..",
+        "moveDown": "맨 위로",
+        "moveUp": "맨 위로",
+        "rename": "이름 *",
+        "viewSettings": "설정 보기.."
+      },
+      "newView": "새로운 전망",
+      "untitledView": "공지사항"
     },
     "welcome": {
-      "body": "",
-      "title": ""
+      "body": "Myne에 오신 것을 환영합니다.\n\n여기에서 저장하는 모든 것은 암호화되어 기기에 머물 수 있습니다. **password** 및 **recovery 구문 **는 오직 키입니다. 잃어버린 경우, 아무도 당신의 노트를 다시 얻을 수 없습니다, 심지어 우리.\n\n이것은 단지 정기적 인 주이므로 스스로하십시오. 그것을 편집, 이름을 변경, 또는 당신이 좋아하는 때마다 삭제, 그리고 당신의 아이디어로 새로운 노트를 추가.\n\n우리는 당신을 기쁘게 여기. Myne에 대해 자세히 알아 보려면 https://myne.md를 방문하십시오.\n",
+      "title": "환영합니다Myne"
     },
     "workspace": {
-      "defaultSlotName": ""
+      "defaultSlotName": "기본 정보"
     }
   },
   "password": {
     "createForm": {
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "defaultEmptyCaption": "",
-      "mismatch": "",
-      "passwordLabel": "",
-      "suggestPassword": "",
-      "tooShort": ""
+      "checkingStrength": "강도 검사 ..",
+      "confirmLabel": "비밀번호",
+      "defaultEmptyCaption": "Argon2id (m=256 MiB, t=3, p=2)에 입력으로 사용됩니다. 당신이 기억할 수있는 무언가를 선택하십시오; 당신은 그것을 재설정 할 수 없습니다.",
+      "mismatch": "비밀번호는 일치하지 않습니다.",
+      "passwordLabel": "마스터 암호",
+      "suggestPassword": "비밀번호",
+      "tooShort": "최소 {{n}} 문자를 사용합니다."
     },
     "input": {
-      "hide": "",
-      "show": ""
+      "hide": "비밀번호",
+      "show": "비밀번호"
     }
   },
   "primitives": {
     "searchableSelect": {
-      "emptyText": "",
-      "placeholder": "",
-      "searchPlaceholder": ""
+      "emptyText": "인기 있는.",
+      "placeholder": "선택 ..",
+      "searchPlaceholder": "기타.."
     }
   },
   "recover": {
     "errors": {
-      "cancelledVaultLocked": "",
-      "operationInProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "cancelledVaultLocked": "복구 취소 : vault가 잠겨 있었다.",
+      "operationInProgress": "진행중인 작업. 자주 묻는 질문.",
+      "unexpected": "오류가 없습니다. 다시 시도하십시오.",
+      "vaultNotFound": "Vault 파일이 없습니다. 앱을 다시 시작하세요."
     }
   },
   "restore": {
-    "backLabel": "",
-    "cancelLabel": "",
+    "backLabel": "이름 *",
+    "cancelLabel": "이름 *",
     "collision": {
-      "body": "",
-      "keepBoth": "",
-      "replaceExisting": ""
+      "body": "이 백업에서 vault는 이미이 장치에 존재합니다. 당신은 모두 유지 할 수 있습니다. 복원 된 복사본은 vault 목록에서 별도의 볼트로 나타납니다. 또는 지금 복원하고 vault 목록에서 기존의 볼트를 제거하십시오 (제거는 DELETE를 입력하도록 요청하고 복원 된 볼트가 열립니다).",
+      "keepBoth": "모두 유지",
+      "replaceExisting": "복원, 다음 기존 교체 .."
     },
     "damaged": {
-      "body": "",
-      "close": "",
-      "salvage": ""
+      "body": "백업 파일은 손상되었으므로 복원되지 않았습니다. 이 유일한 사본이 있다면, 급여는 intact 노트를 복원 할 수 있으며, 결과가 항상 부분 복원으로 표시됩니다.",
+      "close": "뚱 베어",
+      "salvage": "Salvage intact 노트 .."
     },
     "error": {
-      "tryAnotherFile": ""
+      "tryAnotherFile": "다른 파일을 시도"
     },
     "pick": {
-      "body": "",
-      "chooseFile": "",
-      "corruptedSuffix": ""
+      "body": "<code>.myne-backup</code> 파일을 선택합니다. 백업은 복원되기 전에 확인됩니다. 복원 된 vault는 vault의 비밀번호 또는 복구 구문으로 잠금 해제됩니다.",
+      "chooseFile": "백업 파일 선택 ..",
+      "corruptedSuffix": "현재 vault가 터치되지 않습니다. 백업은 별도의 vault로 복원됩니다."
     },
     "summary": {
-      "attachments": "",
-      "collidedNote": "",
-      "notes": "",
-      "openVaultList": "",
-      "partialHeader_other": "",
-      "restored": "",
-      "versionHistory": ""
+      "attachments": "첨부 파일: {{n}}",
+      "collidedNote": "이 vault의 이전 기존 사본은 여전히 vault 목록에 있습니다. 복원 된 볼트가 열리면 vault 목록에서 오래된 것을 제거 할 수 있습니다 (DeLETE를 입력하도록 요청합니다).",
+      "notes": "노트: {{n}}",
+      "openVaultList": "Vault 목록 열기",
+      "partialHeader_other": "부분적으로 복원 - {{count}} 항목은 읽을 수 없습니다.",
+      "restored": "Vault 복원.",
+      "versionHistory": "버전 기록 항목 : {{n}}"
     },
-    "title": "",
+    "title": "백업에서 복원",
     "working": {
-      "cancel": "",
-      "restoringProgress": "",
-      "verifying": "",
-      "verifyingProgress": ""
+      "cancel": "이름 *",
+      "restoringProgress": "복원 ... {{done}}의 {{total}}",
+      "verifying": "백업 검증 ..",
+      "verifyingProgress": "백업 검증... {{done}} 의 {{total}}"
     }
   },
   "settings": {
     "about": {
-      "buildChannelDevelopment": "",
-      "buildChannelLabel": "",
-      "buildChannelStable": "",
-      "changelogButton": "",
-      "changelogHelper": "",
-      "changelogLabel": "",
-      "licenseBody": "",
-      "licenseLabel": "",
-      "tagline": "",
-      "threatModelHelper": "",
-      "threatModelLabel": ""
+      "buildChannelDevelopment": "개발 구축",
+      "buildChannelLabel": "연락처",
+      "buildChannelStable": "제품 정보",
+      "changelogButton": "Changelog 보기..",
+      "changelogHelper": "Per-version 노트. MYND-119 토지가 될 때 나타납니다.",
+      "changelogLabel": "공지사항",
+      "licenseBody": "Pre-alpha · CC0 docs · AGPL-3.0 응용 코드 단계 1 릴리스.",
+      "licenseLabel": "이름 *",
+      "tagline": "Pre-alpha · 단계 1 데스크탑 클라이언트",
+      "threatModelHelper": "브라우저에서 공개 위협 모델 문서를 엽니다.",
+      "threatModelLabel": "위협 모델"
     },
     "account": {
-      "argon2idHeading": "",
-      "changePasswordButton": "",
+      "argon2idHeading": "Argon2id 모수",
+      "changePasswordButton": "비밀번호",
       "changePasswordError": {
-        "invalidCredentialOrVault": "",
-        "ioError": "",
-        "joinFailure": "",
-        "samePasswordRejected": "",
-        "weakNewPassword": ""
+        "invalidCredentialOrVault": "잘못된 현재 암호 또는 vault 파일이 손상됩니다.",
+        "ioError": "디스크 오류, 다시 시도하십시오.",
+        "joinFailure": "뭔가 잘못되었는지, 다시 시도하십시오.",
+        "samePasswordRejected": "새로운 암호는 현재 일치합니다.",
+        "weakNewPassword": "새로운 비밀번호는 최소 12자이어야 합니다."
       },
-      "changePasswordHeading": "",
-      "changePasswordHelper": "",
-      "dangerZoneHeading": "",
-      "dangerZoneHelper": "",
-      "deleteVaultButton": "",
-      "memoryCost": "",
-      "parallelism": "",
-      "timeCost": "",
-      "vaultLabelEyebrow": "",
-      "vaultLabelHelper": "",
-      "vaultLabelPlaceholder": "",
-      "vaultLabelSave": ""
+      "changePasswordHeading": "비밀번호",
+      "changePasswordHelper": "동일한 vault를 유지하면서 마스터 암호를 회전합니다. 복구 구문은 동일합니다.",
+      "dangerZoneHeading": "위험 구역",
+      "dangerZoneHelper": "이 vault 및 모든 노트를 영구적으로 삭제합니다. 할 수 없습니다. 복구 구문은 vault를 복원하지 않습니다.",
+      "deleteVaultButton": "Vault를 삭제 ..",
+      "memoryCost": "메모리 비용",
+      "parallelism": "패럴림픽",
+      "timeCost": "시간 비용",
+      "vaultLabelEyebrow": "VAULT 라벨",
+      "vaultLabelHelper": "이 vault에 대한 이름은 in-app 스위처에 표시됩니다. vault 내부에 암호화 된 저장; 일반 텍스트에서 장치를 결코 나타낸다.",
+      "vaultLabelPlaceholder": "라벨 추가 ..",
+      "vaultLabelSave": "제품 정보"
     },
     "appearance": {
-      "showEditTimesAria": "",
-      "showEditTimesHelper": "",
-      "showEditTimesLabel": "",
-      "themeHelper": "",
-      "themeLabel": "",
-      "themeOptionAria": "",
-      "themeSaveError": "",
-      "timestampsSaveError": ""
+      "showEditTimesAria": "Sidebar에서 편집 시간을 표시",
+      "showEditTimesHelper": "사이드바의 제목 아래 각 메모의 마지막 편집 시간을 표시합니다.",
+      "showEditTimesLabel": "표시 편집 시간",
+      "theme": {
+        "amoled": "AMOLED 디스플레이",
+        "dark": "한국어",
+        "light": "제품 정보",
+        "system": "시스템"
+      },
+      "themeHelper": "빛과 어두운 테마 사이 전환, 또는 시스템 설정을 따르십시오.",
+      "themeLabel": "이름 *",
+      "themeOptionAria": "{{label}} 테마",
+      "themeSaveError": "테마를 저장할 수 없습니다. 다시 시도하십시오.",
+      "timestampsSaveError": "선호도를 저장할 수 없습니다. 다시 시도하십시오."
     },
     "archive": {
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": "",
-      "saveError": ""
+      "helper": "메모가 아카이브로 이동하자, 메인 목록에서 유지. 이 삭제는 모든 아카이브 노트를 폴더에 복원하고 아카이브 컨트롤을 숨깁니다.",
+      "label": "- 한국어",
+      "off": "이름 *",
+      "on": "으로",
+      "saveError": "아카이브 설정을 업데이트 할 수 없습니다."
     },
     "autoBackup": {
-      "backupFolder": "",
-      "chooseFolder": "",
-      "chooseFolderDialogTitle": "",
-      "frequency": "",
-      "frequencyAriaLabel": "",
-      "helper": "",
-      "keepLast": "",
-      "noFolderChosen": "",
-      "saveFailedToast": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "statusFailed": "",
-      "statusLastBackup": "",
-      "statusNever": "",
-      "title": ""
+      "backupFolder": "백업 폴더",
+      "chooseFolder": "폴더를 선택하십시오 ..",
+      "chooseFolderDialogTitle": "자동 백업을위한 폴더를 선택하십시오",
+      "frequency": "주파수 영역",
+      "frequencyAriaLabel": "백업 주파수",
+      "helper": "암호화 된 .myne-backup을 일정에 폴더로 작성하면 앱이 열리고 볼트가 잠금 해제됩니다. 백업은 vault로 암호화됩니다. Myne은 가장 최근 몇 가지를 유지하고 장치에서 아무것도 보낼 수 없습니다.",
+      "intervalDaily": "- 한국어",
+      "intervalEveryUnlock": "모든 잠금 해제",
+      "intervalWeekly": "지원하다",
+      "keepLast": "계속하기",
+      "noFolderChosen": "아직 선택된 폴더 없음.",
+      "saveFailedToast": "백업 설정을 저장할 수 없습니다.",
+      "searchEmpty": "없음.",
+      "searchPlaceholder": "기타..",
+      "statusFailed": "자동 백업 실패 — {{stamp}}",
+      "statusLastBackup": "마지막 백업: {{stamp}}",
+      "statusNever": "자동 백업 없음.",
+      "title": "자동 백업"
     },
     "changePassword": {
-      "cancel": "",
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "currentLabel": "",
-      "mismatch": "",
-      "newLabel": "",
-      "submit": "",
-      "submitting": "",
-      "title": "",
-      "tooShort": ""
+      "cancel": "이름 *",
+      "checkingStrength": "강도 검사 ..",
+      "confirmLabel": "새 비밀번호 확인",
+      "currentLabel": "현재 비밀번호",
+      "mismatch": "비밀번호는 일치하지 않습니다.",
+      "newLabel": "새로운 비밀번호",
+      "submit": "비밀번호",
+      "submitting": "비밀번호 변경",
+      "title": "비밀번호",
+      "tooShort": "최소 {{n}} 문자를 사용합니다."
     },
     "connectedExtensions": {
       "browser": {
-        "chromium": "",
-        "firefox": "",
-        "generic": ""
+        "chromium": "크롬/엣지",
+        "firefox": "다운로드",
+        "generic": "브라우저 확장"
       },
       "when": {
-        "bare": "",
-        "daysAgo_other": "",
-        "hoursAgo_other": "",
-        "justNow": "",
-        "minutesAgo_other": "",
-        "onDate": ""
+        "bare": "연결하기",
+        "daysAgo_other": "연결 {{count}} 일 전",
+        "hoursAgo": "연결 {{count}} h 전",
+        "justNow": "지금 연결",
+        "minutesAgo": "연결 {{count}} 분 전",
+        "onDate": "연결 {{date}}"
       }
     },
     "customThemes": {
-      "appliedBadge": "",
-      "apply": "",
-      "applyError": "",
-      "cancel": "",
-      "confirm": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
+      "appliedBadge": "제품정보",
+      "apply": "지원하다",
+      "applyError": "테마를 적용 할 수 없습니다. 다시 시도하십시오.",
+      "cancel": "이름 *",
+      "confirm": "제품정보",
+      "delete": "기타 제품",
+      "deleteError": "테마를 삭제할 수 없습니다. 다시 시도하십시오.",
+      "empty": "아직 사용자 정의 테마 없음. 가져오기 하나, 또는 themes 폴더를 열고 테마 파일을 추가.",
       "error": {
-        "aColorFallback": "",
-        "invalidFile": "",
-        "invalidName": "",
-        "invalidValue": "",
-        "invalidValueWithLine": "",
-        "missingKey": "",
-        "parseError": "",
-        "parseErrorWithLine": ""
+        "aColorFallback": "색상",
+        "invalidFile": "잘못된 테마 파일.",
+        "invalidName": "Unsafe 테마 이름",
+        "invalidValue": "{{key}}에 대한 잘못된 값",
+        "invalidValueWithLine": "{{key}}에 대한 잘못된 값 (라인 {{line}})",
+        "missingKey": "필요한 색상 {{key}}",
+        "parseError": "유효 JSON",
+        "parseErrorWithLine": "유효 JSON (라인 {{line}})"
       },
-      "fileFilterName": "",
-      "helper": "",
-      "importButton": "",
-      "importError": "",
-      "label": "",
-      "openFolderButton": "",
-      "openFolderError": "",
-      "readError": ""
+      "fileFilterName": "Myne 테마",
+      "helper": "당신의 자신의 색깔 팔레트를 사용하십시오. 테마는 사용하기 전에이 장치에서 유효하다 — 업로드되지 않습니다.",
+      "importButton": "수입 테마 ..",
+      "importError": "그 파일은 유효한 테마가 아닙니다. 형식을 볼 수있는 참조를 엽니 다.",
+      "label": "주문 테마",
+      "openFolderButton": "테마 폴더 열기",
+      "openFolderError": "테마 폴더를 열 수 없습니다.",
+      "readError": "테마 폴더를 읽지 못했습니다."
     },
     "dailyNotes": {
-      "blankTemplate": "",
-      "dateFormatHelper": "",
-      "dateFormatLabel": "",
-      "dateFormatSaveError": "",
-      "folderHelper": "",
-      "folderLabel": "",
-      "folderSaveError": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "templateHelper": "",
-      "templateLabel": "",
-      "templateSaveError": "",
-      "untitledTemplate": ""
+      "blankTemplate": "빈 ( 템플릿 없음)",
+      "dateFormatHelper": "매일의 제목. YYYYY, MM, DD를 지원합니다. {{default}}에 과태.",
+      "dateFormatLabel": "Daily note 날짜 형식",
+      "dateFormatSaveError": "날짜 형식을 저장할 수 없습니다. 다시 시도하십시오.",
+      "folderHelper": "새로운 일일 노트가 파일 된 곳. 기본적으로 {{default}} - 폴더가 빈 경우에도 보관됩니다.",
+      "folderLabel": "매일 메모 폴더",
+      "folderSaveError": "일일 폴더를 저장할 수 없습니다. 다시 시도하십시오.",
+      "searchEmpty": "템플릿 일치 없음.",
+      "searchPlaceholder": "템플릿 검색 ..",
+      "templateHelper": "매일의 메모를 시작하려면 템플릿을 선택하거나 날짜와 제목의 빈 노트에 공백을 남겨주세요.",
+      "templateLabel": "일일 노트 템플릿",
+      "templateSaveError": "매일 템플릿을 저장할 수 없습니다. 다시 시도하십시오.",
+      "untitledTemplate": "Untitled 템플릿"
     },
     "deleteVault": {
-      "cancel": "",
-      "caseSensitiveHint": "",
-      "continue": "",
-      "copyPrimary": "",
-      "copySecondary": "",
-      "eyebrow": "",
-      "heading": "",
-      "ioFailBody": "",
-      "ioFailTitle": "",
-      "partialFailBody_other": "",
-      "partialFailTitle": "",
-      "submit": "",
-      "submitInFlight": "",
-      "typeToConfirmLabel": "",
-      "vaultPath": ""
+      "cancel": "이름 *",
+      "caseSensitiveHint": "케이스 과민한. deletion을 활성화하기 위해 정확히 단어를 입력합니다.",
+      "continue": "계속하기",
+      "copyPrimary": "이 영구적으로 이 vault 및 모든 노트를 삭제합니다. 행동은 undone이 될 수 없으며 복구 구문은 데이터를 복원하지 않습니다.",
+      "copySecondary": "Vault 키는 파일이 연결되지 않기 전에 메모리에서 제로됩니다. 디스크에 남아있는 모든 orphan ciphertext는 제거 가능한 Argon2id-wrapped junk를 유지합니다.",
+      "eyebrow": "계정 정보",
+      "heading": "Vault 삭제",
+      "ioFailBody": "삭제에 대한 vault 파일에 액세스 할 수 없습니다. Vault 키는 이미 메모리에서 Zeroized; 디스크에 남아있는 모든 vault 데이터는 불가능한 Argon2id-wrapped junk입니다.",
+      "ioFailTitle": "삭제 중 디스크 오류",
+      "partialFailBody_other": "{{count}} 파일은 디스크에서 삭제 될 수 없습니다. Vault 키는 이미 메모리에서 Zeroized, 그래서 남아있는 orphan ciphertext는 발견 할 수없는 Argon2id-wrapped junk입니다.",
+      "partialFailTitle": "Vault deletion 부분적으로 실패",
+      "submit": "Vault 삭제",
+      "submitInFlight": "Vault를 삭제 ..",
+      "typeToConfirmLabel": "DELETE를 입력하여 확인",
+      "vaultPath": "Vault 경로: {{path}}"
     },
     "focusMode": {
-      "dimAria": "",
-      "dimHelper": "",
-      "dimLabel": "",
-      "off": "",
-      "on": "",
-      "saveError": "",
-      "typewriterAria": "",
-      "typewriterHelper": "",
-      "typewriterLabel": ""
+      "dimAria": "Dim 비활성 라인",
+      "dimHelper": "포커스 모드 (≧F)에서, 당신이 편집하는 것을 제외한 모든 라인 디엠.",
+      "dimLabel": "초점 모드 · dim 비활성 라인",
+      "off": "이름 *",
+      "on": "으로",
+      "saveError": "초점 형태 조정을 저장할 수 없습니다.",
+      "typewriterAria": "관련 링크",
+      "typewriterHelper": "초점 형태 (≧F)에서는, 당신에게 유형으로 극적으로 집중된 활동적인 선을 지킵니다.",
+      "typewriterLabel": "초점 모드 · typewriter 스크롤"
     },
     "hotkeys": {
-      "addBindingAria": "",
-      "cancel": "",
-      "capturePrompt": "",
-      "conflictIndicator": "",
-      "conflictTitle": "",
-      "fixed": "",
+      "addBindingAria": "{{command}}에 대한 단축키 추가",
+      "cancel": "이름 *",
+      "capturePrompt": "키 입력 ..",
+      "conflictIndicator": "⚠ 충돌",
+      "conflictTitle": "또한 {{commands}}에 의해 사용",
+      "fixed": "설치하기",
       "group": {
-        "editorFormatting": "",
-        "general": "",
-        "navigation": "",
-        "notes": "",
-        "panesTabs": "",
-        "view": ""
+        "editorFormatting": "편집 형식",
+        "general": "주요사업",
+        "navigation": "- 연혁",
+        "notes": "지원하다",
+        "panesTabs": "팬 & 탭",
+        "view": "(주)"
       },
-      "helper": "",
-      "notSet": "",
-      "removeBindingAria": "",
-      "resetAll": "",
-      "resetAllConfirm": "",
-      "resetAllYes": "",
-      "restoreDefaultAria": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "warnAlreadyUsed": ""
+      "helper": "키보드 단축키 보기 편집기 포맷 및 탭 사이클 단축키가 고정됩니다.",
+      "notSet": "설정하기",
+      "removeBindingAria": "제거 {{chord}}",
+      "resetAll": "모든 단축키를 재설정 ..",
+      "resetAllConfirm": "모든 사용자 정의 단축키를 기본으로 재설정?",
+      "resetAllYes": "모든 것",
+      "restoreDefaultAria": "{{command}}에 대한 기본 복원",
+      "searchAriaLabel": "검색 shortcuts",
+      "searchPlaceholder": "검색 Shortcuts..",
+      "warnAlreadyUsed": "Already 에 의해 사용 {{commands}} — 어쨌든 추가."
     },
     "language": {
-      "helper": "",
-      "label": ""
+      "helper": "앱의 표시 언어 선택.",
+      "label": "* 이름"
     },
     "lineNumbers": {
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": ""
+      "errorSaveSetting": "라인 번호 설정을 저장할 수 없습니다.",
+      "helper": "편집자의 라인 번호 개터를 표시합니다. 라인당 1개의 수; 기본적으로 떨어져.",
+      "label": "라인 번호",
+      "off": "이름 *",
+      "on": "으로"
     },
     "prefs": {
-      "saveError": ""
+      "saveError": "설정을 저장할 수 없습니다 — 다시 시도"
     },
     "privacy": {
-      "autoLockHelper": "",
-      "autoLockLabel": "",
-      "autoLockSearchEmpty": "",
-      "autoLockSearchPlaceholder": "",
-      "screenCaptureHelperOff": "",
-      "screenCaptureHelperOn": "",
-      "screenCaptureLabel": ""
+      "autoLockHelper": "이 많은 inactivity 후에 볼트를 잠그십시오.",
+      "autoLockLabel": "자동 자물쇠",
+      "autoLockSearchEmpty": "내구 일치 없음.",
+      "autoLockSearchPlaceholder": "검색..",
+      "screenCaptureHelperOff": "보호는 자물쇠로 엽니다의 앞에 항상 적용합니다. 잠금 해제 후,이 설정을 따르십시오.",
+      "screenCaptureHelperOn": "MacOS 및 Windows 10 (2020년 5월 업데이트 이상)에 능동태. Linux 지원은 향후 출시됩니다.",
+      "screenCaptureLabel": "Screen-capture 보호"
     },
     "quickUnlock": {
-      "errorCancelled": "",
-      "errorGeneric": "",
-      "errorHardwareUnavailable": "",
-      "errorNotUnlocked": "",
-      "errorPinNotDigits": "",
-      "errorPinTooShort_other": "",
-      "helperConfigured": "",
-      "helperNotConfigured": "",
-      "methodPin": "",
-      "methodTouchId": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder_other": "",
-      "setPin": "",
-      "setupHelper": "",
-      "title": "",
-      "useTouchId": ""
+      "errorCancelled": "이름 *.",
+      "errorGeneric": "빠른 잠금을 설정할 수 없습니다.",
+      "errorHardwareUnavailable": "Touch ID는 이 장치에서 사용할 수 없습니다.",
+      "errorNotUnlocked": "첫 번째 vault를 잠금 해제.",
+      "errorPinNotDigits": "PIN은 숫자만 있어야 합니다.",
+      "errorPinTooShort": "PIN은 적어도이어야 합니다 {{count}} 손가락.",
+      "helperConfigured": "{{method}}를 통해 구성. 자동 잠금 후 재입력은 마스터 암호를 건너 뛸 수 있습니다. 마스터 암호는 다시 시작 후 여전히 필요합니다.",
+      "helperNotConfigured": "전체 마스터 암호 대신 PIN 또는 Touch ID로 자동 잠금 후 다시 입력. 암호화된 볼트에 대한 편의성 - 마스터 암호는 재시작 후 필수 유지됩니다.",
+      "methodPin": "핀",
+      "methodTouchId": "접촉 ID",
+      "pinAriaLabel": "빠른 연결 PIN",
+      "pinPlaceholder": "PIN (최소 {{count}} 자리)",
+      "setPin": "세트 PIN",
+      "setupHelper": "Touch ID는 macOS 전용이며 현재 실험용 (펌웨어 검증 완료)입니다. PIN는 어디에나 작동합니다.",
+      "title": "빠른 잠금 해제",
+      "useTouchId": "접촉 ID를 사용하십시오"
     },
     "shell": {
-      "closeLabel": "",
-      "navLabel": "",
-      "passwordUpdatedToast": "",
-      "title": ""
+      "closeLabel": "닫기 설정",
+      "navLabel": "설정 패널",
+      "panels": {
+        "about": "제품정보",
+        "account": "계좌정보",
+        "appearance": "이름 *",
+        "editor": "한국어",
+        "hotkeys": "핫키스",
+        "privacy": "제품 정보",
+        "storage": "제품 정보"
+      },
+      "passwordUpdatedToast": "비밀번호 업데이트",
+      "title": "지원하다"
     },
     "spell": {
-      "errorSaveLanguages": "",
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "languagesAriaLabel": "",
-      "languagesHelper": "",
-      "languagesLabel": "",
-      "languagesPlaceholder": "",
-      "languagesSearchEmpty": "",
-      "languagesSearchPlaceholder": "",
-      "off": "",
-      "on": ""
+      "errorSaveLanguages": "Spell-check 언어를 저장할 수 없습니다.",
+      "errorSaveSetting": "Spell-check 설정을 저장할 수 없습니다.",
+      "helper": "당신이 유형으로 Underline misspelled 단어. 완전히 오프라인 — 당신의 노트는 장치를 결코 떠나지 않습니다.",
+      "label": "Spell 체크",
+      "languagesAriaLabel": "Spell-check 언어",
+      "languagesHelper": "어떤 선택된 언어에서 유효하다면 단어가 정확합니다. - 다른 언어 노트로 영어 용어를 섞을 수 있습니다.",
+      "languagesLabel": "한국어",
+      "languagesPlaceholder": "언어 선택 ..",
+      "languagesSearchEmpty": "언어 일치 없음.",
+      "languagesSearchPlaceholder": "검색 언어..",
+      "off": "이름 *",
+      "on": "으로"
     },
     "storage": {
-      "backupHelper": "",
-      "backupLabel": "",
-      "backUpVault": "",
-      "exportAction": "",
-      "exportBody": "",
-      "exportHelper": "",
-      "exportLabel": "",
-      "importHelper": "",
-      "importLabel": "",
-      "importObsidian": "",
-      "locationHelper": "",
-      "locationLabel": "",
-      "openInFiles": "",
-      "pathUnavailable": "",
-      "restoreBackup": ""
+      "backUpVault": "백업 vault ..",
+      "backupHelper": "백업은 vault로 암호화됩니다. 단일 검증된 .myne-backup 파일. 나머지는 vault의 비밀번호 또는 복구 구문과 함께 작동합니다.",
+      "backupLabel": "지원하다",
+      "exportAction": "수출..",
+      "exportBody": "Markdown로 내보내기 볼트",
+      "exportHelper": "Plain markdown tree - 암호화되지 않습니다.",
+      "exportLabel": "수출입",
+      "importHelper": "기존의 Obsidian vault를 Myne으로 가져옵니다. 모든 Markdown 메모는 장소에 수입 및 암호화됩니다. 원본 파일은 왼쪽이 없습니다.",
+      "importLabel": "제품정보",
+      "importObsidian": "수입 Obsidian 볼트 ..",
+      "locationHelper": "각 vault는이 경로의 밑에 암호화된 파일의 폴더입니다. 수동 사본에 아래의 백업 버튼을 Prefer — 그것은 서면 파일을 verify.",
+      "locationLabel": "Vault 위치",
+      "openInFiles": "파일 열기",
+      "pathUnavailable": "사용 불가",
+      "restoreBackup": "백업에서 복원 .."
     },
     "typography": {
-      "errorSave": ""
+      "contentWidthHelper": "편집 열의 최대 폭. 완전한 lets text spans the 팬티.",
+      "contentWidthLabel": "내용 폭",
+      "errorSave": "선호도를 저장할 수 없습니다. 다시 시도하십시오.",
+      "fontHelper": "Monospace 또는 비례 (sans-serif) 텍스트.",
+      "fontLabel": "이름 *",
+      "lineSpacingHelper": "선 사이 수직 공간.",
+      "lineSpacingLabel": "라인 간격",
+      "textSizeHelper": "편집기 텍스트의 기본 크기. 그것을 가진 가늠자를 두기.",
+      "textSizeLabel": "글자 크기"
     },
     "viewMode": {
-      "errorSave": "",
-      "helper": "",
-      "label": ""
+      "errorSave": "기본 보기 모드를 저장할 수 없습니다.",
+      "helper": "주가 열리는 방법: 라이브 미리보기 (기본값), 읽기 전용 읽기, 또는 원본 소스. ≧E와 노트를 토글.",
+      "label": "기본 보기 모드",
+      "optionLive": "라이브 미리보기",
+      "optionReading": "이름 *",
+      "optionSource": "이름 *"
     }
   },
   "templates": {
     "manager": {
-      "closeLabel": "",
-      "deleteRowLabel": "",
-      "editTemplateLabel": "",
-      "emptyBody": "",
-      "emptyTitle": "",
-      "listLabel": "",
-      "loading": "",
-      "newTemplate": "",
-      "newTemplateName": "",
-      "removeFromTemplates": "",
-      "removeRowLabel": "",
-      "title": ""
+      "closeLabel": "닫기 템플릿",
+      "deleteRowLabel": "템플릿 {{name}} 삭제 (Trsh로 이동)",
+      "editTemplateLabel": "템플릿 편집 {{name}}",
+      "emptyBody": "메모를 재사용하는 템플릿 만들기 - 회의 노트, 일일 로그, 읽기 메모. 새로운 메모를 만들 때 하나를 선택합니다.",
+      "emptyTitle": "아직 템플릿 없음",
+      "listLabel": "한국어",
+      "loading": "로드 중 ..",
+      "newTemplate": "새 템플릿",
+      "newTemplateName": "Untitled 템플릿",
+      "removeFromTemplates": "템플릿에서 제거",
+      "removeRowLabel": "템플릿에서 {{name}} 제거 (주의를 기울일)",
+      "title": "주 템플릿"
     }
   },
   "unlock": {
-    "backToPicker": "",
-    "continue": "",
-    "decrypting": "",
-    "deleteLink": "",
+    "backToPicker": "다른 볼트를 선택하십시오",
+    "continue": "계속하기",
+    "decrypting": "암호 해독 ..",
+    "deleteLink": "암호와 복구 구문을 모두 잃어버렸습니까? vault 삭제 및 시작",
     "errors": {
-      "alreadyUnlocked": "",
-      "inProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "alreadyUnlocked": "Vault는 이미 잠금 해제됩니다.",
+      "inProgress": "진행중인 작업.",
+      "unexpected": "오류가 없습니다. 다시 시도하십시오.",
+      "vaultNotFound": "Vault 파일이 없습니다. 앱을 다시 시작하세요."
     },
-    "passwordLabel": "",
-    "passwordPlaceholder": "",
+    "passwordLabel": "비밀번호",
+    "passwordPlaceholder": "비밀번호",
     "quickUnlock": {
-      "failed": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder": "",
-      "unlockWithPin": "",
-      "unlockWithTouchId": "",
-      "usePasswordBelow": "",
-      "wrongCredential": ""
+      "failed": "빠른 잠금 해제 실패. 비밀번호.",
+      "pinAriaLabel": "빠른 연결 PIN",
+      "pinPlaceholder": "핀",
+      "unlockWithPin": "PIN로 잠금 해제",
+      "unlockWithTouchId": "터치 ID로 잠금 해제",
+      "usePasswordBelow": "비밀번호",
+      "wrongCredential": "잘못된. {{remaining}} 시도 (s) 왼쪽."
     },
-    "recoveryInterruptedBanner": "",
-    "recoveryInterruptedBody": "",
-    "recoveryInterruptedTitle": "",
-    "recoveryLink": "",
-    "submit": "",
-    "subtitle": "",
+    "recoveryInterruptedBanner": "복구 흐름이 중단되었습니다. 새 비밀번호 설정.",
+    "recoveryInterruptedBody": "새로운 암호를 먼저 설정 한 다음 vault를 다시 닫습니다.",
+    "recoveryInterruptedTitle": "복구 흐름이 중단되었습니다.",
+    "recoveryLink": "비밀번호를 잊으셨나요? 복구 구문으로 잠금 해제",
+    "submit": "다운로드",
+    "subtitle": "비밀번호를 계속 입력하세요.",
     "suspicion": {
-      "lockedDuringChange": "",
-      "metaChangedExternally": ""
+      "lockedDuringChange": "비밀번호 변경 취소: vault가 잠겼습니다.",
+      "metaChangedExternally": "Vault는 다른 세션에서 수정되었습니다. 다시 잠금을 해제하십시오."
     },
-    "title": ""
+    "title": "Vault를 잠금 해제."
   },
   "vault": {
     "ioBanner": {
-      "cannotRead": "",
-      "notFound": "",
-      "permissionDenied": ""
+      "cannotRead": "Vault 파일을 읽을 수 없습니다.",
+      "notFound": "Vault 파일이 없습니다. 앱을 다시 시작하세요.",
+      "permissionDenied": "Vault 파일에 액세스 할 권한이 없습니다. 파일 권한 확인."
     }
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "",
-      "back": "",
-      "commit": "",
-      "committing": "",
-      "copied": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "saveAsFile": "",
-      "shownOnceBody": "",
-      "shownOnceEmphasis": ""
+      "ackLabel": "나중에 찾을 수있는 내 계정 번호를 저장했습니다.",
+      "back": "이름 *",
+      "commit": "Vault 만들기",
+      "committing": "저장..",
+      "copied": "뚱 베어",
+      "copy": "관련 기사",
+      "eyebrow": "4 단계 — 계정 번호",
+      "heading": "계정 번호를 저장합니다.",
+      "intro": "이것은 당신의 Bearer 토큰입니다 - 현금처럼 취급합니다.",
+      "saveAsFile": "파일로 저장",
+      "shownOnceBody": "지금 저장 — Myne는 당신을 위해 그것을 복구 할 수 없습니다. 나중에 동기화를 위해 등록해야 합니다.",
+      "shownOnceEmphasis": "한번만 볼 수 있습니다."
     },
     "briefing": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
+      "back": "이름 *",
+      "continue": "Vault 생성 계속",
+      "eyebrow": "당신의 볼트를 생성하기 전에",
+      "heading": "당신의 볼트를 생성하기 전에",
+      "intro": "Myne는 메모를 암호화하여 만 열 수 있습니다. 세 가지는 다음과 같이합니다. - 그들을 읽으십시오. 다음 계속.",
       "statements": {
         "no-email": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "나는 이메일 복구가 없다.",
+          "statement": "이메일 복구가 없습니다. 절대는 없습니다.",
+          "why": "우리는 귀하의 이메일에 묻지 않습니다, 그래서 재설정 링크가없고 잠금 해제에 대한 지원 계정이 없습니다. 이 누락된 기능은 없습니다. 이메일 복구는 우리가 당신의 노트를 읽을 수 있다는 것을 의미하고, Myne는 건축됩니다 그래서 우리는 할 수 없습니다."
         },
         "no-store": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "내 비밀번호를 복구 할 수 없습니다.",
+          "statement": "당신의 암호는 당신의 볼트를 자물쇠로 엽니다. 우리는 그것을 저장하지 않습니다.",
+          "why": "비밀번호는 메모를 해독하는 열쇠에 입력됩니다. 이 장치를 결코 나타낼 수 없습니다, 우리의 서버에서 아무것도 그것을 재현 할 수 있습니다. 그것은 당신의 노트를 개인 유지 하는 것입니다 — 그리고 왜 우리는 당신을 위해 그것을 재설정할 수 없습니다."
         },
         "phrase-backup": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "나는 내 복구 구문은 유일한 백업입니다.",
+          "statement": "복구 구문은 오직 백업입니다.",
+          "why": "암호를 잊어 버린 경우, 24word 복구 구문은 한 가지 방법입니다. {{lostBothSecrets}} 구문을 작성하고 안전한 곳에 보관하십시오."
         }
       },
-      "why": ""
+      "why": "왜?"
     },
     "confirm": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "mismatch": "",
-      "wordAtPosition": ""
+      "back": "이름 *",
+      "continue": "계속하기",
+      "eyebrow": "3 단계 4 - 구문 확인",
+      "heading": "구문에서 4 단어를 다시 입력합니다.",
+      "intro": "우리는 당신이 그것을 저장하기 위하여 특정한 위치를 요구할 것입니다.",
+      "mismatch": "단어 #{{pos}}와 일치하지 않습니다.",
+      "wordAtPosition": "위치의 단어 {{pos}}"
     },
     "encrypting": {
-      "caption": "",
-      "footerHint": "",
-      "heading": ""
+      "caption": "이것은 순간이 걸립니다.",
+      "footerHint": "30 초 이상 걸리면 창을 닫고 다시 시도하십시오.",
+      "heading": "Vault 암호화"
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "계정 번호"
       },
       "aeadFailure": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "암호화 실패"
       },
       "csprng": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "보안 임의 데이터를 생성하지 못했습니다"
       },
       "invalidPassword": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "잘못된 비밀번호"
       },
       "invalidVaultMeta": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "Vault 형식 오류"
       },
       "ioOther": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "Vault를 저장할 수 없습니다"
       },
       "joinFailure": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "뭔가 잘못되었습니다"
       },
       "kdfFailure": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오. 이 일이 발생하면 시스템에는 메모리가 낮을 수 있습니다.",
+        "title": "암호화를 설정할 수 없습니다"
       },
       "noSpace": {
-        "body": "",
-        "title": ""
+        "body": "디스크 공간 무료 및 다시 시도.",
+        "title": "충분히 디스크 공간"
       },
       "notFound": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "Vault 폴더 누락"
       },
       "passwordTooShort": {
-        "body": "",
-        "title": ""
+        "body": "적어도 12 문자를 사용합니다.",
+        "title": "비밀번호"
       },
       "permissionDenied": {
-        "body": "",
-        "title": ""
+        "body": "Myne가 애플리케이션 데이터 폴더에 쓰기 권한이 있는지 확인합니다.",
+        "title": "Vault 폴더에 쓸 수 없습니다"
       },
       "sessionExpired": {
-        "body": "",
-        "title": ""
+        "body": "보안을 위해, 10 분 후에 vault 창조 시간. 시작하기.",
+        "title": "세션 만료"
       },
       "sessionNotFound": {
-        "body": "",
-        "title": ""
+        "body": "처음부터 시작.",
+        "title": "찾을 수 없음"
       },
       "tooManyConcurrentSessions": {
-        "body": "",
-        "title": ""
+        "body": "다른 Myne 창을 닫고 다시 시도하십시오.",
+        "title": "한 번에 많은 볼트 생성"
       },
       "vaultArtifactsPresent": {
-        "body": "",
-        "title": ""
+        "body": "Vault 데이터가 이미이 장치에 존재하기 때문에 새로운 vault를 만들 수 없습니다. 앱을 닫고 재시작 - 시작 화면은 잠금 해제 흐름으로 이동합니다.",
+        "title": "Vault는 이미 존재합니다"
       },
       "vaultBusyAuth": {
-        "body": "",
-        "title": ""
+        "body": "또 다른 vault 작업이 진행 중입니다. 한 순간에 다시 시도하십시오.",
+        "title": "Vault 바쁜"
       }
     },
     "orchestrator": {
       "closePrompt": {
-        "cancelLabel": "",
-        "message": "",
-        "okLabel": "",
-        "title": ""
+        "cancelLabel": "이름 *",
+        "message": "닫힘은 복구 구문을 discard. 계속 종료?",
+        "okLabel": "자주 묻는 질문",
+        "title": "Discard vault 생성?"
       },
       "genericError": {
-        "body": "",
-        "title": ""
+        "body": "다시 시도하십시오.",
+        "title": "뭔가 잘못되었습니다"
       }
     },
     "password": {
-      "back": "",
-      "eyebrow": "",
-      "heading": "",
-      "helperLead": "",
-      "submit": ""
+      "back": "이름 *",
+      "eyebrow": "단계 1 의 4 — 마스터 암호",
+      "heading": "Vault 만들기",
+      "helperLead": "Myne는 비밀번호 또는 복구 구문을 저장하지 않습니다.",
+      "submit": "복구 구문 생성"
     },
     "phrase": {
-      "back": "",
-      "continue": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "reveal": "",
-      "saveAsFile": ""
+      "back": "이름 *",
+      "continue": "나는 이것을 저장했다 — 구문을 확인",
+      "copy": "관련 기사",
+      "eyebrow": "단계 2 의 4 - 복구 구문",
+      "heading": "이 24 단어를 읽으십시오.",
+      "intro": "암호와 함께이 문구는 vault를 복구하는 유일한 방법입니다. 오프라인 저장 — 종이, 암호 관리자, 하드웨어 지갑. 현금처럼 치료.",
+      "reveal": "구문 구문",
+      "saveAsFile": "파일로 저장"
     },
     "ready": {
-      "backedUp": "",
-      "backingUp": "",
-      "backupDefaultFilename": "",
-      "backupError": "",
-      "backupFilterName": "",
-      "backUpNow": "",
-      "body": "",
-      "decrypting": "",
-      "done": "",
-      "heading": "",
-      "showFolder": ""
+      "backUpNow": "이 vault를 지금 백업",
+      "backedUp": "백업 ✓",
+      "backingUp": "백업 ..",
+      "backupDefaultFilename": "Myne 백업.myne-backup",
+      "backupError": "백업이 완료되지 않았습니다 - 파일이 뒤에 남지 않았습니다. 설정 → 저장에서 언제든지 백업 할 수 있습니다.",
+      "backupFilterName": "Myne 백업",
+      "body": "Myne는 애플리케이션 데이터 폴더에 vault를 썼습니다. 마스터 암호 및 복구 구문은 단지 방법 뒤로 - 둘 다 안전한 어딘가에 저장해야합니다.",
+      "decrypting": "암호 해독 ..",
+      "done": "한국어",
+      "heading": "당신의 vault는 준비되어 있습니다.",
+      "showFolder": "Vault 폴더 표시"
     },
     "sessionLost": {
-      "startOver": ""
+      "startOver": "시작하기"
     }
   },
   "vaultPicker": {
-    "createAnother": "",
-    "heading": "",
-    "loading": "",
-    "noneLoaded": "",
-    "openedRelative": "",
-    "restoreFromBackup": "",
-    "subline": "",
-    "vaultFallback": ""
+    "createAnother": "다른 vault 만들기",
+    "heading": "Vault를 선택하십시오",
+    "loading": "당신의 볼트를로드 ..",
+    "noneLoaded": "Vaults가 지금 로드 될 수 없습니다.",
+    "openedRelative": "오픈 {{rel}}",
+    "restoreFromBackup": "백업에서 복원",
+    "subline": "이 장치에서 하나 이상의 볼트가 있습니다. 잠금을 해제하려면 하나를 선택합니다.",
+    "vaultFallback": "볼트 {{n}}"
   },
   "vaultRecover": {
     "decrypting": {
-      "caption": "",
-      "eyebrow": "",
-      "footerHint": "",
-      "heading": "",
-      "subCaption": ""
+      "caption": "이것은 순간이 걸립니다.",
+      "eyebrow": "복구 · DECRYPTING",
+      "footerHint": "30 초 이상 걸리면 창을 닫고 다시 시도하십시오.",
+      "heading": "Vault를 해독",
+      "subCaption": "작업... Argon2id m=256 MiB, t=3, p=2"
     },
     "passwordReset": {
       "errors": {
-        "cancelledVaultLocked": "",
-        "operationInProgress": "",
-        "unexpected": "",
-        "weakPassword": ""
+        "cancelledVaultLocked": "복구 취소 : vault가 잠겨 있었다.",
+        "operationInProgress": "진행중인 작업. 자주 묻는 질문.",
+        "unexpected": "오류가 없습니다. 다시 시도하십시오.",
+        "weakPassword": "새로운 비밀번호는 최소 12자이어야 합니다."
       },
-      "eyebrow": "",
-      "helperBody": "",
-      "helperEmphasis": "",
-      "submit": "",
-      "title": ""
+      "eyebrow": "복구 · 새로운 암호",
+      "helperBody": "Vault 복구 구문 ile açıldı. Eski 파올라 artık çalışmayacak - 엔이 마스터 파올란 ı şimdi belirle.",
+      "helperEmphasis": "복구 구문 aynı kalır.",
+      "submit": "새 비밀번호 설정",
+      "title": "새로운 마스터 암호 설정"
     },
     "phrase": {
-      "back": "",
-      "body": "",
-      "cellLabel": "",
-      "deleteLink": "",
-      "eyebrow": "",
-      "submit": "",
-      "title": ""
+      "back": "← 뒤로",
+      "body": "복구 구문을 입력하십시오. 24 BIP-39 단어.",
+      "cellLabel": "워드 {{index}}",
+      "deleteLink": "Vault 삭제 및 시작",
+      "eyebrow": "관련 기사",
+      "submit": "다운로드",
+      "title": "당신의 볼트를 복구."
     },
     "select": {
-      "accountInvalid": "",
-      "accountLabel": "",
-      "accountPlaceholder": "",
-      "body": "",
-      "cancel": "",
-      "checking": "",
-      "loadFailed": "",
-      "loading": "",
-      "openedRelative": "",
-      "or": "",
-      "title": "",
-      "useAccountNumber": "",
-      "vaultFallback": ""
+      "accountInvalid": "잘못된 계정 번호. 예약 및 문의.",
+      "accountLabel": "계좌번호 (옵션)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (옵션)",
+      "body": "당신이 당신의 24word 회복 구문으로 복구 할 수있는 볼트를 선택합니다. 계정 번호를 입력하여 바로 이동할 수 있습니다.",
+      "cancel": "이름 *",
+      "checking": "여행 정보",
+      "loadFailed": "Vaults가 지금 로드 될 수 없습니다.",
+      "loading": "당신의 볼트를로드 ..",
+      "openedRelative": "오픈 {{rel}}",
+      "or": "또는",
+      "title": "복구 할 볼트를 선택",
+      "useAccountNumber": "계정 번호",
+      "vaultFallback": "볼트 {{index}}"
     }
   },
   "vaultSwitcher": {
-    "chipFallback": "",
-    "createAnother": "",
-    "switching": "",
-    "switchVaultLabel": "",
-    "vaultFallback": ""
+    "chipFallback": "볼트",
+    "createAnother": "다른 vault 만들기",
+    "switchVaultLabel": "스위치 vault",
+    "switching": "스위치 ..",
+    "vaultFallback": "볼트 {{n}}"
   },
   "welcome": {
-    "createCta": "",
-    "headlineLine1": "",
-    "headlineLine2": "",
+    "createCta": "새로운 vault 만들기",
+    "headlineLine1": "암호화된 markdown 노트.",
+    "headlineLine2": "로그인.",
     "repairResidue": {
-      "cancel": "",
-      "cleaningUp": "",
-      "cleanUp": "",
-      "confirmBody_other": "",
-      "confirmTitle": "",
-      "doneBody_other": "",
-      "doneTitle": "",
-      "errorBody": "",
-      "errorTitle": "",
-      "foundBody_other": "",
-      "foundTitle": "",
-      "partialBody_other": "",
-      "partialTitle": ""
+      "cancel": "이름 *",
+      "cleanUp": "더 알아보기",
+      "cleaningUp": "청소 ..",
+      "confirmBody_other": "{{count}} 파일이 제거됩니다. 그들은 이미 읽을 수 있습니다; 아무것도 복구 할 수 없습니다.",
+      "confirmTitle": "왼쪽 파일 정리?",
+      "doneBody_other": "제거 {{count}} 왼쪽 파일. 이제 새로운 볼트를 만들 수 있습니다.",
+      "doneTitle": "지금 예약",
+      "errorBody": "뭔가 잘못되었습니다. 앱을 닫고 다시 시도하십시오.",
+      "errorTitle": "정리 실패",
+      "foundBody_other": "{{count}} 종료되지 않은 이전 삭제 파일. 그들은 이미 읽을 수 없습니다 - 당신은 아무것도 복구 할 수 없습니다.",
+      "foundTitle": "Incomplete deletion의 왼쪽 파일",
+      "partialBody_other": "{{count}} 파일은 다른 응용 프로그램에 의해 잠글 수 있습니다 (항 바이러스, 파일 동기화, 또는 색인을 검색). 앱을 닫고 잠시 다시 시도하거나 vault 폴더를 수동으로 제거하십시오.",
+      "partialTitle": "일부 파일은 제거 할 수 없습니다"
     },
-    "restoreCta": "",
-    "subtitle": ""
+    "restoreCta": "백업에서 복원",
+    "subtitle": "메모는이 장치에서 암호화됩니다. 서버는 ciphertext를 저장합니다."
   }
 }
