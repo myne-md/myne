@@ -1,87 +1,89 @@
 {
   "attachments": {
     "cleanUnused": {
-      "cancel": "Törlés",
-      "cleaning": "Takarítás..",
+      "cancel": "Mégse",
+      "cleaning": "Tisztítás…",
       "close": "Bezárás",
-      "completeTitle": "Tisztítás befejezve",
-      "deleteCta_one": "{{count}} nem használt",
-      "deleteCta_other": "",
-      "error": "Nem tudtam feltakarítani. Néhány megjegyzés olvashatatlan lehet - semmit sem töröltek.",
-      "intro_one": "Ezek a csatolások egyetlen megjegyzésben sem szerepelnek. Törölni végleges, és nem lehet visszacsinálni.",
-      "intro_other": "Ezeket a {{count}} csatlakozókat egyetlen megjegyzésben sem használják. Törölni őket állandó, és nem lehet visszacsinálni.",
-      "summaryFreed": " · szabad {{size}}",
+      "completeTitle": "A tisztítás kész",
+      "deleteCta": "{{count}} nem használt törlése",
+      "deleteCta_one": "{{count}} nem használt törlése",
+      "deleteCta_other": "{{count}} nem használt törlése",
+      "error": "Nem sikerült a tisztítás. Néhány jegyzet olvashatatlan lehet — semmi nem lett törölve.",
+      "intro_one": "Ez a melléklet egyetlen jegyzetben sincs használatban. A törlés végleges, és nem vonható vissza.",
+      "intro_other": "Ez a(z) {{count}} melléklet egyetlen jegyzetben sincs használatban. A törlésük végleges, és nem vonható vissza.",
+      "summaryFreed": " · {{size}} felszabadítva",
       "summaryPeriod": ".",
-      "summaryRemoved_one": "Eltávolított {{count}} csatoló",
-      "summaryRemoved_other": "Eltávolított {{count}} csatlakozók",
-      "summarySkipped_one": " · {{count}} kimaradt (most használatban van)",
-      "summarySkipped_other": "",
-      "title": "Tiszta, fel nem használt tartozékok",
-      "willBeReclaimed": "{{size}} vissza lesz véve."
+      "summaryRemoved_one": "{{count}} melléklet eltávolítva",
+      "summaryRemoved_other": "{{count}} melléklet eltávolítva",
+      "summarySkipped": " · {{count}} kihagyva (időközben használatba került)",
+      "summarySkipped_one": " · {{count}} kihagyva (időközben használatba került)",
+      "summarySkipped_other": " · {{count}} kihagyva (időközben használatba került)",
+      "title": "Nem használt mellékletek tisztítása",
+      "willBeReclaimed": "{{size}} szabadul fel."
     },
     "coverPicker": {
       "close": "Bezárás",
-      "dropHint": "Dobj le egy képet, hogy a borító legyen.",
-      "empty": "Még nincs kép a páncélteremben. Tölts fel egyet, vagy vonszolj ide egy képet.",
-      "loading": "",
-      "removeCover": "A borító eltávolítása",
-      "title": "Válasszon egy borító képet",
+      "dropHint": "Húzz ide egy képet, hogy borítóként használd.",
+      "empty": "Még nincs kép ebben a széfben. Tölts fel egyet, vagy húzz ide egy képet.",
+      "loading": "Betöltés…",
+      "removeCover": "Borító eltávolítása",
+      "title": "Válassz borítóképet",
       "upload": "Feltöltés"
     },
     "deleteDialog": {
-      "cancel": "Törlés",
-      "confirmPrompt": "Véglegesen törölni ezt a csatolást? Ezt nem lehet visszacsinálni.",
+      "cancel": "Mégse",
+      "confirmPrompt": "Véglegesen törlöd ezt a mellékletet? Ez nem vonható vissza.",
       "delete": "Törlés",
-      "deleting": "Törlés..",
-      "error": "Nem sikerült törölni a csatolást. Próbáld újra.",
-      "notUsed": "Egy hangban sem használják.",
-      "stillUsed_one": "Még mindig használják {{count}} megjegyzésben. A törlés egy sírkövet hagy ott, ahová beágyazták:",
-      "stillUsed_other": "Még mindig használják {{count}} jegyzetekben. A törlés egy sírkövet hagy ott, ahová beágyazták:",
-      "title": "A csatolás törlése",
-      "untitled": "Név nélkül"
+      "deleting": "Törlés…",
+      "error": "Nem sikerült törölni a mellékletet. Próbáld újra.",
+      "notUsed": "Egyetlen jegyzetben sincs használatban.",
+      "stillUsed_one": "Még mindig használatban van {{count}} jegyzetben. A törlés sírkövet hagy ott, ahová be volt ágyazva:",
+      "stillUsed_other": "Még mindig használatban van {{count}} jegyzetben. A törlés sírkövet hagy ott, ahová be volt ágyazva:",
+      "title": "Melléklet törlése",
+      "untitled": "Névtelen"
     },
     "library": {
-      "actionsAriaLabel": "",
-      "actionsTitle": "Intézkedések",
-      "checkUnusedFailedNotice": "",
-      "checking": "Ellenőrzöm..",
-      "cleanUnused": "Felhasznált tiszta",
-      "cleanUnusedTitle": "A csatolmányokat semmilyen megjegyzésben nem kell törölni",
-      "colCreated": "",
+      "actionsAriaLabel": "Melléklet műveletei",
+      "actionsTitle": "Műveletek",
+      "checking": "Ellenőrzés…",
+      "checkUnusedFailedNotice": "Nem sikerült ellenőrizni a nem használt mellékleteket. Próbáld újra.",
+      "cleanUnused": "Nem használtak tisztítása",
+      "cleanUnusedTitle": "Egyetlen jegyzetben sem használt mellékletek törlése",
+      "colCreated": "Létrehozva",
       "colName": "Név",
       "colSize": "Méret",
       "colType": "Típus",
-      "colUsedIn": "",
-      "decrypting": "A csatlakozók dekódolása..",
-      "emptyImportHint": "Behozni egy fájlt, hogy a széfben tartsa.",
-      "emptyLoadError": "Nem tudtam elolvasni a mellékleteket.",
-      "emptyNoAttachments": "Még nincs kötődés.",
-      "filterAriaLabel": "Szűrés típusonként",
+      "colUsedIn": "Felhasználva itt",
+      "decrypting": "Mellékletek visszafejtése…",
+      "emptyImportHint": "Importálj egy fájlt, hogy a széfben tartsd.",
+      "emptyLoadError": "Nem sikerült beolvasni a mellékletkatalógust.",
+      "emptyNoAttachments": "Még nincs melléklet.",
+      "filterAriaLabel": "Szűrés típus szerint",
       "gridView": "Rácsnézet",
-      "import": "Import",
-      "importDialogTitle": "Importáló csatolás",
-      "importFile": "",
-      "importing": "Importálás..",
-      "listView": "Lista nézet",
+      "import": "Importálás",
+      "importDialogTitle": "Melléklet importálása",
+      "importFile": "Fájl importálása",
+      "importing": "Importálás…",
+      "listView": "Listanézet",
       "menuDelete": "Törlés",
-      "menuExport": "",
+      "menuExport": "Exportálás",
       "menuPreview": "Előnézet",
       "menuRename": "Átnevezés",
-      "noMatch": "Nincs olyan csatolmány, ami megfelelne a keresésednek.",
-      "noUnusedNotice": "Nem kell tisztítani a fel nem használt tartozékokat.",
+      "noMatch": "Egyetlen melléklet sem felel meg a keresésnek.",
+      "noUnusedNotice": "Nincs nem használt melléklet a tisztításhoz.",
       "preview": "Előnézet",
-      "previewAttachment": "Előnézet",
-      "searchAriaLabel": "Keresési csatolmányok fájlnév szerint",
-      "searchPlaceholder": "Keresés fájlnév alapján",
+      "previewAttachment": "Melléklet előnézete",
+      "searchAriaLabel": "Mellékletek keresése fájlnév szerint",
+      "searchPlaceholder": "Keresés fájlnév szerint",
       "sort": {
-        "createdAsc": "Először a legöregebb",
-        "createdDesc": "Legújabb első",
-        "nameAsc": "Név A- Z",
-        "nameDesc": "Név ZA"
+        "createdAsc": "Legrégebbi elöl",
+        "createdDesc": "Legújabb elöl",
+        "nameAsc": "Név A–Z",
+        "nameDesc": "Név Z–A"
       },
-      "sortAriaLabel": "A mellékletek rendezése",
-      "supportedFilesFilter": "",
-      "title": "",
+      "sortAriaLabel": "Mellékletek rendezése",
+      "supportedFilesFilter": "Támogatott fájlok",
+      "title": "Mellékletek",
       "typeFilter": {
         "all": "Minden típus",
         "audio": "Hang",
@@ -89,269 +91,271 @@
         "other": "Egyéb",
         "pdf": "PDF-ek"
       },
-      "usedInCount_one": "{{count}} megjegyzésben használatos",
-      "usedInCount_other": "{{count}} megjegyzésekben használt",
-      "usedInLoading": ".."
+      "usedInCount_one": "Felhasználva {{count}} jegyzetben",
+      "usedInCount_other": "Felhasználva {{count}} jegyzetben",
+      "usedInLoading": "…"
     },
     "thumbnail": {
       "audioLabel": "Hang: {{filename}}",
       "file": "Fájl",
       "pause": "Szünet",
-      "pdfDocument": "PDF dokumentum",
-      "pdfFirstPage": "PDF első oldal",
-      "play": "Játék"
+      "pdfDocument": "PDF-dokumentum",
+      "pdfFirstPage": "PDF első oldala",
+      "play": "Lejátszás"
     },
     "usedInNotesPopover": {
-      "empty": "Egy hangban sem használják.",
-      "untitled": "Név nélkül"
+      "empty": "Egyetlen jegyzetben sincs használatban.",
+      "untitled": "Névtelen"
     }
   },
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "Egy másik páncélterem művelet folyamatban. Várd meg, amíg befejezi, aztán próbáld újra.",
-        "cancelled": "Az erősítés törölve. Nem hagytak hátra aktát.",
+        "authOperationInProgress": "Egy másik széfművelet van folyamatban. Várd meg, amíg befejeződik, majd próbáld újra.",
+        "cancelled": "A biztonsági mentés megszakítva. Nem maradt fájl utána.",
         "invalidDestination": "Ez a célmappa nem használható.",
-        "ioGeneric": "",
-        "ioNoSpace": "Nincs elég hely a célállomásnál.",
-        "ioPermissionDenied": "Nincs engedélyem írni a célállomáson.",
-        "joinFailure": "Az erősítés váratlanul megbukott. Nem hagytak hátra aktát.",
-        "memberTooLarge": "Egy fájl ebben a széfben nagyobb, mint amit a tartalék formátum lehetővé tesz.",
-        "vaultNotFound": "Nem találtunk páncéltermet.",
-        "verifyFailed": ""
+        "ioGeneric": "Nem sikerült megírni a biztonsági mentés fájlját.",
+        "ioNoSpace": "Nincs elég hely a célhelyen.",
+        "ioPermissionDenied": "Nincs jogosultság az írásra a célhelyen.",
+        "joinFailure": "A biztonsági mentés váratlanul meghiúsult. Nem maradt fájl utána.",
+        "memberTooLarge": "Ebben a széfben egy fájl nagyobb, mint amit a biztonsági mentés formátuma megenged.",
+        "vaultNotFound": "Nem található menthető széf.",
+        "verifyFailed": "A megírt biztonsági mentés nem ment át az ellenőrzésen, ezért el lett vetve. Próbáld újra — ha ismétlődik, más adathordozóra."
       },
       "restore": {
-        "authOperationInProgress": "Egy másik páncélterem művelet folyamatban. Várd meg, amíg befejezi, aztán próbáld újra.",
-        "cancelled": "Visszaállítás törölve. Semmi sem változott.",
-        "damagedBackup": "A tartalék fájl megsérült.",
-        "futureVersionBackup": "Ez az erősítés Myne újabb verziójával készült. Frissítsd Myne-t, aztán állítsd vissza.",
-        "invalidVaultMeta": "Ennek a biztonsági mentésnek a metaadatai olvashatatlanok, így a helyreállítás nem tudott működő páncéltermet létrehozni.",
-        "ioGeneric": "Nem sikerült elolvasni a mentési fájlt.",
-        "ioPermissionDenied": "",
-        "joinFailure": "A visszaállítás váratlanul megbukott. Semmi sem változott.",
-        "missingVaultMeta": "A biztonsági mentésnek hiányzik a páncélterem metaadatai, és nem lehet visszaállítani.",
-        "notABackupFile": "",
-        "vaultAlreadyExists": "Az erősítés széfje már rajta van ezen az eszközön."
+        "authOperationInProgress": "Egy másik széfművelet van folyamatban. Várd meg, amíg befejeződik, majd próbáld újra.",
+        "cancelled": "A visszaállítás megszakítva. Semmi nem változott.",
+        "damagedBackup": "A biztonsági mentés fájlja sérült.",
+        "futureVersionBackup": "Ez a biztonsági mentés a Myne újabb verziójával készült. Frissítsd a Myne-t, majd állítsd vissza.",
+        "invalidVaultMeta": "Ennek a biztonsági mentésnek a széf-metaadatai olvashatatlanok, így a visszaállítás nem tudott működő széfet létrehozni.",
+        "ioGeneric": "Nem sikerült beolvasni a biztonsági mentés fájlját.",
+        "ioPermissionDenied": "Nincs jogosultság a biztonsági mentés fájljának beolvasásához.",
+        "joinFailure": "A visszaállítás váratlanul meghiúsult. Semmi nem változott.",
+        "missingVaultMeta": "Ebből a biztonsági mentésből hiányoznak a széf-metaadatok, ezért nem állítható vissza.",
+        "notABackupFile": "Ez a fájl nem Myne biztonsági mentés.",
+        "vaultAlreadyExists": "Az ebből a biztonsági mentésből származó széf már létezik ezen az eszközön."
       }
     },
     "export": {
-      "cancel": "Törlés",
+      "cancel": "Mégse",
       "close": "Bezárás",
-      "copying": "{{total}} másolása {{done}}..",
-      "preparing": "Felkészülés..",
-      "successToast": "Erősítés megerősítve és elmentve.",
-      "title": "Hátrébb",
-      "verifying": "A {{total}} {{done}} ellenőrzése"
+      "copying": "Másolás: {{done}} / {{total}}…",
+      "preparing": "Előkészítés…",
+      "successToast": "A biztonsági mentés ellenőrizve és elmentve.",
+      "title": "Széf biztonsági mentése",
+      "verifying": "Ellenőrzés: {{done}} / {{total}}…"
     }
   },
   "clipper": {
     "pairing": {
       "accept": "Elfogadás",
       "close": "Bezárás",
-      "codeAriaLabel": "",
-      "intro": "Erősítse meg, hogy ez a kód megegyezik a kiterjesztésben feltüntetett kóddal, majd fogadja el a párt.",
+      "codeAriaLabel": "Párosítási kód",
+      "intro": "Erősítsd meg, hogy ez a kód megegyezik a bővítményben megjelenővel, majd kattints az Elfogadás gombra a párosításhoz.",
       "reject": "Elutasítás",
-      "rejected": "A párzást elutasították.",
-      "title": "A böngésző kiterjesztése csatlakozni szeretne"
+      "rejected": "A párosítás elutasítva.",
+      "title": "Egy böngészőbővítmény csatlakozni szeretne"
     }
   },
   "commandPalette": {
-    "archivedBadge": "Archívum",
+    "archivedBadge": "Archív",
     "archivedBadgeTitle": "Archivált",
     "dialogLabel": "Parancspaletta",
-    "matchedInBody": "hordozható",
-    "noMatches": "Nincs egyezés",
-    "searchPlaceholder": "Keresés jegyzetek vagy futtatni parancs - Esc, hogy ejtse",
+    "matchedInBody": "↳ találat a szövegtörzsben",
+    "noMatches": "Nincs találat",
+    "searchPlaceholder": "Keress jegyzeteket vagy futtass parancsot — Esc a bezáráshoz",
     "sectionCommands": "Parancsok",
-    "sectionNotes": "Megjegyzések",
-    "untitledNote": "Név nélkül"
+    "sectionNotes": "Jegyzetek",
+    "untitledNote": "Névtelen"
   },
   "commands": {
     "actions": {
       "backupVault": {
-        "label": "Vissza a páncélterembe.."
+        "label": "Széf biztonsági mentése…"
       },
       "category": {
-        "app": "App",
+        "app": "Alkalmazás",
         "editor": "Szerkesztő",
-        "vault": "Tárolás",
+        "vault": "Széf",
         "view": "Nézet"
       },
       "convertWikilinks": {
-        "label": "Átalakít importált wikleinks ebben a megjegyzésben.."
+        "label": "Importált wikilinkek konvertálása ebben a jegyzetben…"
       },
       "deleteWorkspace": {
-        "label": "Munkahely törlése.."
+        "label": "Munkaterület törlése…"
       },
       "exportNoteHtml": {
-        "label": "Kiviteli megjegyzés HTML-ként.."
+        "label": "Jegyzet exportálása HTML-ként…"
       },
       "exportNoteMarkdown": {
-        "label": "Export note as Marklown.."
+        "label": "Jegyzet exportálása Markdownként…"
       },
       "exportNotePdf": {
-        "label": "Kiviteli megjegyzés PDF-ként.."
+        "label": "Jegyzet exportálása PDF-ként…"
       },
       "exportNoteTxt": {
-        "label": "Exportáló megjegyzés mint egyszerű szöveg.."
+        "label": "Jegyzet exportálása egyszerű szövegként…"
       },
       "exportVaultMarkdown": {
-        "label": "Export páncélterem, mint Marklown.."
+        "label": "Széf exportálása Markdownként…"
       },
       "foldAll": {
-        "label": "Hajtsa be az összes"
+        "label": "Összes összecsukása"
       },
       "importBaseView": {
-        "label": "Import.base nézet.."
+        "label": ".base nézet importálása…"
       },
       "importObsidian": {
-        "label": "Obszidián páncélterem importálása.."
+        "label": "Obsidian-széf importálása…"
       },
       "lockVault": {
-        "label": "Zár páncélterem"
+        "label": "Széf zárolása"
       },
       "manageTemplates": {
-        "label": "Kezelési sablonok.."
+        "label": "Sablonok kezelése…"
       },
       "newNoteFromTemplate": {
-        "label": "Új megjegyzés a sablon.."
+        "label": "Új jegyzet sablonból…"
       },
       "openAttachments": {
-        "label": "Csatornák megnyitása.."
+        "label": "Mellékletek megnyitása…"
       },
       "openSettings": {
-        "label": "A beállítások megnyitása.."
+        "label": "Beállítások megnyitása…"
       },
       "openSnapshots": {
-        "label": "Snapshots.."
+        "label": "Pillanatképek…"
       },
       "openTodayNote": {
-        "label": "A mai üzenet megnyitása"
+        "label": "Mai jegyzet megnyitása"
       },
       "randomNote": {
-        "label": ""
+        "label": "Véletlenszerű jegyzet megnyitása"
       },
       "renameWorkspace": {
-        "label": "A munkaterület átnevezése.."
+        "label": "Munkaterület átnevezése…"
       },
       "saveWorkspaceAs": {
-        "label": "A munkaterület mentése.."
+        "label": "Munkaterület mentése másként…"
       },
       "showGraph": {
-        "label": "A grafikonok megjelenítése.."
+        "label": "Gráfnézet megjelenítése…"
       },
       "showTags": {
-        "label": ""
+        "label": "Címkék böngészése…"
       },
       "showViews": {
-        "label": "Böngészési nézet.."
+        "label": "Nézetek böngészése…"
       },
       "switchWorkspace": {
-        "label": "Munkahelyet váltani.."
+        "label": "Munkaterület váltása…"
       },
       "toggleFocus": {
-        "label": "Fókusz bekapcsolása"
+        "label": "Fókuszmód be-/kikapcsolása"
       },
       "toggleLeftSidebar": {
-        "label": "Jegyzetek ki- be kapcsolása"
+        "label": "Jegyzetek oldalsáv be-/kikapcsolása"
       },
       "toggleReading": {
-        "label": "Az olvasási nézet bekapcsolása"
+        "label": "Olvasási nézet be-/kikapcsolása"
       },
       "toggleRightSidebar": {
-        "label": "A háttérlinkek ki- be kapcsolása"
+        "label": "Visszahivatkozások oldalsáv be-/kikapcsolása"
       },
       "toggleSource": {
-        "label": "A forrás bekapcsolása"
+        "label": "Forrásmód be-/kikapcsolása"
       },
       "toggleStackedTabs": {
-        "label": ""
+        "label": "Egymásra rakott lapok be-/kikapcsolása"
       },
       "unfoldAll": {
-        "label": "Minden bontása"
+        "label": "Összes kibontása"
       }
     },
     "hotkeys": {
       "command": {
-        "bold": "Merész",
-        "closeTab": "A lap bezárása",
-        "cycleHeadingLevel": "A ciklus iránya",
-        "cycleTabs": "Ciklus fülek",
-        "deleteWorkspace": "Munkahely törlése",
-        "focusNextPane": "Fókuszálj a következő táblára",
-        "focusPrevPane": "Az előző tábla fókuszálása",
-        "foldAll": "Hajtsa be az összes",
-        "inlineCode": "Bejegyzési kód",
-        "insertWikilink": "A Wikilink beszúrása",
-        "italic": "Olasz",
-        "navigateBack": "Visszafelé",
-        "navigateForward": "Hajóút",
-        "newNote": "Új megjegyzés",
+        "bold": "Félkövér",
+        "closeTab": "Lap bezárása",
+        "cycleHeadingLevel": "Címsorszint léptetése",
+        "cycleTabs": "Lapok közötti váltás",
+        "deleteWorkspace": "Munkaterület törlése",
+        "focusNextPane": "Következő panel fókuszálása",
+        "focusPrevPane": "Előző panel fókuszálása",
+        "foldAll": "Összes összecsukása",
+        "inlineCode": "Soron belüli kód",
+        "insertWikilink": "Wikilink beszúrása",
+        "italic": "Dőlt",
+        "navigateBack": "Vissza",
+        "navigateForward": "Előre",
+        "newNote": "Új jegyzet",
         "openSettings": "Beállítások megnyitása",
         "paletteToggle": "Parancspaletta megnyitása",
-        "renameWorkspace": "Munkahely átnevezése",
-        "saveWorkspaceAs": "A munkaterület mentése",
-        "selectAllScoped": "Válassza ki az összes (scope)",
-        "showGraphView": "A grafikonok megjelenítése",
-        "splitPaneDown": "Split pane (lefelé)",
-        "splitPaneRight": "Split pane (jobb)",
-        "switchWorkspace": "",
-        "toggleBulletList": "Golyólista bekapcsolása",
-        "toggleFocusMode": "Fókusz bekapcsolása",
-        "toggleNumberedList": "A számozott lista bekapcsolása",
-        "toggleReadingView": "Az olvasási nézet bekapcsolása",
-        "toggleSourceMode": "A forrás bekapcsolása",
-        "toggleTaskList": "A feladatlista ki- be kapcsolása",
-        "unfoldAll": "Minden bontása"
+        "renameWorkspace": "Munkaterület átnevezése",
+        "saveWorkspaceAs": "Munkaterület mentése másként",
+        "selectAllScoped": "Összes kijelölése (hatókörön belül)",
+        "showGraphView": "Gráfnézet megjelenítése",
+        "splitPaneDown": "Panel felosztása (lefelé)",
+        "splitPaneRight": "Panel felosztása (jobbra)",
+        "switchWorkspace": "Munkaterület váltása",
+        "toggleBulletList": "Felsorolás be-/kikapcsolása",
+        "toggleFocusMode": "Fókuszmód be-/kikapcsolása",
+        "toggleNumberedList": "Számozott lista be-/kikapcsolása",
+        "toggleReadingView": "Olvasási nézet be-/kikapcsolása",
+        "toggleSourceMode": "Forrásmód be-/kikapcsolása",
+        "toggleTaskList": "Feladatlista be-/kikapcsolása",
+        "unfoldAll": "Összes kibontása"
       }
     },
     "rebind": {
-      "invalidChordReason": "Adjunk hozzá egy módosító (), Ctrl, vagy Alt - egy kulcs önmagában nem lehet egy rövidebb."
+      "invalidChordReason": "Adj hozzá egy módosítót (⌘, Ctrl vagy Alt) — egy önálló billentyű nem lehet gyorsbillentyű."
     }
   },
   "common": {
     "prompt": {
-      "cancel": "Törlés",
-      "confirmDefault": "OKÉ"
+      "cancel": "Mégse",
+      "confirmDefault": "OK"
     },
     "spinner": {
-      "loadingLabel": "Berakodás"
+      "loadingLabel": "Betöltés"
     }
   },
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Nem tudtam exportálni {{filename}}.",
-        "exported": "Exportált {{filename}}.",
-        "renameFailed": "Nem tudtam átnevezni a kötődést.",
-        "renamed": "Átnevezve {{name}} -ra.",
-        "saveDialogFailed": "Nem tudtam megnyitni a mentési párbeszédablakot."
+        "exportFailed": "Nem sikerült exportálni: {{filename}}.",
+        "exported": "Exportálva: {{filename}}.",
+        "renameFailed": "Nem sikerült átnevezni a mellékletet.",
+        "renamed": "Átnevezve erre: {{name}}.",
+        "saveDialogFailed": "Nem sikerült megnyitni a mentési párbeszédablakot."
       },
       "convert": {
-        "cancel": "Törlés",
-        "confirm": "Átalakítás",
-        "skipped": "kimaradt - {{note}}",
-        "subtitleEmpty": "Semmi konvertálni - nincs forrásfájl megoldva.",
-        "subtitle_one": "1 hivatkozás kerül átírásra. Felülvizsgálat az elkötelezettség előtt.",
-        "subtitle_other": "{{count}} hivatkozások kerülnek átírásra. Felülvizsgálat az elkötelezettség előtt.",
-        "title": "Az importált tartozékok átalakítása"
+        "cancel": "Mégse",
+        "confirm": "Konvertálás",
+        "skipped": "kihagyva — {{note}}",
+        "subtitleEmpty": "Nincs mit konvertálni — egyetlen forrásfájl sem oldódott fel.",
+        "subtitle_one": "1 hivatkozás lesz átírva. Ellenőrizd a véglegesítés előtt.",
+        "subtitle_other": "{{count}} hivatkozás lesz átírva. Ellenőrizd a véglegesítés előtt.",
+        "title": "Importált mellékletek konvertálása"
       },
       "convertCommand": {
-        "pickerSourceFilter": "Csatolási forrás"
+        "pickerSourceFilter": "Melléklet forrása"
       },
       "convertCore": {
-        "converted_one": "{{count}} átalakítva",
-        "converted_other": "",
-        "noneToConvert": "Ebben a megjegyzésben nincsenek olyan importált mellékletek, amelyek átalakíthatók.",
+        "converted": "{{count}} konvertálva",
+        "converted_one": "{{count}} konvertálva",
+        "converted_other": "{{count}} konvertálva",
+        "noneToConvert": "Ebben a jegyzetben nincs konvertálható importált melléklet.",
         "skipNote": {
-          "failed": "import sikertelen",
-          "locked": "páncélterem zárva",
-          "notFound": "forrás nem található",
+          "failed": "az importálás meghiúsult",
+          "locked": "a széf zárolva van",
+          "notFound": "a forrás nem található",
           "tooLarge": "túl nagy (max. 64 MiB)",
           "unsupported": "nem támogatott típus"
         },
-        "skippedSuffix_one": " * {{count}} kimaradt",
-        "skippedSuffix_other": ""
+        "skippedSuffix": " · {{count}} kihagyva",
+        "skippedSuffix_one": " · {{count}} kihagyva",
+        "skippedSuffix_other": " · {{count}} kihagyva"
       },
       "fileKind": {
         "generic": "Fájl",
@@ -360,119 +364,121 @@
           "audio": "Hang",
           "cHeader": "C fejléc",
           "cSource": "C forrás",
-          "cppSource": "C + + forrás",
+          "cppSource": "C++ forrás",
           "css": "CSS",
           "csv": "CSV",
           "document": "Dokumentum",
-          "ebook": "Ebook",
-          "go": "Menj",
+          "ebook": "E-könyv",
+          "go": "Go",
           "html": "HTML",
           "image": "Kép",
           "java": "Java",
           "javascript": "JavaScript",
           "json": "JSON",
-          "keynote": "Billentyűzet",
+          "keynote": "Keynote",
           "log": "Naplófájl",
-          "markdown": "Jelölés",
-          "numbers": "Számtáblázat",
-          "pages": "Oldalas dokumentum",
+          "markdown": "Markdown",
+          "numbers": "Numbers-táblázat",
+          "pages": "Pages-dokumentum",
           "pdf": "PDF",
           "presentation": "Bemutató",
           "python": "Python",
-          "richText": "Gazdag szöveges dokumentum",
-          "rust": "Rozs",
-          "shell": "Szkript törlése",
-          "spreadsheet": "",
-          "svg": "SVG kép",
+          "richText": "Rich text dokumentum",
+          "rust": "Rust",
+          "shell": "Shell-szkript",
+          "spreadsheet": "Táblázat",
+          "svg": "SVG-kép",
           "text": "Szöveges dokumentum",
           "toml": "TOML",
           "tsv": "TSV",
           "typescript": "TypeScript",
           "video": "Videó",
-          "word": "Szöveges dokumentum",
+          "word": "Word-dokumentum",
           "xml": "XML",
           "yaml": "YAML"
         },
         "unknown": "{{ext}} fájl"
       },
       "lightbox": {
-        "close": "",
+        "close": "Előnézet bezárása",
         "export": "Exportálás",
-        "exportAria": "Kiviteli csatolás",
-        "imagePreview": "Képelőnézet",
+        "exportAria": "Melléklet exportálása",
+        "imagePreview": "Kép előnézete",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDF előnézet"
+        "pdfPreview": "PDF előnézete"
       },
       "menu": {
-        "actionsAria": "Csatolási intézkedések"
+        "actionsAria": "Melléklet műveletei"
       },
       "pdf": {
-        "loading": "Betöltés.."
+        "loading": "Betöltés…"
       },
       "picker": {
-        "openFailed": "Nem tudtam kinyitni az aktát."
+        "openFailed": "Nem sikerült megnyitni a fájlválasztót."
       },
       "progress": {
-        "encrypting": "Titkosítás..",
-        "importing": "Importálás..",
-        "loading": ""
+        "encrypting": "Titkosítás…",
+        "importing": "Importálás…",
+        "loading": "Betöltés…"
       },
       "recording": {
-        "barAria": "",
-        "cancel": "Törlés",
-        "noAudio": "Nincs hang észlelve - ellenőrizze a mikrofon.",
-        "saving": "Megmentem..",
-        "stop": "Állj"
+        "barAria": "Hangjegyzet rögzítése",
+        "cancel": "Mégse",
+        "noAudio": "Nincs észlelt hang — ellenőrizd a mikrofont.",
+        "saving": "Mentés…",
+        "stop": "Leállítás"
       },
       "rename": {
-        "cancel": "Törlés",
+        "cancel": "Mégse",
         "confirm": "Átnevezés",
-        "title": "A csatolás átnevezése"
+        "title": "Melléklet átnevezése"
       },
       "summary": {
-        "added_one": "{{count}} hozzáadott",
-        "added_other": "",
+        "added": "{{count}} hozzáadva",
+        "added_one": "{{count}} hozzáadva",
+        "added_other": "{{count}} hozzáadva",
         "reason": {
-          "failed": "nem sikerült",
-          "locked": "páncélterem zárva",
+          "failed": "meghiúsult",
+          "locked": "a széf zárolva van",
           "tooLarge": "túl nagy",
           "unsupported": "nem támogatott típus"
         },
-        "skipped_one": "{{count}} kimaradt: {{noun}}",
-        "skipped_other": ""
+        "skipped": "{{count}} kihagyva: {{noun}}",
+        "skipped_one": "{{count}} kihagyva: {{noun}}",
+        "skipped_other": "{{count}} kihagyva: {{noun}}"
       },
       "voice": {
         "startError": {
-          "alreadyRecording": "Egy felvétel már folyamatban van.",
-          "captureFailed": "Nem sikerült elindítani a felvételt - ellenőrizze a mikrofon hozzáférést a Rendszerbeállítások.",
-          "generic": "Nem tudtam felvenni.",
-          "locked": "Nyisd ki a páncéltermet, hogy rögzíts egy hangüzenetet.",
-          "noInputDevice": "Nincs mikrofon. Csatlakoztassa az egyiket, és próbálja újra."
+          "alreadyRecording": "Már folyamatban van egy felvétel.",
+          "captureFailed": "Nem sikerült elindítani a felvételt — ellenőrizd a mikrofonhozzáférést a Rendszerbeállításokban.",
+          "generic": "Nem sikerült elindítani a felvételt.",
+          "locked": "Hangjegyzet rögzítéséhez nyisd ki a széfet.",
+          "noInputDevice": "Nem található mikrofon. Csatlakoztass egyet, és próbáld újra."
         },
         "stopError": {
-          "captureFailed": "A felvétel nem sikerült - ellenőrizze a mikrofont.",
-          "emptyRecording": "Semmit sem rögzítettek.",
-          "generic": "Nem tudtam megmenteni a felvételt.",
-          "silentRecording": "A felvétel néma volt és eldobott - nézd meg a mikrofont."
+          "captureFailed": "A felvétel meghiúsult — ellenőrizd a mikrofont.",
+          "emptyRecording": "Semmi sem lett rögzítve.",
+          "generic": "Nem sikerült menteni a felvételt.",
+          "silentRecording": "A felvétel néma volt, ezért el lett vetve — ellenőrizd a mikrofont."
         }
       },
       "widget": {
         "audio": {
           "pause": "Szünet",
-          "play": "Játék",
-          "seek": "Keresés"
+          "play": "Lejátszás",
+          "seek": "Tekerés"
         },
         "menu": {
           "export": "Exportálás",
           "remove": "Eltávolítás",
           "rename": "Átnevezés",
-          "reveal": ""
+          "reveal": "Megjelenítés a tárban"
         },
         "pdfFallback": "PDF",
         "tombstone": {
-          "brokenAria": "Törött rögzítési hivatkozás: {{filename}}",
-          "brokenLabel": "törött",
-          "deletedAria": "Törölt csatolás: {{filename}}",
+          "brokenAria": "Hibás melléklethivatkozás: {{filename}}",
+          "brokenLabel": "hibás",
+          "deletedAria": "Törölt melléklet: {{filename}}",
           "deletedLabel": "törölve"
         },
         "urlImageFallback": "kép"
@@ -481,124 +487,131 @@
     "callout": {
       "label": {
         "attention": "Figyelem",
-        "bug": "Bug",
-        "caution": "Figyelem",
+        "bug": "Hiba",
+        "caution": "Óvatosan",
         "danger": "Veszély",
         "done": "Kész",
         "error": "Hiba",
         "example": "Példa",
-        "failure": "Hiba",
+        "failure": "Sikertelen",
         "faq": "GYIK",
-        "hint": "Jelölés",
+        "hint": "Tipp",
         "important": "Fontos",
         "info": "Információ",
-        "missing": "Eltűnt",
+        "missing": "Hiányzik",
         "note": "Megjegyzés",
         "question": "Kérdés",
         "quote": "Idézet",
         "success": "Siker",
         "tip": "Tipp",
-        "todo": "Todo",
-        "warning": "Figyelem"
+        "todo": "Tennivaló",
+        "warning": "Figyelmeztetés"
       }
     },
     "chrome": {
       "backlinks": {
         "archivedBadge": "Archivált",
-        "empty": "Még nincs visszacsatolás.",
-        "linkedFrom_one": "Kapcsolódó {{count}}",
-        "linkedFrom_other": "",
-        "untitled": "Név nélkül"
+        "empty": "Még nincs visszahivatkozás.",
+        "linkedFrom": "Hivatkozva innen: {{count}}",
+        "linkedFrom_one": "Hivatkozva innen: {{count}}",
+        "linkedFrom_other": "Hivatkozva innen: {{count}}",
+        "untitled": "Névtelen"
       },
       "barItems": {
-        "graph": "Ábra",
+        "graph": "Gráf",
         "lock": "Zárolás",
+        "saveStatus": "Mentés állapota",
         "settings": "Beállítások",
-        "syncStatus": "Sync status",
+        "syncStatus": "Szinkron állapota",
         "tags": "Címkék",
-        "viewMode": "Megtekintési mód",
+        "viewMode": "Nézetmód",
         "views": "Nézetek",
         "wordCount": "Szavak száma",
-        "workspace": "Munkahely"
+        "workspace": "Munkaterület"
       },
       "baseImport": {
-        "droppedFiltersSuffix_one": " · {{count}} szűrők leesett",
-        "droppedFiltersSuffix_other": "",
-        "failed": "A behozatal nem sikerült.",
-        "fileFilterName": "Obszidián bázis",
-        "imported_one": "Importált {{count}} nézet (ok)",
-        "imported_other": "",
+        "droppedFiltersSuffix": " · {{count}} szűrő elvetve",
+        "droppedFiltersSuffix_one": " · {{count}} szűrő elvetve",
+        "droppedFiltersSuffix_other": " · {{count}} szűrő elvetve",
+        "failed": "Az importálás meghiúsult.",
+        "fileFilterName": "Obsidian Base",
+        "imported": "{{count}} nézet importálva",
+        "imported_one": "{{count}} nézet importálva",
+        "imported_other": "{{count}} nézet importálva",
         "notValid": "Nem érvényes .base fájl.",
-        "skippedSuffix_one": "",
-        "skippedSuffix_other": "",
-        "stoppedAfter_one": "A {{count}} nézet után leállt a behozatal.",
-        "stoppedAfter_other": ""
+        "skippedSuffix": " · {{count}} kihagyva",
+        "skippedSuffix_one": " · {{count}} kihagyva",
+        "skippedSuffix_other": " · {{count}} kihagyva",
+        "stoppedAfter": "Az importálás leállt {{count}} nézet után.",
+        "stoppedAfter_one": "Az importálás leállt {{count}} nézet után.",
+        "stoppedAfter_other": "Az importálás leállt {{count}} nézet után."
       },
       "bottomBar": {
-        "browseTags": "A címkék böngészése",
-        "browseViews": "Böngészési nézet",
-        "cycleViewMode": "A ciklus nézete",
+        "browseTags": "Címkék böngészése",
+        "browseViews": "Nézetek böngészése",
+        "cycleViewMode": "Nézetmód léptetése",
         "docStats": {
-          "summarySelectionSuffix": " (sel)",
-          "summary_one": "{{count}} word · {{characters}} chars",
-          "summary_other": "{{count}} szavak · {{characters}} chars",
-          "titleSelectionSuffix": " (kiválasztás)",
-          "title_one": "{{characters}} karakterek · {{words}} szavak · {{spaces}} szóközök · {{count}} bekezdés",
-          "title_other": "{{characters}} karakterek · {{words}} szavak · {{spaces}} szóközök · {{count}} bekezdések"
+          "summary_one": "{{count}} szó · {{characters}} karakter",
+          "summary_other": "{{count}} szó · {{characters}} karakter",
+          "summarySelectionSuffix": " (kijel.)",
+          "title_one": "{{characters}} karakter · {{words}} szó · {{spaces}} szóköz · {{count}} bekezdés",
+          "title_other": "{{characters}} karakter · {{words}} szó · {{spaces}} szóköz · {{count}} bekezdés",
+          "titleSelectionSuffix": " (kijelölés)"
         },
-        "graphTitle": "",
+        "graphTitle": "Gráf (⌘⇧G)",
         "lock": "Zárolás",
-        "lockVault": "Zár páncélterem",
+        "lockVault": "Széf zárolása",
         "openSettings": "Beállítások megnyitása",
-        "settingsTitle": "Beszerelés ()",
-        "showGraph": "A grafikonok megjelenítése",
-        "syncStatus": "",
+        "settingsTitle": "Beállítások (⌘,)",
+        "showGraph": "Gráfnézet megjelenítése",
+        "syncStatus": "Csak helyi · nincs szinkronizálva",
         "tagsTitle": "Címkék",
-        "togglePreview": "Oldal- oldalnézetName",
-        "viewModeTitle": "Megtekintési mód: {{mode}} (kattintson a ciklusra)",
+        "togglePreview": "Osztott előnézet be-/kikapcsolása",
+        "viewModeTitle": "Nézetmód: {{mode}} (kattints a léptetéshez)",
         "viewsTitle": "Nézetek"
       },
       "import": {
-        "imported_one": "Importált {{count}} megjegyzés {{skipped}}",
-        "imported_other": "Importált {{count}} megjegyzések {{skipped}}",
-        "skippedSuffix_one": " * {{count}} kimaradt",
-        "skippedSuffix_other": ""
+        "imported_one": "{{count}} jegyzet importálva{{skipped}}",
+        "imported_other": "{{count}} jegyzet importálva{{skipped}}",
+        "skippedSuffix": " · {{count}} kihagyva",
+        "skippedSuffix_one": " · {{count}} kihagyva",
+        "skippedSuffix_other": " · {{count}} kihagyva"
       },
       "nav": {
-        "goBack": "Menj vissza",
+        "goBack": "Vissza",
         "goForward": "Előre"
       },
-      "noNotesToOpen": "Nincs mit kinyitni.",
-      "resizeBacklinksSidebar": "A backlinksidebar átméretezése",
-      "resizeNotesSidebar": "Megjegyzés átméretezése",
+      "noNotesToOpen": "Nincs megnyitható jegyzet.",
+      "resizeBacklinksSidebar": "Visszahivatkozások oldalsáv átméretezése",
+      "resizeNotesSidebar": "Jegyzetek oldalsáv átméretezése",
       "sidebarToggle": {
-        "hideBacklinks": "",
-        "hideNotes": "Jegyzetek elrejtése",
-        "showBacklinks": "A háttérlinkek megjelenítése",
-        "showNotes": "Megjegyzés megjelenítése"
+        "hideBacklinks": "Visszahivatkozások oldalsáv elrejtése",
+        "hideNotes": "Jegyzetek oldalsáv elrejtése",
+        "showBacklinks": "Visszahivatkozások oldalsáv megjelenítése",
+        "showNotes": "Jegyzetek oldalsáv megjelenítése"
       },
       "switchingOverlay": {
-        "saving": "Megmentem.."
+        "saving": "Mentés…"
       },
       "viewMode": {
-        "live": "",
+        "live": "Élő",
         "reading": "Olvasás",
         "source": "Forrás"
       },
       "workspacePrompt": {
-        "namePlaceholder": "Munkahely neve",
+        "namePlaceholder": "Munkaterület neve",
         "renameConfirm": "Átnevezés",
-        "renameTitle": "Munkahely átnevezése",
-        "saveAsTitle": "A munkaterület mentése",
+        "renameTitle": "Munkaterület átnevezése",
+        "saveAsTitle": "Munkaterület mentése másként",
         "saveConfirm": "Mentés"
       },
       "workspaceSwitcher": {
-        "defaultName": "Munkahely",
-        "renameItemLabel": "Munkahely átnevezése {{name}}",
-        "renameTitle": "Munkahely átnevezése",
-        "saveCurrentAs": "Az áramerősség mentése..",
-        "switchLabel": "Munkahely kapcsolása",
-        "toggleTitle": "Munkahely: {{name}}"
+        "defaultName": "Munkaterület",
+        "renameItemLabel": "{{name}} munkaterület átnevezése",
+        "renameTitle": "Munkaterület átnevezése",
+        "saveCurrentAs": "Jelenlegi mentése másként…",
+        "switchLabel": "Munkaterület váltása",
+        "toggleTitle": "Munkaterület: {{name}}"
       }
     },
     "codeBlock": {
@@ -606,78 +619,78 @@
       "defaultBadge": "kód"
     },
     "find": {
-      "close": "Közel",
-      "matchCase": "Egyezik",
-      "matchCount": "{{current}}",
-      "nextMatch": "Következő mérkőzés",
-      "noMatches": "Nincs egyezés",
-      "placeholder": "Megjegyzés",
-      "previousMatch": "Előző mérkőzés",
-      "replaceAll": "",
-      "replaceAllCount": "Az összes csere ({{total}})",
-      "replaceOne": "",
-      "replacePlaceholder": "Csere",
-      "toggleReplace": "A csere bekapcsolása"
+      "close": "Keresés bezárása",
+      "matchCase": "Kis- és nagybetű megkülönböztetése",
+      "matchCount": "{{current}} / {{total}}",
+      "nextMatch": "Következő találat",
+      "noMatches": "Nincs találat",
+      "placeholder": "Keresés a jegyzetben",
+      "previousMatch": "Előző találat",
+      "replaceAll": "Mind cseréje",
+      "replaceAllCount": "Mind cseréje ({{total}})",
+      "replaceOne": "Csere",
+      "replacePlaceholder": "Csere erre",
+      "toggleReplace": "Csere be-/kikapcsolása"
     },
     "folding": {
-      "clickToUnfold": "",
-      "unfold": "Feloldás"
+      "clickToUnfold": "Kattints a kibontáshoz",
+      "unfold": "Kibontás"
     },
     "footnote": {
       "heading": "Lábjegyzetek",
-      "unreferenced": "nem hivatkozott"
+      "unreferenced": "nincs hivatkozva"
     },
     "frontmatter": {
-      "addProperty": "+ Ingatlan hozzáadása",
+      "addProperty": "+ Tulajdonság hozzáadása",
       "propertiesLabel": "Tulajdonságok",
-      "titleAriaLabel": "Megjegyzés címe",
-      "titlePlaceholder": "Név nélkül"
+      "titleAriaLabel": "Jegyzet címe",
+      "titlePlaceholder": "Névtelen"
     },
     "mermaid": {
-      "rendering": "Renderelési diagram.."
+      "rendering": "Diagram renderelése…"
     },
     "slash": {
       "attachFile": "Fájl csatolása",
-      "bulletList": "Golyólista",
-      "callout": "Kihívás",
-      "date": "Időpont",
+      "bulletList": "Felsorolás",
+      "callout": "Kiemelt blokk",
+      "date": "Dátum",
       "day": "Nap",
-      "divider": "Osztag",
-      "heading1": "1. fejezet",
-      "heading2": "2. fejezet",
-      "heading3": "3. fejezet",
-      "heading4": "4. fejezet",
-      "heading5": "5. fejezet",
-      "heading6": "6. fejezet",
-      "link": "Kapcsolat",
+      "divider": "Elválasztó",
+      "heading1": "Címsor 1",
+      "heading2": "Címsor 2",
+      "heading3": "Címsor 3",
+      "heading4": "Címsor 4",
+      "heading5": "Címsor 5",
+      "heading6": "Címsor 6",
+      "link": "Hivatkozás",
       "now": "Most",
       "numberedList": "Számozott lista",
       "quote": "Idézet",
       "table": "Táblázat",
       "time": "Idő",
-      "todoList": "To-do lista",
-      "voiceNote": "Hangüzenet",
-      "wikiLink": "Wiki link"
+      "todoList": "Tennivaló-lista",
+      "voiceNote": "Hangjegyzet",
+      "wikiLink": "Wikilink"
     },
     "spell": {
       "menu": {
         "addToDictionary": "Hozzáadás a szótárhoz",
-        "ignoreInVault": "Ne törődj vele ebben a széfben",
-        "ignoreThisSession": "A munkamenet figyelmen kívül hagyása",
+        "ignoreInVault": "Mellőzés ebben a széfben",
+        "ignoreThisSession": "Mellőzés ebben a munkamenetben",
         "noSuggestions": "Nincs javaslat"
       }
     },
     "table": {
-      "addColumn": "A jobb oldali oszlop hozzáadása",
-      "addRow": "Az alábbi sor hozzáadása",
+      "addColumn": "Oszlop hozzáadása jobbra",
+      "addRow": "Sor hozzáadása alá",
       "cellAriaLabel": "Táblázatcella",
-      "deleteColumn": "Az oszlop törlése",
-      "deleteRow": "A sor törlése",
-      "reorderColumn": "Törlés oszlopa",
-      "reorderRow": "Törlés"
+      "deleteColumn": "Oszlop törlése",
+      "deleteRow": "Sor törlése",
+      "reorderColumn": "Oszlop átrendezése",
+      "reorderRow": "Sor átrendezése"
     },
     "toolbar": {
-      "apply": "Alkalmazás",
+      "apply": "Alkalmaz",
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -688,18 +701,18 @@
         "paragraph": "Bekezdés"
       },
       "highlight": {
-        "blue": "Mavi",
-        "green": "Yeşil",
-        "pink": "Pembe",
-        "purple": "Mor",
-        "yellow": "Sarı"
+        "blue": "Kék",
+        "green": "Zöld",
+        "pink": "Rózsaszín",
+        "purple": "Lila",
+        "yellow": "Sárga"
       },
-      "urlPlaceholder": "Az URL beillesztése"
+      "urlPlaceholder": "Illeszd be a hivatkozás URL-jét"
     },
     "typography": {
       "contentWidth": {
         "full": "Teljes",
-        "narrow": "Szűk",
+        "narrow": "Keskeny",
         "normal": "Normál",
         "wide": "Széles"
       },
@@ -709,634 +722,640 @@
       },
       "lineSpacing": {
         "normal": "Normál",
-        "relaxed": "Relaxált",
+        "relaxed": "Laza",
         "tight": "Szoros"
       },
       "textSize": {
         "lg": "Nagy",
-        "md": "Alapértelmezés",
+        "md": "Alapértelmezett",
         "sm": "Kicsi",
         "xl": "Extra nagy"
       }
     },
     "wikilink": {
       "chip": {
-        "embed": "Beágyazva: {{label}}"
+        "embed": "Beágyazás: {{label}}"
       },
       "convert": {
-        "cancel": "Törlés",
-        "choiceClause_one": " Kell egy választás.",
-        "choiceClause_other": " Kell egy választás.",
-        "chooseTarget": "Válassza ki a célt..",
-        "convert": "Átalakítás",
-        "convertedToast_one": "{{count}} wikitin- konverzió",
-        "convertedToast_other": "{{count}} átalakított wikitinek",
-        "noneToConvert": "Nincs importált wikleinks átalakítani ebben a megjegyzésben.",
-        "nothingToConvert": "Nincs mit átalakítani - nincs import wikleinks megoldani.",
-        "rewriteCount_one": "{{count}} linket újra kell írni",
-        "rewriteCount_other": "{{count}} linkek lesz átírva",
-        "skipped": "kimaradt - {{reason}}",
-        "title": "Átalakít importált wikleinks ebben a megjegyzésben"
+        "cancel": "Mégse",
+        "choiceClause_one": " · {{count}} választást igényel.",
+        "choiceClause_other": " · {{count}} választást igényel.",
+        "chooseTarget": "Válassz célt…",
+        "convert": "Konvertálás",
+        "convertedToast_one": "{{count}} wikilink konvertálva",
+        "convertedToast_other": "{{count}} wikilink konvertálva",
+        "noneToConvert": "Ebben a jegyzetben nincs konvertálható importált wikilink.",
+        "nothingToConvert": "Nincs mit konvertálni — egyetlen importált wikilink sem oldódott fel.",
+        "rewriteCount_one": "{{count}} hivatkozás lesz átírva",
+        "rewriteCount_other": "{{count}} hivatkozás lesz átírva",
+        "skipped": "kihagyva — {{reason}}",
+        "title": "Importált wikilinkek konvertálása ebben a jegyzetben"
       },
       "convertCore": {
-        "noMatch": "nincs egyezés"
+        "noMatch": "nincs találat"
       }
     }
   },
   "export": {
     "note": {
-      "documentTitleFallback": "",
+      "documentTitleFallback": "Jegyzet",
       "errors": {
-        "attachmentCorrupt": "Egy csatolmányt, amelyre ez a megjegyzés hivatkozik, nem lehetett elolvasni, így nem exportáltak semmit.",
-        "attachmentMissing": "",
-        "cannotDecrypt": "Ezt az üzenetet nem lehetett elolvasni.",
+        "attachmentCorrupt": "A jegyzet által hivatkozott egyik mellékletet nem sikerült beolvasni, ezért semmi nem lett exportálva.",
+        "attachmentMissing": "A jegyzet által hivatkozott egyik melléklet hiányzik, ezért semmi nem lett exportálva.",
+        "cannotDecrypt": "Ezt a jegyzetet nem sikerült beolvasni.",
         "destinationUnusable": "Ez a célmappa nem használható.",
-        "fallback": "Az export váratlanul megbukott. Próbáld újra.",
-        "invalidAttachmentCatalog": "A páncélterem csatolmánykatalógusa nem olvasható, így nem exportáltak semmit.",
-        "invalidNoteFilename": "A fájl neve nem használható, így nem exportáltak semmit.",
-        "invalidNoteId": "Ezt a feljegyzést nem sikerült azonosítani, így nem exportáltak semmit.",
-        "invalidPlaintextEncoding": "Ennek a levélnek a tartalma sérültnek tűnik, így nem exportáltak semmit. Helyreállítani egy tartalékból.",
-        "ioNoSpace": "Nincs elég hely a célállomásnál.",
-        "ioPermissionDenied": "Nincs engedélyem írni a célállomáson.",
-        "ioWriteDefault": "Nem sikerült írni az exportált fájlt.",
-        "noteNotFound": "Ez a megjegyzés már nem létezik - lehet, hogy törölték.",
-        "pdfCaptureFailed": "A PDF nem jött létre, így nem exportáltak semmit.",
-        "pdfExportInProgress": "A PDF export már fut. Várd meg, amíg befejezi, aztán próbáld újra.",
-        "pdfPayloadMissing": "Az export megszakadt - ha a páncélterem zárva van, nyissa ki, és próbálja újra.",
-        "pdfRenderTimeout": "A levél túl sokáig tartott, így nem exportáltak semmit.",
-        "pdfWindowCreateFailed": "A kiviteli ablakot nem lehetett kinyitni, így nem exportáltak semmit.",
-        "targetExists": "Egy ilyen nevű fájl már létezik a célállomáson.",
-        "vaultLocked": "A páncélterem zárva van. Nyisd ki, aztán próbáld újra."
+        "fallback": "Az exportálás váratlanul meghiúsult. Próbáld újra.",
+        "invalidAttachmentCatalog": "A széf mellékletkatalógusát nem sikerült beolvasni, ezért semmi nem lett exportálva.",
+        "invalidNoteFilename": "Ez a fájlnév nem használható, ezért semmi nem lett exportálva.",
+        "invalidNoteId": "Ezt a jegyzetet nem sikerült azonosítani, ezért semmi nem lett exportálva.",
+        "invalidPlaintextEncoding": "Ennek a jegyzetnek a tartalma sérültnek tűnik, ezért semmi nem lett exportálva. Állítsd vissza egy biztonsági mentésből.",
+        "ioNoSpace": "Nincs elég hely a célhelyen.",
+        "ioPermissionDenied": "Nincs jogosultság az írásra a célhelyen.",
+        "ioWriteDefault": "Nem sikerült megírni az exportált fájlt.",
+        "noteNotFound": "Ez a jegyzet már nem létezik — lehet, hogy törölve lett.",
+        "pdfCaptureFailed": "A PDF-et nem sikerült létrehozni, ezért semmi nem lett exportálva.",
+        "pdfExportInProgress": "Már fut egy PDF-exportálás. Várd meg, amíg befejeződik, majd próbáld újra.",
+        "pdfPayloadMissing": "Az exportálás megszakadt — ha a széf zárolódott, oldd fel, és próbáld újra.",
+        "pdfRenderTimeout": "A jegyzet renderelése túl sokáig tartott, ezért semmi nem lett exportálva.",
+        "pdfWindowCreateFailed": "Az exportálási ablakot nem sikerült megnyitni, ezért semmi nem lett exportálva.",
+        "targetExists": "Már létezik ilyen nevű fájl a célhelyen.",
+        "vaultLocked": "A széf zárolva van. Oldd fel, majd próbáld újra."
       },
       "flow": {
-        "couldNotRead": "Ezt az üzenetet nem lehetett elolvasni.",
-        "exportedTo": "Exportálva {{filename}}",
-        "exportedToWithAttachments_one": "Exportálva {{filename}} + {{count}} csatolásra",
-        "exportedToWithAttachments_other": "{{filename}} + {{count}} mellékletbe exportálva",
-        "exportedToWithImages_one": "{{filename}} + {{count}} képre exportálva",
-        "exportedToWithImages_other": "{{filename}} + {{count}} képre exportálva",
+        "couldNotRead": "Ezt a jegyzetet nem sikerült beolvasni.",
+        "exportedTo": "Exportálva ide: {{filename}}",
+        "exportedToWithAttachments_one": "Exportálva ide: {{filename}} + {{count}} melléklet",
+        "exportedToWithAttachments_other": "Exportálva ide: {{filename}} + {{count}} melléklet",
+        "exportedToWithImages_one": "Exportálva ide: {{filename}} + {{count}} kép",
+        "exportedToWithImages_other": "Exportálva ide: {{filename}} + {{count}} kép",
         "filterHtml": "HTML",
-        "filterMarkdown": "Jelölés",
+        "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
         "filterPlainText": "Egyszerű szöveg",
-        "showInFolder": ""
+        "showInFolder": "Megjelenítés a mappában"
       },
       "modal": {
-        "cancel": "Törlés",
-        "export": "Export..",
-        "includeAttachments_one": "A {{count}} csatolással együtt",
-        "includeAttachments_other": "Tartalmazza a {{count}} csatolásokat",
-        "title": "Exportálás jelölésként"
+        "cancel": "Mégse",
+        "export": "Exportálás…",
+        "includeAttachments_one": "{{count}} melléklet belefoglalása",
+        "includeAttachments_other": "{{count}} melléklet belefoglalása",
+        "title": "Exportálás Markdownként"
       }
     },
     "pdf": {
-      "cancel": "Törlés",
-      "continue": "Folytasd..",
+      "cancel": "Mégse",
+      "continue": "Tovább…",
       "title": "Exportálás PDF-ként"
     },
     "vault": {
-      "chooseDestinationDialogTitle": "Válassza ki, hova helyezze az exportot",
+      "chooseDestinationDialogTitle": "Válaszd ki, hová kerüljön az export",
       "errors": {
-        "attachmentCorrupt": "Egy jegyzet által hivatkozott csatolást nem lehetett elolvasni, így nem exportáltak semmit.",
-        "attachmentMissing": "",
-        "authOperationInProgress": "Egy másik páncélterem művelet folyamatban. Várd meg, amíg befejezi, aztán próbáld újra.",
-        "cancelled": "Export törölve. Semmi sem maradt a célállomáson.",
-        "cannotDecrypt": "Egy cetlit nem lehetett elolvasni, így nem exportáltak semmit.",
-        "destinationAlreadyExists": "",
-        "destinationNotAllowed": "Az a hely Myne saját raktárában van. Válasszon egy mappát.",
-        "invalidPlaintextEncoding": "A levél tartalma sérültnek tűnik, így nem exportáltak semmit. Helyreállítani egy tartalékból.",
-        "invalidVaultMeta": "A páncélterem metaadatait nem lehetett leolvasni, tehát semmit sem exportáltak.",
+        "attachmentCorrupt": "Egy jegyzet által hivatkozott mellékletet nem sikerült beolvasni, ezért semmi nem lett exportálva.",
+        "attachmentMissing": "Egy jegyzet által hivatkozott melléklet hiányzik, ezért semmi nem lett exportálva.",
+        "authOperationInProgress": "Egy másik széfművelet van folyamatban. Várd meg, amíg befejeződik, majd próbáld újra.",
+        "cancelled": "Az exportálás megszakítva. Semmi nem maradt a célhelyen.",
+        "cannotDecrypt": "Egy jegyzetet nem sikerült beolvasni, ezért semmi nem lett exportálva.",
+        "destinationAlreadyExists": "Már létezik valami azon a helyen. Válassz egy üres helyet az exporthoz.",
+        "destinationNotAllowed": "Ez a hely a Myne saját tárhelyén belül van. Válassz egy azon kívüli mappát.",
+        "invalidPlaintextEncoding": "Egy jegyzet tartalma sérültnek tűnik, ezért semmi nem lett exportálva. Állítsd vissza egy biztonsági mentésből.",
+        "invalidVaultMeta": "A széf metaadatait nem sikerült beolvasni, ezért semmi nem lett exportálva.",
         "ioWriteDefault": "Nem sikerült megírni az exportot.",
-        "joinFailure": "Az export váratlanul megbukott. Semmi sem maradt a célállomáson.",
-        "vaultLocked": "A páncélterem zárva van. Nyisd ki, aztán próbáld újra.",
-        "vaultNotFound": "Nem találtunk páncéltermet."
+        "joinFailure": "Az exportálás váratlanul meghiúsult. Semmi nem maradt a célhelyen.",
+        "vaultLocked": "A széf zárolva van. Oldd fel, majd próbáld újra.",
+        "vaultNotFound": "Nem található exportálható széf."
       },
       "flow": {
-        "countAttachments_one": "{{count}} csatolás",
-        "countAttachments_other": "{{count}} csatlakozók",
+        "countAttachments_one": "{{count}} melléklet",
+        "countAttachments_other": "{{count}} melléklet",
         "countFolders_one": "{{count}} mappa",
-        "countFolders_other": "{{count}} mappák",
-        "countNotes_one": "{{count}} megjegyzés",
-        "countNotes_other": "{{count}} megjegyzések",
-        "exclusionsHistory": "Verziós előzmények nem szerepelnek.",
-        "exclusionsTrashedAndHistory_one": "{{count}} roncsolt jegyzet és verzióelőzmény nem tartalmazza.",
-        "exclusionsTrashedAndHistory_other": "{{count}} törölt jegyzetek és verzióelőzmények nem tartalmazza.",
-        "exclusionsTrashed_one": "{{count}} nem tartalmazza.",
-        "exclusionsTrashed_other": "{{count}} törölt bankjegyek nem tartalmazza.",
-        "phaseAttachments": "tartozékok",
-        "phaseNotes": "megjegyzések",
-        "preparing": "Felkészülés..",
+        "countFolders_other": "{{count}} mappa",
+        "countNotes_one": "{{count}} jegyzet",
+        "countNotes_other": "{{count}} jegyzet",
+        "exclusionsHistory": "A verzióelőzmények nincsenek belefoglalva.",
+        "exclusionsTrashed_one": "{{count}} kukába helyezett jegyzet nincs belefoglalva.",
+        "exclusionsTrashed_other": "{{count}} kukába helyezett jegyzet nincs belefoglalva.",
+        "exclusionsTrashedAndHistory_one": "{{count}} kukába helyezett jegyzet és a verzióelőzmények nincsenek belefoglalva.",
+        "exclusionsTrashedAndHistory_other": "{{count}} kukába helyezett jegyzet és a verzióelőzmények nincsenek belefoglalva.",
+        "phaseAttachments": "mellékletek",
+        "phaseNotes": "jegyzetek",
+        "preparing": "Előkészítés…",
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "Törlés",
-        "cancelling": "Törlés..",
-        "title": "Exportálás.."
+        "cancel": "Mégse",
+        "cancelling": "Megszakítás…",
+        "title": "Exportálás…"
       },
       "setup": {
-        "cancel": "Törlés",
-        "choose": "Válasszon..",
-        "chooseFolder": "Válasszon egy mappát..",
-        "destinationLabel": "Rendeltetési hely",
-        "export": "Export..",
-        "folderSelectAriaLabel": "Kiviteli mappa",
-        "noFolderChosen": "Nem választott mappa",
+        "cancel": "Mégse",
+        "choose": "Választás…",
+        "chooseFolder": "Válassz egy mappát…",
+        "destinationLabel": "Célhely",
+        "export": "Exportálás…",
+        "folderSelectAriaLabel": "Exportálandó mappa",
+        "noFolderChosen": "Nincs kiválasztott mappa",
         "noFoldersInVault": "Nincs mappa ebben a széfben",
         "scopeFolder": "Egy mappa",
-        "scopeLabel": "Hatály",
-        "scopeWhole": "Az egész páncélterem",
-        "title": "A páncélterem exportálása jelölésként"
+        "scopeLabel": "Hatókör",
+        "scopeWhole": "Teljes széf",
+        "title": "Széf exportálása Markdownként"
       },
       "summary": {
         "done": "Kész",
-        "showInFolder": "A mappa megjelenítése",
-        "title": "Exportálás befejezve"
+        "showInFolder": "Megjelenítés a mappában",
+        "title": "Az exportálás kész"
       }
     }
   },
   "failClosed": {
     "corrupted": {
-      "body": "Ha van egy tartalék, akkor vissza - a jelenlegi fájlokat nem érinti; a tartalék vissza, mint egy külön páncélterem először.",
-      "cta": "Az alkalmazás bezárása",
-      "title": "A páncélfájl hibás."
+      "body": "Ha van biztonsági mentésed, visszaállíthatod — a jelenlegi fájljaid érintetlenek maradnak; a biztonsági mentés először külön széfként áll vissza.",
+      "cta": "Alkalmazás bezárása",
+      "title": "A széf fájlja sérült."
     },
     "invalidState": {
-      "body": "Kérem, kezdje újra.",
+      "body": "Indítsd újra.",
       "cta": "Zárolás",
       "title": "Váratlan állapot."
     },
     "ioError": {
-      "body": "Ez lehet egy lemez vagy fájlrendszer hiba.",
-      "cta": "Az alkalmazás bezárása",
-      "title": "Nem tudom elolvasni a páncélterem aktáját."
+      "body": "Ez lemez- vagy fájlrendszerhiba lehet.",
+      "cta": "Alkalmazás bezárása",
+      "title": "Nem olvasható a széf fájlja."
     },
     "permissionDenied": {
-      "body": "Ellenőrizze a fájljogosultságokat.",
-      "cta": "Az alkalmazás bezárása",
-      "title": "Nem férhet hozzá a páncélterem aktájához."
+      "body": "Ellenőrizd a fájljogosultságokat.",
+      "cta": "Alkalmazás bezárása",
+      "title": "Nincs jogosultság a széf fájljának eléréséhez."
     },
-    "restoreFromBackup": "Vissza az erősítésből.."
+    "restoreFromBackup": "Visszaállítás biztonsági mentésből…"
   },
   "notes": {
     "archive": {
       "close": "Bezárás",
+      "count_one": "{{count}} jegyzet",
+      "count_other": "{{count}} jegyzet",
       "countEmpty": "Üres",
-      "count_one": "{{count}} megjegyzés",
-      "count_other": "{{count}} megjegyzések",
       "delete": "Törlés",
-      "deleteError": "Nem tudtam törölni. Próbáld újra.",
+      "deleteError": "Nem sikerült törölni a jegyzetet. Próbáld újra.",
       "emptyState": "Az archívum üres.",
       "restore": "Visszaállítás",
-      "restoreError": "Nem tudtam visszaállítani. Próbáld újra.",
+      "restoreError": "Nem sikerült visszaállítani a jegyzetet. Próbáld újra.",
       "title": "Archívum",
-      "untitled": "Név nélkül"
+      "untitled": "Névtelen"
     },
     "cardMenu": {
-      "copyLink": "A link másolása",
+      "copyLink": "Hivatkozás másolása",
       "open": "Megnyitás",
       "openInNewTab": "Megnyitás új lapon",
-      "revealInFolder": "Megjelenés a mappában"
+      "revealInFolder": "Megjelenítés a mappában"
     },
     "colorLabels": {
-      "clay": "Clay",
+      "clay": "Agyag",
       "moss": "Moha",
-      "ochre": "Ochre",
+      "ochre": "Okker",
       "plum": "Szilva",
-      "slate": "Slate",
+      "slate": "Pala",
       "stone": "Kő"
     },
     "decoration": {
       "colorSection": "Szín",
-      "default": "Alapértelmezés",
-      "defaultFolderIcon": "",
+      "default": "Alapértelmezett",
+      "defaultFolderIcon": "Alapértelmezett mappaikon",
       "iconSection": "Ikon",
-      "menuLabel": "",
+      "menuLabel": "Színcímke",
       "noColor": "Nincs szín",
       "none": "Nincs"
     },
     "deleteConfirm": {
-      "cancel": "Törlés",
+      "cancel": "Mégse",
       "delete": "Törlés",
-      "title": "Töröljem ezt az üzenetet?",
-      "untitled": "Név nélkül",
-      "warning": "Ezt nem lehet visszacsinálni."
+      "title": "Törlöd ezt a jegyzetet?",
+      "untitled": "Névtelen",
+      "warning": "Ez nem vonható vissza."
     },
     "filterBuilder": {
       "addCondition": "Feltétel hozzáadása",
       "addFilterGroup": "Szűrőcsoport hozzáadása",
-      "cancel": "Törlés",
+      "cancel": "Mégse",
       "combinator": {
-        "all": "valamennyi",
-        "any": "bármilyen"
+        "all": "összes",
+        "any": "bármely"
       },
-      "match": "Egyezik",
+      "match": "Megfelel",
       "negate": {
-        "is": "ed",
-        "isNot": "nem"
+        "is": "ez",
+        "isNot": "nem ez"
       },
-      "noConditions": "Nincsenek feltételek - ez a nézet az összes oldalt mutatja.",
-      "noteCount_one": "{{count}} megjegyzés",
-      "noteCount_other": "{{count}} megjegyzések",
-      "of": "a:",
-      "ofTheGroups": "a csoportok:",
+      "noConditions": "Még nincs feltétel — ez a nézet az összes oldalt megjeleníti.",
+      "noteCount_one": "{{count}} jegyzet",
+      "noteCount_other": "{{count}} jegyzet",
+      "of": "ebből:",
+      "ofTheGroups": "ezekből a csoportokból:",
       "removeCondition": "Feltétel eltávolítása",
       "replaceFilter": "Szűrő cseréje",
       "save": "Mentés",
-      "searchTextPlaceholder": "keresési szöveg",
-      "selectFolderPlaceholder": "válasszon ki egy mappát..",
-      "selectTagPlaceholder": "válasszon ki egy címkét..",
+      "searchTextPlaceholder": "keresett szöveg",
+      "selectFolderPlaceholder": "válassz egy mappát…",
+      "selectTagPlaceholder": "válassz egy címkét…",
       "type": {
         "folder": "Mappa",
         "search": "Keresés",
-        "tag": "Tag"
+        "tag": "Címke"
       },
-      "unrepresentable": "",
-      "unresolved": "megoldatlan"
+      "unrepresentable": "Ez a szűrő egy speciális szerkesztővel készült, és itt nem szerkeszthető.",
+      "unresolved": "feloldatlan"
     },
     "folderManagement": {
-      "illegalSegment": "A mappa neve nem tartalmazhat /\\ yatta124; # ^ [] vagy kezdheti / érhet egy helyet.",
-      "tooLong": "Az a mappa út túl hosszú."
+      "illegalSegment": "A mappa neve nem tartalmazhat / \\ | # ^ [ ] karaktert, és nem kezdődhet vagy végződhet szóközzel.",
+      "tooLong": "Ez a mappaútvonal túl hosszú."
     },
     "folderNote": {
       "defaultTitle": "Index"
     },
     "folderRow": {
-      "createFolderNote": "Könyvtári megjegyzés létrehozása",
+      "createFolderNote": "Mappajegyzet létrehozása",
       "empty": "üres",
-      "folderNote": "mappa megjegyzés",
-      "openFolderNote": "A mappa megnyitása"
+      "folderNote": "mappajegyzet",
+      "openFolderNote": "Mappajegyzet megnyitása"
     },
     "graph": {
-      "allConnected": "Minden összefügg - nincs külön jegyzet.",
-      "building": "Épületábra..",
-      "depthToggleTitle": "Helyi mélység (1 ↔ 2 komló)",
-      "filterAll": "Valamennyi",
-      "filterAroundNote": "A levél körül",
-      "filterByTag": "Szűrő címkével",
-      "filterIsolated": "Elkülönítve",
-      "hop": "{{depth}} hop",
-      "loading": "Betöltési diagram..",
-      "noNotes": "Még nincs feljegyzés.",
-      "overCap": "Ez a páncélterem nagy - az egész páncélterem grafikont lezárták. Szűrés egy címke vagy mutatja elszigetelt jegyzetek felfedezni.",
+      "allConnected": "Minden összekapcsolódik — nincs elszigetelt jegyzet.",
+      "building": "Gráf építése…",
+      "depthToggleTitle": "Szomszédsági mélység váltása (1 ↔ 2 ugrás)",
+      "filterAll": "Összes",
+      "filterAroundNote": "E jegyzet körül",
+      "filterByTag": "Szűrés címke szerint",
+      "filterIsolated": "Elszigetelt",
+      "hop": "{{depth}} ugrás",
+      "loading": "Gráf betöltése…",
+      "noNotes": "Még nincs ábrázolható jegyzet.",
+      "overCap": "Ez a széf nagy — a teljes széf gráfja korlátozva van. Szűrj egy címkére, vagy jeleníts meg elszigetelt jegyzeteket a felfedezéshez.",
       "refresh": "Frissítés",
-      "refreshTitle": "A páncélterem megváltozott - újjáépíteni a grafikont",
-      "tagPlaceholder": "Tag.."
+      "refreshTitle": "A széf megváltozott — a gráf újraépítése",
+      "tagPlaceholder": "Címke…"
     },
     "import": {
       "base": {
         "untitledView": "Névtelen nézet"
       },
       "modal": {
-        "cancel": "Törlés",
-        "cancelledNotImported_one": "{{count}} nem importált",
-        "cancelledNotImported_other": "",
-        "cancelling": "Törlés..",
-        "chooseFolder": "Válassza ki a mappát..",
-        "close": "",
+        "cancel": "Mégse",
+        "cancelledNotImported": "{{count}} nem importálva",
+        "cancelledNotImported_one": "{{count}} nem importálva",
+        "cancelledNotImported_other": "{{count}} nem importálva",
+        "cancelling": "Megszakítás…",
+        "chooseFolder": "Válassz mappát…",
+        "close": "Bezárás",
         "closeAriaLabel": "Bezárás",
-        "copied": "Másolt",
+        "copied": "Másolva",
         "copy": "Másolás",
         "done": "Kész",
-        "errorBody": "Az import nem volt teljes. Minden már importált jegyzetet megőriztek, és biztonságosan tárolhatók vagy törölhetők.",
-        "flagDetail": "{{kind}} \"{{segment}}\" {{reason}}.",
-        "flagKindFolder": "",
+        "errorBody": "Az importálás nem fejeződött be. A már importált jegyzetek megmaradtak, és nyugodtan megtarthatók vagy törölhetők.",
+        "flagDetail": "{{kind}} „{{segment}}” {{reason}}.",
+        "flagKindFolder": "Mappa",
         "flagKindTitle": "Cím",
-        "folderPickerTitle": "Válassza ki az Obszidián páncélterem mappáját",
-        "hiddenIgnoredPrefix_one": "{{count}} config / rejtett elem figyelmen kívül hagyva (pl. ",
-        "hiddenIgnoredPrefix_other": "{{count}} config / rejtett elemek figyelmen kívül hagyva (pl. ",
-        "hiddenIgnoredSuffix": ", dotfiles).",
-        "ifNoteExistsLabel": "Ha már létezik megjegyzés",
-        "import": "Import",
-        "importFailed": "A behozatal nem sikerült.",
-        "importing": "Importálni a páncéltermet..",
-        "markDone": "Mark kész",
-        "markedDone": "Megjelölt",
-        "mediaImported_one": "{{count}} importált",
-        "mediaImported_other": "",
-        "mediaOmittedSuffix_one": " · {{count}} kimaradt",
-        "mediaOmittedSuffix_other": "",
+        "folderPickerTitle": "Válaszd ki az Obsidian-széf mappáját",
+        "hiddenIgnoredPrefix_one": "{{count}} konfigurációs / rejtett elem figyelmen kívül hagyva (pl. ",
+        "hiddenIgnoredPrefix_other": "{{count}} konfigurációs / rejtett elem figyelmen kívül hagyva (pl. ",
+        "hiddenIgnoredSuffix": ", dotfile-ok).",
+        "ifNoteExistsLabel": "Ha már létezik a jegyzet",
+        "import": "Importálás",
+        "importFailed": "Az importálás meghiúsult.",
+        "importing": "A széf importálása…",
+        "markDone": "Megjelölés késznek",
+        "markedDone": "Késznek jelölve",
+        "mediaImported": "{{count}} importálva",
+        "mediaImported_one": "{{count}} importálva",
+        "mediaImported_other": "{{count}} importálva",
+        "mediaOmittedSuffix": " · {{count}} kihagyva",
+        "mediaOmittedSuffix_one": " · {{count}} kihagyva",
+        "mediaOmittedSuffix_other": " · {{count}} kihagyva",
         "needsAttention": "Figyelmet igényel",
-        "needsAttentionHelp": "Ezeket a megjegyzéseket változatlan formában importálták. Javasolt javítások kezdőpontok - másolja az első, majd nevezze át a jegyzetet, amikor kinyitja.",
-        "noFolderChosen": "Nem választott mappa",
-        "notesImported_one": "az importált jegyzet",
-        "notesImported_other": "importált bankjegyek",
-        "policyCopyHint": "Hozd be a meglévő cetli mellé.",
-        "policyCopyLabel": "Másolatként történő behozatal",
-        "policySkipHint": "Ajánlott - újrafuttatni egy import soha nem lemásolja vagy felülírja.",
-        "policySkipLabel": "Hagyd abba",
-        "preexistingDetail": "Ennek a jegyzetnek már megvolt a saját mappája: \"{{existing}}\", amit Myne vezetett - a mappa eltérhet attól, ahol a lemezen ült.",
-        "preparing": "Felkészülés..",
-        "progressNotes": " megjegyzések",
-        "progressOf": " ii ",
-        "reasonIllegalChar": "myne nem használhatja a nevét",
-        "reasonPathTooLong": "a mappa + cím útvonal túl hosszú",
-        "reasonSegmentTooLong": "a név hosszabb, mint amit Myne enged",
-        "scanning": "Átkutatni a páncéltermet..",
-        "setupIntro": "Mutasd meg Myne-nek a meglévő Obszidián széfmappádat. Minden jegyzet importálva és titkosítva van a helyszínen - semmi sem hagyja ezt az eszközt, és az eredeti fájlok érintetlenek.",
-        "statCancelled": "Törölve",
-        "statCanvasSkipped": ".vászon fájlok kimaradt",
-        "statEmptyFoldersKept": "Tartott üres mappák",
-        "statMedia": "",
-        "statOtherSkipped": "",
-        "statSkipped": "Kilépés (már létezik)",
+        "needsAttentionHelp": "Ezek a jegyzetek változatlanul lettek importálva. A javasolt javítások kiindulópontok — másolj ki egyet, majd nevezd át a jegyzetet, amikor megnyitod.",
+        "noFolderChosen": "Nincs kiválasztott mappa",
+        "notesImported_one": "jegyzet importálva",
+        "notesImported_other": "jegyzet importálva",
+        "policyCopyHint": "Hozd be a meglévő jegyzet mellé.",
+        "policyCopyLabel": "Importálás másolatként",
+        "policySkipHint": "Ajánlott — az importálás újrafuttatása soha nem duplikál és nem ír felül.",
+        "policySkipLabel": "Kihagyás",
+        "preexistingDetail": "Ennek a jegyzetnek már volt saját mappája: „{{existing}}”, amelyet a Myne megtartott — a mappája eltérhet attól, ahol a lemezen volt.",
+        "preparing": "Előkészítés…",
+        "progressNotes": " jegyzet",
+        "progressOf": " / ",
+        "reasonIllegalChar": "olyan karaktert tartalmaz, amelyet a Myne nem használhat névben",
+        "reasonPathTooLong": "a mappa + cím útvonala túl hosszú",
+        "reasonSegmentTooLong": "a név hosszabb, mint amennyit a Myne megenged",
+        "scanning": "A széf átvizsgálása…",
+        "setupIntro": "Mutasd meg a Myne-nak a meglévő Obsidian-széfed mappáját. Minden Markdown-jegyzet a helyszínen importálódik és titkosítódik — semmi nem hagyja el ezt az eszközt, és az eredeti fájljaid érintetlenek maradnak.",
+        "statCancelled": "Megszakítva",
+        "statCanvasSkipped": ".canvas fájlok kihagyva",
+        "statEmptyFoldersKept": "Megtartott üres mappák",
+        "statMedia": "Média",
+        "statOtherSkipped": "Egyéb kihagyott fájlok",
+        "statSkipped": "Kihagyva (már létezik)",
         "suggestedNameAriaLabel": "Javasolt név",
-        "titleComplete": "Teljes importálás",
-        "titleFailed": "Nem sikerült importálni",
-        "titleSetup": "Obszidián páncélterem importálása",
-        "vaultFolderLabel": "Tárolómappa",
-        "vaultRoot": "(páncélterem gyökér)"
+        "titleComplete": "Az importálás kész",
+        "titleFailed": "Az importálás meghiúsult",
+        "titleSetup": "Obsidian-széf importálása",
+        "vaultFolderLabel": "Széf mappája",
+        "vaultRoot": "(széf gyökere)"
       },
       "offer": {
-        "body": "Hozd a meglévő jegyzeteidet Myne-ba. Mindegyik kódolva van, mivel importálják - semmi sem hagyja itt ezt az eszközt, és az eredeti fájljaid pontosan ott maradnak, ahol vannak.",
-        "chooseFolder": "Válassza ki a mappát..",
-        "laterHint": "A Beállítások → Tárolás később is importálható.",
-        "notNow": "Ne most",
-        "title": "Behozni az obszidián páncéltermet?"
+        "body": "Hozd be a meglévő jegyzeteidet a Myne-ba. Mindegyik az importáláskor titkosítódik — semmi nem hagyja el ezt az eszközt, és az eredeti fájljaid pontosan ott maradnak, ahol vannak.",
+        "chooseFolder": "Válassz mappát…",
+        "laterHint": "Később is importálhatsz a Beállítások → Tárhely menüből.",
+        "notNow": "Most nem",
+        "title": "Importálod az Obsidian-széfedet?"
       }
     },
     "list": {
       "addToFavorites": "Hozzáadás a kedvencekhez",
-      "archive": "Archívum",
-      "archiveBulkError": "Nem tudtam archiválni a jegyzeteket.",
-      "archiveNote": "Archívum",
-      "archiveSingleError": "Nem tudta archiválni.",
+      "archive": "Archiválás",
+      "archiveBulkError": "Nem sikerült archiválni a jegyzeteket.",
+      "archiveNote": "Archiválás",
+      "archiveSingleError": "Nem sikerült archiválni a jegyzetet.",
       "attachments": "Mellékletek",
-      "bulkArchive_one": "Archive {{count}} notes",
-      "bulkArchive_other": "",
-      "bulkDelete_one": "{{count}} megjegyzések törlése",
-      "bulkDelete_other": "",
-      "bulkMove_one": "{{count}} jegyzetek áthelyezése..",
-      "bulkMove_other": "",
-      "caseMergeBody": "Már létezik \"{{name}}\" nevű mappa. Ezek egyesülnek - átnevez egyet, hogy elkülönítse őket?",
-      "color": "Szín..",
-      "createFirstNote": "+ Első megjegyzés létrehozása",
-      "createFolderNote": "Könyvtári megjegyzés létrehozása",
-      "customize": "Testreszabása..",
+      "bulkArchive": "{{count}} jegyzet archiválása",
+      "bulkArchive_one": "{{count}} jegyzet archiválása",
+      "bulkArchive_other": "{{count}} jegyzet archiválása",
+      "bulkDelete": "{{count}} jegyzet törlése",
+      "bulkDelete_one": "{{count}} jegyzet törlése",
+      "bulkDelete_other": "{{count}} jegyzet törlése",
+      "bulkMove": "{{count}} jegyzet áthelyezése ide…",
+      "bulkMove_one": "{{count}} jegyzet áthelyezése ide…",
+      "bulkMove_other": "{{count}} jegyzet áthelyezése ide…",
+      "caseMergeBody": "Már létezik „{{name}}” nevű mappa. Ezek összevonódnak — átnevezed az egyiket, hogy különállók maradjanak?",
+      "color": "Szín…",
+      "createFirstNote": "+ Hozd létre az első jegyzeted",
+      "createFolderNote": "Mappajegyzet létrehozása",
+      "customize": "Testreszabás…",
       "delete": "Törlés",
-      "deleteFolderBody_one": "\"{{name}}\" és {{count}} megjegyzése",
-      "deleteFolderBody_other": "\"{{name}}\" és {{count}} megjegyzései",
-      "deleteFolderConfirm": "A mappa törlése",
-      "deleteFolderTitle": "Törölni ezt a mappát?",
-      "deleteFolderWarning": "A jegyzetek átkerülnek a szemétbe - később visszaállíthatod őket.",
-      "duplicate": "Duplikáció",
+      "deleteFolderBody_one": "„{{name}}” és a benne lévő {{count}} jegyzet",
+      "deleteFolderBody_other": "„{{name}}” és a benne lévő {{count}} jegyzet",
+      "deleteFolderConfirm": "Mappa törlése",
+      "deleteFolderTitle": "Törlöd ezt a mappát?",
+      "deleteFolderWarning": "A jegyzetek a Kukába kerülnek — később visszaállíthatod őket.",
+      "duplicate": "Másolat",
       "editFilterTitle": "Szűrő szerkesztése",
       "emptyState": "Még nincs jegyzet.",
-      "exportHtml": "Exportálás HTML- ként..",
-      "exportMarkdown": "Exportálás Marklown-ként..",
-      "exportPdf": "Exportálás PDF-ként..",
-      "exportTxt": "Exportálás egyszerű szövegként..",
+      "exportHtml": "Exportálás HTML-ként…",
+      "exportMarkdown": "Exportálás Markdownként…",
+      "exportPdf": "Exportálás PDF-ként…",
+      "exportTxt": "Exportálás egyszerű szövegként…",
       "favoritesHeading": "Kedvencek",
-      "mergeAnyway": "Egyesülni úgyis",
+      "mergeAnyway": "Összevonás mindenképp",
       "newFolder": "Új mappa",
-      "newFolderInPlaceholder": "Új mappa {{path}}",
+      "newFolderInPlaceholder": "Új mappa itt: {{path}}",
       "newFolderPlaceholder": "Új mappa",
-      "newNote": "Új megjegyzés",
-      "newNoteFromTemplate": "Új megjegyzés a sablon..",
-      "newNoteHere": "Új üzenet itt:",
-      "newNoteMenu": "Új megjegyzés",
-      "newNoteShortcut": "Új megjegyzés (N)",
+      "newNote": "Új jegyzet",
+      "newNoteFromTemplate": "Új jegyzet sablonból…",
+      "newNoteHere": "Új jegyzet ide",
+      "newNoteMenu": "Új jegyzet",
+      "newNoteShortcut": "Új jegyzet (⌘N)",
       "newSubfolder": "Új almappa",
       "newViewTitle": "Új nézet",
-      "noteMovedToTrash": "Megjegyzés áthelyezve a szemétbe",
-      "notesHeading": "Megjegyzések",
-      "notesMovedToTrash_one": "{{count}} megjegyzés áthelyezve a szemétbe",
-      "notesMovedToTrash_other": "{{count}} bankjegyek áthelyezve a Trash",
-      "openArchive": "Az archívum megnyitása",
-      "openAttachments": "Csatolások megnyitása",
-      "openFolderNote": "A mappa megnyitása",
+      "noteMovedToTrash": "A jegyzet a Kukába került",
+      "notesHeading": "Jegyzetek",
+      "notesMovedToTrash_one": "{{count}} jegyzet a Kukába került",
+      "notesMovedToTrash_other": "{{count}} jegyzet a Kukába került",
+      "openArchive": "Archívum megnyitása",
+      "openAttachments": "Mellékletek megnyitása",
+      "openFolderNote": "Mappajegyzet megnyitása",
       "openInNewTab": "Megnyitás új lapon",
-      "openToSide": "Oldalra",
-      "openTrash": "Nyisd ki a szemetet",
-      "removeAsFolderNote": "",
+      "openToSide": "Megnyitás oldalt",
+      "openTrash": "Kuka megnyitása",
+      "removeAsFolderNote": "Mappajegyzet megszüntetése",
       "removeFromFavorites": "Eltávolítás a kedvencekből",
       "rename": "Átnevezés",
-      "setAsFolderNote": "Könyvtári jegyzetként beállítva",
-      "trash": "Szemét",
-      "trashBulkError": "Nem tudtam átvinni a jegyzeteket a szemétbe.",
-      "trashSingleError": "Nem tudtam átvinni az üzenetet a szemétbe.",
+      "setAsFolderNote": "Beállítás mappajegyzetként",
+      "trash": "Kuka",
+      "trashBulkError": "Nem sikerült a jegyzeteket a Kukába helyezni.",
+      "trashSingleError": "Nem sikerült a jegyzetet a Kukába helyezni.",
       "undo": "Visszavonás",
-      "vaultRoot": "Tárgygyökér",
-      "viewSettingsTitle": "Beállítások megtekintése"
+      "vaultRoot": "Széf gyökere",
+      "viewSettingsTitle": "Nézet beállításai"
     },
     "newFromTemplate": {
       "back": "Vissza",
-      "blankNote": "Üres megjegyzés",
-      "createNote": "Megjegyzés létrehozása",
-      "emptyState": "Még nem készítettél sablonokat.",
-      "listLabel": "Sablon",
-      "loading": "Betöltés..",
-      "nameLabel": "A megjegyzés neve (a \"{{templateName}}\" -tól)",
-      "namePlaceholder": "Név nélkül",
-      "nameStepTitle": "Név",
-      "pickStepTitle": "Új megjegyzés a sablonból",
+      "blankNote": "Üres jegyzet",
+      "createNote": "Jegyzet létrehozása",
+      "emptyState": "Még nem hoztál létre sablont.",
+      "listLabel": "Sablonok",
+      "loading": "Betöltés…",
+      "nameLabel": "A jegyzet neve (innen: „{{templateName}}”)",
+      "namePlaceholder": "Névtelen",
+      "nameStepTitle": "Nevezd el ezt a jegyzetet",
+      "pickStepTitle": "Új jegyzet sablonból",
       "untitledTemplate": "Névtelen sablon"
     },
     "newTab": {
-      "createNote": "Új megjegyzés létrehozása",
-      "noNotesMatch": "Nincs egyezés.",
+      "createNote": "Új jegyzet létrehozása",
+      "noNotesMatch": "Nincs egyező jegyzet.",
       "noNotesYet": "Még nincs jegyzet.",
-      "searchAriaLabel": "Megnyitandó keresési megjegyzések",
-      "searchPlaceholder": "Keresés jegyzetei..",
-      "untitled": "Név nélkül"
+      "searchAriaLabel": "Megnyitandó jegyzetek keresése",
+      "searchPlaceholder": "Jegyzetek keresése…",
+      "untitled": "Névtelen"
     },
     "pane": {
-      "graphTab": "",
-      "loading": "Betöltés..",
+      "graphTab": "Gráf",
+      "loading": "Betöltés…",
       "untitledView": "Névtelen nézet"
     },
     "relativeTime": {
-      "daysAgo": "{{d}} nappal ezelőtt",
-      "hoursAgo": "{{h}} h évvel ezelőtt",
+      "daysAgo": "{{d}} napja",
+      "hoursAgo": "{{h}} órája",
       "justNow": "épp most",
-      "minutesAgo": "{{m}} min ago",
-      "oneWeekAgo": "2 hónappal ezelőtt xhamster",
-      "weeksAgo": "",
+      "minutesAgo": "{{m}} perce",
+      "oneWeekAgo": "1 hete",
+      "weeksAgo": "{{w}} hete",
       "yesterday": "tegnap"
     },
     "row": {
       "addToFavorites": "Hozzáadás a kedvencekhez",
-      "folderIndexBadgeLabel": "Mappa",
-      "folderIndexBadgeTitle": "Mappa megjegyzés - ez a mappa indexe",
-      "folderIndexConflictLabel": "A mappának már van indexe",
-      "folderIndexConflictTitle": "Ez a mappa már tartalmaz egy indexet",
-      "loadError": "Nem tudtam betölteni ezt az üzenetet",
+      "folderIndexBadgeLabel": "Mappajegyzet",
+      "folderIndexBadgeTitle": "Mappajegyzet — ennek a mappának az indexe",
+      "folderIndexConflictLabel": "A mappának már van indexjegyzete",
+      "folderIndexConflictTitle": "Ennek a mappának már van indexjegyzete",
+      "loadError": "Nem sikerült betölteni ezt a jegyzetet",
       "removeFromFavorites": "Eltávolítás a kedvencekből",
-      "renameAriaLabel": "Megjegyzés átnevezése",
-      "untitled": "Név nélkül"
-    },
-    "saveStatus": {
-      "editing": "Szerkesztés",
-      "editingEllipsis": "Szerkesztés..",
-      "editingTitle": "Szerkesztés - autosave van felfegyverkezve",
-      "justNow": "épp most",
-      "retry": "Újratöltés",
-      "saveFailed": "Nem sikerült elmenteni",
-      "saveFailedTitle": "A mentés nem sikerült - kattintson a Retry gombra",
-      "saved": "Mentett",
-      "savedRelative": "Mentett {{rel}}",
-      "saving": "Mentés",
-      "savingEllipsis": "Megmentem.."
+      "renameAriaLabel": "Jegyzet átnevezése",
+      "untitled": "Névtelen"
     },
     "savedView": {
       "defaultName": "Szűrt nézet"
     },
+    "saveStatus": {
+      "editing": "Szerkesztés",
+      "editingEllipsis": "Szerkesztés…",
+      "editingTitle": "Szerkesztés — az automatikus mentés készen áll",
+      "justNow": "épp most",
+      "retry": "Újra",
+      "saved": "Mentve",
+      "savedRelative": "Mentve {{rel}}",
+      "saveFailed": "A mentés meghiúsult",
+      "saveFailedTitle": "A mentés meghiúsult — kattints az Újra gombra",
+      "saving": "Mentés",
+      "savingEllipsis": "Mentés…"
+    },
     "snapshotFailed": {
-      "dismiss": "Lelépés",
-      "message": "Nem sikerült elmenteni egy pillanatfelvételt - a jegyzet elmentve, de a verzió előzménye lehet hiányos (a lemez lehet tele)."
+      "dismiss": "Elvetés",
+      "message": "Nem sikerült pillanatképet menteni — a jegyzeted mentve van, de a verzióelőzménye hiányos lehet (lehet, hogy a lemez megtelt)."
     },
     "snapshots": {
-      "cancel": "Törlés",
-      "changeCount_one": "{{count}} változás óta a pillanatfelvétel",
-      "changeCount_other": "{{count}} változások óta",
+      "cancel": "Mégse",
+      "changeCount_one": "{{count}} változás e pillanatkép óta",
+      "changeCount_other": "{{count}} változás e pillanatkép óta",
       "close": "Bezárás",
-      "confirmBody": "A jelenlegi üzenet lesz mentve, mint egy pillanatfelvétel először, így lehet visszacsinálni ezt.",
-      "confirmTitle": "Visszaállítani ezt a képet?",
-      "decrypting": "Dekódolás..",
-      "emptyState": "",
-      "encryptedSize": "",
-      "errorCannotDecrypt": "Ezt a képet nem lehet dekódolni.",
-      "errorGeneric": "Valami rosszul sült el. Próbáld újra.",
-      "errorIo": "A lemez hiba történt - a lemez lehet teljes vagy írhatatlan.",
-      "errorNotFound": "Ez a felvétel már nem elérhető.",
-      "errorStorageAccess": "Nem tudtam hozzáférni a páncélterem pillanatfelvételeihez.",
-      "errorVaultLocked": "A páncélterem zárva van. Nyissa ki, hogy lássa a pillanatképeket.",
+      "confirmBody": "A jelenlegi jegyzeted először pillanatképként lesz elmentve, így ez visszavonható.",
+      "confirmTitle": "Visszaállítod ezt a pillanatképet?",
+      "decrypting": "Visszafejtés…",
+      "emptyState": "Még nincs pillanatkép. A pillanatképek szerkesztés közben automatikusan mentődnek, és körülbelül 7 napig megmaradnak. Titkosítva vannak, és eltűnnek, amikor a jegyzetet véglegesen törlöd.",
+      "encryptedSize": "Titkosítva · {{size}}",
+      "errorCannotDecrypt": "Ezt a pillanatképet nem sikerült visszafejteni.",
+      "errorGeneric": "Valami hiba történt. Próbáld újra.",
+      "errorIo": "Lemezhiba történt — lehet, hogy a lemez megtelt vagy nem írható.",
+      "errorNotFound": "Ez a pillanatkép már nem érhető el.",
+      "errorStorageAccess": "Nem sikerült elérni a széf pillanatkép-tárolóját.",
+      "errorVaultLocked": "A széf zárolva van. Oldd fel a pillanatképek megtekintéséhez.",
       "justNow": "épp most",
-      "listLabel": "Premier lista",
-      "loading": "Betöltés..",
+      "listLabel": "Pillanatképek listája",
+      "loading": "Betöltés…",
       "restore": "Visszaállítás",
-      "restoreCta": "Visszaállítani ezt a pillanatképet",
-      "restoredStatus": "Felújult. A te verziód egy pillanatfelvétel.",
-      "selectPlaceholder": "Válassza ki a pillanatképet, hogy megtekinthesse, mi változott azóta.",
-      "title": "Snapshots",
-      "untitled": ""
+      "restoreCta": "Pillanatkép visszaállítása",
+      "restoredStatus": "Visszaállítva. A korábbi verzió pillanatképként van mentve.",
+      "selectPlaceholder": "Válassz egy pillanatképet, hogy lásd, mi változott azóta.",
+      "title": "Pillanatképek",
+      "untitled": "Névtelen"
     },
     "tabStrip": {
       "closeNewTab": "Új lap bezárása",
-      "closeTab": "{{title}}",
+      "closeTab": "{{title}} bezárása",
       "newTab": "Új lap",
-      "openNotes": "Megjegyzés megnyitása",
-      "pin": "Pin",
-      "pinned": "Pinned",
-      "pinnedTitle": "Pinned - unpin záráshoz",
-      "unpin": "Kicsatolás",
-      "untitled": ""
+      "openNotes": "Jegyzetek megnyitása",
+      "pin": "Rögzítés",
+      "pinned": "Rögzítve",
+      "pinnedTitle": "Rögzítve — old fel a bezáráshoz",
+      "unpin": "Rögzítés feloldása",
+      "untitled": "Névtelen"
     },
     "tagBrowser": {
-      "cancel": "",
-      "clear": "Tiszta",
-      "combineTagsWith": "A címkék kombinálása",
-      "filtering": "",
-      "modeAll": "Valamennyi",
+      "cancel": "Mégse",
+      "clear": "Törlés",
+      "combineTagsWith": "Címkék kombinálása ezzel",
+      "filtering": "Szűrés…",
+      "modeAll": "Mind",
       "modeAny": "Bármely",
-      "noNotesForFilter": "Nincs megjegyzés ehhez a szűrőhöz.",
-      "noTagsMatch": "Nincs \"{{query}}\" címke.",
-      "noTagsYet": "Még nincs rajta címke.",
-      "noteCount_one": "{{count}} megjegyzés",
-      "noteCount_other": "{{count}} megjegyzések",
-      "notes": "Megjegyzések",
-      "pickTag": "Válasszon egy címkét a szűréshez.",
+      "noNotesForFilter": "Nincs jegyzet ehhez a szűrőhöz.",
+      "noTagsMatch": "Nincs „{{query}}” címkére illeszkedő találat.",
+      "noTagsYet": "Még nincs címke.",
+      "noteCount_one": "{{count}} jegyzet",
+      "noteCount_other": "{{count}} jegyzet",
+      "notes": "Jegyzetek",
+      "pickTag": "Válassz egy címkét a szűréshez.",
       "save": "Mentés",
       "saveAsView": "Mentés nézetként",
-      "searchPlaceholder": "Keresési címkék..",
+      "searchPlaceholder": "Címkék keresése…",
       "title": "Címkék",
-      "untitled": "Név nélkül",
-      "viewNamePlaceholder": "A név megjelenítése"
+      "untitled": "Névtelen",
+      "viewNamePlaceholder": "Nézet neve"
     },
     "trash": {
       "close": "Bezárás",
+      "count_one": "{{count}} jegyzet",
+      "count_other": "{{count}} jegyzet",
       "countEmpty": "Üres",
-      "count_one": "{{count}} megjegyzés",
-      "count_other": "{{count}} megjegyzések",
       "delete": "Törlés",
-      "deleteError": "Nem tudtam törölni. Próbáld újra.",
-      "empty": "Üres szemét",
-      "emptyConfirmBody_one": "{{count}} megjegyzés véglegesen törlésre kerül.",
-      "emptyConfirmBody_other": "{{count}} jegyzetek véglegesen törlődnek.",
-      "emptyConfirmCta": "",
-      "emptyConfirmTitle": "",
-      "emptyPartialFailure_one": "{{count}} Megjegyzés nem törölhető, és marad a szemétben.",
-      "emptyPartialFailure_other": "A jegyzeteket nem lehet kitörölni, és a szemétben maradni.",
-      "emptyState": "A szemét üres.",
-      "purgeConfirmCta": "Törlés véglegesen",
-      "purgeConfirmTitle": "Véglegesen törölni?",
+      "deleteError": "Nem sikerült törölni a jegyzetet. Próbáld újra.",
+      "empty": "Kuka ürítése",
+      "emptyConfirmBody_one": "{{count}} jegyzet véglegesen törlődik.",
+      "emptyConfirmBody_other": "{{count}} jegyzet véglegesen törlődik.",
+      "emptyConfirmCta": "Kuka ürítése",
+      "emptyConfirmTitle": "Kiüríted a Kukát?",
+      "emptyPartialFailure_one": "{{count}} jegyzetet nem sikerült törölni, az a Kukában marad.",
+      "emptyPartialFailure_other": "{{count}} jegyzetet nem sikerült törölni, azok a Kukában maradnak.",
+      "emptyState": "A Kuka üres.",
+      "purgeConfirmCta": "Végleges törlés",
+      "purgeConfirmTitle": "Véglegesen törlöd?",
       "restore": "Visszaállítás",
-      "restoreError": "Nem tudtam visszaállítani. Próbáld újra.",
-      "title": "Szemét",
-      "untitled": "Név nélkül"
+      "restoreError": "Nem sikerült visszaállítani a jegyzetet. Próbáld újra.",
+      "title": "Kuka",
+      "untitled": "Névtelen"
     },
     "unlinkedMentions": {
-      "empty": "Nincs kapcsolat.",
-      "heading": "Kapcsolatlan említések",
-      "link": "Kapcsolat",
-      "linkTooltip": "Link this notice to {{title}}",
-      "refresh": "Megváltozhattak az utalások - frissítések",
-      "searching": "Keresés..",
-      "thisNote": "ez a megjegyzés",
-      "untitled": "Név nélkül"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Alapértelmezés (16: 9)",
-        "fourThree": "4: 3",
-        "square": "1: 1 (négyzet)",
-        "threeTwo": "3: 2",
-        "wide": "16: 9 (széles)"
-      },
-      "cancel": "Törlés",
-      "cardSize": "Kártyaméret",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Az első anyag tulajdonsága, amelynek értéke egy kép - mindegyik kártya borítója. Hagyd üresen az álcát.",
-      "coverImagePlaceholder": "pl. borítás",
-      "coverImageProperty": "A kép tulajdonsága",
-      "imageAspectRatio": "A kép megjelenési aránya",
-      "reset": "Újra",
-      "save": "Mentés"
+      "empty": "Nincs nem hivatkozott említés.",
+      "heading": "Nem hivatkozott említések",
+      "link": "Hivatkozás",
+      "linkTooltip": "E említés hivatkozása ide: {{title}}",
+      "refresh": "Az említések megváltozhattak — frissítés",
+      "searching": "Keresés…",
+      "thisNote": "ez a jegyzet",
+      "untitled": "Névtelen"
     },
     "views": {
       "cards": {
-        "changeCover": "A borítás megváltoztatása",
-        "changeCoverImage": "A borítókép módosítása",
-        "empty": "Nincs ehhez hasonló megjegyzés",
+        "changeCover": "Borító módosítása",
+        "changeCoverImage": "Borítókép módosítása",
+        "empty": "Nincs erre a nézetre illeszkedő jegyzet",
         "noValue": "Nincs érték",
-        "setCover": "Beállítás",
-        "setCoverImage": "Fedőkép beállítása",
-        "untitled": "Név nélkül"
+        "setCover": "Borító beállítása",
+        "setCoverImage": "Borítókép beállítása",
+        "untitled": "Névtelen"
       },
-      "collapseViews": "Összecsukási nézet",
-      "empty": "Még nincs kilátás. Mentse az aktuális jegyzetlistát nézetként.",
-      "expandViews": "Vélemények bővítése",
+      "collapseViews": "Nézetek összecsukása",
+      "empty": "Még nincs nézet. Mentsd az aktuális jegyzetlistát nézetként.",
+      "expandViews": "Nézetek kibontása",
       "heading": "Nézetek",
       "host": {
         "unsupported": "Ez a nézettípus egy későbbi frissítésben érkezik."
       },
       "menu": {
-        "deleteView": "A nézet törlése",
-        "editFilter": "Szűrő szerkesztése..",
-        "moveDown": "Lejjebb",
-        "moveUp": "Mozgás",
+        "deleteView": "Nézet törlése",
+        "editFilter": "Szűrő szerkesztése…",
+        "moveDown": "Mozgatás lefelé",
+        "moveUp": "Mozgatás felfelé",
         "rename": "Átnevezés",
-        "viewSettings": "A beállítások megtekintése.."
+        "viewSettings": "Nézet beállításai…"
       },
       "newView": "Új nézet",
       "untitledView": "Névtelen nézet"
     },
+    "viewSettings": {
+      "aspect": {
+        "default": "Alapértelmezett (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (négyzet)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (széles)"
+      },
+      "cancel": "Mégse",
+      "cardSize": "Kártyaméret",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Az a frontmatter-tulajdonság, amelynek értéke egy kép — minden kártya borítójaként jelenik meg. Hagyd üresen, ha nem kell borító.",
+      "coverImagePlaceholder": "pl. cover",
+      "coverImageProperty": "Borítókép tulajdonsága",
+      "imageAspectRatio": "Kép képaránya",
+      "reset": "Visszaállítás",
+      "save": "Mentés"
+    },
     "welcome": {
-      "body": "Isten hozott Myne-ban, a privát teredben, ahol gondolkodhatsz és írhatsz.\n\nMinden, amit itt megment, titkosított, és rajta marad az eszközén. A * * jelszó * * és * * helyreállítási kifejezés * * az egyetlen kulcs, így tartsa őket valahol biztonságos. Ha mindketten elvesznek, senki sem kaphatja vissza a jegyzeteidet, még mi sem.\n\nEz csak egy sima üzenet, úgyhogy legyen a sajátod. Szerkesztse, nevezze át, vagy törölje, amikor csak akarja, és adjon hozzá új jegyzeteket, ahogy az ötletek nőnek.\n\nÖrülünk, hogy itt vagy. További információ Myne, látogasson el https: / / myne.md\n",
-      "title": "Üdv Myne-ban"
+      "body": "Üdvözöl a Myne, a magánterületed a gondolkodáshoz és íráshoz.\n\nMinden, amit ide mentesz, titkosított, és az eszközödön marad. A **jelszavad** és a **helyreállító mondatod** az egyetlen kulcs hozzá, ezért tartsd őket biztonságos helyen. Ha mindkettő elveszik, senki sem tudja visszaszerezni a jegyzeteidet, még mi sem.\n\nEz csak egy hétköznapi jegyzet, úgyhogy tedd a sajátoddá. Szerkeszd, nevezd át vagy töröld, amikor csak akarod, és adj hozzá újakat, ahogy az ötleteid gyarapodnak.\n\nÖrülünk, hogy itt vagy. Ha többet szeretnél tudni a Myne-ról, látogass el a https://myne.md oldalra.\n",
+      "title": "Üdvözöl a Myne"
     },
     "workspace": {
-      "defaultSlotName": "Alapértelmezés"
+      "defaultSlotName": "Alapértelmezett"
     }
   },
   "password": {
     "createForm": {
-      "checkingStrength": "Ellenőrzöm az erőt..",
-      "confirmLabel": "Master jelszó megerősítése",
-      "defaultEmptyCaption": "Az Argon2id bemeneteként (m = 256 MiB, t = 3, p = 2). Válassz valamit, amire emlékszel, nem állíthatod vissza.",
+      "checkingStrength": "Erősség ellenőrzése…",
+      "confirmLabel": "Mesterjelszó megerősítése",
+      "defaultEmptyCaption": "Az Argon2id bemeneteként szolgál (m=256 MiB, t=3, p=2). Válassz valamit, amit meg tudsz jegyezni; nem állítható vissza.",
       "mismatch": "A jelszavak nem egyeznek.",
-      "passwordLabel": "Master jelszó",
-      "suggestPassword": "Jelszó",
-      "tooShort": "Legalább {{n}} karakterek használata."
+      "passwordLabel": "Mesterjelszó",
+      "suggestPassword": "Jelszó javaslása",
+      "tooShort": "Használj legalább {{n}} karaktert."
     },
     "input": {
       "hide": "Jelszó elrejtése",
@@ -1345,369 +1364,374 @@
   },
   "primitives": {
     "searchableSelect": {
-      "emptyText": "",
-      "placeholder": "Válassza ki..",
-      "searchPlaceholder": "Keresés.."
+      "emptyText": "Nincs találat.",
+      "placeholder": "Válassz…",
+      "searchPlaceholder": "Keresés…"
     }
   },
   "recover": {
     "errors": {
-      "cancelledVaultLocked": "A helyreállítás törölve, a páncélterem zárva volt.",
-      "operationInProgress": "Művelet folyamatban. Kérem, várjon.",
-      "unexpected": "Váratlan hiba. Kérem, próbálja újra.",
-      "vaultNotFound": "A páncélfájl nem található. Kérem, indítsa újra az alkalmazást."
+      "cancelledVaultLocked": "A helyreállítás megszakítva: a széf zárolva volt.",
+      "operationInProgress": "Művelet van folyamatban. Kérlek, várj.",
+      "unexpected": "Váratlan hiba. Kérlek, próbáld újra.",
+      "vaultNotFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást."
     }
   },
   "restore": {
     "backLabel": "Vissza",
-    "cancelLabel": "Törlés",
+    "cancelLabel": "Mégse",
     "collision": {
-      "body": "Az erősítés széfje már rajta van ezen az eszközön. Megtarthatja mind a két - a restaurált másolat megjelenik, mint egy külön páncélterem a páncélterem listájában - vagy visszaállítja most, majd eltávolítja a meglévő páncéltermet a páncélterem listájáról (eltávolítás arra kéri, hogy írja be a DELETE-t, és csak azután van értelme, miután megerősítette, hogy a helyreállított páncélterem kinyílik).",
-      "keepBoth": "Tartsd meg mindkettőt",
-      "replaceExisting": "Visszaállítás, majd a meglévő.."
+      "body": "Az ebből a biztonsági mentésből származó széf már létezik ezen az eszközön. Megtarthatod mindkettőt — a visszaállított példány külön széfként jelenik meg a széflistádban —, vagy visszaállíthatsz most, majd magad eltávolíthatod a meglévő széfet a széflistáról (az eltávolításhoz be kell írnod, hogy DELETE, és csak akkor van értelme, ha megbizonyosodtál róla, hogy a visszaállított széf megnyílik).",
+      "keepBoth": "Mindkettő megtartása",
+      "replaceExisting": "Visszaállítás, majd a meglévő cseréje…"
     },
     "damaged": {
-      "body": "A tartalék fájl megsérült, így semmi sem került helyre. Ha ez az egyetlen másolat van, mentés visszaállítja az érintetlen jegyzetek és listázza pontosan mit nem lehet olvasni - az eredmény mindig szerepel, mint egy részleges helyreállítás.",
+      "body": "A biztonsági mentés fájlja sérült, ezért semmi nem lett visszaállítva. Ha ez az egyetlen másolatod, a mentés helyreállíthatja az ép jegyzeteket, és pontosan felsorolja, mit nem sikerült beolvasni — az eredmény mindig részleges visszaállításként van megjelölve.",
       "close": "Bezárás",
-      "salvage": "A mentés sértetlen"
+      "salvage": "Ép jegyzetek mentése…"
     },
     "error": {
-      "tryAnotherFile": "Próbálja meg egy másik fájlt"
+      "tryAnotherFile": "Próbálj meg egy másik fájlt"
     },
     "pick": {
-      "body": "Válassz egy <code> .myne- backup </code> fájlt. A biztonsági mentés ellenőrizve van, mielőtt bármi helyreáll; a helyreállított páncélterem kinyitja a páncélterem jelszavát vagy a helyreállító kifejezést - pontosan mint a feloldás.",
-      "chooseFile": "Válassza ki a háttérfájlt..",
-      "corruptedSuffix": "A jelenlegi páncélterem nincs érintve: a tartalék egy külön páncélterem."
+      "body": "Válassz egy <code>.myne-backup</code> fájlt. A biztonsági mentés ellenőrizve lesz, mielőtt bármi visszaállna; a visszaállított széf annak a széfnek a jelszavával vagy helyreállító mondatával nyílik — pontosan úgy, mint a feloldás.",
+      "chooseFile": "Válaszd ki a biztonsági mentés fájlját…",
+      "corruptedSuffix": "A jelenlegi széfed érintetlen marad: a biztonsági mentés először külön széfként áll vissza."
     },
     "summary": {
       "attachments": "Mellékletek: {{n}}",
-      "collidedNote": "A páncélterem korábbi példánya még mindig a páncélterem listáján van. Amint megerősítette, hogy a felújított páncélterem kinyílik, eltávolíthatja a régit a páncélterem listájáról (ez fogja kérni, hogy írja be a DELETE-t).",
-      "notes": "",
-      "openVaultList": "A széflista megnyitása",
-      "partialHeader_one": "Részben felújított - {{count}} elem nem olvasható.",
-      "partialHeader_other": "Részben felújított - {{count}} elemek nem olvashatók.",
-      "restored": "A páncélterem helyreállt.",
-      "versionHistory": "Verzió történeti bejegyzések: {{n}}"
+      "collidedNote": "Ennek a széfnek a korábbi példánya továbbra is a széflistádban van. Amint megbizonyosodtál róla, hogy a visszaállított széf megnyílik, eltávolíthatod a régit a széflistáról (ehhez be kell írnod, hogy DELETE).",
+      "notes": "Jegyzetek: {{n}}",
+      "openVaultList": "Széflista megnyitása",
+      "partialHeader_one": "Részben visszaállítva — {{count}} elemet nem sikerült beolvasni.",
+      "partialHeader_other": "Részben visszaállítva — {{count}} elemet nem sikerült beolvasni.",
+      "restored": "A széf visszaállítva.",
+      "versionHistory": "Verzióelőzmény-bejegyzések: {{n}}"
     },
-    "title": "Erősítés visszaállítása",
+    "title": "Visszaállítás biztonsági mentésből",
     "working": {
-      "cancel": "Törlés",
-      "restoringProgress": "A {{total}} {{done}} visszaállítása",
-      "verifying": "Erősítés ellenőrzése..",
-      "verifyingProgress": "Erősítés ellenőrzése {{total}}"
+      "cancel": "Mégse",
+      "restoringProgress": "Visszaállítás… {{done}} / {{total}}",
+      "verifying": "Biztonsági mentés ellenőrzése…",
+      "verifyingProgress": "Biztonsági mentés ellenőrzése… {{done}} / {{total}}"
     }
   },
   "settings": {
     "about": {
-      "buildChannelDevelopment": "Fejlesztésfejlesztés",
-      "buildChannelLabel": "Csatorna építése",
+      "buildChannelDevelopment": "Fejlesztői build",
+      "buildChannelLabel": "Build-csatorna",
       "buildChannelStable": "Stabil",
-      "changelogButton": "Váltás megtekintése..",
-      "changelogHelper": "Perversion notes. Megjelenik, amikor a MYND-119 leszáll.",
-      "changelogLabel": "Changelog",
-      "licenseBody": "Pre-alfa · CC0 docs · AGPL- 3.0 alkalmazási kód az 1. fázis kiadásakor.",
-      "licenseLabel": "",
-      "tagline": "Pre- alfa · 1. fázis asztali kliens",
-      "threatModelHelper": "Nyissa meg a nyilvános Shail- modell dokumentumot a böngészőjében.",
-      "threatModelLabel": "Fenyegetési modell"
+      "changelogButton": "Változásnapló megtekintése…",
+      "changelogHelper": "Verziónkénti megjegyzések. A MYND-119 megérkezésekor jelennek meg.",
+      "changelogLabel": "Változásnapló",
+      "licenseBody": "Pre-alfa · CC0 dokumentáció · AGPL-3.0 alkalmazáskód az 1. fázis kiadásakor.",
+      "licenseLabel": "Licenc",
+      "tagline": "Pre-alfa · 1. fázisú asztali kliens",
+      "threatModelHelper": "Nyisd meg a nyilvános fenyegetésmodell-dokumentumot a böngésződben.",
+      "threatModelLabel": "Fenyegetésmodell"
     },
     "account": {
-      "argon2idHeading": "",
+      "argon2idHeading": "Argon2id-paraméterek",
       "changePasswordButton": "Jelszó módosítása",
       "changePasswordError": {
-        "invalidCredentialOrVault": "Hibás jelszó vagy páncélterem fájl sérült.",
-        "ioError": "Lemezhiba, kérem próbálja újra.",
-        "joinFailure": "Valami rosszul sült el, kérem próbálja újra.",
+        "invalidCredentialOrVault": "Hibás jelenlegi jelszó, vagy a széf fájlja sérült.",
+        "ioError": "Lemezhiba, kérlek próbáld újra.",
+        "joinFailure": "Valami hiba történt, kérlek próbáld újra.",
         "samePasswordRejected": "Az új jelszó megegyezik a jelenlegivel.",
-        "weakNewPassword": "Az új jelszónak legalább 12 karakternek kell lennie."
+        "weakNewPassword": "Az új jelszónak legalább 12 karakter hosszúnak kell lennie."
       },
       "changePasswordHeading": "Jelszó módosítása",
-      "changePasswordHelper": "Forgassa el a mester jelszavát, miközben ugyanazt a széfet tartja. A gyógyulási kifejezés ugyanaz marad.",
-      "dangerZoneHeading": "Veszélyes zóna",
-      "dangerZoneHelper": "Véglegesen töröld ki ezt a széfet és minden jegyzetet. Nem lehet visszacsinálni. A helyreállítási kifejezés nem fogja visszaállítani a páncéltermet.",
-      "deleteVaultButton": "A páncélterem törlése..",
-      "memoryCost": "",
-      "parallelism": "Parallelizmus",
+      "changePasswordHelper": "Cseréld le a mesterjelszavadat ugyanannak a széfnek a megtartása mellett. A helyreállító mondat változatlan marad.",
+      "dangerZoneHeading": "Veszélyzóna",
+      "dangerZoneHelper": "Véglegesen törli ezt a széfet és minden jegyzetet. Nem vonható vissza. A helyreállító mondat nem fogja visszaállítani a széfet.",
+      "deleteVaultButton": "Széf törlése…",
+      "memoryCost": "Memóriaköltség",
+      "parallelism": "Párhuzamosság",
       "timeCost": "Időköltség",
-      "vaultLabelEyebrow": "VAULT CÍMKE",
-      "vaultLabelHelper": "A páncélterem neve az inapp kapcsolóban. Titkosítva tárolva a páncélteremben, soha nem hagyja az eszközt a szövegben.",
-      "vaultLabelPlaceholder": "Címke hozzáadása..",
+      "vaultLabelEyebrow": "SZÉF CÍMKÉJE",
+      "vaultLabelHelper": "Az alkalmazáson belüli váltóban megjelenő név ehhez a széfhez. Titkosítva, a széfen belül tárolva; soha nem hagyja el az eszközödet titkosítatlanul.",
+      "vaultLabelPlaceholder": "Adj meg egy címkét…",
       "vaultLabelSave": "Mentés"
     },
     "appearance": {
-      "showEditTimesAria": "Szerkesztési idők megjelenítése oldalsorban",
-      "showEditTimesHelper": "Megjeleníti minden jegyzet utolsó szerkesztett idejét a címe alatt az oldallapon.",
-      "showEditTimesLabel": "A szerkesztési idők megjelenítése",
+      "showEditTimesAria": "Szerkesztési idők megjelenítése az oldalsávban",
+      "showEditTimesHelper": "Megjeleníti minden jegyzet utolsó szerkesztési idejét a címe alatt az oldalsávban.",
+      "showEditTimesLabel": "Szerkesztési idők megjelenítése",
       "theme": {
-        "amoled": "ÖSSZEFOGLALÁS",
+        "amoled": "AMOLED",
         "dark": "Sötét",
-        "light": "Fény",
+        "light": "Világos",
         "system": "Rendszer"
       },
-      "themeHelper": "Váltás a fény és a sötét témák között, vagy kövesse a rendszer preferenciáját.",
+      "themeHelper": "Válts a világos és sötét téma között, vagy kövesd a rendszerbeállítást.",
       "themeLabel": "Téma",
       "themeOptionAria": "{{label}} téma",
-      "themeSaveError": "Nem tudtam megmenteni a témát. Kérem, próbálja újra.",
-      "timestampsSaveError": "Nem tarthattam meg a preferenciát. Kérem, próbálja újra."
+      "themeSaveError": "Nem sikerült menteni a témát. Kérlek, próbáld újra.",
+      "timestampsSaveError": "Nem sikerült menteni a beállítást. Kérlek, próbáld újra."
     },
     "archive": {
-      "helper": "Tegyük át a jegyzeteket egy archívumba, ne kerüljön a főlistára. A kikapcsolás visszaállítja az összes archivált jegyzetet a mappába, és elrejti az archívum vezérlését.",
+      "helper": "Engedélyezi, hogy a jegyzetek az Archívumba kerüljenek, kihagyva a fő listából. Kikapcsolva minden archivált jegyzet visszakerül a mappájába, és elrejti az archívum vezérlőit.",
       "label": "Archiválás",
       "off": "Ki",
-      "on": "On",
+      "on": "Be",
       "saveError": "Nem sikerült frissíteni az archiválási beállítást."
     },
     "autoBackup": {
-      "backupFolder": "A mentés mappája",
-      "chooseFolder": "Válassza ki a mappát..",
-      "chooseFolderDialogTitle": "Válassza ki az automatikus mentések mappáját",
+      "backupFolder": "Biztonsági mentés mappája",
+      "chooseFolder": "Válassz mappát…",
+      "chooseFolderDialogTitle": "Válassz mappát az automatikus biztonsági mentésekhez",
       "frequency": "Gyakoriság",
-      "frequencyAriaLabel": "Erősítés gyakorisága",
-      "helper": "Írj egy titkosított .myne- backet egy mappába egy ütemtervbe, amíg az alkalmazás nyitva van és a páncélterem nyitva van. A biztonsági mentések ugyanolyan titkosítottak maradnak, mint a páncélterem; Myne tartja meg a legfrissebb adatokat, és soha nem küld semmit az eszközéről.",
-      "intervalDaily": "Napi",
-      "intervalEveryUnlock": "Minden nyílás",
+      "frequencyAriaLabel": "Biztonsági mentés gyakorisága",
+      "helper": "Ütemezetten ír egy titkosított .myne-backup fájlt egy mappába, amíg az alkalmazás nyitva van és a széf fel van oldva. A biztonsági mentések pontosan annyira titkosítottak, mint a széfed; a Myne csak a legutóbbi néhányat tartja meg, és soha nem küld el semmit az eszközödről.",
+      "intervalDaily": "Naponta",
+      "intervalEveryUnlock": "Minden feloldáskor",
       "intervalWeekly": "Hetente",
-      "keepLast": "Tartsd meg az utolsót",
-      "noFolderChosen": "Még nincs kiválasztva mappa.",
-      "saveFailedToast": "Nem sikerült elmenteni a mentési beállításokat.",
+      "keepLast": "Megtartandó legutóbbiak",
+      "noFolderChosen": "Még nincs kiválasztott mappa.",
+      "saveFailedToast": "Nem sikerült menteni a biztonsági mentés beállításait.",
       "searchEmpty": "Nincs találat.",
-      "searchPlaceholder": "Keresés..",
-      "statusFailed": "Az automatikus mentés nem sikerült - {{stamp}}",
-      "statusLastBackup": "Utolsó mentés: {{stamp}}",
-      "statusNever": "Még nincs automata erősítés.",
-      "title": "Automatikus mentések"
+      "searchPlaceholder": "Keresés…",
+      "statusFailed": "Az automatikus biztonsági mentés meghiúsult — {{stamp}}",
+      "statusLastBackup": "Utolsó biztonsági mentés: {{stamp}}",
+      "statusNever": "Még nem készült automatikus biztonsági mentés.",
+      "title": "Automatikus biztonsági mentések"
     },
     "changePassword": {
-      "cancel": "Törlés",
-      "checkingStrength": "Ellenőrzöm az erőt..",
-      "confirmLabel": "",
+      "cancel": "Mégse",
+      "checkingStrength": "Erősség ellenőrzése…",
+      "confirmLabel": "Új jelszó megerősítése",
       "currentLabel": "Jelenlegi jelszó",
       "mismatch": "A jelszavak nem egyeznek.",
       "newLabel": "Új jelszó",
       "submit": "Jelszó módosítása",
-      "submitting": "",
+      "submitting": "Jelszó módosítása…",
       "title": "Jelszó módosítása",
-      "tooShort": "Legalább {{n}} karakterek használata."
+      "tooShort": "Használj legalább {{n}} karaktert."
     },
     "connectedExtensions": {
       "browser": {
         "chromium": "Chrome / Edge",
-        "firefox": "Tűzróka",
-        "generic": "A böngésző kiterjesztése"
+        "firefox": "Firefox",
+        "generic": "Böngészőbővítmény"
       },
       "when": {
-        "bare": "Csatlakozás",
-        "daysAgo_one": "{{count}} nappal ezelőtt",
-        "daysAgo_other": "{{count}} nappal ezelőtt",
-        "hoursAgo_one": "XHamster 2 hónappal ezelőtt",
-        "hoursAgo_other": "",
-        "justNow": "Most kapcsoltam össze",
-        "minutesAgo_one": "{{count}} perccel ezelőtt",
-        "minutesAgo_other": "",
-        "onDate": "Csatlakozott {{date}}"
+        "bare": "Csatlakoztatva",
+        "daysAgo_one": "Csatlakoztatva {{count}} napja",
+        "daysAgo_other": "Csatlakoztatva {{count}} napja",
+        "hoursAgo": "Csatlakoztatva {{count}} órája",
+        "hoursAgo_one": "Csatlakoztatva {{count}} órája",
+        "hoursAgo_other": "Csatlakoztatva {{count}} órája",
+        "justNow": "Épp most csatlakoztatva",
+        "minutesAgo": "Csatlakoztatva {{count}} perce",
+        "minutesAgo_one": "Csatlakoztatva {{count}} perce",
+        "minutesAgo_other": "Csatlakoztatva {{count}} perce",
+        "onDate": "Csatlakoztatva {{date}}"
       }
     },
     "customThemes": {
-      "appliedBadge": "Alkalmazott",
-      "apply": "Alkalmazás",
-      "applyError": "Ezt a témát nem tudtam alkalmazni. Kérem, próbálja újra.",
-      "cancel": "Törlés",
+      "appliedBadge": "Alkalmazva",
+      "apply": "Alkalmaz",
+      "applyError": "Nem sikerült alkalmazni ezt a témát. Kérlek, próbáld újra.",
+      "cancel": "Mégse",
       "confirm": "Megerősítés",
       "delete": "Törlés",
-      "deleteError": "",
-      "empty": "Még nincs egyedi téma. Egy importálása, vagy nyissa meg a témák mappáját, és adjon hozzá egy téma fájlt.",
+      "deleteError": "Nem sikerült törölni ezt a témát. Kérlek, próbáld újra.",
+      "empty": "Még nincs egyéni téma. Importálj egyet, vagy nyisd meg a témák mappáját, és adj hozzá egy témafájlt.",
       "error": {
         "aColorFallback": "egy szín",
-        "invalidFile": "Érvénytelen téma fájl.",
-        "invalidName": "Nem biztonságos téma neve",
-        "invalidValue": "Érvénytelen érték {{key}}",
-        "invalidValueWithLine": "Érvénytelen érték {{key}} esetében (vonal {{line}})",
-        "missingKey": "Hiányzó szín {{key}}",
+        "invalidFile": "Érvénytelen témafájl.",
+        "invalidName": "Nem biztonságos témanév",
+        "invalidValue": "Érvénytelen érték ehhez: {{key}}",
+        "invalidValueWithLine": "Érvénytelen érték ehhez: {{key}} ({{line}}. sor)",
+        "missingKey": "Hiányzó kötelező szín: {{key}}",
         "parseError": "Nem érvényes JSON",
-        "parseErrorWithLine": "Nem érvényes JSON (vonal {{line}})"
+        "parseErrorWithLine": "Nem érvényes JSON ({{line}}. sor)"
       },
-      "fileFilterName": "Myne téma",
-      "helper": "Használd a saját színpalettádat. Felhasználás előtt validáljuk a témákat ezen az eszközön - semmi sincs feltöltve.",
-      "importButton": "Importáló téma..",
-      "importError": "Az a fájl nem érvényes téma. A hivatkozás megnyitása a formátum megtekintéséhez.",
+      "fileFilterName": "Myne-téma",
+      "helper": "Használd a saját színpalettádat. A témákat felhasználás előtt ezen az eszközön ellenőrizzük — semmi nem töltődik fel.",
+      "importButton": "Téma importálása…",
+      "importError": "Az a fájl nem érvényes téma. Nyisd meg a referenciát a formátum megtekintéséhez.",
       "label": "Egyéni témák",
-      "openFolderButton": "A témák mappájának megnyitása",
+      "openFolderButton": "Témák mappájának megnyitása",
       "openFolderError": "Nem sikerült megnyitni a témák mappáját.",
-      "readError": "Nem tudtam elolvasni a témák mappáját."
+      "readError": "Nem sikerült beolvasni a témák mappáját."
     },
     "dailyNotes": {
       "blankTemplate": "Üres (nincs sablon)",
-      "dateFormatHelper": "Minden napi jegyzet címe. Jóváhagyás dátuma: ÉÉÉÉ, HH, NN. Alapértelmezés: {{default}}.",
+      "dateFormatHelper": "Minden napi jegyzet címe. Támogatja: ÉÉÉÉ, HH, NN. Alapértelmezett: {{default}}.",
       "dateFormatLabel": "Napi jegyzet dátumformátuma",
-      "dateFormatSaveError": "Nem tudtam megmenteni a dátumot. Kérem, próbálja újra.",
-      "folderHelper": "Ahol új napi feljegyzéseket iktatnak. Alapértelmezés: {{default}} - a mappa akkor is megmarad, ha üres.",
-      "folderLabel": "Napilap mappa",
-      "folderSaveError": "Nem tudtam megmenteni a napi mappát. Kérem, próbálja újra.",
-      "searchEmpty": "Nincs sablonok egyezés.",
-      "searchPlaceholder": "Keresés sablonok..",
-      "templateHelper": "Válassza ki a sablont, hogy kezdje el minden napi jegyzet, vagy üresen hagyni egy üres megjegyzés címmel a dátum.",
-      "templateLabel": "Napilap-sablon",
-      "templateSaveError": "Nem tudtam megmenteni a napi sablont. Kérem, próbálja újra.",
+      "dateFormatSaveError": "Nem sikerült menteni a dátumformátumot. Kérlek, próbáld újra.",
+      "folderHelper": "Hová kerülnek az új napi jegyzetek. Alapértelmezett: {{default}} — a mappa üresen is megmarad.",
+      "folderLabel": "Napi jegyzetek mappája",
+      "folderSaveError": "Nem sikerült menteni a napi jegyzetek mappáját. Kérlek, próbáld újra.",
+      "searchEmpty": "Nincs egyező sablon.",
+      "searchPlaceholder": "Sablonok keresése…",
+      "templateHelper": "Válassz egy sablont, amelyből minden napi jegyzet indul, vagy hagyd üresen egy dátummal címzett üres jegyzethez.",
+      "templateLabel": "Napi jegyzet sablonja",
+      "templateSaveError": "Nem sikerült menteni a napi jegyzet sablonját. Kérlek, próbáld újra.",
       "untitledTemplate": "Névtelen sablon"
     },
     "deleteVault": {
-      "cancel": "Törlés",
-      "caseSensitiveHint": "Érzékeny. Írja be pontosan a szót, hogy lehetővé tegye a törlést.",
-      "continue": "Folytatás",
-      "copyPrimary": "Ez véglegesen törli ezt a páncéltermet és minden feljegyzést benne. A cselekvés nem lehet visszavonni, és a helyreállítási kifejezés nem fogja visszaállítani az adatokat.",
-      "copySecondary": "A biztonsági billentyűket a memóriából nullázzák, mielőtt a fájlok nem lesznek összekapcsolva; minden árva rejtjelező, ami a lemezen marad, visszafordíthatatlan Argon2id- becsomagolt szemét marad.",
-      "eyebrow": "HIVATAL",
-      "heading": "A széf törlése",
-      "ioFailBody": "Törlés céljából nem sikerült hozzáférni a páncélterem fájljaihoz. A biztonsági kulcsok már nullák a memóriából; a lemezen maradt páncélterem-adatok nem visszaszerezhetők Argon2id- becsomagolt szemét.",
-      "ioFailTitle": "Lemezhiba törlése közben",
-      "partialFailBody_one": "{{count}} fájl nem törölhető a lemezről. A biztonsági kulcsok már nullák a memóriából, tehát minden árva rejtjelező, ami megmaradt, nem visszaszerezhető Argon2id- becsomagolt szemét.",
-      "partialFailBody_other": "{{count}} fájlok nem törölhetők a lemezről. A biztonsági kulcsok már nullák a memóriából, tehát minden árva rejtjelező, ami megmaradt, nem visszaszerezhető Argon2id- becsomagolt szemét.",
-      "partialFailTitle": "Az értékvesztés részben sikertelen",
-      "submit": "A széf törlése",
-      "submitInFlight": "A páncélterem törlése..",
-      "typeToConfirmLabel": "Típus DELETE megerősítendő",
-      "vaultPath": "Tárolási útvonal: {{path}}"
+      "cancel": "Mégse",
+      "caseSensitiveHint": "Megkülönbözteti a kis- és nagybetűket. Írd be pontosan a szót a törlés engedélyezéséhez.",
+      "continue": "Tovább",
+      "copyPrimary": "Ez véglegesen törli ezt a széfet és minden benne lévő jegyzetet. A művelet nem vonható vissza, és a helyreállító mondat sem fogja helyreállítani az adatokat.",
+      "copySecondary": "A széf kulcsait kinullázzuk a memóriából, mielőtt a fájlokat törölnénk; bármely árva titkosított adat, ami a lemezen marad, helyreállíthatatlan, Argon2id-be csomagolt szemét.",
+      "eyebrow": "VISSZAFORDÍTHATATLAN",
+      "heading": "Széf törlése",
+      "ioFailBody": "Nem sikerült hozzáférni a széf fájljaihoz a törléshez. A széf kulcsait már kinulláztuk a memóriából; bármely lemezen maradt széfadat helyreállíthatatlan, Argon2id-be csomagolt szemét.",
+      "ioFailTitle": "Lemezhiba a törlés során",
+      "partialFailBody_one": "{{count}} fájlt nem sikerült törölni a lemezről. A széf kulcsait már kinulláztuk a memóriából, így bármely megmaradt árva titkosított adat helyreállíthatatlan, Argon2id-be csomagolt szemét.",
+      "partialFailBody_other": "{{count}} fájlt nem sikerült törölni a lemezről. A széf kulcsait már kinulláztuk a memóriából, így bármely megmaradt árva titkosított adat helyreállíthatatlan, Argon2id-be csomagolt szemét.",
+      "partialFailTitle": "A széf törlése részben meghiúsult",
+      "submit": "Széf törlése",
+      "submitInFlight": "Széf törlése…",
+      "typeToConfirmLabel": "Írd be: DELETE a megerősítéshez",
+      "vaultPath": "Széf útvonala: {{path}}"
     },
     "focusMode": {
-      "dimAria": "Dim inaktív vonalak",
-      "dimHelper": "Fókusz módban, minden vonalat tompíts, kivéve azt, amit szerkesztesz.",
-      "dimLabel": "Fókusz mód · sötét inaktív vonalak",
+      "dimAria": "Inaktív sorok halványítása",
+      "dimHelper": "Fókuszmódban (⇧⌘F) halványíts minden sort azon kívül, amelyiket éppen szerkeszted.",
+      "dimLabel": "Fókuszmód · inaktív sorok halványítása",
       "off": "Ki",
-      "on": "On",
-      "saveError": "Nem sikerült elmenteni a fókuszmód beállítást.",
-      "typewriterAria": "Typewriter tekercs",
-      "typewriterHelper": "Fókusz módban az aktív vonal függőlegesen középen marad, ahogy gépel.",
-      "typewriterLabel": "Fókusz mód · írógép tekercs"
+      "on": "Be",
+      "saveError": "Nem sikerült menteni a fókuszmód beállítását.",
+      "typewriterAria": "Írógép-görgetés",
+      "typewriterHelper": "Fókuszmódban (⇧⌘F) tartsd az aktív sort függőlegesen középen gépelés közben.",
+      "typewriterLabel": "Fókuszmód · írógép-görgetés"
     },
     "hotkeys": {
-      "addBindingAria": "Rövidítés hozzáadása {{command}}",
-      "cancel": "Törlés",
-      "capturePrompt": "Nyomja meg a gombot..",
-      "conflictIndicator": "- összeütközés",
-      "conflictTitle": "{{commands}} által is használt",
+      "addBindingAria": "Gyorsbillentyű hozzáadása ehhez: {{command}}",
+      "cancel": "Mégse",
+      "capturePrompt": "Nyomj le egy billentyűt…",
+      "conflictIndicator": "⚠ ütközés",
+      "conflictTitle": "Ezek is használják: {{commands}}",
       "fixed": "rögzített",
       "group": {
-        "editorFormatting": "Szerkesztő formázás",
+        "editorFormatting": "Szerkesztő formázása",
         "general": "Általános",
         "navigation": "Navigáció",
-        "notes": "Megjegyzések",
-        "panesTabs": "Panes & Tabs",
+        "notes": "Jegyzetek",
+        "panesTabs": "Panelek és lapok",
         "view": "Nézet"
       },
-      "helper": "Billentyűparancsok megtekintése és módosítása. Szerkesztő formázás és a tab- ciklus rövidítés fix.",
+      "helper": "Billentyűparancsok megtekintése és módosítása. A szerkesztő formázási és a laplapozó gyorsbillentyűi rögzítettek.",
       "notSet": "Nincs beállítva",
       "removeBindingAria": "{{chord}} eltávolítása",
-      "resetAll": "Minden hotkeyt újraindítani..",
-      "resetAllConfirm": "Minden egyedi rövidítés alaphelyzetbe állítása?",
-      "resetAllYes": "Minden újraindítása",
-      "restoreDefaultAria": "Alapértelmezés visszaállítása {{command}}",
-      "searchAriaLabel": "Keresés",
-      "searchPlaceholder": "Keresés..",
-      "warnAlreadyUsed": "Már használt {{commands}} - hozzáadott egyébként."
+      "resetAll": "Minden gyorsbillentyű visszaállítása…",
+      "resetAllConfirm": "Visszaállítod minden egyéni gyorsbillentyűt az alapértelmezettre?",
+      "resetAllYes": "Mind visszaállítása",
+      "restoreDefaultAria": "Alapértelmezett visszaállítása ehhez: {{command}}",
+      "searchAriaLabel": "Gyorsbillentyűk keresése",
+      "searchPlaceholder": "Gyorsbillentyűk keresése…",
+      "warnAlreadyUsed": "Ezek már használják: {{commands}} — mindenképp hozzáadva."
     },
     "language": {
-      "helper": "Válassza ki az alkalmazás megjelenítő nyelvét.",
+      "helper": "Válaszd ki az alkalmazás megjelenítési nyelvét.",
       "label": "Nyelv"
     },
     "lineNumbers": {
-      "errorSaveSetting": "Nem sikerült elmenteni a line- number beállítást.",
-      "helper": "Mutass egy vonalas csatornát a szerkesztőben. Egy szám soronként, alapértelmezés szerint kikapcsolva.",
-      "label": "Vonalszámok",
+      "errorSaveSetting": "Nem sikerült menteni a sorszámozási beállítást.",
+      "helper": "Sorszámsáv megjelenítése a szerkesztőben. Soronként egy szám; alapértelmezetten kikapcsolva.",
+      "label": "Sorszámok",
       "off": "Ki",
-      "on": "On"
+      "on": "Be"
     },
     "prefs": {
-      "saveError": "Nem sikerült megtakarítani preferencia - próbálja újra"
+      "saveError": "Nem sikerült menteni a beállítást — próbáld újra"
     },
     "privacy": {
-      "autoLockHelper": "Zárd be a széfet ennyi inaktivitás után.",
-      "autoLockLabel": "Auto- lock",
-      "autoLockSearchEmpty": "Nincs egyezés.",
-      "autoLockSearchPlaceholder": "Keresés időtartama..",
-      "screenCaptureHelperOff": "A védelem mindig érvényes a feloldás előtt. Felbontás után kövesse ezt a preferenciát.",
-      "screenCaptureHelperOn": "Aktív MacOS és Windows 10 (Május 2020 Frissítés vagy később). Linux támogatás jön a jövőben kiadás.",
-      "screenCaptureLabel": "Képernyőbefogó védelem"
+      "autoLockHelper": "Zárolja a széfet ennyi inaktivitás után.",
+      "autoLockLabel": "Automatikus zárolás",
+      "autoLockSearchEmpty": "Nincs egyező időtartam.",
+      "autoLockSearchPlaceholder": "Időtartamok keresése…",
+      "screenCaptureHelperOff": "A védelem mindig érvényes feloldás előtt. Feloldás után ezt a beállítást követi.",
+      "screenCaptureHelperOn": "Aktív macOS-en és Windows 10-en (2020. májusi frissítés vagy újabb). A Linux-támogatás egy jövőbeli kiadásban érkezik.",
+      "screenCaptureLabel": "Képernyőfelvétel-védelem"
     },
     "quickUnlock": {
-      "errorCancelled": "Törölték.",
+      "errorCancelled": "Megszakítva.",
       "errorGeneric": "Nem sikerült beállítani a gyors feloldást.",
-      "errorHardwareUnavailable": "Ezen az eszközön nincs érintőazonosító.",
-      "errorNotUnlocked": "Előbb nyisd ki a széfet.",
-      "errorPinNotDigits": "A PIN csak számjegyek lehetnek.",
-      "errorPinTooShort_one": "A PIN-kódnak legalább {{count}} számjegynek kell lennie.",
-      "errorPinTooShort_other": "",
-      "helperConfigured": "Konfigurációja {{method}}. Az automatikus zárolás után a visszatérés kihagyja a jelszót. A főjelszó az újrakezdés után is szükséges.",
-      "helperNotConfigured": "A teljes mester jelszó helyett a PIN vagy Touch azonosítóval rendelkező automatikus zárolás után lépjen be. A kényelem a titkosított páncélterem - a fő jelszó továbbra is szükséges újraindítás után.",
+      "errorHardwareUnavailable": "A Touch ID nem érhető el ezen az eszközön.",
+      "errorNotUnlocked": "Először oldd fel a széfet.",
+      "errorPinNotDigits": "A PIN csak számjegyekből állhat.",
+      "errorPinTooShort": "A PIN-nek legalább {{count}} számjegyűnek kell lennie.",
+      "errorPinTooShort_one": "A PIN-nek legalább {{count}} számjegyűnek kell lennie.",
+      "errorPinTooShort_other": "A PIN-nek legalább {{count}} számjegyűnek kell lennie.",
+      "helperConfigured": "Beállítva ezzel: {{method}}. Az automatikus zárolás utáni újbóli belépés kihagyja a mesterjelszót. A mesterjelszó újraindítás után továbbra is szükséges.",
+      "helperNotConfigured": "Az automatikus zárolás után PIN-kóddal vagy Touch ID-val lépj be újra a teljes mesterjelszó helyett. Kényelmi funkció a titkosított széf felett — a mesterjelszó újraindítás után továbbra is szükséges.",
       "methodPin": "PIN",
-      "methodTouchId": "Érintőazonosító",
-      "pinAriaLabel": "Gyors feloldás PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "Gyors feloldás PIN-kódja",
+      "pinPlaceholder": "PIN (legalább {{count}} számjegy)",
       "pinPlaceholder_one": "PIN (legalább {{count}} számjegy)",
-      "pinPlaceholder_other": "",
+      "pinPlaceholder_other": "PIN (legalább {{count}} számjegy)",
       "setPin": "PIN beállítása",
-      "setupHelper": "Touch ID macos- only és jelenleg kísérleti (folyamatban lévő hardver ellenőrzés). A PIN mindenhol működik.",
+      "setupHelper": "A Touch ID csak macOS-en érhető el, és jelenleg kísérleti (hardveres ellenőrzésre vár). A PIN mindenhol működik.",
       "title": "Gyors feloldás",
-      "useTouchId": "Érintőazonosító használata"
+      "useTouchId": "Touch ID használata"
     },
     "shell": {
-      "closeLabel": "",
-      "navLabel": "Beállítások",
+      "closeLabel": "Beállítások bezárása",
+      "navLabel": "Beállítások panelei",
       "panels": {
-        "about": "Körülbelül",
-        "account": "Számla",
+        "about": "Névjegy",
+        "account": "Fiók",
         "appearance": "Megjelenés",
         "editor": "Szerkesztő",
-        "hotkeys": "Csizma",
+        "hotkeys": "Gyorsbillentyűk",
         "privacy": "Adatvédelem",
-        "storage": "Tárolás"
+        "storage": "Tárhely"
       },
-      "passwordUpdatedToast": "A jelszó frissítése",
+      "passwordUpdatedToast": "Jelszó frissítve",
       "title": "Beállítások"
     },
     "spell": {
-      "errorSaveLanguages": "Nem sikerült elmenteni a helyesírási nyelveket.",
-      "errorSaveSetting": "Nem sikerült elmenteni a helyesírási beállítást.",
-      "helper": "Aláírja a rosszul írt szavakat. Teljesen offline - a jegyzetei soha nem hagyják el az eszközt.",
-      "label": "A helyesírás ellenőrzése",
-      "languagesAriaLabel": "Spell- check nyelvek",
-      "languagesHelper": "Egy szó helyes, ha érvényes bármely kiválasztott nyelven - hasznos az angol kifejezések más-nyelvi jegyzetek.",
+      "errorSaveLanguages": "Nem sikerült menteni a helyesírás-ellenőrzés nyelveit.",
+      "errorSaveSetting": "Nem sikerült menteni a helyesírás-ellenőrzés beállítását.",
+      "helper": "Aláhúzza az elgépelt szavakat gépelés közben. Teljesen offline — a jegyzeteid soha nem hagyják el az eszközt.",
+      "label": "Helyesírás-ellenőrzés",
+      "languagesAriaLabel": "Helyesírás-ellenőrzés nyelvei",
+      "languagesHelper": "Egy szó akkor helyes, ha bármely kiválasztott nyelven érvényes — hasznos, ha angol kifejezéseket keversz más nyelvű jegyzetekbe.",
       "languagesLabel": "Nyelvek",
-      "languagesPlaceholder": "Nyelvek kiválasztása..",
-      "languagesSearchEmpty": "Nem egyeznek a nyelvek.",
-      "languagesSearchPlaceholder": "Keresési nyelvek..",
+      "languagesPlaceholder": "Válassz nyelveket…",
+      "languagesSearchEmpty": "Nincs egyező nyelv.",
+      "languagesSearchPlaceholder": "Nyelvek keresése…",
       "off": "Ki",
-      "on": "On"
+      "on": "Be"
     },
     "storage": {
-      "backUpVault": "Vissza a páncélterembe..",
-      "backupHelper": "A biztonsági mentések ugyanolyan titkosak, mint a páncélterem, egyetlen hitelesített .myne- backup fájlban. A helyreállítás a széf jelszavával vagy a helyreállítási kifejezéssel működik, pontosan mint a feloldás.",
-      "backupLabel": "Erősítés",
-      "exportAction": "Export..",
-      "exportBody": "A páncélterem exportálása jelölésként",
-      "exportHelper": "Egyszerű jelzőrakéta - nincs kódolva.",
+      "backupHelper": "A biztonsági mentések pontosan annyira titkosítottak, mint a széfed, egyetlen ellenőrzött .myne-backup fájlban. A visszaállítás annak a széfnek a jelszavával vagy helyreállító mondatával működik — pontosan úgy, mint a feloldás.",
+      "backupLabel": "Biztonsági mentés",
+      "backUpVault": "Széf biztonsági mentése…",
+      "exportAction": "Exportálás…",
+      "exportBody": "Széf exportálása Markdownként",
+      "exportHelper": "Egyszerű markdown-fastruktúra — nincs titkosítva.",
       "exportLabel": "Exportálás",
-      "importHelper": "Hozzon egy meglévő obszidián páncéltermet Myne-ba. Minden jegyzet importálva és titkosítva van a helyszínen; az eredeti fájlok érintetlenek.",
-      "importLabel": "Import",
-      "importObsidian": "",
-      "locationHelper": "Minden páncélterem titkosított fájlok mappája ezen az útvonalon. Javasoljuk, hogy a biztonsági mentés gomb alább a manuális másolatok - ez ellenőrzi az írott fájlt.",
-      "locationLabel": "Tárolás helye",
-      "openInFiles": "Megnyitás fájlban",
-      "pathUnavailable": "Az út nem elérhető",
-      "restoreBackup": "Vissza az erősítésből.."
+      "importHelper": "Hozz be egy meglévő Obsidian-széfet a Myne-ba. Minden Markdown-jegyzet a helyszínen importálódik és titkosítódik; az eredeti fájljaid érintetlenek maradnak.",
+      "importLabel": "Importálás",
+      "importObsidian": "Obsidian-széf importálása…",
+      "locationHelper": "Minden széf titkosított fájlokat tartalmazó mappa ezen az útvonalon. A kézi másolatok helyett inkább az alábbi Biztonsági mentés gombot használd — az ellenőrzi a megírt fájlt.",
+      "locationLabel": "Széf helye",
+      "openInFiles": "Megnyitás a Fájlokban",
+      "pathUnavailable": "Az útvonal nem érhető el",
+      "restoreBackup": "Visszaállítás biztonsági mentésből…"
     },
     "typography": {
-      "contentWidthHelper": "A szerkesztési oszlop legnagyobb szélessége. A teljes szöveg a táblán van.",
+      "contentWidthHelper": "A szerkesztőoszlop maximális szélessége. A Teljes engedi, hogy a szöveg kitöltse a panelt.",
       "contentWidthLabel": "Tartalom szélessége",
-      "errorSave": "Nem tarthattam meg a preferenciát. Kérem, próbálja újra.",
-      "fontHelper": "Monospace vagy arányos (sans- serif) szöveg.",
+      "errorSave": "Nem sikerült menteni a beállítást. Kérlek, próbáld újra.",
+      "fontHelper": "Monospace vagy proporcionális (sans-serif) szöveg.",
       "fontLabel": "Betűtípus",
-      "lineSpacingHelper": "Függőleges tér a vonalak között.",
-      "lineSpacingLabel": "Vonaltávolság",
-      "textSizeHelper": "A szerkesztő szövegének alapmérete. Fejlécek skáláznak vele."
+      "lineSpacingHelper": "Függőleges térköz a sorok között.",
+      "lineSpacingLabel": "Sortávolság",
+      "textSizeHelper": "A szerkesztő szövegének alapmérete. A címsorok ezzel együtt skálázódnak.",
+      "textSizeLabel": "Szövegméret"
     },
     "viewMode": {
-      "errorSave": "Nem sikerült elmenteni az alapértelmezett nézetmódot.",
-      "helper": "Hogyan nyílik meg egy megjegyzés: Live preview (alapértelmezés), read- only Reading, vagy nyers Forrás. Egy üzenet ki- be kapcsolása az e.",
-      "label": "Alapértelmezett nézet",
+      "errorSave": "Nem sikerült menteni az alapértelmezett nézetmódot.",
+      "helper": "Hogyan nyíljon meg egy jegyzet: Élő előnézet (alapértelmezett), csak olvasható Olvasás vagy nyers Forrás. Egy jegyzet váltása: ⇧⌘E.",
+      "label": "Alapértelmezett nézetmód",
       "optionLive": "Élő előnézet",
       "optionReading": "Olvasás",
       "optionSource": "Forrás"
@@ -1715,127 +1739,127 @@
   },
   "templates": {
     "manager": {
-      "closeLabel": "Záró sablonok",
-      "deleteRowLabel": "A sablon törlése {{name}} (áthelyezés a szemétbe)",
-      "editTemplateLabel": "Sablon szerkesztése {{name}}",
-      "emptyBody": "Hozzon létre egy sablont, hogy újra egy jegyzet csontváz - egy találka, egy napi napló, egy olvasmány. Válassz egyet, ha új jegyzetet írsz.",
-      "emptyTitle": "Nincs sablon még",
-      "listLabel": "Sablon",
-      "loading": "Betöltés..",
+      "closeLabel": "Sablonok bezárása",
+      "deleteRowLabel": "{{name}} sablon törlése (áthelyezés a Kukába)",
+      "editTemplateLabel": "{{name}} sablon szerkesztése",
+      "emptyBody": "Hozz létre egy sablont egy jegyzetváz újrafelhasználásához — egy megbeszélésjegyzet, egy napi napló, egy olvasmányjegyzet. Új jegyzet készítésekor kiválaszthatod valamelyiket.",
+      "emptyTitle": "Még nincs sablon",
+      "listLabel": "Sablonok",
+      "loading": "Betöltés…",
       "newTemplate": "Új sablon",
       "newTemplateName": "Névtelen sablon",
-      "removeFromTemplates": "A sablonok eltávolítása",
-      "removeRowLabel": "Törlés {{name}} sablonokból (megtartja a jegyzetet)",
-      "title": ""
+      "removeFromTemplates": "Eltávolítás a sablonok közül",
+      "removeRowLabel": "{{name}} eltávolítása a sablonok közül (a jegyzet megmarad)",
+      "title": "Jegyzetsablonok"
     }
   },
   "unlock": {
-    "backToPicker": "Válasszon egy másik páncéltermet",
-    "continue": "Folytatás",
-    "decrypting": "Dekódolás..",
-    "deleteLink": "",
+    "backToPicker": "Válassz másik széfet",
+    "continue": "Tovább",
+    "decrypting": "Visszafejtés…",
+    "deleteLink": "Elveszett a jelszó és a helyreállító mondat is? Töröld a széfet, és kezdd elölről",
     "errors": {
-      "alreadyUnlocked": "",
-      "inProgress": "Művelet folyamatban.",
-      "unexpected": "Váratlan hiba. Kérem, próbálja újra.",
-      "vaultNotFound": "A páncélfájl nem található. Kérem, indítsa újra az alkalmazást."
+      "alreadyUnlocked": "A széf már fel van oldva.",
+      "inProgress": "Művelet van folyamatban.",
+      "unexpected": "Váratlan hiba. Kérlek, próbáld újra.",
+      "vaultNotFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást."
     },
     "passwordLabel": "Jelszó",
-    "passwordPlaceholder": "",
+    "passwordPlaceholder": "Jelszó",
     "quickUnlock": {
-      "failed": "",
-      "pinAriaLabel": "",
+      "failed": "A gyors feloldás meghiúsult. Használd a jelszavadat.",
+      "pinAriaLabel": "Gyors feloldás PIN-kódja",
       "pinPlaceholder": "PIN",
-      "unlockWithPin": "A PIN feloldása",
-      "unlockWithTouchId": "Érintőazonosítóval történő feloldás",
-      "usePasswordBelow": "vagy használja az alábbi jelszót",
-      "wrongCredential": "Helytelen. {{remaining}} kísérlet (ek) maradt."
+      "unlockWithPin": "Feloldás PIN-kóddal",
+      "unlockWithTouchId": "Feloldás Touch ID-val",
+      "usePasswordBelow": "vagy használd lent a jelszavadat",
+      "wrongCredential": "Helytelen. {{remaining}} próbálkozás maradt."
     },
-    "recoveryInterruptedBanner": "A felépülés megszakadt. Először állíts be egy új jelszót.",
-    "recoveryInterruptedBody": "Először állíts be egy új jelszót, aztán zárd le a páncéltermet.",
-    "recoveryInterruptedTitle": "A felépülés megszakadt.",
-    "recoveryLink": "Elfelejtetted a jelszavad? Feloldás a helyreállító mondattal",
-    "submit": "Nyisd ki",
-    "subtitle": "Adja meg a jelszavát a folytatáshoz.",
+    "recoveryInterruptedBanner": "A helyreállítási folyamat megszakadt. Először állíts be egy új jelszót.",
+    "recoveryInterruptedBody": "Először állíts be egy új jelszót, majd zárd le újra a széfedet.",
+    "recoveryInterruptedTitle": "A helyreállítási folyamat megszakadt.",
+    "recoveryLink": "Elfelejtetted a jelszavad? Oldd fel a helyreállító mondattal",
+    "submit": "Feloldás",
+    "subtitle": "Add meg a jelszavadat a folytatáshoz.",
     "suspicion": {
-      "lockedDuringChange": "Jelszó csere törölve: a páncélterem zárva volt.",
-      "metaChangedExternally": "A páncélszekrényt egy másik munkamenetben módosították - kérem, nyissa meg újra."
+      "lockedDuringChange": "A jelszómódosítás megszakítva: a széf zárolva volt.",
+      "metaChangedExternally": "A széf egy másik munkamenetben módosult — kérlek, oldd fel újra."
     },
-    "title": "Nyisd ki a páncéltermet."
+    "title": "Oldd fel a széfedet."
   },
   "vault": {
     "ioBanner": {
-      "cannotRead": "Nem tudom elolvasni a páncélterem aktáját.",
-      "notFound": "A páncélfájl nem található. Kérem, indítsa újra az alkalmazást.",
-      "permissionDenied": "Nem férhet hozzá a páncélterem aktájához. Ellenőrizze a fájljogosultságokat."
+      "cannotRead": "Nem olvasható a széf fájlja.",
+      "notFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást.",
+      "permissionDenied": "Nincs jogosultság a széf fájljának eléréséhez. Ellenőrizd a fájljogosultságokat."
     }
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "Elmentettem a számlaszámom, ahol később megtalálhatom.",
+      "ackLabel": "Elmentettem a fiókszámomat oda, ahol később megtalálom.",
       "back": "Vissza",
-      "commit": "A széf létrehozása",
-      "committing": "Megmentem..",
-      "copied": "Másolt",
-      "copy": "",
-      "eyebrow": "4. lépés a 4-ből - számlaszám",
-      "heading": "Mentse meg a számlaszámát.",
-      "intro": "Ez a hozományod, kezeld készpénzként.",
+      "commit": "Széf létrehozása",
+      "committing": "Mentés…",
+      "copied": "Másolva",
+      "copy": "Másolás",
+      "eyebrow": "4. lépés a 4-ből — fiókszám",
+      "heading": "Mentsd el a fiókszámodat.",
+      "intro": "Ez a bemutatóra szóló tokened — kezeld úgy, mint a készpénzt.",
       "saveAsFile": "Mentés fájlként",
-      "shownOnceBody": "Tartogasd most! Myne nem tudja visszaszerezni. A szinkronizáláshoz szükséges.",
-      "shownOnceEmphasis": "Ez csak egyszer látható."
+      "shownOnceBody": "Mentsd el most — a Myne nem tudja visszaszerezni neked. A későbbi szinkronizáláshoz való regisztrációhoz szükséges.",
+      "shownOnceEmphasis": "Ez csak egyszer jelenik meg."
     },
     "briefing": {
       "back": "Vissza",
-      "continue": "Folytatódik a páncélterem létrehozása",
-      "eyebrow": "Mielőtt létrehozod a páncéltermet",
-      "heading": "Mielőtt létrehozod a páncéltermet",
-      "intro": "Myne titkosítja a jegyzeteidet, hogy csak te nyisd ki őket. Három dolog következik ebből - olvassa el őket, majd folytassa.",
+      "continue": "Tovább a széf létrehozásához",
+      "eyebrow": "Mielőtt létrehozod a széfedet",
+      "heading": "Mielőtt létrehozod a széfedet",
+      "intro": "A Myne úgy titkosítja a jegyzeteidet, hogy csak te tudd megnyitni őket. Ebből három dolog következik — olvasd el őket, majd folytasd.",
       "statements": {
         "no-email": {
-          "ackLabel": "Úgy tudom, nincs e-mail visszaszerzés.",
-          "statement": "Nincs email visszaszerzés. Soha nem is lesz.",
-          "why": "Soha nem kérjük az e-mailt, így nincs reset link, és nincs számla a támogatás kinyit. Ez nem egy hiányzó elem - ez a garancia. Az e-mail visszaszerzés azt jelentené, hogy elolvashatnánk a jegyzeteidet, és Myne úgy épült, hogy ne tudjuk."
+          "ackLabel": "Megértettem, hogy nincs e-mailes helyreállítás.",
+          "statement": "Nincs e-mailes helyreállítás. Soha nem is lesz.",
+          "why": "Soha nem kérjük az e-mail-címedet, így nincs visszaállító link, és nincs fiók, amit a támogatás feloldhatna. Ez nem hiányzó funkció — ez a garancia. Az e-mailes helyreállítás azt jelentené, hogy el tudnánk olvasni a jegyzeteidet, és a Myne úgy épült fel, hogy ne tudjuk."
         },
         "no-store": {
-          "ackLabel": "Megértem, hogy Myne nem tudja visszaszerezni a jelszavamat.",
-          "statement": "A jelszavad kinyitja a páncéltermet. Nem tároljuk.",
-          "why": "A jelszavad a kulcs bemenete, ami megfejti a jegyzeteidet. Sosem hagyja el ezt az eszközt, és a szervereinken semmi sem képes reprodukálni. Ez tartja titokban a jegyzeteit, és ezért nem tudjuk újraindítani."
+          "ackLabel": "Megértettem, hogy a Myne nem tudja visszaszerezni a jelszavamat.",
+          "statement": "A jelszavad oldja fel a széfedet. Mi nem tároljuk.",
+          "why": "A jelszavad annak a kulcsnak a bemenete, amely visszafejti a jegyzeteidet. Soha nem hagyja el ezt az eszközt, és a szervereinken semmi sem tudja reprodukálni. Ez tartja a jegyzeteidet biztonságban — és ezért nem tudjuk visszaállítani neked."
         },
         "phrase-backup": {
-          "ackLabel": "Megértem, hogy a gyógyulási kifejezésem az egyetlen tartalék.",
-          "statement": "A gyógyulási kifejezésed az egyetlen erősítésed.",
-          "why": "Ha elfelejti a jelszavát, a 24-szavas helyreállító kifejezés az egyetlen út vissza. Írd le a mondatot, és tartsd biztonságban."
+          "ackLabel": "Megértettem, hogy a helyreállító mondatom az egyetlen biztonsági mentés.",
+          "statement": "A helyreállító mondatod az egyetlen biztonsági mentésed.",
+          "why": "Ha elfelejted a jelszavadat, a 24 szavas helyreállító mondat az egyetlen út vissza. {{lostBothSecrets}} Írd le a mondatot, és tartsd biztonságos helyen."
         }
       },
       "why": "Miért?"
     },
     "confirm": {
       "back": "Vissza",
-      "continue": "Folytatás",
-      "eyebrow": "4. lépés - megerősítendő mondat",
+      "continue": "Tovább",
+      "eyebrow": "3. lépés a 4-ből — mondat megerősítése",
       "heading": "Írj vissza négy szót a mondatodból.",
-      "intro": "Konkrét pozíciókat kérünk, hogy ellenőrizzük, megmentette-e.",
-      "mismatch": "Nem egyezik a # {{pos}} szóval.",
-      "wordAtPosition": "Szöveg a pozícióban {{pos}}"
+      "intro": "Bizonyos pozíciókat fogunk kérni annak ellenőrzésére, hogy elmentetted.",
+      "mismatch": "Nem egyezik a(z) {{pos}}. szóval.",
+      "wordAtPosition": "Szó a(z) {{pos}}. pozícióban"
     },
     "encrypting": {
-      "caption": "Ez eltart egy darabig.",
-      "footerHint": "Ha ez 30 másodpercnél tovább tart, csukja be az ablakot és próbálja újra.",
-      "heading": "Titkosítja a páncéltermet"
+      "caption": "Ez eltart egy pillanatig.",
+      "footerHint": "Ha ez 30 másodpercnél tovább tart, zárd be az ablakot, és próbáld újra.",
+      "heading": "A széfed titkosítása"
     },
     "errors": {
       "accountNumberInvalid": {
         "body": "Próbáld újra.",
-        "title": "Számlaszám érvénytelen"
+        "title": "Érvénytelen fiókszám"
       },
       "aeadFailure": {
         "body": "Próbáld újra.",
-        "title": "A titkosítás nem sikerült"
+        "title": "A titkosítás meghiúsult"
       },
       "csprng": {
         "body": "Próbáld újra.",
-        "title": "Nem sikerült biztonságos véletlenszerű adatokat generálni"
+        "title": "Nem sikerült biztonságos véletlenszerű adatot generálni"
       },
       "invalidPassword": {
         "body": "Próbáld újra.",
@@ -1843,190 +1867,190 @@
       },
       "invalidVaultMeta": {
         "body": "Próbáld újra.",
-        "title": "A biztosíték formátumára vonatkozó hiba"
+        "title": "Széfformátum-hiba"
       },
       "ioOther": {
         "body": "Próbáld újra.",
-        "title": "Nem tudtam megmenteni a páncéltermet"
+        "title": "Nem sikerült menteni a széfet"
       },
       "joinFailure": {
-        "body": "",
-        "title": "Valami rosszul sült el"
+        "body": "Próbáld újra.",
+        "title": "Valami hiba történt"
       },
       "kdfFailure": {
-        "body": "Próbáld újra. Ha ez így megy tovább, lehet, hogy a rendszer nem emlékszik semmire.",
-        "title": "Nem sikerült titkosítani"
+        "body": "Próbáld újra. Ha ez folyamatosan előfordul, lehet, hogy a rendszerednek kevés a memóriája.",
+        "title": "Nem sikerült beállítani a titkosítást"
       },
       "noSpace": {
-        "body": "Szabadítsa fel a lemezt és próbálja újra.",
+        "body": "Szabadíts fel lemezterületet, és próbáld újra.",
         "title": "Nincs elég lemezterület"
       },
       "notFound": {
         "body": "Próbáld újra.",
-        "title": "Hiányzó páncélmappa"
+        "title": "Hiányzó széfmappa"
       },
       "passwordTooShort": {
-        "body": "Használjon legalább 12 karaktert.",
-        "title": "Jelszó túl rövid"
+        "body": "Használj legalább 12 karaktert.",
+        "title": "A jelszó túl rövid"
       },
       "permissionDenied": {
-        "body": "Győződjön meg róla, hogy Myne jogosult írni az alkalmazás adatmappájába.",
-        "title": "Nem tudtam írni a páncélterem mappába"
+        "body": "Győződj meg róla, hogy a Myne-nak van jogosultsága írni az alkalmazás adatmappájába.",
+        "title": "Nem sikerült írni a széfmappába"
       },
       "sessionExpired": {
-        "body": "A biztonságuk érdekében a páncélterem létrehozása 10 perc múlva kezdődik. Kezdjük elölről.",
-        "title": "Az ülés lejárt"
+        "body": "A biztonságod érdekében a széf létrehozása 10 perc után lejár. Kezdd elölről.",
+        "title": "A munkamenet lejárt"
       },
       "sessionNotFound": {
-        "body": "Kezdjük elölről az elejétől.",
+        "body": "Kezdd elölről, az elejéről.",
         "title": "A munkamenet nem található"
       },
       "tooManyConcurrentSessions": {
-        "body": "Zárjon be más Myne ablakokat, és próbálja újra.",
-        "title": "Túl sok a páncélterem egyszerre"
+        "body": "Zárj be más Myne-ablakokat, és próbáld újra.",
+        "title": "Túl sok egyidejű széflétrehozás"
       },
       "vaultArtifactsPresent": {
-        "body": "Nem lehet új páncéltermet létrehozni, mert a páncélterem adatai már léteznek ezen az eszközön. Zárja be az alkalmazást, és indítsa újra - a startup képernyő elvezet a feloldó áramláshoz.",
-        "title": "A biztosíték már létezik"
+        "body": "Nem hozható létre új széf, mert ezen az eszközön már léteznek széfadatok. Zárd be az alkalmazást, és indítsd újra — az indítóképernyő a feloldási folyamathoz irányít.",
+        "title": "A széf már létezik"
       },
       "vaultBusyAuth": {
-        "body": "Egy másik páncélterem művelet folyamatban. Próbáld újra egy pillanat alatt.",
-        "title": "Elfoglalt páncélterem"
+        "body": "Egy másik széfművelet van folyamatban. Próbáld újra egy pillanat múlva.",
+        "title": "A széf foglalt"
       }
     },
     "orchestrator": {
       "closePrompt": {
-        "cancelLabel": "Törlés",
-        "message": "A zárás majd kiejti a gyógyulási kifejezést. Folytatod a zárást?",
-        "okLabel": "Azért zárj be",
-        "title": "A páncélterem létrehozása?"
+        "cancelLabel": "Mégse",
+        "message": "A bezárás elveti a helyreállító mondatodat. Folytatod a bezárást?",
+        "okLabel": "Bezárás mindenképp",
+        "title": "Elveted a széf létrehozását?"
       },
       "genericError": {
         "body": "Próbáld újra.",
-        "title": ""
+        "title": "Valami hiba történt"
       }
     },
     "password": {
       "back": "Vissza",
-      "eyebrow": "Lépés a 4 - mester jelszó",
-      "heading": "A széf létrehozása",
-      "helperLead": "Myne nem tárolja a jelszót vagy a helyreállítási kifejezést.",
-      "submit": "A visszanyerési kifejezés generálása"
+      "eyebrow": "1. lépés a 4-ből — mesterjelszó",
+      "heading": "Széf létrehozása",
+      "helperLead": "A Myne nem tárolja a jelszavadat vagy a helyreállító mondatodat.",
+      "submit": "Helyreállító mondat generálása"
     },
     "phrase": {
       "back": "Vissza",
-      "continue": "Megőriztem ezt a kifejezést",
+      "continue": "Elmentettem — mondat megerősítése",
       "copy": "Másolás",
-      "eyebrow": "4. lépés - helyreállítási mondat",
+      "eyebrow": "2. lépés a 4-ből — helyreállító mondat",
       "heading": "Írd le ezt a 24 szót.",
-      "intro": "Ez a mondat, a jelszóval együtt, az egyetlen módja, hogy visszaszerezzük a páncéltermet. Tárolja offline - papír, jelszókezelő, hardver pénztárca. Kezelje készpénzként.",
-      "reveal": "Felfedő kifejezés",
+      "intro": "Ez a mondat a jelszavaddal együtt az egyetlen módja a széfed helyreállításának. Tárold offline — papíron, jelszókezelőben, hardveres pénztárcában. Kezeld úgy, mint a készpénzt.",
+      "reveal": "Mondat felfedése",
       "saveAsFile": "Mentés fájlként"
     },
     "ready": {
-      "backUpNow": "",
-      "backedUp": "Összecsomagolva",
-      "backingUp": "Összeszedem magam..",
-      "backupDefaultFilename": "Myne backup",
-      "backupError": "Az erősítés nem fejeződött be, nem maradt fájl. A Beállítások → Tárolóból bármikor elmehettek.",
-      "backupFilterName": "Myne tartalék",
-      "body": "Myne felírta a széfet az alkalmazás adatmappájára. A mester jelszó és a helyreállítási kifejezés az egyetlen út vissza - győződjön meg róla, hogy mindkét mentett valahol biztonságos.",
-      "decrypting": "Dekódolás..",
-      "done": "",
-      "heading": "A páncélterem készen áll.",
-      "showFolder": "A páncélterem mappájának megjelenítése"
+      "backedUp": "Mentve ✓",
+      "backingUp": "Biztonsági mentés…",
+      "backupDefaultFilename": "Myne mentés.myne-backup",
+      "backupError": "A biztonsági mentés nem fejeződött be — nem maradt fájl utána. Bármikor készíthetsz mentést a Beállítások → Tárhely menüből.",
+      "backupFilterName": "Myne biztonsági mentés",
+      "backUpNow": "Készíts most biztonsági mentést erről a széfről",
+      "body": "A Myne az alkalmazás adatmappájába írta a széfedet. A mesterjelszavad és a helyreállító mondatod az egyetlen út vissza — győződj meg róla, hogy mindkettő biztonságos helyen van mentve.",
+      "decrypting": "Visszafejtés…",
+      "done": "Kész",
+      "heading": "A széfed készen áll.",
+      "showFolder": "Széfmappa megjelenítése"
     },
     "sessionLost": {
-      "startOver": "Újrakezdés"
+      "startOver": "Kezdés elölről"
     }
   },
   "vaultPicker": {
-    "createAnother": "Új páncélterem létrehozása",
-    "heading": "Válasszon páncéltermet",
-    "loading": "A páncéltermek betöltése..",
-    "noneLoaded": "A páncéltermeket nem lehet megtölteni.",
-    "openedRelative": "felbontva {{rel}}",
-    "restoreFromBackup": "Erősítés visszaállítása",
-    "subline": "Több páncélterem is van ezen az eszközön. Válassz egyet a kinyitáshoz.",
-    "vaultFallback": ""
+    "createAnother": "Másik széf létrehozása",
+    "heading": "Válassz széfet",
+    "loading": "Széfek betöltése…",
+    "noneLoaded": "Jelenleg egyetlen széfet sem sikerült betölteni.",
+    "openedRelative": "megnyitva {{rel}}",
+    "restoreFromBackup": "Visszaállítás biztonsági mentésből",
+    "subline": "Egynél több széf van ezen az eszközön. Válassz egyet a feloldáshoz.",
+    "vaultFallback": "{{n}}. széf"
   },
   "vaultRecover": {
     "decrypting": {
-      "caption": "Ez eltart egy darabig.",
-      "eyebrow": "VISSZATÉRÍTÉS",
-      "footerHint": "Ha ez 30 másodpercnél tovább tart, csukja be az ablakot és próbálja újra.",
-      "heading": "Megfejteni a páncéltermet",
-      "subCaption": "Argon2id m = 256 MiB, t = 3, p = 2"
+      "caption": "Ez eltart egy pillanatig.",
+      "eyebrow": "HELYREÁLLÍTÁS · VISSZAFEJTÉS",
+      "footerHint": "Ha ez 30 másodpercnél tovább tart, zárd be az ablakot, és próbáld újra.",
+      "heading": "A széfed visszafejtése",
+      "subCaption": "Folyamatban… Argon2id m=256 MiB, t=3, p=2"
     },
     "passwordReset": {
       "errors": {
-        "cancelledVaultLocked": "A helyreállítás törölve, a páncélterem zárva volt.",
-        "operationInProgress": "Művelet folyamatban. Kérem, várjon.",
-        "unexpected": "Váratlan hiba. Kérem, próbálja újra.",
-        "weakPassword": "Az új jelszónak legalább 12 karakternek kell lennie."
+        "cancelledVaultLocked": "A helyreállítás megszakítva: a széf zárolva volt.",
+        "operationInProgress": "Művelet van folyamatban. Kérlek, várj.",
+        "unexpected": "Váratlan hiba. Kérlek, próbáld újra.",
+        "weakPassword": "Az új jelszónak legalább 12 karakter hosszúnak kell lennie."
       },
-      "eyebrow": "Behajtás · Új jelszó",
-      "helperBody": "A rekreációs kifejezés az açıldı. Eski parola artık çalışmayacak - yeni master parolanı şimdi belirle.",
-      "helperEmphasis": "Helyreállító mondat aynı kalır.",
+      "eyebrow": "Helyreállítás · Új jelszó",
+      "helperBody": "A helyreállító mondatoddal nyílt meg. A régi jelszavad már nem működik — állíts be most egy új mesterjelszót.",
+      "helperEmphasis": "A helyreállító mondatod változatlan marad.",
       "submit": "Új jelszó beállítása",
-      "title": "Új mester jelszó beállítása"
+      "title": "Állíts be egy új mesterjelszót"
     },
     "phrase": {
-      "back": "ð Vissza",
-      "body": "Írja be a gyógyulási kifejezést. 24 BIP-39 szó.",
-      "cellLabel": "Szó {{index}}",
-      "deleteLink": "A páncélterem törlése és újrakezdés",
-      "eyebrow": "Visszatérítés",
-      "submit": "Nyisd ki",
-      "title": "Hozd vissza a páncéltermet."
+      "back": "← Vissza",
+      "body": "Add meg a helyreállító mondatodat. 24 BIP-39 szó.",
+      "cellLabel": "{{index}}. szó",
+      "deleteLink": "Széf törlése és kezdés elölről",
+      "eyebrow": "Helyreállítás",
+      "submit": "Feloldás",
+      "title": "Állítsd helyre a széfedet."
     },
     "select": {
-      "accountInvalid": "Érvénytelen számlaszám. Kérem, ellenőrizze és próbálja újra.",
-      "accountLabel": "Számlaszám (nem kötelező)",
-      "accountPlaceholder": "MY- XXXX- XXXXXX- XXXXXX- X (nem kötelező)",
-      "body": "Válassza ki azt a széfet, amit a 24 szavas helyreállítási mondatával akar helyreállítani. A számlaszámot is be lehet írni, hogy egyenesen ráugorjon.",
-      "cancel": "Törlés",
-      "checking": "Ellenőrzöm..",
-      "loadFailed": "A páncéltermeket nem lehet megtölteni.",
-      "loading": "A páncéltermek betöltése..",
-      "openedRelative": "felbontva {{rel}}",
+      "accountInvalid": "Érvénytelen fiókszám. Kérlek, ellenőrizd, és próbáld újra.",
+      "accountLabel": "Fiókszám (nem kötelező)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (nem kötelező)",
+      "body": "Válaszd ki azt a széfet, amelyet a 24 szavas helyreállító mondatoddal szeretnél helyreállítani. A fiókszámodat is beírhatod, hogy egyenesen rátalálj.",
+      "cancel": "Mégse",
+      "checking": "Ellenőrzés…",
+      "loadFailed": "Jelenleg egyetlen széfet sem sikerült betölteni.",
+      "loading": "Széfek betöltése…",
+      "openedRelative": "megnyitva {{rel}}",
       "or": "vagy",
-      "title": "Válasszon egy páncéltermet, hogy helyreálljon",
-      "useAccountNumber": "Felhasználási számlaszám",
-      "vaultFallback": "Tárolás {{index}}"
+      "title": "Válassz egy helyreállítandó széfet",
+      "useAccountNumber": "Fiókszám használata",
+      "vaultFallback": "{{index}}. széf"
     }
   },
   "vaultSwitcher": {
-    "chipFallback": "Tárolás",
-    "createAnother": "",
-    "switchVaultLabel": "Csere páncélterem",
-    "switching": "váltás..",
-    "vaultFallback": ""
+    "chipFallback": "Széf",
+    "createAnother": "Másik széf létrehozása",
+    "switching": "váltás…",
+    "switchVaultLabel": "Széf váltása",
+    "vaultFallback": "{{n}}. széf"
   },
   "welcome": {
-    "createCta": "Új páncélterem létrehozása",
-    "headlineLine1": "Titkosított jegyzetek.",
-    "headlineLine2": "Nincs e-mail a bejelentkezéskor.",
+    "createCta": "Új széf létrehozása",
+    "headlineLine1": "Titkosított markdown-jegyzetek.",
+    "headlineLine2": "Nincs e-mail a regisztrációkor.",
     "repairResidue": {
-      "cancel": "Törlés",
-      "cleanUp": "Takarítás",
-      "cleaningUp": "Takarítok..",
-      "confirmBody_one": "{{count}} fájl eltávolításra kerül. Már olvashatatlanok, semmi sem vész kárba.",
-      "confirmBody_other": "{{count}} fájlokat eltávolítjuk. Már olvashatatlanok, semmi sem vész kárba.",
-      "confirmTitle": "Kitisztítani a maradék aktákat?",
-      "doneBody_one": "Törölt {{count}} maradék fájl. Most már létrehozhatsz egy új páncéltermet.",
-      "doneBody_other": "Törölt {{count}} maradék fájlok. Most már létrehozhatsz egy új páncéltermet.",
-      "doneTitle": "Tisztított",
-      "errorBody": "Valami rosszul sült el. Zárja be az alkalmazást, és próbálja újra.",
-      "errorTitle": "A takarítás sikertelen",
-      "foundBody_one": "{{count}} A maradék fájl egy korábbi törlésből, ami nem fejeződött be. Ők már olvashatatlanok, nem veszíthetsz el semmit.",
-      "foundBody_other": "A maradék fájlok egy korábbi törlésből, ami nem fejeződött be. Ők már olvashatatlanok, nem veszíthetsz el semmit.",
-      "foundTitle": "Nem teljes törölt fájlok",
-      "partialBody_one": "{{count}} fájl lehet zárolva egy másik alkalmazás (vírusellenes, fájlszinkron, vagy keresési indexelés). Zárja be az alkalmazást, és próbálja újra egy pillanat alatt, vagy távolítsa el a páncélterem mappát kézzel.",
-      "partialBody_other": "{{count}} fájlokat zárolhat egy másik alkalmazás (vírusellenes, fájlszinkronizálás, vagy keresési indexelés). Zárja be az alkalmazást, és próbálja újra egy pillanat alatt, vagy távolítsa el a páncélterem mappát kézzel.",
-      "partialTitle": "Néhány fájlt nem lehet eltávolítani"
+      "cancel": "Mégse",
+      "cleaningUp": "Tisztítás…",
+      "cleanUp": "Tisztítás",
+      "confirmBody_one": "{{count}} fájl lesz eltávolítva. Ezek már olvashatatlanok; semmi visszaállítható nem vész el.",
+      "confirmBody_other": "{{count}} fájl lesz eltávolítva. Ezek már olvashatatlanok; semmi visszaállítható nem vész el.",
+      "confirmTitle": "Eltakarítod a megmaradt fájlokat?",
+      "doneBody_one": "{{count}} megmaradt fájl eltávolítva. Most már létrehozhatsz egy új széfet.",
+      "doneBody_other": "{{count}} megmaradt fájl eltávolítva. Most már létrehozhatsz egy új széfet.",
+      "doneTitle": "Eltakarítva",
+      "errorBody": "Valami hiba történt. Zárd be az alkalmazást, és próbáld újra.",
+      "errorTitle": "A tisztítás meghiúsult",
+      "foundBody_one": "{{count}} megmaradt fájl egy korábbi, be nem fejezett törlésből. Ezek már olvashatatlanok — semmi visszaállíthatót nem fogsz elveszíteni.",
+      "foundBody_other": "{{count}} megmaradt fájl egy korábbi, be nem fejezett törlésből. Ezek már olvashatatlanok — semmi visszaállíthatót nem fogsz elveszíteni.",
+      "foundTitle": "Megmaradt fájlok egy befejezetlen törlésből",
+      "partialBody_one": "{{count}} fájlt zárolhat egy másik alkalmazás (vírusirtó, fájlszinkronizálás vagy keresési indexelés). Zárd be az alkalmazást, és próbáld újra egy pillanat múlva, vagy távolítsd el a széfmappát kézzel.",
+      "partialBody_other": "{{count}} fájlt zárolhat egy másik alkalmazás (vírusirtó, fájlszinkronizálás vagy keresési indexelés). Zárd be az alkalmazást, és próbáld újra egy pillanat múlva, vagy távolítsd el a széfmappát kézzel.",
+      "partialTitle": "Néhány fájlt nem sikerült eltávolítani"
     },
-    "restoreCta": "Erősítés visszaállítása",
-    "subtitle": "A jegyzeteid titkosítva vannak ezen az eszközön, mielőtt elhagynák. A szerver csak a titkosítást tárolja."
+    "restoreCta": "Visszaállítás biztonsági mentésből",
+    "subtitle": "A jegyzeteid ezen az eszközön titkosítódnak, mielőtt elhagynák. A szerver csak titkosított szöveget tárol."
   }
 }

@@ -2,264 +2,266 @@
   "attachments": {
     "cleanUnused": {
       "cancel": "Annuleren",
-      "cleaning": "Schoonmaken..",
+      "cleaning": "Opruimen…",
       "close": "Sluiten",
       "completeTitle": "Opruimen voltooid",
-      "deleteCta_one": "Verwijder {{count}} ongebruikt",
-      "deleteCta_other": "",
-      "error": "Kon niet opruimen. Sommige notities kunnen onleesbaar zijn. Er is niets verwijderd.",
-      "intro_one": "Deze bijlage wordt in geen enkele noot gebruikt. Het verwijderen is permanent en kan niet ongedaan worden gemaakt.",
-      "intro_other": "Deze {{count}} bijlagen worden in geen enkele noot gebruikt. Ze verwijderen is permanent en kan niet ongedaan gemaakt worden.",
-      "summaryFreed": " · bevrijd {{size}}",
+      "deleteCta": "{{count}} ongebruikte verwijderen",
+      "deleteCta_one": "{{count}} ongebruikte verwijderen",
+      "deleteCta_other": "{{count}} ongebruikte verwijderen",
+      "error": "Opruimen mislukt. Sommige notities zijn mogelijk onleesbaar — er is niets verwijderd.",
+      "intro_one": "Deze bijlage wordt in geen enkele notitie gebruikt. Verwijderen is definitief en kan niet ongedaan worden gemaakt.",
+      "intro_other": "Deze {{count}} bijlagen worden in geen enkele notitie gebruikt. Verwijderen is definitief en kan niet ongedaan worden gemaakt.",
+      "summaryFreed": " · {{size}} vrijgemaakt",
       "summaryPeriod": ".",
-      "summaryRemoved_one": "Verwijderde {{count}} bijlage",
-      "summaryRemoved_other": "Verwijderde {{count}} bijlagen",
+      "summaryRemoved_one": "{{count}} bijlage verwijderd",
+      "summaryRemoved_other": "{{count}} bijlagen verwijderd",
+      "summarySkipped": " · {{count}} overgeslagen (nu in gebruik)",
       "summarySkipped_one": " · {{count}} overgeslagen (nu in gebruik)",
-      "summarySkipped_other": "",
-      "title": "Niet-gebruikte bijlagen schoonmaken",
-      "willBeReclaimed": "{{size}} zal worden teruggevorderd."
+      "summarySkipped_other": " · {{count}} overgeslagen (nu in gebruik)",
+      "title": "Ongebruikte bijlagen opruimen",
+      "willBeReclaimed": "{{size}} wordt vrijgemaakt."
     },
     "coverPicker": {
       "close": "Sluiten",
-      "dropHint": "Laat een afbeelding vallen om het als hoes te gebruiken.",
-      "empty": "Nog geen afbeeldingen in deze kluis. Upload één of sleep hier een afbeelding.",
-      "loading": "Laden..",
-      "removeCover": "Afdekdeksel verwijderen",
-      "title": "Kies een hoesafbeelding",
+      "dropHint": "Sleep een afbeelding hierheen om die als omslag te gebruiken.",
+      "empty": "Nog geen afbeeldingen in deze kluis. Upload er een of sleep hier een afbeelding naartoe.",
+      "loading": "Laden…",
+      "removeCover": "Omslag verwijderen",
+      "title": "Kies een omslagafbeelding",
       "upload": "Uploaden"
     },
     "deleteDialog": {
       "cancel": "Annuleren",
       "confirmPrompt": "Deze bijlage definitief verwijderen? Dit kan niet ongedaan worden gemaakt.",
       "delete": "Verwijderen",
-      "deleting": "Verwijderen..",
-      "error": "Kon de bijlage niet verwijderen. Probeer het nog eens.",
-      "notUsed": "Niet gebruikt in een noot.",
-      "stillUsed_one": "Het wordt nog steeds gebruikt in {{count}} noot. Het verwijderen van het laat een grafsteen waar het werd ingebed:",
-      "stillUsed_other": "Het wordt nog steeds gebruikt in {{count}} notities. Het verwijderen van het laat een grafsteen waar het werd ingebed:",
+      "deleting": "Verwijderen…",
+      "error": "De bijlage kon niet worden verwijderd. Probeer het opnieuw.",
+      "notUsed": "In geen enkele notitie gebruikt.",
+      "stillUsed_one": "De bijlage wordt nog gebruikt in {{count}} notitie. Bij verwijderen blijft er een markering achter op de plek waar de bijlage was ingesloten:",
+      "stillUsed_other": "De bijlage wordt nog gebruikt in {{count}} notities. Bij verwijderen blijft er een markering achter op de plek waar de bijlage was ingesloten:",
       "title": "Bijlage verwijderen",
       "untitled": "Naamloos"
     },
     "library": {
       "actionsAriaLabel": "Bijlageacties",
       "actionsTitle": "Acties",
-      "checkUnusedFailedNotice": "Kon niet controleren op ongebruikte bijlagen. Probeer het nog eens.",
-      "checking": "Controleren..",
-      "cleanUnused": "Schoon ongebruikt",
-      "cleanUnusedTitle": "Bijlages verwijderen die niet in een notitie worden gebruikt",
+      "checkUnusedFailedNotice": "Controleren op ongebruikte bijlagen is mislukt. Probeer het opnieuw.",
+      "checking": "Controleren…",
+      "cleanUnused": "Ongebruikte opruimen",
+      "cleanUnusedTitle": "Bijlagen verwijderen die in geen enkele notitie worden gebruikt",
       "colCreated": "Aangemaakt",
       "colName": "Naam",
       "colSize": "Grootte",
       "colType": "Type",
       "colUsedIn": "Gebruikt in",
-      "decrypting": "Bijlagen ontcijferen..",
+      "decrypting": "Bijlagen ontsleutelen…",
       "emptyImportHint": "Importeer een bestand om het in je kluis te bewaren.",
-      "emptyLoadError": "Kon de bijlagencatalogus niet lezen.",
+      "emptyLoadError": "De bijlagencatalogus kon niet worden gelezen.",
       "emptyNoAttachments": "Nog geen bijlagen.",
       "filterAriaLabel": "Filteren op type",
       "gridView": "Rasterweergave",
       "import": "Importeren",
       "importDialogTitle": "Bijlage importeren",
       "importFile": "Een bestand importeren",
-      "importing": "Importeren..",
+      "importing": "Importeren…",
       "listView": "Lijstweergave",
       "menuDelete": "Verwijderen",
-      "menuExport": "Uitvoer",
+      "menuExport": "Exporteren",
       "menuPreview": "Voorbeeld",
       "menuRename": "Hernoemen",
-      "noMatch": "Geen bijlagen bij uw zoekopdracht.",
-      "noUnusedNotice": "Geen ongebruikte bijlagen om schoon te maken.",
+      "noMatch": "Geen bijlagen komen overeen met je zoekopdracht.",
+      "noUnusedNotice": "Geen ongebruikte bijlagen om op te ruimen.",
       "preview": "Voorbeeld",
-      "previewAttachment": "Voorbeeldbijlage",
+      "previewAttachment": "Bijlage als voorbeeld",
       "searchAriaLabel": "Bijlagen zoeken op bestandsnaam",
       "searchPlaceholder": "Zoeken op bestandsnaam",
       "sort": {
         "createdAsc": "Oudste eerst",
         "createdDesc": "Nieuwste eerst",
-        "nameAsc": "Naam",
-        "nameDesc": "Naam"
+        "nameAsc": "Naam A–Z",
+        "nameDesc": "Naam Z–A"
       },
       "sortAriaLabel": "Bijlagen sorteren",
       "supportedFilesFilter": "Ondersteunde bestanden",
       "title": "Bijlagen",
       "typeFilter": {
-        "all": "Alle soorten",
+        "all": "Alle types",
         "audio": "Audio",
         "image": "Afbeeldingen",
-        "other": "Andere",
+        "other": "Overige",
         "pdf": "PDF's"
       },
-      "usedInCount_one": "Gebruikt in {{count}} note",
-      "usedInCount_other": "Gebruikt in {{count}} notes",
-      "usedInLoading": ".."
+      "usedInCount_one": "Gebruikt in {{count}} notitie",
+      "usedInCount_other": "Gebruikt in {{count}} notities",
+      "usedInLoading": "…"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
       "file": "Bestand",
-      "pause": "Pauze",
+      "pause": "Pauzeren",
       "pdfDocument": "PDF-document",
-      "pdfFirstPage": "PDF eerste pagina",
+      "pdfFirstPage": "Eerste pagina van PDF",
       "play": "Afspelen"
     },
     "usedInNotesPopover": {
-      "empty": "Niet gebruikt in een noot.",
+      "empty": "In geen enkele notitie gebruikt.",
       "untitled": "Naamloos"
     }
   },
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "Er is weer een kluisoperatie gaande. Wacht tot het klaar is, probeer het dan opnieuw.",
-        "cancelled": "Back-up geannuleerd. Er is geen dossier achtergelaten.",
+        "authOperationInProgress": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het opnieuw.",
+        "cancelled": "Back-up geannuleerd. Er is geen bestand achtergelaten.",
         "invalidDestination": "Die doelmap is niet bruikbaar.",
-        "ioGeneric": "Kon het reservekopiebestand niet schrijven.",
+        "ioGeneric": "Het back-upbestand kon niet worden geschreven.",
         "ioNoSpace": "Niet genoeg ruimte op de bestemming.",
-        "ioPermissionDenied": "Geen toestemming om te schrijven op de bestemming.",
-        "joinFailure": "De back-up is onverwacht mislukt. Er is geen dossier achtergelaten.",
-        "memberTooLarge": "Een bestand in deze kluis is groter dan het back-upformaat toelaat.",
-        "vaultNotFound": "Geen kluis gevonden om terug te keren.",
-        "verifyFailed": "De geschreven back-up niet geverifieerd, dus het werd weggegooid. Probeer het opnieuw op verschillende media als het herhaalt."
+        "ioPermissionDenied": "Geen toestemming om naar de bestemming te schrijven.",
+        "joinFailure": "De back-up is onverwacht mislukt. Er is geen bestand achtergelaten.",
+        "memberTooLarge": "Een bestand in deze kluis is groter dan de back-upindeling toestaat.",
+        "vaultNotFound": "Geen kluis gevonden om een back-up van te maken.",
+        "verifyFailed": "De geschreven back-up kon niet worden geverifieerd en is daarom verwijderd. Probeer het opnieuw — op een ander medium als het zich blijft voordoen."
       },
       "restore": {
-        "authOperationInProgress": "Er is weer een kluisoperatie gaande. Wacht tot het klaar is, probeer het dan opnieuw.",
-        "cancelled": "Herstel geannuleerd. Er is niets veranderd.",
+        "authOperationInProgress": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het opnieuw.",
+        "cancelled": "Herstel geannuleerd. Er is niets gewijzigd.",
         "damagedBackup": "Het back-upbestand is beschadigd.",
-        "futureVersionBackup": "Deze back-up is gemaakt door een nieuwere versie van Myne. Update Myne, dan herstellen.",
-        "invalidVaultMeta": "De kluis metadata van deze backup is onleesbaar, dus het herstellen kon geen werkende kluis produceren.",
-        "ioGeneric": "Kon het reservekopiebestand niet lezen.",
+        "futureVersionBackup": "Deze back-up is gemaakt met een nieuwere versie van Myne. Werk Myne bij en herstel hem daarna.",
+        "invalidVaultMeta": "De kluismetadata van deze back-up is onleesbaar, dus het herstellen kon geen werkende kluis opleveren.",
+        "ioGeneric": "Het back-upbestand kon niet worden gelezen.",
         "ioPermissionDenied": "Geen toestemming om het back-upbestand te lezen.",
-        "joinFailure": "Herstellen mislukt onverwacht. Er is niets veranderd.",
-        "missingVaultMeta": "Deze back-up mist de metadata van de kluis en kan niet hersteld worden.",
-        "notABackupFile": "Dit bestand is geen Myne back-up.",
-        "vaultAlreadyExists": "Een kluis van deze back-up bestaat al op dit apparaat."
+        "joinFailure": "Herstel is onverwacht mislukt. Er is niets gewijzigd.",
+        "missingVaultMeta": "Deze back-up mist de kluismetadata en kan niet worden hersteld.",
+        "notABackupFile": "Dit bestand is geen Myne-back-up.",
+        "vaultAlreadyExists": "Een kluis uit deze back-up bestaat al op dit apparaat."
       }
     },
     "export": {
       "cancel": "Annuleren",
       "close": "Sluiten",
-      "copying": "Kopiëren {{done}} van {{total}}..",
-      "preparing": "Voorbereiding..",
-      "successToast": "Reservekopie geverifieerd en opgeslagen.",
-      "title": "Terugkluis",
-      "verifying": "Controleren {{done}} van {{total}}.."
+      "copying": "{{done}} van {{total}} kopiëren…",
+      "preparing": "Voorbereiden…",
+      "successToast": "Back-up geverifieerd en opgeslagen.",
+      "title": "Back-up van kluis maken",
+      "verifying": "{{done}} van {{total}} verifiëren…"
     }
   },
   "clipper": {
     "pairing": {
       "accept": "Accepteren",
       "close": "Sluiten",
-      "codeAriaLabel": "Code paring",
-      "intro": "Bevestig deze code komt overeen met die in de extensie, vervolgens accepteren om te koppelen.",
+      "codeAriaLabel": "Koppelcode",
+      "intro": "Bevestig dat deze code overeenkomt met die in de extensie en kies Accepteren om te koppelen.",
       "reject": "Weigeren",
-      "rejected": "Pairing afgewezen.",
-      "title": "Een browserextensie wil verbinden"
+      "rejected": "Koppeling geweigerd.",
+      "title": "Een browserextensie wil verbinding maken"
     }
   },
   "commandPalette": {
     "archivedBadge": "Archief",
     "archivedBadgeTitle": "Gearchiveerd",
     "dialogLabel": "Opdrachtpalet",
-    "matchedInBody": "gematcht in lichaam",
+    "matchedInBody": "↳ gevonden in tekst",
     "noMatches": "Geen overeenkomsten",
-    "searchPlaceholder": "Zoek notities of voer een opdracht uit om Esc te verwerpen",
-    "sectionCommands": "Commando's",
-    "sectionNotes": "Opmerkingen",
+    "searchPlaceholder": "Zoek notities of voer een opdracht uit — Esc om te sluiten",
+    "sectionCommands": "Opdrachten",
+    "sectionNotes": "Notities",
     "untitledNote": "Naamloos"
   },
   "commands": {
     "actions": {
       "backupVault": {
-        "label": "Achteruit kluis"
+        "label": "Back-up van kluis maken…"
       },
       "category": {
         "app": "App",
         "editor": "Editor",
         "vault": "Kluis",
-        "view": "Beeld"
+        "view": "Weergave"
       },
       "convertWikilinks": {
-        "label": "Geïmporteerde wikilinks omzetten in deze notitie.."
+        "label": "Geïmporteerde wikilinks in deze notitie omzetten…"
       },
       "deleteWorkspace": {
-        "label": "Werkblad verwijderen.."
+        "label": "Werkruimte verwijderen…"
       },
       "exportNoteHtml": {
-        "label": "Notitie exporteren als HTML.."
+        "label": "Notitie exporteren als HTML…"
       },
       "exportNoteMarkdown": {
-        "label": "Notitie exporteren als Markdown.."
+        "label": "Notitie exporteren als Markdown…"
       },
       "exportNotePdf": {
-        "label": "Notitie exporteren als PDF.."
+        "label": "Notitie exporteren als PDF…"
       },
       "exportNoteTxt": {
-        "label": "Notitie exporteren als platte tekst.."
+        "label": "Notitie exporteren als platte tekst…"
       },
       "exportVaultMarkdown": {
-        "label": "Kluis exporteren als Markdown.."
+        "label": "Kluis exporteren als Markdown…"
       },
       "foldAll": {
-        "label": "Vouw alles"
+        "label": "Alles inklappen"
       },
       "importBaseView": {
-        "label": ".base-weergave importeren.."
+        "label": ".base-weergave importeren…"
       },
       "importObsidian": {
-        "label": "Obsidiaan-kluis importeren.."
+        "label": "Obsidian-kluis importeren…"
       },
       "lockVault": {
-        "label": "Slotkluis"
+        "label": "Kluis vergrendelen"
       },
       "manageTemplates": {
-        "label": "Sjablonen beheren.."
+        "label": "Sjablonen beheren…"
       },
       "newNoteFromTemplate": {
-        "label": "Nieuwe notitie van sjabloon.."
+        "label": "Nieuwe notitie op basis van sjabloon…"
       },
       "openAttachments": {
-        "label": "Bijlagen openen.."
+        "label": "Bijlagen openen…"
       },
       "openSettings": {
-        "label": "Instellingen openen.."
+        "label": "Instellingen openen…"
       },
       "openSnapshots": {
-        "label": "Snapshots.."
+        "label": "Momentopnamen…"
       },
       "openTodayNote": {
-        "label": "De notitie van vandaag openen"
+        "label": "Notitie van vandaag openen"
       },
       "randomNote": {
-        "label": "Random note openen"
+        "label": "Willekeurige notitie openen"
       },
       "renameWorkspace": {
-        "label": "Werkblad hernoemen.."
+        "label": "Werkruimte hernoemen…"
       },
       "saveWorkspaceAs": {
-        "label": "Werkruimte opslaan als.."
+        "label": "Werkruimte opslaan als…"
       },
       "showGraph": {
-        "label": "Grafiekweergave tonen.."
+        "label": "Grafiekweergave tonen…"
       },
       "showTags": {
-        "label": "Tags doorbladeren.."
+        "label": "Tags doorbladeren…"
       },
       "showViews": {
-        "label": "Beelden doorbladeren.."
+        "label": "Weergaven doorbladeren…"
       },
       "switchWorkspace": {
-        "label": "Werkruimte wisselen.."
+        "label": "Werkruimte wisselen…"
       },
       "toggleFocus": {
         "label": "Focusmodus aan/uit"
       },
       "toggleLeftSidebar": {
-        "label": "Zijbalk tonen aan/uit"
+        "label": "Notitiezijbalk aan/uit"
       },
       "toggleReading": {
         "label": "Leesweergave aan/uit"
       },
       "toggleRightSidebar": {
-        "label": "Achterwaartse links aan-/uitschakelen zijbalk"
+        "label": "Backlinkszijbalk aan/uit"
       },
       "toggleSource": {
         "label": "Bronmodus aan/uit"
@@ -268,45 +270,45 @@
         "label": "Gestapelde tabbladen aan/uit"
       },
       "unfoldAll": {
-        "label": "Alles ontvouwen"
+        "label": "Alles uitklappen"
       }
     },
     "hotkeys": {
       "command": {
         "bold": "Vet",
         "closeTab": "Tabblad sluiten",
-        "cycleHeadingLevel": "Niveau cyclusrichting",
-        "cycleTabs": "Cyclustabbladen",
-        "deleteWorkspace": "Werkblad verwijderen",
-        "focusNextPane": "Volgende paneel focussen",
-        "focusPrevPane": "Vorig paneel focussen",
-        "foldAll": "Vouw alles",
-        "inlineCode": "Inlinecode",
+        "cycleHeadingLevel": "Kopniveau doorlopen",
+        "cycleTabs": "Tabbladen doorlopen",
+        "deleteWorkspace": "Werkruimte verwijderen",
+        "focusNextPane": "Volgend deelvenster focussen",
+        "focusPrevPane": "Vorig deelvenster focussen",
+        "foldAll": "Alles inklappen",
+        "inlineCode": "Inline-code",
         "insertWikilink": "Wikilink invoegen",
         "italic": "Cursief",
-        "navigateBack": "Terugvigeren",
-        "navigateForward": "Voorwaarts navigeren",
-        "newNote": "Nieuwe noot",
+        "navigateBack": "Terug navigeren",
+        "navigateForward": "Vooruit navigeren",
+        "newNote": "Nieuwe notitie",
         "openSettings": "Instellingen openen",
-        "paletteToggle": "Open commandopalet",
-        "renameWorkspace": "Werkblad hernoemen",
-        "saveWorkspaceAs": "Werkblad opslaan als",
-        "selectAllScoped": "Alles selecteren (gescoopt)",
+        "paletteToggle": "Opdrachtpalet openen",
+        "renameWorkspace": "Werkruimte hernoemen",
+        "saveWorkspaceAs": "Werkruimte opslaan als",
+        "selectAllScoped": "Alles selecteren (binnen bereik)",
         "showGraphView": "Grafiekweergave tonen",
-        "splitPaneDown": "Paneel splitsen (af)",
-        "splitPaneRight": "Paneel splitsen (rechts)",
-        "switchWorkspace": "Werkblad wisselen",
-        "toggleBulletList": "Koppellijst aan/uit",
+        "splitPaneDown": "Deelvenster splitsen (omlaag)",
+        "splitPaneRight": "Deelvenster splitsen (rechts)",
+        "switchWorkspace": "Werkruimte wisselen",
+        "toggleBulletList": "Opsommingslijst aan/uit",
         "toggleFocusMode": "Focusmodus aan/uit",
         "toggleNumberedList": "Genummerde lijst aan/uit",
         "toggleReadingView": "Leesweergave aan/uit",
         "toggleSourceMode": "Bronmodus aan/uit",
-        "toggleTaskList": "Taaklijst aan/uit",
-        "unfoldAll": "Alles ontvouwen"
+        "toggleTaskList": "Takenlijst aan/uit",
+        "unfoldAll": "Alles uitklappen"
       }
     },
     "rebind": {
-      "invalidChordReason": "Voeg een modifier (."
+      "invalidChordReason": "Voeg een modifier toe (⌘, Ctrl of Alt) — een toets op zichzelf kan geen sneltoets zijn."
     }
   },
   "common": {
@@ -321,51 +323,53 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Kon {{filename}} niet exporteren.",
-        "exported": "Geexporteerd {{filename}}.",
-        "renameFailed": "Kon de bijlage niet hernoemen.",
+        "exportFailed": "{{filename}} kon niet worden geëxporteerd.",
+        "exported": "{{filename}} geëxporteerd.",
+        "renameFailed": "De bijlage kon niet worden hernoemd.",
         "renamed": "Hernoemd naar {{name}}.",
-        "saveDialogFailed": "Kon het dialoogvenster Opslaan niet openen."
+        "saveDialogFailed": "Het opslagvenster kon niet worden geopend."
       },
       "convert": {
         "cancel": "Annuleren",
         "confirm": "Omzetten",
-        "skipped": "overgeslagen {{note}}",
-        "subtitleEmpty": "Niets om te converteren geen bronbestanden opgelost.",
-        "subtitle_one": "1 verwijzing wordt herschreven. Beoordelen voor het plegen.",
-        "subtitle_other": "{{count}} referenties worden herschreven. Beoordelen voor het plegen.",
+        "skipped": "overgeslagen — {{note}}",
+        "subtitleEmpty": "Niets om om te zetten — geen bronbestanden gevonden.",
+        "subtitle_one": "1 verwijzing wordt herschreven. Controleer voordat je doorgaat.",
+        "subtitle_other": "{{count}} verwijzingen worden herschreven. Controleer voordat je doorgaat.",
         "title": "Geïmporteerde bijlagen omzetten"
       },
       "convertCommand": {
         "pickerSourceFilter": "Bijlagebron"
       },
       "convertCore": {
+        "converted": "{{count}} omgezet",
         "converted_one": "{{count}} omgezet",
-        "converted_other": "",
-        "noneToConvert": "Geen geïmporteerde bijlagen om in deze notitie te converteren.",
+        "converted_other": "{{count}} omgezet",
+        "noneToConvert": "Geen geïmporteerde bijlagen om om te zetten in deze notitie.",
         "skipNote": {
-          "failed": "importeren mislukt",
+          "failed": "import mislukt",
           "locked": "kluis vergrendeld",
           "notFound": "bron niet gevonden",
-          "tooLarge": "te groot (max 64 MiB)",
-          "unsupported": "niet ondersteund type"
+          "tooLarge": "te groot (max. 64 MiB)",
+          "unsupported": "niet-ondersteund type"
         },
+        "skippedSuffix": " · {{count}} overgeslagen",
         "skippedSuffix_one": " · {{count}} overgeslagen",
-        "skippedSuffix_other": ""
+        "skippedSuffix_other": " · {{count}} overgeslagen"
       },
       "fileKind": {
         "generic": "Bestand",
         "label": {
           "archive": "Archief",
           "audio": "Audio",
-          "cHeader": "C-kop",
-          "cSource": "C bron",
-          "cppSource": "C++ bron",
+          "cHeader": "C-header",
+          "cSource": "C-broncode",
+          "cppSource": "C++-broncode",
           "css": "CSS",
           "csv": "CSV",
           "document": "Document",
-          "ebook": "Ebook",
-          "go": "Ga",
+          "ebook": "E-book",
+          "go": "Go",
           "html": "HTML",
           "image": "Afbeelding",
           "java": "Java",
@@ -373,31 +377,31 @@
           "json": "JSON",
           "keynote": "Keynote",
           "log": "Logbestand",
-          "markdown": "Markering",
-          "numbers": "Nummers spreadsheet",
-          "pages": "Document van pagina's",
+          "markdown": "Markdown",
+          "numbers": "Numbers-spreadsheet",
+          "pages": "Pages-document",
           "pdf": "PDF",
           "presentation": "Presentatie",
           "python": "Python",
-          "richText": "Rijk tekstdocument",
-          "rust": "Roest",
+          "richText": "Rich text-document",
+          "rust": "Rust",
           "shell": "Shellscript",
           "spreadsheet": "Spreadsheet",
-          "svg": "SVG afbeelding",
+          "svg": "SVG-afbeelding",
           "text": "Tekstdocument",
           "toml": "TOML",
           "tsv": "TSV",
           "typescript": "TypeScript",
           "video": "Video",
-          "word": "Woorddocument",
+          "word": "Word-document",
           "xml": "XML",
           "yaml": "YAML"
         },
-        "unknown": "{{ext}} bestand"
+        "unknown": "{{ext}}-bestand"
       },
       "lightbox": {
         "close": "Voorbeeld sluiten",
-        "export": "Uitvoer",
+        "export": "Exporteren",
         "exportAria": "Bijlage exporteren",
         "imagePreview": "Afbeeldingsvoorbeeld",
         "pdfFallback": "PDF",
@@ -407,21 +411,21 @@
         "actionsAria": "Bijlageacties"
       },
       "pdf": {
-        "loading": "Laden.."
+        "loading": "Laden…"
       },
       "picker": {
-        "openFailed": "Kon de file picker niet openen."
+        "openFailed": "De bestandskiezer kon niet worden geopend."
       },
       "progress": {
-        "encrypting": "Versleutelen..",
-        "importing": "Importeren..",
-        "loading": "Laden.."
+        "encrypting": "Versleutelen…",
+        "importing": "Importeren…",
+        "loading": "Laden…"
       },
       "recording": {
-        "barAria": "Voicenote opnemen",
+        "barAria": "Spraaknotitie opnemen",
         "cancel": "Annuleren",
-        "noAudio": "Geen audio gedetecteerd, controleer je microfoon.",
-        "saving": "Opslaan..",
+        "noAudio": "Geen audio gedetecteerd — controleer je microfoon.",
+        "saving": "Opslaan…",
         "stop": "Stoppen"
       },
       "rename": {
@@ -430,75 +434,77 @@
         "title": "Bijlage hernoemen"
       },
       "summary": {
+        "added": "{{count}} toegevoegd",
         "added_one": "{{count}} toegevoegd",
-        "added_other": "",
+        "added_other": "{{count}} toegevoegd",
         "reason": {
           "failed": "mislukt",
           "locked": "kluis vergrendeld",
           "tooLarge": "te groot",
-          "unsupported": "niet ondersteund type"
+          "unsupported": "niet-ondersteund type"
         },
+        "skipped": "{{count}} overgeslagen: {{noun}}",
         "skipped_one": "{{count}} overgeslagen: {{noun}}",
-        "skipped_other": ""
+        "skipped_other": "{{count}} overgeslagen: {{noun}}"
       },
       "voice": {
         "startError": {
-          "alreadyRecording": "Een opname is al bezig.",
-          "captureFailed": "Kon niet starten met opnemen van de microfoontoegang in systeeminstellingen.",
-          "generic": "Ik kon niet beginnen met opnemen.",
-          "locked": "Ontgrendel je kluis om een voicenota op te nemen.",
+          "alreadyRecording": "Er is al een opname bezig.",
+          "captureFailed": "Opname kon niet worden gestart — controleer de microfoontoegang in Systeeminstellingen.",
+          "generic": "Opname kon niet worden gestart.",
+          "locked": "Ontgrendel je kluis om een spraaknotitie op te nemen.",
           "noInputDevice": "Geen microfoon gevonden. Sluit er een aan en probeer het opnieuw."
         },
         "stopError": {
-          "captureFailed": "Opname is mislukt, controleer uw microfoon.",
+          "captureFailed": "Opname is mislukt — controleer je microfoon.",
           "emptyRecording": "Er is niets opgenomen.",
-          "generic": "Kon de opname niet opslaan.",
-          "silentRecording": "Opname was stil en weggegooid Controleer uw microfoon."
+          "generic": "De opname kon niet worden opgeslagen.",
+          "silentRecording": "De opname was stil en is verwijderd — controleer je microfoon."
         }
       },
       "widget": {
         "audio": {
-          "pause": "Pauze",
+          "pause": "Pauzeren",
           "play": "Afspelen",
-          "seek": "Zoeken"
+          "seek": "Verschuiven"
         },
         "menu": {
-          "export": "Uitvoer",
+          "export": "Exporteren",
           "remove": "Verwijderen",
           "rename": "Hernoemen",
-          "reveal": "Onthullen in bibliotheek"
+          "reveal": "Tonen in bibliotheek"
         },
         "pdfFallback": "PDF",
         "tombstone": {
-          "brokenAria": "Gebroken bijlagereferentie: {{filename}}",
-          "brokenLabel": "gebroken",
+          "brokenAria": "Verbroken bijlageverwijzing: {{filename}}",
+          "brokenLabel": "verbroken",
           "deletedAria": "Verwijderde bijlage: {{filename}}",
-          "deletedLabel": "geschrapt"
+          "deletedLabel": "verwijderd"
         },
         "urlImageFallback": "afbeelding"
       }
     },
     "callout": {
       "label": {
-        "attention": "Attentie",
+        "attention": "Let op",
         "bug": "Bug",
-        "caution": "Voorzichtigheid",
+        "caution": "Voorzichtig",
         "danger": "Gevaar",
         "done": "Klaar",
         "error": "Fout",
         "example": "Voorbeeld",
-        "failure": "Fout",
-        "faq": "VEELGESTELDE VRAGEN",
+        "failure": "Mislukt",
+        "faq": "Veelgestelde vragen",
         "hint": "Hint",
         "important": "Belangrijk",
-        "info": "Informatie",
-        "missing": "Ontbrekend",
-        "note": "Opmerking",
+        "info": "Info",
+        "missing": "Ontbreekt",
+        "note": "Notitie",
         "question": "Vraag",
         "quote": "Citaat",
-        "success": "Succes",
+        "success": "Geslaagd",
         "tip": "Tip",
-        "todo": "Taken",
+        "todo": "Te doen",
         "warning": "Waarschuwing"
       }
     },
@@ -506,100 +512,106 @@
       "backlinks": {
         "archivedBadge": "Gearchiveerd",
         "empty": "Nog geen backlinks.",
-        "linkedFrom_one": "Gekoppeld van {{count}}",
-        "linkedFrom_other": "",
+        "linkedFrom": "Gelinkt vanuit {{count}}",
+        "linkedFrom_one": "Gelinkt vanuit {{count}}",
+        "linkedFrom_other": "Gelinkt vanuit {{count}}",
         "untitled": "Naamloos"
       },
       "barItems": {
         "graph": "Grafiek",
         "lock": "Vergrendelen",
-        "saveStatus": "Status opslaan",
+        "saveStatus": "Opslagstatus",
         "settings": "Instellingen",
-        "syncStatus": "Status synchroniseren",
+        "syncStatus": "Synchronisatiestatus",
         "tags": "Tags",
-        "viewMode": "Beeldmodus",
+        "viewMode": "Weergavemodus",
         "views": "Weergaven",
         "wordCount": "Aantal woorden",
-        "workspace": "Werkblad"
+        "workspace": "Werkruimte"
       },
       "baseImport": {
-        "droppedFiltersSuffix_one": " · {{count}} filters gevallen",
-        "droppedFiltersSuffix_other": "",
-        "failed": "Importeren mislukt.",
-        "fileFilterName": "Obsidiaanbasis",
-        "imported_one": "Geïmporteerd {{count}} weergave(s)",
-        "imported_other": "",
-        "notValid": "Geen geldig .base bestand.",
+        "droppedFiltersSuffix": " · {{count}} filters weggelaten",
+        "droppedFiltersSuffix_one": " · {{count}} filter weggelaten",
+        "droppedFiltersSuffix_other": " · {{count}} filters weggelaten",
+        "failed": "Import mislukt.",
+        "fileFilterName": "Obsidian Base",
+        "imported": "{{count}} weergave(n) geïmporteerd",
+        "imported_one": "{{count}} weergave geïmporteerd",
+        "imported_other": "{{count}} weergaven geïmporteerd",
+        "notValid": "Geen geldig .base-bestand.",
+        "skippedSuffix": " · {{count}} overgeslagen",
         "skippedSuffix_one": " · {{count}} overgeslagen",
-        "skippedSuffix_other": "",
-        "stoppedAfter_one": "Importeren gestopt na {{count}} view(s).",
-        "stoppedAfter_other": ""
+        "skippedSuffix_other": " · {{count}} overgeslagen",
+        "stoppedAfter": "Import gestopt na {{count}} weergave(n).",
+        "stoppedAfter_one": "Import gestopt na {{count}} weergave.",
+        "stoppedAfter_other": "Import gestopt na {{count}} weergaven."
       },
       "bottomBar": {
-        "browseTags": "Door tags bladeren",
-        "browseViews": "Beelden doorbladeren",
-        "cycleViewMode": "Cyclusweergavemodus",
+        "browseTags": "Tags doorbladeren",
+        "browseViews": "Weergaven doorbladeren",
+        "cycleViewMode": "Weergavemodus doorlopen",
         "docStats": {
-          "summarySelectionSuffix": " (zelf)",
+          "summarySelectionSuffix": " (sel.)",
           "summary_one": "{{count}} woord · {{characters}} tekens",
           "summary_other": "{{count}} woorden · {{characters}} tekens",
           "titleSelectionSuffix": " (selectie)",
           "title_one": "{{characters}} tekens · {{words}} woorden · {{spaces}} spaties · {{count}} alinea",
           "title_other": "{{characters}} tekens · {{words}} woorden · {{spaces}} spaties · {{count}} alinea's"
         },
-        "graphTitle": "Grafiek",
+        "graphTitle": "Grafiek (⌘⇧G)",
         "lock": "Vergrendelen",
-        "lockVault": "Slotkluis",
+        "lockVault": "Kluis vergrendelen",
         "openSettings": "Instellingen openen",
-        "settingsTitle": "Instellingen",
+        "settingsTitle": "Instellingen (⌘,)",
         "showGraph": "Grafiekweergave tonen",
         "syncStatus": "Alleen lokaal · niet gesynchroniseerd",
         "tagsTitle": "Tags",
-        "togglePreview": "Side-by-side voorbeeld aan/uit",
-        "viewModeTitle": "Weergavemodus: {{mode}} (klik om te fietsen)",
+        "togglePreview": "Voorbeeld naast elkaar aan/uit",
+        "viewModeTitle": "Weergavemodus: {{mode}} (klik om te wisselen)",
         "viewsTitle": "Weergaven"
       },
       "import": {
-        "imported_one": "Geïmporteerde {{count}} note{{skipped}}",
-        "imported_other": "Geïmporteerde {{count}} noten{{skipped}}",
+        "imported_one": "{{count}} notitie geïmporteerd{{skipped}}",
+        "imported_other": "{{count}} notities geïmporteerd{{skipped}}",
+        "skippedSuffix": " · {{count}} overgeslagen",
         "skippedSuffix_one": " · {{count}} overgeslagen",
-        "skippedSuffix_other": ""
+        "skippedSuffix_other": " · {{count}} overgeslagen"
       },
       "nav": {
         "goBack": "Ga terug",
         "goForward": "Ga vooruit"
       },
-      "noNotesToOpen": "Geen notities te openen.",
-      "resizeBacklinksSidebar": "Zijbalk backlinks verkleinen",
-      "resizeNotesSidebar": "Grootte notities zijbalk wijzigen",
+      "noNotesToOpen": "Geen notities om te openen.",
+      "resizeBacklinksSidebar": "Backlinkszijbalk vergroten/verkleinen",
+      "resizeNotesSidebar": "Notitiezijbalk vergroten/verkleinen",
       "sidebarToggle": {
-        "hideBacklinks": "Achterwaartse links zijbalk verbergen",
-        "hideNotes": "Zijbalk tonen verbergen",
-        "showBacklinks": "Zijbalk backlinks tonen",
-        "showNotes": "Zijbalk tonen"
+        "hideBacklinks": "Backlinkszijbalk verbergen",
+        "hideNotes": "Notitiezijbalk verbergen",
+        "showBacklinks": "Backlinkszijbalk tonen",
+        "showNotes": "Notitiezijbalk tonen"
       },
       "switchingOverlay": {
-        "saving": "Opslaan.."
+        "saving": "Opslaan…"
       },
       "viewMode": {
-        "live": "Levend",
+        "live": "Live",
         "reading": "Lezen",
         "source": "Bron"
       },
       "workspacePrompt": {
-        "namePlaceholder": "Werkbladnaam",
+        "namePlaceholder": "Naam werkruimte",
         "renameConfirm": "Hernoemen",
-        "renameTitle": "Werkblad hernoemen",
-        "saveAsTitle": "Werkblad opslaan als",
+        "renameTitle": "Werkruimte hernoemen",
+        "saveAsTitle": "Werkruimte opslaan als",
         "saveConfirm": "Opslaan"
       },
       "workspaceSwitcher": {
-        "defaultName": "Werkblad",
-        "renameItemLabel": "Werkblad hernoemen {{name}}",
-        "renameTitle": "Werkblad hernoemen",
-        "saveCurrentAs": "Huidige opslaan als..",
-        "switchLabel": "Werkblad wisselen",
-        "toggleTitle": "Werkblad: {{name}}"
+        "defaultName": "Werkruimte",
+        "renameItemLabel": "Werkruimte {{name}} hernoemen",
+        "renameTitle": "Werkruimte hernoemen",
+        "saveCurrentAs": "Huidige opslaan als…",
+        "switchLabel": "Werkruimte wisselen",
+        "toggleTitle": "Werkruimte: {{name}}"
       }
     },
     "codeBlock": {
@@ -607,63 +619,63 @@
       "defaultBadge": "code"
     },
     "find": {
-      "close": "Dichtbij vinden",
-      "matchCase": "Match case",
+      "close": "Zoeken sluiten",
+      "matchCase": "Hoofdlettergevoelig",
       "matchCount": "{{current}} van {{total}}",
-      "nextMatch": "Volgende wedstrijd",
+      "nextMatch": "Volgende overeenkomst",
       "noMatches": "Geen overeenkomsten",
-      "placeholder": "Zoek in noot",
+      "placeholder": "Zoeken in notitie",
       "previousMatch": "Vorige overeenkomst",
       "replaceAll": "Alles vervangen",
       "replaceAllCount": "Alles vervangen ({{total}})",
       "replaceOne": "Vervangen",
       "replacePlaceholder": "Vervangen door",
-      "toggleReplace": "Vervangen schakelen"
+      "toggleReplace": "Vervangen aan/uit"
     },
     "folding": {
-      "clickToUnfold": "Klik om te ontvouwen",
-      "unfold": "Ontvouwen"
+      "clickToUnfold": "Klik om uit te klappen",
+      "unfold": "Uitklappen"
     },
     "footnote": {
       "heading": "Voetnoten",
-      "unreferenced": "ongereferentied"
+      "unreferenced": "niet-verwezen"
     },
     "frontmatter": {
       "addProperty": "+ Eigenschap toevoegen",
       "propertiesLabel": "Eigenschappen",
-      "titleAriaLabel": "Titel noot",
+      "titleAriaLabel": "Notitietitel",
       "titlePlaceholder": "Naamloos"
     },
     "mermaid": {
-      "rendering": "Schema wordt gerenderd.."
+      "rendering": "Diagram renderen…"
     },
     "slash": {
       "attachFile": "Bestand bijvoegen",
-      "bulletList": "Kogellijst",
-      "callout": "Oproep",
+      "bulletList": "Opsommingslijst",
+      "callout": "Callout",
       "date": "Datum",
       "day": "Dag",
-      "divider": "Divider",
-      "heading1": "Rubriek 1",
-      "heading2": "Rubriek 2",
-      "heading3": "Rubriek 3",
-      "heading4": "Rubriek 4",
-      "heading5": "Rubriek 5",
-      "heading6": "Rubriek 6",
-      "link": "Verband",
+      "divider": "Scheidingslijn",
+      "heading1": "Kop 1",
+      "heading2": "Kop 2",
+      "heading3": "Kop 3",
+      "heading4": "Kop 4",
+      "heading5": "Kop 5",
+      "heading6": "Kop 6",
+      "link": "Link",
       "now": "Nu",
       "numberedList": "Genummerde lijst",
       "quote": "Citaat",
       "table": "Tabel",
       "time": "Tijd",
       "todoList": "Takenlijst",
-      "voiceNote": "Stemnotitie",
-      "wikiLink": "Wiki-link"
+      "voiceNote": "Spraaknotitie",
+      "wikiLink": "Wikilink"
     },
     "spell": {
       "menu": {
         "addToDictionary": "Toevoegen aan woordenboek",
-        "ignoreInVault": "Negeer in deze kluis",
+        "ignoreInVault": "Negeren in deze kluis",
         "ignoreThisSession": "Deze sessie negeren",
         "noSuggestions": "Geen suggesties"
       }
@@ -674,8 +686,8 @@
       "cellAriaLabel": "Tabelcel",
       "deleteColumn": "Kolom verwijderen",
       "deleteRow": "Rij verwijderen",
-      "reorderColumn": "Kolom herschikken",
-      "reorderRow": "Rij herschikken"
+      "reorderColumn": "Kolom herordenen",
+      "reorderRow": "Rij herordenen"
     },
     "toolbar": {
       "apply": "Toepassen",
@@ -686,21 +698,21 @@
         "h4": "H4",
         "h5": "H5",
         "h6": "H6",
-        "paragraph": "Paragraaf"
+        "paragraph": "Alinea"
       },
       "highlight": {
-        "blue": "Mavi",
-        "green": "Yeşil",
-        "pink": "Pembe",
-        "purple": "Mor",
-        "yellow": "Sarı"
+        "blue": "Blauw",
+        "green": "Groen",
+        "pink": "Roze",
+        "purple": "Paars",
+        "yellow": "Geel"
       },
-      "urlPlaceholder": "Link-URL plakken"
+      "urlPlaceholder": "Plak link-URL"
     },
     "typography": {
       "contentWidth": {
-        "full": "Vol",
-        "narrow": "Narrow",
+        "full": "Volledig",
+        "narrow": "Smal",
         "normal": "Normaal",
         "wide": "Breed"
       },
@@ -710,8 +722,8 @@
       },
       "lineSpacing": {
         "normal": "Normaal",
-        "relaxed": "Ontspannen",
-        "tight": "Strak"
+        "relaxed": "Ruim",
+        "tight": "Krap"
       },
       "textSize": {
         "lg": "Groot",
@@ -722,22 +734,22 @@
     },
     "wikilink": {
       "chip": {
-        "embed": "Ingebed: {{label}}"
+        "embed": "Insluiten: {{label}}"
       },
       "convert": {
         "cancel": "Annuleren",
-        "choiceClause_one": " · {{count}} heeft een keuze nodig.",
-        "choiceClause_other": " · {{count}} hebben een keuze nodig.",
-        "chooseTarget": "Kies doel..",
+        "choiceClause_one": " · voor {{count}} is een keuze nodig.",
+        "choiceClause_other": " · voor {{count}} is een keuze nodig.",
+        "chooseTarget": "Kies doel…",
         "convert": "Omzetten",
-        "convertedToast_one": "{{count}} wikilink geconverteerd",
-        "convertedToast_other": "{{count}} wikilinks geconverteerd",
-        "noneToConvert": "Geen geïmporteerde wikilinks om in deze notitie te converteren.",
-        "nothingToConvert": "Niets om te converteren naar een geïmporteerde wikilinks oplossing.",
+        "convertedToast_one": "{{count}} wikilink omgezet",
+        "convertedToast_other": "{{count}} wikilinks omgezet",
+        "noneToConvert": "Geen geïmporteerde wikilinks om om te zetten in deze notitie.",
+        "nothingToConvert": "Niets om om te zetten — geen geïmporteerde wikilinks gevonden.",
         "rewriteCount_one": "{{count}} link wordt herschreven",
         "rewriteCount_other": "{{count}} links worden herschreven",
-        "skipped": "overgeslagen {{reason}}",
-        "title": "Geïmporteerde wikilinks omzetten in deze noot"
+        "skipped": "overgeslagen — {{reason}}",
+        "title": "Geïmporteerde wikilinks in deze notitie omzetten"
       },
       "convertCore": {
         "noMatch": "geen overeenkomst"
@@ -746,70 +758,70 @@
   },
   "export": {
     "note": {
-      "documentTitleFallback": "Opmerking",
+      "documentTitleFallback": "Notitie",
       "errors": {
-        "attachmentCorrupt": "Een bijlage waarnaar deze noot verwijst kon niet worden gelezen, dus niets werd geëxporteerd.",
+        "attachmentCorrupt": "Een bijlage waarnaar deze notitie verwijst kon niet worden gelezen, dus er is niets geëxporteerd.",
         "attachmentMissing": "Een bijlage waarnaar deze notitie verwijst ontbreekt, dus er is niets geëxporteerd.",
         "cannotDecrypt": "Deze notitie kon niet worden gelezen.",
         "destinationUnusable": "Die doelmap is niet bruikbaar.",
-        "fallback": "Exporteren is onverwacht mislukt. Probeer het nog eens.",
-        "invalidAttachmentCatalog": "De bijlagecatalogus van de kluis kon niet worden gelezen, dus er werd niets geëxporteerd.",
+        "fallback": "Export is onverwacht mislukt. Probeer het opnieuw.",
+        "invalidAttachmentCatalog": "De bijlagencatalogus van de kluis kon niet worden gelezen, dus er is niets geëxporteerd.",
         "invalidNoteFilename": "Die bestandsnaam is niet bruikbaar, dus er is niets geëxporteerd.",
-        "invalidNoteId": "Deze notitie kon niet worden geïdentificeerd, dus niets werd geëxporteerd.",
-        "invalidPlaintextEncoding": "De inhoud van deze notitie lijkt beschadigd, dus er is niets geëxporteerd. Herstel het van een back-up.",
+        "invalidNoteId": "Deze notitie kon niet worden geïdentificeerd, dus er is niets geëxporteerd.",
+        "invalidPlaintextEncoding": "De inhoud van deze notitie lijkt beschadigd, dus er is niets geëxporteerd. Herstel hem vanuit een back-up.",
         "ioNoSpace": "Niet genoeg ruimte op de bestemming.",
-        "ioPermissionDenied": "Geen toestemming om te schrijven op de bestemming.",
-        "ioWriteDefault": "Kon het geëxporteerde bestand niet schrijven.",
-        "noteNotFound": "Deze noot bestaat niet meer .",
-        "pdfCaptureFailed": "De PDF kon niet worden gegenereerd, dus er werd niets geëxporteerd.",
-        "pdfExportInProgress": "Er wordt al een PDF-export uitgevoerd. Wacht tot het klaar is, probeer het dan opnieuw.",
-        "pdfPayloadMissing": "De export werd onderbroken als de kluis vergrendeld, ontgrendelen en opnieuw proberen.",
-        "pdfRenderTimeout": "De nota duurde te lang om te maken, dus niets werd geëxporteerd.",
-        "pdfWindowCreateFailed": "Het exportvenster kon niet worden geopend, dus er werd niets geëxporteerd.",
-        "targetExists": "Een bestand met die naam bestaat al op de bestemming.",
-        "vaultLocked": "De kluis is gesloten. Ontgrendel het, probeer het dan opnieuw."
+        "ioPermissionDenied": "Geen toestemming om naar de bestemming te schrijven.",
+        "ioWriteDefault": "Het geëxporteerde bestand kon niet worden geschreven.",
+        "noteNotFound": "Deze notitie bestaat niet meer — mogelijk is hij verwijderd.",
+        "pdfCaptureFailed": "De PDF kon niet worden gegenereerd, dus er is niets geëxporteerd.",
+        "pdfExportInProgress": "Er wordt al een PDF geëxporteerd. Wacht tot die klaar is en probeer het opnieuw.",
+        "pdfPayloadMissing": "De export werd onderbroken — als de kluis is vergrendeld, ontgrendel hem dan en probeer het opnieuw.",
+        "pdfRenderTimeout": "Het renderen van de notitie duurde te lang, dus er is niets geëxporteerd.",
+        "pdfWindowCreateFailed": "Het exportvenster kon niet worden geopend, dus er is niets geëxporteerd.",
+        "targetExists": "Er bestaat al een bestand met die naam op de bestemming.",
+        "vaultLocked": "De kluis is vergrendeld. Ontgrendel hem en probeer het opnieuw."
       },
       "flow": {
         "couldNotRead": "Deze notitie kon niet worden gelezen.",
-        "exportedTo": "Geexporteerd naar {{filename}}",
-        "exportedToWithAttachments_one": "Geexporteerd naar {{filename}} + {{count}} bijlage",
-        "exportedToWithAttachments_other": "Geexporteerd naar {{filename}} + {{count}} bijlagen",
-        "exportedToWithImages_one": "Geexporteerd naar {{filename}} + {{count}} afbeelding",
-        "exportedToWithImages_other": "Geexporteerd naar {{filename}} + {{count}} afbeeldingen",
+        "exportedTo": "Geëxporteerd naar {{filename}}",
+        "exportedToWithAttachments_one": "Geëxporteerd naar {{filename}} + {{count}} bijlage",
+        "exportedToWithAttachments_other": "Geëxporteerd naar {{filename}} + {{count}} bijlagen",
+        "exportedToWithImages_one": "Geëxporteerd naar {{filename}} + {{count}} afbeelding",
+        "exportedToWithImages_other": "Geëxporteerd naar {{filename}} + {{count}} afbeeldingen",
         "filterHtml": "HTML",
-        "filterMarkdown": "Markering",
+        "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
         "filterPlainText": "Platte tekst",
-        "showInFolder": "Toon in map"
+        "showInFolder": "Tonen in map"
       },
       "modal": {
         "cancel": "Annuleren",
-        "export": "Exporteren..",
-        "includeAttachments_one": "Inclusief {{count}} bijlage",
-        "includeAttachments_other": "Inclusief {{count}} bijlagen",
-        "title": "Exporteren als markdown"
+        "export": "Exporteren…",
+        "includeAttachments_one": "{{count}} bijlage opnemen",
+        "includeAttachments_other": "{{count}} bijlagen opnemen",
+        "title": "Exporteren als Markdown"
       }
     },
     "pdf": {
       "cancel": "Annuleren",
-      "continue": "Ga door..",
+      "continue": "Doorgaan…",
       "title": "Exporteren als PDF"
     },
     "vault": {
-      "chooseDestinationDialogTitle": "Kies waar de export geplaatst moet worden",
+      "chooseDestinationDialogTitle": "Kies waar de export moet komen",
       "errors": {
-        "attachmentCorrupt": "Een bijlage waarnaar een noot verwijst kon niet worden gelezen, dus er werd niets geëxporteerd.",
-        "attachmentMissing": "Een bijlage waarnaar een noot verwijst ontbreekt, dus er is niets geëxporteerd.",
-        "authOperationInProgress": "Er is weer een kluisoperatie gaande. Wacht tot het klaar is, probeer het dan opnieuw.",
-        "cancelled": "Uitvoer geannuleerd. Er was niets over op de bestemming.",
-        "cannotDecrypt": "Een notitie kon niet gelezen worden, dus er werd niets geëxporteerd.",
-        "destinationAlreadyExists": "Er bestaat al iets op die locatie. Kies een verse plek voor de export.",
-        "destinationNotAllowed": "Die locatie ligt in Myne's eigen opslagruimte. Kies een map erbuiten.",
-        "invalidPlaintextEncoding": "De inhoud van een notitie lijkt beschadigd, dus er is niets geëxporteerd. Herstel het van een back-up.",
-        "invalidVaultMeta": "De metadata van de kluis konden niet worden gelezen, dus er werd niets geëxporteerd.",
-        "ioWriteDefault": "Kon de export niet schrijven.",
-        "joinFailure": "Exporteren is onverwacht mislukt. Er was niets over op de bestemming.",
-        "vaultLocked": "De kluis is gesloten. Ontgrendel het, probeer het dan opnieuw.",
+        "attachmentCorrupt": "Een bijlage waarnaar een notitie verwijst kon niet worden gelezen, dus er is niets geëxporteerd.",
+        "attachmentMissing": "Een bijlage waarnaar een notitie verwijst ontbreekt, dus er is niets geëxporteerd.",
+        "authOperationInProgress": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het opnieuw.",
+        "cancelled": "Export geannuleerd. Er is niets op de bestemming achtergebleven.",
+        "cannotDecrypt": "Een notitie kon niet worden gelezen, dus er is niets geëxporteerd.",
+        "destinationAlreadyExists": "Er bestaat al iets op die locatie. Kies een lege plek voor de export.",
+        "destinationNotAllowed": "Die locatie ligt binnen de eigen opslag van Myne. Kies een map daarbuiten.",
+        "invalidPlaintextEncoding": "De inhoud van een notitie lijkt beschadigd, dus er is niets geëxporteerd. Herstel hem vanuit een back-up.",
+        "invalidVaultMeta": "De metadata van de kluis kon niet worden gelezen, dus er is niets geëxporteerd.",
+        "ioWriteDefault": "De export kon niet worden geschreven.",
+        "joinFailure": "Export is onverwacht mislukt. Er is niets op de bestemming achtergebleven.",
+        "vaultLocked": "De kluis is vergrendeld. Ontgrendel hem en probeer het opnieuw.",
         "vaultNotFound": "Geen kluis gevonden om te exporteren."
       },
       "flow": {
@@ -817,93 +829,93 @@
         "countAttachments_other": "{{count}} bijlagen",
         "countFolders_one": "{{count}} map",
         "countFolders_other": "{{count}} mappen",
-        "countNotes_one": "{{count}} noot",
-        "countNotes_other": "{{count}} noten",
-        "exclusionsHistory": "Versiegeschiedenis niet inbegrepen.",
-        "exclusionsTrashedAndHistory_one": "{{count}} vernietigde notitie en versiegeschiedenis niet inbegrepen.",
-        "exclusionsTrashedAndHistory_other": "{{count}} vernietigde notities en versiegeschiedenis niet inbegrepen.",
-        "exclusionsTrashed_one": "{{count}} niet inbegrepen.",
-        "exclusionsTrashed_other": "{{count}} niet inbegrepen.",
+        "countNotes_one": "{{count}} notitie",
+        "countNotes_other": "{{count}} notities",
+        "exclusionsHistory": "Versiegeschiedenis niet opgenomen.",
+        "exclusionsTrashedAndHistory_one": "{{count}} verwijderde notitie en versiegeschiedenis niet opgenomen.",
+        "exclusionsTrashedAndHistory_other": "{{count}} verwijderde notities en versiegeschiedenis niet opgenomen.",
+        "exclusionsTrashed_one": "{{count}} verwijderde notitie niet opgenomen.",
+        "exclusionsTrashed_other": "{{count}} verwijderde notities niet opgenomen.",
         "phaseAttachments": "bijlagen",
-        "phaseNotes": "opmerkingen",
-        "preparing": "Voorbereiding..",
+        "phaseNotes": "notities",
+        "preparing": "Voorbereiden…",
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
         "cancel": "Annuleren",
-        "cancelling": "Annuleren..",
-        "title": "Exporteren.."
+        "cancelling": "Annuleren…",
+        "title": "Exporteren…"
       },
       "setup": {
         "cancel": "Annuleren",
-        "choose": "Kies..",
-        "chooseFolder": "Een map kiezen..",
+        "choose": "Kiezen…",
+        "chooseFolder": "Een map kiezen…",
         "destinationLabel": "Bestemming",
-        "export": "Exporteren..",
+        "export": "Exporteren…",
         "folderSelectAriaLabel": "Map om te exporteren",
-        "noFolderChosen": "Geen map geselecteerd",
+        "noFolderChosen": "Geen map gekozen",
         "noFoldersInVault": "Geen mappen in deze kluis",
         "scopeFolder": "Eén map",
-        "scopeLabel": "Toepassingsgebied",
-        "scopeWhole": "Gehele kluis",
-        "title": "Kluis exporteren als markdown"
+        "scopeLabel": "Bereik",
+        "scopeWhole": "Hele kluis",
+        "title": "Kluis exporteren als Markdown"
       },
       "summary": {
         "done": "Klaar",
-        "showInFolder": "Toon in map",
-        "title": "Uitvoer voltooid"
+        "showInFolder": "Tonen in map",
+        "title": "Export voltooid"
       }
     }
   },
   "failClosed": {
     "corrupted": {
-      "body": "Als u een back-up hebt, kunt u deze herstellen, uw huidige bestanden worden niet aangeraakt; de back-up wordt eerst hersteld als een aparte kluis.",
+      "body": "Als je een back-up hebt, kun je die herstellen — je huidige bestanden blijven onaangeroerd; de back-up wordt eerst als aparte kluis hersteld.",
       "cta": "App sluiten",
-      "title": "Vault-bestand is beschadigd."
+      "title": "Kluisbestand is beschadigd."
     },
     "invalidState": {
-      "body": "Herstart.",
+      "body": "Start opnieuw op.",
       "cta": "Vergrendelen",
-      "title": "Onverwachte toestand."
+      "title": "Onverwachte status."
     },
     "ioError": {
-      "body": "Dit kan een disk- of bestandssysteemfout zijn.",
+      "body": "Dit kan een schijf- of bestandssysteemfout zijn.",
       "cta": "App sluiten",
       "title": "Kan het kluisbestand niet lezen."
     },
     "permissionDenied": {
-      "body": "Bestandsrechten controleren.",
+      "body": "Controleer de bestandsrechten.",
       "cta": "App sluiten",
-      "title": "Geen toestemming om toegang te krijgen tot het kluisbestand."
+      "title": "Geen toestemming om het kluisbestand te openen."
     },
-    "restoreFromBackup": "Herstel van back-up.."
+    "restoreFromBackup": "Herstellen vanuit back-up…"
   },
   "notes": {
     "archive": {
       "close": "Sluiten",
       "countEmpty": "Leeg",
-      "count_one": "{{count}} noot",
-      "count_other": "{{count}} noten",
+      "count_one": "{{count}} notitie",
+      "count_other": "{{count}} notities",
       "delete": "Verwijderen",
-      "deleteError": "Kon dat briefje niet verwijderen. Probeer het nog eens.",
+      "deleteError": "Die notitie kon niet worden verwijderd. Probeer het opnieuw.",
       "emptyState": "Het archief is leeg.",
       "restore": "Herstellen",
-      "restoreError": "Kon dat briefje niet herstellen. Probeer het nog eens.",
+      "restoreError": "Die notitie kon niet worden hersteld. Probeer het opnieuw.",
       "title": "Archief",
       "untitled": "Naamloos"
     },
     "cardMenu": {
-      "copyLink": "Verwijzing kopiëren",
-      "open": "Open",
+      "copyLink": "Link kopiëren",
+      "open": "Openen",
       "openInNewTab": "In nieuw tabblad openen",
-      "revealInFolder": "Onthullen in map"
+      "revealInFolder": "Tonen in map"
     },
     "colorLabels": {
       "clay": "Klei",
       "moss": "Mos",
-      "ochre": "Ochre",
+      "ochre": "Oker",
       "plum": "Pruim",
-      "slate": "Slate",
+      "slate": "Leigrijs",
       "stone": "Steen"
     },
     "decoration": {
@@ -923,29 +935,29 @@
       "warning": "Dit kan niet ongedaan worden gemaakt."
     },
     "filterBuilder": {
-      "addCondition": "Conditie toevoegen",
+      "addCondition": "Voorwaarde toevoegen",
       "addFilterGroup": "Filtergroep toevoegen",
       "cancel": "Annuleren",
       "combinator": {
         "all": "alle",
-        "any": "alle"
+        "any": "een van de"
       },
-      "match": "Match",
+      "match": "Overeenkomst",
       "negate": {
         "is": "is",
         "isNot": "is niet"
       },
-      "noConditions": "Er zijn nog geen voorwaarden voor deze weergave.",
-      "noteCount_one": "{{count}} noot",
-      "noteCount_other": "{{count}} noten",
+      "noConditions": "Nog geen voorwaarden — deze weergave toont alle pagina's.",
+      "noteCount_one": "{{count}} notitie",
+      "noteCount_other": "{{count}} notities",
       "of": "van:",
       "ofTheGroups": "van de groepen:",
       "removeCondition": "Voorwaarde verwijderen",
       "replaceFilter": "Filter vervangen",
       "save": "Opslaan",
       "searchTextPlaceholder": "zoektekst",
-      "selectFolderPlaceholder": "een map selecteren..",
-      "selectTagPlaceholder": "selecteer een tag..",
+      "selectFolderPlaceholder": "selecteer een map…",
+      "selectTagPlaceholder": "selecteer een tag…",
       "type": {
         "folder": "Map",
         "search": "Zoeken",
@@ -955,33 +967,33 @@
       "unresolved": "onopgelost"
     },
     "folderManagement": {
-      "illegalSegment": "Een mapnaam kan / \\ .",
+      "illegalSegment": "Een mapnaam mag geen / \\ | # ^ [ ] bevatten en niet met een spatie beginnen of eindigen.",
       "tooLong": "Dat mappad is te lang."
     },
     "folderNote": {
       "defaultTitle": "Index"
     },
     "folderRow": {
-      "createFolderNote": "Mapnotitie aanmaken",
+      "createFolderNote": "Mapnotitie maken",
       "empty": "leeg",
       "folderNote": "mapnotitie",
       "openFolderNote": "Mapnotitie openen"
     },
     "graph": {
-      "allConnected": "Alles is met elkaar verbonden.",
-      "building": "Een grafiek maken..",
-      "depthToggleTitle": "Schakelen van buurtdiepte (1 ↔ 2 hop)",
-      "filterAll": "Alles",
-      "filterAroundNote": "Rondom deze noot",
+      "allConnected": "Alles is verbonden — geen geïsoleerde notities.",
+      "building": "Grafiek opbouwen…",
+      "depthToggleTitle": "Buurtdiepte wisselen (1 ↔ 2 stappen)",
+      "filterAll": "Alle",
+      "filterAroundNote": "Rond deze notitie",
       "filterByTag": "Filteren op tag",
       "filterIsolated": "Geïsoleerd",
-      "hop": "{{depth}} hop",
-      "loading": "Grafiek wordt geladen..",
-      "noNotes": "Nog geen aantekeningen op grafiek.",
-      "overCap": "Deze kluis is groot, de hele kluis grafiek is afgesloten. Filter naar een tag of toon geïsoleerde notities om te verkennen.",
-      "refresh": "Verversen",
-      "refreshTitle": "De kluis is veranderd",
-      "tagPlaceholder": "Tag.."
+      "hop": "{{depth}} stap",
+      "loading": "Grafiek laden…",
+      "noNotes": "Nog geen notities om in een grafiek te tonen.",
+      "overCap": "Deze kluis is groot — de grafiek van de hele kluis is begrensd. Filter op een tag of toon geïsoleerde notities om te verkennen.",
+      "refresh": "Vernieuwen",
+      "refreshTitle": "De kluis is gewijzigd — bouw de grafiek opnieuw op",
+      "tagPlaceholder": "Tag…"
     },
     "import": {
       "base": {
@@ -989,166 +1001,172 @@
       },
       "modal": {
         "cancel": "Annuleren",
+        "cancelledNotImported": "{{count}} niet geïmporteerd",
         "cancelledNotImported_one": "{{count}} niet geïmporteerd",
-        "cancelledNotImported_other": "",
-        "cancelling": "Annuleren..",
-        "chooseFolder": "Map kiezen..",
+        "cancelledNotImported_other": "{{count}} niet geïmporteerd",
+        "cancelling": "Annuleren…",
+        "chooseFolder": "Map kiezen…",
         "close": "Sluiten",
         "closeAriaLabel": "Sluiten",
         "copied": "Gekopieerd",
         "copy": "Kopiëren",
         "done": "Klaar",
-        "errorBody": "De import kon niet worden voltooid. Alle reeds geïmporteerde notities werden bewaard en zijn veilig te bewaren of te verwijderen.",
-        "flagDetail": "{{kind}}.",
+        "errorBody": "De import kon niet worden voltooid. Alle al geïmporteerde notities zijn bewaard en je kunt ze veilig houden of verwijderen.",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
         "flagKindFolder": "Map",
         "flagKindTitle": "Titel",
-        "folderPickerTitle": "Kies uw Obsidian-kluismap",
-        "hiddenIgnoredPrefix_one": "{{count}} config / verborgen item genegeerd (bijv. ",
-        "hiddenIgnoredPrefix_other": "{{count}} config / verborgen items genegeerd (bijv. ",
+        "folderPickerTitle": "Kies je Obsidian-kluismap",
+        "hiddenIgnoredPrefix_one": "{{count}} config-/verborgen item genegeerd (bijv. ",
+        "hiddenIgnoredPrefix_other": "{{count}} config-/verborgen items genegeerd (bijv. ",
         "hiddenIgnoredSuffix": ", dotfiles).",
         "ifNoteExistsLabel": "Als er al een notitie bestaat",
         "import": "Importeren",
-        "importFailed": "Importeren mislukt.",
-        "importing": "Uw kluis importeren..",
-        "markDone": "Markeren gedaan",
-        "markedDone": "Gemarkeerd",
+        "importFailed": "Import mislukt.",
+        "importing": "Je kluis importeren…",
+        "markDone": "Markeren als klaar",
+        "markedDone": "Gemarkeerd als klaar",
+        "mediaImported": "{{count}} geïmporteerd",
         "mediaImported_one": "{{count}} geïmporteerd",
-        "mediaImported_other": "",
+        "mediaImported_other": "{{count}} geïmporteerd",
+        "mediaOmittedSuffix": " · {{count}} weggelaten",
         "mediaOmittedSuffix_one": " · {{count}} weggelaten",
-        "mediaOmittedSuffix_other": "",
-        "needsAttention": "Heeft aandacht nodig",
-        "needsAttentionHelp": "Deze notities werden ongewijzigd ingevoerd. Voorgestelde fixes zijn startpunten .",
-        "noFolderChosen": "Geen map geselecteerd",
-        "notesImported_one": "geïmporteerde notitie",
-        "notesImported_other": "geïmporteerde notities",
-        "policyCopyHint": "Breng het naast de bestaande noot.",
+        "mediaOmittedSuffix_other": " · {{count}} weggelaten",
+        "needsAttention": "Vereist aandacht",
+        "needsAttentionHelp": "Deze notities zijn ongewijzigd geïmporteerd. De voorgestelde correcties zijn startpunten — kopieer er een en hernoem de notitie wanneer je hem opent.",
+        "noFolderChosen": "Geen map gekozen",
+        "notesImported_one": "notitie geïmporteerd",
+        "notesImported_other": "notities geïmporteerd",
+        "policyCopyHint": "Voeg het toe naast de bestaande notitie.",
         "policyCopyLabel": "Importeren als kopie",
-        "policySkipHint": "Aanbevolen opnieuw uitvoeren van een import nooit dupliceert of overschrijft.",
+        "policySkipHint": "Aanbevolen — een import opnieuw uitvoeren dupliceert of overschrijft nooit.",
         "policySkipLabel": "Overslaan",
-        "preexistingDetail": "Deze noot had al een eigen map: .",
-        "preparing": "Voorbereiding..",
-        "progressNotes": " opmerkingen",
+        "preexistingDetail": "Deze notitie had al een eigen map: “{{existing}}”, die Myne heeft behouden — die map kan afwijken van waar de notitie op schijf stond.",
+        "preparing": "Voorbereiden…",
+        "progressNotes": " notities",
         "progressOf": " van ",
-        "reasonIllegalChar": "bevat een karakter dat Myne niet kan gebruiken in een naam",
-        "reasonPathTooLong": "de map + titel pad is te lang",
+        "reasonIllegalChar": "bevat een teken dat Myne niet in een naam kan gebruiken",
+        "reasonPathTooLong": "het pad van map + titel is te lang",
         "reasonSegmentTooLong": "naam is langer dan Myne toestaat",
-        "scanning": "Je kluis scannen..",
-        "setupIntro": "Richt Myne op je bestaande Obsidian kluis map. Elke Markdown note wordt geïmporteerd en versleuteld ter plaatse, niets verlaat dit apparaat, en uw originele bestanden worden ongemoeid gelaten.",
+        "scanning": "Je kluis scannen…",
+        "setupIntro": "Wijs Myne naar je bestaande Obsidian-kluismap. Elke Markdown-notitie wordt direct geïmporteerd en versleuteld — niets verlaat dit apparaat en je originele bestanden blijven onaangeroerd.",
         "statCancelled": "Geannuleerd",
-        "statCanvasSkipped": ".canvas bestanden overgeslagen",
-        "statEmptyFoldersKept": "Lege mappen bewaard",
+        "statCanvasSkipped": ".canvas-bestanden overgeslagen",
+        "statEmptyFoldersKept": "Lege mappen behouden",
         "statMedia": "Media",
-        "statOtherSkipped": "Andere bestanden overgeslagen",
-        "statSkipped": "Overgeslagen (bestaande)",
+        "statOtherSkipped": "Overige bestanden overgeslagen",
+        "statSkipped": "Overgeslagen (bestaan al)",
         "suggestedNameAriaLabel": "Voorgestelde naam",
-        "titleComplete": "Importeren voltooid",
-        "titleFailed": "Importeren mislukt",
-        "titleSetup": "Obsidiaan-kluis importeren",
+        "titleComplete": "Import voltooid",
+        "titleFailed": "Import mislukt",
+        "titleSetup": "Obsidian-kluis importeren",
         "vaultFolderLabel": "Kluismap",
-        "vaultRoot": "(gewelf wortel)"
+        "vaultRoot": "(kluiswortel)"
       },
       "offer": {
-        "body": "Breng uw bestaande notities naar Myne. Elk wordt versleuteld als het geïmporteerd .. niets verlaat dit apparaat, en uw originele bestanden blijven precies waar ze zijn.",
-        "chooseFolder": "Map kiezen..",
-        "laterHint": "U kunt altijd later importeren vanuit Instellingen → Opslag.",
+        "body": "Breng je bestaande notities naar Myne. Elke notitie wordt versleuteld zodra die wordt geïmporteerd — niets verlaat dit apparaat en je originele bestanden blijven precies waar ze zijn.",
+        "chooseFolder": "Map kiezen…",
+        "laterHint": "Je kunt later altijd importeren via Instellingen → Opslag.",
         "notNow": "Niet nu",
-        "title": "Je Obsidiaan kluis importeren?"
+        "title": "Je Obsidian-kluis importeren?"
       }
     },
     "list": {
       "addToFavorites": "Aan favorieten toevoegen",
       "archive": "Archief",
-      "archiveBulkError": "Kon de notities niet archiveren.",
-      "archiveNote": "Archief",
-      "archiveSingleError": "Kon het briefje niet archiveren.",
+      "archiveBulkError": "De notities konden niet worden gearchiveerd.",
+      "archiveNote": "Archiveren",
+      "archiveSingleError": "De notitie kon niet worden gearchiveerd.",
       "attachments": "Bijlagen",
-      "bulkArchive_one": "Archief {{count}} notities",
-      "bulkArchive_other": "",
-      "bulkDelete_one": "{{count}} tonen verwijderen",
-      "bulkDelete_other": "",
-      "bulkMove_one": "{{count}} notities verplaatsen naar..",
-      "bulkMove_other": "",
-      "caseMergeBody": "Er bestaat al een map met de naam \"X16X.\" Deze zullen mergen met een hernoemen om ze gescheiden te houden?",
-      "color": "Kleur",
-      "createFirstNote": "+ Maak uw eerste noot",
-      "createFolderNote": "Mapnotitie aanmaken",
-      "customize": "Aanpassen..",
+      "bulkArchive": "{{count}} notities archiveren",
+      "bulkArchive_one": "{{count}} notitie archiveren",
+      "bulkArchive_other": "{{count}} notities archiveren",
+      "bulkDelete": "{{count}} notities verwijderen",
+      "bulkDelete_one": "{{count}} notitie verwijderen",
+      "bulkDelete_other": "{{count}} notities verwijderen",
+      "bulkMove": "{{count}} notities verplaatsen naar…",
+      "bulkMove_one": "{{count}} notitie verplaatsen naar…",
+      "bulkMove_other": "{{count}} notities verplaatsen naar…",
+      "caseMergeBody": "Er bestaat al een map met de naam “{{name}}”. Deze worden samengevoegd — wil je er een hernoemen om ze gescheiden te houden?",
+      "color": "Kleur…",
+      "createFirstNote": "+ Maak je eerste notitie",
+      "createFolderNote": "Mapnotitie maken",
+      "customize": "Aanpassen…",
       "delete": "Verwijderen",
-      "deleteFolderBody_one": "“{{name}}” and its {{count}} note",
-      "deleteFolderBody_other": "“{{name}}” and its {{count}} notes",
+      "deleteFolderBody_one": "“{{name}}” en de {{count}} notitie erin",
+      "deleteFolderBody_other": "“{{name}}” en de {{count}} notities erin",
       "deleteFolderConfirm": "Map verwijderen",
       "deleteFolderTitle": "Deze map verwijderen?",
-      "deleteFolderWarning": "De notities verplaatsen naar de prullenbak U kunt ze later herstellen.",
+      "deleteFolderWarning": "De notities gaan naar de prullenbak — je kunt ze later herstellen.",
       "duplicate": "Dupliceren",
       "editFilterTitle": "Filter bewerken",
-      "emptyState": "Nog geen aantekeningen.",
-      "exportHtml": "Exporteren als HTML..",
-      "exportMarkdown": "Exporteren als Markdown..",
-      "exportPdf": "Als PDF exporteren..",
-      "exportTxt": "Als platte tekst exporteren..",
+      "emptyState": "Nog geen notities.",
+      "exportHtml": "Exporteren als HTML…",
+      "exportMarkdown": "Exporteren als Markdown…",
+      "exportPdf": "Exporteren als PDF…",
+      "exportTxt": "Exporteren als platte tekst…",
       "favoritesHeading": "Favorieten",
       "mergeAnyway": "Toch samenvoegen",
       "newFolder": "Nieuwe map",
       "newFolderInPlaceholder": "Nieuwe map in {{path}}",
       "newFolderPlaceholder": "Nieuwe map",
-      "newNote": "Nieuwe noot",
-      "newNoteFromTemplate": "Nieuwe notitie van sjabloon..",
-      "newNoteHere": "Nieuwe noot hier",
-      "newNoteMenu": "Nieuwe noot",
-      "newNoteShortcut": "Nieuwe noot (",
+      "newNote": "Nieuwe notitie",
+      "newNoteFromTemplate": "Nieuwe notitie op basis van sjabloon…",
+      "newNoteHere": "Nieuwe notitie hier",
+      "newNoteMenu": "Nieuwe notitie",
+      "newNoteShortcut": "Nieuwe notitie (⌘N)",
       "newSubfolder": "Nieuwe submap",
       "newViewTitle": "Nieuwe weergave",
-      "noteMovedToTrash": "Notitie verplaatst naar prullenbak",
-      "notesHeading": "Opmerkingen",
-      "notesMovedToTrash_one": "{{count}} note verplaatst naar prullenbak",
-      "notesMovedToTrash_other": "{{count}} notities verplaatst naar prullenbak",
+      "noteMovedToTrash": "Notitie naar prullenbak verplaatst",
+      "notesHeading": "Notities",
+      "notesMovedToTrash_one": "{{count}} notitie naar prullenbak verplaatst",
+      "notesMovedToTrash_other": "{{count}} notities naar prullenbak verplaatst",
       "openArchive": "Archief openen",
       "openAttachments": "Bijlagen openen",
       "openFolderNote": "Mapnotitie openen",
       "openInNewTab": "In nieuw tabblad openen",
-      "openToSide": "Aan de zijkant openen",
+      "openToSide": "Naast elkaar openen",
       "openTrash": "Prullenbak openen",
-      "removeAsFolderNote": "Verwijderen als map notitie",
+      "removeAsFolderNote": "Niet meer als mapnotitie gebruiken",
       "removeFromFavorites": "Uit favorieten verwijderen",
       "rename": "Hernoemen",
-      "setAsFolderNote": "Als mapnotitie instellen",
+      "setAsFolderNote": "Instellen als mapnotitie",
       "trash": "Prullenbak",
-      "trashBulkError": "Kon de notities niet naar de prullenbak verplaatsen.",
-      "trashSingleError": "Ik kon het briefje niet naar de prullenbak verplaatsen.",
+      "trashBulkError": "De notities konden niet naar de prullenbak worden verplaatst.",
+      "trashSingleError": "De notitie kon niet naar de prullenbak worden verplaatst.",
       "undo": "Ongedaan maken",
       "vaultRoot": "Kluiswortel",
-      "viewSettingsTitle": "Beeldinstellingen"
+      "viewSettingsTitle": "Weergave-instellingen"
     },
     "newFromTemplate": {
       "back": "Terug",
-      "blankNote": "Lege noot",
-      "createNote": "Notities maken",
+      "blankNote": "Lege notitie",
+      "createNote": "Notitie maken",
       "emptyState": "Je hebt nog geen sjablonen gemaakt.",
       "listLabel": "Sjablonen",
-      "loading": "Laden..",
-      "nameLabel": "Naam van de noot (vanaf {{templateName}}",
+      "loading": "Laden…",
+      "nameLabel": "Naam voor de notitie (op basis van “{{templateName}}”)",
       "namePlaceholder": "Naamloos",
-      "nameStepTitle": "Noem deze noot",
-      "pickStepTitle": "Nieuwe noot uit sjabloon",
+      "nameStepTitle": "Geef deze notitie een naam",
+      "pickStepTitle": "Nieuwe notitie op basis van sjabloon",
       "untitledTemplate": "Naamloos sjabloon"
     },
     "newTab": {
-      "createNote": "Een nieuwe notitie aanmaken",
-      "noNotesMatch": "Geen notities die overeenkomen.",
-      "noNotesYet": "Nog geen aantekeningen.",
-      "searchAriaLabel": "Zoek notities om te openen",
-      "searchPlaceholder": "Doorzoek notities..",
+      "createNote": "Een nieuwe notitie maken",
+      "noNotesMatch": "Geen notities komen overeen.",
+      "noNotesYet": "Nog geen notities.",
+      "searchAriaLabel": "Notities zoeken om te openen",
+      "searchPlaceholder": "Notities zoeken…",
       "untitled": "Naamloos"
     },
     "pane": {
       "graphTab": "Grafiek",
-      "loading": "Laden..",
+      "loading": "Laden…",
       "untitledView": "Naamloze weergave"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dagen geleden",
-      "hoursAgo": "{{h}} h geleden",
-      "justNow": "net",
+      "hoursAgo": "{{h}} u geleden",
+      "justNow": "zojuist",
       "minutesAgo": "{{m}} min geleden",
       "oneWeekAgo": "1 week geleden",
       "weeksAgo": "{{w}} weken geleden",
@@ -1157,122 +1175,122 @@
     "row": {
       "addToFavorites": "Aan favorieten toevoegen",
       "folderIndexBadgeLabel": "Mapnotitie",
-      "folderIndexBadgeTitle": "Mapnotitie De index van deze map",
-      "folderIndexConflictLabel": "Map heeft al een indexnoot",
-      "folderIndexConflictTitle": "Deze map heeft al een index notitie",
-      "loadError": "Kon deze notitie niet laden",
+      "folderIndexBadgeTitle": "Mapnotitie — de index van deze map",
+      "folderIndexConflictLabel": "Map heeft al een indexnotitie",
+      "folderIndexConflictTitle": "Deze map heeft al een indexnotitie",
+      "loadError": "Deze notitie kon niet worden geladen",
       "removeFromFavorites": "Uit favorieten verwijderen",
       "renameAriaLabel": "Notitie hernoemen",
       "untitled": "Naamloos"
     },
     "saveStatus": {
       "editing": "Bewerken",
-      "editingEllipsis": "Bewerken..",
-      "editingTitle": "Het bewerken van autosave is bewapend",
-      "justNow": "net",
+      "editingEllipsis": "Bewerken…",
+      "editingTitle": "Bewerken — automatisch opslaan staat klaar",
+      "justNow": "zojuist",
       "retry": "Opnieuw proberen",
       "saveFailed": "Opslaan mislukt",
-      "saveFailedTitle": "Opslaan mislukt Klik op Opnieuw proberen",
+      "saveFailedTitle": "Opslaan mislukt — klik op Opnieuw proberen",
       "saved": "Opgeslagen",
       "savedRelative": "Opgeslagen {{rel}}",
       "saving": "Opslaan",
-      "savingEllipsis": "Opslaan.."
+      "savingEllipsis": "Opslaan…"
     },
     "savedView": {
       "defaultName": "Gefilterde weergave"
     },
     "snapshotFailed": {
-      "dismiss": "Ingetrokken",
-      "message": "Kon een snapshot niet opslaan.Uw notitie wordt opgeslagen, maar de versiegeschiedenis kan onvolledig zijn (de schijf kan vol zijn)."
+      "dismiss": "Sluiten",
+      "message": "Er kon geen momentopname worden opgeslagen — je notitie is opgeslagen, maar de versiegeschiedenis kan onvolledig zijn (de schijf is mogelijk vol)."
     },
     "snapshots": {
       "cancel": "Annuleren",
-      "changeCount_one": "{{count}} wijzigen sinds deze snapshot",
-      "changeCount_other": "{{count}} verandert sinds deze snapshot",
+      "changeCount_one": "{{count}} wijziging sinds deze momentopname",
+      "changeCount_other": "{{count}} wijzigingen sinds deze momentopname",
       "close": "Sluiten",
-      "confirmBody": "Uw huidige notitie wordt eerst als snapshot opgeslagen, zodat u dit ongedaan kunt maken.",
-      "confirmTitle": "Deze foto herstellen?",
-      "decrypting": "Ontcijferen..",
-      "emptyState": "Nog geen foto's. Snapshots worden automatisch opgeslagen als u bewerkt en bewaard voor ongeveer 7 dagen. Ze worden versleuteld en verdwijnen wanneer de noot permanent wordt verwijderd.",
+      "confirmBody": "Je huidige notitie wordt eerst als momentopname opgeslagen, zodat je dit ongedaan kunt maken.",
+      "confirmTitle": "Deze momentopname herstellen?",
+      "decrypting": "Ontsleutelen…",
+      "emptyState": "Nog geen momentopnamen. Momentopnamen worden automatisch opgeslagen terwijl je bewerkt en ongeveer 7 dagen bewaard. Ze zijn versleuteld en verdwijnen wanneer de notitie definitief wordt verwijderd.",
       "encryptedSize": "Versleuteld · {{size}}",
-      "errorCannotDecrypt": "Deze snapshot kon niet gedecodeerd worden.",
-      "errorGeneric": "Er ging iets mis. Probeer het nog eens.",
-      "errorIo": "Er is een diskfout opgetreden. De disk kan vol of onschrijfbaar zijn.",
-      "errorNotFound": "Die snapshot is niet meer beschikbaar.",
-      "errorStorageAccess": "Ik kon de kluis niet bereiken.",
-      "errorVaultLocked": "De kluis is gesloten. Ontgrendel het om snapshots te bekijken.",
-      "justNow": "net",
-      "listLabel": "Snapshotlijst",
-      "loading": "Laden..",
+      "errorCannotDecrypt": "Deze momentopname kon niet worden ontsleuteld.",
+      "errorGeneric": "Er is iets misgegaan. Probeer het opnieuw.",
+      "errorIo": "Er is een schijffout opgetreden — de schijf is mogelijk vol of niet beschrijfbaar.",
+      "errorNotFound": "Die momentopname is niet meer beschikbaar.",
+      "errorStorageAccess": "Geen toegang tot de momentopnameopslag van de kluis.",
+      "errorVaultLocked": "De kluis is vergrendeld. Ontgrendel hem om momentopnamen te bekijken.",
+      "justNow": "zojuist",
+      "listLabel": "Lijst met momentopnamen",
+      "loading": "Laden…",
       "restore": "Herstellen",
-      "restoreCta": "Deze snapshot herstellen",
-      "restoredStatus": "Gerestaureerd. De versie die je had is opgeslagen als snapshot.",
-      "selectPlaceholder": "Selecteer een snapshot om te bekijken wat er sindsdien is veranderd.",
-      "title": "Snapshots",
+      "restoreCta": "Deze momentopname herstellen",
+      "restoredStatus": "Hersteld. De versie die je had, is als momentopname opgeslagen.",
+      "selectPlaceholder": "Selecteer een momentopname om te zien wat er sindsdien is gewijzigd.",
+      "title": "Momentopnamen",
       "untitled": "Naamloos"
     },
     "tabStrip": {
       "closeNewTab": "Nieuw tabblad sluiten",
-      "closeTab": "Sluiten {{title}}",
+      "closeTab": "{{title}} sluiten",
       "newTab": "Nieuw tabblad",
       "openNotes": "Notities openen",
-      "pin": "Pin",
-      "pinned": "Gepind",
-      "pinnedTitle": "Gepind en los te sluiten",
-      "unpin": "Verwijderen",
+      "pin": "Vastzetten",
+      "pinned": "Vastgezet",
+      "pinnedTitle": "Vastgezet — maak los om te sluiten",
+      "unpin": "Losmaken",
       "untitled": "Naamloos"
     },
     "tagBrowser": {
       "cancel": "Annuleren",
       "clear": "Wissen",
       "combineTagsWith": "Tags combineren met",
-      "filtering": "Filteren..",
-      "modeAll": "Alles",
-      "modeAny": "Elk",
+      "filtering": "Filteren…",
+      "modeAll": "Alle",
+      "modeAny": "Een van",
       "noNotesForFilter": "Geen notities voor dit filter.",
-      "noTagsMatch": "Geen tags die overeenkomen met de naam.",
-      "noTagsYet": "Nog geen labels.",
-      "noteCount_one": "{{count}} noot",
-      "noteCount_other": "{{count}} noten",
-      "notes": "Opmerkingen",
+      "noTagsMatch": "Geen tags komen overeen met “{{query}}”.",
+      "noTagsYet": "Nog geen tags.",
+      "noteCount_one": "{{count}} notitie",
+      "noteCount_other": "{{count}} notities",
+      "notes": "Notities",
       "pickTag": "Kies een tag om te filteren.",
       "save": "Opslaan",
       "saveAsView": "Opslaan als weergave",
-      "searchPlaceholder": "Tags zoeken..",
+      "searchPlaceholder": "Tags zoeken…",
       "title": "Tags",
       "untitled": "Naamloos",
-      "viewNamePlaceholder": "Naam tonen"
+      "viewNamePlaceholder": "Naam weergave"
     },
     "trash": {
       "close": "Sluiten",
       "countEmpty": "Leeg",
-      "count_one": "{{count}} noot",
-      "count_other": "{{count}} noten",
+      "count_one": "{{count}} notitie",
+      "count_other": "{{count}} notities",
       "delete": "Verwijderen",
-      "deleteError": "Kon dat briefje niet verwijderen. Probeer het nog eens.",
+      "deleteError": "Die notitie kon niet worden verwijderd. Probeer het opnieuw.",
       "empty": "Prullenbak legen",
-      "emptyConfirmBody_one": "{{count}} noot wordt definitief verwijderd.",
-      "emptyConfirmBody_other": "{{count}} noten worden definitief verwijderd.",
+      "emptyConfirmBody_one": "{{count}} notitie wordt definitief verwijderd.",
+      "emptyConfirmBody_other": "{{count}} notities worden definitief verwijderd.",
       "emptyConfirmCta": "Prullenbak legen",
-      "emptyConfirmTitle": "Leeg afval?",
-      "emptyPartialFailure_one": "{{count}} note kon niet verwijderd worden en in de prullenbak blijven.",
-      "emptyPartialFailure_other": "{{count}} notities konden niet verwijderd worden en in de prullenbak blijven.",
-      "emptyState": "Het afval is leeg.",
-      "purgeConfirmCta": "Permanent verwijderen",
-      "purgeConfirmTitle": "Voorgoed verwijderen?",
+      "emptyConfirmTitle": "Prullenbak legen?",
+      "emptyPartialFailure_one": "{{count}} notitie kon niet worden verwijderd en blijft in de prullenbak.",
+      "emptyPartialFailure_other": "{{count}} notities konden niet worden verwijderd en blijven in de prullenbak.",
+      "emptyState": "De prullenbak is leeg.",
+      "purgeConfirmCta": "Definitief verwijderen",
+      "purgeConfirmTitle": "Definitief verwijderen?",
       "restore": "Herstellen",
-      "restoreError": "Kon dat briefje niet herstellen. Probeer het nog eens.",
+      "restoreError": "Die notitie kon niet worden hersteld. Probeer het opnieuw.",
       "title": "Prullenbak",
       "untitled": "Naamloos"
     },
     "unlinkedMentions": {
-      "empty": "Geen losgekoppelde vermeldingen.",
-      "heading": "Niet-verbonden vermeldingen",
-      "link": "Verband",
-      "linkTooltip": "Koppel deze vermelding aan {{title}}",
-      "refresh": "Vermeldingen kunnen veranderd zijn",
-      "searching": "Zoeken..",
-      "thisNote": "deze noot",
+      "empty": "Geen niet-gelinkte vermeldingen.",
+      "heading": "Niet-gelinkte vermeldingen",
+      "link": "Linken",
+      "linkTooltip": "Deze vermelding linken aan {{title}}",
+      "refresh": "Vermeldingen zijn mogelijk gewijzigd — vernieuwen",
+      "searching": "Zoeken…",
+      "thisNote": "deze notitie",
       "untitled": "Naamloos"
     },
     "viewSettings": {
@@ -1286,44 +1304,44 @@
       "cancel": "Annuleren",
       "cardSize": "Kaartgrootte",
       "cardSizeValue": "{{size}} px",
-      "coverImageHint": "De eigenschap frontmaterie waarvan de waarde een afbeelding is die wordt weergegeven als de omslag van elke kaart. Laat leeg zonder dekking.",
-      "coverImagePlaceholder": "bv. dekking",
-      "coverImageProperty": "Afbeeldingseigenschap bedekken",
+      "coverImageHint": "De frontmatter-eigenschap waarvan de waarde een afbeelding is — getoond als de omslag van elke kaart. Laat leeg voor geen omslag.",
+      "coverImagePlaceholder": "bijv. cover",
+      "coverImageProperty": "Eigenschap voor omslagafbeelding",
       "imageAspectRatio": "Beeldverhouding",
-      "reset": "Reset",
+      "reset": "Resetten",
       "save": "Opslaan"
     },
     "views": {
       "cards": {
-        "changeCover": "Verander dekking",
-        "changeCoverImage": "Hoofdafbeelding wijzigen",
+        "changeCover": "Omslag wijzigen",
+        "changeCoverImage": "Omslagafbeelding wijzigen",
         "empty": "Geen notities komen overeen met deze weergave",
         "noValue": "Geen waarde",
-        "setCover": "Dekking instellen",
-        "setCoverImage": "Hoesafbeelding instellen",
+        "setCover": "Omslag instellen",
+        "setCoverImage": "Omslagafbeelding instellen",
         "untitled": "Naamloos"
       },
-      "collapseViews": "Beelden invouwen",
-      "empty": "Nog geen meningen. Bewaar de huidige notitielijst als een weergave.",
-      "expandViews": "Beelden uitvouwen",
+      "collapseViews": "Weergaven inklappen",
+      "empty": "Nog geen weergaven. Sla de huidige notitielijst op als weergave.",
+      "expandViews": "Weergaven uitklappen",
       "heading": "Weergaven",
       "host": {
         "unsupported": "Dit type weergave komt in een latere update."
       },
       "menu": {
-        "deleteView": "Beeld verwijderen",
-        "editFilter": "Filter bewerken..",
-        "moveDown": "Omlaag",
-        "moveUp": "Omhoog",
+        "deleteView": "Weergave verwijderen",
+        "editFilter": "Filter bewerken…",
+        "moveDown": "Omlaag verplaatsen",
+        "moveUp": "Omhoog verplaatsen",
         "rename": "Hernoemen",
-        "viewSettings": "Instellingen weergeven.."
+        "viewSettings": "Weergave-instellingen…"
       },
       "newView": "Nieuwe weergave",
       "untitledView": "Naamloze weergave"
     },
     "welcome": {
-      "body": "Welkom in Myne, je privéruimte om te denken en te schrijven.\n\nAlles wat u hier opslaat is gecodeerd en blijft op uw apparaat. Uw **wachtwoord** en **herstelzin** zijn de enige sleutels, dus houd ze ergens veilig. Als beide ooit verloren zijn, kan niemand je notities terugkrijgen, zelfs wij niet.\n\nDit is gewoon een gewone noot, dus maak het je eigen. Bewerken, hernoemen of verwijderen wanneer je wilt, en voeg nieuwe noten toe als je ideeën groeien.\n\nWe zijn blij dat je er bent. Voor meer informatie over Myne, bezoek https://myne.md\n",
-      "title": "Welkom in Myne"
+      "body": "Welkom bij Myne, je privéruimte om te denken en te schrijven.\n\nAlles wat je hier opslaat is versleuteld en blijft op je apparaat. Je **wachtwoord** en **herstelzin** zijn de enige sleutels ertoe, dus bewaar ze op een veilige plek. Als je beide ooit verliest, kan niemand je notities meer terughalen, wij ook niet.\n\nDit is gewoon een normale notitie, dus maak hem helemaal van jezelf. Bewerk, hernoem of verwijder hem wanneer je maar wilt, en voeg nieuwe notities toe naarmate je ideeën groeien.\n\nFijn dat je er bent. Voor meer informatie over Myne, ga naar https://myne.md\n",
+      "title": "Welkom bij Myne"
     },
     "workspace": {
       "defaultSlotName": "Standaard"
@@ -1331,13 +1349,13 @@
   },
   "password": {
     "createForm": {
-      "checkingStrength": "Kracht controleren..",
+      "checkingStrength": "Sterkte controleren…",
       "confirmLabel": "Hoofdwachtwoord bevestigen",
-      "defaultEmptyCaption": "Gebruikt als input voor Argon2id (m=256 MiB, t=3, p=2). Kies iets dat je je kunt herinneren; je kunt het niet resetten.",
+      "defaultEmptyCaption": "Wordt gebruikt als invoer voor Argon2id (m=256 MiB, t=3, p=2). Kies iets dat je kunt onthouden; je kunt het niet resetten.",
       "mismatch": "Wachtwoorden komen niet overeen.",
       "passwordLabel": "Hoofdwachtwoord",
       "suggestPassword": "Wachtwoord voorstellen",
-      "tooShort": "Gebruik ten minste {{n}} tekens."
+      "tooShort": "Gebruik minstens {{n}} tekens."
     },
     "input": {
       "hide": "Wachtwoord verbergen",
@@ -1346,316 +1364,320 @@
   },
   "primitives": {
     "searchableSelect": {
-      "emptyText": "Geen lucifers.",
-      "placeholder": "Selecteren..",
-      "searchPlaceholder": "Doorzoeken.."
+      "emptyText": "Geen overeenkomsten.",
+      "placeholder": "Selecteren…",
+      "searchPlaceholder": "Zoeken…"
     }
   },
   "recover": {
     "errors": {
-      "cancelledVaultLocked": "Herstel geannuleerd: kluis was vergrendeld.",
-      "operationInProgress": "Operatie in uitvoering. Wacht even.",
-      "unexpected": "Onverwachte fout. Probeer het nog eens.",
-      "vaultNotFound": "Kluisbestand niet gevonden. Herstart de app."
+      "cancelledVaultLocked": "Herstel geannuleerd: de kluis was vergrendeld.",
+      "operationInProgress": "Er is een bewerking bezig. Even geduld.",
+      "unexpected": "Onverwachte fout. Probeer het opnieuw.",
+      "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op."
     }
   },
   "restore": {
     "backLabel": "Terug",
     "cancelLabel": "Annuleren",
     "collision": {
-      "body": "Een kluis van deze back-up bestaat al op dit apparaat. U kunt zowel de gerestaureerde kopie verschijnt als een aparte kluis in uw kluis lijst te herstellen of te herstellen nu en verwijder de bestaande kluis uit de kluis lijst zelf (removal vraagt u om DELETE te typen, en pas zinvol nadat u bevestigt dat de gerestaureerde kluis opent).",
-      "keepBoth": "Houd beide",
-      "replaceExisting": "Herstellen en vervangen van bestaande.."
+      "body": "Een kluis uit deze back-up bestaat al op dit apparaat. Je kunt beide houden — de herstelde kopie verschijnt als aparte kluis in je kluislijst — of nu herstellen en daarna de bestaande kluis zelf uit de kluislijst verwijderen (bij verwijderen moet je DELETE typen, en dat heeft alleen zin nadat je hebt bevestigd dat de herstelde kluis opent).",
+      "keepBoth": "Beide houden",
+      "replaceExisting": "Herstellen en daarna bestaande vervangen…"
     },
     "damaged": {
-      "body": "Het back-upbestand is beschadigd, dus er is niets hersteld. Als dit de enige kopie is die je hebt, kan de berging de intacte notities herstellen en precies opsommen wat niet gelezen kon worden.Het resultaat wordt altijd aangeduid als een gedeeltelijke herstel.",
+      "body": "Het back-upbestand is beschadigd, dus er is niets hersteld. Als dit je enige kopie is, kan herstel de intacte notities terughalen en precies opsommen wat niet kon worden gelezen — het resultaat wordt altijd als gedeeltelijk herstel aangeduid.",
       "close": "Sluiten",
-      "salvage": "Bewaar intacte notities.."
+      "salvage": "Intacte notities terughalen…"
     },
     "error": {
       "tryAnotherFile": "Probeer een ander bestand"
     },
     "pick": {
-      "body": "Kies een <code>.myne-backup</code> bestand. De back-up wordt geverifieerd voordat iets wordt hersteld; de gerestaureerde kluis ontgrendelt met het wachtwoord van die kluis of herstel frase .",
-      "chooseFile": "Kies een reservekopie..",
-      "corruptedSuffix": "Uw huidige kluis wordt niet aangeraakt: de back-up wordt eerst als aparte kluis hersteld."
+      "body": "Kies een <code>.myne-backup</code>-bestand. De back-up wordt geverifieerd voordat er iets wordt hersteld; de herstelde kluis ontgrendel je met het wachtwoord of de herstelzin van die kluis — net als bij ontgrendelen.",
+      "chooseFile": "Back-upbestand kiezen…",
+      "corruptedSuffix": "Je huidige kluis blijft onaangeroerd: de back-up wordt eerst als aparte kluis hersteld."
     },
     "summary": {
       "attachments": "Bijlagen: {{n}}",
-      "collidedNote": "De eerder bestaande kopie van deze kluis staat nog in je kluislijst. Zodra u de herstelde kluis opent, kunt u de oude uit de kluislijst verwijderen (het zal u vragen om DELETE te typen).",
-      "notes": "Opmerkingen: {{n}}",
+      "collidedNote": "De eerder bestaande kopie van deze kluis staat nog in je kluislijst. Zodra je hebt bevestigd dat de herstelde kluis opent, kun je de oude uit de kluislijst verwijderen (je moet dan DELETE typen).",
+      "notes": "Notities: {{n}}",
       "openVaultList": "Kluislijst openen",
-      "partialHeader_one": "Gedeeltelijk gerestaureerd item {{count}} kon niet worden gelezen.",
-      "partialHeader_other": "Gedeeltelijk gerestaureerde items {{count}} konden niet worden gelezen.",
+      "partialHeader_one": "Gedeeltelijk hersteld — {{count}} item kon niet worden gelezen.",
+      "partialHeader_other": "Gedeeltelijk hersteld — {{count}} items konden niet worden gelezen.",
       "restored": "Kluis hersteld.",
-      "versionHistory": "Versiegeschiedenis: {{n}}"
+      "versionHistory": "Vermeldingen in versiegeschiedenis: {{n}}"
     },
-    "title": "Herstellen van back-up",
+    "title": "Herstellen vanuit back-up",
     "working": {
       "cancel": "Annuleren",
-      "restoringProgress": "Herstel... {{done}} van {{total}}",
-      "verifying": "Reservekopie verifiëren..",
-      "verifyingProgress": "Reservekopie verifiëren... {{done}} van {{total}}"
+      "restoringProgress": "Herstellen… {{done}} van {{total}}",
+      "verifying": "Back-up verifiëren…",
+      "verifyingProgress": "Back-up verifiëren… {{done}} van {{total}}"
     }
   },
   "settings": {
     "about": {
-      "buildChannelDevelopment": "Ontwikkelingsopbouw",
-      "buildChannelLabel": "Kanaal bouwen",
+      "buildChannelDevelopment": "Ontwikkelversie",
+      "buildChannelLabel": "Buildkanaal",
       "buildChannelStable": "Stabiel",
-      "changelogButton": "Wijziglog tonen..",
-      "changelogHelper": "Perversie notities. Zal verschijnen wanneer MYND-119 landt.",
-      "changelogLabel": "Changelog",
-      "licenseBody": "Pre-alfa · CC0 docs · AGPL-3.0 application code on Phase 1 release.",
+      "changelogButton": "Wijzigingslog bekijken…",
+      "changelogHelper": "Notities per versie. Verschijnt zodra MYND-119 wordt opgeleverd.",
+      "changelogLabel": "Wijzigingslog",
+      "licenseBody": "Pre-alpha · CC0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
       "licenseLabel": "Licentie",
-      "tagline": "Pre-alfa · Fase 1 desktopclient",
-      "threatModelHelper": "Open het publieke dreiging-model document in uw browser.",
-      "threatModelLabel": "Bedreigingsmodel"
+      "tagline": "Pre-alpha · Desktopclient fase 1",
+      "threatModelHelper": "Open het openbare dreigingsmodeldocument in je browser.",
+      "threatModelLabel": "Dreigingsmodel"
     },
     "account": {
-      "argon2idHeading": "Argon2id parameters",
+      "argon2idHeading": "Argon2id-parameters",
       "changePasswordButton": "Wachtwoord wijzigen",
       "changePasswordError": {
-        "invalidCredentialOrVault": "Verkeerde huidige wachtwoord of gewelf bestand is beschadigd.",
+        "invalidCredentialOrVault": "Verkeerd huidig wachtwoord of het kluisbestand is beschadigd.",
         "ioError": "Schijffout, probeer het opnieuw.",
         "joinFailure": "Er is iets misgegaan, probeer het opnieuw.",
-        "samePasswordRejected": "Nieuw wachtwoord komt overeen met het huidige wachtwoord.",
-        "weakNewPassword": "Nieuw wachtwoord moet ten minste 12 tekens zijn."
+        "samePasswordRejected": "Het nieuwe wachtwoord komt overeen met het huidige.",
+        "weakNewPassword": "Het nieuwe wachtwoord moet minstens 12 tekens lang zijn."
       },
       "changePasswordHeading": "Wachtwoord wijzigen",
-      "changePasswordHelper": "Draai uw hoofdwachtwoord terwijl u dezelfde kluis behoudt. Herstel zin blijft hetzelfde.",
-      "dangerZoneHeading": "Gevaarszone",
-      "dangerZoneHelper": "Verwijder deze kluis en alle notities definitief. Kan niet ongedaan worden gemaakt. Herstelzin zal de kluis niet herstellen.",
-      "deleteVaultButton": "Kluis verwijderen..",
+      "changePasswordHelper": "Vervang je hoofdwachtwoord terwijl je dezelfde kluis houdt. Je herstelzin blijft hetzelfde.",
+      "dangerZoneHeading": "Gevarenzone",
+      "dangerZoneHelper": "Verwijder deze kluis en alle notities definitief. Dit kan niet ongedaan worden gemaakt. De herstelzin herstelt de kluis niet.",
+      "deleteVaultButton": "Kluis verwijderen…",
       "memoryCost": "Geheugenkosten",
-      "parallelism": "Parallelisme",
-      "timeCost": "Tijdskosten",
-      "vaultLabelEyebrow": "ETIKET VAULT",
-      "vaultLabelHelper": "Een naam voor deze kluis in de in-app switcher. Versleuteld opgeslagen in de kluis; laat uw apparaat nooit in platte tekst achter.",
-      "vaultLabelPlaceholder": "Een label toevoegen..",
+      "parallelism": "Parallellisme",
+      "timeCost": "Tijdkosten",
+      "vaultLabelEyebrow": "KLUISLABEL",
+      "vaultLabelHelper": "Een naam voor deze kluis die in de wisselaar in de app wordt getoond. Versleuteld opgeslagen in de kluis; verlaat je apparaat nooit in platte tekst.",
+      "vaultLabelPlaceholder": "Een label toevoegen…",
       "vaultLabelSave": "Opslaan"
     },
     "appearance": {
       "showEditTimesAria": "Bewerktijden in zijbalk tonen",
-      "showEditTimesHelper": "Toon de laatst bewerkte tijd van elke noot onder de titel in de zijbalk.",
+      "showEditTimesHelper": "Toon de tijd van de laatste bewerking van elke notitie onder de titel in de zijbalk.",
       "showEditTimesLabel": "Bewerktijden tonen",
       "theme": {
-        "amoled": "VERMOORD",
+        "amoled": "AMOLED",
         "dark": "Donker",
         "light": "Licht",
         "system": "Systeem"
       },
-      "themeHelper": "Schakel tussen lichte en donkere thema's, of volg de systeemvoorkeur.",
+      "themeHelper": "Wissel tussen lichte en donkere thema's, of volg de systeemvoorkeur.",
       "themeLabel": "Thema",
-      "themeOptionAria": "{{label}} thema",
-      "themeSaveError": "Kon thema niet opslaan. Probeer het nog eens.",
-      "timestampsSaveError": "Kon voorkeur niet opslaan. Probeer het nog eens."
+      "themeOptionAria": "Thema {{label}}",
+      "themeSaveError": "Het thema kon niet worden opgeslagen. Probeer het opnieuw.",
+      "timestampsSaveError": "De voorkeur kon niet worden opgeslagen. Probeer het opnieuw."
     },
     "archive": {
-      "helper": "Notities worden verplaatst naar een archief, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar de map en verbergt de archiefbesturingen.",
+      "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map en verbergt de archiefknoppen.",
       "label": "Archiveren",
       "off": "Uit",
       "on": "Aan",
-      "saveError": "Kon de archiveringsinstelling niet bijwerken."
+      "saveError": "De archiveringsinstelling kon niet worden bijgewerkt."
     },
     "autoBackup": {
-      "backupFolder": "Backup map",
-      "chooseFolder": "Map kiezen..",
+      "backupFolder": "Back-upmap",
+      "chooseFolder": "Map kiezen…",
       "chooseFolderDialogTitle": "Kies een map voor automatische back-ups",
       "frequency": "Frequentie",
-      "frequencyAriaLabel": "Reservekopiefrequentie",
-      "helper": "Schrijf een gecodeerde .myne-back-up naar een map op een schema, terwijl de app is geopend en de kluis is ontgrendeld. Backups blijven zo gecodeerd als uw kluis; Myne houdt de meest recente paar en stuurt nooit iets van uw apparaat.",
+      "frequencyAriaLabel": "Back-upfrequentie",
+      "helper": "Schrijf volgens een schema een versleutelde .myne-backup naar een map, terwijl de app open is en de kluis ontgrendeld. Back-ups blijven net zo versleuteld als je kluis; Myne bewaart de meest recente paar en stuurt nooit iets van je apparaat af.",
       "intervalDaily": "Dagelijks",
-      "intervalEveryUnlock": "Elke ontgrendeling",
+      "intervalEveryUnlock": "Bij elke ontgrendeling",
       "intervalWeekly": "Wekelijks",
-      "keepLast": "Laatste houden",
+      "keepLast": "Laatste bewaren",
       "noFolderChosen": "Nog geen map gekozen.",
-      "saveFailedToast": "Kon back-upinstellingen niet opslaan.",
+      "saveFailedToast": "De back-upinstellingen konden niet worden opgeslagen.",
       "searchEmpty": "Geen overeenkomst.",
-      "searchPlaceholder": "Doorzoeken..",
-      "statusFailed": "Automatische reservekopie is mislukt {{stamp}}",
-      "statusLastBackup": "Laatste backup: {{stamp}}",
+      "searchPlaceholder": "Zoeken…",
+      "statusFailed": "Automatische back-up mislukt — {{stamp}}",
+      "statusLastBackup": "Laatste back-up: {{stamp}}",
       "statusNever": "Nog geen automatische back-up.",
       "title": "Automatische back-ups"
     },
     "changePassword": {
       "cancel": "Annuleren",
-      "checkingStrength": "Kracht controleren..",
+      "checkingStrength": "Sterkte controleren…",
       "confirmLabel": "Nieuw wachtwoord bevestigen",
       "currentLabel": "Huidig wachtwoord",
       "mismatch": "Wachtwoorden komen niet overeen.",
       "newLabel": "Nieuw wachtwoord",
       "submit": "Wachtwoord wijzigen",
-      "submitting": "Wachtwoord wordt gewijzigd..",
+      "submitting": "Wachtwoord wijzigen…",
       "title": "Wachtwoord wijzigen",
-      "tooShort": "Gebruik ten minste {{n}} tekens."
+      "tooShort": "Gebruik minstens {{n}} tekens."
     },
     "connectedExtensions": {
       "browser": {
-        "chromium": "Chrome/rand",
+        "chromium": "Chrome / Edge",
         "firefox": "Firefox",
         "generic": "Browserextensie"
       },
       "when": {
         "bare": "Verbonden",
-        "daysAgo_one": "Verbonden {{count}} dag geleden",
-        "daysAgo_other": "Verbonden {{count}} dagen geleden",
-        "hoursAgo_one": "Verbonden {{count}} h geleden",
-        "hoursAgo_other": "",
-        "justNow": "Verbonden net",
-        "minutesAgo_one": "Verbonden {{count}} min geleden",
-        "minutesAgo_other": "",
-        "onDate": "Verbonden {{date}}"
+        "daysAgo_one": "{{count}} dag geleden verbonden",
+        "daysAgo_other": "{{count}} dagen geleden verbonden",
+        "hoursAgo": "{{count}} u geleden verbonden",
+        "hoursAgo_one": "{{count}} u geleden verbonden",
+        "hoursAgo_other": "{{count}} u geleden verbonden",
+        "justNow": "Zojuist verbonden",
+        "minutesAgo": "{{count}} min geleden verbonden",
+        "minutesAgo_one": "{{count}} min geleden verbonden",
+        "minutesAgo_other": "{{count}} min geleden verbonden",
+        "onDate": "Verbonden op {{date}}"
       }
     },
     "customThemes": {
       "appliedBadge": "Toegepast",
       "apply": "Toepassen",
-      "applyError": "Kon dat thema niet toepassen. Probeer het nog eens.",
+      "applyError": "Dat thema kon niet worden toegepast. Probeer het opnieuw.",
       "cancel": "Annuleren",
       "confirm": "Bevestigen",
       "delete": "Verwijderen",
-      "deleteError": "Kon dat thema niet verwijderen. Probeer het nog eens.",
-      "empty": "Nog geen aangepaste thema's. Importeer één, of open de map thema's en voeg een themabestand toe.",
+      "deleteError": "Dat thema kon niet worden verwijderd. Probeer het opnieuw.",
+      "empty": "Nog geen aangepaste thema's. Importeer er een, of open de themamap en voeg een themabestand toe.",
       "error": {
         "aColorFallback": "een kleur",
         "invalidFile": "Ongeldig themabestand.",
-        "invalidName": "Themanaam onveilig",
+        "invalidName": "Onveilige themanaam",
         "invalidValue": "Ongeldige waarde voor {{key}}",
         "invalidValueWithLine": "Ongeldige waarde voor {{key}} (regel {{line}})",
-        "missingKey": "Ontbrekende vereiste kleur {{key}}",
-        "parseError": "Niet geldig JSON",
-        "parseErrorWithLine": "Niet geldig JSON (regel {{line}})"
+        "missingKey": "Vereiste kleur {{key}} ontbreekt",
+        "parseError": "Geen geldige JSON",
+        "parseErrorWithLine": "Geen geldige JSON (regel {{line}})"
       },
       "fileFilterName": "Myne-thema",
-      "helper": "Gebruik je eigen kleurenpalet. Thema's zijn gevalideerd op dit apparaat voor gebruik .",
-      "importButton": "Thema importeren..",
-      "importError": "Dat bestand is geen geldig thema. Open de verwijzing naar het formaat.",
-      "label": "Zelfgemaakte thema's",
-      "openFolderButton": "Themamamap openen",
-      "openFolderError": "Kon de themamap niet openen.",
-      "readError": "Kon uw themamap niet lezen."
+      "helper": "Gebruik je eigen kleurenpalet. Thema's worden vóór gebruik op dit apparaat gevalideerd — er wordt niets geüpload.",
+      "importButton": "Thema importeren…",
+      "importError": "Dat bestand is geen geldig thema. Open de referentie om de indeling te zien.",
+      "label": "Aangepaste thema's",
+      "openFolderButton": "Themamap openen",
+      "openFolderError": "De themamap kon niet worden geopend.",
+      "readError": "Je themamap kon niet worden gelezen."
     },
     "dailyNotes": {
-      "blankTemplate": "Blanco (geen sjabloon)",
-      "dateFormatHelper": "De titel van elke dagelijkse noot. OndersteuningsJJJJ, MM, DD. Standaardwaarden voor {{default}}.",
-      "dateFormatLabel": "Dagelijkse notitie datumformaat",
-      "dateFormatSaveError": "Kon het datumformaat niet opslaan. Probeer het nog eens.",
-      "folderHelper": "Waar nieuwe dagelijkse notities worden ingediend. Defaults voor {{default}} .",
-      "folderLabel": "Dagelijkse notitiemap",
-      "folderSaveError": "Kon de dagelijkse map niet opslaan. Probeer het nog eens.",
-      "searchEmpty": "Geen sjablonen die overeenkomen.",
-      "searchPlaceholder": "Sjablonen zoeken..",
-      "templateHelper": "Kies een sjabloon om elke dagelijkse noot te starten, of laat leeg voor een lege noot met de datum.",
-      "templateLabel": "Sjabloon voor dagelijkse opmerkingen",
-      "templateSaveError": "Kon de dagelijkse template niet opslaan. Probeer het nog eens.",
+      "blankTemplate": "Leeg (geen sjabloon)",
+      "dateFormatHelper": "De titel van elke dagelijkse notitie. Ondersteunt YYYY, MM, DD. Standaard {{default}}.",
+      "dateFormatLabel": "Datumindeling dagelijkse notitie",
+      "dateFormatSaveError": "De datumindeling kon niet worden opgeslagen. Probeer het opnieuw.",
+      "folderHelper": "Waar nieuwe dagelijkse notities worden geplaatst. Standaard {{default}} — de map blijft behouden, ook als die leeg is.",
+      "folderLabel": "Map voor dagelijkse notities",
+      "folderSaveError": "De dagelijkse map kon niet worden opgeslagen. Probeer het opnieuw.",
+      "searchEmpty": "Geen sjablonen komen overeen.",
+      "searchPlaceholder": "Sjablonen zoeken…",
+      "templateHelper": "Kies een sjabloon om elke dagelijkse notitie mee te beginnen, of laat leeg voor een lege notitie met de datum als titel.",
+      "templateLabel": "Sjabloon voor dagelijkse notitie",
+      "templateSaveError": "Het dagelijkse sjabloon kon niet worden opgeslagen. Probeer het opnieuw.",
       "untitledTemplate": "Naamloos sjabloon"
     },
     "deleteVault": {
       "cancel": "Annuleren",
-      "caseSensitiveHint": "Hoofdlettergevoelig. Typ het woord precies om verwijdering in te schakelen.",
+      "caseSensitiveHint": "Hoofdlettergevoelig. Typ het woord exact om verwijderen mogelijk te maken.",
       "continue": "Doorgaan",
-      "copyPrimary": "Dit verwijdert permanent deze kluis en elke noot erin. De actie kan niet ongedaan worden gemaakt, en uw herstelzin zal de gegevens niet herstellen.",
-      "copySecondary": "De kluissleutels worden uit het geheugen gezeriseerd voordat de bestanden worden losgekoppeld; elke weesversleuteling die op de schijf blijft, blijft onherstelbaar Argon2id-ingepakte spam.",
-      "eyebrow": "ONWEERSTAANBAAR",
+      "copyPrimary": "Hiermee verwijder je deze kluis en elke notitie erin definitief. De actie kan niet ongedaan worden gemaakt en je herstelzin herstelt de gegevens niet.",
+      "copySecondary": "De kluissleutels worden uit het geheugen gewist voordat de bestanden worden verwijderd; eventuele achtergebleven ciphertext op de schijf blijft onherstelbare, met Argon2id ingepakte ruis.",
+      "eyebrow": "ONOMKEERBAAR",
       "heading": "Kluis verwijderen",
-      "ioFailBody": "Kon geen toegang krijgen tot kluisbestanden voor verwijdering. Gewelfssleutels zijn al nulgemaakt uit het geheugen; alle gewelfde gegevens die op de schijf blijven is niet terug te vinden Argon2id-ingepakte spam.",
+      "ioFailBody": "Kon de kluisbestanden niet openen om te verwijderen. De kluissleutels zijn al uit het geheugen gewist; eventuele kluisgegevens die op de schijf achterblijven zijn onherstelbare, met Argon2id ingepakte ruis.",
       "ioFailTitle": "Schijffout tijdens verwijderen",
-      "partialFailBody_one": "{{count}} bestand kon niet van de schijf worden verwijderd. De sleutels van de kluis zijn al uit het geheugen gezeurd, dus elke codetekst die overblijft is onherstelbaar Argon2id-ingepakte troep.",
-      "partialFailBody_other": "{{count}} bestanden konden niet van de schijf worden verwijderd. De sleutels van de kluis zijn al uit het geheugen gezeurd, dus elke codetekst die overblijft is onherstelbaar Argon2id-ingepakte troep.",
-      "partialFailTitle": "Verwijdering van kluis gedeeltelijk mislukt",
+      "partialFailBody_one": "{{count}} bestand kon niet van de schijf worden verwijderd. De kluissleutels zijn al uit het geheugen gewist, dus eventuele achtergebleven ciphertext is onherstelbare, met Argon2id ingepakte ruis.",
+      "partialFailBody_other": "{{count}} bestanden konden niet van de schijf worden verwijderd. De kluissleutels zijn al uit het geheugen gewist, dus eventuele achtergebleven ciphertext is onherstelbare, met Argon2id ingepakte ruis.",
+      "partialFailTitle": "Kluis verwijderen gedeeltelijk mislukt",
       "submit": "Kluis verwijderen",
-      "submitInFlight": "Kluis verwijderen..",
-      "typeToConfirmLabel": "Type DELETE om te bevestigen",
+      "submitInFlight": "Kluis verwijderen…",
+      "typeToConfirmLabel": "Typ DELETE om te bevestigen",
       "vaultPath": "Kluispad: {{path}}"
     },
     "focusMode": {
       "dimAria": "Inactieve regels dimmen",
-      "dimHelper": "In focusmodus (.",
-      "dimLabel": "Focusmodus · dim inactieve regels",
+      "dimHelper": "Dim in de focusmodus (⇧⌘F) elke regel behalve de regel die je bewerkt.",
+      "dimLabel": "Focusmodus · inactieve regels dimmen",
       "off": "Uit",
       "on": "Aan",
-      "saveError": "Kon de instelling van de focusmodus niet opslaan.",
-      "typewriterAria": "Schrijfmachine scroll",
-      "typewriterHelper": "Houd de actieve lijn verticaal gecentreerd terwijl u typt.",
-      "typewriterLabel": "Focusmodus · schrijfmachine scroll"
+      "saveError": "De focusmodus-instelling kon niet worden opgeslagen.",
+      "typewriterAria": "Typemachinescroll",
+      "typewriterHelper": "Houd in de focusmodus (⇧⌘F) de actieve regel verticaal gecentreerd terwijl je typt.",
+      "typewriterLabel": "Focusmodus · typemachinescroll"
     },
     "hotkeys": {
       "addBindingAria": "Een sneltoets toevoegen voor {{command}}",
       "cancel": "Annuleren",
-      "capturePrompt": "Druk op een toets..",
-      "conflictIndicator": "conflict",
+      "capturePrompt": "Druk op een toets…",
+      "conflictIndicator": "⚠ conflict",
       "conflictTitle": "Ook gebruikt door {{commands}}",
       "fixed": "vast",
       "group": {
-        "editorFormatting": "Editor formatteren",
+        "editorFormatting": "Editoropmaak",
         "general": "Algemeen",
         "navigation": "Navigatie",
-        "notes": "Opmerkingen",
-        "panesTabs": "Panes & tabbladen",
-        "view": "Beeld"
+        "notes": "Notities",
+        "panesTabs": "Deelvensters & tabbladen",
+        "view": "Weergave"
       },
-      "helper": "Sneltoetsen weergeven en wijzigen. Editor formatteren en de tab-cyclus snelkoppeling zijn vastgesteld.",
+      "helper": "Bekijk en wijzig sneltoetsen. De editoropmaak en de sneltoets voor het doorlopen van tabbladen liggen vast.",
       "notSet": "Niet ingesteld",
-      "removeBindingAria": "Verwijderen {{chord}}",
-      "resetAll": "Alle sneltoetsen resetten..",
-      "resetAllConfirm": "Reset elke aangepaste sneltoets naar zijn standaard?",
+      "removeBindingAria": "{{chord}} verwijderen",
+      "resetAll": "Alle sneltoetsen resetten…",
+      "resetAllConfirm": "Elke aangepaste sneltoets terugzetten naar de standaard?",
       "resetAllYes": "Alles resetten",
-      "restoreDefaultAria": "Standaard voor {{command}} herstellen",
+      "restoreDefaultAria": "Standaard herstellen voor {{command}}",
       "searchAriaLabel": "Sneltoetsen zoeken",
-      "searchPlaceholder": "Sneltoetsen zoeken..",
-      "warnAlreadyUsed": "Reeds gebruikt door {{commands}} toegevoegd toch."
+      "searchPlaceholder": "Sneltoetsen zoeken…",
+      "warnAlreadyUsed": "Al gebruikt door {{commands}} — toch toegevoegd."
     },
     "language": {
       "helper": "Kies de weergavetaal voor de app.",
       "label": "Taal"
     },
     "lineNumbers": {
-      "errorSaveSetting": "Kon de regelnummerinstelling niet opslaan.",
-      "helper": "Toon een regelnummer goot in de editor. Eén nummer per regel; standaard uitgeschakeld.",
+      "errorSaveSetting": "De regelnummerinstelling kon niet worden opgeslagen.",
+      "helper": "Toon een regelnummerkantlijn in de editor. Eén nummer per regel; standaard uit.",
       "label": "Regelnummers",
       "off": "Uit",
       "on": "Aan"
     },
     "prefs": {
-      "saveError": "Kon voorkeuren niet opslaan Probeer opnieuw"
+      "saveError": "De voorkeur kon niet worden opgeslagen — probeer het opnieuw"
     },
     "privacy": {
-      "autoLockHelper": "Sluit de kluis na zoveel inactiviteit.",
-      "autoLockLabel": "Automatisch blokkeren",
-      "autoLockSearchEmpty": "Geen duur komt overeen.",
-      "autoLockSearchPlaceholder": "Duur van zoeken..",
-      "screenCaptureHelperOff": "Bescherming geldt altijd voor het ontgrendelen. Na het ontgrendelen volgt deze voorkeur.",
-      "screenCaptureHelperOn": "Actief op macOS en Windows 10 (mei 2020 Update of later). Linux ondersteuning komt in een toekomstige release.",
-      "screenCaptureLabel": "Bescherming scherm-opvang"
+      "autoLockHelper": "Vergrendel de kluis na deze tijd van inactiviteit.",
+      "autoLockLabel": "Automatisch vergrendelen",
+      "autoLockSearchEmpty": "Geen tijdsduren komen overeen.",
+      "autoLockSearchPlaceholder": "Tijdsduren zoeken…",
+      "screenCaptureHelperOff": "Bescherming geldt altijd vóór ontgrendeling. Na ontgrendeling volgt het deze voorkeur.",
+      "screenCaptureHelperOn": "Actief op macOS en Windows 10 (mei 2020-update of later). Linux-ondersteuning volgt in een toekomstige release.",
+      "screenCaptureLabel": "Bescherming tegen schermopname"
     },
     "quickUnlock": {
       "errorCancelled": "Geannuleerd.",
-      "errorGeneric": "Kon snel ontgrendelen niet instellen.",
+      "errorGeneric": "Snel ontgrendelen kon niet worden ingesteld.",
       "errorHardwareUnavailable": "Touch ID is niet beschikbaar op dit apparaat.",
-      "errorNotUnlocked": "Maak eerst de kluis open.",
-      "errorPinNotDigits": "PIN mag alleen cijfers zijn.",
-      "errorPinTooShort_one": "PIN moet ten minste {{count}} cijfers zijn.",
-      "errorPinTooShort_other": "",
-      "helperConfigured": "Configureerd via {{method}}. Re-entry na autolock slaat het hoofdwachtwoord over. Het hoofdwachtwoord is nog steeds vereist na herstart.",
-      "helperNotConfigured": "Na automatisch vergrendelen opnieuw invoeren met een PIN- of Touch-ID in plaats van het volledige hoofdwachtwoord. Een gemak boven de versleutelde kluis, het hoofdwachtwoord blijft nodig na herstart.",
-      "methodPin": "PIN",
-      "methodTouchId": "ID aanraken",
-      "pinAriaLabel": "Snelwisselpincode",
-      "pinPlaceholder_one": "PIN (minstens {{count}} cijfers)",
-      "pinPlaceholder_other": "",
-      "setPin": "PIN instellen",
-      "setupHelper": "Touch ID is alleen macOS en momenteel experimenteel (pending hardware verificatie). PIN werkt overal.",
+      "errorNotUnlocked": "Ontgrendel eerst de kluis.",
+      "errorPinNotDigits": "De pincode mag alleen cijfers bevatten.",
+      "errorPinTooShort": "De pincode moet minstens {{count}} cijfers lang zijn.",
+      "errorPinTooShort_one": "De pincode moet minstens {{count}} cijfer lang zijn.",
+      "errorPinTooShort_other": "De pincode moet minstens {{count}} cijfers lang zijn.",
+      "helperConfigured": "Ingesteld via {{method}}. Opnieuw invoeren na automatisch vergrendelen slaat het hoofdwachtwoord over. Het hoofdwachtwoord blijft vereist na opnieuw opstarten.",
+      "helperNotConfigured": "Voer na automatisch vergrendelen een pincode of Touch ID in plaats van het volledige hoofdwachtwoord opnieuw in. Een gemak boven op de versleutelde kluis — het hoofdwachtwoord blijft vereist na opnieuw opstarten.",
+      "methodPin": "Pincode",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "Pincode voor snel ontgrendelen",
+      "pinPlaceholder": "Pincode (minstens {{count}} cijfers)",
+      "pinPlaceholder_one": "Pincode (minstens {{count}} cijfer)",
+      "pinPlaceholder_other": "Pincode (minstens {{count}} cijfers)",
+      "setPin": "Pincode instellen",
+      "setupHelper": "Touch ID is alleen voor macOS en momenteel experimenteel (in afwachting van hardwareverificatie). Een pincode werkt overal.",
       "title": "Snel ontgrendelen",
-      "useTouchId": "Aanraak-ID gebruiken"
+      "useTouchId": "Touch ID gebruiken"
     },
     "shell": {
       "closeLabel": "Instellingen sluiten",
-      "navLabel": "Instellingen panelen",
+      "navLabel": "Instellingenpanelen",
       "panels": {
-        "about": "Info",
+        "about": "Over",
         "account": "Account",
-        "appearance": "Uiterlijk",
+        "appearance": "Weergave",
         "editor": "Editor",
         "hotkeys": "Sneltoetsen",
         "privacy": "Privacy",
@@ -1665,52 +1687,52 @@
       "title": "Instellingen"
     },
     "spell": {
-      "errorSaveLanguages": "Kon de spellingcontrole talen niet opslaan.",
-      "errorSaveSetting": "Kon de spellingcontrole-instelling niet opslaan.",
-      "helper": "Onderstreep verkeerd gespelde woorden als je typt. Volledig offline uw notities nooit verlaten het apparaat.",
-      "label": "Spellingscontrole",
-      "languagesAriaLabel": "Spellingscontroletalen",
-      "languagesHelper": "Een woord is juist als het geldig is in een geselecteerde taal . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .",
+      "errorSaveLanguages": "De talen voor spellingcontrole konden niet worden opgeslagen.",
+      "errorSaveSetting": "De instelling voor spellingcontrole kon niet worden opgeslagen.",
+      "helper": "Onderstreep verkeerd gespelde woorden terwijl je typt. Volledig offline — je notities verlaten het apparaat nooit.",
+      "label": "Spellingcontrole",
+      "languagesAriaLabel": "Talen voor spellingcontrole",
+      "languagesHelper": "Een woord is goed als het in een van de geselecteerde talen geldig is — handig om Engelse termen in anderstalige notities te mengen.",
       "languagesLabel": "Talen",
-      "languagesPlaceholder": "Talen selecteren..",
-      "languagesSearchEmpty": "Geen talen die overeenkomen.",
-      "languagesSearchPlaceholder": "Talen zoeken..",
+      "languagesPlaceholder": "Talen selecteren…",
+      "languagesSearchEmpty": "Geen talen komen overeen.",
+      "languagesSearchPlaceholder": "Talen zoeken…",
       "off": "Uit",
       "on": "Aan"
     },
     "storage": {
-      "backUpVault": "Achteruit kluis",
-      "backupHelper": "Back-ups blijven net zo gecodeerd als uw kluis, in een enkel geverifieerd .myne-backup bestand. Herstel werkt met het wachtwoord van die kluis of herstel frase precies zoals ontgrendelen.",
-      "backupLabel": "Reservekopie",
-      "exportAction": "Exporteren..",
-      "exportBody": "Kluis exporteren als markdown",
-      "exportHelper": "Plain markdown tree, niet versleuteld.",
-      "exportLabel": "Uitvoer",
-      "importHelper": "Breng een bestaande Obsidiaan kluis in Myne. Elke Markdown nota wordt geïmporteerd en versleuteld ter plaatse; uw originele bestanden worden ongerept gelaten.",
+      "backUpVault": "Back-up van kluis maken…",
+      "backupHelper": "Back-ups blijven precies zo versleuteld als je kluis, in één geverifieerd .myne-backup-bestand. Herstellen werkt met het wachtwoord of de herstelzin van die kluis — net als bij ontgrendelen.",
+      "backupLabel": "Back-up",
+      "exportAction": "Exporteren…",
+      "exportBody": "Kluis exporteren als Markdown",
+      "exportHelper": "Platte Markdown-structuur — niet versleuteld.",
+      "exportLabel": "Exporteren",
+      "importHelper": "Breng een bestaande Obsidian-kluis naar Myne. Elke Markdown-notitie wordt direct geïmporteerd en versleuteld; je originele bestanden blijven onaangeroerd.",
       "importLabel": "Importeren",
-      "importObsidian": "Obsidiaan-kluis importeren..",
-      "locationHelper": "Elke kluis is een map van gecodeerde bestanden onder dit pad. Liever de Back-up knop hieronder over handmatige kopieën . . . . . .",
+      "importObsidian": "Obsidian-kluis importeren…",
+      "locationHelper": "Elke kluis is een map met versleutelde bestanden onder dit pad. Gebruik liever de knop Back-up hieronder dan handmatige kopieën — die verifieert het geschreven bestand.",
       "locationLabel": "Kluislocatie",
-      "openInFiles": "In bestanden openen",
+      "openInFiles": "Openen in Bestanden",
       "pathUnavailable": "Pad niet beschikbaar",
-      "restoreBackup": "Herstel van back-up.."
+      "restoreBackup": "Herstellen vanuit back-up…"
     },
     "typography": {
-      "contentWidthHelper": "Maximale breedte van de bewerkingskolom. Volledige tekst over het paneel.",
+      "contentWidthHelper": "Maximale breedte van de bewerkingskolom. Met Volledig spant de tekst het hele deelvenster.",
       "contentWidthLabel": "Inhoudsbreedte",
-      "errorSave": "Kon voorkeur niet opslaan. Probeer het nog eens.",
-      "fontHelper": "Monoruimte of proportionele (sans-serif) tekst.",
+      "errorSave": "De voorkeur kon niet worden opgeslagen. Probeer het opnieuw.",
+      "fontHelper": "Monospace of proportionele (schreefloze) tekst.",
       "fontLabel": "Lettertype",
-      "lineSpacingHelper": "Verticale ruimte tussen lijnen.",
+      "lineSpacingHelper": "Verticale ruimte tussen regels.",
       "lineSpacingLabel": "Regelafstand",
-      "textSizeHelper": "Basisgrootte van de editortekst. Richtingen schalen ermee op.",
+      "textSizeHelper": "Basisgrootte van de editortekst. Koppen schalen mee.",
       "textSizeLabel": "Tekstgrootte"
     },
     "viewMode": {
-      "errorSave": "Kon de standaardweergavemodus niet opslaan.",
-      "helper": "Hoe een noot opent: Live preview (standaard), alleen-lezen, of ruwe bron. Schakel een noot in met de E.",
-      "label": "Standaard weergavemodus",
-      "optionLive": "Live voorbeeld",
+      "errorSave": "De standaardweergavemodus kon niet worden opgeslagen.",
+      "helper": "Hoe een notitie opent: Live-voorbeeld (standaard), alleen-lezen Lezen of ruwe Bron. Wissel een notitie met ⇧⌘E.",
+      "label": "Standaardweergavemodus",
+      "optionLive": "Live-voorbeeld",
       "optionReading": "Lezen",
       "optionSource": "Bron"
     }
@@ -1718,96 +1740,96 @@
   "templates": {
     "manager": {
       "closeLabel": "Sjablonen sluiten",
-      "deleteRowLabel": "Sjabloon verwijderen {{name}} (verplaats naar prullenbak)",
-      "editTemplateLabel": "Sjabloon bewerken {{name}}",
-      "emptyBody": "Maak een sjabloon om een notenskelet te hergebruiken, een meeting note, een dagelijks logboek, een leesnotitie. Kies er een als je een nieuwe noot maakt.",
+      "deleteRowLabel": "Sjabloon {{name}} verwijderen (naar prullenbak verplaatsen)",
+      "editTemplateLabel": "Sjabloon {{name}} bewerken",
+      "emptyBody": "Maak een sjabloon om een notitieskelet te hergebruiken — een vergadernotitie, een dagelijks logboek, een leesnotitie. Kies er een wanneer je een nieuwe notitie maakt.",
       "emptyTitle": "Nog geen sjablonen",
       "listLabel": "Sjablonen",
-      "loading": "Laden..",
+      "loading": "Laden…",
       "newTemplate": "Nieuw sjabloon",
       "newTemplateName": "Naamloos sjabloon",
-      "removeFromTemplates": "Verwijderen van sjablonen",
-      "removeRowLabel": "Verwijder {{name}} uit sjablonen (behoudt de noot)",
-      "title": "Nootsjablonen"
+      "removeFromTemplates": "Uit sjablonen verwijderen",
+      "removeRowLabel": "{{name}} uit sjablonen verwijderen (notitie blijft behouden)",
+      "title": "Notitiesjablonen"
     }
   },
   "unlock": {
     "backToPicker": "Kies een andere kluis",
     "continue": "Doorgaan",
-    "decrypting": "Ontcijferen..",
-    "deleteLink": "Wachtwoord en herstelzin verloren? Kluis verwijderen en opnieuw beginnen",
+    "decrypting": "Ontsleutelen…",
+    "deleteLink": "Zowel wachtwoord als herstelzin kwijt? Verwijder de kluis en begin opnieuw",
     "errors": {
-      "alreadyUnlocked": "De kluis is al open.",
-      "inProgress": "Operatie in uitvoering.",
-      "unexpected": "Onverwachte fout. Probeer het nog eens.",
-      "vaultNotFound": "Kluisbestand niet gevonden. Herstart de app."
+      "alreadyUnlocked": "De kluis is al ontgrendeld.",
+      "inProgress": "Er is een bewerking bezig.",
+      "unexpected": "Onverwachte fout. Probeer het opnieuw.",
+      "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op."
     },
     "passwordLabel": "Wachtwoord",
     "passwordPlaceholder": "Wachtwoord",
     "quickUnlock": {
-      "failed": "Snelle ontgrendeling mislukt. Gebruik je wachtwoord.",
-      "pinAriaLabel": "Snelwisselpincode",
-      "pinPlaceholder": "PIN",
-      "unlockWithPin": "Ontgrendelen met PIN",
+      "failed": "Snel ontgrendelen is mislukt. Gebruik je wachtwoord.",
+      "pinAriaLabel": "Pincode voor snel ontgrendelen",
+      "pinPlaceholder": "Pincode",
+      "unlockWithPin": "Ontgrendelen met pincode",
       "unlockWithTouchId": "Ontgrendelen met Touch ID",
-      "usePasswordBelow": "of gebruik uw wachtwoord hieronder",
-      "wrongCredential": "Onjuist. {{remaining}} poging(s) links."
+      "usePasswordBelow": "of gebruik hieronder je wachtwoord",
+      "wrongCredential": "Onjuist. Nog {{remaining}} poging(en) over."
     },
-    "recoveryInterruptedBanner": "Herstelstroom werd onderbroken. Stel eerst een nieuw wachtwoord in.",
-    "recoveryInterruptedBody": "Stel eerst een nieuw wachtwoord in en bezegel je kluis opnieuw.",
-    "recoveryInterruptedTitle": "Herstelstroom werd onderbroken.",
-    "recoveryLink": "Wachtwoord vergeten? Ontgrendelen met herstelzin",
+    "recoveryInterruptedBanner": "De herstelprocedure werd onderbroken. Stel eerst een nieuw wachtwoord in.",
+    "recoveryInterruptedBody": "Stel eerst een nieuw wachtwoord in en verzegel daarna je kluis opnieuw.",
+    "recoveryInterruptedTitle": "De herstelprocedure werd onderbroken.",
+    "recoveryLink": "Wachtwoord vergeten? Ontgrendel met je herstelzin",
     "submit": "Ontgrendelen",
-    "subtitle": "Voer uw wachtwoord in om door te gaan.",
+    "subtitle": "Voer je wachtwoord in om door te gaan.",
     "suspicion": {
-      "lockedDuringChange": "Wachtwoordwijziging geannuleerd: kluis is vergrendeld.",
-      "metaChangedExternally": "De kluis is gewijzigd in een andere sessie."
+      "lockedDuringChange": "Wachtwoordwijziging geannuleerd: de kluis was vergrendeld.",
+      "metaChangedExternally": "De kluis is in een andere sessie gewijzigd — ontgrendel opnieuw."
     },
-    "title": "Maak je kluis open."
+    "title": "Ontgrendel je kluis."
   },
   "vault": {
     "ioBanner": {
       "cannotRead": "Kan het kluisbestand niet lezen.",
-      "notFound": "Kluisbestand niet gevonden. Herstart de app.",
-      "permissionDenied": "Geen toestemming om toegang te krijgen tot het kluisbestand. Bestandsmachtigingen controleren."
+      "notFound": "Kluisbestand niet gevonden. Start de app opnieuw op.",
+      "permissionDenied": "Geen toestemming om het kluisbestand te openen. Controleer de bestandsrechten."
     }
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "Ik heb mijn rekeningnummer opgeslagen waar ik het later kan vinden.",
+      "ackLabel": "Ik heb mijn accountnummer opgeslagen op een plek waar ik het later kan terugvinden.",
       "back": "Terug",
       "commit": "Kluis aanmaken",
-      "committing": "Opslaan..",
+      "committing": "Opslaan…",
       "copied": "Gekopieerd",
       "copy": "Kopiëren",
-      "eyebrow": "Stap 4 van 4",
-      "heading": "Bewaar je rekeningnummer.",
-      "intro": "Dit is uw drager token te behandelen als contant geld.",
-      "saveAsFile": "Als bestand opslaan",
-      "shownOnceBody": "Sla het nu op. Myne kan het niet voor je herstellen. Moet zich later registreren voor synchronisatie.",
+      "eyebrow": "Stap 4 van 4 — accountnummer",
+      "heading": "Bewaar je accountnummer.",
+      "intro": "Dit is je toonderwaarde — behandel het als contant geld.",
+      "saveAsFile": "Opslaan als bestand",
+      "shownOnceBody": "Sla het nu op — Myne kan het niet voor je herstellen. Vereist om je later voor synchronisatie te registreren.",
       "shownOnceEmphasis": "Dit wordt maar één keer getoond."
     },
     "briefing": {
       "back": "Terug",
-      "continue": "Ga door met het aanmaken van de kluis",
-      "eyebrow": "Voordat u uw kluis aanmaakt",
-      "heading": "Voordat u uw kluis aanmaakt",
-      "intro": "Myne versleutelt je notities zodat alleen jij ze kunt openen. Drie dingen volgen uit dat te lezen, ga dan verder.",
+      "continue": "Doorgaan naar het aanmaken van de kluis",
+      "eyebrow": "Voordat je je kluis aanmaakt",
+      "heading": "Voordat je je kluis aanmaakt",
+      "intro": "Myne versleutelt je notities zodat alleen jij ze kunt openen. Daar volgen drie dingen uit — lees ze en ga daarna verder.",
       "statements": {
         "no-email": {
-          "ackLabel": "Ik begrijp dat er geen e-mailherstel is.",
-          "statement": "Er is geen e-mailherstel. Dat zal er nooit zijn.",
-          "why": "We vragen nooit om uw e-mail, dus er is geen reset link en geen account voor ondersteuning om te ontgrendelen. Dit is niet een ontbrekende functie . . Het is de garantie. E-mail herstel zou betekenen dat we uw notities konden lezen, en Myne is gebouwd zodat we niet kunnen."
+          "ackLabel": "Ik begrijp dat er geen herstel via e-mail is.",
+          "statement": "Er is geen herstel via e-mail. Dat zal er nooit zijn.",
+          "why": "We vragen nooit om je e-mailadres, dus er is geen resetlink en geen account dat de support kan ontgrendelen. Dit is geen ontbrekende functie — het is de garantie. Herstel via e-mail zou betekenen dat we je notities konden lezen, en Myne is zo gebouwd dat we dat niet kunnen."
         },
         "no-store": {
-          "ackLabel": "Ik begrijp dat Myne mijn wachtwoord niet terugkrijgt.",
-          "statement": "Je wachtwoord opent je kluis. We slaan het niet op.",
-          "why": "Uw wachtwoord is de invoer naar de sleutel die uw notities decodeert. Het verlaat dit apparaat nooit, en niets op onze servers kan het reproduceren. Dat is wat uw notities privé houdt en waarom we het niet voor u kunnen resetten."
+          "ackLabel": "Ik begrijp dat Myne mijn wachtwoord niet kan herstellen.",
+          "statement": "Je wachtwoord ontgrendelt je kluis. Wij slaan het niet op.",
+          "why": "Je wachtwoord is de invoer voor de sleutel die je notities ontsleutelt. Het verlaat dit apparaat nooit, en niets op onze servers kan het reproduceren. Dat houdt je notities privé — en daarom kunnen we het niet voor je resetten."
         },
         "phrase-backup": {
           "ackLabel": "Ik begrijp dat mijn herstelzin de enige back-up is.",
           "statement": "Je herstelzin is je enige back-up.",
-          "why": "Als je je wachtwoord vergeet, is de 24-woorden herstelzin de enige weg terug naar binnen. {{lostBothSecrets}} Schrijf de zin op en bewaar het ergens veilig."
+          "why": "Als je je wachtwoord vergeet, is de herstelzin van 24 woorden de enige manier om weer binnen te komen. {{lostBothSecrets}} Schrijf de zin op en bewaar hem op een veilige plek."
         }
       },
       "why": "Waarom?"
@@ -1815,56 +1837,56 @@
     "confirm": {
       "back": "Terug",
       "continue": "Doorgaan",
-      "eyebrow": "Stap 3 van 4 bevestigen",
-      "heading": "Typ vier woorden terug uit je zin.",
-      "intro": "We vragen specifieke posities om te controleren of je het bewaard hebt.",
+      "eyebrow": "Stap 3 van 4 — zin bevestigen",
+      "heading": "Typ vier woorden uit je zin opnieuw in.",
+      "intro": "We vragen om specifieke posities om te controleren of je hem hebt opgeslagen.",
       "mismatch": "Komt niet overeen met woord #{{pos}}.",
       "wordAtPosition": "Woord op positie {{pos}}"
     },
     "encrypting": {
       "caption": "Dit duurt even.",
-      "footerHint": "Als dit langer duurt dan 30 seconden, sluit het venster en probeer het opnieuw.",
-      "heading": "Uw kluis versleutelen"
+      "footerHint": "Als dit langer dan 30 seconden duurt, sluit dan het venster en probeer het opnieuw.",
+      "heading": "Je kluis versleutelen"
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "Probeer het nog eens.",
+        "body": "Probeer het opnieuw.",
         "title": "Accountnummer ongeldig"
       },
       "aeadFailure": {
-        "body": "Probeer het nog eens.",
+        "body": "Probeer het opnieuw.",
         "title": "Versleuteling mislukt"
       },
       "csprng": {
-        "body": "Probeer het nog eens.",
-        "title": "Kon geen beveiligde willekeurige gegevens genereren"
+        "body": "Probeer het opnieuw.",
+        "title": "Kon geen veilige willekeurige gegevens genereren"
       },
       "invalidPassword": {
-        "body": "Probeer het nog eens.",
+        "body": "Probeer het opnieuw.",
         "title": "Ongeldig wachtwoord"
       },
       "invalidVaultMeta": {
-        "body": "Probeer het nog eens.",
-        "title": "Kluisformaatfout"
+        "body": "Probeer het opnieuw.",
+        "title": "Fout in kluisindeling"
       },
       "ioOther": {
-        "body": "Probeer het nog eens.",
+        "body": "Probeer het opnieuw.",
         "title": "Kon de kluis niet opslaan"
       },
       "joinFailure": {
-        "body": "Probeer het nog eens.",
+        "body": "Probeer het opnieuw.",
         "title": "Er is iets misgegaan"
       },
       "kdfFailure": {
-        "body": "Probeer het nog eens. Als dit blijft gebeuren, kan je systeem weinig geheugen hebben.",
-        "title": "Kon encryptie niet instellen"
+        "body": "Probeer het opnieuw. Als dit zich blijft voordoen, heeft je systeem mogelijk te weinig geheugen.",
+        "title": "Kon versleuteling niet instellen"
       },
       "noSpace": {
         "body": "Maak schijfruimte vrij en probeer het opnieuw.",
         "title": "Niet genoeg schijfruimte"
       },
       "notFound": {
-        "body": "Probeer het nog eens.",
+        "body": "Probeer het opnieuw.",
         "title": "Kluismap ontbreekt"
       },
       "passwordTooShort": {
@@ -1872,163 +1894,163 @@
         "title": "Wachtwoord te kort"
       },
       "permissionDenied": {
-        "body": "Zorg ervoor dat Myne toestemming heeft om naar uw toepassingsgegevensmap te schrijven.",
+        "body": "Zorg dat Myne toestemming heeft om naar je map met toepassingsgegevens te schrijven.",
         "title": "Kon niet naar kluismap schrijven"
       },
       "sessionExpired": {
-        "body": "Voor uw veiligheid, kluis creatie tijden uit na 10 minuten. Begin opnieuw.",
+        "body": "Voor je veiligheid verloopt het aanmaken van een kluis na 10 minuten. Begin opnieuw.",
         "title": "Sessie verlopen"
       },
       "sessionNotFound": {
-        "body": "Begin opnieuw vanaf het begin.",
+        "body": "Begin helemaal opnieuw.",
         "title": "Sessie niet gevonden"
       },
       "tooManyConcurrentSessions": {
-        "body": "Sluit andere Myne vensters en probeer het opnieuw.",
-        "title": "Te veel gewelf creaties tegelijk"
+        "body": "Sluit andere Myne-vensters en probeer het opnieuw.",
+        "title": "Te veel kluizen tegelijk aangemaakt"
       },
       "vaultArtifactsPresent": {
-        "body": "Er kan geen nieuwe kluis worden aangemaakt omdat er al gewelfde gegevens op dit apparaat aanwezig zijn. Sluit de app en herstart het opstartscherm zal u leiden naar de ontgrendelingsstroom.",
-        "title": "Vault bestaat al"
+        "body": "Er kan geen nieuwe kluis worden aangemaakt omdat er al kluisgegevens op dit apparaat staan. Sluit de app en start opnieuw op — het opstartscherm leidt je dan naar de ontgrendelprocedure.",
+        "title": "Kluis bestaat al"
       },
       "vaultBusyAuth": {
-        "body": "Er is weer een kluisoperatie gaande. Probeer het zo nog eens.",
+        "body": "Er is een andere kluisbewerking bezig. Probeer het zo opnieuw.",
         "title": "Kluis bezet"
       }
     },
     "orchestrator": {
       "closePrompt": {
         "cancelLabel": "Annuleren",
-        "message": "Sluiten zal je herstelzin wegdoen. Doorgaan met sluiten?",
+        "message": "Bij sluiten wordt je herstelzin weggegooid. Toch doorgaan met sluiten?",
         "okLabel": "Toch sluiten",
-        "title": "Het maken van een kluis weggooien?"
+        "title": "Kluis aanmaken afbreken?"
       },
       "genericError": {
-        "body": "Probeer het nog eens.",
+        "body": "Probeer het opnieuw.",
         "title": "Er is iets misgegaan"
       }
     },
     "password": {
       "back": "Terug",
-      "eyebrow": "Stap 1 van 4: Hoofdwachtwoord",
+      "eyebrow": "Stap 1 van 4 — hoofdwachtwoord",
       "heading": "Kluis aanmaken",
-      "helperLead": "Myne bewaart uw wachtwoord of herstelzin niet.",
-      "submit": "Terugwinningszin genereren"
+      "helperLead": "Myne slaat je wachtwoord of herstelzin niet op.",
+      "submit": "Herstelzin genereren"
     },
     "phrase": {
       "back": "Terug",
-      "continue": "Ik heb deze bevestigingszin opgeslagen",
+      "continue": "Ik heb dit opgeslagen — zin bevestigen",
       "copy": "Kopiëren",
-      "eyebrow": "Stap 2 van 4",
+      "eyebrow": "Stap 2 van 4 — herstelzin",
       "heading": "Schrijf deze 24 woorden op.",
-      "intro": "Deze zin, samen met uw wachtwoord, is de enige manier om uw kluis te herstellen. Bewaar het offline papier, wachtwoord manager, hardware portemonnee. Behandel het als geld.",
-      "reveal": "Woord onthullen",
-      "saveAsFile": "Als bestand opslaan"
+      "intro": "Deze zin is, samen met je wachtwoord, de enige manier om je kluis te herstellen. Bewaar hem offline — op papier, in een wachtwoordmanager of een hardware wallet. Behandel hem als contant geld.",
+      "reveal": "Zin tonen",
+      "saveAsFile": "Opslaan als bestand"
     },
     "ready": {
-      "backUpNow": "Achteruit, nu",
-      "backedUp": "Back-up",
-      "backingUp": "Terugtrekken..",
+      "backUpNow": "Maak nu een back-up van deze kluis",
+      "backedUp": "Back-up gemaakt ✓",
+      "backingUp": "Back-up maken…",
       "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "Back-up is niet voltooid. Er is geen bestand achtergelaten. U kunt een back-up maken vanaf Instellingen → Opslag.",
-      "backupFilterName": "Myne back-up",
-      "body": "Myne schreef uw kluis naar uw applicatiegegevensmap. Uw hoofdwachtwoord en herstel frase zijn de enige manier terug in .",
-      "decrypting": "Ontcijferen..",
+      "backupError": "De back-up is niet voltooid — er is geen bestand achtergelaten. Je kunt op elk moment een back-up maken via Instellingen → Opslag.",
+      "backupFilterName": "Myne-back-up",
+      "body": "Myne heeft je kluis naar je map met toepassingsgegevens geschreven. Je hoofdwachtwoord en herstelzin zijn de enige manier om weer binnen te komen — zorg dat beide veilig zijn opgeslagen.",
+      "decrypting": "Ontsleutelen…",
       "done": "Klaar",
       "heading": "Je kluis is klaar.",
       "showFolder": "Kluismap tonen"
     },
     "sessionLost": {
-      "startOver": "Overnieuw beginnen"
+      "startOver": "Opnieuw beginnen"
     }
   },
   "vaultPicker": {
-    "createAnother": "Een andere kluis aanmaken",
+    "createAnother": "Nog een kluis aanmaken",
     "heading": "Kies een kluis",
-    "loading": "Uw kluizen laden..",
-    "noneLoaded": "Er kunnen nu geen kluizen geladen worden.",
+    "loading": "Je kluizen laden…",
+    "noneLoaded": "Er konden nu geen kluizen worden geladen.",
     "openedRelative": "geopend {{rel}}",
-    "restoreFromBackup": "Herstellen van back-up",
+    "restoreFromBackup": "Herstellen vanuit back-up",
     "subline": "Je hebt meer dan één kluis op dit apparaat. Kies er een om te ontgrendelen.",
     "vaultFallback": "Kluis {{n}}"
   },
   "vaultRecover": {
     "decrypting": {
       "caption": "Dit duurt even.",
-      "eyebrow": "HERSTEL · DECRYPTING",
-      "footerHint": "Als dit langer duurt dan 30 seconden, sluit het venster en probeer het opnieuw.",
-      "heading": "Uw kluis ontcijferen",
-      "subCaption": "Argon2id m=256 MiB, t=3, p=2"
+      "eyebrow": "HERSTEL · ONTSLEUTELEN",
+      "footerHint": "Als dit langer dan 30 seconden duurt, sluit dan het venster en probeer het opnieuw.",
+      "heading": "Je kluis ontsleutelen",
+      "subCaption": "Bezig… Argon2id m=256 MiB, t=3, p=2"
     },
     "passwordReset": {
       "errors": {
-        "cancelledVaultLocked": "Herstel geannuleerd: kluis was vergrendeld.",
-        "operationInProgress": "Operatie in uitvoering. Wacht even.",
-        "unexpected": "Onverwachte fout. Probeer het nog eens.",
-        "weakPassword": "Nieuw wachtwoord moet ten minste 12 tekens zijn."
+        "cancelledVaultLocked": "Herstel geannuleerd: de kluis was vergrendeld.",
+        "operationInProgress": "Er is een bewerking bezig. Even geduld.",
+        "unexpected": "Onverwachte fout. Probeer het opnieuw.",
+        "weakPassword": "Het nieuwe wachtwoord moet minstens 12 tekens lang zijn."
       },
       "eyebrow": "Herstel · Nieuw wachtwoord",
-      "helperBody": "Kluis herstel zinile açıldı. Eski parola artık çalışmayacak .",
-      "helperEmphasis": "Herstel zin aynı kalır.",
+      "helperBody": "Geopend met je herstelzin. Je oude wachtwoord werkt niet meer — stel nu een nieuw hoofdwachtwoord in.",
+      "helperEmphasis": "Je herstelzin blijft hetzelfde.",
       "submit": "Nieuw wachtwoord instellen",
-      "title": "Een nieuw hoofdwachtwoord instellen"
+      "title": "Stel een nieuw hoofdwachtwoord in"
     },
     "phrase": {
       "back": "← Terug",
-      "body": "Voer je herstelzin in. 24 BIP-39 woorden.",
+      "body": "Voer je herstelzin in. 24 BIP-39-woorden.",
       "cellLabel": "Woord {{index}}",
       "deleteLink": "Kluis verwijderen en opnieuw beginnen",
-      "eyebrow": "Terugvordering",
+      "eyebrow": "Herstel",
       "submit": "Ontgrendelen",
       "title": "Herstel je kluis."
     },
     "select": {
-      "accountInvalid": "Ongeldig rekeningnummer. Controleer en probeer het opnieuw.",
-      "accountLabel": "Rekeningnummer (facultatief)",
-      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (facultatief)",
-      "body": "Kies de kluis die u wilt herstellen met uw 24-woord herstel zin. U kunt ook uw accountnummer typen om er direct naartoe te springen.",
+      "accountInvalid": "Ongeldig accountnummer. Controleer het en probeer het opnieuw.",
+      "accountLabel": "Accountnummer (optioneel)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (optioneel)",
+      "body": "Kies de kluis die je wilt herstellen met je herstelzin van 24 woorden. Je kunt ook je accountnummer typen om er direct naartoe te gaan.",
       "cancel": "Annuleren",
-      "checking": "Controleren..",
-      "loadFailed": "Er kunnen nu geen kluizen geladen worden.",
-      "loading": "Uw kluizen laden..",
+      "checking": "Controleren…",
+      "loadFailed": "Er konden nu geen kluizen worden geladen.",
+      "loading": "Je kluizen laden…",
       "openedRelative": "geopend {{rel}}",
       "or": "of",
       "title": "Kies een kluis om te herstellen",
-      "useAccountNumber": "Rekeningnummer gebruiken",
+      "useAccountNumber": "Accountnummer gebruiken",
       "vaultFallback": "Kluis {{index}}"
     }
   },
   "vaultSwitcher": {
     "chipFallback": "Kluis",
-    "createAnother": "Een andere kluis aanmaken",
-    "switchVaultLabel": "Wissel kluis",
-    "switching": "schakelen..",
+    "createAnother": "Nog een kluis aanmaken",
+    "switchVaultLabel": "Kluis wisselen",
+    "switching": "wisselen…",
     "vaultFallback": "Kluis {{n}}"
   },
   "welcome": {
     "createCta": "Nieuwe kluis aanmaken",
-    "headlineLine1": "Gecodeerde markeringen.",
-    "headlineLine2": "Geen e-mail bij aanmelding.",
+    "headlineLine1": "Versleutelde Markdown-notities.",
+    "headlineLine2": "Geen e-mail bij aanmelden.",
     "repairResidue": {
       "cancel": "Annuleren",
       "cleanUp": "Opruimen",
-      "cleaningUp": "Opruimen..",
-      "confirmBody_one": "{{count}} bestand wordt verwijderd. Ze zijn al onleesbaar, er is niets verloren gegaan.",
-      "confirmBody_other": "{{count}} bestanden worden verwijderd. Ze zijn al onleesbaar, er is niets verloren gegaan.",
-      "confirmTitle": "De restjes opruimen?",
-      "doneBody_one": "Verwijderd {{count}} overgebleven bestand. Je kunt nu een nieuwe kluis maken.",
-      "doneBody_other": "Verwijderde {{count}} overgebleven bestanden. Je kunt nu een nieuwe kluis maken.",
+      "cleaningUp": "Opruimen…",
+      "confirmBody_one": "{{count}} bestand wordt verwijderd. Ze zijn al onleesbaar; er gaat niets herstelbaars verloren.",
+      "confirmBody_other": "{{count}} bestanden worden verwijderd. Ze zijn al onleesbaar; er gaat niets herstelbaars verloren.",
+      "confirmTitle": "Achtergebleven bestanden opruimen?",
+      "doneBody_one": "{{count}} achtergebleven bestand verwijderd. Je kunt nu een nieuwe kluis aanmaken.",
+      "doneBody_other": "{{count}} achtergebleven bestanden verwijderd. Je kunt nu een nieuwe kluis aanmaken.",
       "doneTitle": "Opgeruimd",
-      "errorBody": "Er ging iets mis. Sluit de app en probeer het opnieuw.",
+      "errorBody": "Er is iets misgegaan. Sluit de app en probeer het opnieuw.",
       "errorTitle": "Opruimen mislukt",
-      "foundBody_one": "{{count}} overgebleven bestand van een vorige verwijdering die niet af was. Ze zijn al onleesbaar .",
-      "foundBody_other": "{{count}} overgebleven bestanden van een vorige verwijdering die niet af was. Ze zijn al onleesbaar .",
-      "foundTitle": "Overblijvende bestanden van een onvolledige verwijdering",
-      "partialBody_one": "{{count}} bestand kan worden vergrendeld door een andere app (antivirus, bestandssynchronisatie, of zoekindexering). Sluit de app en probeer het opnieuw in een moment, of verwijder de map kluis handmatig.",
-      "partialBody_other": "{{count}} bestanden kunnen worden vergrendeld door een andere app (antivirus, bestandssynchronisatie, of zoekindexering). Sluit de app en probeer het opnieuw in een moment, of verwijder de map kluis handmatig.",
-      "partialTitle": "Sommige bestanden konden niet verwijderd worden"
+      "foundBody_one": "{{count}} achtergebleven bestand van een eerdere verwijdering die niet is voltooid. Ze zijn al onleesbaar — je verliest niets herstelbaars.",
+      "foundBody_other": "{{count}} achtergebleven bestanden van een eerdere verwijdering die niet is voltooid. Ze zijn al onleesbaar — je verliest niets herstelbaars.",
+      "foundTitle": "Achtergebleven bestanden van een onvolledige verwijdering",
+      "partialBody_one": "{{count}} bestand is mogelijk vergrendeld door een andere app (antivirus, bestandssynchronisatie of zoekindexering). Sluit de app en probeer het zo opnieuw, of verwijder de kluismap handmatig.",
+      "partialBody_other": "{{count}} bestanden zijn mogelijk vergrendeld door een andere app (antivirus, bestandssynchronisatie of zoekindexering). Sluit de app en probeer het zo opnieuw, of verwijder de kluismap handmatig.",
+      "partialTitle": "Sommige bestanden konden niet worden verwijderd"
     },
-    "restoreCta": "Herstellen van back-up",
-    "subtitle": "Uw notities zijn gecodeerd op dit apparaat voordat ze het verlaten. De server slaat alleen codetekst op."
+    "restoreCta": "Herstellen vanuit back-up",
+    "subtitle": "Je notities worden op dit apparaat versleuteld voordat ze het verlaten. De server slaat alleen ciphertext op."
   }
 }
