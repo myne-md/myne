@@ -1,1985 +1,2093 @@
 {
   "attachments": {
     "cleanUnused": {
-      "cancel": "",
-      "cleaning": "",
-      "close": "",
-      "completeTitle": "",
-      "deleteCta_one": "",
+      "cancel": "Cancelar",
+      "cleaning": "Limpieza..",
+      "close": "Cerca",
+      "completeTitle": "Limpieza completa",
       "deleteCta_many": "",
+      "deleteCta_one": "Suprimir {{count}} no utilizado",
       "deleteCta_other": "",
-      "error": "",
-      "intro_one": "",
+      "error": "No pude limpiar. Algunas notas pueden no ser legibles; nada fue eliminado.",
       "intro_many": "",
-      "intro_other": "",
-      "summaryFreed": "",
-      "summaryPeriod": "",
-      "summaryRemoved_one": "",
+      "intro_one": "Este apego no se utiliza en ninguna nota. Eliminarlo es permanente y no se puede deshacer.",
+      "intro_other": "Estos archivos adjuntos {{count}} no se utilizan en ninguna nota. Eliminarlos es permanente y no se puede deshacer.",
+      "summaryFreed": " · liberado {{size}}",
+      "summaryPeriod": ".",
       "summaryRemoved_many": "",
-      "summaryRemoved_other": "",
-      "summarySkipped_one": "",
+      "summaryRemoved_one": "Eliminado {{count}} adjunto",
+      "summaryRemoved_other": "Apegos eliminados {{count}}",
       "summarySkipped_many": "",
+      "summarySkipped_one": " · {{count}} saltado (ahora en uso)",
       "summarySkipped_other": "",
-      "title": "",
-      "willBeReclaimed": ""
+      "title": "Apegos limpios no utilizados",
+      "willBeReclaimed": "{{size}} será reclamado."
     },
     "coverPicker": {
-      "close": "",
-      "dropHint": "",
-      "empty": "",
-      "loading": "",
-      "removeCover": "",
-      "title": "",
-      "upload": ""
+      "close": "Cerca",
+      "dropHint": "Suelte una imagen para usarla como tapadera.",
+      "empty": "Aún no hay imágenes en esta bóveda. Sube una o arrastra una imagen aquí.",
+      "loading": "Cargando..",
+      "removeCover": "Quitar la cubierta",
+      "title": "Elige una imagen de cubierta",
+      "upload": "Subir"
     },
     "deleteDialog": {
-      "cancel": "",
-      "confirmPrompt": "",
-      "delete": "",
-      "deleting": "",
-      "error": "",
-      "notUsed": "",
-      "stillUsed_one": "",
+      "cancel": "Cancelar",
+      "confirmPrompt": "¿Permanecer permanentemente este apego? Esto no se puede deshacer.",
+      "delete": "Suprimir",
+      "deleting": "Eliminar..",
+      "error": "No pude borrar el apego. Prueba otra vez.",
+      "notUsed": "No se usa en ninguna nota.",
       "stillUsed_many": "",
-      "stillUsed_other": "",
-      "title": "",
-      "untitled": ""
+      "stillUsed_one": "Todavía se utiliza en la nota {{count}}. Eliminarlo deja una lápida donde estaba incrustada:",
+      "stillUsed_other": "Todavía se usa en notas {{count}}. Eliminarlo deja una lápida donde estaba incrustada:",
+      "title": "Suprimir el apéndice",
+      "untitled": "Untitled"
     },
     "library": {
-      "actionsAriaLabel": "",
-      "actionsTitle": "",
-      "checking": "",
-      "checkUnusedFailedNotice": "",
-      "cleanUnused": "",
-      "cleanUnusedTitle": "",
-      "colCreated": "",
-      "colName": "",
-      "colSize": "",
-      "colType": "",
-      "colUsedIn": "",
-      "decrypting": "",
-      "emptyImportHint": "",
-      "emptyLoadError": "",
-      "emptyNoAttachments": "",
-      "filterAriaLabel": "",
-      "gridView": "",
-      "import": "",
-      "importDialogTitle": "",
-      "importFile": "",
-      "importing": "",
-      "listView": "",
-      "menuDelete": "",
-      "menuExport": "",
-      "menuPreview": "",
-      "menuRename": "",
-      "noMatch": "",
-      "noUnusedNotice": "",
-      "preview": "",
-      "previewAttachment": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "sortAriaLabel": "",
-      "supportedFilesFilter": "",
-      "title": "",
-      "usedInCount_one": "",
+      "actionsAriaLabel": "Medidas de aprendimiento",
+      "actionsTitle": "Acciones",
+      "checkUnusedFailedNotice": "No pude comprobar los apegos no utilizados. Prueba otra vez.",
+      "checking": "Comprobando..",
+      "cleanUnused": "Limpio no utilizado",
+      "cleanUnusedTitle": "Eliminar los archivos adjuntos no utilizados en ninguna nota",
+      "colCreated": "Creado",
+      "colName": "Nombre",
+      "colSize": "Tamaño",
+      "colType": "Tipo",
+      "colUsedIn": "Se utiliza en",
+      "decrypting": "Decodificando archivos adjuntos..",
+      "emptyImportHint": "Importar un archivo para mantenerlo en su bóveda.",
+      "emptyLoadError": "No podía leer el catálogo de archivos adjuntos.",
+      "emptyNoAttachments": "Todavía no hay apegos.",
+      "filterAriaLabel": "Filtro por tipo",
+      "gridView": "Vista a la parrilla",
+      "import": "Importación",
+      "importDialogTitle": "Admisión de importación",
+      "importFile": "Importar un archivo",
+      "importing": "Importando..",
+      "listView": "Vista lista",
+      "menuDelete": "Suprimir",
+      "menuExport": "Exportación",
+      "menuPreview": "Vista previa",
+      "menuRename": "Rename",
+      "noMatch": "No hay archivos adjuntos que coincidan con su búsqueda.",
+      "noUnusedNotice": "No se usan apegos para limpiar.",
+      "preview": "Vista previa",
+      "previewAttachment": "Admisión de vista previa",
+      "searchAriaLabel": "Buscar archivos adjuntos por nombre de archivo",
+      "searchPlaceholder": "Búsqueda por nombre de archivo",
+      "sort": {
+        "createdAsc": "Más viejo primero",
+        "createdDesc": "Más reciente primero",
+        "nameAsc": "Nombre A-Z",
+        "nameDesc": "Nombre Z-A"
+      },
+      "sortAriaLabel": "Ordenar apegos",
+      "supportedFilesFilter": "Archivos compatibles",
+      "title": "Adjuntos",
+      "typeFilter": {
+        "all": "Todos los tipos",
+        "audio": "Audio",
+        "image": "Imágenes",
+        "other": "Otros",
+        "pdf": "PDF"
+      },
       "usedInCount_many": "",
-      "usedInCount_other": "",
-      "usedInLoading": ""
+      "usedInCount_one": "Utilizado en {{count}} nota",
+      "usedInCount_other": "Usado en {{count}} notas",
+      "usedInLoading": ".."
     },
     "thumbnail": {
-      "audioLabel": "",
-      "file": "",
-      "pause": "",
-      "pdfDocument": "",
-      "pdfFirstPage": "",
-      "play": ""
+      "audioLabel": "Audio: {{filename}}",
+      "file": "Archivo",
+      "pause": "Pausa",
+      "pdfDocument": "Documento PDF",
+      "pdfFirstPage": "PDF primera página",
+      "play": "Jugar"
     },
     "usedInNotesPopover": {
-      "empty": "",
-      "untitled": ""
+      "empty": "No se usa en ninguna nota.",
+      "untitled": "Untitled"
     }
   },
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "invalidDestination": "",
-        "ioGeneric": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "memberTooLarge": "",
-        "vaultNotFound": "",
-        "verifyFailed": ""
+        "authOperationInProgress": "Otra operación de bóveda está en marcha. Espera a que termine, luego vuelve a intentarlo.",
+        "cancelled": "Respaldo cancelado. No queda ningún archivo atrás.",
+        "invalidDestination": "Esa carpeta de destino no es usable.",
+        "ioGeneric": "No podía escribir el archivo de respaldo.",
+        "ioNoSpace": "No hay suficiente espacio en el destino.",
+        "ioPermissionDenied": "No hay permiso para escribir en el destino.",
+        "joinFailure": "El respaldo falló inesperadamente. No queda ningún archivo atrás.",
+        "memberTooLarge": "Un archivo en esta bóveda es más grande que el formato de copia de seguridad permite.",
+        "vaultNotFound": "No hay bóveda encontrada para respaldar.",
+        "verifyFailed": "La copia de seguridad escrita no verificó, así que fue descartada. Intente de nuevo — en diferentes medios si se repite."
       },
       "restore": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "damagedBackup": "",
-        "futureVersionBackup": "",
-        "invalidVaultMeta": "",
-        "ioGeneric": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "missingVaultMeta": "",
-        "notABackupFile": "",
-        "vaultAlreadyExists": ""
+        "authOperationInProgress": "Otra operación de bóveda está en marcha. Espera a que termine, luego vuelve a intentarlo.",
+        "cancelled": "Restaurar cancelado. Nada cambió.",
+        "damagedBackup": "El archivo de respaldo está dañado.",
+        "futureVersionBackup": "Esta copia de seguridad fue hecha por una nueva versión de Myne. Actualizar Myne, luego restaurarlo.",
+        "invalidVaultMeta": "Los metadatos de bóveda de este respaldo no son legibles, por lo que restaurarlo no podría producir una bóveda de trabajo.",
+        "ioGeneric": "No podía leer el archivo de respaldo.",
+        "ioPermissionDenied": "No hay permiso para leer el archivo de respaldo.",
+        "joinFailure": "Restaurar falló inesperadamente. Nada cambió.",
+        "missingVaultMeta": "Esta copia de seguridad falta sus metadatos de bóveda y no se puede restaurar.",
+        "notABackupFile": "Este archivo no es una copia de seguridad Myne.",
+        "vaultAlreadyExists": "Una bóveda de esta copia de seguridad ya existe en este dispositivo."
       }
     },
     "export": {
-      "cancel": "",
-      "close": "",
-      "copying": "",
-      "preparing": "",
-      "successToast": "",
-      "title": "",
-      "verifying": ""
+      "cancel": "Cancelar",
+      "close": "Cerca",
+      "copying": "Copiado {{done}} de {{total}}..",
+      "preparing": "Preparando..",
+      "successToast": "Copia de seguridad verificada y guardada.",
+      "title": "Bóveda de atrás",
+      "verifying": "Verificar {{done}} de {{total}}.."
     }
   },
   "clipper": {
     "pairing": {
-      "accept": "",
-      "close": "",
-      "codeAriaLabel": "",
-      "intro": "",
-      "reject": "",
-      "rejected": "",
-      "title": ""
+      "accept": "Aceptar",
+      "close": "Cerca",
+      "codeAriaLabel": "Código de unión",
+      "intro": "Confirmar este código coincide con el que se muestra en la extensión, luego Aceptar a par.",
+      "reject": "Rechazo",
+      "rejected": "El emparejamiento rechazado.",
+      "title": "Una extensión del navegador quiere conectarse"
     }
   },
   "commandPalette": {
-    "archivedBadge": "",
-    "archivedBadgeTitle": "",
-    "dialogLabel": "",
-    "matchedInBody": "",
-    "noMatches": "",
-    "searchPlaceholder": "",
-    "sectionCommands": "",
-    "sectionNotes": "",
-    "untitledNote": ""
+    "archivedBadge": "Archivo",
+    "archivedBadgeTitle": "Archivado",
+    "dialogLabel": "Paleta de mando",
+    "matchedInBody": "↳ emparejado en el cuerpo",
+    "noMatches": "No hay coincidencias",
+    "searchPlaceholder": "Buscar notas o ejecutar un comando — Esc para desestimar",
+    "sectionCommands": "Comandos",
+    "sectionNotes": "Notas",
+    "untitledNote": "Untitled"
   },
   "commands": {
     "actions": {
       "backupVault": {
-        "label": ""
+        "label": "Retrocedan la bóveda.."
       },
       "category": {
-        "app": "",
-        "editor": "",
-        "vault": "",
-        "view": ""
+        "app": "App",
+        "editor": "Editor",
+        "vault": "Vault",
+        "view": "Vista"
       },
       "convertWikilinks": {
-        "label": ""
+        "label": "Convertir wikilinks importados en esta nota.."
       },
       "deleteWorkspace": {
-        "label": ""
+        "label": "Eliminar el espacio de trabajo.."
       },
       "exportNoteHtml": {
-        "label": ""
+        "label": "Nota de exportación como HTML.."
       },
       "exportNoteMarkdown": {
-        "label": ""
+        "label": "Nota de exportación como Markdown.."
       },
       "exportNotePdf": {
-        "label": ""
+        "label": "Nota de exportación como PDF.."
       },
       "exportNoteTxt": {
-        "label": ""
+        "label": "Nota de exportación como texto simple.."
       },
       "exportVaultMarkdown": {
-        "label": ""
+        "label": "Exportar bóveda como Markdown.."
       },
       "foldAll": {
-        "label": ""
+        "label": "Doble todo"
       },
       "importBaseView": {
-        "label": ""
+        "label": "Importar vista .base.."
       },
       "importObsidian": {
-        "label": ""
+        "label": "Importar bóveda obsidiana.."
       },
       "lockVault": {
-        "label": ""
+        "label": "Bloqueo de seguridad"
       },
       "manageTemplates": {
-        "label": ""
+        "label": "Administrar plantillas.."
       },
       "newNoteFromTemplate": {
-        "label": ""
+        "label": "Nueva nota de la plantilla.."
       },
       "openAttachments": {
-        "label": ""
+        "label": "Apegos abiertos.."
       },
       "openSettings": {
-        "label": ""
+        "label": "Configuración abierta.."
       },
       "openSnapshots": {
-        "label": ""
+        "label": "Corridas.."
       },
       "openTodayNote": {
-        "label": ""
+        "label": "Abrir la nota de hoy"
       },
       "randomNote": {
-        "label": ""
+        "label": "Abrir nota al azar"
       },
       "renameWorkspace": {
-        "label": ""
+        "label": "Renombrar espacio de trabajo.."
       },
       "saveWorkspaceAs": {
-        "label": ""
+        "label": "Guardar el espacio de trabajo como.."
       },
       "showGraph": {
-        "label": ""
+        "label": "Mostrar la vista gráfica.."
       },
       "showTags": {
-        "label": ""
+        "label": "Buscar etiquetas.."
       },
       "showViews": {
-        "label": ""
+        "label": "Ver vistas.."
       },
       "switchWorkspace": {
-        "label": ""
+        "label": "Cambiar el espacio de trabajo.."
       },
       "toggleFocus": {
-        "label": ""
+        "label": "Modo de enfoque"
       },
       "toggleLeftSidebar": {
-        "label": ""
+        "label": "Toggle notas laterales"
       },
       "toggleReading": {
-        "label": ""
+        "label": "Toggle reading view"
       },
       "toggleRightSidebar": {
-        "label": ""
+        "label": "Toggle backlinks sidebar"
       },
       "toggleSource": {
-        "label": ""
+        "label": "Modo fuente de movimiento"
       },
       "toggleStackedTabs": {
-        "label": ""
+        "label": "Toggle pestañas apiladas"
       },
       "unfoldAll": {
-        "label": ""
+        "label": "Desarrollar todo"
       }
     },
     "hotkeys": {
       "command": {
-        "bold": "",
-        "closeTab": "",
-        "cycleHeadingLevel": "",
-        "cycleTabs": "",
-        "deleteWorkspace": "",
-        "focusNextPane": "",
-        "focusPrevPane": "",
-        "foldAll": "",
-        "inlineCode": "",
-        "insertWikilink": "",
-        "italic": "",
-        "navigateBack": "",
-        "navigateForward": "",
-        "newNote": "",
-        "openSettings": "",
-        "paletteToggle": "",
-        "renameWorkspace": "",
-        "saveWorkspaceAs": "",
-        "selectAllScoped": "",
-        "showGraphView": "",
-        "splitPaneDown": "",
-        "splitPaneRight": "",
-        "switchWorkspace": "",
-        "toggleBulletList": "",
-        "toggleFocusMode": "",
-        "toggleNumberedList": "",
-        "toggleReadingView": "",
-        "toggleSourceMode": "",
-        "toggleTaskList": "",
-        "unfoldAll": ""
+        "bold": "Bold",
+        "closeTab": "Cerrar ficha",
+        "cycleHeadingLevel": "Nivel de partida del ciclo",
+        "cycleTabs": "Tapas de ciclo",
+        "deleteWorkspace": "Eliminar el espacio de trabajo",
+        "focusNextPane": "Enfócate en el siguiente panel",
+        "focusPrevPane": "Enfoque anterior",
+        "foldAll": "Doble todo",
+        "inlineCode": "Código en línea",
+        "insertWikilink": "Insertar wikilink",
+        "italic": "Italic",
+        "navigateBack": "Navigate de vuelta",
+        "navigateForward": "Navigate forward",
+        "newNote": "Nueva nota",
+        "openSettings": "Configuración abierta",
+        "paletteToggle": "Paleta de comando abierta",
+        "renameWorkspace": "Cambiar el espacio de trabajo",
+        "saveWorkspaceAs": "Guardar espacio de trabajo como",
+        "selectAllScoped": "Seleccione todo (scopiod)",
+        "showGraphView": "Mostrar vista gráfica",
+        "splitPaneDown": "Dividir el panel (abajo)",
+        "splitPaneRight": "Dividir el panel (derecha)",
+        "switchWorkspace": "Cambiar espacio de trabajo",
+        "toggleBulletList": "Toggle bullet list",
+        "toggleFocusMode": "Modo de enfoque",
+        "toggleNumberedList": "Lista numerada de Toggle",
+        "toggleReadingView": "Toggle reading view",
+        "toggleSourceMode": "Modo fuente de movimiento",
+        "toggleTaskList": "Lista de tareas",
+        "unfoldAll": "Desarrollar todo"
       }
     },
     "rebind": {
-      "invalidChordReason": ""
+      "invalidChordReason": "Agregue un modificador ( latitud, Ctrl o Alt) — una clave por sí sola no puede ser un atajo."
     }
   },
   "common": {
     "prompt": {
-      "cancel": "",
-      "confirmDefault": ""
+      "cancel": "Cancelar",
+      "confirmDefault": "OK"
     },
     "spinner": {
-      "loadingLabel": ""
+      "loadingLabel": "Cargando"
     }
   },
   "editor": {
     "attachment": {
       "actions": {
-        "exported": "",
-        "exportFailed": "",
-        "renamed": "",
-        "renameFailed": "",
-        "saveDialogFailed": ""
+        "exportFailed": "No podía exportar {{filename}}.",
+        "exported": "Exportado {{filename}}.",
+        "renameFailed": "No podía cambiar el nombre del apego.",
+        "renamed": "Renombrado a {{name}}.",
+        "saveDialogFailed": "No podía abrir el diálogo de ahorro."
       },
       "convert": {
-        "cancel": "",
-        "confirm": "",
-        "skipped": "",
-        "subtitle_one": "",
+        "cancel": "Cancelar",
+        "confirm": "Convertir",
+        "skipped": "{{note}}",
+        "subtitleEmpty": "Nada para convertir — ningún archivo fuente resuelto.",
         "subtitle_many": "",
-        "subtitle_other": "",
-        "subtitleEmpty": "",
-        "title": ""
+        "subtitle_one": "1 referencia será reescrita. Revisión antes de comprometerse.",
+        "subtitle_other": "{{count}} referencias serán reescritas. Revisión antes de comprometerse.",
+        "title": "Convertir apegos importados"
       },
       "convertCommand": {
-        "pickerSourceFilter": ""
+        "pickerSourceFilter": "Fuente del adjunto"
       },
       "convertCore": {
-        "converted_one": "",
         "converted_many": "",
+        "converted_one": "{{count}} convertido",
         "converted_other": "",
-        "noneToConvert": "",
+        "noneToConvert": "No importados accesorios para convertir en esta nota.",
         "skipNote": {
-          "failed": "",
-          "locked": "",
-          "notFound": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "la importación falló",
+          "locked": "bloque cerrado",
+          "notFound": "fuente no encontrada",
+          "tooLarge": "demasiado grande (max 64 MiB)",
+          "unsupported": "tipo sin soporte"
         },
-        "skippedSuffix_one": "",
         "skippedSuffix_many": "",
+        "skippedSuffix_one": " · {{count}} saltado",
         "skippedSuffix_other": ""
       },
       "fileKind": {
-        "generic": "",
+        "generic": "Archivo",
         "label": {
-          "archive": "",
-          "audio": "",
-          "cHeader": "",
-          "cppSource": "",
-          "cSource": "",
-          "css": "",
-          "csv": "",
-          "document": "",
-          "ebook": "",
-          "go": "",
-          "html": "",
-          "image": "",
-          "java": "",
-          "javascript": "",
-          "json": "",
-          "keynote": "",
-          "log": "",
-          "markdown": "",
-          "numbers": "",
-          "pages": "",
-          "pdf": "",
-          "presentation": "",
-          "python": "",
-          "richText": "",
-          "rust": "",
-          "shell": "",
-          "spreadsheet": "",
-          "svg": "",
-          "text": "",
-          "toml": "",
-          "tsv": "",
-          "typescript": "",
-          "video": "",
-          "word": "",
-          "xml": "",
-          "yaml": ""
+          "archive": "Archivo",
+          "audio": "Audio",
+          "cHeader": "C header",
+          "cSource": "Fuente C",
+          "cppSource": "Fuente C++",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Documento",
+          "ebook": "Ebook",
+          "go": "Vamos",
+          "html": "HTML",
+          "image": "Imagen",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Nota clave",
+          "log": "Archivo de registro",
+          "markdown": "Markdown",
+          "numbers": "Números hoja de cálculo",
+          "pages": "Documentos de las páginas",
+          "pdf": "PDF",
+          "presentation": "Presentación",
+          "python": "Python",
+          "richText": "Documento de texto rico",
+          "rust": "Rust",
+          "shell": "Shell script",
+          "spreadsheet": "Hoja de cálculo",
+          "svg": "Imagen SVG",
+          "text": "Documento de texto",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TipoScript",
+          "video": "Video",
+          "word": "Documento de Word",
+          "xml": "XML",
+          "yaml": "YAML"
         },
-        "unknown": ""
+        "unknown": "{{ext}} archivo"
       },
       "lightbox": {
-        "close": "",
-        "export": "",
-        "exportAria": "",
-        "imagePreview": "",
-        "pdfFallback": "",
-        "pdfPreview": ""
+        "close": "Cerrar vista previa",
+        "export": "Exportación",
+        "exportAria": "Adhesión a la exportación",
+        "imagePreview": "Imagen previa",
+        "pdfFallback": "PDF",
+        "pdfPreview": "Previsto PDF"
       },
       "menu": {
-        "actionsAria": ""
+        "actionsAria": "Medidas de aprendimiento"
       },
       "pdf": {
-        "loading": ""
+        "loading": "Cargando.."
       },
       "picker": {
-        "openFailed": ""
+        "openFailed": "No podía abrir el picker de archivos."
       },
       "progress": {
-        "encrypting": "",
-        "importing": "",
-        "loading": ""
+        "encrypting": "Encriptando..",
+        "importing": "Importando..",
+        "loading": "Cargando.."
       },
       "recording": {
-        "barAria": "",
-        "cancel": "",
-        "noAudio": "",
-        "saving": "",
-        "stop": ""
+        "barAria": "Nota de voz grabada",
+        "cancel": "Cancelar",
+        "noAudio": "No se detecta ningún audio — compruebe su micrófono.",
+        "saving": "Salvando..",
+        "stop": "Para"
       },
       "rename": {
-        "cancel": "",
-        "confirm": "",
-        "title": ""
+        "cancel": "Cancelar",
+        "confirm": "Rename",
+        "title": "Adhesión de nombre"
       },
       "summary": {
-        "added_one": "",
         "added_many": "",
+        "added_one": "{{count}} añadido",
         "added_other": "",
         "reason": {
-          "failed": "",
-          "locked": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "fracasado",
+          "locked": "bloque cerrado",
+          "tooLarge": "demasiado grande",
+          "unsupported": "tipo sin soporte"
         },
-        "skipped_one": "",
         "skipped_many": "",
+        "skipped_one": "{{count}} saltó: {{noun}}",
         "skipped_other": ""
       },
       "voice": {
         "startError": {
-          "alreadyRecording": "",
-          "captureFailed": "",
-          "generic": "",
-          "locked": "",
-          "noInputDevice": ""
+          "alreadyRecording": "Ya está en marcha una grabación.",
+          "captureFailed": "No podía empezar a grabar — verifique el acceso al micrófono en Configuración de Sistema.",
+          "generic": "No pude empezar a grabar.",
+          "locked": "Abre tu bóveda para grabar una nota de voz.",
+          "noInputDevice": "No hay micrófono encontrado. Conecta uno e intenta de nuevo."
         },
         "stopError": {
-          "captureFailed": "",
-          "emptyRecording": "",
-          "generic": "",
-          "silentRecording": ""
+          "captureFailed": "La grabación falló: compruebe su micrófono.",
+          "emptyRecording": "No se registró nada.",
+          "generic": "No pude guardar la grabación.",
+          "silentRecording": "Grabar fue silencioso y descartado — comprobar su micrófono."
         }
       },
       "widget": {
         "audio": {
-          "pause": "",
-          "play": "",
-          "seek": ""
+          "pause": "Pausa",
+          "play": "Jugar",
+          "seek": "Seek"
         },
         "menu": {
-          "export": "",
-          "remove": "",
-          "rename": "",
-          "reveal": ""
+          "export": "Exportación",
+          "remove": "Retirar",
+          "rename": "Rename",
+          "reveal": "Reveal en la biblioteca"
         },
-        "pdfFallback": "",
+        "pdfFallback": "PDF",
         "tombstone": {
-          "brokenAria": "",
-          "brokenLabel": "",
-          "deletedAria": "",
-          "deletedLabel": ""
+          "brokenAria": "Referencia de apego rota: {{filename}}",
+          "brokenLabel": "roto",
+          "deletedAria": "Apego suprimido: {{filename}}",
+          "deletedLabel": "suprimido"
         },
-        "urlImageFallback": ""
+        "urlImageFallback": "imagen"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Atención",
+        "bug": "Bug",
+        "caution": "Precaución",
+        "danger": "Peligro",
+        "done": "Hecho",
+        "error": "Error",
+        "example": "Ejemplo",
+        "failure": "Fallo",
+        "faq": "FAQ",
+        "hint": "Hint",
+        "important": "Importante",
+        "info": "Info",
+        "missing": "Falta",
+        "note": "Nota",
+        "question": "Pregunta",
+        "quote": "Cita",
+        "success": "Éxito",
+        "tip": "Tip",
+        "todo": "Todo",
+        "warning": "Advertencia"
       }
     },
     "chrome": {
       "backlinks": {
-        "archivedBadge": "",
-        "empty": "",
-        "linkedFrom_one": "",
+        "archivedBadge": "Archivado",
+        "empty": "Todavía no hay backlinks.",
         "linkedFrom_many": "",
+        "linkedFrom_one": "Linked from {{count}}",
         "linkedFrom_other": "",
-        "untitled": ""
+        "untitled": "Untitled"
+      },
+      "barItems": {
+        "graph": "Gráfico",
+        "lock": "Cerradura",
+        "saveStatus": "Salvo el estado",
+        "settings": "Ajustes",
+        "syncStatus": "Situación sincronizada",
+        "tags": "Etiquetas",
+        "viewMode": "Ver modo",
+        "views": "Vistas",
+        "wordCount": "Cuenta de palabras",
+        "workspace": "Workspace"
       },
       "baseImport": {
-        "droppedFiltersSuffix_one": "",
         "droppedFiltersSuffix_many": "",
+        "droppedFiltersSuffix_one": " · {{count}} filtros caídos",
         "droppedFiltersSuffix_other": "",
-        "failed": "",
-        "fileFilterName": "",
-        "imported_one": "",
+        "failed": "La importación falló.",
+        "fileFilterName": "Base obsidiana",
         "imported_many": "",
+        "imported_one": "Importado {{count}} vista(s)",
         "imported_other": "",
-        "notValid": "",
-        "skippedSuffix_one": "",
+        "notValid": "No es un archivo válido.",
         "skippedSuffix_many": "",
+        "skippedSuffix_one": " · {{count}} saltado",
         "skippedSuffix_other": "",
-        "stoppedAfter_one": "",
         "stoppedAfter_many": "",
+        "stoppedAfter_one": "La importación se detuvo después de {{count}} vista(s).",
         "stoppedAfter_other": ""
       },
       "bottomBar": {
-        "browseTags": "",
-        "browseViews": "",
-        "cycleViewMode": "",
+        "browseTags": "Etiquetas de navegador",
+        "browseViews": "Ver opiniones",
+        "cycleViewMode": "Modo de vista del ciclo",
         "docStats": {
-          "summary_one": "",
+          "summarySelectionSuffix": " (sel)",
           "summary_many": "",
-          "summary_other": "",
-          "summarySelectionSuffix": "",
-          "title_one": "",
+          "summary_one": "{{count}} word · {{characters}} chars",
+          "summary_other": "{{count}} palabras · {{characters}} chars",
+          "titleSelectionSuffix": " (selección)",
           "title_many": "",
-          "title_other": "",
-          "titleSelectionSuffix": ""
+          "title_one": "{{characters}} caracteres · {{words}} palabras · {{spaces}} espacios · {{count}} párrafo",
+          "title_other": "{{characters}} caracteres · {{words}} palabras · {{spaces}} espacios · {{count}} párrafos"
         },
-        "graphTitle": "",
-        "lock": "",
-        "lockVault": "",
-        "openSettings": "",
-        "settingsTitle": "",
-        "showGraph": "",
-        "syncStatus": "",
-        "tagsTitle": "",
-        "togglePreview": "",
-        "viewModeTitle": "",
-        "viewsTitle": ""
+        "graphTitle": "Gráfico ( latitud)",
+        "lock": "Cerradura",
+        "lockVault": "Bloqueo de seguridad",
+        "openSettings": "Configuración abierta",
+        "settingsTitle": "Ajustes (de latitud)",
+        "showGraph": "Mostrar vista gráfica",
+        "syncStatus": "Solo local · no sincronizado",
+        "tagsTitle": "Etiquetas",
+        "togglePreview": "Toggle side-by-side vista previa",
+        "viewModeTitle": "Modo de vista: {{mode}} (haga clic en el ciclo)",
+        "viewsTitle": "Vistas"
       },
       "import": {
-        "imported_one": "",
         "imported_many": "",
-        "imported_other": "",
-        "skippedSuffix_one": "",
+        "imported_one": "Importado {{count}} nota{{skipped}}",
+        "imported_other": "Imported {{count}} notes{{skipped}}",
         "skippedSuffix_many": "",
+        "skippedSuffix_one": " · {{count}} saltado",
         "skippedSuffix_other": ""
       },
       "nav": {
-        "goBack": "",
-        "goForward": ""
+        "goBack": "Vuelve",
+        "goForward": "Adelante"
       },
-      "noNotesToOpen": "",
-      "resizeBacklinksSidebar": "",
-      "resizeNotesSidebar": "",
+      "noNotesToOpen": "No hay notas que abrir.",
+      "resizeBacklinksSidebar": "Resize backlinks sidebar",
+      "resizeNotesSidebar": "Resize notes sidebar",
       "sidebarToggle": {
-        "hideBacklinks": "",
-        "hideNotes": "",
-        "showBacklinks": "",
-        "showNotes": ""
+        "hideBacklinks": "Esconder backlinks barra lateral",
+        "hideNotes": "Ocultar notas laterales",
+        "showBacklinks": "Mostrar backlinks barra lateral",
+        "showNotes": "Mostrar notas laterales"
       },
       "switchingOverlay": {
-        "saving": ""
+        "saving": "Salvando.."
       },
       "viewMode": {
-        "live": "",
-        "reading": "",
-        "source": ""
+        "live": "Vivir",
+        "reading": "Lectura",
+        "source": "Fuente"
       },
       "workspacePrompt": {
-        "namePlaceholder": "",
-        "renameConfirm": "",
-        "renameTitle": "",
-        "saveAsTitle": "",
-        "saveConfirm": ""
+        "namePlaceholder": "Nombre del espacio de trabajo",
+        "renameConfirm": "Rename",
+        "renameTitle": "Cambiar el espacio de trabajo",
+        "saveAsTitle": "Guardar espacio de trabajo como",
+        "saveConfirm": "Guardar"
       },
       "workspaceSwitcher": {
-        "defaultName": "",
-        "renameItemLabel": "",
-        "renameTitle": "",
-        "saveCurrentAs": "",
-        "switchLabel": "",
-        "toggleTitle": ""
+        "defaultName": "Workspace",
+        "renameItemLabel": "Espacio de trabajo de renombre {{name}}",
+        "renameTitle": "Cambiar el espacio de trabajo",
+        "saveCurrentAs": "Guardar la corriente como..",
+        "switchLabel": "Cambiar espacio de trabajo",
+        "toggleTitle": "Espacio de trabajo: {{name}}"
       }
     },
     "codeBlock": {
-      "copyCode": "",
-      "defaultBadge": ""
+      "copyCode": "Copiar código",
+      "defaultBadge": "código"
     },
     "find": {
-      "close": "",
-      "matchCase": "",
-      "matchCount": "",
-      "nextMatch": "",
-      "noMatches": "",
-      "placeholder": "",
-      "previousMatch": "",
-      "replaceAll": "",
-      "replaceAllCount": "",
-      "replaceOne": "",
-      "replacePlaceholder": "",
-      "toggleReplace": ""
+      "close": "Encontrar cerca",
+      "matchCase": "Caso de coincidencia",
+      "matchCount": "{{current}} de {{total}}",
+      "nextMatch": "Siguiente partido",
+      "noMatches": "No hay coincidencias",
+      "placeholder": "Encontrar en la nota",
+      "previousMatch": "Previa coincidencia",
+      "replaceAll": "Reemplazar todos",
+      "replaceAllCount": "Reemplazar todo ({{total}})",
+      "replaceOne": "Reemplazamiento",
+      "replacePlaceholder": "Reemplazar con",
+      "toggleReplace": "Reemplazar"
     },
     "folding": {
-      "clickToUnfold": "",
-      "unfold": ""
+      "clickToUnfold": "Haga clic para desplegarse",
+      "unfold": "Desplegable"
     },
     "footnote": {
-      "heading": "",
-      "unreferenced": ""
+      "heading": "Notas de pie de página",
+      "unreferenced": "no referenciadas"
     },
     "frontmatter": {
-      "addProperty": "",
-      "propertiesLabel": "",
-      "titleAriaLabel": "",
-      "titlePlaceholder": ""
+      "addProperty": "+ Add property",
+      "propertiesLabel": "Propiedades",
+      "titleAriaLabel": "Título de nota",
+      "titlePlaceholder": "Untitled"
     },
     "mermaid": {
-      "rendering": ""
+      "rendering": "Diagrama de renderación.."
     },
     "slash": {
-      "attachFile": "",
-      "bulletList": "",
-      "callout": "",
-      "date": "",
-      "day": "",
-      "divider": "",
-      "heading1": "",
-      "heading2": "",
-      "heading3": "",
-      "heading4": "",
-      "heading5": "",
-      "heading6": "",
-      "link": "",
-      "now": "",
-      "numberedList": "",
-      "quote": "",
-      "table": "",
-      "time": "",
-      "todoList": "",
-      "voiceNote": "",
-      "wikiLink": ""
+      "attachFile": "Archivo adjunto",
+      "bulletList": "Lista de reproducción",
+      "callout": "Callout",
+      "date": "Fecha",
+      "day": "Día",
+      "divider": "Divider",
+      "heading1": "Dirección 1",
+      "heading2": "Dirección 2",
+      "heading3": "Heading 3",
+      "heading4": "Dirección 4",
+      "heading5": "Heading 5",
+      "heading6": "Dirección 6",
+      "link": "Enlace",
+      "now": "Ahora",
+      "numberedList": "Lista numerada",
+      "quote": "Cita",
+      "table": "Cuadro",
+      "time": "Hora",
+      "todoList": "Lista de tareas",
+      "voiceNote": "Nota de voz",
+      "wikiLink": "Enlace de Wiki"
     },
     "spell": {
       "menu": {
-        "addToDictionary": "",
-        "ignoreInVault": "",
-        "ignoreThisSession": "",
-        "noSuggestions": ""
+        "addToDictionary": "Añadir al diccionario",
+        "ignoreInVault": "Ignora en esta bóveda",
+        "ignoreThisSession": "Ignorar este período de sesiones",
+        "noSuggestions": "No hay sugerencias"
       }
     },
     "table": {
-      "addColumn": "",
-      "addRow": "",
-      "cellAriaLabel": "",
-      "deleteColumn": "",
-      "deleteRow": "",
-      "reorderColumn": "",
-      "reorderRow": ""
+      "addColumn": "Añadir columna a la derecha",
+      "addRow": "Agregar fila abajo",
+      "cellAriaLabel": "Celular de mesa",
+      "deleteColumn": "Suprimir la columna",
+      "deleteRow": "Borrar la fila",
+      "reorderColumn": "Columna de reordenamiento",
+      "reorderRow": "Reorden fila"
     },
     "toolbar": {
-      "apply": "",
+      "apply": "Aplicar",
       "heading": {
-        "h1": "",
-        "h2": "",
-        "h3": "",
-        "h4": "",
-        "h5": "",
-        "h6": "",
-        "paragraph": ""
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Párrafo"
       },
-      "urlPlaceholder": ""
+      "highlight": {
+        "blue": "Mavi",
+        "green": "Yeşil",
+        "pink": "Pembe",
+        "purple": "Mor",
+        "yellow": "Sarı"
+      },
+      "urlPlaceholder": "Enlace de prueba URL"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Total",
+        "narrow": "Narrow",
+        "normal": "Normal",
+        "wide": "Amplio"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normal",
+        "relaxed": "Relajado",
+        "tight": "Tight"
+      },
+      "textSize": {
+        "lg": "Grande",
+        "md": "Default",
+        "sm": "Pequeñas",
+        "xl": "Extragrande"
+      }
     },
     "wikilink": {
       "chip": {
-        "embed": ""
+        "embed": "Insertado: {{label}}"
       },
       "convert": {
-        "cancel": "",
-        "choiceClause_one": "",
+        "cancel": "Cancelar",
         "choiceClause_many": "",
-        "choiceClause_other": "",
-        "chooseTarget": "",
-        "convert": "",
-        "convertedToast_one": "",
+        "choiceClause_one": " · {{count}} necesita una elección.",
+        "choiceClause_other": " · {{count}} necesita una opción.",
+        "chooseTarget": "Elige el objetivo..",
+        "convert": "Convertir",
         "convertedToast_many": "",
-        "convertedToast_other": "",
-        "noneToConvert": "",
-        "nothingToConvert": "",
-        "rewriteCount_one": "",
+        "convertedToast_one": "{{count}} wikilink convertido",
+        "convertedToast_other": "{{count}} wikilinks convertido",
+        "noneToConvert": "No importan wikilinks para convertir en esta nota.",
+        "nothingToConvert": "Nada que convertir — ningún wikilink importado resuelve.",
         "rewriteCount_many": "",
-        "rewriteCount_other": "",
-        "skipped": "",
-        "title": ""
+        "rewriteCount_one": "{{count}} enlace será reescrito",
+        "rewriteCount_other": "{{count}} links serán reescritos",
+        "skipped": "{{reason}}",
+        "title": "Convertir wikilinks importados en esta nota"
       },
       "convertCore": {
-        "noMatch": ""
+        "noMatch": "no hay coincidencia"
       }
     }
   },
   "export": {
     "note": {
-      "documentTitleFallback": "",
+      "documentTitleFallback": "Nota",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "cannotDecrypt": "",
-        "destinationUnusable": "",
-        "fallback": "",
-        "invalidAttachmentCatalog": "",
-        "invalidNoteFilename": "",
-        "invalidNoteId": "",
-        "invalidPlaintextEncoding": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "ioWriteDefault": "",
-        "noteNotFound": "",
-        "pdfCaptureFailed": "",
-        "pdfExportInProgress": "",
-        "pdfPayloadMissing": "",
-        "pdfRenderTimeout": "",
-        "pdfWindowCreateFailed": "",
-        "targetExists": "",
-        "vaultLocked": ""
+        "attachmentCorrupt": "No se podía leer un apego mencionado en esta nota, por lo que no se exportaba nada.",
+        "attachmentMissing": "Falta un apego referenciado por esta nota, por lo que no se exportó nada.",
+        "cannotDecrypt": "Esta nota no podía leerse.",
+        "destinationUnusable": "Esa carpeta de destino no es usable.",
+        "fallback": "La exportación falló inesperadamente. Prueba otra vez.",
+        "invalidAttachmentCatalog": "El catálogo adjunto de la bóveda no podía ser leído, así que nada se exportó.",
+        "invalidNoteFilename": "Ese nombre de archivo no es usable, así que nada fue exportado.",
+        "invalidNoteId": "Esta nota no pudo identificarse, por lo que no se exportó nada.",
+        "invalidPlaintextEncoding": "El contenido de esta nota parece dañado, así que nada fue exportado. Recuérdalo de un respaldo.",
+        "ioNoSpace": "No hay suficiente espacio en el destino.",
+        "ioPermissionDenied": "No hay permiso para escribir en el destino.",
+        "ioWriteDefault": "No podía escribir el archivo exportado.",
+        "noteNotFound": "Esta nota ya no existe — puede haber sido eliminada.",
+        "pdfCaptureFailed": "El PDF no se pudo generar, así que nada fue exportado.",
+        "pdfExportInProgress": "Una exportación PDF ya está funcionando. Espera a que termine, luego vuelve a intentarlo.",
+        "pdfPayloadMissing": "La exportación fue interrumpida — si la bóveda bloqueada, desbloquea y vuelve a intentarlo.",
+        "pdfRenderTimeout": "La nota tomó demasiado tiempo para renderizar, así que nada fue exportado.",
+        "pdfWindowCreateFailed": "No se podía abrir la ventana de exportación, por lo que no se exportaba nada.",
+        "targetExists": "Un archivo con ese nombre ya existe en el destino.",
+        "vaultLocked": "La bóveda está cerrada. Desbloquea, luego vuelve a intentarlo."
       },
       "flow": {
-        "couldNotRead": "",
-        "exportedTo": "",
-        "exportedToWithAttachments_one": "",
+        "couldNotRead": "Esta nota no podía leerse.",
+        "exportedTo": "Exportado a {{filename}}",
         "exportedToWithAttachments_many": "",
-        "exportedToWithAttachments_other": "",
-        "exportedToWithImages_one": "",
+        "exportedToWithAttachments_one": "Exportado a {{filename}} + {{count}} adjunto",
+        "exportedToWithAttachments_other": "Exportado a los adjuntos {{filename}} + {{count}}",
         "exportedToWithImages_many": "",
-        "exportedToWithImages_other": "",
-        "filterHtml": "",
-        "filterMarkdown": "",
-        "filterPdf": "",
-        "filterPlainText": "",
-        "showInFolder": ""
+        "exportedToWithImages_one": "Exportado a {{filename}} + {{count}} imagen",
+        "exportedToWithImages_other": "Exportado a {{filename}} + {{count}} imágenes",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Texto del texto",
+        "showInFolder": "Mostrar en la carpeta"
       },
       "modal": {
-        "cancel": "",
-        "export": "",
-        "includeAttachments_one": "",
+        "cancel": "Cancelar",
+        "export": "Exportar..",
         "includeAttachments_many": "",
-        "includeAttachments_other": "",
-        "title": ""
+        "includeAttachments_one": "Incluir {{count}} adjunto",
+        "includeAttachments_other": "Incluye archivos adjuntos {{count}}",
+        "title": "Exportar como marcación"
       }
     },
     "pdf": {
-      "cancel": "",
-      "continue": "",
-      "title": ""
+      "cancel": "Cancelar",
+      "continue": "Continúa..",
+      "title": "Exportar como PDF"
     },
     "vault": {
-      "chooseDestinationDialogTitle": "",
+      "chooseDestinationDialogTitle": "Elige dónde poner la exportación",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "cannotDecrypt": "",
-        "destinationAlreadyExists": "",
-        "destinationNotAllowed": "",
-        "invalidPlaintextEncoding": "",
-        "invalidVaultMeta": "",
-        "ioWriteDefault": "",
-        "joinFailure": "",
-        "vaultLocked": "",
-        "vaultNotFound": ""
+        "attachmentCorrupt": "No se podía leer un apego mencionado por una nota, por lo que no se exportaba nada.",
+        "attachmentMissing": "Falta un apego referenciado por una nota, por lo que no se exportó nada.",
+        "authOperationInProgress": "Otra operación de bóveda está en marcha. Espera a que termine, luego vuelve a intentarlo.",
+        "cancelled": "Exportar cancelado. No quedaba nada en el destino.",
+        "cannotDecrypt": "No se podía leer una nota, así que no se exportaba nada.",
+        "destinationAlreadyExists": "Algo ya existe en ese lugar. Elige un lugar nuevo para la exportación.",
+        "destinationNotAllowed": "Esa ubicación está dentro del propio almacenamiento de Myne. Elija una carpeta fuera de ella.",
+        "invalidPlaintextEncoding": "El contenido de una nota parece dañado, así que nada fue exportado. Recuérdalo de un respaldo.",
+        "invalidVaultMeta": "Los metadatos de la bóveda no podían leerse, así que nada fue exportado.",
+        "ioWriteDefault": "No podía escribir la exportación.",
+        "joinFailure": "La exportación falló inesperadamente. No quedaba nada en el destino.",
+        "vaultLocked": "La bóveda está cerrada. Desbloquea, luego vuelve a intentarlo.",
+        "vaultNotFound": "No hay bóveda encontrada para exportar."
       },
       "flow": {
-        "countAttachments_one": "",
         "countAttachments_many": "",
-        "countAttachments_other": "",
-        "countFolders_one": "",
+        "countAttachments_one": "{{count}} adjunto",
+        "countAttachments_other": "{{count}} adjuntos",
         "countFolders_many": "",
-        "countFolders_other": "",
-        "countNotes_one": "",
+        "countFolders_one": "{{count}} carpeta",
+        "countFolders_other": "{{count}} carpetas",
         "countNotes_many": "",
-        "countNotes_other": "",
-        "exclusionsHistory": "",
-        "exclusionsTrashed_one": "",
-        "exclusionsTrashed_many": "",
-        "exclusionsTrashed_other": "",
-        "exclusionsTrashedAndHistory_one": "",
+        "countNotes_one": "{{count}} nota",
+        "countNotes_other": "{{count}} notes",
+        "exclusionsHistory": "Historia de la versión no incluida.",
         "exclusionsTrashedAndHistory_many": "",
-        "exclusionsTrashedAndHistory_other": "",
-        "phaseAttachments": "",
-        "phaseNotes": "",
-        "preparing": "",
-        "runningCounts": ""
+        "exclusionsTrashedAndHistory_one": "{{count}} destrozar la nota y la historia de la versión no incluidos.",
+        "exclusionsTrashedAndHistory_other": "{{count}} Notas destrozadas e historial de versiones no incluidos.",
+        "exclusionsTrashed_many": "",
+        "exclusionsTrashed_one": "{{count}} Nota de destrozada no incluida.",
+        "exclusionsTrashed_other": "{{count}} Notas destrozadas no incluidas.",
+        "phaseAttachments": "adjuntos",
+        "phaseNotes": "notas",
+        "preparing": "Preparando..",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "",
-        "cancelling": "",
-        "title": ""
+        "cancel": "Cancelar",
+        "cancelling": "Cancelando..",
+        "title": "Exportando.."
       },
       "setup": {
-        "cancel": "",
-        "choose": "",
-        "chooseFolder": "",
-        "destinationLabel": "",
-        "export": "",
-        "folderSelectAriaLabel": "",
-        "noFolderChosen": "",
-        "noFoldersInVault": "",
-        "scopeFolder": "",
-        "scopeLabel": "",
-        "scopeWhole": "",
-        "title": ""
+        "cancel": "Cancelar",
+        "choose": "Elige..",
+        "chooseFolder": "Elige una carpeta..",
+        "destinationLabel": "Destino",
+        "export": "Exportar..",
+        "folderSelectAriaLabel": "Carpeta a la exportación",
+        "noFolderChosen": "No hay carpeta elegida",
+        "noFoldersInVault": "Sin carpetas en esta bóveda",
+        "scopeFolder": "Una carpeta",
+        "scopeLabel": "Ámbito",
+        "scopeWhole": "Bóveda entera",
+        "title": "Bóveda de exportación como Markdown"
       },
       "summary": {
-        "done": "",
-        "showInFolder": "",
-        "title": ""
+        "done": "Hecho",
+        "showInFolder": "Mostrar en la carpeta",
+        "title": "Exportación completa"
       }
     }
   },
   "failClosed": {
     "corrupted": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Si tiene una copia de seguridad, puede restaurarla; sus archivos actuales no se tocan; la copia de seguridad se restaura como una bóveda separada primero.",
+      "cta": "Cerrar app",
+      "title": "El archivo Vault está dañado."
     },
     "invalidState": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Por favor reinicia.",
+      "cta": "Cerradura",
+      "title": "Estado inesperado."
     },
     "ioError": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Esto puede ser un error de disco o sistema de archivos.",
+      "cta": "Cerrar app",
+      "title": "No puedo leer el archivo de la bóveda."
     },
     "permissionDenied": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Compruebe los permisos de archivo.",
+      "cta": "Cerrar app",
+      "title": "No hay permiso para acceder al archivo de bóveda."
     },
-    "restoreFromBackup": ""
+    "restoreFromBackup": "Restaurar de respaldo.."
   },
   "notes": {
     "archive": {
-      "close": "",
-      "count_one": "",
+      "close": "Cerca",
+      "countEmpty": "Vacío",
       "count_many": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "emptyState": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "count_one": "{{count}} nota",
+      "count_other": "{{count}} notes",
+      "delete": "Suprimir",
+      "deleteError": "No pude borrar esa nota. Prueba otra vez.",
+      "emptyState": "El archivo está vacío.",
+      "restore": "Restauración",
+      "restoreError": "No pude restaurar esa nota. Prueba otra vez.",
+      "title": "Archivo",
+      "untitled": "Untitled"
     },
     "cardMenu": {
-      "copyLink": "",
-      "open": "",
-      "openInNewTab": "",
-      "revealInFolder": ""
+      "copyLink": "Copiar el enlace",
+      "open": "Abierto",
+      "openInNewTab": "Abrir en nueva pestaña",
+      "revealInFolder": "Revela en carpeta"
     },
     "colorLabels": {
-      "clay": "",
-      "moss": "",
-      "ochre": "",
-      "plum": "",
-      "slate": "",
-      "stone": ""
+      "clay": "Clay",
+      "moss": "Moss",
+      "ochre": "Ochre",
+      "plum": "Plum",
+      "slate": "Slate",
+      "stone": "Stone"
     },
     "decoration": {
-      "colorSection": "",
-      "default": "",
-      "defaultFolderIcon": "",
-      "iconSection": "",
-      "menuLabel": "",
-      "noColor": "",
-      "none": ""
+      "colorSection": "Color",
+      "default": "Default",
+      "defaultFolderIcon": "Icono de carpeta predeterminada",
+      "iconSection": "Icon",
+      "menuLabel": "Etiquetas de color",
+      "noColor": "No color",
+      "none": "Ninguno"
     },
     "deleteConfirm": {
-      "cancel": "",
-      "delete": "",
-      "title": "",
-      "untitled": "",
-      "warning": ""
+      "cancel": "Cancelar",
+      "delete": "Suprimir",
+      "title": "¿Supir esta nota?",
+      "untitled": "Untitled",
+      "warning": "Esto no puede ser deshecho."
     },
     "filterBuilder": {
-      "addCondition": "",
-      "addFilterGroup": "",
-      "cancel": "",
+      "addCondition": "Agregar condición",
+      "addFilterGroup": "Agregar grupo filtro",
+      "cancel": "Cancelar",
       "combinator": {
-        "all": "",
-        "any": ""
+        "all": "todos",
+        "any": "cualquiera"
       },
-      "match": "",
+      "match": "Partido",
       "negate": {
-        "is": "",
-        "isNot": ""
+        "is": "es",
+        "isNot": "no"
       },
-      "noConditions": "",
-      "noteCount_one": "",
+      "noConditions": "Todavía sin condiciones — esta vista muestra todas las páginas.",
       "noteCount_many": "",
-      "noteCount_other": "",
-      "of": "",
-      "ofTheGroups": "",
-      "removeCondition": "",
-      "replaceFilter": "",
-      "save": "",
-      "searchTextPlaceholder": "",
-      "selectFolderPlaceholder": "",
-      "selectTagPlaceholder": "",
+      "noteCount_one": "{{count}} nota",
+      "noteCount_other": "{{count}} notes",
+      "of": "de:",
+      "ofTheGroups": "de los grupos:",
+      "removeCondition": "Quitar condición",
+      "replaceFilter": "Filtro de repuesto",
+      "save": "Guardar",
+      "searchTextPlaceholder": "texto de búsqueda",
+      "selectFolderPlaceholder": "seleccione una carpeta..",
+      "selectTagPlaceholder": "seleccionar una etiqueta..",
       "type": {
-        "folder": "",
-        "search": "",
-        "tag": ""
+        "folder": "Folder",
+        "search": "Buscar",
+        "tag": "Tag"
       },
-      "unrepresentable": "",
-      "unresolved": ""
+      "unrepresentable": "Este filtro fue hecho con un editor avanzado y no se puede editar aquí.",
+      "unresolved": "sin resolver"
     },
     "folderManagement": {
-      "illegalSegment": "",
-      "tooLong": ""
+      "illegalSegment": "Un nombre de carpeta no puede contener / \\ Silencio # ^ [ ] o iniciar / terminar con un espacio.",
+      "tooLong": "Esa ruta de la carpeta es demasiado larga."
     },
     "folderNote": {
-      "defaultTitle": ""
+      "defaultTitle": "Índice"
     },
     "folderRow": {
-      "createFolderNote": "",
-      "empty": "",
-      "folderNote": "",
-      "openFolderNote": ""
+      "createFolderNote": "Crear una nota de carpeta",
+      "empty": "vacío",
+      "folderNote": "nota de carpeta",
+      "openFolderNote": "Nota de carpeta abierta"
     },
     "graph": {
-      "allConnected": "",
-      "building": "",
-      "depthToggleTitle": "",
-      "filterAll": "",
-      "filterAroundNote": "",
-      "filterByTag": "",
-      "filterIsolated": "",
-      "hop": "",
-      "loading": "",
-      "noNotes": "",
-      "overCap": "",
-      "refresh": "",
-      "refreshTitle": "",
-      "tagPlaceholder": ""
+      "allConnected": "Todo está conectado, sin notas aisladas.",
+      "building": "Gráfico de construcción..",
+      "depthToggleTitle": "Profundidad del vecindario (1 ↔ 2 hops)",
+      "filterAll": "Todos",
+      "filterAroundNote": "Sobre esta nota",
+      "filterByTag": "Filtro por etiqueta",
+      "filterIsolated": "Isolated",
+      "hop": "{{depth}} hop",
+      "loading": "Carga gráfica..",
+      "noNotes": "Aún no hay notas para graficar.",
+      "overCap": "Esta bóveda es grande — el gráfico de vault entero está tapado. Filtrar a una etiqueta o mostrar notas aisladas para explorar.",
+      "refresh": "Refresh",
+      "refreshTitle": "La bóveda cambió: reconstruir el gráfico",
+      "tagPlaceholder": "Tag.."
     },
     "import": {
       "base": {
-        "untitledView": ""
+        "untitledView": "Vista sin título"
       },
       "modal": {
-        "cancel": "",
-        "cancelledNotImported_one": "",
+        "cancel": "Cancelar",
         "cancelledNotImported_many": "",
+        "cancelledNotImported_one": "No importado",
         "cancelledNotImported_other": "",
-        "cancelling": "",
-        "chooseFolder": "",
-        "close": "",
-        "closeAriaLabel": "",
-        "copied": "",
-        "copy": "",
-        "done": "",
-        "errorBody": "",
-        "flagDetail": "",
-        "flagKindFolder": "",
-        "flagKindTitle": "",
-        "folderPickerTitle": "",
-        "hiddenIgnoredPrefix_one": "",
+        "cancelling": "Cancelando..",
+        "chooseFolder": "Elige la carpeta..",
+        "close": "Cerca",
+        "closeAriaLabel": "Cerca",
+        "copied": "Copiado",
+        "copy": "Copiado",
+        "done": "Hecho",
+        "errorBody": "La importación no pudo completarse. Las notas ya importadas fueron guardadas y son seguras de guardar o borrar.",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
+        "flagKindFolder": "Folder",
+        "flagKindTitle": "Título",
+        "folderPickerTitle": "Elige tu carpeta de bóveda obsidiana",
         "hiddenIgnoredPrefix_many": "",
-        "hiddenIgnoredPrefix_other": "",
-        "hiddenIgnoredSuffix": "",
-        "ifNoteExistsLabel": "",
-        "import": "",
-        "importFailed": "",
-        "importing": "",
-        "markDone": "",
-        "markedDone": "",
-        "mediaImported_one": "",
+        "hiddenIgnoredPrefix_one": "{{count}} configuración / elemento oculto ignorado (por ejemplo. ",
+        "hiddenIgnoredPrefix_other": "{{count}} config / objetos ocultos ignorados (por ejemplo. ",
+        "hiddenIgnoredSuffix": ", fichas).",
+        "ifNoteExistsLabel": "Si ya existe una nota",
+        "import": "Importación",
+        "importFailed": "La importación falló.",
+        "importing": "Importando tu bóveda..",
+        "markDone": "Marca hecha",
+        "markedDone": "Marcado hecho",
         "mediaImported_many": "",
+        "mediaImported_one": "{{count}} import",
         "mediaImported_other": "",
-        "mediaOmittedSuffix_one": "",
         "mediaOmittedSuffix_many": "",
+        "mediaOmittedSuffix_one": " · {{count}} omitido",
         "mediaOmittedSuffix_other": "",
-        "needsAttention": "",
-        "needsAttentionHelp": "",
-        "noFolderChosen": "",
-        "notesImported_one": "",
+        "needsAttention": "Necesita atención",
+        "needsAttentionHelp": "Estas notas fueron importadas sin cambios. Las correcciones sugeridas son puntos de partida: copiar uno, luego cambiar el nombre de la nota cuando la abra.",
+        "noFolderChosen": "No hay carpeta elegida",
         "notesImported_many": "",
-        "notesImported_other": "",
-        "policyCopyHint": "",
-        "policyCopyLabel": "",
-        "policySkipHint": "",
-        "policySkipLabel": "",
-        "preexistingDetail": "",
-        "preparing": "",
-        "progressNotes": "",
-        "progressOf": "",
-        "reasonIllegalChar": "",
-        "reasonPathTooLong": "",
-        "reasonSegmentTooLong": "",
-        "scanning": "",
-        "setupIntro": "",
-        "statCancelled": "",
-        "statCanvasSkipped": "",
-        "statEmptyFoldersKept": "",
-        "statMedia": "",
-        "statOtherSkipped": "",
-        "statSkipped": "",
-        "suggestedNameAriaLabel": "",
-        "titleComplete": "",
-        "titleFailed": "",
-        "titleSetup": "",
-        "vaultFolderLabel": "",
-        "vaultRoot": ""
+        "notesImported_one": "nota importada",
+        "notesImported_other": "notas importadas",
+        "policyCopyHint": "Tráelo junto a la nota existente.",
+        "policyCopyLabel": "Importar como copia",
+        "policySkipHint": "Recomendado: volver a administrar una importación nunca duplica ni sobrescribe.",
+        "policySkipLabel": "Skip it",
+        "preexistingDetail": "Esta nota ya tenía su propia carpeta: “{{existing}}”, que Myne guardó, su carpeta puede diferir de donde se sentó en el disco.",
+        "preparing": "Preparando..",
+        "progressNotes": " notas",
+        "progressOf": " de ",
+        "reasonIllegalChar": "contiene un personaje Myne no puede usar en un nombre",
+        "reasonPathTooLong": "la carpeta + ruta del título es demasiado largo",
+        "reasonSegmentTooLong": "nombre es más largo de lo que Myne permite",
+        "scanning": "Escaneando tu bóveda..",
+        "setupIntro": "Point Myne en su carpeta de bóveda obsidiana existente. Cada nota de Markdown es importada y encriptada en el lugar - nada deja este dispositivo, y sus archivos originales se quedan sin tocar.",
+        "statCancelled": "Cancelada",
+        "statCanvasSkipped": ".canvas archivos saltados",
+        "statEmptyFoldersKept": "Carpetas vacías guardadas",
+        "statMedia": "Media",
+        "statOtherSkipped": "Otros archivos saltados",
+        "statSkipped": "Saltar (ya existen)",
+        "suggestedNameAriaLabel": "Nombre sugerido",
+        "titleComplete": "Importación completa",
+        "titleFailed": "La importación falló",
+        "titleSetup": "Importación Bóveda obsidiana",
+        "vaultFolderLabel": "Carpeta predeterminada",
+        "vaultRoot": "(raíz predeterminada)"
       },
       "offer": {
-        "body": "",
-        "chooseFolder": "",
-        "laterHint": "",
-        "notNow": "",
-        "title": ""
+        "body": "Lleva tus notas existentes a Myne. Cada uno está encriptado ya que es importado — nada deja este dispositivo, y sus archivos originales permanecen exactamente donde están.",
+        "chooseFolder": "Elige la carpeta..",
+        "laterHint": "Siempre puedes importar más tarde desde Ajustes → Almacenamiento.",
+        "notNow": "Ahora no",
+        "title": "¿Importar su bóveda obsidiana?"
       }
     },
     "list": {
-      "addToFavorites": "",
-      "archive": "",
-      "archiveBulkError": "",
-      "archiveNote": "",
-      "archiveSingleError": "",
-      "attachments": "",
-      "bulkArchive_one": "",
+      "addToFavorites": "Añadir a favoritos",
+      "archive": "Archivo",
+      "archiveBulkError": "No podía archivar las notas.",
+      "archiveNote": "Archivo",
+      "archiveSingleError": "No podía archivar la nota.",
+      "attachments": "Adjuntos",
       "bulkArchive_many": "",
+      "bulkArchive_one": "Archivo {{count}}",
       "bulkArchive_other": "",
-      "bulkDelete_one": "",
       "bulkDelete_many": "",
+      "bulkDelete_one": "Suprimir {{count}} notas",
       "bulkDelete_other": "",
-      "bulkMove_one": "",
       "bulkMove_many": "",
+      "bulkMove_one": "Mover {{count}} notas a..",
       "bulkMove_other": "",
-      "caseMergeBody": "",
-      "color": "",
-      "createFirstNote": "",
-      "createFolderNote": "",
-      "customize": "",
-      "delete": "",
-      "deleteFolderBody_one": "",
+      "caseMergeBody": "Ya existe una carpeta llamada “{{name}}”. Estos se fusionarán: ¿renombrar uno para mantenerlos separados?",
+      "color": "Color..",
+      "createFirstNote": "+ Crear su primera nota",
+      "createFolderNote": "Crear carpeta",
+      "customize": "Personalizar..",
+      "delete": "Suprimir",
       "deleteFolderBody_many": "",
-      "deleteFolderBody_other": "",
-      "deleteFolderConfirm": "",
-      "deleteFolderTitle": "",
-      "deleteFolderWarning": "",
-      "duplicate": "",
-      "editFilterTitle": "",
-      "emptyState": "",
-      "exportHtml": "",
-      "exportMarkdown": "",
-      "exportPdf": "",
-      "exportTxt": "",
-      "favoritesHeading": "",
-      "mergeAnyway": "",
-      "newFolder": "",
-      "newFolderInPlaceholder": "",
-      "newFolderPlaceholder": "",
-      "newNote": "",
-      "newNoteFromTemplate": "",
-      "newNoteHere": "",
-      "newNoteMenu": "",
-      "newNoteShortcut": "",
-      "newSubfolder": "",
-      "newViewTitle": "",
-      "noteMovedToTrash": "",
-      "notesHeading": "",
-      "notesMovedToTrash_one": "",
+      "deleteFolderBody_one": "“{{name}}” y su nota {{count}}",
+      "deleteFolderBody_other": "“{{name}}” y sus notas {{count}}",
+      "deleteFolderConfirm": "Eliminar la carpeta",
+      "deleteFolderTitle": "¿Supir esta carpeta?",
+      "deleteFolderWarning": "Las notas se mueven a Trash – puedes restaurarlas más tarde.",
+      "duplicate": "Duplicar",
+      "editFilterTitle": "Editar filtro",
+      "emptyState": "Aún no hay notas.",
+      "exportHtml": "Exportar como HTML..",
+      "exportMarkdown": "Exportar como Markdown..",
+      "exportPdf": "Exportar como PDF..",
+      "exportTxt": "Exportar como texto simple..",
+      "favoritesHeading": "Favoritos",
+      "mergeAnyway": "Merge de todos modos",
+      "newFolder": "Nueva carpeta",
+      "newFolderInPlaceholder": "Nueva carpeta en {{path}}",
+      "newFolderPlaceholder": "Nueva carpeta",
+      "newNote": "Nueva nota",
+      "newNoteFromTemplate": "Nueva nota de la plantilla..",
+      "newNoteHere": "Nueva nota aquí",
+      "newNoteMenu": "Nueva nota",
+      "newNoteShortcut": "Nueva nota",
+      "newSubfolder": "Nuevo subcarpeta",
+      "newViewTitle": "Nueva vista",
+      "noteMovedToTrash": "Nota trasladada a Trash",
+      "notesHeading": "Notas",
       "notesMovedToTrash_many": "",
-      "notesMovedToTrash_other": "",
-      "openArchive": "",
-      "openAttachments": "",
-      "openFolderNote": "",
-      "openInNewTab": "",
-      "openToSide": "",
-      "openTrash": "",
-      "removeAsFolderNote": "",
-      "removeFromFavorites": "",
-      "rename": "",
-      "setAsFolderNote": "",
-      "trash": "",
-      "trashBulkError": "",
-      "trashSingleError": "",
-      "undo": "",
-      "vaultRoot": "",
-      "viewSettingsTitle": ""
+      "notesMovedToTrash_one": "{{count}} nota movida a Trash",
+      "notesMovedToTrash_other": "{{count}} notas movidas a Trash",
+      "openArchive": "Abrir el archivo",
+      "openAttachments": "Apegos abiertos",
+      "openFolderNote": "Nota de carpeta abierta",
+      "openInNewTab": "Abrir en nueva pestaña",
+      "openToSide": "Abierto al lado",
+      "openTrash": "Abre la basura",
+      "removeAsFolderNote": "Eliminar como carpeta",
+      "removeFromFavorites": "Eliminar de los favoritos",
+      "rename": "Rename",
+      "setAsFolderNote": "Establecer como nota de carpeta",
+      "trash": "Trash",
+      "trashBulkError": "No podía mover las notas a Trash.",
+      "trashSingleError": "No podía mover la nota a Trash.",
+      "undo": "Undo",
+      "vaultRoot": "Vault root",
+      "viewSettingsTitle": "Ver configuración"
     },
     "newFromTemplate": {
-      "back": "",
-      "blankNote": "",
-      "createNote": "",
-      "emptyState": "",
-      "listLabel": "",
-      "loading": "",
-      "nameLabel": "",
-      "namePlaceholder": "",
-      "nameStepTitle": "",
-      "pickStepTitle": "",
-      "untitledTemplate": ""
+      "back": "Atrás",
+      "blankNote": "Nota de Blank",
+      "createNote": "Crear nota",
+      "emptyState": "Aún no has creado plantillas.",
+      "listLabel": "Plantillas",
+      "loading": "Cargando..",
+      "nameLabel": "Nombre de la nota (de “{{templateName}}”)",
+      "namePlaceholder": "Untitled",
+      "nameStepTitle": "Nombre esta nota",
+      "pickStepTitle": "Nueva nota de la plantilla",
+      "untitledTemplate": "Plantilla sin título"
     },
     "newTab": {
-      "createNote": "",
-      "noNotesMatch": "",
-      "noNotesYet": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "untitled": ""
+      "createNote": "Crear una nueva nota",
+      "noNotesMatch": "No hay coincidencia de notas.",
+      "noNotesYet": "Aún no hay notas.",
+      "searchAriaLabel": "Notas de búsqueda para abrir",
+      "searchPlaceholder": "Notas de búsqueda..",
+      "untitled": "Untitled"
     },
     "pane": {
-      "graphTab": "",
-      "loading": "",
-      "untitledView": ""
+      "graphTab": "Gráfico",
+      "loading": "Cargando..",
+      "untitledView": "Vista sin título"
     },
     "relativeTime": {
-      "daysAgo": "",
-      "hoursAgo": "",
-      "justNow": "",
-      "minutesAgo": "",
-      "oneWeekAgo": "",
-      "weeksAgo": "",
-      "yesterday": ""
+      "daysAgo": "{{d}} days ago",
+      "hoursAgo": "{{h}} h ago",
+      "justNow": "ahora",
+      "minutesAgo": "{{m}} min ago",
+      "oneWeekAgo": "hace 1 semana",
+      "weeksAgo": "Hace semanas",
+      "yesterday": "ayer"
     },
     "row": {
-      "addToFavorites": "",
-      "folderIndexBadgeLabel": "",
-      "folderIndexBadgeTitle": "",
-      "folderIndexConflictLabel": "",
-      "folderIndexConflictTitle": "",
-      "loadError": "",
-      "removeFromFavorites": "",
-      "renameAriaLabel": "",
-      "untitled": ""
-    },
-    "savedView": {
-      "defaultName": ""
+      "addToFavorites": "Añadir a favoritos",
+      "folderIndexBadgeLabel": "Nota de carpeta",
+      "folderIndexBadgeTitle": "Nota de carpeta: índice de esta carpeta",
+      "folderIndexConflictLabel": "La carpeta ya tiene una nota índice",
+      "folderIndexConflictTitle": "Esta carpeta ya tiene una nota índice",
+      "loadError": "No podía cargar esta nota",
+      "removeFromFavorites": "Eliminar de los favoritos",
+      "renameAriaLabel": "Nota de nombre",
+      "untitled": "Untitled"
     },
     "saveStatus": {
-      "editing": "",
-      "editingEllipsis": "",
-      "editingTitle": "",
-      "justNow": "",
-      "retry": "",
-      "saved": "",
-      "savedRelative": "",
-      "saveFailed": "",
-      "saveFailedTitle": "",
-      "saving": "",
-      "savingEllipsis": ""
+      "editing": "Edición",
+      "editingEllipsis": "Edición..",
+      "editingTitle": "Edición: autosalvado está armado",
+      "justNow": "ahora",
+      "retry": "Retry",
+      "saveFailed": "Salvar falló",
+      "saveFailedTitle": "Guardar fallido - haga clic en Retry",
+      "saved": "Guardado",
+      "savedRelative": "Guardado {{rel}}",
+      "saving": "Salvación",
+      "savingEllipsis": "Salvando.."
+    },
+    "savedView": {
+      "defaultName": "Vista filtrada"
     },
     "snapshotFailed": {
-      "dismiss": "",
-      "message": ""
+      "dismiss": "Desestimación",
+      "message": "No se puede guardar una instantánea — su nota se guarda, pero su historia de la versión puede ser incompleta (el disco puede estar lleno)."
     },
     "snapshots": {
-      "cancel": "",
-      "changeCount_one": "",
+      "cancel": "Cancelar",
       "changeCount_many": "",
-      "changeCount_other": "",
-      "close": "",
-      "confirmBody": "",
-      "confirmTitle": "",
-      "decrypting": "",
-      "emptyState": "",
-      "encryptedSize": "",
-      "errorCannotDecrypt": "",
-      "errorGeneric": "",
-      "errorIo": "",
-      "errorNotFound": "",
-      "errorStorageAccess": "",
-      "errorVaultLocked": "",
-      "justNow": "",
-      "listLabel": "",
-      "loading": "",
-      "restore": "",
-      "restoreCta": "",
-      "restoredStatus": "",
-      "selectPlaceholder": "",
-      "title": "",
-      "untitled": ""
+      "changeCount_one": "{{count}} cambiar desde esta instantánea",
+      "changeCount_other": "{{count}} cambia desde esta instantánea",
+      "close": "Cerca",
+      "confirmBody": "Tu nota actual se guardará como una instantánea primero, para que puedas deshacer esto.",
+      "confirmTitle": "¿Restorear esta instantánea?",
+      "decrypting": "Descifrando..",
+      "emptyState": "Todavía no hay fotos. Las instantáneas se guardan automáticamente mientras se edita y se mantiene durante unos 7 días. Están encriptados y desaparecen cuando la nota se elimina permanentemente.",
+      "encryptedSize": "Encrypted · {{size}}",
+      "errorCannotDecrypt": "Esta instantánea no podría descifrarse.",
+      "errorGeneric": "Algo salió mal. Prueba otra vez.",
+      "errorIo": "Se produjo un error de disco — el disco puede ser completo o inequívoco.",
+      "errorNotFound": "Esa instantánea ya no está disponible.",
+      "errorStorageAccess": "No podía acceder al almacenamiento de instantáneas de la cámara.",
+      "errorVaultLocked": "La bóveda está cerrada. Desbloquearlo para ver instantáneas.",
+      "justNow": "ahora",
+      "listLabel": "Lista de fotos",
+      "loading": "Cargando..",
+      "restore": "Restauración",
+      "restoreCta": "Restaurar esta instantánea",
+      "restoredStatus": "Restablecido. La versión que tenías se guarda como una instantánea.",
+      "selectPlaceholder": "Seleccione una instantánea para previsualizar lo que cambió desde entonces.",
+      "title": "Juegos de rol",
+      "untitled": "Untitled"
     },
     "tabStrip": {
-      "closeNewTab": "",
-      "closeTab": "",
-      "newTab": "",
-      "openNotes": "",
-      "pin": "",
-      "pinned": "",
-      "pinnedTitle": "",
-      "unpin": "",
-      "untitled": ""
+      "closeNewTab": "Cerrar nueva pestaña",
+      "closeTab": "Cerrar {{title}}",
+      "newTab": "Nueva pestaña",
+      "openNotes": "Notas abiertas",
+      "pin": "Pin",
+      "pinned": "Pinned",
+      "pinnedTitle": "Pinned — unpin to close",
+      "unpin": "Unpin",
+      "untitled": "Untitled"
     },
     "tagBrowser": {
-      "cancel": "",
-      "clear": "",
-      "combineTagsWith": "",
-      "filtering": "",
-      "modeAll": "",
-      "modeAny": "",
-      "noNotesForFilter": "",
-      "noTagsMatch": "",
-      "noTagsYet": "",
-      "noteCount_one": "",
+      "cancel": "Cancelar",
+      "clear": "Despejado",
+      "combineTagsWith": "Combinar etiquetas con",
+      "filtering": "Filtrar..",
+      "modeAll": "Todos",
+      "modeAny": "Cualquier",
+      "noNotesForFilter": "No hay notas para este filtro.",
+      "noTagsMatch": "No hay etiquetas que coincidan con “{{query}}”.",
+      "noTagsYet": "Todavía no hay etiquetas.",
       "noteCount_many": "",
-      "noteCount_other": "",
-      "notes": "",
-      "pickTag": "",
-      "save": "",
-      "saveAsView": "",
-      "searchPlaceholder": "",
-      "title": "",
-      "untitled": "",
-      "viewNamePlaceholder": ""
+      "noteCount_one": "{{count}} nota",
+      "noteCount_other": "{{count}} notes",
+      "notes": "Notas",
+      "pickTag": "Escoge una etiqueta para filtrar.",
+      "save": "Guardar",
+      "saveAsView": "Guardar la vista",
+      "searchPlaceholder": "Buscar etiquetas..",
+      "title": "Etiquetas",
+      "untitled": "Untitled",
+      "viewNamePlaceholder": "Ver nombre"
     },
     "trash": {
-      "close": "",
-      "count_one": "",
+      "close": "Cerca",
+      "countEmpty": "Vacío",
       "count_many": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
-      "emptyConfirmBody_one": "",
+      "count_one": "{{count}} nota",
+      "count_other": "{{count}} notes",
+      "delete": "Suprimir",
+      "deleteError": "No pude borrar esa nota. Prueba otra vez.",
+      "empty": "Basura vacía",
       "emptyConfirmBody_many": "",
-      "emptyConfirmBody_other": "",
-      "emptyConfirmCta": "",
-      "emptyConfirmTitle": "",
-      "emptyPartialFailure_one": "",
+      "emptyConfirmBody_one": "{{count}} nota será eliminada permanentemente.",
+      "emptyConfirmBody_other": "{{count}} notas serán eliminadas permanentemente.",
+      "emptyConfirmCta": "Basura vacía",
+      "emptyConfirmTitle": "¿La basura vacía?",
       "emptyPartialFailure_many": "",
-      "emptyPartialFailure_other": "",
-      "emptyState": "",
-      "purgeConfirmCta": "",
-      "purgeConfirmTitle": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "emptyPartialFailure_one": "{{count}} nota no podía ser borrada y permanecer en la basura.",
+      "emptyPartialFailure_other": "{{count}} notas no podían ser borradas y permanecer en la basura.",
+      "emptyState": "La basura está vacía.",
+      "purgeConfirmCta": "Suprimir permanentemente",
+      "purgeConfirmTitle": "Eliminar permanentemente?",
+      "restore": "Restauración",
+      "restoreError": "No pude restaurar esa nota. Prueba otra vez.",
+      "title": "Trash",
+      "untitled": "Untitled"
     },
     "unlinkedMentions": {
-      "empty": "",
-      "heading": "",
-      "link": "",
-      "linkTooltip": "",
-      "refresh": "",
-      "searching": "",
-      "thisNote": "",
-      "untitled": ""
-    },
-    "views": {
-      "cards": {
-        "changeCover": "",
-        "changeCoverImage": "",
-        "empty": "",
-        "noValue": "",
-        "setCover": "",
-        "setCoverImage": "",
-        "untitled": ""
-      },
-      "collapseViews": "",
-      "empty": "",
-      "expandViews": "",
-      "heading": "",
-      "host": {
-        "unsupported": ""
-      },
-      "menu": {
-        "deleteView": "",
-        "editFilter": "",
-        "moveDown": "",
-        "moveUp": "",
-        "rename": "",
-        "viewSettings": ""
-      },
-      "newView": "",
-      "untitledView": ""
+      "empty": "Sin menciones inconexas.",
+      "heading": "Menciones sin conexión",
+      "link": "Enlace",
+      "linkTooltip": "Enlace esta mención a {{title}}",
+      "refresh": "Las menciones pueden haber cambiado — refrescante",
+      "searching": "Buscando..",
+      "thisNote": "esta nota",
+      "untitled": "Untitled"
     },
     "viewSettings": {
       "aspect": {
-        "default": "",
-        "fourThree": "",
-        "square": "",
-        "threeTwo": "",
-        "wide": ""
+        "default": "Default (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (cuadra)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (total)"
       },
-      "cancel": "",
-      "cardSize": "",
-      "cardSizeValue": "",
-      "coverImageHint": "",
-      "coverImagePlaceholder": "",
-      "coverImageProperty": "",
-      "imageAspectRatio": "",
-      "reset": "",
-      "save": ""
+      "cancel": "Cancelar",
+      "cardSize": "Tamaño de la tarjeta",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "La propiedad de primera categoría cuyo valor es una imagen - se muestra como la cubierta de cada tarjeta. Deja vacío sin cobertura.",
+      "coverImagePlaceholder": "e.g. cover",
+      "coverImageProperty": "Propiedad de la imagen cubierta",
+      "imageAspectRatio": "Relación de aspecto de imagen",
+      "reset": "Reset",
+      "save": "Guardar"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Cubierta de cambio",
+        "changeCoverImage": "Cambio de imagen",
+        "empty": "Ninguna nota coincide con esta vista",
+        "noValue": "No valor",
+        "setCover": "Cubierta de conjunto",
+        "setCoverImage": "Coloque la imagen",
+        "untitled": "Untitled"
+      },
+      "collapseViews": "Colapso de vistas",
+      "empty": "Todavía no hay opiniones. Guardar la lista de notas actual como vista.",
+      "expandViews": "Ampliar opiniones",
+      "heading": "Vistas",
+      "host": {
+        "unsupported": "Este tipo de vista llega a una actualización posterior."
+      },
+      "menu": {
+        "deleteView": "Suprímase la vista",
+        "editFilter": "Editar filtro..",
+        "moveDown": "Muévete",
+        "moveUp": "Muévanse",
+        "rename": "Rename",
+        "viewSettings": "Ver configuración.."
+      },
+      "newView": "Nueva vista",
+      "untitledView": "Vista sin título"
     },
     "welcome": {
-      "body": "",
-      "title": ""
+      "body": "Bienvenido a Myne, tu espacio privado para pensar y escribir.\n\nTodo lo que guardas aquí está encriptado y permanece en tu dispositivo. Tu frase **password** y **Recovery frase** son las únicas claves de ella, así que mantenlas en algún lugar seguro. Si ambos se pierden, nadie puede recuperar sus notas, ni siquiera nosotros.\n\nEsto es sólo una nota regular, así que haz que sea tuya. Editarlo, renombrarlo o eliminarlo cuando quiera, y añadir nuevas notas a medida que crecen sus ideas.\n\nNos alegra que estés aquí. Para obtener más información sobre Myne, visite https://myne.md\n",
+      "title": "Bienvenido a Myne"
     },
     "workspace": {
-      "defaultSlotName": ""
+      "defaultSlotName": "Default"
     }
   },
   "password": {
     "createForm": {
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "defaultEmptyCaption": "",
-      "mismatch": "",
-      "passwordLabel": "",
-      "suggestPassword": "",
-      "tooShort": ""
+      "checkingStrength": "Comprobando fuerza..",
+      "confirmLabel": "Confirme contraseña maestra",
+      "defaultEmptyCaption": "Se utiliza como entrada a Argon2id (m=256 MiB, t=3, p=2). Elige algo que puedas recordar; no puedes restablecerlo.",
+      "mismatch": "Las contraseñas no coinciden.",
+      "passwordLabel": "Contraseña maestra",
+      "suggestPassword": "Sugerir contraseña",
+      "tooShort": "Usa al menos caracteres {{n}}."
     },
     "input": {
-      "hide": "",
-      "show": ""
+      "hide": "Ocultar contraseña",
+      "show": "Mostrar contraseña"
     }
   },
   "primitives": {
     "searchableSelect": {
-      "emptyText": "",
-      "placeholder": "",
-      "searchPlaceholder": ""
+      "emptyText": "No hay coincidencias.",
+      "placeholder": "Seleccione..",
+      "searchPlaceholder": "Buscar.."
     }
   },
   "recover": {
     "errors": {
-      "cancelledVaultLocked": "",
-      "operationInProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "cancelledVaultLocked": "Recuperación cancelada: la bóveda estaba cerrada.",
+      "operationInProgress": "Operación en marcha. Por favor, espera.",
+      "unexpected": "Un error inesperado. Por favor, inténtalo de nuevo.",
+      "vaultNotFound": "El archivo Vault no se encuentra. Por favor reinicia la aplicación."
     }
   },
   "restore": {
-    "backLabel": "",
-    "cancelLabel": "",
+    "backLabel": "Atrás",
+    "cancelLabel": "Cancelar",
     "collision": {
-      "body": "",
-      "keepBoth": "",
-      "replaceExisting": ""
+      "body": "Una bóveda de esta copia de seguridad ya existe en este dispositivo. Usted puede guardar ambos — la copia restaurada aparece como una bóveda separada en su lista de bóvedas — o restaurar ahora y luego retirar la bóveda existente de la lista de bóveda usted mismo (la recuperación le pide que escriba DELETE, y sólo tiene sentido después de confirmar que la bóveda restaurada abre).",
+      "keepBoth": "Mantén ambos",
+      "replaceExisting": "Restaurar, luego sustituir.."
     },
     "damaged": {
-      "body": "",
-      "close": "",
-      "salvage": ""
+      "body": "El archivo de respaldo está dañado, así que nada fue restaurado. Si esta es la única copia que tienes, el rescate puede restaurar las notas intactas y lista exactamente lo que no se puede leer; el resultado siempre se etiqueta como una restauración parcial.",
+      "close": "Cerca",
+      "salvage": "Salvaje notas intactas.."
     },
     "error": {
-      "tryAnotherFile": ""
+      "tryAnotherFile": "Prueba otro archivo"
     },
     "pick": {
-      "body": "",
-      "chooseFile": "",
-      "corruptedSuffix": ""
+      "body": "Elija un archivo <code>.myne-backup</code>. La copia de seguridad se verifica antes de que se restablezca cualquier cosa; la bóveda restaurada se desbloquea con la contraseña o frase de recuperación de esa bóveda, exactamente como desbloquear.",
+      "chooseFile": "Elija el archivo de respaldo..",
+      "corruptedSuffix": "Su bóveda actual no se toca: la copia de seguridad se restaura como una bóveda separada primero."
     },
     "summary": {
-      "attachments": "",
-      "collidedNote": "",
-      "notes": "",
-      "openVaultList": "",
-      "partialHeader_one": "",
+      "attachments": "Adjuntos: {{n}}",
+      "collidedNote": "La copia previamente existente de esta bóveda sigue en su lista de bóvedas. Una vez que confirme la bóveda restaurada se abre, puede quitar la vieja de la lista de la bóveda (se le pedirá que escriba DELETE).",
+      "notes": "Notas: {{n}}",
+      "openVaultList": "Lista de bóveda abierta",
       "partialHeader_many": "",
-      "partialHeader_other": "",
-      "restored": "",
-      "versionHistory": ""
+      "partialHeader_one": "Restaurado parcialmente — {{count}} artículo no se podía leer.",
+      "partialHeader_other": "Restablecido parcialmente — {{count}} artículos no se podían leer.",
+      "restored": "Vault restaurado.",
+      "versionHistory": "Version history entries: {{n}}"
     },
-    "title": "",
+    "title": "Restaurar de respaldo",
     "working": {
-      "cancel": "",
-      "restoringProgress": "",
-      "verifying": "",
-      "verifyingProgress": ""
+      "cancel": "Cancelar",
+      "restoringProgress": "Restaurar... {{done}} de {{total}}",
+      "verifying": "Verificando refuerzos..",
+      "verifyingProgress": "Verificando refuerzos... {{done}} de {{total}}"
     }
   },
   "settings": {
     "about": {
-      "buildChannelDevelopment": "",
-      "buildChannelLabel": "",
-      "buildChannelStable": "",
-      "changelogButton": "",
-      "changelogHelper": "",
-      "changelogLabel": "",
-      "licenseBody": "",
-      "licenseLabel": "",
-      "tagline": "",
-      "threatModelHelper": "",
-      "threatModelLabel": ""
+      "buildChannelDevelopment": "Desarrollo",
+      "buildChannelLabel": "Canal de construcción",
+      "buildChannelStable": "Stable",
+      "changelogButton": "Ver cambio..",
+      "changelogHelper": "Notas de perversión. aparecerá cuando el MYND-119 aterriza.",
+      "changelogLabel": "Cambio",
+      "licenseBody": "Pre-alpha · CC0 docs · Código de aplicación AGPL-3.0 sobre la liberación de Fase 1.",
+      "licenseLabel": "Licencia",
+      "tagline": "Pre-alpha · cliente de escritorio de fase 1",
+      "threatModelHelper": "Abra el documento de modelo de amenaza pública en su navegador.",
+      "threatModelLabel": "Modelo de amenaza"
     },
     "account": {
-      "argon2idHeading": "",
-      "changePasswordButton": "",
+      "argon2idHeading": "Parámetros Argon2id",
+      "changePasswordButton": "Cambiar contraseña",
       "changePasswordError": {
-        "invalidCredentialOrVault": "",
-        "ioError": "",
-        "joinFailure": "",
-        "samePasswordRejected": "",
-        "weakNewPassword": ""
+        "invalidCredentialOrVault": "La contraseña actual incorrecta o archivo de bóveda está dañado.",
+        "ioError": "Error de disco, por favor intente de nuevo.",
+        "joinFailure": "Algo salió mal, por favor intente de nuevo.",
+        "samePasswordRejected": "La nueva contraseña coincide con la actual.",
+        "weakNewPassword": "La nueva contraseña debe ser al menos 12 caracteres."
       },
-      "changePasswordHeading": "",
-      "changePasswordHelper": "",
-      "dangerZoneHeading": "",
-      "dangerZoneHelper": "",
-      "deleteVaultButton": "",
-      "memoryCost": "",
-      "parallelism": "",
-      "timeCost": "",
-      "vaultLabelEyebrow": "",
-      "vaultLabelHelper": "",
-      "vaultLabelPlaceholder": "",
-      "vaultLabelSave": ""
+      "changePasswordHeading": "Cambiar contraseña",
+      "changePasswordHelper": "Rota tu contraseña principal mientras mantiene la misma bóveda. La frase de recuperación sigue igual.",
+      "dangerZoneHeading": "Zona peligrosa",
+      "dangerZoneHelper": "Eliminar permanentemente esta bóveda y todas las notas. No se puede deshacer. La frase de recuperación no restaurará la bóveda.",
+      "deleteVaultButton": "Borrar la bóveda..",
+      "memoryCost": "Costo de memoria",
+      "parallelism": "Paralelismo",
+      "timeCost": "Costo del tiempo",
+      "vaultLabelEyebrow": "VAULT LABEL",
+      "vaultLabelHelper": "Un nombre para esta bóveda que se muestra en el interruptor de la aplicación. Almacenado encriptado dentro de la bóveda; nunca deja tu dispositivo en texto claro.",
+      "vaultLabelPlaceholder": "Añadir una etiqueta..",
+      "vaultLabelSave": "Guardar"
     },
     "appearance": {
-      "showEditTimesAria": "",
-      "showEditTimesHelper": "",
-      "showEditTimesLabel": "",
-      "themeHelper": "",
-      "themeLabel": "",
-      "themeOptionAria": "",
-      "themeSaveError": "",
-      "timestampsSaveError": ""
+      "showEditTimesAria": "Mostrar tiempos de edición en la barra lateral",
+      "showEditTimesHelper": "Muestra el tiempo de última edición de cada nota bajo su título en la barra lateral.",
+      "showEditTimesLabel": "Mostrar tiempos de edición",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Oscuro",
+        "light": "Luz",
+        "system": "Sistema"
+      },
+      "themeHelper": "Cambiar entre temas ligeros y oscuros, o seguir la preferencia del sistema.",
+      "themeLabel": "Tema",
+      "themeOptionAria": "{{label}} tema",
+      "themeSaveError": "No pude salvar el tema. Por favor, inténtalo de nuevo.",
+      "timestampsSaveError": "No podía ahorrar preferencia. Por favor, inténtalo de nuevo."
     },
     "archive": {
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": "",
-      "saveError": ""
+      "helper": "Deje que las notas se muevan a un Archivo, mantenido fuera de la lista principal. Apague esto restaura cada nota archivada en su carpeta y oculta los controles de archivo.",
+      "label": "Archivado",
+      "off": "Fuera",
+      "on": "On",
+      "saveError": "No podía actualizar la configuración de archivo."
     },
     "autoBackup": {
-      "backupFolder": "",
-      "chooseFolder": "",
-      "chooseFolderDialogTitle": "",
-      "frequency": "",
-      "frequencyAriaLabel": "",
-      "helper": "",
-      "keepLast": "",
-      "noFolderChosen": "",
-      "saveFailedToast": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "statusFailed": "",
-      "statusLastBackup": "",
-      "statusNever": "",
-      "title": ""
+      "backupFolder": "Carpeta de respaldo",
+      "chooseFolder": "Elige la carpeta..",
+      "chooseFolderDialogTitle": "Elija una carpeta para copias de seguridad automáticas",
+      "frequency": "Frecuencia",
+      "frequencyAriaLabel": "Frecuencia de respaldo",
+      "helper": "Escriba un .myne-backup encriptado a una carpeta en un horario, mientras que la aplicación está abierta y la bóveda está desbloqueada. Las copias de seguridad permanecen tan encriptadas como tu bóveda; Myne guarda los pocos más recientes y nunca envía nada de tu dispositivo.",
+      "intervalDaily": "Diario",
+      "intervalEveryUnlock": "Cada desbloqueo",
+      "intervalWeekly": "Semanal",
+      "keepLast": "Mantén la última",
+      "noFolderChosen": "Todavía no hay carpeta elegida.",
+      "saveFailedToast": "No podía guardar ajustes de copia de seguridad.",
+      "searchEmpty": "Sin coincidencia.",
+      "searchPlaceholder": "Buscar..",
+      "statusFailed": "Falló la copia de seguridad automática — {{stamp}}",
+      "statusLastBackup": "Última copia de seguridad: {{stamp}}",
+      "statusNever": "Aún no hay respaldo automático.",
+      "title": "Respaldos automáticos"
     },
     "changePassword": {
-      "cancel": "",
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "currentLabel": "",
-      "mismatch": "",
-      "newLabel": "",
-      "submit": "",
-      "submitting": "",
-      "title": "",
-      "tooShort": ""
+      "cancel": "Cancelar",
+      "checkingStrength": "Comprobando fuerza..",
+      "confirmLabel": "Confirme nueva contraseña",
+      "currentLabel": "Contraseña actual",
+      "mismatch": "Las contraseñas no coinciden.",
+      "newLabel": "Nueva contraseña",
+      "submit": "Cambiar contraseña",
+      "submitting": "Cambiar contraseña..",
+      "title": "Cambiar contraseña",
+      "tooShort": "Usa al menos caracteres {{n}}."
     },
     "connectedExtensions": {
       "browser": {
-        "chromium": "",
-        "firefox": "",
-        "generic": ""
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Extensión del navegador"
       },
       "when": {
-        "bare": "",
-        "daysAgo_one": "",
+        "bare": "Conectado",
         "daysAgo_many": "",
-        "daysAgo_other": "",
-        "hoursAgo_one": "",
+        "daysAgo_one": "Conectado {{count}} día hace",
+        "daysAgo_other": "Conectado {{count}} hace días",
         "hoursAgo_many": "",
+        "hoursAgo_one": "Conectado {{count}} h hace",
         "hoursAgo_other": "",
-        "justNow": "",
-        "minutesAgo_one": "",
+        "justNow": "Conectado justo ahora",
         "minutesAgo_many": "",
+        "minutesAgo_one": "Conectado {{count}} min ago",
         "minutesAgo_other": "",
-        "onDate": ""
+        "onDate": "Conectado {{date}}"
       }
     },
     "customThemes": {
-      "appliedBadge": "",
-      "apply": "",
-      "applyError": "",
-      "cancel": "",
-      "confirm": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
+      "appliedBadge": "Aplicadas",
+      "apply": "Aplicar",
+      "applyError": "No podía aplicar ese tema. Por favor, inténtalo de nuevo.",
+      "cancel": "Cancelar",
+      "confirm": "Confirmación",
+      "delete": "Suprimir",
+      "deleteError": "No pude borrar ese tema. Por favor, inténtalo de nuevo.",
+      "empty": "Aún no hay temas personalizados. Importar uno, o abrir la carpeta de temas y añadir un archivo temático.",
       "error": {
-        "aColorFallback": "",
-        "invalidFile": "",
-        "invalidName": "",
-        "invalidValue": "",
-        "invalidValueWithLine": "",
-        "missingKey": "",
-        "parseError": "",
-        "parseErrorWithLine": ""
+        "aColorFallback": "un color",
+        "invalidFile": "Archivo temático inválido.",
+        "invalidName": "Nombre del tema peligroso",
+        "invalidValue": "Valor inválido para {{key}}",
+        "invalidValueWithLine": "Valor inválido para {{key}} (línea {{line}})",
+        "missingKey": "Desapareciendo el color requerido {{key}}",
+        "parseError": "No válido JSON",
+        "parseErrorWithLine": "No válido JSON (línea {{line}})"
       },
-      "fileFilterName": "",
-      "helper": "",
-      "importButton": "",
-      "importError": "",
-      "label": "",
-      "openFolderButton": "",
-      "openFolderError": "",
-      "readError": ""
+      "fileFilterName": "Tema Myne",
+      "helper": "Usa tu propia paleta de colores. Los temas se validan en este dispositivo antes de usar — nada se carga.",
+      "importButton": "Importar tema..",
+      "importError": "Ese archivo no es un tema válido. Abra la referencia para ver el formato.",
+      "label": "Temas personalizados",
+      "openFolderButton": "Carpeta temática abierta",
+      "openFolderError": "No podía abrir la carpeta de temas.",
+      "readError": "No podía leer tu carpeta de temas."
     },
     "dailyNotes": {
-      "blankTemplate": "",
-      "dateFormatHelper": "",
-      "dateFormatLabel": "",
-      "dateFormatSaveError": "",
-      "folderHelper": "",
-      "folderLabel": "",
-      "folderSaveError": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "templateHelper": "",
-      "templateLabel": "",
-      "templateSaveError": "",
-      "untitledTemplate": ""
+      "blankTemplate": "Blank (sin plantilla)",
+      "dateFormatHelper": "El título de cada nota diaria. Admite YYYY, MM, DD. Defaults a {{default}}.",
+      "dateFormatLabel": "Formato de fecha de la nota diaria",
+      "dateFormatSaveError": "No pude guardar el formato de la fecha. Por favor, inténtalo de nuevo.",
+      "folderHelper": "Donde se presentan nuevas notas diarias. Defaults to {{default}} — la carpeta se mantiene incluso cuando está vacía.",
+      "folderLabel": "Carpeta de nota diaria",
+      "folderSaveError": "No pude guardar la carpeta diaria. Por favor, inténtalo de nuevo.",
+      "searchEmpty": "No hay plantillas compatibles.",
+      "searchPlaceholder": "Plantillas de búsqueda..",
+      "templateHelper": "Escoja una plantilla para iniciar cada nota diaria desde, o deje en blanco para una nota vacía titulada con la fecha.",
+      "templateLabel": "Plantilla de notas diarias",
+      "templateSaveError": "No pude guardar la plantilla diaria. Por favor, inténtalo de nuevo.",
+      "untitledTemplate": "Plantilla sin título"
     },
     "deleteVault": {
-      "cancel": "",
-      "caseSensitiveHint": "",
-      "continue": "",
-      "copyPrimary": "",
-      "copySecondary": "",
-      "eyebrow": "",
-      "heading": "",
-      "ioFailBody": "",
-      "ioFailTitle": "",
-      "partialFailBody_one": "",
+      "cancel": "Cancelar",
+      "caseSensitiveHint": "Un caso sensible. Escriba la palabra exactamente para permitir la eliminación.",
+      "continue": "Continuar",
+      "copyPrimary": "Esto elimina permanentemente esta bóveda y cada nota dentro de ella. La acción no se puede deshacer, y su frase de recuperación no restaurará los datos.",
+      "copySecondary": "Las teclas Vault se nutren de la memoria antes de que los archivos no estén conectados; cualquier cifertexto huérfano que permanece en el disco permanece basura descubierta Argon2id-wrapped.",
+      "eyebrow": "IRREVERSIBLE",
+      "heading": "Borrar la bóveda",
+      "ioFailBody": "No podía acceder a los archivos de bóveda para la eliminación. Las teclas Vault ya están ceroizadas de memoria; cualquier datos de bóveda que permanezca en el disco es basura descubierta de Argon2id.",
+      "ioFailTitle": "Error de disco durante el borrador",
       "partialFailBody_many": "",
-      "partialFailBody_other": "",
-      "partialFailTitle": "",
-      "submit": "",
-      "submitInFlight": "",
-      "typeToConfirmLabel": "",
-      "vaultPath": ""
+      "partialFailBody_one": "{{count}} archivo no se puede eliminar del disco. Las claves de Vault ya están ceroizadas de memoria, por lo que cualquier cifertexto huérfano que permanece es basura descubierta de Argon2id.",
+      "partialFailBody_other": "Los archivos {{count}} no se pueden borrar del disco. Las claves de Vault ya están ceroizadas de memoria, por lo que cualquier cifertexto huérfano que permanece es basura descubierta de Argon2id.",
+      "partialFailTitle": "Fallo parcial de la eliminación",
+      "submit": "Borrar la bóveda",
+      "submitInFlight": "Borrar la bóveda..",
+      "typeToConfirmLabel": "Tipo DELETE para confirmar",
+      "vaultPath": "Camino predeterminado: {{path}}"
     },
     "focusMode": {
-      "dimAria": "",
-      "dimHelper": "",
-      "dimLabel": "",
-      "off": "",
-      "on": "",
-      "saveError": "",
-      "typewriterAria": "",
-      "typewriterHelper": "",
-      "typewriterLabel": ""
+      "dimAria": "Dim líneas inactivas",
+      "dimHelper": "En modo de enfoque (⇧ latitudF), dim cada línea excepto la que está editando.",
+      "dimLabel": "Modo de enfoque · líneas dim inactivas",
+      "off": "Fuera",
+      "on": "On",
+      "saveError": "No podía guardar el ajuste de movimiento de enfoque.",
+      "typewriterAria": "Tipowriter rollo",
+      "typewriterHelper": "En modo de enfoque (⇧ latitudF), mantenga la línea activa centrada verticalmente a medida que escriba.",
+      "typewriterLabel": "Modo de enfoque · pergamino de máquina de escribir"
     },
     "hotkeys": {
-      "addBindingAria": "",
-      "cancel": "",
-      "capturePrompt": "",
-      "conflictIndicator": "",
-      "conflictTitle": "",
-      "fixed": "",
+      "addBindingAria": "Añadir un atajo para {{command}}",
+      "cancel": "Cancelar",
+      "capturePrompt": "Presiona una llave..",
+      "conflictIndicator": "▪ conflicto",
+      "conflictTitle": "También utilizado por {{commands}}",
+      "fixed": "fijo",
       "group": {
-        "editorFormatting": "",
-        "general": "",
-        "navigation": "",
-        "notes": "",
-        "panesTabs": "",
-        "view": ""
+        "editorFormatting": "Formato de editor",
+        "general": "General",
+        "navigation": "Navegación",
+        "notes": "Notas",
+        "panesTabs": "Panes & Tabs",
+        "view": "Vista"
       },
-      "helper": "",
-      "notSet": "",
-      "removeBindingAria": "",
-      "resetAll": "",
-      "resetAllConfirm": "",
-      "resetAllYes": "",
-      "restoreDefaultAria": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "warnAlreadyUsed": ""
+      "helper": "Ver y cambiar atajos de teclado. El formato del editor y el atajo del ciclo de pestañas están fijos.",
+      "notSet": "No está listo",
+      "removeBindingAria": "Quitar {{chord}}",
+      "resetAll": "Reiniciar todos los hotkeys..",
+      "resetAllConfirm": "¿Reiniciar cada acceso directo personalizado a su defecto?",
+      "resetAllYes": "Restablecer todo",
+      "restoreDefaultAria": "Restaurar predeterminado para {{command}}",
+      "searchAriaLabel": "Buscar atajos",
+      "searchPlaceholder": "Buscar atajos..",
+      "warnAlreadyUsed": "Ya utilizado por {{commands}} — añadido de todos modos."
     },
     "language": {
-      "helper": "",
-      "label": ""
+      "helper": "Elija el idioma de visualización para la aplicación.",
+      "label": "Idioma"
     },
     "lineNumbers": {
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": ""
+      "errorSaveSetting": "No podía salvar el ajuste de número de línea.",
+      "helper": "Muéstrale una cadena de números en el editor. Un número por línea; apagado por defecto.",
+      "label": "Números de línea",
+      "off": "Fuera",
+      "on": "On"
     },
     "prefs": {
-      "saveError": ""
+      "saveError": "No podía guardar la preferencia — intentarlo de nuevo"
     },
     "privacy": {
-      "autoLockHelper": "",
-      "autoLockLabel": "",
-      "autoLockSearchEmpty": "",
-      "autoLockSearchPlaceholder": "",
-      "screenCaptureHelperOff": "",
-      "screenCaptureHelperOn": "",
-      "screenCaptureLabel": ""
+      "autoLockHelper": "Cierra la bóveda después de tanta inactividad.",
+      "autoLockLabel": "Auto-lock",
+      "autoLockSearchEmpty": "Ninguna duración coincide.",
+      "autoLockSearchPlaceholder": "Duración de la búsqueda..",
+      "screenCaptureHelperOff": "La protección siempre se aplica antes de desbloquear. Después de desbloquear, sigue esta preferencia.",
+      "screenCaptureHelperOn": "Active on macOS and Windows 10 (May 2020 Update or later). Soporte Linux viene en una futura versión.",
+      "screenCaptureLabel": "Protección de captura de pantalla"
     },
     "quickUnlock": {
-      "errorCancelled": "",
-      "errorGeneric": "",
-      "errorHardwareUnavailable": "",
-      "errorNotUnlocked": "",
-      "errorPinNotDigits": "",
-      "errorPinTooShort_one": "",
+      "errorCancelled": "Cancelado.",
+      "errorGeneric": "No podía configurar el desbloqueo rápido.",
+      "errorHardwareUnavailable": "El ID táctil no está disponible en este dispositivo.",
+      "errorNotUnlocked": "Abre la bóveda primero.",
+      "errorPinNotDigits": "PIN debe ser sólo dígitos.",
       "errorPinTooShort_many": "",
+      "errorPinTooShort_one": "PIN debe ser al menos {{count}} dígitos.",
       "errorPinTooShort_other": "",
-      "helperConfigured": "",
-      "helperNotConfigured": "",
-      "methodPin": "",
-      "methodTouchId": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder_one": "",
+      "helperConfigured": "Configurado a través {{method}}. Re-entrada después del bloqueo automático salta la contraseña principal. La contraseña principal sigue siendo necesaria después de reiniciar.",
+      "helperNotConfigured": "Reingrese después del bloqueo automático con un ID PIN o Touch en lugar de la contraseña maestra completa. Una comodidad sobre la bóveda cifrada — la contraseña principal permanece necesaria después de reiniciar.",
+      "methodPin": "PIN",
+      "methodTouchId": "ID táctil",
+      "pinAriaLabel": "PIN de bloqueo rápido",
       "pinPlaceholder_many": "",
+      "pinPlaceholder_one": "PIN (al menos {{count}} dígitos)",
       "pinPlaceholder_other": "",
-      "setPin": "",
-      "setupHelper": "",
-      "title": "",
-      "useTouchId": ""
+      "setPin": "Establecer PIN",
+      "setupHelper": "Touch ID es solo macOS y actualmente experimental (pendiente verificación de hardware). PIN trabaja en todas partes.",
+      "title": "Desbloqueo rápido",
+      "useTouchId": "Use Touch ID"
     },
     "shell": {
-      "closeLabel": "",
-      "navLabel": "",
-      "passwordUpdatedToast": "",
-      "title": ""
+      "closeLabel": "Cerrar configuración",
+      "navLabel": "Paneles de configuración",
+      "panels": {
+        "about": "Acerca de",
+        "account": "Cuenta",
+        "appearance": "Apariencia",
+        "editor": "Editor",
+        "hotkeys": "Hotkeys",
+        "privacy": "Privacidad",
+        "storage": "Almacenamiento"
+      },
+      "passwordUpdatedToast": "Contraseña actualizada",
+      "title": "Ajustes"
     },
     "spell": {
-      "errorSaveLanguages": "",
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "languagesAriaLabel": "",
-      "languagesHelper": "",
-      "languagesLabel": "",
-      "languagesPlaceholder": "",
-      "languagesSearchEmpty": "",
-      "languagesSearchPlaceholder": "",
-      "off": "",
-      "on": ""
+      "errorSaveLanguages": "No podía guardar los lenguajes de verificación de hechizos.",
+      "errorSaveSetting": "No podía salvar la configuración de la comprobación de hechizos.",
+      "helper": "Bajo línea palabras mal escritas como usted escribe. Completamente offline: tus notas nunca salen del dispositivo.",
+      "label": "Comprobación de gastos",
+      "languagesAriaLabel": "Idiomas de revisión",
+      "languagesHelper": "Una palabra es correcta si es válida en cualquier idioma seleccionado, útil para mezclar términos de inglés en notas de otro idioma.",
+      "languagesLabel": "Idiomas",
+      "languagesPlaceholder": "Seleccione idiomas..",
+      "languagesSearchEmpty": "No hay coincidencias en idiomas.",
+      "languagesSearchPlaceholder": "Idiomas de búsqueda..",
+      "off": "Fuera",
+      "on": "On"
     },
     "storage": {
-      "backupHelper": "",
-      "backupLabel": "",
-      "backUpVault": "",
-      "exportAction": "",
-      "exportBody": "",
-      "exportHelper": "",
-      "exportLabel": "",
-      "importHelper": "",
-      "importLabel": "",
-      "importObsidian": "",
-      "locationHelper": "",
-      "locationLabel": "",
-      "openInFiles": "",
-      "pathUnavailable": "",
-      "restoreBackup": ""
+      "backUpVault": "Retrocedan la bóveda..",
+      "backupHelper": "Las copias de seguridad se mantienen exactamente tan encriptadas como su bóveda, en un solo archivo .myne-backup verificado. Restaurar funciona con la contraseña o frase de recuperación de esa bóveda, exactamente como desbloquear.",
+      "backupLabel": "Copia de seguridad",
+      "exportAction": "Exportar..",
+      "exportBody": "Bóveda de exportación como Markdown",
+      "exportHelper": "Árbol demarcado de la cola — no encriptado.",
+      "exportLabel": "Exportación",
+      "importHelper": "Lleve una bóveda obsidiana existente a Myne. Cada nota Markdown es importada y encriptada en el lugar; sus archivos originales se quedan sin tocar.",
+      "importLabel": "Importación",
+      "importObsidian": "Importar bóveda obsidiana..",
+      "locationHelper": "Cada bóveda es una carpeta de archivos cifrados bajo este camino. Preferir el botón Backup a continuación sobre copias manuales — verifica el archivo escrito.",
+      "locationLabel": "Ubicación predeterminada",
+      "openInFiles": "Abrir en archivos",
+      "pathUnavailable": "Camino no disponible",
+      "restoreBackup": "Restaurar de respaldo.."
     },
     "typography": {
-      "errorSave": ""
+      "contentWidthHelper": "Ancho máximo de la columna de edición. Completamente deja que el texto llene el panel.",
+      "contentWidthLabel": "Ancho de contenido",
+      "errorSave": "No podía ahorrar preferencia. Por favor, inténtalo de nuevo.",
+      "fontHelper": "Texto monoespacial o proporcional (sans-serif).",
+      "fontLabel": "Fuente",
+      "lineSpacingHelper": "Espacio vertical entre líneas.",
+      "lineSpacingLabel": "Línea de espaciado",
+      "textSizeHelper": "Tamaño base del texto del editor. Cabezales escala con él.",
+      "textSizeLabel": "Tamaño del texto"
     },
     "viewMode": {
-      "errorSave": "",
-      "helper": "",
-      "label": ""
+      "errorSave": "No podía guardar el modo de vista predeterminado.",
+      "helper": "Cómo se abre una nota: Previsualización en vivo (por defecto), lectura sólo lectura, o fuente cruda. Retrocede una nota con ⇧justE.",
+      "label": "Modo de vista predeterminado",
+      "optionLive": "Avance en vivo",
+      "optionReading": "Lectura",
+      "optionSource": "Fuente"
     }
   },
   "templates": {
     "manager": {
-      "closeLabel": "",
-      "deleteRowLabel": "",
-      "editTemplateLabel": "",
-      "emptyBody": "",
-      "emptyTitle": "",
-      "listLabel": "",
-      "loading": "",
-      "newTemplate": "",
-      "newTemplateName": "",
-      "removeFromTemplates": "",
-      "removeRowLabel": "",
-      "title": ""
+      "closeLabel": "Cerrar plantillas",
+      "deleteRowLabel": "Borrar plantilla {{name}} (Move to Trash)",
+      "editTemplateLabel": "Editar plantilla {{name}}",
+      "emptyBody": "Cree una plantilla para reutilizar un esqueleto de notas: una nota de reunión, un registro diario, una nota de lectura. Elige uno cuando hagas una nueva nota.",
+      "emptyTitle": "Todavía no hay plantillas",
+      "listLabel": "Plantillas",
+      "loading": "Cargando..",
+      "newTemplate": "Nueva plantilla",
+      "newTemplateName": "Plantilla sin título",
+      "removeFromTemplates": "Eliminar de las plantillas",
+      "removeRowLabel": "Quitar {{name}} de plantillas (mantiene la nota)",
+      "title": "Plantillas de notas"
     }
   },
   "unlock": {
-    "backToPicker": "",
-    "continue": "",
-    "decrypting": "",
-    "deleteLink": "",
+    "backToPicker": "Elija una bóveda diferente",
+    "continue": "Continuar",
+    "decrypting": "Descifrando..",
+    "deleteLink": "¿Perdiste la contraseña y la frase de recuperación? Eliminar la bóveda y empezar de nuevo",
     "errors": {
-      "alreadyUnlocked": "",
-      "inProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "alreadyUnlocked": "Vault ya está abierto.",
+      "inProgress": "Operación en marcha.",
+      "unexpected": "Un error inesperado. Por favor, inténtalo de nuevo.",
+      "vaultNotFound": "El archivo Vault no se encuentra. Por favor reinicia la aplicación."
     },
-    "passwordLabel": "",
-    "passwordPlaceholder": "",
+    "passwordLabel": "Contraseña",
+    "passwordPlaceholder": "Contraseña",
     "quickUnlock": {
-      "failed": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder": "",
-      "unlockWithPin": "",
-      "unlockWithTouchId": "",
-      "usePasswordBelow": "",
-      "wrongCredential": ""
+      "failed": "El desbloqueo rápido falló. Usa tu contraseña.",
+      "pinAriaLabel": "PIN de bloqueo rápido",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "Desbloquear con PIN",
+      "unlockWithTouchId": "Desbloquear con Touch ID",
+      "usePasswordBelow": "o utilice su contraseña abajo",
+      "wrongCredential": "Incorrecto. {{remaining}} intento(s) izquierda."
     },
-    "recoveryInterruptedBanner": "",
-    "recoveryInterruptedBody": "",
-    "recoveryInterruptedTitle": "",
-    "recoveryLink": "",
-    "submit": "",
-    "subtitle": "",
+    "recoveryInterruptedBanner": "El flujo de recuperación fue interrumpido. Establece una nueva contraseña primero.",
+    "recoveryInterruptedBody": "Establece una nueva contraseña primero, luego vuelve a sellar tu bóveda.",
+    "recoveryInterruptedTitle": "El flujo de recuperación fue interrumpido.",
+    "recoveryLink": "¿Olvidó su contraseña? Desbloquear con frase de recuperación",
+    "submit": "Desbloquear",
+    "subtitle": "Introduzca su contraseña para continuar.",
     "suspicion": {
-      "lockedDuringChange": "",
-      "metaChangedExternally": ""
+      "lockedDuringChange": "Cambio de contraseña cancelado: la bóveda estaba cerrada.",
+      "metaChangedExternally": "Vault fue modificado en otra sesión — por favor desbloquear de nuevo."
     },
-    "title": ""
+    "title": "Abre tu bóveda."
   },
   "vault": {
     "ioBanner": {
-      "cannotRead": "",
-      "notFound": "",
-      "permissionDenied": ""
+      "cannotRead": "No puedo leer el archivo de la bóveda.",
+      "notFound": "El archivo Vault no se encuentra. Por favor reinicia la aplicación.",
+      "permissionDenied": "No hay permiso para acceder al archivo de bóveda. Compruebe los permisos de archivo."
     }
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "",
-      "back": "",
-      "commit": "",
-      "committing": "",
-      "copied": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "saveAsFile": "",
-      "shownOnceBody": "",
-      "shownOnceEmphasis": ""
+      "ackLabel": "He guardado mi número de cuenta donde puedo encontrarlo más tarde.",
+      "back": "Atrás",
+      "commit": "Crear bóveda",
+      "committing": "Salvando..",
+      "copied": "Copiado",
+      "copy": "Copiado",
+      "eyebrow": "Paso 4 de 4 - número de cuenta",
+      "heading": "Guarda tu número de cuenta.",
+      "intro": "Esta es tu señal de portador — tratarlo como efectivo.",
+      "saveAsFile": "Guardar como archivo",
+      "shownOnceBody": "Sálvalo ahora: Myne no puede recuperarlo por ti. Se requiere registrarse para sincronizar más tarde.",
+      "shownOnceEmphasis": "Esto se muestra sólo una vez."
     },
     "briefing": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
+      "back": "Atrás",
+      "continue": "Continuar con la creación de bóveda",
+      "eyebrow": "Antes de crear su bóveda",
+      "heading": "Antes de crear su bóveda",
+      "intro": "Myne encripta tus notas para que sólo puedas abrirlas. Tres cosas siguen de eso — leerlas, luego continuar.",
       "statements": {
         "no-email": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Entiendo que no hay recuperación de correo electrónico.",
+          "statement": "No hay recuperación de correo electrónico. Nunca lo habrá.",
+          "why": "Nunca pedimos su correo electrónico, así que no hay ningún enlace de reset y ninguna cuenta de soporte para desbloquear. Esta no es una característica perdida — es la garantía. La recuperación de correo electrónico significaría que podríamos leer tus notas, y Myne está construida para que no podamos."
         },
         "no-store": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Entiendo que Myne no puede recuperar mi contraseña.",
+          "statement": "Tu contraseña abre tu bóveda. No lo almacenamos.",
+          "why": "Su contraseña es la entrada a la clave que descifra sus notas. Nunca deja este dispositivo, y nada en nuestros servidores puede reproducirlo. Eso es lo que mantiene tus notas privadas — y por qué no podemos reiniciarla para ti."
         },
         "phrase-backup": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Entiendo que mi frase de recuperación es la única copia de seguridad.",
+          "statement": "Su frase de recuperación es su único respaldo.",
+          "why": "Si olvida su contraseña, la frase de recuperación de 24 palabras es la única manera de volver a entrar. {{lostBothSecrets}} Escribe la frase y manténla a salvo."
         }
       },
-      "why": ""
+      "why": "¿Por qué?"
     },
     "confirm": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "mismatch": "",
-      "wordAtPosition": ""
+      "back": "Atrás",
+      "continue": "Continuar",
+      "eyebrow": "Paso 3 de 4 - confirmar frase",
+      "heading": "Escribe cuatro palabras de tu frase.",
+      "intro": "Pediremos posiciones específicas para verificar que usted lo salvó.",
+      "mismatch": "No coincide con la palabra #{{pos}}.",
+      "wordAtPosition": "Palabra en posición {{pos}}"
     },
     "encrypting": {
-      "caption": "",
-      "footerHint": "",
-      "heading": ""
+      "caption": "Esto lleva un momento.",
+      "footerHint": "Si esto lleva más de 30 segundos, cierra la ventana e intenta de nuevo.",
+      "heading": "Cifrando tu bóveda"
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "Número de cuenta nula"
       },
       "aeadFailure": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "Encriptación falló"
       },
       "csprng": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "No podría generar datos aleatorios seguros"
       },
       "invalidPassword": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "Contraseña inválida"
       },
       "invalidVaultMeta": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "Error de formato Vault"
       },
       "ioOther": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "No podía salvar la bóveda"
       },
       "joinFailure": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "Algo salió mal"
       },
       "kdfFailure": {
-        "body": "",
-        "title": ""
+        "body": "Prueba otra vez. Si esto sigue sucediendo, su sistema puede estar bajo en memoria.",
+        "title": "No podía configurar la encriptación"
       },
       "noSpace": {
-        "body": "",
-        "title": ""
+        "body": "Libera espacio de disco y prueba de nuevo.",
+        "title": "No suficiente espacio de disco"
       },
       "notFound": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "Falta la carpeta Vault"
       },
       "passwordTooShort": {
-        "body": "",
-        "title": ""
+        "body": "Usa al menos 12 caracteres.",
+        "title": "Contraseña demasiado corta"
       },
       "permissionDenied": {
-        "body": "",
-        "title": ""
+        "body": "Asegúrese de que Myne tiene permiso para escribir a su carpeta de datos de aplicación.",
+        "title": "No podía escribir a la carpeta bóveda"
       },
       "sessionExpired": {
-        "body": "",
-        "title": ""
+        "body": "Para su seguridad, la creación de la bóveda es de 10 minutos. Empieza de nuevo.",
+        "title": "Período de sesiones expirado"
       },
       "sessionNotFound": {
-        "body": "",
-        "title": ""
+        "body": "Empieza desde el principio.",
+        "title": "Período de sesiones no encontrado"
       },
       "tooManyConcurrentSessions": {
-        "body": "",
-        "title": ""
+        "body": "Cierra otras ventanas de Myne e intenta de nuevo.",
+        "title": "Demasiadas creaciones a la vez"
       },
       "vaultArtifactsPresent": {
-        "body": "",
-        "title": ""
+        "body": "No se puede crear una nueva bóveda porque ya existen datos de bóveda en este dispositivo. Cerrar la aplicación y reiniciar — la pantalla de inicio le guiará al flujo de desbloqueo.",
+        "title": "Vault ya existe"
       },
       "vaultBusyAuth": {
-        "body": "",
-        "title": ""
+        "body": "Otra operación de bóveda está en marcha. Inténtalo de nuevo en un momento.",
+        "title": "Vault ocupada"
       }
     },
     "orchestrator": {
       "closePrompt": {
-        "cancelLabel": "",
-        "message": "",
-        "okLabel": "",
-        "title": ""
+        "cancelLabel": "Cancelar",
+        "message": "El cierre descartará su frase de recuperación. ¿Sigues cerrando?",
+        "okLabel": "Cerrar de todos modos",
+        "title": "¿Creación de bóveda discreta?"
       },
       "genericError": {
-        "body": "",
-        "title": ""
+        "body": "Inténtalo de nuevo.",
+        "title": "Algo salió mal"
       }
     },
     "password": {
-      "back": "",
-      "eyebrow": "",
-      "heading": "",
-      "helperLead": "",
-      "submit": ""
+      "back": "Atrás",
+      "eyebrow": "Paso 1 de 4 — contraseña principal",
+      "heading": "Crear bóveda",
+      "helperLead": "Myne no almacena su contraseña o frase de recuperación.",
+      "submit": "Generar frase de recuperación"
     },
     "phrase": {
-      "back": "",
-      "continue": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "reveal": "",
-      "saveAsFile": ""
+      "back": "Atrás",
+      "continue": "He salvado esto - confirmar frase",
+      "copy": "Copiado",
+      "eyebrow": "Paso 2 de 4 - frase de recuperación",
+      "heading": "Escribe estas 24 palabras.",
+      "intro": "Esta frase, junto con su contraseña, es la única manera de recuperar su bóveda. Guárdelo sin conexión — papel, gestor de contraseñas, cartera de hardware. Tratarlo como en efectivo.",
+      "reveal": "Fraternidad",
+      "saveAsFile": "Guardar como archivo"
     },
     "ready": {
-      "backedUp": "",
-      "backingUp": "",
-      "backupDefaultFilename": "",
-      "backupError": "",
-      "backupFilterName": "",
-      "backUpNow": "",
-      "body": "",
-      "decrypting": "",
-      "done": "",
-      "heading": "",
-      "showFolder": ""
+      "backUpNow": "Retrocede esta bóveda ahora",
+      "backedUp": "Respaldo ✓",
+      "backingUp": "Retrocediendo..",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "La copia de seguridad no se completó — ningún archivo quedó atrás. Usted puede respaldar en cualquier momento desde Ajustes → Almacenamiento.",
+      "backupFilterName": "Myne backup",
+      "body": "Myne escribió su bóveda a su carpeta de datos de aplicaciones. Su contraseña principal y su frase de recuperación son la única manera de volver a entrar - asegúrese de que ambos se guardan en algún lugar seguro.",
+      "decrypting": "Descifrando..",
+      "done": "Hecho",
+      "heading": "Tu bóveda está lista.",
+      "showFolder": "Mostrar carpeta bóveda"
     },
     "sessionLost": {
-      "startOver": ""
+      "startOver": "Empieza de nuevo"
     }
   },
   "vaultPicker": {
-    "createAnother": "",
-    "heading": "",
-    "loading": "",
-    "noneLoaded": "",
-    "openedRelative": "",
-    "restoreFromBackup": "",
-    "subline": "",
-    "vaultFallback": ""
+    "createAnother": "Crear otra cámara",
+    "heading": "Elige una bóveda",
+    "loading": "Carga tus bóvedas..",
+    "noneLoaded": "No se pueden cargar bóvedas ahora mismo.",
+    "openedRelative": "abierto {{rel}}",
+    "restoreFromBackup": "Restaurar de respaldo",
+    "subline": "Tienes más de una bóveda en este dispositivo. Escoge uno para desbloquear.",
+    "vaultFallback": "Vault {{n}}"
   },
   "vaultRecover": {
     "decrypting": {
-      "caption": "",
-      "eyebrow": "",
-      "footerHint": "",
-      "heading": "",
-      "subCaption": ""
+      "caption": "Esto lleva un momento.",
+      "eyebrow": "RECOVERY · DECRYPING",
+      "footerHint": "Si esto lleva más de 30 segundos, cierra la ventana e intenta de nuevo.",
+      "heading": "Descifrando tu bóveda",
+      "subCaption": "Trabajando... Argon2id m=256 MiB, t=3, p=2"
     },
     "passwordReset": {
       "errors": {
-        "cancelledVaultLocked": "",
-        "operationInProgress": "",
-        "unexpected": "",
-        "weakPassword": ""
+        "cancelledVaultLocked": "Recuperación cancelada: la bóveda estaba cerrada.",
+        "operationInProgress": "Operación en marcha. Por favor, espera.",
+        "unexpected": "Un error inesperado. Por favor, inténtalo de nuevo.",
+        "weakPassword": "La nueva contraseña debe ser al menos 12 caracteres."
       },
-      "eyebrow": "",
-      "helperBody": "",
-      "helperEmphasis": "",
-      "submit": "",
-      "title": ""
+      "eyebrow": "Recuperación · Nueva contraseña",
+      "helperBody": "Vault recovery frase ile açıldı. Eski parola artık çalışmayacak — yeni master parolanı şimdi belirle.",
+      "helperEmphasis": "Recuperación frase aynı kalır.",
+      "submit": "Establecer nueva contraseña",
+      "title": "Establecer una nueva contraseña maestra"
     },
     "phrase": {
-      "back": "",
-      "body": "",
-      "cellLabel": "",
-      "deleteLink": "",
-      "eyebrow": "",
-      "submit": "",
-      "title": ""
+      "back": "← Volver",
+      "body": "Introduzca su frase de recuperación. 24 palabras BIP-39.",
+      "cellLabel": "Palabra {{index}}",
+      "deleteLink": "Eliminar la bóveda y empezar de nuevo",
+      "eyebrow": "Recuperación",
+      "submit": "Desbloquear",
+      "title": "Recupera tu bóveda."
     },
     "select": {
-      "accountInvalid": "",
-      "accountLabel": "",
-      "accountPlaceholder": "",
-      "body": "",
-      "cancel": "",
-      "checking": "",
-      "loadFailed": "",
-      "loading": "",
-      "openedRelative": "",
-      "or": "",
-      "title": "",
-      "useAccountNumber": "",
-      "vaultFallback": ""
+      "accountInvalid": "Número de cuenta inválida. Por favor, compruebe y vuelva a entrar.",
+      "accountLabel": "Número de cuenta (opcional)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (opcional)",
+      "body": "Escoja la bóveda que desea recuperar con su frase de recuperación de 24 palabras. También puede escribir su número de cuenta para saltar directamente a él.",
+      "cancel": "Cancelar",
+      "checking": "Comprobando..",
+      "loadFailed": "No se pueden cargar bóvedas ahora mismo.",
+      "loading": "Carga tus bóvedas..",
+      "openedRelative": "abierto {{rel}}",
+      "or": "o",
+      "title": "Elige una bóveda para recuperar",
+      "useAccountNumber": "Número de cuenta de uso",
+      "vaultFallback": "Vault {{index}}"
     }
   },
   "vaultSwitcher": {
-    "chipFallback": "",
-    "createAnother": "",
-    "switching": "",
-    "switchVaultLabel": "",
-    "vaultFallback": ""
+    "chipFallback": "Vault",
+    "createAnother": "Crear otra cámara",
+    "switchVaultLabel": "Bóveda de interruptor",
+    "switching": "cambiando..",
+    "vaultFallback": "Vault {{n}}"
   },
   "welcome": {
-    "createCta": "",
-    "headlineLine1": "",
-    "headlineLine2": "",
+    "createCta": "Crear nueva bóveda",
+    "headlineLine1": "Notas de marcado cifradas.",
+    "headlineLine2": "No hay email en el registro.",
     "repairResidue": {
-      "cancel": "",
-      "cleaningUp": "",
-      "cleanUp": "",
-      "confirmBody_one": "",
+      "cancel": "Cancelar",
+      "cleanUp": "Limpiar",
+      "cleaningUp": "Limpieza..",
       "confirmBody_many": "",
-      "confirmBody_other": "",
-      "confirmTitle": "",
-      "doneBody_one": "",
+      "confirmBody_one": "{{count}} archivo será eliminado. Ya no son legibles; nada recuperable se pierde.",
+      "confirmBody_other": "{{count}} archivos serán eliminados. Ya no son legibles; nada recuperable se pierde.",
+      "confirmTitle": "¿Limpia archivos sobrantes?",
       "doneBody_many": "",
-      "doneBody_other": "",
-      "doneTitle": "",
-      "errorBody": "",
-      "errorTitle": "",
-      "foundBody_one": "",
+      "doneBody_one": "Eliminado {{count}} archivo sobrante. Ahora puedes crear una nueva bóveda.",
+      "doneBody_other": "Eliminado {{count}} archivos sobrantes. Ahora puedes crear una nueva bóveda.",
+      "doneTitle": "Limpiado",
+      "errorBody": "Algo salió mal. Cierra la aplicación e intenta de nuevo.",
+      "errorTitle": "La limpieza falló",
       "foundBody_many": "",
-      "foundBody_other": "",
-      "foundTitle": "",
-      "partialBody_one": "",
+      "foundBody_one": "{{count}} archivo sobrante de una eliminación anterior que no terminó. Ya no están legibles, no perderás nada recuperable.",
+      "foundBody_other": "{{count}} archivos sobrantes de una eliminación anterior que no terminó. Ya no están legibles, no perderás nada recuperable.",
+      "foundTitle": "Archivos sobrantes de una eliminación incompleta",
       "partialBody_many": "",
-      "partialBody_other": "",
-      "partialTitle": ""
+      "partialBody_one": "{{count}} archivo puede ser bloqueado por otra aplicación (antivirus, sincronización de archivos o indexación de búsqueda). Cierre la aplicación e intente de nuevo en un momento, o retire la carpeta de la bóveda manualmente.",
+      "partialBody_other": "{{count}} archivos pueden ser bloqueados por otra aplicación (antivirus, sincronización de archivos o indexación de búsqueda). Cierre la aplicación e intente de nuevo en un momento, o retire la carpeta de la bóveda manualmente.",
+      "partialTitle": "Algunos archivos no pueden ser eliminados"
     },
-    "restoreCta": "",
-    "subtitle": ""
+    "restoreCta": "Restaurar de respaldo",
+    "subtitle": "Sus notas están encriptadas en este dispositivo antes de dejarlo. El servidor sólo almacena ciphertext."
   }
 }

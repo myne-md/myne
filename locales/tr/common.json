@@ -1,1626 +1,1734 @@
 {
   "attachments": {
     "cleanUnused": {
-      "cancel": "",
-      "cleaning": "",
-      "close": "",
-      "completeTitle": "",
-      "deleteCta_one": "",
+      "cancel": "Cancel",
+      "cleaning": "Temizlik..",
+      "close": "Close",
+      "completeTitle": "Cleanup Complete",
+      "deleteCta_one": "Delete {{count}} kullanılmayan",
       "deleteCta_other": "",
-      "error": "",
-      "intro_one": "",
-      "intro_other": "",
-      "summaryFreed": "",
-      "summaryPeriod": "",
-      "summaryRemoved_one": "",
-      "summaryRemoved_other": "",
-      "summarySkipped_one": "",
+      "error": "Temizlenebilir. Bazı notlar düzeltilebilir olabilir - hiçbir şey silinmedi.",
+      "intro_one": "Bu ek herhangi bir notda kullanılmaz. Onu bitirmek kalıcıdır ve geri alınabilir.",
+      "intro_other": "Bu {{count}} ekler herhangi bir notda kullanılmaz. Onları bitirmek kalıcıdır ve geri alınabilir.",
+      "summaryFreed": " {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "{{count}}",
+      "summaryRemoved_other": "{{count}}",
+      "summarySkipped_one": " · {{count}} atladı (şimdi kullanımda)",
       "summarySkipped_other": "",
-      "title": "",
-      "willBeReclaimed": ""
+      "title": "Temiz kullanılmayan eklentiler",
+      "willBeReclaimed": "{{size}} yeniden kabul edilecek."
     },
     "coverPicker": {
-      "close": "",
-      "dropHint": "",
-      "empty": "",
-      "loading": "",
-      "removeCover": "",
-      "title": "",
-      "upload": ""
+      "close": "Close",
+      "dropHint": "Onu kapak olarak kullanmak için bir görüntü açın.",
+      "empty": "Henüz bu tondaki görüntüler yok. Bir veya burada bir görüntü sürükleyin.",
+      "loading": "Yükleniyor..",
+      "removeCover": "Kaldır kapak",
+      "title": "Bir kapak görüntüsü seçin",
+      "upload": "Download"
     },
     "deleteDialog": {
-      "cancel": "",
-      "confirmPrompt": "",
-      "delete": "",
-      "deleting": "",
-      "error": "",
-      "notUsed": "",
-      "stillUsed_one": "",
-      "stillUsed_other": "",
-      "title": "",
-      "untitled": ""
+      "cancel": "Cancel",
+      "confirmPrompt": "Sürekli olarak bu eki silin? Bu geri alınabilir.",
+      "delete": "Delete",
+      "deleting": "Deleting..",
+      "error": "Bağı silemez. Tekrar deneyin.",
+      "notUsed": "Herhangi bir notda kullanılmaz.",
+      "stillUsed_one": "Hala {{count}} notunda kullanılır. Bu, gömülü olduğu bir mezar taşı bırakıyor:",
+      "stillUsed_other": "Hala {{count}} notlarında kullanılır. Bu, gömülü olduğu bir mezar taşı bırakıyor:",
+      "title": "Delete ek",
+      "untitled": "Untitled"
     },
     "library": {
-      "actionsAriaLabel": "",
-      "actionsTitle": "",
-      "checking": "",
-      "checkUnusedFailedNotice": "",
-      "cleanUnused": "",
-      "cleanUnusedTitle": "",
-      "colCreated": "",
-      "colName": "",
-      "colSize": "",
-      "colType": "",
-      "colUsedIn": "",
-      "decrypting": "",
-      "emptyImportHint": "",
-      "emptyLoadError": "",
-      "emptyNoAttachments": "",
-      "filterAriaLabel": "",
-      "gridView": "",
-      "import": "",
-      "importDialogTitle": "",
-      "importFile": "",
-      "importing": "",
-      "listView": "",
-      "menuDelete": "",
-      "menuExport": "",
-      "menuPreview": "",
-      "menuRename": "",
-      "noMatch": "",
-      "noUnusedNotice": "",
-      "preview": "",
-      "previewAttachment": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "sortAriaLabel": "",
-      "supportedFilesFilter": "",
-      "title": "",
-      "usedInCount_one": "",
-      "usedInCount_other": "",
-      "usedInLoading": ""
+      "actionsAriaLabel": "Atam eylemleri",
+      "actionsTitle": "Eylemler",
+      "checkUnusedFailedNotice": "Kullanılmamış ekleri kontrol edemez. Tekrar deneyin.",
+      "checking": "Checking..",
+      "cleanUnused": "Temiz kullanılmayan",
+      "cleanUnusedTitle": "Delete ekleri herhangi bir notda kullanılmaz",
+      "colCreated": "Oluşturulmuş Yaratılmış",
+      "colName": "Name",
+      "colSize": "Boyut Boyutu",
+      "colType": "Tipi",
+      "colUsedIn": "Kullanılanlarda kullanılır",
+      "decrypting": "Bağlantılar..",
+      "emptyImportHint": "Bir dosyayı to keep it in yourob.",
+      "emptyLoadError": "Eks kataloğunu okuyamazdı.",
+      "emptyNoAttachments": "Henüz eklem yok.",
+      "filterAriaLabel": "Filter by type",
+      "gridView": "Grid view",
+      "import": "İthalat",
+      "importDialogTitle": "İthalat eki",
+      "importFile": "Bir dosyayı",
+      "importing": "İthalat..",
+      "listView": "Liste görünümü",
+      "menuDelete": "Delete",
+      "menuExport": "İhracat İhracatı",
+      "menuPreview": "Öfke",
+      "menuRename": "Rename",
+      "noMatch": "Hiçbir eklenti aramanıza uymuyor.",
+      "noUnusedNotice": "Temizlemek için kullanılmamış eklemler yok.",
+      "preview": "Öfke",
+      "previewAttachment": "Öfke",
+      "searchAriaLabel": "Dosya adı",
+      "searchPlaceholder": "File by filename",
+      "sort": {
+        "createdAsc": "En yaşlı ilk",
+        "createdDesc": "En yeni",
+        "nameAsc": "Ad A-Z",
+        "nameDesc": "Ad Z-A"
+      },
+      "sortAriaLabel": "Sort eks",
+      "supportedFilesFilter": "Desteklenen dosyalar",
+      "title": "Atalar",
+      "typeFilter": {
+        "all": "Tüm türleri",
+        "audio": "Audio",
+        "image": "Fotoğraflar",
+        "other": "Diğer",
+        "pdf": "PDFs"
+      },
+      "usedInCount_one": "{{count}} notunda kullanılır",
+      "usedInCount_other": "{{count}} notları",
+      "usedInLoading": ".."
     },
     "thumbnail": {
-      "audioLabel": "",
-      "file": "",
-      "pause": "",
-      "pdfDocument": "",
-      "pdfFirstPage": "",
-      "play": ""
+      "audioLabel": "Ses: {{filename}}",
+      "file": "Dosya",
+      "pause": "Pause",
+      "pdfDocument": "PDF belgesi",
+      "pdfFirstPage": "PDF ilk sayfa",
+      "play": "Play"
     },
     "usedInNotesPopover": {
-      "empty": "",
-      "untitled": ""
+      "empty": "Herhangi bir notda kullanılmaz.",
+      "untitled": "Untitled"
     }
   },
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "invalidDestination": "",
-        "ioGeneric": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "memberTooLarge": "",
-        "vaultNotFound": "",
-        "verifyFailed": ""
+        "authOperationInProgress": "Başka bir tank operasyonu devam ediyor. bitirmek için bekleyin, sonra tekrar deneyin.",
+        "cancelled": "Backup iptal edildi. Hiçbir dosya geride bırakılmadı.",
+        "invalidDestination": "Bu hedef klasörü kullanılabilir değildir.",
+        "ioGeneric": "Yedekleme dosyasını yazamayabilir.",
+        "ioNoSpace": "Hedefte yeterince yer değil.",
+        "ioPermissionDenied": "Hedefte yazma izni yok.",
+        "joinFailure": "Backup beklenmedik bir şekilde başarısız oldu. Hiçbir dosya geride bırakılmadı.",
+        "memberTooLarge": "Bu diskteki bir dosya yedekleme formatının izin verdiğinden daha büyük.",
+        "vaultNotFound": "Hiçbir ton geri dönmedi.",
+        "verifyFailed": "Yazılı yedekleme doğrulanmadı, bu yüzden iptal edildi. Tekrar deneyin - farklı medyada tekrarlarsa."
       },
       "restore": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "damagedBackup": "",
-        "futureVersionBackup": "",
-        "invalidVaultMeta": "",
-        "ioGeneric": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "missingVaultMeta": "",
-        "notABackupFile": "",
-        "vaultAlreadyExists": ""
+        "authOperationInProgress": "Başka bir tank operasyonu devam ediyor. bitirmek için bekleyin, sonra tekrar deneyin.",
+        "cancelled": "Geri yükleme iptal edildi. Hiçbir şey değişmedi.",
+        "damagedBackup": "Yedekleme dosyası zarar görür.",
+        "futureVersionBackup": "Bu yedekleme Myne'nin yeni bir versiyonu tarafından yapıldı. Update Myne, sonra restore et.",
+        "invalidVaultMeta": "Bu yedeklemenin tonoz metadatası hazırlanabilir, bu yüzden bir çalışma tonunu üretemedi.",
+        "ioGeneric": "Yedekleme dosyasını okuyamazdı.",
+        "ioPermissionDenied": "Yedekleme dosyasını okumak için izin yok.",
+        "joinFailure": "Geri yükleme beklenmedik bir şekilde başarısız oldu. Hiçbir şey değişmedi.",
+        "missingVaultMeta": "Bu yedekleme, tonoz metadata'yı eksik ve restore edilemez.",
+        "notABackupFile": "Bu dosya Myne yedeklemesi değildir.",
+        "vaultAlreadyExists": "Bu yedeklemeden bir ton zaten bu cihazda var."
       }
     },
     "export": {
-      "cancel": "",
-      "close": "",
-      "copying": "",
-      "preparing": "",
-      "successToast": "",
-      "title": "",
-      "verifying": ""
+      "cancel": "Cancel",
+      "close": "Close",
+      "copying": "{{done}} {{total}}",
+      "preparing": "Hazırlanma..",
+      "successToast": "Onaylanmış ve kurtarıldı.",
+      "title": "Geri yukarı",
+      "verifying": "{{done}} {{total}}"
     }
   },
   "clipper": {
     "pairing": {
-      "accept": "",
-      "close": "",
-      "codeAriaLabel": "",
-      "intro": "",
-      "reject": "",
-      "rejected": "",
-      "title": ""
+      "accept": "Kabul",
+      "close": "Close",
+      "codeAriaLabel": "Pairing code",
+      "intro": "Bu kodun genişlemede gösterilen birini karşılaştır, sonra çift kabul et.",
+      "reject": "Reject",
+      "rejected": "Pairing reddedildi.",
+      "title": "Bir tarayıcı uzatması bağlanmak istiyor"
     }
   },
   "commandPalette": {
-    "archivedBadge": "",
-    "archivedBadgeTitle": "",
-    "dialogLabel": "",
-    "matchedInBody": "",
-    "noMatches": "",
-    "searchPlaceholder": "",
-    "sectionCommands": "",
-    "sectionNotes": "",
-    "untitledNote": ""
+    "archivedBadge": "Archive",
+    "archivedBadgeTitle": "Archived",
+    "dialogLabel": "Komut",
+    "matchedInBody": "vücutta eşleştirilmiş",
+    "noMatches": "No maçları",
+    "searchPlaceholder": "Arama notları veya bir komut çalıştırın - Esc to dis",
+    "sectionCommands": "Komutanlar",
+    "sectionNotes": "Notlar",
+    "untitledNote": "Untitled"
   },
   "commands": {
     "actions": {
       "backupVault": {
-        "label": ""
+        "label": "Back upob.."
       },
       "category": {
-        "app": "",
-        "editor": "",
-        "vault": "",
-        "view": ""
+        "app": "App",
+        "editor": "Editor",
+        "vault": "Pencere",
+        "view": "View"
       },
       "convertWikilinks": {
-        "label": ""
+        "label": "Bu notda ithal wikilinkler dönüştürülür .."
       },
       "deleteWorkspace": {
-        "label": ""
+        "label": "Delete workspace.."
       },
       "exportNoteHtml": {
-        "label": ""
+        "label": "HTML olarak ihracat notu.."
       },
       "exportNoteMarkdown": {
-        "label": ""
+        "label": "Markdown olarak ihracat notu.."
       },
       "exportNotePdf": {
-        "label": ""
+        "label": "PDF olarak ihracat notu.."
       },
       "exportNoteTxt": {
-        "label": ""
+        "label": "Plain Text olarak ihracat notu.."
       },
       "exportVaultMarkdown": {
-        "label": ""
+        "label": "Markdown olarak ihracat"
       },
       "foldAll": {
-        "label": ""
+        "label": "Tüm Fold All"
       },
       "importBaseView": {
-        "label": ""
+        "label": "Import .base view.."
       },
       "importObsidian": {
-        "label": ""
+        "label": "Import Obsidianob.."
       },
       "lockVault": {
-        "label": ""
+        "label": "Lockob"
       },
       "manageTemplates": {
-        "label": ""
+        "label": "Şablonları yönetin.."
       },
       "newNoteFromTemplate": {
-        "label": ""
+        "label": "Şablondan yeni not.."
       },
       "openAttachments": {
-        "label": ""
+        "label": "Açık ekler.."
       },
       "openSettings": {
-        "label": ""
+        "label": "Açık ayarlar.."
       },
       "openSnapshots": {
-        "label": ""
+        "label": "Snapshots.."
       },
       "openTodayNote": {
-        "label": ""
+        "label": "Bugünün notu"
       },
       "randomNote": {
-        "label": ""
+        "label": "Açık rastgele not"
       },
       "renameWorkspace": {
-        "label": ""
+        "label": "Rename workspace.."
       },
       "saveWorkspaceAs": {
-        "label": ""
+        "label": "İş alanı kurtarmak.."
       },
       "showGraph": {
-        "label": ""
+        "label": "Show grafik görünümü.."
       },
       "showTags": {
-        "label": ""
+        "label": "Göz etiketleri .."
       },
       "showViews": {
-        "label": ""
+        "label": "Görünüşe göz atın.."
       },
       "switchWorkspace": {
-        "label": ""
+        "label": "Anahtar çalışma alanı.."
       },
       "toggleFocus": {
-        "label": ""
+        "label": "Toggle odaklanma modu"
       },
       "toggleLeftSidebar": {
-        "label": ""
+        "label": "Toggle notları sidebar"
       },
       "toggleReading": {
-        "label": ""
+        "label": "Okumak"
       },
       "toggleRightSidebar": {
-        "label": ""
+        "label": "Toggle backlinks sidebar"
       },
       "toggleSource": {
-        "label": ""
+        "label": "Toggle source mode"
       },
       "toggleStackedTabs": {
-        "label": ""
+        "label": "Toggle yığılmış sekmeler"
       },
       "unfoldAll": {
-        "label": ""
+        "label": "Her şey"
       }
     },
     "hotkeys": {
       "command": {
-        "bold": "",
-        "closeTab": "",
-        "cycleHeadingLevel": "",
-        "cycleTabs": "",
-        "deleteWorkspace": "",
-        "focusNextPane": "",
-        "focusPrevPane": "",
-        "foldAll": "",
-        "inlineCode": "",
-        "insertWikilink": "",
-        "italic": "",
-        "navigateBack": "",
-        "navigateForward": "",
-        "newNote": "",
-        "openSettings": "",
-        "paletteToggle": "",
-        "renameWorkspace": "",
-        "saveWorkspaceAs": "",
-        "selectAllScoped": "",
-        "showGraphView": "",
-        "splitPaneDown": "",
-        "splitPaneRight": "",
-        "switchWorkspace": "",
-        "toggleBulletList": "",
-        "toggleFocusMode": "",
-        "toggleNumberedList": "",
-        "toggleReadingView": "",
-        "toggleSourceMode": "",
-        "toggleTaskList": "",
-        "unfoldAll": ""
+        "bold": "Bold",
+        "closeTab": "Close sekmesi",
+        "cycleHeadingLevel": "Üst düzey",
+        "cycleTabs": "Çevrim sekmeleri",
+        "deleteWorkspace": "Delete workspace",
+        "focusNextPane": "Focus next pane",
+        "focusPrevPane": "Focus previous panee",
+        "foldAll": "Tüm Fold All",
+        "inlineCode": "Inline code",
+        "insertWikilink": "Ekle wikilink",
+        "italic": "Italicic",
+        "navigateBack": "Navigate geri döndü",
+        "navigateForward": "Navigate forward forward",
+        "newNote": "Yeni not",
+        "openSettings": "Açık ayarlar",
+        "paletteToggle": "Open commandte palet",
+        "renameWorkspace": "Rename workspace",
+        "saveWorkspaceAs": "Save workspace as Kaydet",
+        "selectAllScoped": "Her şeyi seçin (scoped)",
+        "showGraphView": "Show grafik görünümü",
+        "splitPaneDown": "Split pane (down)",
+        "splitPaneRight": "Split pane (sağ)",
+        "switchWorkspace": "Anahtar çalışma alanı",
+        "toggleBulletList": "Toggle mermi listesi",
+        "toggleFocusMode": "Toggle odaklanma modu",
+        "toggleNumberedList": "Toggle numara listesi",
+        "toggleReadingView": "Okumak",
+        "toggleSourceMode": "Toggle source mode",
+        "toggleTaskList": "Toggle task listesi",
+        "unfoldAll": "Her şey"
       }
     },
     "rebind": {
-      "invalidChordReason": ""
+      "invalidChordReason": "Bir modifier ( Ctrl, Ctrl veya Alt) ekleyin - kendi başına bir anahtar bir kısayol olamaz."
     }
   },
   "common": {
     "prompt": {
-      "cancel": "",
-      "confirmDefault": ""
+      "cancel": "Cancel",
+      "confirmDefault": "TAMAM TAMAM"
     },
     "spinner": {
-      "loadingLabel": ""
+      "loadingLabel": "Yükleniyor"
     }
   },
   "editor": {
     "attachment": {
       "actions": {
-        "exported": "",
-        "exportFailed": "",
-        "renamed": "",
-        "renameFailed": "",
-        "saveDialogFailed": ""
+        "exportFailed": "(X16X) ihracat yapamaz.",
+        "exported": "{{filename}}.",
+        "renameFailed": "Bağı olarak adlandırılamaz.",
+        "renamed": "{{name}}'a yemin ederim.",
+        "saveDialogFailed": "Kurtarıcı açabilir."
       },
       "convert": {
-        "cancel": "",
-        "confirm": "",
-        "skipped": "",
-        "subtitle_one": "",
-        "subtitle_other": "",
-        "subtitleEmpty": "",
-        "title": ""
+        "cancel": "Cancel",
+        "confirm": "Convert",
+        "skipped": "atladı - {{note}}",
+        "subtitleEmpty": "Hiçbir şey dönüştürme - kaynak dosyaları çözülmedi.",
+        "subtitle_one": "1 referans yeniden yazılacaktır. İş yapmadan önce gözden geçirin.",
+        "subtitle_other": "{{count}} referanslar yeniden yazılacaktır. İş yapmadan önce gözden geçirin.",
+        "title": "Dönüştürme ekleri"
       },
       "convertCommand": {
-        "pickerSourceFilter": ""
+        "pickerSourceFilter": "Ata"
       },
       "convertCore": {
-        "converted_one": "",
+        "converted_one": "{{count}} dönüştürüldü",
         "converted_other": "",
-        "noneToConvert": "",
+        "noneToConvert": "Bu notayı dönüştürmek için ithal edilen ekler yok.",
         "skipNote": {
-          "failed": "",
-          "locked": "",
-          "notFound": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "ithalat başarısız oldu",
+          "locked": "yastık kilitli",
+          "notFound": "bulunamadı kaynak bulunamadı",
+          "tooLarge": "çok büyük (max 64 MiB)",
+          "unsupported": "desteklenmemiş tip"
         },
-        "skippedSuffix_one": "",
+        "skippedSuffix_one": " · {{count}} atladı",
         "skippedSuffix_other": ""
       },
       "fileKind": {
-        "generic": "",
+        "generic": "Dosya",
         "label": {
-          "archive": "",
-          "audio": "",
-          "cHeader": "",
-          "cppSource": "",
-          "cSource": "",
-          "css": "",
-          "csv": "",
-          "document": "",
-          "ebook": "",
-          "go": "",
-          "html": "",
-          "image": "",
-          "java": "",
-          "javascript": "",
-          "json": "",
-          "keynote": "",
-          "log": "",
-          "markdown": "",
-          "numbers": "",
-          "pages": "",
-          "pdf": "",
-          "presentation": "",
-          "python": "",
-          "richText": "",
-          "rust": "",
-          "shell": "",
-          "spreadsheet": "",
-          "svg": "",
-          "text": "",
-          "toml": "",
-          "tsv": "",
-          "typescript": "",
-          "video": "",
-          "word": "",
-          "xml": "",
-          "yaml": ""
+          "archive": "Archive",
+          "audio": "Audio",
+          "cHeader": "Chead",
+          "cSource": "C kaynağı",
+          "cppSource": "C++ kaynağı",
+          "css": "CSS",
+          "csv": "KATALOĞU",
+          "document": "Doküman",
+          "ebook": "Ebook",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Image",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "Log file",
+          "markdown": "Markdown",
+          "numbers": "Sayılar",
+          "pages": "Sayfalar Belgeler",
+          "pdf": "PDF",
+          "presentation": "Sunum",
+          "python": "Python",
+          "richText": "Zengin metin belgesi",
+          "rust": "Rust",
+          "shell": "Shell senaryo",
+          "spreadsheet": "Sayfa",
+          "svg": "SVG imajı",
+          "text": "Text document belgesi",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "Typenot",
+          "video": "Video",
+          "word": "Word belgesi",
+          "xml": "XML",
+          "yaml": "YAML"
         },
-        "unknown": ""
+        "unknown": "{{ext}} dosyası"
       },
       "lightbox": {
-        "close": "",
-        "export": "",
-        "exportAria": "",
-        "imagePreview": "",
-        "pdfFallback": "",
-        "pdfPreview": ""
+        "close": "Close önizleme",
+        "export": "İhracat İhracatı",
+        "exportAria": "İhracat ekleri",
+        "imagePreview": "Görüntü Tanıtımı",
+        "pdfFallback": "PDF",
+        "pdfPreview": "PDF önizleme"
       },
       "menu": {
-        "actionsAria": ""
+        "actionsAria": "Atam eylemleri"
       },
       "pdf": {
-        "loading": ""
+        "loading": "Yükleniyor.."
       },
       "picker": {
-        "openFailed": ""
+        "openFailed": "Dosya seçicisini açabilir."
       },
       "progress": {
-        "encrypting": "",
-        "importing": "",
-        "loading": ""
+        "encrypting": "Şifreleme..",
+        "importing": "İthalat..",
+        "loading": "Yükleniyor.."
       },
       "recording": {
-        "barAria": "",
-        "cancel": "",
-        "noAudio": "",
-        "saving": "",
-        "stop": ""
+        "barAria": "Kayıt ses notu",
+        "cancel": "Cancel",
+        "noAudio": "Hiçbir ses tespit edilmedi - mikrofonunuzu kontrol edin.",
+        "saving": "Tasarruf..",
+        "stop": "Dur"
       },
       "rename": {
-        "cancel": "",
-        "confirm": "",
-        "title": ""
+        "cancel": "Cancel",
+        "confirm": "Rename",
+        "title": "Rename ek"
       },
       "summary": {
-        "added_one": "",
+        "added_one": "{{count}} ekledi",
         "added_other": "",
         "reason": {
-          "failed": "",
-          "locked": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "başarısız",
+          "locked": "yastık kilitli",
+          "tooLarge": "çok büyük çok büyük",
+          "unsupported": "desteklenmemiş tip"
         },
-        "skipped_one": "",
+        "skipped_one": "{{count}} atladı: {{noun}}",
         "skipped_other": ""
       },
       "voice": {
         "startError": {
-          "alreadyRecording": "",
-          "captureFailed": "",
-          "generic": "",
-          "locked": "",
-          "noInputDevice": ""
+          "alreadyRecording": "Bir kayıt zaten ilerlemede.",
+          "captureFailed": "Kayıt başlamayabilir - Sistem Ayarlarında mikrofon erişimini kontrol edin.",
+          "generic": "Kayıt başlamayabilir.",
+          "locked": "Bir ses notunu kaydetmek için toplan.",
+          "noInputDevice": "Hiçbir mikrofon bulunamadı. Birini bağlayın ve tekrar deneyin."
         },
         "stopError": {
-          "captureFailed": "",
-          "emptyRecording": "",
-          "generic": "",
-          "silentRecording": ""
+          "captureFailed": "Kayıt başarısız oldu - mikrofonunuzu kontrol edin.",
+          "emptyRecording": "Hiçbir şey kaydedildi.",
+          "generic": "Kaydı kurtaramaz.",
+          "silentRecording": "Kayıt sessiz ve yıpranmış - mikrofonunuzu kontrol edin."
         }
       },
       "widget": {
         "audio": {
-          "pause": "",
-          "play": "",
-          "seek": ""
+          "pause": "Pause",
+          "play": "Play",
+          "seek": "Seek"
         },
         "menu": {
-          "export": "",
-          "remove": "",
-          "rename": "",
-          "reveal": ""
+          "export": "İhracat İhracatı",
+          "remove": "Kaldırın",
+          "rename": "Rename",
+          "reveal": "Kütüphanede Açın"
         },
-        "pdfFallback": "",
+        "pdfFallback": "PDF",
         "tombstone": {
-          "brokenAria": "",
-          "brokenLabel": "",
-          "deletedAria": "",
-          "deletedLabel": ""
+          "brokenAria": "Kırık ek referans: {{filename}}",
+          "brokenLabel": "kırık",
+          "deletedAria": "Deleted ek: {{filename}}",
+          "deletedLabel": "silinmiş"
         },
-        "urlImageFallback": ""
+        "urlImageFallback": "görüntü görüntüsü"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Dikkat",
+        "bug": "Bug",
+        "caution": "Caution",
+        "danger": "Tehlikeli",
+        "done": "Done",
+        "error": "Hata hatası",
+        "example": "Örnek",
+        "failure": "Başarısızlık",
+        "faq": "SSS",
+        "hint": "Hint",
+        "important": "Önemli",
+        "info": "Info",
+        "missing": "Eksik Eksikliği Eksik",
+        "note": "Not",
+        "question": "Soru",
+        "quote": "Alıntı",
+        "success": "Başarı",
+        "tip": "İpucu",
+        "todo": "Todo",
+        "warning": "Uyarı"
       }
     },
     "chrome": {
       "backlinks": {
-        "archivedBadge": "",
-        "empty": "",
-        "linkedFrom_one": "",
+        "archivedBadge": "Archived",
+        "empty": "Henüz backlink yok.",
+        "linkedFrom_one": "{{count}}",
         "linkedFrom_other": "",
-        "untitled": ""
+        "untitled": "Untitled"
+      },
+      "barItems": {
+        "graph": "Graph",
+        "lock": "Lock",
+        "saveStatus": "Kaydet durumu",
+        "settings": "Ayarlar",
+        "syncStatus": "Senkronizasyon durumu",
+        "tags": "Etiketler",
+        "viewMode": "View mode",
+        "views": "Görüntüleme",
+        "wordCount": "Word count",
+        "workspace": "Workspace"
       },
       "baseImport": {
-        "droppedFiltersSuffix_one": "",
+        "droppedFiltersSuffix_one": " · {{count}} filtreler düştü",
         "droppedFiltersSuffix_other": "",
-        "failed": "",
-        "fileFilterName": "",
-        "imported_one": "",
+        "failed": "İthalat başarısız oldu.",
+        "fileFilterName": "Obsidian Base",
+        "imported_one": "{{count}} görüşü (s)",
         "imported_other": "",
-        "notValid": "",
-        "skippedSuffix_one": "",
+        "notValid": "Geçerli bir .base dosyası değil.",
+        "skippedSuffix_one": " · {{count}} atladı",
         "skippedSuffix_other": "",
-        "stoppedAfter_one": "",
+        "stoppedAfter_one": "İthalat {{count}} görünümünden sonra durduruldu (s).",
         "stoppedAfter_other": ""
       },
       "bottomBar": {
-        "browseTags": "",
-        "browseViews": "",
-        "cycleViewMode": "",
+        "browseTags": "Browse tags",
+        "browseViews": "Yüz yüze görüş",
+        "cycleViewMode": "Çevrim manzarası modu",
         "docStats": {
-          "summary_one": "",
-          "summary_other": "",
-          "summarySelectionSuffix": "",
-          "title_one": "",
-          "title_other": "",
-          "titleSelectionSuffix": ""
+          "summarySelectionSuffix": " (sel)",
+          "summary_one": "{{count}} kelimesi · {{characters}}",
+          "summary_other": "{{count}} kelimeler · {{characters}}",
+          "titleSelectionSuffix": " (selection)",
+          "title_one": "{{characters}} karakterler · {{words}} kelimeler · {{spaces}} uzaylar · {{count}} paragraf",
+          "title_other": "{{characters}} karakterler · {{words}} kelimeler · {{spaces}} uzaylar · {{count}} paragraflar"
         },
-        "graphTitle": "",
-        "lock": "",
-        "lockVault": "",
-        "openSettings": "",
-        "settingsTitle": "",
-        "showGraph": "",
-        "syncStatus": "",
-        "tagsTitle": "",
-        "togglePreview": "",
-        "viewModeTitle": "",
-        "viewsTitle": ""
+        "graphTitle": "Graph (⌘⇧G)",
+        "lock": "Lock",
+        "lockVault": "Lockob",
+        "openSettings": "Açık ayarlar",
+        "settingsTitle": "Ayarlar (,,)",
+        "showGraph": "Show grafik görünümü",
+        "syncStatus": "Yerel-yalnızca · senkronize edilmedi",
+        "tagsTitle": "Etiketler",
+        "togglePreview": "Toggle side-by-side önizleme",
+        "viewModeTitle": "Görüntüleme modu: {{mode}} ( döngüsüne tıkla)",
+        "viewsTitle": "Görüntüleme"
       },
       "import": {
-        "imported_one": "",
-        "imported_other": "",
-        "skippedSuffix_one": "",
+        "imported_one": "{{count}} notu {{skipped}}",
+        "imported_other": "{{count}} notları {{skipped}}",
+        "skippedSuffix_one": " · {{count}} atladı",
         "skippedSuffix_other": ""
       },
       "nav": {
-        "goBack": "",
-        "goForward": ""
+        "goBack": "Go back back back",
+        "goForward": "İleriye git"
       },
-      "noNotesToOpen": "",
-      "resizeBacklinksSidebar": "",
-      "resizeNotesSidebar": "",
+      "noNotesToOpen": "Açıklığa not yok.",
+      "resizeBacklinksSidebar": "Resize backlinks sidebar",
+      "resizeNotesSidebar": "Yeniden notlar sidebar",
       "sidebarToggle": {
-        "hideBacklinks": "",
-        "hideNotes": "",
-        "showBacklinks": "",
-        "showNotes": ""
+        "hideBacklinks": "Hide backlinks sidebar",
+        "hideNotes": "Gizle notları sidebar",
+        "showBacklinks": "Show backlinks sidebar",
+        "showNotes": "Show notları sidebar"
       },
       "switchingOverlay": {
-        "saving": ""
+        "saving": "Tasarruf.."
       },
       "viewMode": {
-        "live": "",
-        "reading": "",
-        "source": ""
+        "live": "Canlı",
+        "reading": "Okuma",
+        "source": "Kaynak Kaynağı"
       },
       "workspacePrompt": {
-        "namePlaceholder": "",
-        "renameConfirm": "",
-        "renameTitle": "",
-        "saveAsTitle": "",
-        "saveConfirm": ""
+        "namePlaceholder": "Workspace name",
+        "renameConfirm": "Rename",
+        "renameTitle": "Rename workspace",
+        "saveAsTitle": "Save workspace as Kaydet",
+        "saveConfirm": "Kaydet"
       },
       "workspaceSwitcher": {
-        "defaultName": "",
-        "renameItemLabel": "",
-        "renameTitle": "",
-        "saveCurrentAs": "",
-        "switchLabel": "",
-        "toggleTitle": ""
+        "defaultName": "Workspace",
+        "renameItemLabel": "Rename workspace {{name}}",
+        "renameTitle": "Rename workspace",
+        "saveCurrentAs": "Mevcut Kaydet..",
+        "switchLabel": "Anahtar çalışma alanı",
+        "toggleTitle": "İş Alanı: {{name}}"
       }
     },
     "codeBlock": {
-      "copyCode": "",
-      "defaultBadge": ""
+      "copyCode": "Kopya kodu",
+      "defaultBadge": "kodu"
     },
     "find": {
-      "close": "",
-      "matchCase": "",
-      "matchCount": "",
-      "nextMatch": "",
-      "noMatches": "",
-      "placeholder": "",
-      "previousMatch": "",
-      "replaceAll": "",
-      "replaceAllCount": "",
-      "replaceOne": "",
-      "replacePlaceholder": "",
-      "toggleReplace": ""
+      "close": "Close found",
+      "matchCase": "Maç davası",
+      "matchCount": "[X0X15X]",
+      "nextMatch": "Sonraki maç",
+      "noMatches": "No maçları",
+      "placeholder": "Not",
+      "previousMatch": "Önceki Maç",
+      "replaceAll": "Tüm Değiştirin",
+      "replaceAllCount": "Her şeyi değiştirin ([X13X)",
+      "replaceOne": "Değişimi Değiştirin",
+      "replacePlaceholder": "Değişimle",
+      "toggleReplace": "Toggle replace"
     },
     "folding": {
-      "clickToUnfold": "",
-      "unfold": ""
+      "clickToUnfold": "Başlamak için tıklayın",
+      "unfold": "Unfold"
     },
     "footnote": {
-      "heading": "",
-      "unreferenced": ""
+      "heading": "Ayaknotlar",
+      "unreferenced": "hayırsız"
     },
     "frontmatter": {
-      "addProperty": "",
-      "propertiesLabel": "",
-      "titleAriaLabel": "",
-      "titlePlaceholder": ""
+      "addProperty": "+ Ek mülk ekleyin",
+      "propertiesLabel": "Özellikler",
+      "titleAriaLabel": "Not title",
+      "titlePlaceholder": "Untitled"
     },
     "mermaid": {
-      "rendering": ""
+      "rendering": "Rendering diagram.."
     },
     "slash": {
-      "attachFile": "",
-      "bulletList": "",
-      "callout": "",
-      "date": "",
-      "day": "",
-      "divider": "",
-      "heading1": "",
-      "heading2": "",
-      "heading3": "",
-      "heading4": "",
-      "heading5": "",
-      "heading6": "",
-      "link": "",
-      "now": "",
-      "numberedList": "",
-      "quote": "",
-      "table": "",
-      "time": "",
-      "todoList": "",
-      "voiceNote": "",
-      "wikiLink": ""
+      "attachFile": "Dosya adı",
+      "bulletList": "Bülten listesi",
+      "callout": "Callout",
+      "date": "Tarih Tarihi",
+      "day": "Gün Günü",
+      "divider": "Bölünmüş",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "heading4": "Heading 4",
+      "heading5": "5",
+      "heading6": "Heading 6",
+      "link": "Link",
+      "now": "Şimdi",
+      "numberedList": "Sayılan liste",
+      "quote": "Alıntı",
+      "table": "Masa",
+      "time": "Zaman Zamanı",
+      "todoList": "To-do list",
+      "voiceNote": "Ses notu",
+      "wikiLink": "Wiki link"
     },
     "spell": {
       "menu": {
-        "addToDictionary": "",
-        "ignoreInVault": "",
-        "ignoreThisSession": "",
-        "noSuggestions": ""
+        "addToDictionary": "Sözlüğe Ekle",
+        "ignoreInVault": "Ignore in thisob",
+        "ignoreThisSession": "Bu seansı görmezden gelin",
+        "noSuggestions": "Hiçbir öneri"
       }
     },
     "table": {
-      "addColumn": "",
-      "addRow": "",
-      "cellAriaLabel": "",
-      "deleteColumn": "",
-      "deleteRow": "",
-      "reorderColumn": "",
-      "reorderRow": ""
+      "addColumn": "Doğru sütunu sağa ekleyin",
+      "addRow": "Aşağıdaki satırları ekle",
+      "cellAriaLabel": "Masa hücresi",
+      "deleteColumn": "Delete column",
+      "deleteRow": "Delete row",
+      "reorderColumn": "Yeniden sipariş sütunu",
+      "reorderRow": "Reorder row"
     },
     "toolbar": {
-      "apply": "",
+      "apply": "Başvuru",
       "heading": {
-        "h1": "",
-        "h2": "",
-        "h3": "",
-        "h4": "",
-        "h5": "",
-        "h6": "",
-        "paragraph": ""
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Paragraf"
       },
-      "urlPlaceholder": ""
+      "highlight": {
+        "blue": "Mavi",
+        "green": "Yeşil",
+        "pink": "Pembe",
+        "purple": "Mor",
+        "yellow": "Sarı"
+      },
+      "urlPlaceholder": "Paste link URL URL"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Full",
+        "narrow": "Narrow",
+        "normal": "Normal",
+        "wide": "Wide"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normal",
+        "relaxed": "Rahatlayın",
+        "tight": "Dar"
+      },
+      "textSize": {
+        "lg": "Büyük",
+        "md": "Varsayılan olarak",
+        "sm": "Küçük",
+        "xl": "Ekstra büyük ekstra büyük"
+      }
     },
     "wikilink": {
       "chip": {
-        "embed": ""
+        "embed": "Embed: {{label}}"
       },
       "convert": {
-        "cancel": "",
-        "choiceClause_one": "",
-        "choiceClause_other": "",
-        "chooseTarget": "",
-        "convert": "",
-        "convertedToast_one": "",
-        "convertedToast_other": "",
-        "noneToConvert": "",
-        "nothingToConvert": "",
-        "rewriteCount_one": "",
-        "rewriteCount_other": "",
-        "skipped": "",
-        "title": ""
+        "cancel": "Cancel",
+        "choiceClause_one": " · {{count}} bir seçime ihtiyaç duyar.",
+        "choiceClause_other": " · {{count}} bir seçime ihtiyaç duyar.",
+        "chooseTarget": "Hedef seçin..",
+        "convert": "Convert",
+        "convertedToast_one": "{{count}} wikilink dönüştürüldü",
+        "convertedToast_other": "{{count}} wikilinkler dönüştürüldü",
+        "noneToConvert": "Bu notu dönüştürmek için wikilinkler ithal edilmedi.",
+        "nothingToConvert": "Hiçbir şey dönüştürmek için - ithal wikilinks çözme.",
+        "rewriteCount_one": "{{count}} bağlantı yeniden yazılacak",
+        "rewriteCount_other": "{{count}} bağlantıları yeniden yazılacak",
+        "skipped": "atladı - {{reason}}",
+        "title": "Bu notda ithal wikilinkler"
       },
       "convertCore": {
-        "noMatch": ""
+        "noMatch": "hiçbir maç"
       }
     }
   },
   "export": {
     "note": {
-      "documentTitleFallback": "",
+      "documentTitleFallback": "Not",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "cannotDecrypt": "",
-        "destinationUnusable": "",
-        "fallback": "",
-        "invalidAttachmentCatalog": "",
-        "invalidNoteFilename": "",
-        "invalidNoteId": "",
-        "invalidPlaintextEncoding": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "ioWriteDefault": "",
-        "noteNotFound": "",
-        "pdfCaptureFailed": "",
-        "pdfExportInProgress": "",
-        "pdfPayloadMissing": "",
-        "pdfRenderTimeout": "",
-        "pdfWindowCreateFailed": "",
-        "targetExists": "",
-        "vaultLocked": ""
+        "attachmentCorrupt": "Bu notun referansı okumayabilirdi, bu yüzden hiçbir şey ihraç edilmedi.",
+        "attachmentMissing": "Bu notun referansı eksik, bu yüzden hiçbir şey ihraç edilmedi.",
+        "cannotDecrypt": "Bu not okunamadı.",
+        "destinationUnusable": "Bu hedef klasörü kullanılabilir değildir.",
+        "fallback": "İhracat beklenmedik bir şekilde başarısız oldu. Tekrar deneyin.",
+        "invalidAttachmentCatalog": "Tozun ek kataloğu okunamadı, bu yüzden hiçbir şey ihraç edilmedi.",
+        "invalidNoteFilename": "Bu dosya adı kullanılabilir değildir, bu yüzden hiçbir şey ihraç edilmedi.",
+        "invalidNoteId": "Bu not tanımlanamadı, bu yüzden hiçbir şey ihraç edilmedi.",
+        "invalidPlaintextEncoding": "Bu notun içeriği hasarlı görünüyor, bu yüzden hiçbir şey ihraç edilmedi. Onu bir yedeklemeden geri yükleyin.",
+        "ioNoSpace": "Hedefte yeterince yer değil.",
+        "ioPermissionDenied": "Hedefte yazma izni yok.",
+        "ioWriteDefault": "Ihraç edilen dosyayı yazamaz.",
+        "noteNotFound": "Bu not artık yok - silinmiş olabilir.",
+        "pdfCaptureFailed": "PDF oluşturulamadı, bu yüzden hiçbir şey ihraç edilmedi.",
+        "pdfExportInProgress": "PDF ihracat zaten çalışıyor. bitirmek için bekleyin, sonra tekrar deneyin.",
+        "pdfPayloadMissing": "İhracat kesintiye uğradı - eğer ton kilitliyse, onu açın ve tekrar deneyin.",
+        "pdfRenderTimeout": "Not çok uzun sürdü, bu yüzden hiçbir şey ihraç edilmedi.",
+        "pdfWindowCreateFailed": "İhracat penceresi açılmadı, bu yüzden hiçbir şey ihraç edilmedi.",
+        "targetExists": "Bu isim ile bir dosya zaten varışta var.",
+        "vaultLocked": "Yastık kilitlidir. Unlock it, then try again."
       },
       "flow": {
-        "couldNotRead": "",
-        "exportedTo": "",
-        "exportedToWithAttachments_one": "",
-        "exportedToWithAttachments_other": "",
-        "exportedToWithImages_one": "",
-        "exportedToWithImages_other": "",
-        "filterHtml": "",
-        "filterMarkdown": "",
-        "filterPdf": "",
-        "filterPlainText": "",
-        "showInFolder": ""
+        "couldNotRead": "Bu not okunamadı.",
+        "exportedTo": "{{filename}}",
+        "exportedToWithAttachments_one": "{{filename}} + {{count}}",
+        "exportedToWithAttachments_other": "{{filename}} + {{count}} ekleri",
+        "exportedToWithImages_one": "{{filename}} + {{count}} görüntülendi",
+        "exportedToWithImages_other": "{{filename}} + {{count}} görüntüler",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Plain text",
+        "showInFolder": "Klasöründe göster"
       },
       "modal": {
-        "cancel": "",
-        "export": "",
-        "includeAttachments_one": "",
-        "includeAttachments_other": "",
-        "title": ""
+        "cancel": "Cancel",
+        "export": "İhracat..",
+        "includeAttachments_one": "{{count}} ek",
+        "includeAttachments_other": "{{count}} ekleri ekleyin",
+        "title": "Markdown olarak ihracat"
       }
     },
     "pdf": {
-      "cancel": "",
-      "continue": "",
-      "title": ""
+      "cancel": "Cancel",
+      "continue": "Devam et..",
+      "title": "PDF olarak"
     },
     "vault": {
-      "chooseDestinationDialogTitle": "",
+      "chooseDestinationDialogTitle": "İhracatı nereye koymak için nerede seçin",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "cannotDecrypt": "",
-        "destinationAlreadyExists": "",
-        "destinationNotAllowed": "",
-        "invalidPlaintextEncoding": "",
-        "invalidVaultMeta": "",
-        "ioWriteDefault": "",
-        "joinFailure": "",
-        "vaultLocked": "",
-        "vaultNotFound": ""
+        "attachmentCorrupt": "Bir not tarafından referans alınmadı, bu yüzden hiçbir şey ihraç edilmedi.",
+        "attachmentMissing": "Bir not tarafından referans eksik, bu yüzden hiçbir şey ihraç edilmedi.",
+        "authOperationInProgress": "Başka bir tank operasyonu devam ediyor. bitirmek için bekleyin, sonra tekrar deneyin.",
+        "cancelled": "İhracat iptal edildi. Hedefte hiçbir şey kalmadı.",
+        "cannotDecrypt": "Bir not okunamadı, bu yüzden hiçbir şey ihraç edilmedi.",
+        "destinationAlreadyExists": "Bu yerde zaten bir şeyler var. İhracat için taze bir yer seçin.",
+        "destinationNotAllowed": "Bu konum Myne'nin kendi depolamasındadır. Dışarıda bir klasör seçin.",
+        "invalidPlaintextEncoding": "Bir notun içeriği hasarlı görünüyor, bu yüzden hiçbir şey ihraç edilmedi. Onu bir yedeklemeden geri yükleyin.",
+        "invalidVaultMeta": "Torun metadata okunamadı, bu yüzden hiçbir şey ihraç edilmedi.",
+        "ioWriteDefault": "İhracatı yazamayabilir.",
+        "joinFailure": "İhracat beklenmedik bir şekilde başarısız oldu. Hedefte hiçbir şey kalmadı.",
+        "vaultLocked": "Yastık kilitlidir. Unlock it, then try again.",
+        "vaultNotFound": "İhracat için bulamadık."
       },
       "flow": {
-        "countAttachments_one": "",
-        "countAttachments_other": "",
-        "countFolders_one": "",
-        "countFolders_other": "",
-        "countNotes_one": "",
-        "countNotes_other": "",
-        "exclusionsHistory": "",
-        "exclusionsTrashed_one": "",
-        "exclusionsTrashed_other": "",
-        "exclusionsTrashedAndHistory_one": "",
-        "exclusionsTrashedAndHistory_other": "",
-        "phaseAttachments": "",
-        "phaseNotes": "",
-        "preparing": "",
-        "runningCounts": ""
+        "countAttachments_one": "{{count}}",
+        "countAttachments_other": "{{count}} ekleri",
+        "countFolders_one": "{{count}} klasörü",
+        "countFolders_other": "{{count}} klasörler",
+        "countNotes_one": "{{count}} not",
+        "countNotes_other": "{{count}} notlar",
+        "exclusionsHistory": "Version history not included.",
+        "exclusionsTrashedAndHistory_one": "{{count}} çöp notu ve sürüm tarihi dahil değil.",
+        "exclusionsTrashedAndHistory_other": "{{count}} çöp notları ve sürüm tarihi dahil değil.",
+        "exclusionsTrashed_one": "{{count}} dahil olmayan çöp notu.",
+        "exclusionsTrashed_other": "{{count}} çöp notları dahil edilmez.",
+        "phaseAttachments": "bağlar",
+        "phaseNotes": "notlar",
+        "preparing": "Hazırlanma..",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "",
-        "cancelling": "",
-        "title": ""
+        "cancel": "Cancel",
+        "cancelling": "İptal..",
+        "title": "İhracat .."
       },
       "setup": {
-        "cancel": "",
-        "choose": "",
-        "chooseFolder": "",
-        "destinationLabel": "",
-        "export": "",
-        "folderSelectAriaLabel": "",
-        "noFolderChosen": "",
-        "noFoldersInVault": "",
-        "scopeFolder": "",
-        "scopeLabel": "",
-        "scopeWhole": "",
-        "title": ""
+        "cancel": "Cancel",
+        "choose": "Seçin..",
+        "chooseFolder": "Bir klasör seçin..",
+        "destinationLabel": "Hedef",
+        "export": "İhracat..",
+        "folderSelectAriaLabel": "Kater ihracat için",
+        "noFolderChosen": "Hiçbir klasör seçmedi",
+        "noFoldersInVault": "Bu tonlarda hiçbir klasör yok",
+        "scopeFolder": "Bir klasör",
+        "scopeLabel": "Kapsam",
+        "scopeWhole": "Bütün bütün",
+        "title": "Markdown olarak ihracat"
       },
       "summary": {
-        "done": "",
-        "showInFolder": "",
-        "title": ""
+        "done": "Done",
+        "showInFolder": "Klasöründe göster",
+        "title": "İhracat tamamlandı"
       }
     }
   },
   "failClosed": {
     "corrupted": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Bir yedeklemeniz varsa, geri yükleyebilirsiniz - mevcut dosyalarınız dokunmaz; yedekleme ilk önce ayrı bir ton olarak restore edilir.",
+      "cta": "Close app",
+      "title": "Vault dosyası bozulmuştur."
     },
     "invalidState": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Lütfen yeniden başlayın.",
+      "cta": "Lock",
+      "title": "Beklenmeyen devlet."
     },
     "ioError": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Bu bir disk veya dosya sistemi hatası olabilir.",
+      "cta": "Close app",
+      "title": "Not read theob file."
     },
     "permissionDenied": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Check file permissions.",
+      "cta": "Close app",
+      "title": "Toz dosyasına erişmek için izin yok."
     },
-    "restoreFromBackup": ""
+    "restoreFromBackup": "Yedekten geri dönün.."
   },
   "notes": {
     "archive": {
-      "close": "",
-      "count_one": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "emptyState": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "close": "Close",
+      "countEmpty": "Boş boş",
+      "count_one": "{{count}} not",
+      "count_other": "{{count}} notlar",
+      "delete": "Delete",
+      "deleteError": "Bu notu silemezdi. Tekrar deneyin.",
+      "emptyState": "Archive boş.",
+      "restore": "Geri yükleme geri yükleme",
+      "restoreError": "Bu notu geri yükleyemeyebilir. Tekrar deneyin.",
+      "title": "Archive",
+      "untitled": "Untitled"
     },
     "cardMenu": {
-      "copyLink": "",
-      "open": "",
-      "openInNewTab": "",
-      "revealInFolder": ""
+      "copyLink": "Kopyalama linki",
+      "open": "Açık",
+      "openInNewTab": "Yeni sekmede açık",
+      "revealInFolder": "Klasörü açın"
     },
     "colorLabels": {
-      "clay": "",
-      "moss": "",
-      "ochre": "",
-      "plum": "",
-      "slate": "",
-      "stone": ""
+      "clay": "Clay",
+      "moss": "Moss",
+      "ochre": "Ochre",
+      "plum": "Tesis",
+      "slate": "Slate",
+      "stone": "Stone"
     },
     "decoration": {
-      "colorSection": "",
-      "default": "",
-      "defaultFolderIcon": "",
-      "iconSection": "",
-      "menuLabel": "",
-      "noColor": "",
-      "none": ""
+      "colorSection": "Renkli Renk",
+      "default": "Varsayılan olarak",
+      "defaultFolderIcon": "Varsayılan klasör simgesi",
+      "iconSection": "Icon",
+      "menuLabel": "Renk etiketi",
+      "noColor": "Hiçbir renk yok",
+      "none": "Hiçbir şey yok"
     },
     "deleteConfirm": {
-      "cancel": "",
-      "delete": "",
-      "title": "",
-      "untitled": "",
-      "warning": ""
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "title": "Bu notu delete?",
+      "untitled": "Untitled",
+      "warning": "Bu geri alınmaz."
     },
     "filterBuilder": {
-      "addCondition": "",
-      "addFilterGroup": "",
-      "cancel": "",
+      "addCondition": "Ekle koşul",
+      "addFilterGroup": "Filtre grubu ekleyin",
+      "cancel": "Cancel",
       "combinator": {
-        "all": "",
-        "any": ""
+        "all": "bütün hepsi",
+        "any": "herhangi bir şey herhangi bir"
       },
-      "match": "",
+      "match": "Maç",
       "negate": {
-        "is": "",
-        "isNot": ""
+        "is": "is",
+        "isNot": "değil"
       },
-      "noConditions": "",
-      "noteCount_one": "",
-      "noteCount_other": "",
-      "of": "",
-      "ofTheGroups": "",
-      "removeCondition": "",
-      "replaceFilter": "",
-      "save": "",
-      "searchTextPlaceholder": "",
-      "selectFolderPlaceholder": "",
-      "selectTagPlaceholder": "",
+      "noConditions": "Henüz şartlar yok - bu görüş tüm sayfaları gösterir.",
+      "noteCount_one": "{{count}} not",
+      "noteCount_other": "{{count}} notlar",
+      "of": ":",
+      "ofTheGroups": "gruplar:",
+      "removeCondition": "Kaldır koşul",
+      "replaceFilter": "Filtre Ekle Filtre",
+      "save": "Kaydet",
+      "searchTextPlaceholder": "arama metin",
+      "selectFolderPlaceholder": "bir klasör seçin..",
+      "selectTagPlaceholder": "bir etiket seçin..",
       "type": {
-        "folder": "",
-        "search": "",
-        "tag": ""
+        "folder": "Folder",
+        "search": "Arama",
+        "tag": "Tag"
       },
-      "unrepresentable": "",
-      "unresolved": ""
+      "unrepresentable": "Bu filtre gelişmiş bir editörle yapıldı ve burada düzenlenebilir.",
+      "unresolved": "çözülmemiş"
     },
     "folderManagement": {
-      "illegalSegment": "",
-      "tooLong": ""
+      "illegalSegment": "Bir klasör adı / \\ | # ^ [ ] veya bir uzayla bitemez.",
+      "tooLong": "Bu klasör yolu çok uzun."
     },
     "folderNote": {
-      "defaultTitle": ""
+      "defaultTitle": "Index"
     },
     "folderRow": {
-      "createFolderNote": "",
-      "empty": "",
-      "folderNote": "",
-      "openFolderNote": ""
+      "createFolderNote": "Bir klasör notu oluşturun",
+      "empty": "boş boş boş boş",
+      "folderNote": "klasörü not",
+      "openFolderNote": "Açık klasör notu"
     },
     "graph": {
-      "allConnected": "",
-      "building": "",
-      "depthToggleTitle": "",
-      "filterAll": "",
-      "filterAroundNote": "",
-      "filterByTag": "",
-      "filterIsolated": "",
-      "hop": "",
-      "loading": "",
-      "noNotes": "",
-      "overCap": "",
-      "refresh": "",
-      "refreshTitle": "",
-      "tagPlaceholder": ""
+      "allConnected": "Her şey bağlantılı - izole notlar yok.",
+      "building": "Yapı grafiği..",
+      "depthToggleTitle": "Mahalle derinliği (1 ↔ 2 umut)",
+      "filterAll": "Bütün Bütün Hepsi",
+      "filterAroundNote": "Bu not çevresinde",
+      "filterByTag": "Filter by tag",
+      "filterIsolated": "Isolated",
+      "hop": "{{depth}} Umarım",
+      "loading": "Yükleme grafiği..",
+      "noNotes": "Henüz grafik için not yok.",
+      "overCap": "Bu ton büyük - tüm-vault grafiği kapıldı. Bir etikete filtre veya keşfetmek için izole notlar gösterir.",
+      "refresh": "Yenileme",
+      "refreshTitle": "Toz değişti - grafiği yeniden inşa",
+      "tagPlaceholder": "Tag.."
     },
     "import": {
       "base": {
-        "untitledView": ""
+        "untitledView": "Untitled view"
       },
       "modal": {
-        "cancel": "",
-        "cancelledNotImported_one": "",
+        "cancel": "Cancel",
+        "cancelledNotImported_one": "{{count}} ithal edilmedi",
         "cancelledNotImported_other": "",
-        "cancelling": "",
-        "chooseFolder": "",
-        "close": "",
-        "closeAriaLabel": "",
-        "copied": "",
-        "copy": "",
-        "done": "",
-        "errorBody": "",
-        "flagDetail": "",
-        "flagKindFolder": "",
-        "flagKindTitle": "",
-        "folderPickerTitle": "",
-        "hiddenIgnoredPrefix_one": "",
-        "hiddenIgnoredPrefix_other": "",
-        "hiddenIgnoredSuffix": "",
-        "ifNoteExistsLabel": "",
-        "import": "",
-        "importFailed": "",
-        "importing": "",
-        "markDone": "",
-        "markedDone": "",
-        "mediaImported_one": "",
+        "cancelling": "İptal..",
+        "chooseFolder": "Klasörü seçin..",
+        "close": "Close",
+        "closeAriaLabel": "Close",
+        "copied": "Copied",
+        "copy": "Kopya kopya",
+        "done": "Done",
+        "errorBody": "İthalat tamamlanmadı. Herhangi bir not zaten ithal edildi ve tutmak veya silmek için güvenlidir.",
+        "flagDetail": "{{kind}} {{segment}}.",
+        "flagKindFolder": "Folder",
+        "flagKindTitle": "Başlık:",
+        "folderPickerTitle": "Obsidianob klasörünü seçin",
+        "hiddenIgnoredPrefix_one": "{{count}} yapılandır / gizli öğe görmezden gelindi (örneğin.g. ",
+        "hiddenIgnoredPrefix_other": "{{count}} yapılandırılmış / gizli öğeler görmezden geldi (örneğin.g. ",
+        "hiddenIgnoredSuffix": "). ). ).",
+        "ifNoteExistsLabel": "Bir not zaten mevcutsa",
+        "import": "İthalat",
+        "importFailed": "İthalat başarısız oldu.",
+        "importing": "Torununuzu ithal etmek..",
+        "markDone": "Mark yaptı",
+        "markedDone": "Marked yapıldı",
+        "mediaImported_one": "{{count}} ithal edildi",
         "mediaImported_other": "",
-        "mediaOmittedSuffix_one": "",
+        "mediaOmittedSuffix_one": " · {{count}}",
         "mediaOmittedSuffix_other": "",
-        "needsAttention": "",
-        "needsAttentionHelp": "",
-        "noFolderChosen": "",
-        "notesImported_one": "",
-        "notesImported_other": "",
-        "policyCopyHint": "",
-        "policyCopyLabel": "",
-        "policySkipHint": "",
-        "policySkipLabel": "",
-        "preexistingDetail": "",
-        "preparing": "",
-        "progressNotes": "",
-        "progressOf": "",
-        "reasonIllegalChar": "",
-        "reasonPathTooLong": "",
-        "reasonSegmentTooLong": "",
-        "scanning": "",
-        "setupIntro": "",
-        "statCancelled": "",
-        "statCanvasSkipped": "",
-        "statEmptyFoldersKept": "",
-        "statMedia": "",
-        "statOtherSkipped": "",
-        "statSkipped": "",
-        "suggestedNameAriaLabel": "",
-        "titleComplete": "",
-        "titleFailed": "",
-        "titleSetup": "",
-        "vaultFolderLabel": "",
-        "vaultRoot": ""
+        "needsAttention": "Dikkate ihtiyaç var",
+        "needsAttentionHelp": "Bu notlar ithal edilmedi. Önerilenen düzeltmeler başlangıç noktalarıdır - bir kopyasını kopyalayın, sonra onu açtığınız notu yeniden isimlendirin.",
+        "noFolderChosen": "Hiçbir klasör seçmedi",
+        "notesImported_one": "ithal edilen notlar",
+        "notesImported_other": "ithal edilen notlar",
+        "policyCopyHint": "Mevcut notun yanında getirin.",
+        "policyCopyLabel": "Bir kopya olarak İthalat",
+        "policySkipHint": "Önerilen - bir ithalat asla tekrarlamak veya yazmalar.",
+        "policySkipLabel": "Skip it Skip it Skip it",
+        "preexistingDetail": "Bu not zaten kendi klasörü vardı: “{{existing}}, Myne’nin tuttuğu – klasörü disk üzerinde oturduğu yerden farklı olabilir.",
+        "preparing": "Hazırlanma..",
+        "progressNotes": " notlar",
+        "progressOf": " of ",
+        "reasonIllegalChar": "bir karakter Myne bir isimde kullanamaz",
+        "reasonPathTooLong": "klasör + başlık yolu çok uzun",
+        "reasonSegmentTooLong": "adım Myne'den daha uzun",
+        "scanning": "Tonunuzu tarayın..",
+        "setupIntro": "Mevcut Obsidianob klasöründe Myne. Her Markdown notu yerde ithal edilir ve şifrelenir - bu cihazı hiçbir şey bırakmaz ve orijinal dosyalarınız silinir.",
+        "statCancelled": "Cancelled",
+        "statCanvasSkipped": ".canvas dosyaları atladı",
+        "statEmptyFoldersKept": "Boş klasörler tuttu",
+        "statMedia": "Media",
+        "statOtherSkipped": "Diğer dosyalar atladı",
+        "statSkipped": "Skipped (already var)",
+        "suggestedNameAriaLabel": "Önerilen isim",
+        "titleComplete": "Import Complete",
+        "titleFailed": "İthalat başarısız oldu",
+        "titleSetup": "İthalat Obsidiana",
+        "vaultFolderLabel": "Vault klasörü",
+        "vaultRoot": "(vault kök)"
       },
       "offer": {
-        "body": "",
-        "chooseFolder": "",
-        "laterHint": "",
-        "notNow": "",
-        "title": ""
+        "body": "Mevcut notlarınızı Myne'ye getirin. Her biri ithal edildiği gibi şifrelenir - bu cihazı hiçbir şey bırakmaz ve orijinal dosyalarınız tam olarak nerede olduklarını kalır.",
+        "chooseFolder": "Klasörü seçin..",
+        "laterHint": "Daha sonra Ayarlar → Storage'dan her zaman ithal edebilirsiniz.",
+        "notNow": "Şimdi Değil",
+        "title": "Obsidianob'ı ithal edin mi?"
       }
     },
     "list": {
-      "addToFavorites": "",
-      "archive": "",
-      "archiveBulkError": "",
-      "archiveNote": "",
-      "archiveSingleError": "",
-      "attachments": "",
-      "bulkArchive_one": "",
+      "addToFavorites": "Favorilere Ekle",
+      "archive": "Archive",
+      "archiveBulkError": "Notları arşivleyemez.",
+      "archiveNote": "Archive",
+      "archiveSingleError": "Notu arşivleyemez.",
+      "attachments": "Atalar",
+      "bulkArchive_one": "{{count}} notlar",
       "bulkArchive_other": "",
-      "bulkDelete_one": "",
+      "bulkDelete_one": "Delete {{count}} notlar",
       "bulkDelete_other": "",
-      "bulkMove_one": "",
+      "bulkMove_one": "{{count}} notları ..",
       "bulkMove_other": "",
-      "caseMergeBody": "",
-      "color": "",
-      "createFirstNote": "",
-      "createFolderNote": "",
-      "customize": "",
-      "delete": "",
-      "deleteFolderBody_one": "",
-      "deleteFolderBody_other": "",
-      "deleteFolderConfirm": "",
-      "deleteFolderTitle": "",
-      "deleteFolderWarning": "",
-      "duplicate": "",
-      "editFilterTitle": "",
-      "emptyState": "",
-      "exportHtml": "",
-      "exportMarkdown": "",
-      "exportPdf": "",
-      "exportTxt": "",
-      "favoritesHeading": "",
-      "mergeAnyway": "",
-      "newFolder": "",
-      "newFolderInPlaceholder": "",
-      "newFolderPlaceholder": "",
-      "newNote": "",
-      "newNoteFromTemplate": "",
-      "newNoteHere": "",
-      "newNoteMenu": "",
-      "newNoteShortcut": "",
-      "newSubfolder": "",
-      "newViewTitle": "",
-      "noteMovedToTrash": "",
-      "notesHeading": "",
-      "notesMovedToTrash_one": "",
-      "notesMovedToTrash_other": "",
-      "openArchive": "",
-      "openAttachments": "",
-      "openFolderNote": "",
-      "openInNewTab": "",
-      "openToSide": "",
-      "openTrash": "",
-      "removeAsFolderNote": "",
-      "removeFromFavorites": "",
-      "rename": "",
-      "setAsFolderNote": "",
-      "trash": "",
-      "trashBulkError": "",
-      "trashSingleError": "",
-      "undo": "",
-      "vaultRoot": "",
-      "viewSettingsTitle": ""
+      "caseMergeBody": "“[X16X) adında bir klasör zaten var. Bunlar bir araya gelecek - onları ayrı tutmak için bir isim olarak adlandırılacak mı?",
+      "color": "Renk..",
+      "createFirstNote": "+ İlk notunuzu oluşturun",
+      "createFolderNote": "Create klasör note",
+      "customize": "Özelleştir..",
+      "delete": "Delete",
+      "deleteFolderBody_one": "{{name}} ve {{count}} notu",
+      "deleteFolderBody_other": "{{name}} ve {{count}} notları",
+      "deleteFolderConfirm": "Delete klasörü",
+      "deleteFolderTitle": "Bu klasörü dene?",
+      "deleteFolderWarning": "Notlar Trash'a taşınır - onları daha sonra geri yükleyebilirsiniz.",
+      "duplicate": "Duplicate",
+      "editFilterTitle": "Edit filtre",
+      "emptyState": "Henüz not yok.",
+      "exportHtml": "HTML olarak ihracat..",
+      "exportMarkdown": "Markdown olarak ihracat..",
+      "exportPdf": "PDF olarak ihracat..",
+      "exportTxt": "Plain Text olarak ihracat..",
+      "favoritesHeading": "Favoriler",
+      "mergeAnyway": "Merge her neyse",
+      "newFolder": "Yeni klasör",
+      "newFolderInPlaceholder": "Yeni klasör {{path}}",
+      "newFolderPlaceholder": "Yeni klasör",
+      "newNote": "Yeni not",
+      "newNoteFromTemplate": "Şablondan yeni not..",
+      "newNoteHere": "Burada yeni not",
+      "newNoteMenu": "Yeni not",
+      "newNoteShortcut": "Yeni not (⌘N)",
+      "newSubfolder": "Yeni alt kater",
+      "newViewTitle": "Yeni bakış",
+      "noteMovedToTrash": "Not Trash'a taşındı",
+      "notesHeading": "Notlar",
+      "notesMovedToTrash_one": "{{count}} not Trash'a taşındı",
+      "notesMovedToTrash_other": "{{count}} notlar Trash'e taşındı",
+      "openArchive": "Arşivi açın",
+      "openAttachments": "Açık ekler",
+      "openFolderNote": "Açık klasör notu",
+      "openInNewTab": "Yeni sekmede açık",
+      "openToSide": "Tarafa açık",
+      "openTrash": "Çöpü açın",
+      "removeAsFolderNote": "Klasörü not olarak geri alın",
+      "removeFromFavorites": "Favorilerden Çıkarın",
+      "rename": "Rename",
+      "setAsFolderNote": "Klasörü not olarak ayarlayın",
+      "trash": "Trash",
+      "trashBulkError": "Notları Trash'e taşıyamazsınız.",
+      "trashSingleError": "Trash'e notu hareket edemezdi.",
+      "undo": "Undo",
+      "vaultRoot": "Vault kök",
+      "viewSettingsTitle": "View settings"
     },
     "newFromTemplate": {
-      "back": "",
-      "blankNote": "",
-      "createNote": "",
-      "emptyState": "",
-      "listLabel": "",
-      "loading": "",
-      "nameLabel": "",
-      "namePlaceholder": "",
-      "nameStepTitle": "",
-      "pickStepTitle": "",
-      "untitledTemplate": ""
+      "back": "Geri dön",
+      "blankNote": "Blank notu",
+      "createNote": "Create not note",
+      "emptyState": "Henüz herhangi bir şablon yaratmadın.",
+      "listLabel": "Şablonlar",
+      "loading": "Yükleniyor..",
+      "nameLabel": "Not için Ad (from “[X25X)",
+      "namePlaceholder": "Untitled",
+      "nameStepTitle": "Name this note",
+      "pickStepTitle": "Şablondan yeni not",
+      "untitledTemplate": "Untitled şablon"
     },
     "newTab": {
-      "createNote": "",
-      "noNotesMatch": "",
-      "noNotesYet": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "untitled": ""
+      "createNote": "Yeni bir not oluşturun",
+      "noNotesMatch": "Hiçbir not maçı yok.",
+      "noNotesYet": "Henüz not yok.",
+      "searchAriaLabel": "Arama notları açık",
+      "searchPlaceholder": "Arama notları..",
+      "untitled": "Untitled"
     },
     "pane": {
-      "graphTab": "",
-      "loading": "",
-      "untitledView": ""
+      "graphTab": "Graph",
+      "loading": "Yükleniyor..",
+      "untitledView": "Untitled view"
     },
     "relativeTime": {
-      "daysAgo": "",
-      "hoursAgo": "",
-      "justNow": "",
-      "minutesAgo": "",
-      "oneWeekAgo": "",
-      "weeksAgo": "",
-      "yesterday": ""
+      "daysAgo": "{{d}} günler önce",
+      "hoursAgo": "{{h}} h önce",
+      "justNow": "sadece şimdi",
+      "minutesAgo": "{{m}} dakika önce",
+      "oneWeekAgo": "1 hafta önce",
+      "weeksAgo": "{{w}} haftalar önce",
+      "yesterday": "dün"
     },
     "row": {
-      "addToFavorites": "",
-      "folderIndexBadgeLabel": "",
-      "folderIndexBadgeTitle": "",
-      "folderIndexConflictLabel": "",
-      "folderIndexConflictTitle": "",
-      "loadError": "",
-      "removeFromFavorites": "",
-      "renameAriaLabel": "",
-      "untitled": ""
-    },
-    "savedView": {
-      "defaultName": ""
+      "addToFavorites": "Favorilere Ekle",
+      "folderIndexBadgeLabel": "Kater not",
+      "folderIndexBadgeTitle": "Kater not - bu klasörün indeksi",
+      "folderIndexConflictLabel": "Folder zaten bir indeks notu var",
+      "folderIndexConflictTitle": "Bu klasör zaten bir indeks notu var",
+      "loadError": "Bu notu yükleyemez",
+      "removeFromFavorites": "Favorilerden Çıkarın",
+      "renameAriaLabel": "Rename note",
+      "untitled": "Untitled"
     },
     "saveStatus": {
-      "editing": "",
-      "editingEllipsis": "",
-      "editingTitle": "",
-      "justNow": "",
-      "retry": "",
-      "saved": "",
-      "savedRelative": "",
-      "saveFailed": "",
-      "saveFailedTitle": "",
-      "saving": "",
-      "savingEllipsis": ""
+      "editing": "Editing",
+      "editingEllipsis": "Editing..",
+      "editingTitle": "Editing – autosave silahlı",
+      "justNow": "sadece şimdi",
+      "retry": "Retry",
+      "saveFailed": "Kurtarılmadı",
+      "saveFailedTitle": "Kurtarın - Retry'ye tıklayın",
+      "saved": "Saved",
+      "savedRelative": "{{rel}}",
+      "saving": "Tasarruf Tasarruf Tasarrufunu Tasarruf Etmek",
+      "savingEllipsis": "Tasarruf.."
+    },
+    "savedView": {
+      "defaultName": "Filtrelenen görünüm"
     },
     "snapshotFailed": {
-      "dismiss": "",
-      "message": ""
+      "dismiss": "Başarısızlık",
+      "message": "Bir anlık tasarruf edemez - notunuz kurtarılır, ancak versiyonu tarihi eksik olabilir ( disk dolu olabilir)."
     },
     "snapshots": {
-      "cancel": "",
-      "changeCount_one": "",
-      "changeCount_other": "",
-      "close": "",
-      "confirmBody": "",
-      "confirmTitle": "",
-      "decrypting": "",
-      "emptyState": "",
-      "encryptedSize": "",
-      "errorCannotDecrypt": "",
-      "errorGeneric": "",
-      "errorIo": "",
-      "errorNotFound": "",
-      "errorStorageAccess": "",
-      "errorVaultLocked": "",
-      "justNow": "",
-      "listLabel": "",
-      "loading": "",
-      "restore": "",
-      "restoreCta": "",
-      "restoredStatus": "",
-      "selectPlaceholder": "",
-      "title": "",
-      "untitled": ""
+      "cancel": "Cancel",
+      "changeCount_one": "{{count}} Bu snapshot'dan beri değişim",
+      "changeCount_other": "{{count}} bu snapshot'dan beri değişiklikler",
+      "close": "Close",
+      "confirmBody": "Mevcut notunuz ilk önce bir anlık olarak kurtarılacak, bu yüzden bunu geri alabilirsiniz.",
+      "confirmTitle": "Bu snapshot'ı geri yükleyin mi?",
+      "decrypting": "Decrypting..",
+      "emptyState": "Henüz anlık yok. Snapshots otomatik olarak sizin düzenlemeniz ve yaklaşık 7 gün boyunca tutulur. Şifrelenirler ve not kalıcı olarak silindiğinde kaybolurlar.",
+      "encryptedSize": "Encrypted · {{size}}",
+      "errorCannotDecrypt": "Bu anlık şifrelenemedi.",
+      "errorGeneric": "Bir şey yanlış gitti. Tekrar deneyin.",
+      "errorIo": "Bir disk hatası meydana geldi - disk tam veya güvenilmez olabilir.",
+      "errorNotFound": "Bu anlık artık mevcut değildir.",
+      "errorStorageAccess": "Tonun snapshot depolamasına erişemez.",
+      "errorVaultLocked": "Yastık kilitlidir. Notları görüntülemek için.",
+      "justNow": "sadece şimdi",
+      "listLabel": "Snapshot listesi",
+      "loading": "Yükleniyor..",
+      "restore": "Geri yükleme geri yükleme",
+      "restoreCta": "Bu snapshot'ı geri yükleyin",
+      "restoredStatus": "Geri yükleme. Sahip olduğunuz sürüm bir anlık olarak kaydedilir.",
+      "selectPlaceholder": "O zamandan beri neyin değiştiğini önizlemek için bir anlık seçin.",
+      "title": "Snapshots",
+      "untitled": "Untitled"
     },
     "tabStrip": {
-      "closeNewTab": "",
-      "closeTab": "",
-      "newTab": "",
-      "openNotes": "",
-      "pin": "",
-      "pinned": "",
-      "pinnedTitle": "",
-      "unpin": "",
-      "untitled": ""
+      "closeNewTab": "Yakın yeni sekme",
+      "closeTab": "{{title}}",
+      "newTab": "Yeni sekme",
+      "openNotes": "Açık notlar",
+      "pin": "Pin",
+      "pinned": "Pinnedildi",
+      "pinnedTitle": "Pinned – yakın olmayan",
+      "unpin": "Unpin",
+      "untitled": "Untitled"
     },
     "tagBrowser": {
-      "cancel": "",
-      "clear": "",
-      "combineTagsWith": "",
-      "filtering": "",
-      "modeAll": "",
-      "modeAny": "",
-      "noNotesForFilter": "",
-      "noTagsMatch": "",
-      "noTagsYet": "",
-      "noteCount_one": "",
-      "noteCount_other": "",
-      "notes": "",
-      "pickTag": "",
-      "save": "",
-      "saveAsView": "",
-      "searchPlaceholder": "",
-      "title": "",
-      "untitled": "",
-      "viewNamePlaceholder": ""
+      "cancel": "Cancel",
+      "clear": "Clear",
+      "combineTagsWith": "Birlikte etiketler",
+      "filtering": "Filtreleme..",
+      "modeAll": "Bütün Bütün Hepsi",
+      "modeAny": "Any",
+      "noNotesForFilter": "Bu filtre için not yok.",
+      "noTagsMatch": "Hiçbir etiket maç “{{query}}.",
+      "noTagsYet": "Henüz etiket yok.",
+      "noteCount_one": "{{count}} not",
+      "noteCount_other": "{{count}} notlar",
+      "notes": "Notlar",
+      "pickTag": "Filtre için bir etiket seçin.",
+      "save": "Kaydet",
+      "saveAsView": "Görme olarak Kaydet",
+      "searchPlaceholder": "Arama etiketleri..",
+      "title": "Etiketler",
+      "untitled": "Untitled",
+      "viewNamePlaceholder": "View name"
     },
     "trash": {
-      "close": "",
-      "count_one": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
-      "emptyConfirmBody_one": "",
-      "emptyConfirmBody_other": "",
-      "emptyConfirmCta": "",
-      "emptyConfirmTitle": "",
-      "emptyPartialFailure_one": "",
-      "emptyPartialFailure_other": "",
-      "emptyState": "",
-      "purgeConfirmCta": "",
-      "purgeConfirmTitle": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "close": "Close",
+      "countEmpty": "Boş boş",
+      "count_one": "{{count}} not",
+      "count_other": "{{count}} notlar",
+      "delete": "Delete",
+      "deleteError": "Bu notu silemezdi. Tekrar deneyin.",
+      "empty": "Boş çöp çöp çöp",
+      "emptyConfirmBody_one": "{{count}} not kalıcı olarak silinecektir.",
+      "emptyConfirmBody_other": "{{count}} notlar kalıcı olarak silinecektir.",
+      "emptyConfirmCta": "Boş çöp çöp çöp",
+      "emptyConfirmTitle": "Boş çöp?",
+      "emptyPartialFailure_one": "{{count}} not silinmedi ve çöpte kaldı.",
+      "emptyPartialFailure_other": "{{count}} notlar silinmedi ve çöpte kaldı.",
+      "emptyState": "Trash boş.",
+      "purgeConfirmCta": "Delete kalıcı olarak",
+      "purgeConfirmTitle": "Sürekli mi?",
+      "restore": "Geri yükleme geri yükleme",
+      "restoreError": "Bu notu geri yükleyemeyebilir. Tekrar deneyin.",
+      "title": "Trash",
+      "untitled": "Untitled"
     },
     "unlinkedMentions": {
-      "empty": "",
-      "heading": "",
-      "link": "",
-      "linkTooltip": "",
-      "refresh": "",
-      "searching": "",
-      "thisNote": "",
-      "untitled": ""
-    },
-    "views": {
-      "cards": {
-        "changeCover": "",
-        "changeCoverImage": "",
-        "empty": "",
-        "noValue": "",
-        "setCover": "",
-        "setCoverImage": "",
-        "untitled": ""
-      },
-      "collapseViews": "",
-      "empty": "",
-      "expandViews": "",
-      "heading": "",
-      "host": {
-        "unsupported": ""
-      },
-      "menu": {
-        "deleteView": "",
-        "editFilter": "",
-        "moveDown": "",
-        "moveUp": "",
-        "rename": "",
-        "viewSettings": ""
-      },
-      "newView": "",
-      "untitledView": ""
+      "empty": "Hiçbir bağlantı söz konusu değildir.",
+      "heading": "Unlinked talks",
+      "link": "Link",
+      "linkTooltip": "Link this talk to {{title}}",
+      "refresh": "Mentions değişmiş olabilir - yeni yenileme",
+      "searching": "Arama..",
+      "thisNote": "bu not",
+      "untitled": "Untitled"
     },
     "viewSettings": {
       "aspect": {
-        "default": "",
-        "fourThree": "",
-        "square": "",
-        "threeTwo": "",
-        "wide": ""
+        "default": "(5)",
+        "fourThree": "4:3",
+        "square": "1:1 (square)",
+        "threeTwo": "3:2",
+        "wide": "16:9 ( çapında)"
       },
-      "cancel": "",
-      "cardSize": "",
-      "cardSizeValue": "",
-      "coverImageHint": "",
-      "coverImagePlaceholder": "",
-      "coverImageProperty": "",
-      "imageAspectRatio": "",
-      "reset": "",
-      "save": ""
+      "cancel": "Cancel",
+      "cardSize": "Kart büyüklüğü",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Değerin bir görüntü olduğu cephe mülk - her kartın kapağı olarak gösterilen. Hiçbir kapak için boş bırakın.",
+      "coverImagePlaceholder": "e.g. cover",
+      "coverImageProperty": "Cover image mülk",
+      "imageAspectRatio": "Görüntü yönü oranı oranı oranı oranı oranı",
+      "reset": "Reset",
+      "save": "Kaydet"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Change cover",
+        "changeCoverImage": "Change cover image",
+        "empty": "Hiçbir not bu görüşe uymuyor",
+        "noValue": "Değer yok",
+        "setCover": "Set",
+        "setCoverImage": "Set cover image",
+        "untitled": "Untitled"
+      },
+      "collapseViews": "Collap views",
+      "empty": "Henüz görüş yok. Mevcut not listesini bir görüş olarak kurtarın.",
+      "expandViews": "Genişletilmiş görüşler",
+      "heading": "Görüntüleme",
+      "host": {
+        "unsupported": "Bu görünüm türü daha sonra bir güncellemede geliyor."
+      },
+      "menu": {
+        "deleteView": "Delete view",
+        "editFilter": "Edit filtre..",
+        "moveDown": "Move down",
+        "moveUp": "Move up up",
+        "rename": "Rename",
+        "viewSettings": "View settings.."
+      },
+      "newView": "Yeni bakış",
+      "untitledView": "Untitled view"
     },
     "welcome": {
-      "body": "",
-      "title": ""
+      "body": "Myne'ye hoş geldiniz, özel alanınızı düşünmek ve yazmak için.\n\nBurada tasarruf ettiğiniz her şey şifrelenir ve cihazınızda kalır. **password** ve **recovery cümlesi **, onlara güvenli bir yerde tutmak için tek anahtardır. Her ikisi de kaybolduysa, notlarınızı geri alamaz, hatta bize bile değil.\n\nBu sadece normal bir not, bu yüzden kendi yapın. Bunu, yeniden adlandırmak veya istediğiniz zaman silmek ve fikirleriniz büyüdükçe yeni notlar ekleyin.\n\nBurada olduğun için memnunuz. Myne hakkında daha fazla bilgi edinmek için, https://myne.md\n",
+      "title": "Myne'ye hoş geldiniz"
     },
     "workspace": {
-      "defaultSlotName": ""
+      "defaultSlotName": "Varsayılan olarak"
     }
   },
   "password": {
     "createForm": {
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "defaultEmptyCaption": "",
-      "mismatch": "",
-      "passwordLabel": "",
-      "suggestPassword": "",
-      "tooShort": ""
+      "checkingStrength": "Güç kontrol etmek..",
+      "confirmLabel": "Usta şifreyi onaylayın",
+      "defaultEmptyCaption": "Argon2id'e giriş olarak kullanılır (m=256 MiB, t=3, p=2). Hatırlayabileceğiniz bir şeyi seçin; onu sıfırlayamazsın.",
+      "mismatch": "Şifreler eşleşmez.",
+      "passwordLabel": "Master password",
+      "suggestPassword": "Önerilen şifre",
+      "tooShort": "En az {{n}} karakterleri kullanın."
     },
     "input": {
-      "hide": "",
-      "show": ""
+      "hide": "Gizle password",
+      "show": "Göster şifre göster"
     }
   },
   "primitives": {
     "searchableSelect": {
-      "emptyText": "",
-      "placeholder": "",
-      "searchPlaceholder": ""
+      "emptyText": "Hiç maç yok.",
+      "placeholder": "Seç..",
+      "searchPlaceholder": "Arama.."
     }
   },
   "recover": {
     "errors": {
-      "cancelledVaultLocked": "",
-      "operationInProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "cancelledVaultLocked": "Kurtarma iptal edildi: ton kilitliydi.",
+      "operationInProgress": "İlerlemede Operasyon. Lütfen bekleyin.",
+      "unexpected": "Beklenmeyen hata. Lütfen tekrar deneyin.",
+      "vaultNotFound": "Ekran dosyası bulunamadı. Lütfen uygulamayı yeniden başlatın."
     }
   },
   "restore": {
-    "backLabel": "",
-    "cancelLabel": "",
+    "backLabel": "Geri dön",
+    "cancelLabel": "Cancel",
     "collision": {
-      "body": "",
-      "keepBoth": "",
-      "replaceExisting": ""
+      "body": "Bu yedeklemeden bir ton zaten bu cihazda var. Her ikisini de tutabilirsin - restore edilmiş kopya, ton listenizde ayrı bir ton olarak görünür - ya da şimdi geri yükleme ve sonra mevcut tonluk listeden kendiniz (removal size DELETE tipini sorar ve sadece restore edilen toparlamayı onaylarken mantıklı olur).",
+      "keepBoth": "Her ikisini de tut",
+      "replaceExisting": "Geri yükleme, sonra mevcut yerini değiştirin.."
     },
     "damaged": {
-      "body": "",
-      "close": "",
-      "salvage": ""
+      "body": "Yedekleme dosyası hasar gördü, bu yüzden hiçbir şey restore edilmedi. Eğer bu sahip olduğunuz tek kopyaysa, salvage sağlam notları geri alabilir ve tam olarak ne okuyamayabilir - sonuç her zaman kısmi bir geri yükleme olarak etiketlenir.",
+      "close": "Close",
+      "salvage": "Salvage sağlam notlar.."
     },
     "error": {
-      "tryAnotherFile": ""
+      "tryAnotherFile": "Başka bir dosyayı deneyin"
     },
     "pick": {
-      "body": "",
-      "chooseFile": "",
-      "corruptedSuffix": ""
+      "body": "<code>.myne-backup</code> dosyasını seçin. Her şeyden önce yedekleme doğrulanır; restore edilen ton, o ton şifre veya kurtarma cümlesi ile kilidini açar - tam olarak kilidini açmak gibi.",
+      "chooseFile": "Yedekleme dosyasını seçin..",
+      "corruptedSuffix": "Mevcut tonunuz dokunmaz: yedekleme ilk önce ayrı bir ton olarak restore edilir."
     },
     "summary": {
-      "attachments": "",
-      "collidedNote": "",
-      "notes": "",
-      "openVaultList": "",
-      "partialHeader_one": "",
-      "partialHeader_other": "",
-      "restored": "",
-      "versionHistory": ""
+      "attachments": "Atalar: {{n}}",
+      "collidedNote": "Bu tonun daha önce mevcut kopyası hala ton listenizdedir. Yeniden restore edilen tonağı onayladığınızda, eskisini ton listeden kaldırabilirsiniz ( size DELETE tipini soracaktır).",
+      "notes": "Notlar: {{n}}",
+      "openVaultList": "Açık ton listesi",
+      "partialHeader_one": "Kısmen geri çekildi - {{count}} öğe okuyamazdı.",
+      "partialHeader_other": "Kısmen geri çekildi - {{count}} eşyaları okuyamazdı.",
+      "restored": "Vault restore edilmiştir.",
+      "versionHistory": "Tarih girişleri: {{n}}"
     },
-    "title": "",
+    "title": "Yedeklemeden geri yükleme",
     "working": {
-      "cancel": "",
-      "restoringProgress": "",
-      "verifying": "",
-      "verifyingProgress": ""
+      "cancel": "Cancel",
+      "restoringProgress": "[X23X11X]",
+      "verifying": "Doğrulama yedekleme..",
+      "verifyingProgress": "Yedek sipariş edin... {{done}}"
     }
   },
   "settings": {
     "about": {
-      "buildChannelDevelopment": "",
-      "buildChannelLabel": "",
-      "buildChannelStable": "",
-      "changelogButton": "",
-      "changelogHelper": "",
-      "changelogLabel": "",
-      "licenseBody": "",
-      "licenseLabel": "",
-      "tagline": "",
-      "threatModelHelper": "",
+      "buildChannelDevelopment": "Geliştirme",
+      "buildChannelLabel": "Build kanal",
+      "buildChannelStable": "Stable",
+      "changelogButton": "View changelog..",
+      "changelogHelper": "Per-vers notları. MYND-119 topraklarında görünecek.",
+      "changelogLabel": "Changelog",
+      "licenseBody": "Pre-alpha · CC0 docs · AGPL-3.0 uygulama kodu 1 sürümde.",
+      "licenseLabel": "Lisans",
+      "tagline": "Pre-alpha · Aşama 1 masaüstü müşteri",
+      "threatModelHelper": "Tarayıcınızda halk tehdit modeli belgesi açın.",
       "threatModelLabel": ""
     },
     "account": {
-      "argon2idHeading": "",
-      "changePasswordButton": "",
+      "argon2idHeading": "Argon2id parametreleri",
+      "changePasswordButton": "Şifre değişikliği",
       "changePasswordError": {
-        "invalidCredentialOrVault": "",
-        "ioError": "",
-        "joinFailure": "",
-        "samePasswordRejected": "",
-        "weakNewPassword": ""
+        "invalidCredentialOrVault": "Yanlış şu anki şifre veya küçük dosya bozuldu.",
+        "ioError": "Disk hatası, lütfen tekrar deneyin.",
+        "joinFailure": "Bir şey yanlış gitti, lütfen tekrar deneyin.",
+        "samePasswordRejected": "Yeni şifre mevcut olanı karşılaştırır.",
+        "weakNewPassword": "Yeni şifre en az 12 karakter olmalıdır."
       },
-      "changePasswordHeading": "",
-      "changePasswordHelper": "",
-      "dangerZoneHeading": "",
-      "dangerZoneHelper": "",
-      "deleteVaultButton": "",
-      "memoryCost": "",
-      "parallelism": "",
-      "timeCost": "",
-      "vaultLabelEyebrow": "",
-      "vaultLabelHelper": "",
-      "vaultLabelPlaceholder": "",
-      "vaultLabelSave": ""
+      "changePasswordHeading": "Şifre değişikliği",
+      "changePasswordHelper": "Aynı ton tutuyorken master şifrenizi bekleyin. Kurtarma cümlesi aynı kalır.",
+      "dangerZoneHeading": "Tehlike bölgesi",
+      "dangerZoneHelper": "Sürekli olarak bu küçük ve tüm notları sil. Yok olamaz. Kurtarma cümlesi tonu geri yüklemeyecektir.",
+      "deleteVaultButton": "Deleteob..",
+      "memoryCost": "Memory maliyeti",
+      "parallelism": "Paralelizm",
+      "timeCost": "Zaman maliyeti",
+      "vaultLabelEyebrow": "VAULT LABEL",
+      "vaultLabelHelper": "In-app switcher'de gösterilen bu ton için bir isim. Torun içinde şifrelenmiş; asla cihazınızı düz metinde bırakmaz.",
+      "vaultLabelPlaceholder": "Bir etiket ekleyin..",
+      "vaultLabelSave": "Kaydet"
     },
     "appearance": {
-      "showEditTimesAria": "",
-      "showEditTimesHelper": "",
-      "showEditTimesLabel": "",
-      "themeHelper": "",
-      "themeLabel": "",
-      "themeOptionAria": "",
-      "themeSaveError": "",
-      "timestampsSaveError": ""
+      "showEditTimesAria": "Show edit times in sidebar",
+      "showEditTimesHelper": "Her notun kenar çubuğundaki başlığının altında son derece tasarlanmış zamanı göster.",
+      "showEditTimesLabel": "Show edit times",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Dark",
+        "light": "Işık Işığı",
+        "system": "Sistem Sistem Sistemi"
+      },
+      "themeHelper": "Işık ve karanlık temalar arasındaki geçiş veya sistem tercihini takip edin.",
+      "themeLabel": "Tema",
+      "themeOptionAria": "{{label}} teması",
+      "themeSaveError": "Temayı kurtaramaz. Lütfen tekrar deneyin.",
+      "timestampsSaveError": "Tercihten tasarruf edemezdi. Lütfen tekrar deneyin."
     },
     "archive": {
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": "",
-      "saveError": ""
+      "helper": "Bir Archive'a taşınalım, ana listeden çık. Bunu klasörüne her arşivlenen notu geri yükleyin ve arşiv kontrollerini gizler.",
+      "label": "Archiving",
+      "off": "Off",
+      "on": "Onda",
+      "saveError": "Arşivleme ayarı güncelleyemez."
     },
     "autoBackup": {
-      "backupFolder": "",
-      "chooseFolder": "",
-      "chooseFolderDialogTitle": "",
-      "frequency": "",
-      "frequencyAriaLabel": "",
-      "helper": "",
-      "keepLast": "",
-      "noFolderChosen": "",
-      "saveFailedToast": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "statusFailed": "",
-      "statusLastBackup": "",
-      "statusNever": "",
-      "title": ""
+      "backupFolder": "Backup klasörü",
+      "chooseFolder": "Klasörü seçin..",
+      "chooseFolderDialogTitle": "Otomatik yedeklemeler için bir klasör seçin",
+      "frequency": "Frekans",
+      "frequencyAriaLabel": "Backup frekansı",
+      "helper": "Bir programda bir klasöre şifre yazın, uygulama açık ve ton açık olduğunda. Backups, tonunuz kadar şifreli kalır; Myne en son birkaçını tutar ve asla cihazınızdan bir şey göndermez.",
+      "intervalDaily": "Daily",
+      "intervalEveryUnlock": "Her şey kilidini açın",
+      "intervalWeekly": "Weekly",
+      "keepLast": "Keep last last",
+      "noFolderChosen": "Henüz seçilen bir klasör yok.",
+      "saveFailedToast": "Yedek ayarları kurtaramaz.",
+      "searchEmpty": "Hiç maç yok.",
+      "searchPlaceholder": "Arama..",
+      "statusFailed": "Otomatik yedekleme başarısız oldu - {{stamp}}",
+      "statusLastBackup": "Son yedekleme: {{stamp}}",
+      "statusNever": "Henüz otomatik yedekleme yok.",
+      "title": "Otomatik yedeklemeler"
     },
     "changePassword": {
-      "cancel": "",
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "currentLabel": "",
-      "mismatch": "",
-      "newLabel": "",
-      "submit": "",
-      "submitting": "",
-      "title": "",
-      "tooShort": ""
+      "cancel": "Cancel",
+      "checkingStrength": "Güç kontrol etmek..",
+      "confirmLabel": "Yeni şifreyi teyit et",
+      "currentLabel": "Mevcut şifre",
+      "mismatch": "Şifreler eşleşmez.",
+      "newLabel": "Yeni şifre",
+      "submit": "Şifre değişikliği",
+      "submitting": "Değişen şifre..",
+      "title": "Şifre değişikliği",
+      "tooShort": "En az {{n}} karakterleri kullanın."
     },
     "connectedExtensions": {
       "browser": {
-        "chromium": "",
-        "firefox": "",
-        "generic": ""
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Tarayıcı uzatma"
       },
       "when": {
-        "bare": "",
-        "daysAgo_one": "",
-        "daysAgo_other": "",
-        "hoursAgo_one": "",
+        "bare": "Connected",
+        "daysAgo_one": "{{count}} gün önce",
+        "daysAgo_other": "{{count}} günler önce",
+        "hoursAgo_one": "{{count}} h önce",
         "hoursAgo_other": "",
-        "justNow": "",
-        "minutesAgo_one": "",
+        "justNow": "Connected just now now",
+        "minutesAgo_one": "Bağlantılı {{count}} dakika önce",
         "minutesAgo_other": "",
-        "onDate": ""
+        "onDate": "{{date}}"
       }
     },
     "customThemes": {
-      "appliedBadge": "",
-      "apply": "",
-      "applyError": "",
-      "cancel": "",
-      "confirm": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
+      "appliedBadge": "Applied",
+      "apply": "Başvuru",
+      "applyError": "Bu temayı uygulayamaz. Lütfen tekrar deneyin.",
+      "cancel": "Cancel",
+      "confirm": "Onay Onay Onay Onaylandı",
+      "delete": "Delete",
+      "deleteError": "Bu temayı silemez. Lütfen tekrar deneyin.",
+      "empty": "Henüz özel temalar yok. Bir tane ithal etmek veya tema klasörü açın ve bir tema dosyası ekleyin.",
       "error": {
-        "aColorFallback": "",
-        "invalidFile": "",
-        "invalidName": "",
-        "invalidValue": "",
-        "invalidValueWithLine": "",
-        "missingKey": "",
-        "parseError": "",
-        "parseErrorWithLine": ""
+        "aColorFallback": "bir renk",
+        "invalidFile": "Invalid tema dosyası.",
+        "invalidName": "Güvenli tema adı",
+        "invalidValue": "Invalid değeri {{key}}",
+        "invalidValueWithLine": "Invalid değeri {{key}} (line [X32X))",
+        "missingKey": "Eksik gerekli renk {{key}}",
+        "parseError": "Geçerli değil JSON",
+        "parseErrorWithLine": "Geçerli değil JSON (line [X21X)"
       },
-      "fileFilterName": "",
-      "helper": "",
-      "importButton": "",
-      "importError": "",
-      "label": "",
-      "openFolderButton": "",
-      "openFolderError": "",
-      "readError": ""
+      "fileFilterName": "Myne tema",
+      "helper": "Kendi renk paletini kullanın. Temalar, kullanımdan önce bu cihazda geçerlidir - hiçbir şey yüklenmez.",
+      "importButton": "İthalat teması..",
+      "importError": "Bu dosya geçerli bir tema değildir. Biçimi görmek için referans açın.",
+      "label": "Özel temalar",
+      "openFolderButton": "Açık temalar klasör klasörü",
+      "openFolderError": "Temalar klasörü açamaz.",
+      "readError": "Temalarınızın klasörünü okuyamazsın."
     },
     "dailyNotes": {
-      "blankTemplate": "",
-      "dateFormatHelper": "",
-      "dateFormatLabel": "",
-      "dateFormatSaveError": "",
-      "folderHelper": "",
-      "folderLabel": "",
-      "folderSaveError": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "templateHelper": "",
-      "templateLabel": "",
-      "templateSaveError": "",
-      "untitledTemplate": ""
+      "blankTemplate": "Blank (no şablon)",
+      "dateFormatHelper": "Her günlük notun başlığı. Destekler YYYYYYYYYY, MM, DD. Temsilleri {{default}}.",
+      "dateFormatLabel": "Günlük not tarihi format",
+      "dateFormatSaveError": "Tarih biçimini kurtaramaz. Lütfen tekrar deneyin.",
+      "folderHelper": "Yeni günlük notlar nerede açılır? Varsayılanler {{default}} - klasörü boş olduğunda bile tutulur.",
+      "folderLabel": "Günlük not klasörü",
+      "folderSaveError": "Günlük klasörü kurtaramaz. Lütfen tekrar deneyin.",
+      "searchEmpty": "Hiçbir şablon maçı yok.",
+      "searchPlaceholder": "Arama şablonları..",
+      "templateHelper": "Her günlük nota başlamak için bir şablon seçin veya tarihle ilgili boş bir not için boş bırakın.",
+      "templateLabel": "Günlük not şablonu",
+      "templateSaveError": "Günlük şablonları kurtaramaz. Lütfen tekrar deneyin.",
+      "untitledTemplate": "Untitled şablon"
     },
     "deleteVault": {
-      "cancel": "",
-      "caseSensitiveHint": "",
-      "continue": "",
-      "copyPrimary": "",
-      "copySecondary": "",
-      "eyebrow": "",
-      "heading": "",
-      "ioFailBody": "",
-      "ioFailTitle": "",
-      "partialFailBody_one": "",
-      "partialFailBody_other": "",
-      "partialFailTitle": "",
-      "submit": "",
-      "submitInFlight": "",
-      "typeToConfirmLabel": "",
-      "vaultPath": ""
+      "cancel": "Cancel",
+      "caseSensitiveHint": "Vakaya duyarlı. Kelime tam olarak silinmesini sağlamak için kelime yazın.",
+      "continue": "Devam etmeye devam et",
+      "copyPrimary": "Bu kalıcı olarak bu tonları ve içindeki her notu silir. Eylem geri alınamaz ve kurtarma cümleniz verileri geri yüklemeyecektir.",
+      "copySecondary": "Ekran anahtarları, dosyaların bağlantılanmadan önce bellekten sıfırlanır; disk üzerinde kalan herhangi bir yetim ciphertext keşfedilmemiş Argon2id-wrapped çöp kalır.",
+      "eyebrow": "IRREVER",
+      "heading": "Delete",
+      "ioFailBody": "Yıkım için küçük dosyalara erişemez. Vault anahtarları zaten hafızadan sıfırlanır; disk üzerinde kalan herhangi bir tonoz, keşfedilmemiş Argon2id-wrapped çöpdür.",
+      "ioFailTitle": "Disk hatası sırasında",
+      "partialFailBody_one": "{{count}} dosyası diskten silinemezdi. Ekran anahtarları zaten hafızadan sıfırlanır, bu yüzden kalıntıları olmayan herhangi bir yetim, Argon2id-wragged abur.",
+      "partialFailBody_other": "{{count}} dosyaları diskten silinemezdi. Ekran anahtarları zaten hafızadan sıfırlanır, bu yüzden kalıntıları olmayan herhangi bir yetim, Argon2id-wragged abur.",
+      "partialFailTitle": "Vault deletion kısmen başarısız oldu",
+      "submit": "Delete",
+      "submitInFlight": "Yıkıcı..",
+      "typeToConfirmLabel": "Tip DELETE doğrulamak için",
+      "vaultPath": "Pencere yolu: {{path}}"
     },
     "focusMode": {
-      "dimAria": "",
-      "dimHelper": "",
-      "dimLabel": "",
-      "off": "",
-      "on": "",
-      "saveError": "",
-      "typewriterAria": "",
-      "typewriterHelper": "",
-      "typewriterLabel": ""
+      "dimAria": "Dim inaktif çizgiler",
+      "dimHelper": "Odak modunda (.F), dim her çizgi sizin düzenlemeniz dışında.",
+      "dimLabel": "Focus modu · dim inaktif hatları",
+      "off": "Off",
+      "on": "Onda",
+      "saveError": "Oda ayarını kurtaramaz.",
+      "typewriterAria": "Typewriter kaydırma",
+      "typewriterHelper": "Odak modunda (.F), aktif çizgiyi dikey olarak sizin türüniz olarak merkezileştirin.",
+      "typewriterLabel": "Focus modu · tipwriter kaydırma"
     },
     "hotkeys": {
-      "addBindingAria": "",
-      "cancel": "",
-      "capturePrompt": "",
-      "conflictIndicator": "",
-      "conflictTitle": "",
-      "fixed": "",
+      "addBindingAria": "{{command}} için bir kısayol ekleyin",
+      "cancel": "Cancel",
+      "capturePrompt": "Bir anahtar basın..",
+      "conflictIndicator": "çatışma",
+      "conflictTitle": "Ayrıca {{commands}}",
+      "fixed": "sabit",
       "group": {
-        "editorFormatting": "",
-        "general": "",
-        "navigation": "",
-        "notes": "",
-        "panesTabs": "",
-        "view": ""
+        "editorFormatting": "Editor formatting",
+        "general": "General",
+        "navigation": "Navigation",
+        "notes": "Notlar",
+        "panesTabs": "Panes & Tabs",
+        "view": "View"
       },
-      "helper": "",
-      "notSet": "",
-      "removeBindingAria": "",
-      "resetAll": "",
-      "resetAllConfirm": "",
-      "resetAllYes": "",
-      "restoreDefaultAria": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "warnAlreadyUsed": ""
+      "helper": "View and change klavye kısayolları. Editör formatı ve sekme kısayolu sabittir.",
+      "notSet": "Not set Not set",
+      "removeBindingAria": "{{chord}}",
+      "resetAll": "Tüm hotkeys'i açın..",
+      "resetAllConfirm": "Her özel kısayolu varsayılan olarak sıfırlama?",
+      "resetAllYes": "Bütünü Tamamlayın",
+      "restoreDefaultAria": "[X20X için varsayılan geri yükleme]",
+      "searchAriaLabel": "Arama kısayolları",
+      "searchPlaceholder": "Arama kısayolları..",
+      "warnAlreadyUsed": "Zaten [X16X) tarafından kullanılır - yine de ekledi."
     },
     "language": {
       "helper": "Uygulamanın görüntüleme dilini seçin.",
       "label": "Dil"
     },
     "lineNumbers": {
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": ""
+      "errorSaveSetting": "Çizgi sayı ayarını kurtaramaz.",
+      "helper": "Editörde bir çizgi numara bağırsak göster. Bir numara line; varsayılan olarak.",
+      "label": "Line sayıları",
+      "off": "Off",
+      "on": "Onda"
     },
     "prefs": {
-      "saveError": ""
+      "saveError": "Tercihini kurtaramaz - tekrar deneyin"
     },
     "privacy": {
-      "autoLockHelper": "",
-      "autoLockLabel": "",
-      "autoLockSearchEmpty": "",
-      "autoLockSearchPlaceholder": "",
-      "screenCaptureHelperOff": "",
-      "screenCaptureHelperOn": "",
-      "screenCaptureLabel": ""
+      "autoLockHelper": "Bu çok inaktiviteden sonra toparlayın.",
+      "autoLockLabel": "Auto-lock",
+      "autoLockSearchEmpty": "Hiçbir zaman maç yok.",
+      "autoLockSearchPlaceholder": "Arama süresi..",
+      "screenCaptureHelperOff": "Koruma her zaman kilidini açmadan önce geçerlidir. Daha sonra, bu tercihi takip edin.",
+      "screenCaptureHelperOn": "Linux ve Windows 10'da Aktif (2020 Güncelleme veya daha sonra) Linux desteği gelecekteki bir sürümde geliyor.",
+      "screenCaptureLabel": "Ekran görüntüsü koruma"
     },
     "quickUnlock": {
-      "errorCancelled": "",
-      "errorGeneric": "",
-      "errorHardwareUnavailable": "",
-      "errorNotUnlocked": "",
-      "errorPinNotDigits": "",
-      "errorPinTooShort_one": "",
+      "errorCancelled": "İptal edildi.",
+      "errorGeneric": "Hızlı bir şekilde kilidini yapılandıramaz.",
+      "errorHardwareUnavailable": "Touch ID bu cihazda mevcut değildir.",
+      "errorNotUnlocked": "İlk önce topak.",
+      "errorPinNotDigits": "PIN sadece basamak olmalıdır.",
+      "errorPinTooShort_one": "PIN en az {{count}} basamakları olmalıdır.",
       "errorPinTooShort_other": "",
-      "helperConfigured": "",
-      "helperNotConfigured": "",
-      "methodPin": "",
-      "methodTouchId": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder_one": "",
+      "helperConfigured": "{{method}} aracılığıyla yapılandırın. Auto-lock'tan sonra re-entry master şifresini atlar. Ana şifre hala yeniden başlamasından sonra gereklidir.",
+      "helperNotConfigured": "Tam ana şifre yerine bir PIN veya Touch ID ile otomatik olarak giriş yapın. Şifreli tonların üzerinde bir kolaylık - usta şifre yeniden başladıktan sonra gereklidir.",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "Quick-unlock PIN",
+      "pinPlaceholder_one": "PIN (en azından {{count}} basamakları)",
       "pinPlaceholder_other": "",
-      "setPin": "",
-      "setupHelper": "",
-      "title": "",
-      "useTouchId": ""
+      "setPin": "Set PIN",
+      "setupHelper": "Touch ID, Mac-sadece ve şu anda deneysel (pending Hardware doğrulama). PIN her yerde çalışır.",
+      "title": "Hızlı kilidini aç",
+      "useTouchId": "Touch ID ID"
     },
     "shell": {
-      "closeLabel": "",
-      "navLabel": "",
-      "passwordUpdatedToast": "",
-      "title": ""
+      "closeLabel": "Kapat ayarlar",
+      "navLabel": "Ayarlar paneller",
+      "panels": {
+        "about": "About",
+        "account": "Hesap Hesabı",
+        "appearance": "Görünüm görünümü",
+        "editor": "Editor",
+        "hotkeys": "Hotkeys",
+        "privacy": "Gizlilik",
+        "storage": "Depolama"
+      },
+      "passwordUpdatedToast": "Şifre güncellendi",
+      "title": "Ayarlar"
     },
     "spell": {
-      "errorSaveLanguages": "",
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "languagesAriaLabel": "",
-      "languagesHelper": "",
-      "languagesLabel": "",
-      "languagesPlaceholder": "",
-      "languagesSearchEmpty": "",
-      "languagesSearchPlaceholder": "",
-      "off": "",
-      "on": ""
+      "errorSaveLanguages": "Büyüyen dilleri kurtaramaz.",
+      "errorSaveSetting": "Büyüyü kurtarmayabilir.",
+      "helper": "Underline, yazdığınız gibi kelimeler yazdı. Tam çevrimdışı - notlarınız asla cihazı terk etmez.",
+      "label": "Spell check",
+      "languagesAriaLabel": "Spell-check languages",
+      "languagesHelper": "Herhangi bir seçilmiş dilde geçerliyse bir kelime doğrudur - İngilizce terimleri diğer dil notlarına karıştırmak için ely.",
+      "languagesLabel": "Diller",
+      "languagesPlaceholder": "Dilleri seçin..",
+      "languagesSearchEmpty": "Hiçbir dil eşleşmez.",
+      "languagesSearchPlaceholder": "Arama dilleri..",
+      "off": "Off",
+      "on": "Onda"
     },
     "storage": {
-      "backupHelper": "",
-      "backupLabel": "",
-      "backUpVault": "",
-      "exportAction": "",
-      "exportBody": "",
-      "exportHelper": "",
-      "exportLabel": "",
-      "importHelper": "",
-      "importLabel": "",
-      "importObsidian": "",
-      "locationHelper": "",
-      "locationLabel": "",
-      "openInFiles": "",
-      "pathUnavailable": "",
-      "restoreBackup": ""
+      "backUpVault": "Back upob..",
+      "backupHelper": "Backups tam olarak tonunuz kadar şifreli kalır, tek doğrulanmış bir .myne-backup dosyasında. Restoring bu ton şifresi veya kurtarma cümlesi ile çalışır - tam olarak kilidini açmak gibi.",
+      "backupLabel": "Backup",
+      "exportAction": "İhracat..",
+      "exportBody": "Markdown olarak ihracat",
+      "exportHelper": "Düz işaret ağacı - şifrelenme.",
+      "exportLabel": "İhracat İhracatı",
+      "importHelper": "Mevcut bir Obsidianozu Myne'e getirin. Her Markdown notu yerde ithal edilir ve şifrelenir; orijinal dosyalarınız silinir.",
+      "importLabel": "İthalat",
+      "importObsidian": "Import Obsidianob..",
+      "locationHelper": "Her bir ton bu yolda şifreli dosyaların bir klasörüdür. Yedekleme düğmesine manuel kopyalar üzerinden tercih edin - yazılı dosyayı doğrular.",
+      "locationLabel": "Vault location",
+      "openInFiles": "Files Open in Files",
+      "pathUnavailable": "Pat bulunamadı",
+      "restoreBackup": "Yedekten geri dönün.."
     },
     "typography": {
-      "errorSave": ""
+      "contentWidthHelper": "Düzenleme sütununun maksimum genişliği. Full metin pane anlamına gelir.",
+      "contentWidthLabel": "İçerik genişliği",
+      "errorSave": "Tercihten tasarruf edemezdi. Lütfen tekrar deneyin.",
+      "fontHelper": "Monospace veya orantılı (sans-serif) metin.",
+      "fontLabel": "Font",
+      "lineSpacingHelper": "Çizgiler arasındaki dikey uzay.",
+      "lineSpacingLabel": "Line spacing",
+      "textSizeHelper": "Editör metninin temel büyüklüğü. Onunla ölçeklendirmek.",
+      "textSizeLabel": "Metin büyüklüğü"
     },
     "viewMode": {
-      "errorSave": "",
-      "helper": "",
-      "label": ""
+      "errorSave": "Varsayılan görünüm modunu kurtaramaz.",
+      "helper": "Bir not nasıl açılır: Canlı önizleme (default), okuma-sadece okuma veya ham Kaynak. .E ile bir not almak.",
+      "label": "Varsayılan görünüm modu",
+      "optionLive": "Canlı önizleme",
+      "optionReading": "Okuma",
+      "optionSource": "Kaynak Kaynağı"
     }
   },
   "templates": {
     "manager": {
-      "closeLabel": "",
-      "deleteRowLabel": "",
-      "editTemplateLabel": "",
-      "emptyBody": "",
-      "emptyTitle": "",
-      "listLabel": "",
-      "loading": "",
-      "newTemplate": "",
-      "newTemplateName": "",
-      "removeFromTemplates": "",
-      "removeRowLabel": "",
-      "title": ""
+      "closeLabel": "Kapat şablonlar",
+      "deleteRowLabel": "Delete şablonu {{name}} (Alve to Trash)",
+      "editTemplateLabel": "{{name}}",
+      "emptyBody": "Bir not iskeleti yeniden kullanmak için bir şablon oluşturun - bir toplantı notu, günlük bir giriş, bir okuma notu. Yeni bir not yaptığınızda birini seçin.",
+      "emptyTitle": "Henüz şablon yok",
+      "listLabel": "Şablonlar",
+      "loading": "Yükleniyor..",
+      "newTemplate": "Yeni şablon",
+      "newTemplateName": "Untitled şablon",
+      "removeFromTemplates": "Şablonlardan Çıkarın",
+      "removeRowLabel": "{{name}} şablonlardan çıkar ( notu tutar)",
+      "title": "Not şablonları"
     }
   },
   "unlock": {
@@ -1637,13 +1745,13 @@
     "passwordLabel": "Parola",
     "passwordPlaceholder": "Parola",
     "quickUnlock": {
-      "failed": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder": "",
-      "unlockWithPin": "",
-      "unlockWithTouchId": "",
-      "usePasswordBelow": "",
-      "wrongCredential": ""
+      "failed": "Hızlı kilidi başarısız oldu. Parolanızı kullanın.",
+      "pinAriaLabel": "Quick-unlock PIN",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "PIN ile",
+      "unlockWithTouchId": "Touch ID",
+      "usePasswordBelow": "veya parolanızı aşağıda kullanın",
+      "wrongCredential": "Incorrect. {{remaining}} deneme (s) ayrıldı."
     },
     "recoveryInterruptedBanner": "Kurtarma akışı yarıda kesildi. Önce yeni bir parola belirleyin.",
     "recoveryInterruptedBody": "Önce yeni bir parola belirleyin, ardından kasanızı yeniden mühürleyin.",
@@ -1652,273 +1760,273 @@
     "submit": "Kilidi aç",
     "subtitle": "Devam etmek için parolanızı girin.",
     "suspicion": {
-      "lockedDuringChange": "",
-      "metaChangedExternally": ""
+      "lockedDuringChange": "Şifre değişikliği iptal edildi: ton kilitliydi.",
+      "metaChangedExternally": "Vault başka bir oturumda değiştirildi - lütfen tekrar kilidini açın."
     },
     "title": "Kasanızı açın."
   },
   "vault": {
     "ioBanner": {
-      "cannotRead": "",
-      "notFound": "",
-      "permissionDenied": ""
+      "cannotRead": "Not read theob file.",
+      "notFound": "Ekran dosyası bulunamadı. Lütfen uygulamayı yeniden başlatın.",
+      "permissionDenied": "Toz dosyasına erişmek için izin yok. Check file permissions."
     }
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "",
-      "back": "",
-      "commit": "",
-      "committing": "",
-      "copied": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "saveAsFile": "",
-      "shownOnceBody": "",
-      "shownOnceEmphasis": ""
+      "ackLabel": "Daha sonra bulabileceğim hesap numaramı kurtardım.",
+      "back": "Geri dön",
+      "commit": "Oluşturun",
+      "committing": "Tasarruf..",
+      "copied": "Copied",
+      "copy": "Kopya kopya",
+      "eyebrow": "Adım 4 of 4 - hesap numarası",
+      "heading": "Hesap numaranızı kurtar.",
+      "intro": "Bu senin ayıcı token - nakit gibi davran.",
+      "saveAsFile": "Dosya olarak Kaydet",
+      "shownOnceBody": "Şimdi onu kurtar – Myne bunu sizin için kurtaramaz. Daha sonra senkronize etmek için gerekli.",
+      "shownOnceEmphasis": "Bu sadece bir kez gösteriliyor."
     },
     "briefing": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
+      "back": "Geri dön",
+      "continue": "Kırk yaratmaya devam et",
+      "eyebrow": "Önce senin tonunu yaratırsın",
+      "heading": "Önce senin tonunu yaratırsın",
+      "intro": "Myne notlarınızı şifreliyor, böylece sadece onları açabilirsiniz. Üç şey bundan takip eder - onları okuyun, sonra devam edin.",
       "statements": {
         "no-email": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "E-posta kurtarma olmadığını anlıyorum.",
+          "statement": "E-posta kurtarma yoktur. Asla olmayacak.",
+          "why": "E-postanızı asla sormayız, bu yüzden sıfır bağlantı yok ve kilidini desteklemek için bir hesap yok. Bu eksik bir özellik değil - garanti. E-posta kurtarma notlarınızı okuyabileceğimiz anlamına gelir ve Myne inşa edilir, böylece yapamıyoruz."
         },
         "no-store": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Myne'nin şifremi kurtarmadığını anlıyorum.",
+          "statement": "Parolanız tonunuzu açar. Onu saklamayız.",
+          "why": "Parolanız notlarınızı şifreleyen anahtara giriştir. Bu cihazı asla terk etmez ve sunucularda hiçbir şey onu yeniden üretemez. Bu, notlarınızı özel tutar - ve neden bunu sizin için sıfırlamayız."
         },
         "phrase-backup": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Kurtarma cümlemi anlıyorum tek yedekleme.",
+          "statement": "Kurtarma cümleniz tek yedeklemenizdir.",
+          "why": "Parolanızı unutursanız, 24 kelime kurtarma cümlesi bir şekilde geri dönüyor. {{lostBothSecrets}} Cümleyi yazın ve güvenli bir yere tutun."
         }
       },
-      "why": ""
+      "why": "Neden?"
     },
     "confirm": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "mismatch": "",
-      "wordAtPosition": ""
+      "back": "Geri dön",
+      "continue": "Devam etmeye devam et",
+      "eyebrow": "Adım 3 of 4 - doğru cümle",
+      "heading": "Type back four words from your phrase.",
+      "intro": "Onu kurtarmanızı doğrulamanız için özel pozisyonları soracağız.",
+      "mismatch": "Kelimeyle eşleşmeyin #{{pos}}.",
+      "wordAtPosition": "{{pos}}"
     },
     "encrypting": {
-      "caption": "",
-      "footerHint": "",
-      "heading": ""
+      "caption": "Bu bir an alır.",
+      "footerHint": "Eğer bu 30 saniyeden uzun sürerse, pencereyi kapatın ve tekrar deneyin.",
+      "heading": "Tonunuzu şifrele"
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Hesap numarası geçersiz"
       },
       "aeadFailure": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Şifreleme başarısız oldu"
       },
       "csprng": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Güvenli rastgele veriler üretemez"
       },
       "invalidPassword": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Invalid password"
       },
       "invalidVaultMeta": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Ekran formatı hatası"
       },
       "ioOther": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Karanlığı kurtaramaz"
       },
       "joinFailure": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Bir şeyler ters gitti yanlış bir şey gitti"
       },
       "kdfFailure": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin. Eğer bu devam ederse, sisteminiz hafızada düşük olabilir.",
+        "title": "Şifreyi ayarlayamadım"
       },
       "noSpace": {
-        "body": "",
-        "title": ""
+        "body": "Free up disk alanı ve tekrar deneyin.",
+        "title": "Yeterli disk alanı değil"
       },
       "notFound": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Vault klasörü eksik"
       },
       "passwordTooShort": {
-        "body": "",
-        "title": ""
+        "body": "En az 12 karakter kullanın.",
+        "title": "Şifre çok kısa"
       },
       "permissionDenied": {
-        "body": "",
-        "title": ""
+        "body": "Myne'nin uygulama veri klasörüne yazma izni olduğundan emin olun.",
+        "title": "Donmuş klasörü yazamaz"
       },
       "sessionExpired": {
-        "body": "",
-        "title": ""
+        "body": "Güvenlikiniz için, 10 dakika sonra yaratma zamanı. Başlayın.",
+        "title": "Oturum süresi doldu"
       },
       "sessionNotFound": {
-        "body": "",
-        "title": ""
+        "body": "Başlangıçtan başlayarak.",
+        "title": "Oturum bulunamadı"
       },
       "tooManyConcurrentSessions": {
-        "body": "",
-        "title": ""
+        "body": "Diğer Myne pencerelerini kapatın ve tekrar deneyin.",
+        "title": "Bir zamanlar çok fazla ton yaratımı"
       },
       "vaultArtifactsPresent": {
-        "body": "",
-        "title": ""
+        "body": "Yeni bir ton oluşturulamaz, çünkü bu cihazda küçük veriler zaten var. Uygulamayı kapatın ve yeniden başlayın - başlangıç ekranı sizi kilit akışa yönlendirecektir.",
+        "title": "Vault zaten var"
       },
       "vaultBusyAuth": {
-        "body": "",
-        "title": ""
+        "body": "Başka bir tank operasyonu devam ediyor. Bir anda tekrar deneyin.",
+        "title": "Vault meşgul"
       }
     },
     "orchestrator": {
       "closePrompt": {
-        "cancelLabel": "",
-        "message": "",
-        "okLabel": "",
-        "title": ""
+        "cancelLabel": "Cancel",
+        "message": "Kapanış, kurtarma cümlenizi atlayacaktır. Kapanışa devam et?",
+        "okLabel": "Her neyse Kapat",
+        "title": "Discardob yaratımı?"
       },
       "genericError": {
-        "body": "",
-        "title": ""
+        "body": "Tekrar deneyin.",
+        "title": "Bir şeyler ters gitti yanlış bir şey gitti"
       }
     },
     "password": {
-      "back": "",
-      "eyebrow": "",
-      "heading": "",
-      "helperLead": "",
-      "submit": ""
+      "back": "Geri dön",
+      "eyebrow": "Adım 1 of 4 - master password",
+      "heading": "Oluşturun",
+      "helperLead": "Myne şifrenizi veya kurtarma cümlenizi saklamaz.",
+      "submit": "Genrate recovery cümle"
     },
     "phrase": {
-      "back": "",
-      "continue": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "reveal": "",
-      "saveAsFile": ""
+      "back": "Geri dön",
+      "continue": "Bunu kurtardım – cümleyi doğruluyor",
+      "copy": "Kopya kopya",
+      "eyebrow": "Adım 2 of 4 - kurtarma cümlesi",
+      "heading": "Bu 24 kelimeyi yazın.",
+      "intro": "Bu cümle, şifrenizle birlikte, tonunuzu kurtarmanın tek yoludur. Mağaza çevrimdışı - kağıt, şifre yöneticisi, donanım cüzdanı. Para gibi davranın.",
+      "reveal": "Açık cümle",
+      "saveAsFile": "Dosya olarak Kaydet"
     },
     "ready": {
-      "backedUp": "",
-      "backingUp": "",
-      "backupDefaultFilename": "",
-      "backupError": "",
-      "backupFilterName": "",
-      "backUpNow": "",
-      "body": "",
-      "decrypting": "",
-      "done": "",
-      "heading": "",
-      "showFolder": ""
+      "backUpNow": "Şimdi bu topa geri dön",
+      "backedUp": "Geri döndü",
+      "backingUp": "Backing up..",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Backup tamamlanmadı – hiçbir dosya geride bırakılmadı. Ayarlardan herhangi bir süre geri → Storage.",
+      "backupFilterName": "Myne backup",
+      "body": "Myne, bebeğinizi uygulama veri klasörüne yazdı. Yüksek şifreniz ve kurtarma cümleniz, geri dönüş tek yoldur - her ikisi de güvenli bir yerde kurtardığından emin olun.",
+      "decrypting": "Decrypting..",
+      "done": "Done",
+      "heading": "Senin ton hazır.",
+      "showFolder": "Showob klasörü göster"
     },
     "sessionLost": {
-      "startOver": ""
+      "startOver": "Over Start over Start over Start over Start over Start over Start over Start over"
     }
   },
   "vaultPicker": {
-    "createAnother": "",
-    "heading": "",
-    "loading": "",
-    "noneLoaded": "",
-    "openedRelative": "",
-    "restoreFromBackup": "",
-    "subline": "",
-    "vaultFallback": ""
+    "createAnother": "Başka bir toz oluşturun",
+    "heading": "Bir dakika seçin",
+    "loading": "Yastıklarınızı yükleyin..",
+    "noneLoaded": "Hiçbir ton şu anda yüklenebilir.",
+    "openedRelative": "{{rel}}",
+    "restoreFromBackup": "Yedeklemeden geri yükleme",
+    "subline": "Bu cihazda birden fazla ton var. kilidini açmak için birini seçin.",
+    "vaultFallback": "Pencere {{n}}"
   },
   "vaultRecover": {
     "decrypting": {
-      "caption": "",
-      "eyebrow": "",
-      "footerHint": "",
-      "heading": "",
-      "subCaption": ""
+      "caption": "Bu bir an alır.",
+      "eyebrow": "RECOVERY · DECRYPTING",
+      "footerHint": "Eğer bu 30 saniyeden uzun sürerse, pencereyi kapatın ve tekrar deneyin.",
+      "heading": "Senin tonu şifrele",
+      "subCaption": "Çalışma... Argon2id m =256 MiB, t=3, p=2"
     },
     "passwordReset": {
       "errors": {
-        "cancelledVaultLocked": "",
-        "operationInProgress": "",
-        "unexpected": "",
-        "weakPassword": ""
+        "cancelledVaultLocked": "Kurtarma iptal edildi: ton kilitliydi.",
+        "operationInProgress": "İlerlemede Operasyon. Lütfen bekleyin.",
+        "unexpected": "Beklenmeyen hata. Lütfen tekrar deneyin.",
+        "weakPassword": "Yeni şifre en az 12 karakter olmalıdır."
       },
-      "eyebrow": "",
-      "helperBody": "",
-      "helperEmphasis": "",
-      "submit": "",
-      "title": ""
+      "eyebrow": "Kurtarma · Yeni şifre",
+      "helperBody": "Pencere kurtarma cümlesi ile açılır. Eski şifre artık yayınla- yeni master Wordnu Özellikler.",
+      "helperEmphasis": "Kurtarma cümlesi aynı zamanda.",
+      "submit": "Yeni şifre oluşturun",
+      "title": "Yeni bir master şifresi oluşturun"
     },
     "phrase": {
-      "back": "",
-      "body": "",
-      "cellLabel": "",
-      "deleteLink": "",
-      "eyebrow": "",
-      "submit": "",
-      "title": ""
+      "back": "Back Back",
+      "body": "Kurtarma cümlenizi girin. 24 BIP-39 kelime.",
+      "cellLabel": "Word {{index}}",
+      "deleteLink": "Deleteob ve baştan başlayın",
+      "eyebrow": "Kurtarma",
+      "submit": "Unlock",
+      "title": "Torunu yeniden keşfedin."
     },
     "select": {
-      "accountInvalid": "",
-      "accountLabel": "",
-      "accountPlaceholder": "",
-      "body": "",
-      "cancel": "",
-      "checking": "",
-      "loadFailed": "",
-      "loading": "",
-      "openedRelative": "",
-      "or": "",
-      "title": "",
-      "useAccountNumber": "",
-      "vaultFallback": ""
+      "accountInvalid": "Invalid hesabı numarası. Lütfen kontrol ve yeniden deneme.",
+      "accountLabel": "Hesap numarası (optional)",
+      "accountPlaceholder": "My-XXXX-XXXX-XXXX-XXXX-X (optional)",
+      "body": "24 kelime kurtarma cümlenizle kurtarmak istediğiniz toparlayın. Ayrıca doğrudan ona atlamak için hesap numaranızı da yazabilirsiniz.",
+      "cancel": "Cancel",
+      "checking": "Checking..",
+      "loadFailed": "Hiçbir ton şu anda yüklenebilir.",
+      "loading": "Yastıklarınızı yükleyin..",
+      "openedRelative": "{{rel}}",
+      "or": "veya",
+      "title": "Kurtarmak için bir topar seçin",
+      "useAccountNumber": "Use account number",
+      "vaultFallback": "Pencere {{index}}"
     }
   },
   "vaultSwitcher": {
-    "chipFallback": "",
-    "createAnother": "",
-    "switching": "",
-    "switchVaultLabel": "",
-    "vaultFallback": ""
+    "chipFallback": "Pencere",
+    "createAnother": "Başka bir toz oluşturun",
+    "switchVaultLabel": "Anahtar",
+    "switching": "geçiş..",
+    "vaultFallback": "Pencere {{n}}"
   },
   "welcome": {
     "createCta": "Yeni kasa oluştur",
     "headlineLine1": "Şifreli markdown notları.",
     "headlineLine2": "Kayıtta e-posta yok.",
     "repairResidue": {
-      "cancel": "",
-      "cleaningUp": "",
-      "cleanUp": "",
-      "confirmBody_one": "",
-      "confirmBody_other": "",
-      "confirmTitle": "",
-      "doneBody_one": "",
-      "doneBody_other": "",
-      "doneTitle": "",
-      "errorBody": "",
-      "errorTitle": "",
-      "foundBody_one": "",
-      "foundBody_other": "",
-      "foundTitle": "",
-      "partialBody_one": "",
-      "partialBody_other": "",
-      "partialTitle": ""
+      "cancel": "Cancel",
+      "cleanUp": "Temiz yukarı",
+      "cleaningUp": "Temizlik..",
+      "confirmBody_one": "{{count}} dosyası kaldırılacaktır. Onlar zaten hazırlanamaz; hiçbir şey kurtarılabilir.",
+      "confirmBody_other": "{{count}} dosyaları kaldırılacaktır. Onlar zaten hazırlanamaz; hiçbir şey kurtarılabilir.",
+      "confirmTitle": "Temiz sol dosyaları mı?",
+      "doneBody_one": "{{count}} sol dosya. Şimdi yeni bir ton oluşturabilirsiniz.",
+      "doneBody_other": "{{count}} sol dosyaları. Şimdi yeni bir ton oluşturabilirsiniz.",
+      "doneTitle": "Temizlendi",
+      "errorBody": "Bir şey yanlış gitti. Uygulamayı kapatın ve tekrar deneyin.",
+      "errorTitle": "Cleanup başarısız oldu",
+      "foundBody_one": "{{count}} bitmemiş bir önceki deletion dosyasından ayrıldı. Onlar zaten hazırlanamazlar – kurtarılabilir bir şeyi kaybetmeyeceksiniz.",
+      "foundBody_other": "{{count}} bitmemiş bir önceki deletion dosyalarından ayrıldı. Onlar zaten hazırlanamazlar – kurtarılabilir bir şeyi kaybetmeyeceksiniz.",
+      "foundTitle": "Eksik bir deletion dosyaları",
+      "partialBody_one": "{{count}} dosyası başka bir uygulama tarafından kilitlenebilir (antivirüs, dosya senkronizasyonu veya arama indeksleme). Uygulamayı kapatın ve bir anda tekrar deneyin veya ton klasörü manuel olarak kaldırın.",
+      "partialBody_other": "{{count}} dosyaları başka bir uygulama tarafından kilitlenebilir (antivirüs, dosya senkronizasyonu veya arama indeksleme). Uygulamayı kapatın ve bir anda tekrar deneyin veya ton klasörü manuel olarak kaldırın.",
+      "partialTitle": "Bazı dosyalar kaldırılamaz"
     },
     "restoreCta": "Yedekten geri yükle",
     "subtitle": "Notlarınız bu cihazdan çıkmadan önce şifrelenir. Sunucu yalnızca şifreli metni saklar."
