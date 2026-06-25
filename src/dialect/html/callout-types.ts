@@ -11,34 +11,37 @@ export type CalloutTone = "info" | "success" | "warning" | "danger" | "accent";
 
 export interface CalloutHtmlType {
   readonly tone: CalloutTone;
-  readonly label: string;
+  /** i18n key for the default title — REUSES the editor's keys
+   *  (`editor.callout.label.*`) so editor + HTML projection stay in lockstep
+   *  and a single translation drives both. Resolved at emit time via i18n.t. */
+  readonly labelKey: string;
 }
 
-/** Obsidian-full type set (case-insensitive) → tone + default title. */
+/** Obsidian-full type set (case-insensitive) → tone + default-title i18n key. */
 export const CALLOUT_HTML_TYPES: Readonly<Record<string, CalloutHtmlType>> = {
-  note: { tone: "accent", label: "Note" },
-  info: { tone: "info", label: "Info" },
-  todo: { tone: "info", label: "Todo" },
-  tip: { tone: "success", label: "Tip" },
-  hint: { tone: "success", label: "Hint" },
-  important: { tone: "success", label: "Important" },
-  success: { tone: "success", label: "Success" },
-  check: { tone: "success", label: "Success" },
-  done: { tone: "success", label: "Done" },
-  question: { tone: "warning", label: "Question" },
-  faq: { tone: "warning", label: "FAQ" },
-  warning: { tone: "warning", label: "Warning" },
-  caution: { tone: "warning", label: "Caution" },
-  attention: { tone: "warning", label: "Attention" },
-  failure: { tone: "danger", label: "Failure" },
-  fail: { tone: "danger", label: "Failure" },
-  missing: { tone: "danger", label: "Missing" },
-  danger: { tone: "danger", label: "Danger" },
-  error: { tone: "danger", label: "Error" },
-  bug: { tone: "danger", label: "Bug" },
-  example: { tone: "accent", label: "Example" },
-  quote: { tone: "accent", label: "Quote" },
-  cite: { tone: "accent", label: "Quote" },
+  note: { tone: "accent", labelKey: "editor.callout.label.note" },
+  info: { tone: "info", labelKey: "editor.callout.label.info" },
+  todo: { tone: "info", labelKey: "editor.callout.label.todo" },
+  tip: { tone: "success", labelKey: "editor.callout.label.tip" },
+  hint: { tone: "success", labelKey: "editor.callout.label.hint" },
+  important: { tone: "success", labelKey: "editor.callout.label.important" },
+  success: { tone: "success", labelKey: "editor.callout.label.success" },
+  check: { tone: "success", labelKey: "editor.callout.label.success" },
+  done: { tone: "success", labelKey: "editor.callout.label.done" },
+  question: { tone: "warning", labelKey: "editor.callout.label.question" },
+  faq: { tone: "warning", labelKey: "editor.callout.label.faq" },
+  warning: { tone: "warning", labelKey: "editor.callout.label.warning" },
+  caution: { tone: "warning", labelKey: "editor.callout.label.caution" },
+  attention: { tone: "warning", labelKey: "editor.callout.label.attention" },
+  failure: { tone: "danger", labelKey: "editor.callout.label.failure" },
+  fail: { tone: "danger", labelKey: "editor.callout.label.failure" },
+  missing: { tone: "danger", labelKey: "editor.callout.label.missing" },
+  danger: { tone: "danger", labelKey: "editor.callout.label.danger" },
+  error: { tone: "danger", labelKey: "editor.callout.label.error" },
+  bug: { tone: "danger", labelKey: "editor.callout.label.bug" },
+  example: { tone: "accent", labelKey: "editor.callout.label.example" },
+  quote: { tone: "accent", labelKey: "editor.callout.label.quote" },
+  cite: { tone: "accent", labelKey: "editor.callout.label.quote" },
 };
 
 /** Callout header on a blockquote's first source line (after the leading `>`
