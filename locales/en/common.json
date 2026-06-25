@@ -1,0 +1,36 @@
+{
+  "settings": {
+    "language": {
+      "helper": "Choose the display language for the app.",
+      "label": "Language"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Choose a different vault",
+    "continue": "Continue",
+    "decrypting": "Decrypting…",
+    "deleteLink": "Lost both password and recovery phrase? Delete vault and start over",
+    "errors": {
+      "alreadyUnlocked": "Vault is already unlocked.",
+      "inProgress": "Operation in progress.",
+      "unexpected": "Unexpected error. Please try again.",
+      "vaultNotFound": "Vault file not found. Please restart the app."
+    },
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Password",
+    "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
+    "recoveryInterruptedBody": "Set a new password first, then re-seal your vault.",
+    "recoveryInterruptedTitle": "Recovery flow was interrupted.",
+    "recoveryLink": "Forgot your password? Unlock with recovery phrase",
+    "submit": "Unlock",
+    "subtitle": "Enter your password to continue.",
+    "title": "Unlock your vault."
+  },
+  "welcome": {
+    "createCta": "Create new vault",
+    "headlineLine1": "Encrypted markdown notes.",
+    "headlineLine2": "No email at signup.",
+    "restoreCta": "Restore from backup",
+    "subtitle": "Your notes are encrypted on this device before they leave it. The server only stores ciphertext."
+  }
+}

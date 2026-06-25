@@ -1,0 +1,36 @@
+{
+  "settings": {
+    "language": {
+      "helper": "",
+      "label": ""
+    }
+  },
+  "unlock": {
+    "backToPicker": "",
+    "continue": "",
+    "decrypting": "",
+    "deleteLink": "",
+    "errors": {
+      "alreadyUnlocked": "",
+      "inProgress": "",
+      "unexpected": "",
+      "vaultNotFound": ""
+    },
+    "passwordLabel": "",
+    "passwordPlaceholder": "",
+    "recoveryInterruptedBanner": "",
+    "recoveryInterruptedBody": "",
+    "recoveryInterruptedTitle": "",
+    "recoveryLink": "",
+    "submit": "",
+    "subtitle": "",
+    "title": ""
+  },
+  "welcome": {
+    "createCta": "",
+    "headlineLine1": "",
+    "headlineLine2": "",
+    "restoreCta": "",
+    "subtitle": ""
+  }
+}

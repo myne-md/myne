@@ -25,6 +25,15 @@ Available tokens include `--bg-1`/`--bg-2`, `--paper-1`/`--paper-2`, `--fg-1`/`-
 
 Self-hosted fonts: Inter Variable + JetBrains Mono in `public/fonts/` (commit 40eab75). Don't add Google Fonts CDN — adds tracking + breaks reproducibility.
 
+## Internationalization (i18n)
+
+User-facing strings go through **react-i18next**, not hardcoded JSX. Source language is **English**; catalogs live at repo-root `locales/<lang>/common.json` and are bundled statically by `src/i18n/index.ts` (no HTTP backend). Translations are managed in self-hosted **Weblate** — see `docs/dev/i18n.md` for the full workflow and `decisions.md` 2026-06-25 for the rationale.
+
+- In components: `const { t } = useTranslation();` → `t("welcome.createCta")`. Outside React: `import i18n from "src/i18n"` → `i18n.t(...)`.
+- Add a key → `pnpm i18n:extract` → fill the **English** value in `locales/en/common.json`. Never hand-edit non-English catalogs (Weblate owns them).
+- **Do NOT i18n load-bearing copy** (`src/lib/load-bearing-copy.ts`): its exact English wording is a privacy property and is E2E-pinned by literal equality. Render the constant verbatim in every locale.
+- Status: **Phase 0 (pilot)** — Welcome, Unlock, and the Settings language selector are migrated; remaining screens migrate incrementally, one PR per screen.
+
 ## Layout
 
 ```
