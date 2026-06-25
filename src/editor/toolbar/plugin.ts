@@ -18,6 +18,7 @@ import { ensureFloatingStyles } from "../floating-styles";
 import { toggleWrap } from "../wrap-toggle";
 import { isSelectionInCode } from "../code-context";
 import { rangeOverlapsAttachmentEmbed } from "../decorations/attachment-embed";
+import i18n from "../../i18n";
 
 type Mode = "toolbar" | "url-overlay";
 
@@ -35,11 +36,11 @@ const TOOLBAR_BUTTONS = [
 // constrained to this closed `hl-*` set at the sanitizer (see sanitize.ts
 // HIGHLIGHT_CLASSES). The `cssVar` paints each swatch's preview square.
 const HIGHLIGHT_SWATCHES = [
-  { id: "hl-yellow", label: "Sarı", cssVar: "--highlight", open: "==", close: "==" },
-  { id: "hl-green", label: "Yeşil", cssVar: "--highlight-green", open: '<mark class="hl-green">', close: "</mark>" },
-  { id: "hl-blue", label: "Mavi", cssVar: "--highlight-blue", open: '<mark class="hl-blue">', close: "</mark>" },
-  { id: "hl-pink", label: "Pembe", cssVar: "--highlight-pink", open: '<mark class="hl-pink">', close: "</mark>" },
-  { id: "hl-purple", label: "Mor", cssVar: "--highlight-purple", open: '<mark class="hl-purple">', close: "</mark>" },
+  { id: "hl-yellow", labelKey: "editor.toolbar.highlight.yellow", cssVar: "--highlight", open: "==", close: "==" },
+  { id: "hl-green", labelKey: "editor.toolbar.highlight.green", cssVar: "--highlight-green", open: '<mark class="hl-green">', close: "</mark>" },
+  { id: "hl-blue", labelKey: "editor.toolbar.highlight.blue", cssVar: "--highlight-blue", open: '<mark class="hl-blue">', close: "</mark>" },
+  { id: "hl-pink", labelKey: "editor.toolbar.highlight.pink", cssVar: "--highlight-pink", open: '<mark class="hl-pink">', close: "</mark>" },
+  { id: "hl-purple", labelKey: "editor.toolbar.highlight.purple", cssVar: "--highlight-purple", open: '<mark class="hl-purple">', close: "</mark>" },
 ] as const;
 
 function toggleAction(open: string, close: string) {
@@ -260,13 +261,13 @@ class ToolbarView implements PluginValue {
       drop.style.top = "32px";
       drop.style.left = "0";
       const items: Array<{ label: string; level: number }> = [
-        { label: "Paragraph", level: 0 },
-        { label: "H1", level: 1 },
-        { label: "H2", level: 2 },
-        { label: "H3", level: 3 },
-        { label: "H4", level: 4 },
-        { label: "H5", level: 5 },
-        { label: "H6", level: 6 },
+        { label: i18n.t("editor.toolbar.heading.paragraph"), level: 0 },
+        { label: i18n.t("editor.toolbar.heading.h1"), level: 1 },
+        { label: i18n.t("editor.toolbar.heading.h2"), level: 2 },
+        { label: i18n.t("editor.toolbar.heading.h3"), level: 3 },
+        { label: i18n.t("editor.toolbar.heading.h4"), level: 4 },
+        { label: i18n.t("editor.toolbar.heading.h5"), level: 5 },
+        { label: i18n.t("editor.toolbar.heading.h6"), level: 6 },
       ];
       for (const item of items) {
         const el = document.createElement("div");
@@ -334,7 +335,7 @@ class ToolbarView implements PluginValue {
         const square = document.createElement("button");
         square.type = "button";
         square.className = "cm-toolbar-highlight-swatch";
-        square.title = sw.label;
+        square.title = i18n.t(sw.labelKey);
         square.setAttribute("data-testid", `toolbar.highlight-${sw.id}`);
         square.style.backgroundColor = `var(${sw.cssVar})`;
         square.addEventListener("mousedown", (e) => {
@@ -352,11 +353,11 @@ class ToolbarView implements PluginValue {
   private renderUrlOverlay(container: HTMLDivElement): void {
     const input = document.createElement("input");
     input.type = "url";
-    input.placeholder = "Paste link URL";
+    input.placeholder = i18n.t("editor.toolbar.urlPlaceholder");
     input.className = "cm-url-overlay-input";
     const apply = document.createElement("button");
     apply.type = "button";
-    apply.textContent = "Apply";
+    apply.textContent = i18n.t("editor.toolbar.apply");
     apply.className = "cm-url-overlay-apply";
 
     const commit = (): void => {

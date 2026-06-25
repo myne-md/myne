@@ -9,6 +9,8 @@
 // when cancelled. First introduced for the named-workspaces save-as / rename
 // commands (MYND-308), kept generic so other text prompts can reuse it.
 
+import i18n from "../i18n";
+
 /** Options for {@link promptForText}. */
 export interface PromptForTextOptions {
   /** The dialog heading (e.g. "Save workspace as"). */
@@ -35,7 +37,7 @@ export function promptForText(
   const {
     title,
     initialValue = "",
-    confirmLabel = "OK",
+    confirmLabel = i18n.t("common.prompt.confirmDefault"),
     placeholder = "",
     testIdPrefix = "text-prompt",
   } = options;
@@ -132,7 +134,7 @@ export function promptForText(
 
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "Cancel";
+    cancel.textContent = i18n.t("common.prompt.cancel");
     cancel.setAttribute("data-testid", `${testIdPrefix}.cancel`);
     Object.assign(cancel.style, {
       fontFamily: "var(--font-sans)",

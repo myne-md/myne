@@ -43,6 +43,7 @@ import {
   type ChangeEvent,
   type ClipboardEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { DestructiveBanner } from "../../components/DestructiveBanner";
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 import {
@@ -223,6 +224,7 @@ export function PhraseEntryStep({
   onCancel,
   onSubmitNormalizedPhrase,
 }: PhraseEntryStepProps) {
+  const { t } = useTranslation();
   const baseId = useId();
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
@@ -255,9 +257,9 @@ export function PhraseEntryStep({
   return (
     <div style={ROOT_STYLE}>
       <div style={CARD_STYLE}>
-        <div style={EYEBROW_STYLE}>Recovery</div>
-        <h1 style={TITLE_STYLE}>Recover your vault.</h1>
-        <p style={BODY_STYLE}>Enter your recovery phrase. 24 BIP-39 words.</p>
+        <div style={EYEBROW_STYLE}>{t("vaultRecover.phrase.eyebrow")}</div>
+        <h1 style={TITLE_STYLE}>{t("vaultRecover.phrase.title")}</h1>
+        <p style={BODY_STYLE}>{t("vaultRecover.phrase.body")}</p>
 
         {state.banner != null && (
           <DestructiveBanner testId="recover.banner">{state.banner}</DestructiveBanner>
@@ -284,7 +286,7 @@ export function PhraseEntryStep({
                   autoCorrect="off"
                   inputMode="text"
                   style={CELL_INPUT_STYLE}
-                  aria-label={`Word ${i + 1}`}
+                  aria-label={t("vaultRecover.phrase.cellLabel", { index: i + 1 })}
                   data-testid="recover.phrase-cell"
                   data-index={i + 1}
                 />
@@ -300,7 +302,7 @@ export function PhraseEntryStep({
             style={CANCEL_STYLE}
             data-testid="recover.cancel"
           >
-            ← Back
+            {t("vaultRecover.phrase.back")}
           </button>
           <button
             type="button"
@@ -308,7 +310,7 @@ export function PhraseEntryStep({
             style={DELETE_LINK_STYLE}
             data-testid="recover.delete-link"
           >
-            Delete vault and start over
+            {t("vaultRecover.phrase.deleteLink")}
           </button>
           <div style={{ flex: 1 }} />
           <button
@@ -318,7 +320,7 @@ export function PhraseEntryStep({
             style={submitStyle(!allFilled)}
             data-testid="recover.submit"
           >
-            Unlock
+            {t("vaultRecover.phrase.submit")}
           </button>
         </div>
       </div>

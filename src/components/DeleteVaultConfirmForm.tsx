@@ -22,6 +22,7 @@
 // `docs/spec/recovery-flow.md` §2.4 explicit prohibition.
 
 import { useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
 import { DestructiveBanner } from "./DestructiveBanner";
@@ -148,6 +149,7 @@ export function DeleteVaultConfirmForm({
   inFlight,
   partialFailContext,
 }: DeleteVaultConfirmFormProps) {
+  const { t } = useTranslation();
   const [typed, setTyped] = useState("");
   const submitReady = typed === CONFIRM_PHRASE && !inFlight;
 
@@ -167,21 +169,17 @@ export function DeleteVaultConfirmForm({
       }}
     >
       <div style={HEADING_ROW_STYLE}>
-        <h3 style={HEADING_STYLE}>Delete vault</h3>
+        <h3 style={HEADING_STYLE}>{t("settings.deleteVault.heading")}</h3>
       </div>
 
       {partialFailContext === null ? (
         <>
-          <div style={EYEBROW_STYLE}>IRREVERSIBLE</div>
+          <div style={EYEBROW_STYLE}>{t("settings.deleteVault.eyebrow")}</div>
           <p style={COPY_PRIMARY_STYLE}>
-            This permanently deletes this vault and every note inside
-            it. The action cannot be undone, and your recovery phrase
-            will not restore the data.
+            {t("settings.deleteVault.copyPrimary")}
           </p>
           <p style={COPY_SECONDARY_STYLE}>
-            Vault keys are zeroized from memory before the files are
-            unlinked; any orphan ciphertext that remains on disk stays
-            unrecoverable Argon2id-wrapped junk.
+            {t("settings.deleteVault.copySecondary")}
           </p>
 
           <div
@@ -195,7 +193,7 @@ export function DeleteVaultConfirmForm({
               htmlFor="delete-vault-confirm-input"
               style={INPUT_LABEL_STYLE}
             >
-              Type DELETE to confirm
+              {t("settings.deleteVault.typeToConfirmLabel")}
             </label>
             <Input
               id="delete-vault-confirm-input"
@@ -211,8 +209,7 @@ export function DeleteVaultConfirmForm({
               data-testid="delete-vault.confirm-input"
             />
             <div style={INPUT_HINT_STYLE}>
-              Case-sensitive. Type the word exactly to enable
-              deletion.
+              {t("settings.deleteVault.caseSensitiveHint")}
             </div>
           </div>
 
@@ -223,7 +220,7 @@ export function DeleteVaultConfirmForm({
               disabled={inFlight}
               data-testid="delete-vault.cancel"
             >
-              Cancel
+              {t("settings.deleteVault.cancel")}
             </Button>
             <Button
               variant="danger"
@@ -231,7 +228,9 @@ export function DeleteVaultConfirmForm({
               disabled={!submitReady}
               data-testid="delete-vault.submit"
             >
-              {inFlight ? "Deleting vault…" : "Delete vault"}
+              {inFlight
+                ? t("settings.deleteVault.submitInFlight")
+                : t("settings.deleteVault.submit")}
             </Button>
           </div>
         </>
@@ -245,20 +244,20 @@ export function DeleteVaultConfirmForm({
               }}
             >
               {partialFailContext.kind === "partial-delete"
-                ? "Vault deletion partially failed"
-                : "Disk error during delete"}
+                ? t("settings.deleteVault.partialFailTitle")
+                : t("settings.deleteVault.ioFailTitle")}
             </div>
             <div>
               {partialFailContext.kind === "partial-delete"
-                ? `${partialFailContext.remainingCount} ${
-                    partialFailContext.remainingCount === 1
-                      ? "file"
-                      : "files"
-                  } could not be deleted from disk. Vault keys are already zeroized from memory, so any orphan ciphertext that remains is unrecoverable Argon2id-wrapped junk.`
-                : "Could not access vault files for deletion. Vault keys are already zeroized from memory; any vault data that remains on disk is unrecoverable Argon2id-wrapped junk."}
+                ? t("settings.deleteVault.partialFailBody", {
+                    count: partialFailContext.remainingCount,
+                  })
+                : t("settings.deleteVault.ioFailBody")}
             </div>
             <code style={VAULT_PATH_STYLE}>
-              Vault path: {partialFailContext.vaultDirPath}
+              {t("settings.deleteVault.vaultPath", {
+                path: partialFailContext.vaultDirPath,
+              })}
             </code>
           </DestructiveBanner>
 
@@ -268,7 +267,7 @@ export function DeleteVaultConfirmForm({
               onClick={onContinueAfterPartial}
               data-testid="delete-vault.continue"
             >
-              Continue
+              {t("settings.deleteVault.continue")}
             </Button>
           </div>
         </>

@@ -15,14 +15,16 @@
 // flow's `decrypting` sub-step (per `recovery-flow.md` §3.3) renders
 // the same idiom with a different label.
 
+import { useTranslation } from "react-i18next";
 import { BlockingProgressStep } from "../../components/BlockingProgressStep";
 
 export function EncryptingStep() {
+  const { t } = useTranslation();
   return (
     <BlockingProgressStep
-      heading="Encrypting your vault"
-      caption="This takes a moment."
-      footerHint="If this takes longer than 30 seconds, close the window and try again."
+      heading={t("vaultCreation.encrypting.heading")}
+      caption={t("vaultCreation.encrypting.caption")}
+      footerHint={t("vaultCreation.encrypting.footerHint")}
       testId="create.encrypting"
     />
   );

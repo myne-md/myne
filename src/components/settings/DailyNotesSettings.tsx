@@ -12,6 +12,7 @@
 // Disk-first + no in-flight gating, matching the other Editor-panel controls.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { Input } from "../primitives/Input";
 import { SearchableSelect } from "../primitives/SearchableSelect";
@@ -27,6 +28,7 @@ import {
   DEFAULT_DAILY_DATE_FORMAT,
   DEFAULT_DAILY_FOLDER,
 } from "../../notes";
+import i18n from "../../i18n";
 
 // The "blank" sentinel option value — distinct from any note UUID; maps to a
 // null `daily_template` pref (an empty note titled with the date).
@@ -40,10 +42,11 @@ const ERROR_STYLE: CSSProperties = {
 };
 
 function templateName(rec: TitleRecord): string {
-  return rec.title?.trim() || "Untitled template";
+  return rec.title?.trim() || i18n.t("settings.dailyNotes.untitledTemplate");
 }
 
 export function DailyNotesSettings() {
+  const { t } = useTranslation();
   const [folder, setFolder] = useState("");
   const [format, setFormat] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
@@ -81,7 +84,7 @@ export function DailyNotesSettings() {
     try {
       await setDailyFolder(value);
     } catch {
-      setError("Couldn't save the daily folder. Please try again.");
+      setError(t("settings.dailyNotes.folderSaveError"));
     }
   }
 
@@ -92,7 +95,7 @@ export function DailyNotesSettings() {
     try {
       await setDailyDateFormat(value);
     } catch {
-      setError("Couldn't save the date format. Please try again.");
+      setError(t("settings.dailyNotes.dateFormatSaveError"));
     }
   }
 
@@ -103,33 +106,37 @@ export function DailyNotesSettings() {
     try {
       await setDailyTemplate(next);
     } catch {
-      setError("Couldn't save the daily template. Please try again.");
+      setError(t("settings.dailyNotes.templateSaveError"));
     }
   }
 
   const templateOptions: SelectOption<string>[] = [
-    { value: BLANK_TEMPLATE, label: "Blank (no template)" },
+    { value: BLANK_TEMPLATE, label: t("settings.dailyNotes.blankTemplate") },
     ...templates.map((rec) => ({ value: rec.noteUuid, label: templateName(rec) })),
   ];
 
   return (
     <>
       <ControlBlock
-        label="Daily note folder"
-        helper={`Where new daily notes are filed. Defaults to ${DEFAULT_DAILY_FOLDER} — the folder is kept even when empty.`}
+        label={t("settings.dailyNotes.folderLabel")}
+        helper={t("settings.dailyNotes.folderHelper", {
+          default: DEFAULT_DAILY_FOLDER,
+        })}
         control={
           <Input
             value={folder}
             placeholder={DEFAULT_DAILY_FOLDER}
             onChange={(e) => setFolder(e.target.value)}
             onBlur={() => void persistFolder()}
-            aria-label="Daily note folder"
+            aria-label={t("settings.dailyNotes.folderLabel")}
           />
         }
       />
       <ControlBlock
-        label="Daily note date format"
-        helper={`The title of each daily note. Supports YYYY, MM, DD. Defaults to ${DEFAULT_DAILY_DATE_FORMAT}.`}
+        label={t("settings.dailyNotes.dateFormatLabel")}
+        helper={t("settings.dailyNotes.dateFormatHelper", {
+          default: DEFAULT_DAILY_DATE_FORMAT,
+        })}
         control={
           <Input
             value={format}
@@ -137,23 +144,23 @@ export function DailyNotesSettings() {
             mono
             onChange={(e) => setFormat(e.target.value)}
             onBlur={() => void persistFormat()}
-            aria-label="Daily note date format"
+            aria-label={t("settings.dailyNotes.dateFormatLabel")}
           />
         }
       />
       <ControlBlock
-        label="Daily note template"
-        helper="Pick a template to start each daily note from, or leave blank for an empty note titled with the date."
+        label={t("settings.dailyNotes.templateLabel")}
+        helper={t("settings.dailyNotes.templateHelper")}
         control={
           <div>
             <SearchableSelect
               options={templateOptions}
               selected={[templateId ?? BLANK_TEMPLATE]}
               onChange={(next) => void chooseTemplate(next[0] ?? BLANK_TEMPLATE)}
-              aria-label="Daily note template"
+              aria-label={t("settings.dailyNotes.templateLabel")}
               testId="settings.daily-template-select"
-              searchPlaceholder="Search templates…"
-              emptyText="No templates match."
+              searchPlaceholder={t("settings.dailyNotes.searchPlaceholder")}
+              emptyText={t("settings.dailyNotes.searchEmpty")}
             />
             {error && (
               <p role="alert" style={ERROR_STYLE}>

@@ -17,6 +17,7 @@
 // frame (page "4 — Desktop UI Kit", board `find-bar--states`).
 
 import { ICON_PATHS, type IconName } from "../../lib/icons";
+import i18n from "../../i18n";
 
 export type FindBarStatus = "idle" | "matches" | "no-match";
 
@@ -73,12 +74,6 @@ export interface FindBarView {
   /** Detach all listeners and remove the DOM. Call on panel destroy. */
   destroy(): void;
 }
-
-const PLACEHOLDER = "Find in note";
-const REPLACE_PLACEHOLDER = "Replace with";
-const NO_MATCH_LABEL = "No matches";
-const REPLACE_ALL_LABEL = "Replace all";
-const REPLACE_ONE_LABEL = "Replace";
 
 function svgIcon(name: IconName, size: number): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -143,7 +138,7 @@ export function createFindBarView(
   // two rows align under one disclosure control (Obsidian/VS Code pattern).
   const toggleBtn = makeButton(
     "cm-find-bar-toggle",
-    "Toggle replace",
+    i18n.t("editor.find.toggleReplace"),
     svgIcon("chevron-right", 16),
     "find.toggle-replace",
   );
@@ -158,8 +153,9 @@ export function createFindBarView(
   const input = document.createElement("input");
   input.type = "text";
   input.className = "cm-find-bar-input";
-  input.placeholder = PLACEHOLDER;
-  input.setAttribute("aria-label", PLACEHOLDER);
+  const findPlaceholder = i18n.t("editor.find.placeholder");
+  input.placeholder = findPlaceholder;
+  input.setAttribute("aria-label", findPlaceholder);
   input.setAttribute("data-testid", "find.input");
   input.spellcheck = false;
   input.autocomplete = "off";
@@ -173,15 +169,15 @@ export function createFindBarView(
   // convention and the approved frame; Lucide `case-sensitive` deferred).
   const caseGlyph = document.createElement("span");
   caseGlyph.textContent = "Aa";
-  const caseBtn = makeButton("cm-find-bar-case", "Match case", caseGlyph);
+  const caseBtn = makeButton("cm-find-bar-case", i18n.t("editor.find.matchCase"), caseGlyph);
   caseBtn.setAttribute("aria-pressed", String(initial.caseSensitive));
 
   // Prev / next navigation.
-  const prevBtn = makeButton("cm-find-bar-prev", "Previous match", svgIcon("chevron-up", 16));
-  const nextBtn = makeButton("cm-find-bar-next", "Next match", svgIcon("chevron-down", 16));
+  const prevBtn = makeButton("cm-find-bar-prev", i18n.t("editor.find.previousMatch"), svgIcon("chevron-up", 16));
+  const nextBtn = makeButton("cm-find-bar-next", i18n.t("editor.find.nextMatch"), svgIcon("chevron-down", 16));
 
   // Close.
-  const closeBtn = makeButton("cm-find-bar-close", "Close find", svgIcon("x", 14));
+  const closeBtn = makeButton("cm-find-bar-close", i18n.t("editor.find.close"), svgIcon("x", 14));
 
   // Visually-hidden polite live region: the visible count ("3/12") is terse and
   // monospace, so screen readers get a clearer spoken form here ("3 of 12" / "No
@@ -220,8 +216,9 @@ export function createFindBarView(
   const replaceInput = document.createElement("input");
   replaceInput.type = "text";
   replaceInput.className = "cm-find-bar-input cm-find-bar-replace-input";
-  replaceInput.placeholder = REPLACE_PLACEHOLDER;
-  replaceInput.setAttribute("aria-label", REPLACE_PLACEHOLDER);
+  const replacePlaceholder = i18n.t("editor.find.replacePlaceholder");
+  replaceInput.placeholder = replacePlaceholder;
+  replaceInput.setAttribute("aria-label", replacePlaceholder);
   replaceInput.setAttribute("data-testid", "find.replace-input");
   replaceInput.spellcheck = false;
   replaceInput.autocomplete = "off";
@@ -231,13 +228,13 @@ export function createFindBarView(
   replaceOneBtn.type = "button";
   replaceOneBtn.className = "cm-find-bar-action";
   replaceOneBtn.setAttribute("data-testid", "find.replace-one");
-  replaceOneBtn.textContent = REPLACE_ONE_LABEL;
+  replaceOneBtn.textContent = i18n.t("editor.find.replaceOne");
 
   const replaceAllBtn = document.createElement("button");
   replaceAllBtn.type = "button";
   replaceAllBtn.className = "cm-find-bar-action";
   replaceAllBtn.setAttribute("data-testid", "find.replace-all");
-  replaceAllBtn.textContent = REPLACE_ALL_LABEL;
+  replaceAllBtn.textContent = i18n.t("editor.find.replaceAll");
 
   // A spacer keeps the replace input aligned with the find input above (no lead
   // search-icon slot on the replace row; the toggle column + replace glyph do).
@@ -252,11 +249,15 @@ export function createFindBarView(
     if (state.status === "matches" && state.match) {
       status.textContent = `${state.match.current}/${state.match.total}`;
       status.className = "cm-find-bar-status cm-find-bar-status--count";
-      liveText = `${state.match.current} of ${state.match.total}`;
+      liveText = i18n.t("editor.find.matchCount", {
+        current: state.match.current,
+        total: state.match.total,
+      });
     } else if (state.status === "no-match") {
-      status.textContent = NO_MATCH_LABEL;
+      const noMatch = i18n.t("editor.find.noMatches");
+      status.textContent = noMatch;
       status.className = "cm-find-bar-status cm-find-bar-status--nomatch";
-      liveText = NO_MATCH_LABEL;
+      liveText = noMatch;
     } else {
       status.textContent = "";
       status.className = "cm-find-bar-status cm-find-bar-status--hidden";
@@ -286,8 +287,8 @@ export function createFindBarView(
       // Count-aware "Replace all (N)" — reuses the SAME live match total the find
       // count renders (k/N). No matches → bare "Replace all" (nothing to count).
       replaceAllBtn.textContent = hasMatches
-        ? `${REPLACE_ALL_LABEL} (${state.match!.total})`
-        : REPLACE_ALL_LABEL;
+        ? i18n.t("editor.find.replaceAllCount", { total: state.match!.total })
+        : i18n.t("editor.find.replaceAll");
 
       // Replace acts on the current/all matches — only meaningful with live hits.
       replaceOneBtn.disabled = !hasMatches;

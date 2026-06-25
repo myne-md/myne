@@ -34,6 +34,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 import type { SelectOption } from "./Select";
 
@@ -165,11 +166,17 @@ export function SearchableSelect<T extends string>({
   multiple = false,
   disabled = false,
   "aria-label": ariaLabel,
-  placeholder = "Select…",
-  searchPlaceholder = "Search…",
-  emptyText = "No matches.",
+  placeholder: placeholderProp,
+  searchPlaceholder: searchPlaceholderProp,
+  emptyText: emptyTextProp,
   testId,
 }: SearchableSelectProps<T>) {
+  const { t } = useTranslation();
+  const placeholder =
+    placeholderProp ?? t("primitives.searchableSelect.placeholder");
+  const searchPlaceholder =
+    searchPlaceholderProp ?? t("primitives.searchableSelect.searchPlaceholder");
+  const emptyText = emptyTextProp ?? t("primitives.searchableSelect.emptyText");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);

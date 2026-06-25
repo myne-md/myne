@@ -20,6 +20,7 @@
 // past ~5 fields, revisit (separate PRD).
 
 import { useCallback, useEffect, useState } from "react";
+import i18n from "../i18n";
 import {
   PrefsView,
   prefsRead,
@@ -179,7 +180,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
           // backend tracing has logged the original failure. User can
           // retry by toggling again.
         }
-        onError?.("Couldn't save preference — try again");
+        onError?.(i18n.t("settings.prefs.saveError"));
       }
     },
     [onError],
@@ -201,7 +202,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
           // Re-read also failed — keep the optimistic value; the backend
           // tracing logged the original failure. User can retry.
         }
-        onError?.("Couldn't save preference — try again");
+        onError?.(i18n.t("settings.prefs.saveError"));
       }
     },
     [onError],
@@ -223,7 +224,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
           // Re-read also failed — keep the optimistic value; the backend
           // tracing logged the original failure. User can retry.
         }
-        onError?.("Couldn't save preference — try again");
+        onError?.(i18n.t("settings.prefs.saveError"));
       }
     },
     [onError],
@@ -246,7 +247,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
           // Re-read also failed — keep the optimistic value; backend tracing
           // logged the original failure. User can retry.
         }
-        onError?.("Couldn't save preference — try again");
+        onError?.(i18n.t("settings.prefs.saveError"));
       }
     },
     [onError],
@@ -298,7 +299,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
           // Re-read also failed — keep the optimistic value; the backend tracing
           // logged the original failure. User can retry.
         }
-        onError?.("Couldn't save preference — try again");
+        onError?.(i18n.t("settings.prefs.saveError"));
       }
     },
     [onError],

@@ -20,6 +20,8 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import type { NoteId } from "../sidebarState";
 import { noteRead } from "../readNote";
 import {
@@ -207,20 +209,20 @@ function formatSnapshotError(err: unknown): string {
   const kind = (err as Partial<SnapshotError>)?.kind;
   switch (kind) {
     case "VaultNotUnlocked":
-      return "The vault is locked. Unlock it to view snapshots.";
+      return i18n.t("notes.snapshots.errorVaultLocked");
     case "SnapshotNotFound":
-      return "That snapshot is no longer available.";
+      return i18n.t("notes.snapshots.errorNotFound");
     case "CannotDecrypt":
-      return "This snapshot couldn't be decrypted.";
+      return i18n.t("notes.snapshots.errorCannotDecrypt");
     case "Io":
-      return "A disk error occurred — the disk may be full or unwritable.";
+      return i18n.t("notes.snapshots.errorIo");
     case "NotesDirNotADirectory":
-      return "Couldn't access the vault's snapshot storage.";
+      return i18n.t("notes.snapshots.errorStorageAccess");
     case "InvalidNoteId":
     case "InvalidSnapshotId":
     case "JoinFailure":
     default:
-      return "Something went wrong. Try again.";
+      return i18n.t("notes.snapshots.errorGeneric");
   }
 }
 
@@ -247,6 +249,7 @@ export function SnapshotsPanel({
   noteTitle,
   onRestored,
 }: SnapshotsPanelProps) {
+  const { t } = useTranslation();
   const [snaps, setSnaps] = useState<SnapshotMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
@@ -324,14 +327,14 @@ export function SnapshotsPanel({
       // Re-read the open note's editor body from disk — restore overwrote the
       // `.myn` via the backend, so the editor's buffer is otherwise stale.
       onRestored?.();
-      setStatus("Restored. The version you had is saved as a snapshot.");
+      setStatus(t("notes.snapshots.restoredStatus"));
       setSelected(null);
       setPreview(null);
       await loadList();
     } catch (err) {
       setStatus(formatSnapshotError(err));
     }
-  }, [noteId, confirmRestore, loadList, onRestored]);
+  }, [noteId, confirmRestore, loadList, onRestored, t]);
 
   const handleBackdrop = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -360,24 +363,28 @@ export function SnapshotsPanel({
       >
         <div style={HEADER_STYLE}>
           <h2 id="snapshots-panel-title" style={HEADER_TITLE_STYLE}>
-            Snapshots
+            {t("notes.snapshots.title")}
           </h2>
-          <span style={SUBTITLE_STYLE} title={noteTitle ?? "Untitled"}>
-            {noteTitle && noteTitle.trim() !== "" ? noteTitle : "Untitled"}
+          <span
+            style={SUBTITLE_STYLE}
+            title={noteTitle ?? t("notes.snapshots.untitled")}
+          >
+            {noteTitle && noteTitle.trim() !== ""
+              ? noteTitle
+              : t("notes.snapshots.untitled")}
           </span>
         </div>
 
         {count === 0 && !loading ? (
           <div style={EMPTY_STATE_STYLE}>
-            {listError ??
-              "No snapshots yet. Snapshots are saved automatically as you edit and kept for about 7 days. They’re encrypted, and disappear when the note is permanently deleted."}
+            {listError ?? t("notes.snapshots.emptyState")}
           </div>
         ) : (
           <div style={BODY_STYLE}>
-            <div style={LIST_STYLE} aria-label="Snapshot list">
+            <div style={LIST_STYLE} aria-label={t("notes.snapshots.listLabel")}>
               {loading && snaps.length === 0 ? (
                 <div style={{ ...ROW_META_STYLE, padding: "var(--space-3) var(--space-5)" }}>
-                  Loading…
+                  {t("notes.snapshots.loading")}
                 </div>
               ) : (
                 snaps.map((s, idx) => {
@@ -395,10 +402,12 @@ export function SnapshotsPanel({
                     >
                       <span style={ROW_AGE_STYLE}>
                         {formatRelativeTime(new Date(s.captured_at_ms)) ||
-                          "just now"}
+                          t("notes.snapshots.justNow")}
                       </span>
                       <span style={ROW_META_STYLE}>
-                        Encrypted · {formatBytes(s.size_bytes)}
+                        {t("notes.snapshots.encryptedSize", {
+                          size: formatBytes(s.size_bytes),
+                        })}
                       </span>
                     </button>
                   );
@@ -409,18 +418,22 @@ export function SnapshotsPanel({
             <div style={DETAIL_STYLE}>
               {selected === null ? (
                 <div style={PLACEHOLDER_STYLE}>
-                  Select a snapshot to preview what changed since then.
+                  {t("notes.snapshots.selectPlaceholder")}
                 </div>
               ) : detailError !== null ? (
                 <div style={PLACEHOLDER_STYLE}>{detailError}</div>
               ) : preview === null ? (
-                <div style={PLACEHOLDER_STYLE}>Decrypting…</div>
+                <div style={PLACEHOLDER_STYLE}>
+                  {t("notes.snapshots.decrypting")}
+                </div>
               ) : (
                 <>
                   <div style={DETAIL_BAR_STYLE}>
                     <span style={ROW_META_STYLE}>
                       {diff
-                        ? `${changedLineCount(diff)} change${changedLineCount(diff) === 1 ? "" : "s"} since this snapshot`
+                        ? t("notes.snapshots.changeCount", {
+                            count: changedLineCount(diff),
+                          })
                         : ""}
                     </span>
                     <button
@@ -430,7 +443,7 @@ export function SnapshotsPanel({
                       data-snapshot-id={selected}
                       onClick={() => setConfirmRestore(selected)}
                     >
-                      Restore this snapshot
+                      {t("notes.snapshots.restoreCta")}
                     </button>
                   </div>
                   <pre style={DIFF_STYLE} data-testid="snapshots.preview">
@@ -463,7 +476,7 @@ export function SnapshotsPanel({
             style={{ ...BTN_STYLE, marginLeft: "auto" }}
             onClick={onClose}
           >
-            Close
+            {t("notes.snapshots.close")}
           </button>
         </div>
       </div>
@@ -521,6 +534,7 @@ function RestoreConfirm({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -552,12 +566,9 @@ function RestoreConfirm({
         aria-labelledby="restore-confirm-title"
       >
         <h2 id="restore-confirm-title" style={CONFIRM_TITLE_STYLE}>
-          Restore this snapshot?
+          {t("notes.snapshots.confirmTitle")}
         </h2>
-        <p style={CONFIRM_BODY_STYLE}>
-          Your current note will be saved as a snapshot first, so you can undo
-          this.
-        </p>
+        <p style={CONFIRM_BODY_STYLE}>{t("notes.snapshots.confirmBody")}</p>
         <div style={CONFIRM_ROW_STYLE}>
           <button
             ref={cancelRef}
@@ -566,7 +577,7 @@ function RestoreConfirm({
             data-testid="snapshots.restore-cancel"
             onClick={onCancel}
           >
-            Cancel
+            {t("notes.snapshots.cancel")}
           </button>
           <button
             type="button"
@@ -574,7 +585,7 @@ function RestoreConfirm({
             data-testid="snapshots.restore-confirm-cta"
             onClick={onConfirm}
           >
-            Restore
+            {t("notes.snapshots.restore")}
           </button>
         </div>
       </div>

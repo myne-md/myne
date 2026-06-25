@@ -9,6 +9,7 @@
 // and resolves a Promise with the user's decision. NO byte change happens here;
 // the caller (`convert.ts`) applies the rewrite only on `confirm`.
 
+import i18n from "../../i18n";
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 
 /** One line in the preview: a proposed rewrite, or a skipped ref. */
@@ -44,19 +45,19 @@ export function showDiffPreview(
     modal.className = "cm-attach-diff";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-label", "Convert imported attachments");
+    modal.setAttribute("aria-label", i18n.t("editor.attachment.convert.title"));
 
     const title = document.createElement("div");
     title.className = "cm-attach-diff-title";
-    title.textContent = "Convert imported attachments";
+    title.textContent = i18n.t("editor.attachment.convert.title");
     modal.appendChild(title);
 
     const subtitle = document.createElement("div");
     subtitle.className = "cm-attach-diff-subtitle";
     subtitle.textContent =
       rewriteCount === 0
-        ? "Nothing to convert — no source files resolved."
-        : `${rewriteCount} reference${rewriteCount === 1 ? "" : "s"} will be rewritten. Review before committing.`;
+        ? i18n.t("editor.attachment.convert.subtitleEmpty")
+        : i18n.t("editor.attachment.convert.subtitle", { count: rewriteCount });
     modal.appendChild(subtitle);
 
     const list = document.createElement("div");
@@ -78,7 +79,7 @@ export function showDiffPreview(
         before.textContent = row.before;
         const skipped = document.createElement("div");
         skipped.className = "cm-attach-diff-skipped";
-        skipped.textContent = `skipped — ${row.note}`;
+        skipped.textContent = i18n.t("editor.attachment.convert.skipped", { note: row.note });
         rowEl.append(before, skipped);
       }
       list.appendChild(rowEl);
@@ -90,11 +91,11 @@ export function showDiffPreview(
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "cm-attach-diff-btn";
-    cancelBtn.textContent = "Cancel";
+    cancelBtn.textContent = i18n.t("editor.attachment.convert.cancel");
     const commitBtn = document.createElement("button");
     commitBtn.type = "button";
     commitBtn.className = "cm-attach-diff-btn cm-attach-diff-btn-primary";
-    commitBtn.textContent = "Convert";
+    commitBtn.textContent = i18n.t("editor.attachment.convert.confirm");
     commitBtn.disabled = rewriteCount === 0;
     actions.append(cancelBtn, commitBtn);
     modal.appendChild(actions);

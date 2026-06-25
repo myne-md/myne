@@ -25,6 +25,7 @@
 
 import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import i18n from "../i18n";
 import {
   EXPORT_PDF_PLAIN_SENTENCE,
   EXPORT_PLAIN_HTML_SENTENCE,
@@ -41,7 +42,7 @@ import { exportNotePdf } from "./exportPdf";
 import { noteRead } from "./readNote";
 import { extractAttachmentIds } from "./attachmentRef";
 import {
-  EXPORT_FALLBACK_MESSAGE,
+  exportFallbackMessage,
   noteExportAttachmentsErrorMessage,
   noteExportErrorMessage,
   notePdfExportErrorMessage,
@@ -213,7 +214,7 @@ export async function runNoteExportFlow({
     // exactly where this flow runs.
     ...(egressSentenceShown ? {} : { title: EXPORT_PLAIN_MARKDOWN_SENTENCE }),
     defaultPath: defaultExportFilename(noteTitle),
-    filters: [{ name: "Markdown", extensions: ["md"] }],
+    filters: [{ name: i18n.t("export.note.flow.filterMarkdown"), extensions: ["md"] }],
   }).catch(() => null);
   if (typeof destination !== "string") return; // dismissed — silent no-op
 
@@ -227,15 +228,18 @@ export async function runNoteExportFlow({
       showToast({
         message:
           written === 0
-            ? `Exported to ${filename}`
-            : `Exported to ${filename} + ${written} attachment${written === 1 ? "" : "s"}`,
+            ? i18n.t("export.note.flow.exportedTo", { filename })
+            : i18n.t("export.note.flow.exportedToWithAttachments", {
+                filename,
+                count: written,
+              }),
         revealPath: destination,
       });
     } catch (raw) {
       showToast({
         message:
           noteExportAttachmentsErrorMessage(raw as NoteExportAttachmentsError) ??
-          EXPORT_FALLBACK_MESSAGE,
+          exportFallbackMessage(),
       });
     }
     return;
@@ -245,7 +249,9 @@ export async function runNoteExportFlow({
     // overwrite=true: the OS dialog's "Replace" prompt was the consent.
     await noteExportAsMarkdown(noteId, destination, true);
     showToast({
-      message: `Exported to ${exportedBasename(destination)}`,
+      message: i18n.t("export.note.flow.exportedTo", {
+        filename: exportedBasename(destination),
+      }),
       revealPath: destination,
     });
   } catch (raw) {
@@ -253,7 +259,7 @@ export async function runNoteExportFlow({
     // out-of-contract rejection shape falls back to the generic line.
     showToast({
       message:
-        noteExportErrorMessage(raw as NoteExportError) ?? EXPORT_FALLBACK_MESSAGE,
+        noteExportErrorMessage(raw as NoteExportError) ?? exportFallbackMessage(),
     });
   }
 }
@@ -312,7 +318,7 @@ export async function runNotePdfExportFlow({
   try {
     body = await getBody(noteId);
   } catch {
-    showToast({ message: "This note could not be read." });
+    showToast({ message: i18n.t("export.note.flow.couldNotRead") });
     return;
   }
 
@@ -337,7 +343,7 @@ export async function runNotePdfExportFlow({
     // omitted when the pre-export notice already said it.
     ...(egressSentenceShown ? {} : { title: EXPORT_PDF_PLAIN_SENTENCE }),
     defaultPath: defaultExportFilename(noteTitle, "pdf"),
-    filters: [{ name: "PDF", extensions: ["pdf"] }],
+    filters: [{ name: i18n.t("export.note.flow.filterPdf"), extensions: ["pdf"] }],
   }).catch(() => null);
   if (typeof destination !== "string") return; // dismissed — silent no-op
 
@@ -351,7 +357,9 @@ export async function runNotePdfExportFlow({
     // The emitted title (frontmatter `title:`) feeds the PDF metadata.
     await exportNotePdf(emitted.html, emitted.title, destination, true);
     showToast({
-      message: `Exported to ${exportedBasename(destination)}`,
+      message: i18n.t("export.note.flow.exportedTo", {
+        filename: exportedBasename(destination),
+      }),
       revealPath: destination,
     });
   } catch (raw) {
@@ -360,7 +368,7 @@ export async function runNotePdfExportFlow({
     showToast({
       message:
         notePdfExportErrorMessage(raw as PdfExportError) ??
-        EXPORT_FALLBACK_MESSAGE,
+        exportFallbackMessage(),
     });
   }
 }
@@ -415,7 +423,7 @@ export async function runNoteHtmlExportFlow({
   try {
     body = await getBody(noteId);
   } catch {
-    showToast({ message: "This note could not be read." });
+    showToast({ message: i18n.t("export.note.flow.couldNotRead") });
     return;
   }
 
@@ -437,7 +445,7 @@ export async function runNoteHtmlExportFlow({
   const destination = await saveFileDialog({
     ...(egressSentenceShown ? {} : { title: EXPORT_PLAIN_HTML_SENTENCE }),
     defaultPath: defaultExportFilename(noteTitle, "html"),
-    filters: [{ name: "HTML", extensions: ["html"] }],
+    filters: [{ name: i18n.t("export.note.flow.filterHtml"), extensions: ["html"] }],
   }).catch(() => null);
   if (typeof destination !== "string") return; // dismissed — silent no-op
 
@@ -452,7 +460,7 @@ export async function runNoteHtmlExportFlow({
     });
     document = composed.document;
   } catch {
-    showToast({ message: EXPORT_FALLBACK_MESSAGE });
+    showToast({ message: exportFallbackMessage() });
     return;
   }
 
@@ -469,15 +477,18 @@ export async function runNoteHtmlExportFlow({
       showToast({
         message:
           written === 0
-            ? `Exported to ${filename}`
-            : `Exported to ${filename} + ${written} image${written === 1 ? "" : "s"}`,
+            ? i18n.t("export.note.flow.exportedTo", { filename })
+            : i18n.t("export.note.flow.exportedToWithImages", {
+                filename,
+                count: written,
+              }),
         revealPath: destination,
       });
     } catch (raw) {
       showToast({
         message:
           noteExportAttachmentsErrorMessage(raw as NoteExportAttachmentsError) ??
-          EXPORT_FALLBACK_MESSAGE,
+          exportFallbackMessage(),
       });
     }
     return;
@@ -487,13 +498,15 @@ export async function runNoteHtmlExportFlow({
     // overwrite=true: the OS dialog's "Replace" prompt was the consent.
     await noteExportHtml(document, destination, true);
     showToast({
-      message: `Exported to ${exportedBasename(destination)}`,
+      message: i18n.t("export.note.flow.exportedTo", {
+        filename: exportedBasename(destination),
+      }),
       revealPath: destination,
     });
   } catch (raw) {
     showToast({
       message:
-        noteExportErrorMessage(raw as NoteExportError) ?? EXPORT_FALLBACK_MESSAGE,
+        noteExportErrorMessage(raw as NoteExportError) ?? exportFallbackMessage(),
     });
   }
 }
@@ -534,7 +547,7 @@ export async function runNoteTxtExportFlow({
   try {
     body = await getBody(noteId);
   } catch {
-    showToast({ message: "This note could not be read." });
+    showToast({ message: i18n.t("export.note.flow.couldNotRead") });
     return;
   }
 
@@ -544,7 +557,7 @@ export async function runNoteTxtExportFlow({
     // point (SYNC-6).
     title: EXPORT_PLAIN_TEXT_SENTENCE,
     defaultPath: defaultExportFilename(noteTitle, "txt"),
-    filters: [{ name: "Plain text", extensions: ["txt"] }],
+    filters: [{ name: i18n.t("export.note.flow.filterPlainText"), extensions: ["txt"] }],
   }).catch(() => null);
   if (typeof destination !== "string") return; // dismissed — silent no-op
 
@@ -554,7 +567,7 @@ export async function runNoteTxtExportFlow({
     // A trailing newline so the file is a well-formed POSIX text file.
     text = `${emitNoteText(body)}\n`;
   } catch {
-    showToast({ message: EXPORT_FALLBACK_MESSAGE });
+    showToast({ message: exportFallbackMessage() });
     return;
   }
 
@@ -564,13 +577,15 @@ export async function runNoteTxtExportFlow({
     // any composed text document verbatim — not HTML-specific).
     await noteExportHtml(text, destination, true);
     showToast({
-      message: `Exported to ${exportedBasename(destination)}`,
+      message: i18n.t("export.note.flow.exportedTo", {
+        filename: exportedBasename(destination),
+      }),
       revealPath: destination,
     });
   } catch (raw) {
     showToast({
       message:
-        noteExportErrorMessage(raw as NoteExportError) ?? EXPORT_FALLBACK_MESSAGE,
+        noteExportErrorMessage(raw as NoteExportError) ?? exportFallbackMessage(),
     });
   }
 }
@@ -590,7 +605,7 @@ export function exportToastAction(
   const path = toast.revealPath;
   if (path === undefined) return undefined;
   return {
-    label: "Show in folder",
+    label: i18n.t("export.note.flow.showInFolder"),
     onAction: () => {
       void revealItemInDir(path).catch(() => {});
       dismiss();

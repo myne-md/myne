@@ -13,6 +13,7 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type { FolderNode } from "../folderTree";
 import { ColorDot } from "./ColorDot";
 import { FolderGlyph } from "./FolderGlyph";
@@ -259,6 +260,7 @@ export function FolderRow({
   onOpenIndexNote,
   onCreateFolderNote,
 }: FolderRowProps) {
+  const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const paddingLeft = BASE_PADDING_LEFT + depth * INDENT_PER_LEVEL;
@@ -386,7 +388,9 @@ export function FolderRow({
       ) : (
         <>
           <span style={empty ? emptyNameStyle : nameStyle}>{node.name}</span>
-          {empty && <span style={emptyHintStyle}>empty</span>}
+          {empty && (
+            <span style={emptyHintStyle}>{t("notes.folderRow.empty")}</span>
+          )}
           {node.indexNoteId !== null ? (
             onOpenIndexNote && (
               <button
@@ -394,8 +398,8 @@ export function FolderRow({
                 style={indexAffordanceBaseStyle}
                 data-testid="notes.folder-index-affordance"
                 data-folder-path={node.path}
-                title="Open folder note"
-                aria-label="Open folder note"
+                title={t("notes.folderRow.openFolderNote")}
+                aria-label={t("notes.folderRow.openFolderNote")}
                 onClick={(e) => {
                   // Never toggle collapse — opening the index note is its own
                   // action (MYND-370).
@@ -414,15 +418,15 @@ export function FolderRow({
                 style={indexAffordanceBaseStyle}
                 data-testid="notes.folder-index-affordance"
                 data-folder-path={node.path}
-                title="Create a folder note"
-                aria-label="Create a folder note"
+                title={t("notes.folderRow.createFolderNote")}
+                aria-label={t("notes.folderRow.createFolderNote")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onCreateFolderNote(node.path);
                 }}
               >
                 <Icon name="book-open" size={13} />
-                <span>folder note</span>
+                <span>{t("notes.folderRow.folderNote")}</span>
               </button>
             )
           )}

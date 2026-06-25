@@ -12,6 +12,7 @@
 // bare Escape as "cancel capture", not a chord (UI concern, not here).
 
 import { eventToChord, normalizeChord, splitChord, isMacPlatform, type ChordEvent } from "./chord";
+import i18n from "../i18n";
 
 const REAL_MODIFIERS = new Set(["Mod", "Ctrl", "Alt", "Meta"]);
 const F_KEY = /^F([1-9]|1[0-9]|2[0-4])$/;
@@ -28,9 +29,14 @@ export type CaptureResult =
   | { ok: true; chord: string }
   | { ok: false; reason: string };
 
-/** Human-facing rejection reason for an invalid captured chord (load-bearing copy lives elsewhere). */
-export const INVALID_CHORD_REASON =
-  "Add a modifier (⌘, Ctrl, or Alt) — a key on its own can't be a shortcut.";
+/**
+ * Human-facing rejection reason for an invalid captured chord (load-bearing copy
+ * lives elsewhere). Resolved at call time via i18n so it tracks the active
+ * language (never frozen at module load).
+ */
+export function invalidChordReason(): string {
+  return i18n.t("commands.rebind.invalidChordReason");
+}
 
 /**
  * Validate a captured KeyboardEvent as a bindable chord. Returns the canonical
@@ -48,7 +54,7 @@ export function captureChordFromEvent(
     return { ok: false, reason: "" };
   }
   if (!isValidBindableChord(chord)) {
-    return { ok: false, reason: INVALID_CHORD_REASON };
+    return { ok: false, reason: invalidChordReason() };
   }
   return { ok: true, chord };
 }

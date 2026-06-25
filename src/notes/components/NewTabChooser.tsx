@@ -9,6 +9,7 @@
 // recency, so picking is instant with no extra IPC.
 
 import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { liveCache, useSelectedNote, type NoteId } from "../sidebarState";
@@ -94,6 +95,7 @@ export function NewTabChooser({
   cancellable,
   onCancel,
 }: NewTabChooserProps) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   const [query, setQuery] = useState("");
   // Focus the whole search pill (not the bare input) — inline styles can't
@@ -141,17 +143,19 @@ export function NewTabChooser({
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
-          placeholder="Search notes…"
+          placeholder={t("notes.newTab.searchPlaceholder")}
           spellCheck={false}
           autoComplete="off"
-          aria-label="Search notes to open"
+          aria-label={t("notes.newTab.searchAriaLabel")}
           style={INPUT}
         />
       </div>
       <div style={LIST}>
         {rows.length === 0 ? (
           <div style={EMPTY}>
-            {query.trim() === "" ? "No notes yet." : "No notes match."}
+            {query.trim() === ""
+              ? t("notes.newTab.noNotesYet")
+              : t("notes.newTab.noNotesMatch")}
           </div>
         ) : (
           rows.map((r) => (
@@ -178,7 +182,7 @@ export function NewTabChooser({
                   color: r.title === null ? "var(--fg-3)" : undefined,
                 }}
               >
-                {r.title ?? "Untitled"}
+                {r.title ?? t("notes.newTab.untitled")}
               </span>
             </button>
           ))
@@ -190,7 +194,7 @@ export function NewTabChooser({
         onClick={onCreate}
         style={{ alignSelf: "center", marginTop: 4 }}
       >
-        Create a new note
+        {t("notes.newTab.createNote")}
       </Button>
     </div>
   );

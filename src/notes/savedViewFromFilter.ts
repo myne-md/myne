@@ -4,6 +4,7 @@
 // keys + AND/OR `mode`, this turns them into the canonical filter AST, and the
 // caller persists via `upsertSavedView` (#3's API). No IPC here.
 
+import i18n from "../i18n";
 import type { FilterMode } from "./tagFilter";
 import type { FilterNode, SavedView } from "../lib/prefs";
 
@@ -46,5 +47,7 @@ export function buildViewFromTags(
 /** A sensible default view name from the selected tags (used when the user
  *  leaves the name blank): the joined tags, or "Filtered view" when empty. */
 export function defaultFilterViewName(selectedKeys: readonly string[]): string {
-  return selectedKeys.length === 0 ? "Filtered view" : selectedKeys.join(", ");
+  return selectedKeys.length === 0
+    ? i18n.t("notes.savedView.defaultName")
+    : selectedKeys.join(", ");
 }

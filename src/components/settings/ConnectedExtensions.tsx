@@ -32,6 +32,7 @@ import {
 import { Button } from "../primitives/Button";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 import { BrowserIcon, browserLabel } from "./browser-icons";
+import i18n from "../../i18n";
 
 const ROW_STYLE = {
   display: "flex",
@@ -74,21 +75,27 @@ const WHEN_STYLE = {
  * the panel is transient, so no live ticking is needed.
  */
 function connectedWhen(pairedAt: number | null): string {
-  if (pairedAt === null) return "Connected";
+  if (pairedAt === null) return i18n.t("settings.connectedExtensions.when.bare");
   const secs = Math.max(0, Math.floor(Date.now() / 1000) - pairedAt);
-  if (secs < 60) return "Connected just now";
-  if (secs < 3600) return `Connected ${Math.floor(secs / 60)} min ago`;
-  if (secs < 86400) return `Connected ${Math.floor(secs / 3600)} h ago`;
+  if (secs < 60) return i18n.t("settings.connectedExtensions.when.justNow");
+  if (secs < 3600)
+    return i18n.t("settings.connectedExtensions.when.minutesAgo", {
+      count: Math.floor(secs / 60),
+    });
+  if (secs < 86400)
+    return i18n.t("settings.connectedExtensions.when.hoursAgo", {
+      count: Math.floor(secs / 3600),
+    });
   const days = Math.floor(secs / 86400);
-  if (days < 30) return `Connected ${days} day${days === 1 ? "" : "s"} ago`;
-  return (
-    "Connected " +
-    new Date(pairedAt * 1000).toLocaleDateString(undefined, {
+  if (days < 30)
+    return i18n.t("settings.connectedExtensions.when.daysAgo", { count: days });
+  return i18n.t("settings.connectedExtensions.when.onDate", {
+    date: new Date(pairedAt * 1000).toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
       day: "numeric",
-    })
-  );
+    }),
+  });
 }
 
 export function ConnectedExtensions() {

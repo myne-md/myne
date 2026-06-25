@@ -17,6 +17,7 @@
 // Load-bearing copy is asserted by E2E — keep the literals stable.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import {
   pairingAccept,
   pairingDispatchComplete,
@@ -77,7 +78,13 @@ const BTN_BASE: CSSProperties = {
   cursor: "pointer",
 };
 
-/** Title + intro copy (E2E asserts these literals). */
+// Title + intro copy. These exported constants are the canonical ENGLISH source
+// the component test (`tests/components/pairingDialog.test.tsx`) imports and
+// asserts against; production renders the i18n keys
+// (`clipper.pairing.{title,intro,rejected}`) whose English values are
+// byte-identical to these literals, so the English render still matches the
+// pinned strings while other locales translate.
+/** Title + intro copy (English source; test-asserted). */
 export const PAIRING_TITLE = "A browser extension wants to connect";
 export const PAIRING_INTRO =
   "Confirm this code matches the one shown in the extension, then Accept to pair.";
@@ -95,6 +102,7 @@ type DialogState =
  * Accept/Reject calls.
  */
 export function PairingDialog() {
+  const { t } = useTranslation();
   const [state, setState] = useState<DialogState>({ phase: "idle" });
   // Avoid clobbering a "rejected"/"working" phase with a poll result.
   const busyRef = useRef(false);
@@ -185,9 +193,9 @@ export function PairingDialog() {
   if (state.phase === "rejected") {
     return (
       <div style={BACKDROP_STYLE} data-testid="pairing.dialog" data-phase="rejected">
-        <div style={CARD_STYLE} role="dialog" aria-label={PAIRING_TITLE}>
+        <div style={CARD_STYLE} role="dialog" aria-label={t("clipper.pairing.title")}>
           <p data-testid="pairing.rejected" style={{ margin: 0 }}>
-            {PAIRING_REJECTED_COPY}
+            {t("clipper.pairing.rejected")}
           </p>
           <div style={BUTTON_ROW_STYLE}>
             <button
@@ -196,7 +204,7 @@ export function PairingDialog() {
               data-testid="pairing.dismiss"
               onClick={() => setState({ phase: "idle" })}
             >
-              Close
+              {t("clipper.pairing.close")}
             </button>
           </div>
         </div>
@@ -211,13 +219,15 @@ export function PairingDialog() {
 
   return (
     <div style={BACKDROP_STYLE} data-testid="pairing.dialog" data-phase="pending">
-      <div style={CARD_STYLE} role="dialog" aria-label={PAIRING_TITLE}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>{PAIRING_TITLE}</h2>
-        <p style={{ margin: 0, fontSize: 14, color: "var(--fg-2)" }}>{PAIRING_INTRO}</p>
+      <div style={CARD_STYLE} role="dialog" aria-label={t("clipper.pairing.title")}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>{t("clipper.pairing.title")}</h2>
+        <p style={{ margin: 0, fontSize: 14, color: "var(--fg-2)" }}>
+          {t("clipper.pairing.intro")}
+        </p>
         <div
           style={CHALLENGE_STYLE}
           data-testid="pairing.challenge"
-          aria-label="Pairing code"
+          aria-label={t("clipper.pairing.codeAriaLabel")}
         >
           {pending.challenge}
         </div>
@@ -229,7 +239,7 @@ export function PairingDialog() {
             disabled={working}
             onClick={() => void onReject(pending.request_id)}
           >
-            Reject
+            {t("clipper.pairing.reject")}
           </button>
           <button
             type="button"
@@ -243,7 +253,7 @@ export function PairingDialog() {
             disabled={working}
             onClick={() => void onAccept(pending.request_id)}
           >
-            Accept
+            {t("clipper.pairing.accept")}
           </button>
         </div>
       </div>

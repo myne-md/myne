@@ -17,6 +17,7 @@ import {
   type CSSProperties,
   type DragEvent as ReactDragEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { CMEditor, type ScrollAnchorRequest } from "../../editor/CMEditor";
 import { asViewMode, type ViewMode } from "../../editor/view-mode";
 
@@ -142,6 +143,7 @@ export function PaneView({
   insetLeft = 0,
   insetRight = 0,
 }: PaneViewProps) {
+  const { t } = useTranslation();
   const ws = useWorkspace();
   const ctx = useSelectedNote();
   const { prefs } = usePrefs();
@@ -595,13 +597,15 @@ export function PaneView({
           const it = parseItemKey(key);
           if (it.kind === "note") return ctx.cache.get(it.id)?.title ?? null;
           // Graph tab: the whole-vault graph is a singleton with a fixed label.
-          if (it.kind === "graph") return "Graph";
+          if (it.kind === "graph") return t("notes.pane.graphTab");
           // View tab: label by the saved view's name (MYND-274), not its raw id.
           // A blank name shows "Untitled view" (the sidebar's label rule); an
           // unknown id (a stale tab for a deleted view) falls back to null.
           const view = prefs.saved_views.find((v) => v.id === it.id);
           if (view === undefined) return null;
-          return view.name.trim() === "" ? "Untitled view" : view.name;
+          return view.name.trim() === ""
+            ? t("notes.pane.untitledView")
+            : view.name;
         }}
         iconOf={(key) => {
           const it = parseItemKey(key);
@@ -683,6 +687,7 @@ export function PaneView({
 }
 
 function PaneLoading() {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -694,7 +699,7 @@ function PaneLoading() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      Loading…
+      {t("notes.pane.loading")}
     </div>
   );
 }

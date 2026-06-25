@@ -21,6 +21,7 @@
 // `view-settings.*` testid so the real-IPC E2E can drive and read it.
 
 import { useMemo, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
@@ -130,13 +131,6 @@ const FOOTER_STYLE: CSSProperties = {
 // (`resolveAspectRatio` in cardsView.tsx); the empty value means "unset" → the
 // render falls back to its ≈16:9 default, so we omit the field entirely.
 const ASPECT_DEFAULT = "";
-const ASPECT_OPTIONS: readonly SelectOption<string>[] = [
-  { value: ASPECT_DEFAULT, label: "Default (16:9)" },
-  { value: "1.78", label: "16:9 (wide)" },
-  { value: "1.5", label: "3:2" },
-  { value: "1.33", label: "4:3" },
-  { value: "1", label: "1:1 (square)" },
-];
 
 export function ViewSettings({
   title,
@@ -145,6 +139,14 @@ export function ViewSettings({
   onCancel,
   onSave,
 }: ViewSettingsProps) {
+  const { t } = useTranslation();
+  const ASPECT_OPTIONS: readonly SelectOption<string>[] = [
+    { value: ASPECT_DEFAULT, label: t("notes.viewSettings.aspect.default") },
+    { value: "1.78", label: t("notes.viewSettings.aspect.wide") },
+    { value: "1.5", label: t("notes.viewSettings.aspect.threeTwo") },
+    { value: "1.33", label: t("notes.viewSettings.aspect.fourThree") },
+    { value: "1", label: t("notes.viewSettings.aspect.square") },
+  ];
   const [image, setImage] = useState(initial.image ?? "");
   const [aspect, setAspect] = useState(
     initial.image_aspect_ratio ?? ASPECT_DEFAULT,
@@ -175,24 +177,23 @@ export function ViewSettings({
       labelId="view-settings-title"
       onClose={onCancel}
       width={480}
-      closeLabel="Cancel"
+      closeLabel={t("notes.viewSettings.cancel")}
     >
       <div data-testid="view-settings.modal" style={BODY_STYLE}>
         {/* Cover image property -------------------------------------------- */}
         <div style={FIELD_STYLE}>
           <label htmlFor="view-settings.image-input" style={LABEL_STYLE}>
-            Cover image property
+            {t("notes.viewSettings.coverImageProperty")}
           </label>
           <p style={HINT_STYLE}>
-            The frontmatter property whose value is an image — shown as each
-            card's cover. Leave empty for no cover.
+            {t("notes.viewSettings.coverImageHint")}
           </p>
           <Input
             id="view-settings.image-input"
             type="text"
             data-testid="view-settings.image-input"
             value={image}
-            placeholder="e.g. cover"
+            placeholder={t("notes.viewSettings.coverImagePlaceholder")}
             onChange={(e) => setImage(e.target.value)}
           />
           {suggestions.length > 0 && (
@@ -215,10 +216,10 @@ export function ViewSettings({
 
         {/* Aspect ratio ----------------------------------------------------- */}
         <div style={FIELD_STYLE}>
-          <span style={LABEL_STYLE}>Image aspect ratio</span>
+          <span style={LABEL_STYLE}>{t("notes.viewSettings.imageAspectRatio")}</span>
           <SearchableSelect
             testId="view-settings.aspect-select"
-            aria-label="Image aspect ratio"
+            aria-label={t("notes.viewSettings.imageAspectRatio")}
             options={ASPECT_OPTIONS}
             selected={[aspect]}
             onChange={(next) => setAspect(next[0] ?? ASPECT_DEFAULT)}
@@ -227,12 +228,12 @@ export function ViewSettings({
 
         {/* Card size -------------------------------------------------------- */}
         <div style={FIELD_STYLE}>
-          <span style={LABEL_STYLE}>Card size</span>
+          <span style={LABEL_STYLE}>{t("notes.viewSettings.cardSize")}</span>
           <div style={CARD_SIZE_ROW_STYLE}>
             <input
               type="range"
               data-testid="view-settings.card-size"
-              aria-label="Card size"
+              aria-label={t("notes.viewSettings.cardSize")}
               min={MIN_CARD_WIDTH}
               max={MAX_CARD_WIDTH}
               step={10}
@@ -241,7 +242,7 @@ export function ViewSettings({
               style={{ flex: 1 }}
             />
             <span data-testid="view-settings.card-size-value" style={CARD_SIZE_VALUE_STYLE}>
-              {cardSize} px
+              {t("notes.viewSettings.cardSizeValue", { size: cardSize })}
             </span>
             <Button
               variant="ghost"
@@ -249,7 +250,7 @@ export function ViewSettings({
               disabled={cardSize === DEFAULT_CARD_WIDTH}
               onClick={() => setCardSize(DEFAULT_CARD_WIDTH)}
             >
-              Reset
+              {t("notes.viewSettings.reset")}
             </Button>
           </div>
         </div>
@@ -257,10 +258,10 @@ export function ViewSettings({
 
       <div style={FOOTER_STYLE}>
         <Button variant="ghost" data-testid="view-settings.cancel" onClick={onCancel}>
-          Cancel
+          {t("notes.viewSettings.cancel")}
         </Button>
         <Button variant="primary" data-testid="view-settings.save" onClick={save}>
-          Save
+          {t("notes.viewSettings.save")}
         </Button>
       </div>
     </ModalShell>

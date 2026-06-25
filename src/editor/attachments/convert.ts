@@ -17,6 +17,7 @@
 // surfaced as "skipped" in the preview, never rewritten on a guess.
 
 import { EditorView } from "@codemirror/view";
+import i18n from "../../i18n";
 import {
   type ImportedAttachment,
   type ImportedImageRef,
@@ -68,7 +69,7 @@ export async function convertImportedRefs(
   const refs = findImportedImageRefs(body);
 
   if (refs.length === 0) {
-    showAttachmentToast("No imported attachments to convert in this note.");
+    showAttachmentToast(i18n.t("editor.attachment.convertCore.noneToConvert"));
     return { converted: 0, skipped: 0, cancelled: false };
   }
 
@@ -130,8 +131,10 @@ export async function convertImportedRefs(
 
   if (rewrites.length > 0) {
     const msg =
-      `${rewrites.length} converted` +
-      (skipped.length > 0 ? ` · ${skipped.length} skipped` : "");
+      i18n.t("editor.attachment.convertCore.converted", { count: rewrites.length }) +
+      (skipped.length > 0
+        ? i18n.t("editor.attachment.convertCore.skippedSuffix", { count: skipped.length })
+        : "");
     showAttachmentToast(msg);
   }
   return { converted: rewrites.length, skipped: skipped.length, cancelled: false };
@@ -158,14 +161,14 @@ export function applyRewrites(view: EditorView, rewrites: readonly PlannedRewrit
 export function importSkipNote(reason: string): string {
   switch (reason) {
     case "too-large":
-      return "too large (max 64 MiB)";
+      return i18n.t("editor.attachment.convertCore.skipNote.tooLarge");
     case "unsupported":
-      return "unsupported type";
+      return i18n.t("editor.attachment.convertCore.skipNote.unsupported");
     case "locked":
-      return "vault locked";
+      return i18n.t("editor.attachment.convertCore.skipNote.locked");
     case "not-found":
-      return "source not found";
+      return i18n.t("editor.attachment.convertCore.skipNote.notFound");
     default:
-      return "import failed";
+      return i18n.t("editor.attachment.convertCore.skipNote.failed");
   }
 }

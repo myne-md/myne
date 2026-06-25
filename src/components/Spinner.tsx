@@ -5,6 +5,7 @@
 // accent), an honest "work-in-progress" indicator without rotation.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SpinnerProps {
   size?: number;
@@ -12,12 +13,13 @@ interface SpinnerProps {
 }
 
 export function Spinner({ size = 32, style }: SpinnerProps) {
+  const { t } = useTranslation();
   const borderWidth = Math.max(2, Math.round(size / 12));
   return (
     <div
       className="myne-spinner"
       role="status"
-      aria-label="Loading"
+      aria-label={t("common.spinner.loadingLabel")}
       style={{
         width: size,
         height: size,

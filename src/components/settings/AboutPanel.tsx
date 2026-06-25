@@ -9,6 +9,7 @@
 // `9fb59646-2811-8082-8007-fd4c5a602b46`).
 
 import type { CSSProperties, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "../primitives/Button";
 import {
@@ -75,23 +76,26 @@ function handleThreatModelClick() {
 }
 
 export function AboutPanel() {
+  const { t } = useTranslation();
   const buildChannelLabel =
-    import.meta.env.MODE === "development" ? "Development build" : "Stable";
+    import.meta.env.MODE === "development"
+      ? t("settings.about.buildChannelDevelopment")
+      : t("settings.about.buildChannelStable");
 
   return (
     <div style={PANEL_ROOT_STYLE}>
       <Block>
         <h3 style={VERSION_TITLE_STYLE}>Myne {__APP_VERSION__}</h3>
-        <p style={VERSION_SUBTITLE_STYLE}>Pre-alpha · Phase 1 desktop client</p>
+        <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
       </Block>
 
       <Block>
-        <span style={LABEL_STYLE}>Build channel</span>
+        <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
         <p style={VALUE_STYLE}>{buildChannelLabel}</p>
       </Block>
 
       <Block>
-        <span style={LABEL_STYLE}>Threat model</span>
+        <span style={LABEL_STYLE}>{t("settings.about.threatModelLabel")}</span>
         <button
           type="button"
           onClick={handleThreatModelClick}
@@ -100,28 +104,22 @@ export function AboutPanel() {
           myne.md/threat-model
           <span aria-hidden="true">↗</span>
         </button>
-        <p style={HELPER_STYLE}>
-          Open the public threat-model document in your browser.
-        </p>
+        <p style={HELPER_STYLE}>{t("settings.about.threatModelHelper")}</p>
       </Block>
 
       <Block>
-        <span style={LABEL_STYLE}>License</span>
-        <p style={LICENSE_BODY_STYLE}>
-          Pre-alpha · CC0 docs · AGPL-3.0 application code on Phase 1 release.
-        </p>
+        <span style={LABEL_STYLE}>{t("settings.about.licenseLabel")}</span>
+        <p style={LICENSE_BODY_STYLE}>{t("settings.about.licenseBody")}</p>
       </Block>
 
       <Block>
-        <span style={LABEL_STYLE}>Changelog</span>
+        <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
         <div>
           <Button variant="secondary" disabled>
-            View changelog…
+            {t("settings.about.changelogButton")}
           </Button>
         </div>
-        <p style={HELPER_STYLE}>
-          Per-version notes. Will appear when MYND-119 lands.
-        </p>
+        <p style={HELPER_STYLE}>{t("settings.about.changelogHelper")}</p>
       </Block>
     </div>
   );

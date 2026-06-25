@@ -9,6 +9,7 @@
 // line-number compartment live (no remount).
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { prefsRead, setEditorLineNumbers } from "../../lib/prefs";
 
@@ -32,6 +33,7 @@ const ERROR_STYLE: CSSProperties = {
 };
 
 export function LineNumbersSettings() {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,26 +61,26 @@ export function LineNumbersSettings() {
       setError(null);
     } catch {
       setEnabled(prev); // rollback
-      setError("Could not save the line-number setting.");
+      setError(t("settings.lineNumbers.errorSaveSetting"));
     }
   }
 
   return (
     <>
       <ControlBlock
-        label="Line numbers"
-        helper="Show a line-number gutter in the editor. One number per line; off by default."
+        label={t("settings.lineNumbers.label")}
+        helper={t("settings.lineNumbers.helper")}
         control={
           <button
             type="button"
             role="switch"
             aria-checked={enabled}
-            aria-label="Line numbers"
+            aria-label={t("settings.lineNumbers.label")}
             data-testid="settings.line-numbers"
             onClick={() => void toggle(!enabled)}
             style={TOGGLE_STYLE}
           >
-            {enabled ? "On" : "Off"}
+            {enabled ? t("settings.lineNumbers.on") : t("settings.lineNumbers.off")}
           </button>
         }
       />

@@ -9,6 +9,7 @@
 // All visible text is set via `textContent` (never `innerHTML`) per TB2.
 
 import { formatClock } from "../../components/attachments/format";
+import i18n from "../../i18n";
 import { ensureAttachmentInsertStyles } from "./styles";
 
 const METER_BARS = 12;
@@ -43,7 +44,7 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
   const bar = document.createElement("div");
   bar.className = "cm-voice-rec";
   bar.setAttribute("role", "dialog");
-  bar.setAttribute("aria-label", "Recording voice note");
+  bar.setAttribute("aria-label", i18n.t("editor.attachment.recording.barAria"));
   bar.setAttribute("data-testid", "voice-record-bar");
 
   const dot = document.createElement("span");
@@ -81,7 +82,7 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
   stop.type = "button";
   stop.className = "cm-voice-rec-stop";
   stop.setAttribute("data-testid", "voice-record.stop");
-  stop.textContent = "Stop";
+  stop.textContent = i18n.t("editor.attachment.recording.stop");
   stop.addEventListener("click", () => opts.onStop());
   bar.appendChild(stop);
 
@@ -89,7 +90,7 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
   cancel.type = "button";
   cancel.className = "cm-voice-rec-cancel";
   cancel.setAttribute("data-testid", "voice-record.cancel");
-  cancel.textContent = "Cancel";
+  cancel.textContent = i18n.t("editor.attachment.recording.cancel");
   cancel.addEventListener("click", () => opts.onCancel());
   bar.appendChild(cancel);
 
@@ -100,7 +101,7 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
     time.textContent = formatClock(elapsed / 1000);
     if (elapsed > SILENCE_GRACE_MS && maxLevel < SILENCE_LEVEL) {
       warning.hidden = false;
-      warning.textContent = "No audio detected — check your microphone.";
+      warning.textContent = i18n.t("editor.attachment.recording.noAudio");
     }
   }, TIMER_TICK_MS);
   teardownFns.push(() => window.clearInterval(tick));
@@ -122,7 +123,7 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
     setBusy(): void {
       stop.disabled = true;
       cancel.disabled = true;
-      stop.textContent = "Saving…";
+      stop.textContent = i18n.t("editor.attachment.recording.saving");
     },
     teardown(): void {
       for (const fn of teardownFns) fn();

@@ -9,6 +9,7 @@ import { syntaxTree } from "@codemirror/language";
 import { type EditorState } from "@codemirror/state";
 import { type EditorView } from "@codemirror/view";
 import { save } from "@tauri-apps/plugin-dialog";
+import i18n from "../../i18n";
 import { attachmentExport, attachmentRename } from "../../lib/attachments";
 import { parseAttachmentTarget } from "../../notes/attachmentRef";
 import { parseWikilinkParts } from "../wikilink/chip-widget";
@@ -32,16 +33,16 @@ export async function exportAttachment(id: string, filename: string): Promise<vo
   try {
     dest = await save({ defaultPath: filename });
   } catch {
-    showAttachmentToast("Couldn't open the save dialog.");
+    showAttachmentToast(i18n.t("editor.attachment.actions.saveDialogFailed"));
     return;
   }
   if (dest === null) return; // cancelled
   try {
     // The OS save dialog already confirmed any overwrite → overwrite = true.
     await attachmentExport(id, dest, true);
-    showAttachmentToast(`Exported ${filename}.`);
+    showAttachmentToast(i18n.t("editor.attachment.actions.exported", { filename }));
   } catch {
-    showAttachmentToast(`Couldn't export ${filename}.`);
+    showAttachmentToast(i18n.t("editor.attachment.actions.exportFailed", { filename }));
   }
 }
 
@@ -69,9 +70,9 @@ export async function renameFileCard(
         { id, contentType: row.contentType, filename: trimmed, size: row.size },
       ]);
     }
-    showAttachmentToast(`Renamed to ${trimmed}.`);
+    showAttachmentToast(i18n.t("editor.attachment.actions.renamed", { name: trimmed }));
   } catch {
-    showAttachmentToast("Couldn't rename the attachment.");
+    showAttachmentToast(i18n.t("editor.attachment.actions.renameFailed"));
   }
 }
 

@@ -12,6 +12,7 @@
 // `screen------importer — onboarding-offer (MYND-53)`.
 
 import { useEffect, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 
@@ -38,6 +39,7 @@ export function ImporterOnboardingOffer({
   onChoose,
   onDismiss,
 }: ImporterOnboardingOfferProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -107,7 +109,7 @@ export function ImporterOnboardingOffer({
               color: "var(--fg-display)",
             }}
           >
-            Import your Obsidian vault?
+            {t("notes.import.offer.title")}
           </h2>
         </div>
 
@@ -119,22 +121,20 @@ export function ImporterOnboardingOffer({
             color: "var(--fg-2)",
           }}
         >
-          Bring your existing notes into Myne. Each one is encrypted as it’s
-          imported — nothing leaves this device, and your original files stay
-          exactly where they are.
+          {t("notes.import.offer.body")}
         </p>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
           <Button variant="ghost" onClick={onDismiss} data-testid="importer.offer-dismiss">
-            Not now
+            {t("notes.import.offer.notNow")}
           </Button>
           <Button variant="primary" icon="folder" onClick={onChoose} data-testid="importer.offer-choose">
-            Choose folder…
+            {t("notes.import.offer.chooseFolder")}
           </Button>
         </div>
 
         <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
-          You can always import later from Settings → Storage.
+          {t("notes.import.offer.laterHint")}
         </p>
       </div>
     </div>

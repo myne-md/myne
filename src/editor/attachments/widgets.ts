@@ -18,6 +18,7 @@
 // All visible text is set via `textContent` (never `innerHTML`) per TB2.
 
 import { type EditorView, WidgetType } from "@codemirror/view";
+import i18n from "../../i18n";
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { makeAttachmentIcon } from "./icons";
 import type { CatalogRow } from "./catalog";
@@ -163,7 +164,7 @@ export class AttachmentPdfWidget extends WidgetType {
         fallback.appendChild(makeAttachmentIcon("file"));
         const label = document.createElement("span");
         label.className = "cm-attachment-pdf-fallback-label";
-        label.textContent = "PDF";
+        label.textContent = i18n.t("editor.attachment.widget.pdfFallback");
         fallback.appendChild(label);
         scroller.replaceChildren(fallback);
         scroller.style.cursor = "default";
@@ -210,8 +211,8 @@ export class AttachmentTombstoneWidget extends WidgetType {
     chip.setAttribute(
       "aria-label",
       this.kind === "deleted"
-        ? `Deleted attachment: ${this.filename}`
-        : `Broken attachment reference: ${this.filename}`,
+        ? i18n.t("editor.attachment.widget.tombstone.deletedAria", { filename: this.filename })
+        : i18n.t("editor.attachment.widget.tombstone.brokenAria", { filename: this.filename }),
     );
 
     chip.appendChild(
@@ -220,7 +221,11 @@ export class AttachmentTombstoneWidget extends WidgetType {
 
     const label = document.createElement("span");
     label.className = "cm-attachment-tombstone-label";
-    label.textContent = this.filename || (this.kind === "deleted" ? "deleted" : "broken");
+    label.textContent =
+      this.filename ||
+      (this.kind === "deleted"
+        ? i18n.t("editor.attachment.widget.tombstone.deletedLabel")
+        : i18n.t("editor.attachment.widget.tombstone.brokenLabel"));
     chip.appendChild(label);
 
     return chip;
@@ -259,7 +264,7 @@ export class UrlImageChipWidget extends WidgetType {
     const label = document.createElement("span");
     label.className = "cm-attachment-url-chip-label";
     // "image (not loaded)" reads at a glance; the alt (if any) names it.
-    label.textContent = this.alt !== "" ? this.alt : "image";
+    label.textContent = this.alt !== "" ? this.alt : i18n.t("editor.attachment.widget.urlImageFallback");
     chip.appendChild(label);
 
     return chip;
@@ -291,7 +296,6 @@ export class AttachmentFileCardWidget extends WidgetType {
     private readonly id: string,
     private readonly filename: string,
     private readonly size: number,
-    private readonly label: string = fileTypeLabel(filename),
   ) {
     super();
   }
@@ -325,18 +329,20 @@ export class AttachmentFileCardWidget extends WidgetType {
 
     const meta = document.createElement("span");
     meta.className = "cm-attachment-file-card-meta";
-    // textContent (never innerHTML) per TB2.
-    meta.textContent = `${this.label} · ${formatBytes(this.size)}`;
+    // textContent (never innerHTML) per TB2. The type label is resolved here
+    // (at render) rather than cached in the constructor, so it tracks a
+    // language switch.
+    meta.textContent = `${fileTypeLabel(this.filename)} · ${formatBytes(this.size)}`;
     text.appendChild(meta);
 
     card.appendChild(text);
 
     const menu = buildOverflowMenu(
       [
-        { label: "Export", testid: "attachment-card.export", run: () => void exportAttachment(this.id, this.filename) },
-        { label: "Rename", testid: "attachment-card.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-        { label: "Remove", testid: "attachment-card.remove", run: () => removeFileCard(view, card, this.id) },
-        { label: "Reveal in library", testid: "attachment-card.reveal", run: () => revealFileCard(view, this.id) },
+        { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-card.export", run: () => void exportAttachment(this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-card.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-card.remove", run: () => removeFileCard(view, card, this.id) },
+        { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-card.reveal", run: () => revealFileCard(view, this.id) },
       ],
       { buttonTestId: "attachment-card.menu-button", menuTestId: "attachment-card.menu" },
     );
@@ -419,7 +425,7 @@ export class AttachmentAudioWidget extends WidgetType {
     playBtn.type = "button";
     playBtn.className = "cm-attachment-audio-play";
     playBtn.setAttribute("data-testid", "attachment-audio.play");
-    playBtn.setAttribute("aria-label", "Play");
+    playBtn.setAttribute("aria-label", i18n.t("editor.attachment.widget.audio.play"));
     playBtn.appendChild(makeAttachmentIcon("play"));
     row.appendChild(playBtn);
 
@@ -427,7 +433,7 @@ export class AttachmentAudioWidget extends WidgetType {
     track.className = "cm-attachment-audio-track";
     track.setAttribute("data-testid", "attachment-audio.track");
     track.setAttribute("role", "slider");
-    track.setAttribute("aria-label", "Seek");
+    track.setAttribute("aria-label", i18n.t("editor.attachment.widget.audio.seek"));
     track.setAttribute("aria-valuemin", "0");
     track.setAttribute("aria-valuemax", "0");
     track.setAttribute("aria-valuenow", "0");
@@ -447,10 +453,10 @@ export class AttachmentAudioWidget extends WidgetType {
 
     const menu = buildOverflowMenu(
       [
-        { label: "Export", testid: "attachment-audio.export", run: () => void exportAttachment(this.id, this.filename) },
-        { label: "Rename", testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-        { label: "Remove", testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
-        { label: "Reveal in library", testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
+        { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-audio.export", run: () => void exportAttachment(this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
+        { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
       ],
       { buttonTestId: "attachment-audio.menu-button", menuTestId: "attachment-audio.menu" },
     );
@@ -470,7 +476,12 @@ export class AttachmentAudioWidget extends WidgetType {
     let bars: HTMLElement[] = [];
     const setPaused = (paused: boolean) => {
       playBtn.replaceChildren(makeAttachmentIcon(paused ? "play" : "pause"));
-      playBtn.setAttribute("aria-label", paused ? "Play" : "Pause");
+      playBtn.setAttribute(
+        "aria-label",
+        paused
+          ? i18n.t("editor.attachment.widget.audio.play")
+          : i18n.t("editor.attachment.widget.audio.pause"),
+      );
     };
     const render = () => {
       const cur = audio.currentTime || 0;

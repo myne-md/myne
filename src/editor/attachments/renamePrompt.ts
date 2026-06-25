@@ -8,6 +8,8 @@
 // commit, Esc / backdrop to cancel. Resolves to the entered string, or `null`
 // when cancelled.
 
+import i18n from "../../i18n";
+
 /** Open the rename prompt seeded with `currentValue`. Resolves to the entered
  *  value (Rename / Enter) or `null` (Cancel / Esc / backdrop). No-op without a
  *  DOM (node test env) → resolves `null`. */
@@ -52,7 +54,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
     const dialog = document.createElement("div");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-label", "Rename attachment");
+    dialog.setAttribute("aria-label", i18n.t("editor.attachment.rename.title"));
     dialog.setAttribute("data-testid", "attachment-rename");
     Object.assign(dialog.style, {
       width: "360px",
@@ -66,7 +68,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
     });
 
     const label = document.createElement("div");
-    label.textContent = "Rename attachment";
+    label.textContent = i18n.t("editor.attachment.rename.title");
     Object.assign(label.style, {
       fontSize: "13px",
       fontWeight: "600",
@@ -101,7 +103,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
 
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "Cancel";
+    cancel.textContent = i18n.t("editor.attachment.rename.cancel");
     cancel.setAttribute("data-testid", "attachment-rename.cancel");
     Object.assign(cancel.style, {
       fontFamily: "var(--font-sans)",
@@ -117,7 +119,7 @@ export function promptForName(currentValue: string): Promise<string | null> {
 
     const confirm = document.createElement("button");
     confirm.type = "button";
-    confirm.textContent = "Rename";
+    confirm.textContent = i18n.t("editor.attachment.rename.confirm");
     confirm.setAttribute("data-testid", "attachment-rename.confirm");
     Object.assign(confirm.style, {
       fontFamily: "var(--font-sans)",

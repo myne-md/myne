@@ -18,6 +18,7 @@
 // hand-mirrored per the no-codegen note in `src/CLAUDE.md`.
 
 import { invoke } from "@tauri-apps/api/core";
+import i18n from "../../i18n";
 import { emitAttachmentEmbed } from "../../notes/attachmentRef";
 
 /** The success payload of `attachment_import` (mirrors Rust
@@ -173,13 +174,13 @@ export async function importMany(
 function skipPhrase(reason: SkipReason, count: number): string {
   const noun =
     reason === "too-large"
-      ? "too large"
+      ? i18n.t("editor.attachment.summary.reason.tooLarge")
       : reason === "unsupported"
-        ? "unsupported type"
+        ? i18n.t("editor.attachment.summary.reason.unsupported")
         : reason === "locked"
-          ? "vault locked"
-          : "failed";
-  return `${count} skipped: ${noun}`;
+          ? i18n.t("editor.attachment.summary.reason.locked")
+          : i18n.t("editor.attachment.summary.reason.failed");
+  return i18n.t("editor.attachment.summary.skipped", { count, noun });
 }
 
 /**
@@ -198,7 +199,7 @@ export function summarizeBatch(outcomes: readonly ImportOutcome[]): string | nul
 
   // A single clean success: no toast (the inserted embed is the feedback).
   if (skips.length === 0) {
-    return added <= 1 ? null : `${added} added`;
+    return added <= 1 ? null : i18n.t("editor.attachment.summary.added", { count: added });
   }
 
   // Group skips by reason, in a stable order.
@@ -210,7 +211,7 @@ export function summarizeBatch(outcomes: readonly ImportOutcome[]): string | nul
     .map((r) => skipPhrase(r, counts.get(r)!));
 
   const parts: string[] = [];
-  if (added > 0) parts.push(`${added} added`);
+  if (added > 0) parts.push(i18n.t("editor.attachment.summary.added", { count: added }));
   parts.push(...skipParts);
   return parts.join(" · ");
 }

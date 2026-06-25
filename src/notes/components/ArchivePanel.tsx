@@ -17,6 +17,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   archivedRecords,
   useSelectedNote,
@@ -50,6 +51,7 @@ export type ArchivePanelProps = {
 };
 
 export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   const [status, setStatus] = useState<string | null>(null);
 
@@ -83,7 +85,7 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
   const restore = useCallback(
     (id: NoteId) => {
       void ctx.unarchiveWithRollback(id).catch(() => {
-        setStatus("Couldn't restore that note. Try again.");
+        setStatus(t("notes.archive.restoreError"));
       });
     },
     [ctx],
@@ -95,7 +97,7 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
   const deleteToTrash = useCallback(
     (id: NoteId) => {
       void ctx.trashWithRollback(id).catch(() => {
-        setStatus("Couldn't delete that note. Try again.");
+        setStatus(t("notes.archive.deleteError"));
       });
     },
     [ctx],
@@ -116,22 +118,27 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
       >
         <div style={HEADER_STYLE}>
           <h2 id="archive-panel-title" style={HEADER_TITLE_STYLE}>
-            Archive
+            {t("notes.archive.title")}
           </h2>
           <span style={COUNT_STYLE}>
-            {count === 0 ? "Empty" : `${count} note${count === 1 ? "" : "s"}`}
+            {count === 0
+              ? t("notes.archive.countEmpty")
+              : t("notes.archive.count", { count })}
           </span>
         </div>
 
         {count === 0 ? (
-          <div style={EMPTY_STATE_STYLE}>Archive is empty.</div>
+          <div style={EMPTY_STATE_STYLE}>{t("notes.archive.emptyState")}</div>
         ) : (
           <div style={LIST_STYLE}>
             {records.map((r) => (
               <div key={r.noteUuid} style={ROW_STYLE}>
-                <span style={ROW_TITLE_STYLE} title={r.title ?? "Untitled"}>
+                <span
+                  style={ROW_TITLE_STYLE}
+                  title={r.title ?? t("notes.archive.untitled")}
+                >
                   {r.title === null || r.title.trim() === ""
-                    ? "Untitled"
+                    ? t("notes.archive.untitled")
                     : r.title}
                 </span>
                 <span style={AGE_STYLE}>
@@ -146,7 +153,7 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
                   data-note-id={r.noteUuid}
                   onClick={() => restore(r.noteUuid)}
                 >
-                  Restore
+                  {t("notes.archive.restore")}
                 </button>
                 <button
                   type="button"
@@ -155,7 +162,7 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
                   data-note-id={r.noteUuid}
                   onClick={() => deleteToTrash(r.noteUuid)}
                 >
-                  Delete
+                  {t("notes.archive.delete")}
                 </button>
               </div>
             ))}
@@ -170,7 +177,7 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
             data-testid="archive.close"
             onClick={onClose}
           >
-            Close
+            {t("notes.archive.close")}
           </button>
         </div>
       </div>

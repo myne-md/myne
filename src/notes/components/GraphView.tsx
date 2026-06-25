@@ -6,6 +6,7 @@
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   isolatedModel,
   loadNeighborhood,
@@ -49,6 +50,7 @@ const MESSAGE_STYLE = {
 };
 
 export function GraphPane() {
+  const { t } = useTranslation();
   const notes = useResolverNotes();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
@@ -126,23 +128,22 @@ export function GraphPane() {
   if (overCap) {
     content = (
       <div style={MESSAGE_STYLE}>
-        This vault is large — the whole-vault graph is capped. Filter to a tag or
-        show isolated notes to explore.
+        {t("notes.graph.overCap")}
       </div>
     );
   } else if (model === null) {
-    content = <div style={MESSAGE_STYLE}>Building graph…</div>;
+    content = <div style={MESSAGE_STYLE}>{t("notes.graph.building")}</div>;
   } else if (model.nodes.length === 0) {
     content = (
       <div style={MESSAGE_STYLE}>
         {filter.kind === "orphans"
-          ? "Everything is connected — no isolated notes."
-          : "No notes to graph yet."}
+          ? t("notes.graph.allConnected")
+          : t("notes.graph.noNotes")}
       </div>
     );
   } else {
     content = (
-      <Suspense fallback={<div style={MESSAGE_STYLE}>Loading graph…</div>}>
+      <Suspense fallback={<div style={MESSAGE_STYLE}>{t("notes.graph.loading")}</div>}>
         <GraphCanvas
           model={model}
           // Whole/orphans/tag: a click navigates. Local: a click PIVOTS
@@ -180,18 +181,18 @@ export function GraphPane() {
         }}
       >
         <FilterChip
-          label="All"
+          label={t("notes.graph.filterAll")}
           active={filter.kind === "all"}
           onClick={() => setFilter({ kind: "all" })}
         />
         <FilterChip
-          label="Isolated"
+          label={t("notes.graph.filterIsolated")}
           active={filter.kind === "orphans"}
           onClick={() => setFilter({ kind: "orphans" })}
         />
         {ctx.selectedId !== null && (
           <FilterChip
-            label="Around this note"
+            label={t("notes.graph.filterAroundNote")}
             active={filter.kind === "local"}
             onClick={() =>
               setFilter({ kind: "local", seed: ctx.selectedId as string, depth: 1 })
@@ -204,7 +205,7 @@ export function GraphPane() {
             onClick={() =>
               setFilter({ ...filter, depth: filter.depth === 1 ? 2 : 1 })
             }
-            title="Toggle neighborhood depth (1 ↔ 2 hops)"
+            title={t("notes.graph.depthToggleTitle")}
             style={{
               fontSize: 12,
               padding: "3px 8px",
@@ -215,7 +216,7 @@ export function GraphPane() {
               cursor: "pointer",
             }}
           >
-            {filter.depth} hop
+            {t("notes.graph.hop", { depth: filter.depth })}
           </button>
         )}
         {tags.length > 0 && (
@@ -228,7 +229,7 @@ export function GraphPane() {
                   : { kind: "tag", key: e.target.value },
               )
             }
-            aria-label="Filter by tag"
+            aria-label={t("notes.graph.filterByTag")}
             style={{
               fontSize: 12,
               padding: "3px 6px",
@@ -238,7 +239,7 @@ export function GraphPane() {
               borderRadius: 6,
             }}
           >
-            <option value="">Tag…</option>
+            <option value="">{t("notes.graph.tagPlaceholder")}</option>
             {tags.map((t) => (
               <option key={t.key} value={t.key}>
                 {`#${t.display} (${t.subtreeCount})`}
@@ -251,7 +252,7 @@ export function GraphPane() {
           <button
             type="button"
             onClick={() => setBuildTrigger((n) => n + 1)}
-            title="The vault changed — rebuild the graph"
+            title={t("notes.graph.refreshTitle")}
             style={{
               fontSize: 12,
               padding: "3px 8px",
@@ -262,7 +263,7 @@ export function GraphPane() {
               cursor: "pointer",
             }}
           >
-            Refresh
+            {t("notes.graph.refresh")}
           </button>
         )}
       </div>

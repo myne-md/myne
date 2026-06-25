@@ -8,6 +8,7 @@
 // `tests/notes/exportFlow.test.ts` pins non-empty, pairwise-distinct copy
 // per variant at runtime.
 
+import i18n from "../i18n";
 import type {
   NoteExportAttachmentsError,
   NoteExportError,
@@ -17,27 +18,33 @@ import type { IoFailureKind } from "../types/vault-unlock-error";
 
 // Shared sentences — one export vocabulary across the markdown /
 // attachments / PDF / vault tables (each table's switch stays exhaustive;
-// only the copy is single-sourced here).
+// only the copy is single-sourced here). Resolved through i18n at CALL
+// time (functions, not module-scope constants) so a language switch is
+// reflected — a frozen `const i18n.t(...)` would capture the boot locale.
 
-export const EXPORT_DESTINATION_UNUSABLE_MESSAGE =
-  "That destination folder is not usable.";
-export const EXPORT_TARGET_EXISTS_MESSAGE =
-  "A file with that name already exists at the destination.";
+export function exportDestinationUnusableMessage(): string {
+  return i18n.t("export.note.errors.destinationUnusable");
+}
+export function exportTargetExistsMessage(): string {
+  return i18n.t("export.note.errors.targetExists");
+}
 /** Out-of-contract rejection shapes (and JoinFailure) fall back to this
  *  generic line in both per-note flows. */
-export const EXPORT_FALLBACK_MESSAGE = "Export failed unexpectedly. Try again.";
+export function exportFallbackMessage(): string {
+  return i18n.t("export.note.errors.fallback");
+}
 
 /** `Io` variant → copy, shared by every export error table. The space /
  *  permission sentences are common; the residual write line differs per
  *  flow (`fallback`). */
 export function ioWriteErrorMessage(
   kind: IoFailureKind,
-  fallback = "Could not write the exported file.",
+  fallback: string = i18n.t("export.note.errors.ioWriteDefault"),
 ): string {
   return kind === "NoSpace"
-    ? "Not enough space at the destination."
+    ? i18n.t("export.note.errors.ioNoSpace")
     : kind === "PermissionDenied"
-      ? "No permission to write at the destination."
+      ? i18n.t("export.note.errors.ioPermissionDenied")
       : fallback;
 }
 
@@ -49,31 +56,31 @@ export function ioWriteErrorMessage(
 export function noteExportErrorMessage(e: NoteExportError): string {
   switch (e?.kind) {
     case "VaultNotUnlocked":
-      return "The vault is locked. Unlock it, then try again.";
+      return i18n.t("export.note.errors.vaultLocked");
     case "InvalidNoteId":
       // Bug-canary on the Rust side — the UI should never produce a
       // malformed id. Surfaced as a generic failure, nothing was written.
-      return "This note could not be identified, so nothing was exported.";
+      return i18n.t("export.note.errors.invalidNoteId");
     case "NoteNotFound":
       // Normal user-flow outcome: the note was deleted between the
       // context-menu open and the dialog confirm.
-      return "This note no longer exists — it may have been deleted.";
+      return i18n.t("export.note.errors.noteNotFound");
     case "CannotDecrypt":
       // Deterministic fail (protocol.md §6.4 non-distinguishing) — no
       // "try again" CTA.
-      return "This note could not be read.";
+      return i18n.t("export.note.errors.cannotDecrypt");
     case "InvalidPlaintextEncoding":
-      return "This note's content looks damaged, so nothing was exported. Restore it from a backup.";
+      return i18n.t("export.note.errors.invalidPlaintextEncoding");
     case "InvalidDestination":
-      return EXPORT_DESTINATION_UNUSABLE_MESSAGE;
+      return exportDestinationUnusableMessage();
     case "TargetAlreadyExists":
       // Only reachable with overwrite=false — the context-menu/palette flow
       // passes overwrite=true (the OS Replace prompt is the consent).
-      return EXPORT_TARGET_EXISTS_MESSAGE;
+      return exportTargetExistsMessage();
     case "Io":
       return ioWriteErrorMessage(e.detail.io_error_kind);
     case "JoinFailure":
-      return EXPORT_FALLBACK_MESSAGE;
+      return exportFallbackMessage();
   }
 }
 
@@ -90,13 +97,13 @@ export function noteExportAttachmentsErrorMessage(
     case "InvalidNoteFilename":
       // Bug-canary — the UI passes the OS dialog's final path component
       // verbatim; surfaced as a generic failure, nothing was written.
-      return "That file name is not usable, so nothing was exported.";
+      return i18n.t("export.note.errors.invalidNoteFilename");
     case "InvalidVaultMeta":
-      return "The vault's attachment catalog could not be read, so nothing was exported.";
+      return i18n.t("export.note.errors.invalidAttachmentCatalog");
     case "AttachmentMissing":
-      return "An attachment referenced by this note is missing, so nothing was exported.";
+      return i18n.t("export.note.errors.attachmentMissing");
     case "AttachmentCorrupt":
-      return "An attachment referenced by this note could not be read, so nothing was exported.";
+      return i18n.t("export.note.errors.attachmentCorrupt");
     default:
       // Every remaining variant is shape-identical to its NoteExportError
       // twin — delegating keeps the copy single-sourced, and a future
@@ -116,25 +123,25 @@ export function notePdfExportErrorMessage(e: PdfExportError): string {
   switch (e?.kind) {
     case "ExportInProgress":
       // Bug-canary (the UI serializes exports), but still honest copy.
-      return "A PDF export is already running. Wait for it to finish, then try again.";
+      return i18n.t("export.note.errors.pdfExportInProgress");
     case "InvalidDestination":
-      return EXPORT_DESTINATION_UNUSABLE_MESSAGE;
+      return exportDestinationUnusableMessage();
     case "TargetAlreadyExists":
       // Only reachable with overwrite=false — the flow passes
       // overwrite=true (the OS Replace prompt is the consent).
-      return EXPORT_TARGET_EXISTS_MESSAGE;
+      return exportTargetExistsMessage();
     case "WindowCreateFailed":
-      return "The export window could not be opened, so nothing was exported.";
+      return i18n.t("export.note.errors.pdfWindowCreateFailed");
     case "RenderTimeout":
-      return "The note took too long to render, so nothing was exported.";
+      return i18n.t("export.note.errors.pdfRenderTimeout");
     case "PayloadMissing":
       // Lock-during-export lands here (teardown cancels the session).
-      return "The export was interrupted — if the vault locked, unlock it and try again.";
+      return i18n.t("export.note.errors.pdfPayloadMissing");
     case "CaptureFailed":
-      return "The PDF could not be generated, so nothing was exported.";
+      return i18n.t("export.note.errors.pdfCaptureFailed");
     case "Io":
       return ioWriteErrorMessage(e.detail.io_error_kind);
     case "JoinFailure":
-      return EXPORT_FALLBACK_MESSAGE;
+      return exportFallbackMessage();
   }
 }

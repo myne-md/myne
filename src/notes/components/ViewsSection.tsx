@@ -19,6 +19,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
 import { IconButton } from "../../components/primitives/IconButton";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
@@ -104,8 +105,8 @@ const EMPTY_HINT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-const viewLabel = (view: SavedView): string =>
-  view.name.trim() === "" ? "Untitled view" : view.name;
+const viewLabel = (view: SavedView, untitled: string): string =>
+  view.name.trim() === "" ? untitled : view.name;
 
 /** One saved-view row — opens on click, right-click for the action menu, or an
  *  inline rename input when this row is being renamed. */
@@ -124,8 +125,9 @@ function ViewRow({
   onCommitRename: (id: string, name: string) => void;
   onCancelRename: () => void;
 }) {
+  const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
-  const label = viewLabel(view);
+  const label = viewLabel(view, t("notes.views.untitledView"));
 
   if (renaming) {
     return (
@@ -207,6 +209,7 @@ export function ViewsSection({
   onDelete: (id: string) => void;
   onMoveView: (id: string, dir: -1 | 1) => void;
 }) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(
     null,
@@ -243,36 +246,36 @@ export function ViewsSection({
     ? [
         {
           id: "edit-filter",
-          label: "Edit filter…",
+          label: t("notes.views.menu.editFilter"),
           onSelect: () => onEditFilter(menu.id),
         },
         ...(menuView?.view_type === "cards"
           ? [
               {
                 id: "view-settings",
-                label: "View settings…",
+                label: t("notes.views.menu.viewSettings"),
                 onSelect: () => onViewSettings(menu.id),
               },
             ]
           : []),
         {
           id: "rename",
-          label: "Rename",
+          label: t("notes.views.menu.rename"),
           onSelect: () => setRenamingId(menu.id),
         },
         {
           id: "move-up",
-          label: "Move up",
+          label: t("notes.views.menu.moveUp"),
           onSelect: () => onMoveView(menu.id, -1),
         },
         {
           id: "move-down",
-          label: "Move down",
+          label: t("notes.views.menu.moveDown"),
           onSelect: () => onMoveView(menu.id, 1),
         },
         {
           id: "delete",
-          label: "Delete view",
+          label: t("notes.views.menu.deleteView"),
           destructive: true,
           onSelect: () => onDelete(menu.id),
         },
@@ -307,7 +310,11 @@ export function ViewsSection({
         <div style={HEADER_LEAD_STYLE}>
           <button
             type="button"
-            aria-label={collapsed ? "Expand views" : "Collapse views"}
+            aria-label={
+              collapsed
+                ? t("notes.views.expandViews")
+                : t("notes.views.collapseViews")
+            }
             aria-expanded={!collapsed}
             data-testid="views.collapse-toggle"
             onClick={() => setCollapsed((v) => !v)}
@@ -315,11 +322,11 @@ export function ViewsSection({
           >
             <Icon name={collapsed ? "chevron-right" : "chevron-down"} size={14} />
           </button>
-          <div style={SECTION_HEADING_STYLE}>Views</div>
+          <div style={SECTION_HEADING_STYLE}>{t("notes.views.heading")}</div>
         </div>
         <IconButton
           icon="file-plus"
-          label="New view"
+          label={t("notes.views.newView")}
           testId="views.new-button"
           onClick={onNewView}
         />
@@ -327,7 +334,7 @@ export function ViewsSection({
       {!collapsed &&
         (views.length === 0 ? (
           <div style={EMPTY_HINT_STYLE} data-testid="views.empty">
-            No views yet. Save the current note list as a view.
+            {t("notes.views.empty")}
           </div>
         ) : (
           <div>

@@ -32,7 +32,8 @@ User-facing strings go through **react-i18next**, not hardcoded JSX. Source lang
 - In components: `const { t } = useTranslation();` → `t("welcome.createCta")`. Outside React: `import i18n from "src/i18n"` → `i18n.t(...)`.
 - Add a key → `pnpm i18n:extract` → fill the **English** value in `locales/en/common.json`. Never hand-edit non-English catalogs (Weblate owns them).
 - **Do NOT i18n load-bearing copy** (`src/lib/load-bearing-copy.ts`): its exact English wording is a privacy property and is E2E-pinned by literal equality. Render the constant verbatim in every locale.
-- Status: **Phase 0 (pilot)** — Welcome, Unlock, and the Settings language selector are migrated; remaining screens migrate incrementally, one PR per screen.
+- **Module-level data (command catalogs, label maps, error maps): store i18n KEYS, resolve with `t()`/`i18n.t()` at the render/usage consumer — never freeze a resolved string at module top level** (it would capture the boot language and not react to a language switch). `main.tsx` imports `./i18n` first so module-level `i18n.t()` (called at usage time) resolves against loaded resources.
+- Status: **Comprehensive** — the whole desktop UI is migrated (~1300 strings, ~139 files, en catalog ≈1500 keys). When you add a user-facing string, add its `t()` key in the same change (`pnpm i18n:extract`, fill the English value in `locales/en/common.json`).
 
 ## Layout
 
