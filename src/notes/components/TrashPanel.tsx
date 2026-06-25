@@ -12,11 +12,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import {
   trashedRecords,
   useSelectedNote,
@@ -72,6 +74,9 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   const ctx = useSelectedNote();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
 
   const records = useMemo(() => trashedRecords(ctx.cache), [ctx.cache]);
 
@@ -141,6 +146,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   return (
     <div style={BACKDROP_STYLE} onClick={handleBackdrop} role="presentation">
       <div
+        ref={dialogRef}
         style={PANEL_STYLE}
         role="dialog"
         aria-modal="true"

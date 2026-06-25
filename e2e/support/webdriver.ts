@@ -386,6 +386,13 @@ export class Session {
     return this.send("POST", "/execute/sync", { script, args });
   }
 
+  /** Async script: the LAST argument injected into `script` is a callback
+   *  that resolves this promise. Used to await page-side Promises (e.g.
+   *  `axe.run(...)`) that the sync endpoint cannot. */
+  executeAsync<T>(script: string, args: unknown[] = []): Promise<T> {
+    return this.send("POST", "/execute/async", { script, args });
+  }
+
   /** Full page source (debugging aid for failure artifacts). */
   source(): Promise<string> {
     return this.send("GET", "/source");

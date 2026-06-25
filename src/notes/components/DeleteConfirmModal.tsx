@@ -21,6 +21,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 // Shared modal backdrop envelope — also imported by `<TrashPanel>` so the two
 // trash-related modals don't re-declare the same fixed-inset dim layer.
@@ -125,11 +126,11 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   const { noteTitle, title, body, warning, confirmLabel, onCancel, onConfirm } =
     props;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-
-  // Default-focus on Cancel (safer destructive UX).
-  useEffect(() => {
-    cancelRef.current?.focus();
-  }, []);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open; default-focus on Cancel (safer
+  // destructive UX). The modal only mounts while shown, so always enabled
+  // (MYND-93).
+  useFocusTrap(dialogRef, { enabled: true, initialFocusRef: cancelRef });
 
   // Esc → Cancel.
   useEffect(() => {
@@ -160,6 +161,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   return (
     <div style={BACKDROP_STYLE} onClick={handleBackdropClick} role="presentation">
       <div
+        ref={dialogRef}
         style={MODAL_STYLE}
         role="alertdialog"
         aria-labelledby="delete-confirm-title"

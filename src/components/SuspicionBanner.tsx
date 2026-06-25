@@ -52,7 +52,12 @@ export function SuspicionBanner({ reason }: SuspicionBannerProps) {
     return <DestructiveBanner testId="suspicion.banner">{message}</DestructiveBanner>;
   }
   return (
-    <div role="alert" data-testid="suspicion.banner" style={GRAY_STYLE}>
+    <div
+      role="alert"
+      aria-live="assertive"
+      data-testid="suspicion.banner"
+      style={GRAY_STYLE}
+    >
       {message}
     </div>
   );

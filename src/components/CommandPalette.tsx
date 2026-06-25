@@ -28,6 +28,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS, fuzzyFilter } from "../commands";
 import { Icon } from "./primitives/Icon";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { formatChord } from "../commands/chord";
 import type {
   ActionVisibility,
@@ -213,6 +214,11 @@ export function CommandPalette({
   // search effect below; empty while the query is empty.
   const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Carve-out modal: trap focus directly (not via ModalShell, which would
+  // strip the input + arrow/Enter list navigation). Initial focus is the
+  // search input. MYND-93.
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
   // Monotonic dispatch counter for the note-search generation-guard (MYND-40):
   // each query dispatch claims the next value; only the latest-dispatched
   // response is applied (see `shouldApplyNoteSearchResult`).
@@ -429,7 +435,13 @@ export function CommandPalette({
 
   return (
     <div style={BACKDROP_STYLE} onClick={onBackdropClick} role="presentation">
-      <div style={MODAL_STYLE} role="dialog" aria-label={t("commandPalette.dialogLabel")}>
+      <div
+        ref={modalRef}
+        style={MODAL_STYLE}
+        role="dialog"
+        aria-label={t("commandPalette.dialogLabel")}
+        data-testid="palette.dialog"
+      >
         <input
           ref={inputRef}
           type="text"
@@ -440,6 +452,7 @@ export function CommandPalette({
           }}
           onKeyDown={onKeyDown}
           placeholder={t("commandPalette.searchPlaceholder")}
+          aria-label={t("commandPalette.searchPlaceholder")}
           style={INPUT_STYLE}
           autoComplete="off"
           autoCorrect="off"

@@ -29,6 +29,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
@@ -101,6 +102,9 @@ const MONO: CSSProperties = {
 
 export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImportModalProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
   const [phase, setPhase] = useState<Phase>("setup");
   const [folder, setFolder] = useState<string | null>(null);
   const [policy, setPolicy] = useState<DuplicatePolicy>(DEFAULT_DUPLICATE_POLICY);
@@ -214,6 +218,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
       onClick={handleBackdrop}
     >
       <div
+        ref={dialogRef}
         style={{
           width: 560,
           maxWidth: "calc(100vw - var(--space-7))",

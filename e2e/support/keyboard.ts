@@ -1,0 +1,117 @@
+// Shared keyboard-driving helpers for the accessibility E2E specs (MYND-93).
+//
+// Keys are sent through the W3C Actions API (a `key` input source), so they
+// land on the document's FOCUSED element rather than a specific node — the
+// right model for Tab/Shift-Tab/Escape navigation.
+//
+// CRITICAL: the W3C key code points are PRIVATE-USE characters (U+E004 Tab,
+// U+E007 Enter, …). Writing them as literals would put invisible bytes in the
+// source — the exact U+E007 hazard the harness warns about. So they are built
+// with `String.fromCharCode(...)`, keeping this file pure ASCII.
+
+import type { Session } from "./webdriver";
+
+/** W3C WebDriver key code points (https://www.w3.org/TR/webdriver2/#keyboard-actions). */
+export const KEY = {
+  TAB: String.fromCharCode(0xe004),
+  ENTER: String.fromCharCode(0xe007),
+  ESCAPE: String.fromCharCode(0xe00c),
+  SPACE: String.fromCharCode(0xe00d),
+  SHIFT: String.fromCharCode(0xe008),
+  CONTROL: String.fromCharCode(0xe009),
+} as const;
+
+/** Press a single key (optionally with Shift held) at the focused element. */
+export async function pressKey(
+  session: Session,
+  key: string,
+  opts: { shift?: boolean } = {},
+): Promise<void> {
+  const actions: Array<Record<string, unknown>> = [];
+  if (opts.shift) actions.push({ type: "keyDown", value: KEY.SHIFT });
+  actions.push({ type: "keyDown", value: key });
+  actions.push({ type: "keyUp", value: key });
+  if (opts.shift) actions.push({ type: "keyUp", value: KEY.SHIFT });
+  await session.send("POST", "/actions", {
+    actions: [{ type: "key", id: "kbd", actions }],
+  });
+  // Release the driver's input-source state between chains (W3C "release
+  // actions") so a held modifier never leaks into the next press.
+  await session.send("DELETE", "/actions");
+}
+
+/** Tab (or Shift-Tab) once. */
+export function tab(session: Session, opts: { shift?: boolean } = {}): Promise<void> {
+  return pressKey(session, KEY.TAB, opts);
+}
+
+/** Press `key` while holding a single modifier (e.g. Ctrl+K to open the
+ *  command palette). `key` is a plain character; `modifier` a KEY escape. */
+export async function pressChord(
+  session: Session,
+  modifier: string,
+  key: string,
+): Promise<void> {
+  await session.send("POST", "/actions", {
+    actions: [
+      {
+        type: "key",
+        id: "kbd",
+        actions: [
+          { type: "keyDown", value: modifier },
+          { type: "keyDown", value: key },
+          { type: "keyUp", value: key },
+          { type: "keyUp", value: modifier },
+        ],
+      },
+    ],
+  });
+}
+
+/** `data-testid` of the focused element, or null. */
+export function activeTestId(session: Session): Promise<string | null> {
+  return session.execute<string | null>(
+    "return document.activeElement ? document.activeElement.getAttribute('data-testid') : null",
+  );
+}
+
+/** A stable focus signature: `testid:<id>` when the focused element carries a
+ *  testid, else `<tag>#<id>`, else `(body)` — enough to detect movement and
+ *  traps without needing every control to be testid'd. */
+export function activeSignature(session: Session): Promise<string> {
+  return session.execute<string>(
+    "var el = document.activeElement;" +
+      "if (!el || el === document.body) return '(body)';" +
+      "var tid = el.getAttribute('data-testid');" +
+      "if (tid) return 'testid:' + tid;" +
+      "return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '');",
+  );
+}
+
+/** Tab forward up to `maxTabs` times, stopping when the focused element's
+ *  testid equals `testId`. Returns true if reached. */
+export async function tabToTestId(
+  session: Session,
+  testId: string,
+  maxTabs = 12,
+): Promise<boolean> {
+  for (let i = 0; i < maxTabs; i++) {
+    if ((await activeTestId(session)) === testId) return true;
+    await tab(session);
+  }
+  return (await activeTestId(session)) === testId;
+}
+
+/** Press Tab `count` times, returning the focus signature after each press. */
+export async function tabSignatures(
+  session: Session,
+  count: number,
+  opts: { shift?: boolean } = {},
+): Promise<string[]> {
+  const seen: string[] = [];
+  for (let i = 0; i < count; i++) {
+    await tab(session, opts);
+    seen.push(await activeSignature(session));
+  }
+  return seen;
+}

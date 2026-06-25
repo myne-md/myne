@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import {
   pairingAccept,
   pairingDispatchComplete,
@@ -106,6 +107,9 @@ export function PairingDialog() {
   const [state, setState] = useState<DialogState>({ phase: "idle" });
   // Avoid clobbering a "rejected"/"working" phase with a poll result.
   const busyRef = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while the pairing card is on screen (MYND-93).
+  useFocusTrap(dialogRef, { enabled: state.phase === "pending" });
 
   const poll = useCallback(async () => {
     if (busyRef.current) return;
@@ -219,7 +223,7 @@ export function PairingDialog() {
 
   return (
     <div style={BACKDROP_STYLE} data-testid="pairing.dialog" data-phase="pending">
-      <div style={CARD_STYLE} role="dialog" aria-label={t("clipper.pairing.title")}>
+      <div ref={dialogRef} style={CARD_STYLE} role="dialog" aria-label={t("clipper.pairing.title")}>
         <h2 style={{ margin: 0, fontSize: 18 }}>{t("clipper.pairing.title")}</h2>
         <p style={{ margin: 0, fontSize: 14, color: "var(--fg-2)" }}>
           {t("clipper.pairing.intro")}
