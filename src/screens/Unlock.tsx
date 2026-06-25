@@ -41,8 +41,10 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useReducer, useRef, type CSSProperties, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import i18n from "../i18n";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
@@ -228,12 +230,12 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "VaultNotFound":
       return {
         kind: "banner",
-        text: "Vault file not found. Please restart the app.",
+        text: i18n.t("unlock.errors.vaultNotFound"),
       };
     case "VaultAlreadyUnlocked":
-      return { kind: "banner", text: "Vault is already unlocked." };
+      return { kind: "banner", text: i18n.t("unlock.errors.alreadyUnlocked") };
     case "UnlockInProgress":
-      return { kind: "banner", text: "Operation in progress." };
+      return { kind: "banner", text: i18n.t("unlock.errors.inProgress") };
     case "VaultRecoveryInProgress":
       // Slot is in Slot::Recovering — user must complete the
       // password-reset chained step (recovery-flow.md §4.1) before any
@@ -244,7 +246,7 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "JoinFailure":
       return {
         kind: "banner",
-        text: "Unexpected error. Please try again.",
+        text: i18n.t("unlock.errors.unexpected"),
       };
   }
 }
@@ -360,6 +362,7 @@ export function Unlock({
   onRestoreBackup,
   suspicionReason,
 }: UnlockProps) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -488,16 +491,14 @@ export function Unlock({
   if (state.kind === "recovery-in-progress") {
     return (
       <CenteredCard>
-        <h1 style={CARD_TITLE_STYLE}>Recovery flow was interrupted.</h1>
-        <p style={CARD_BODY_STYLE}>
-          Set a new password first, then re-seal your vault.
-        </p>
+        <h1 style={CARD_TITLE_STYLE}>{t("unlock.recoveryInterruptedTitle")}</h1>
+        <p style={CARD_BODY_STYLE}>{t("unlock.recoveryInterruptedBody")}</p>
         <div
           role="alert"
           data-testid="unlock.recovery-in-progress-banner"
           style={INFO_BANNER_STYLE}
         >
-          Recovery flow was interrupted. Set a new password first.
+          {t("unlock.recoveryInterruptedBanner")}
         </div>
         <button
           type="button"
@@ -505,7 +506,7 @@ export function Unlock({
           style={ctaStyle(false)}
           data-testid="unlock.resume-cta"
         >
-          <span>Continue</span>
+          <span>{t("unlock.continue")}</span>
         </button>
       </CenteredCard>
     );
@@ -558,12 +559,12 @@ export function Unlock({
           data-testid="unlock.back-to-picker"
         >
           <span aria-hidden="true">←</span>
-          <span>Choose a different vault</span>
+          <span>{t("unlock.backToPicker")}</span>
         </button>
       )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
-      <h1 style={CARD_TITLE_STYLE}>Unlock your vault.</h1>
-      <p style={CARD_BODY_STYLE}>Enter your password to continue.</p>
+      <h1 style={CARD_TITLE_STYLE}>{t("unlock.title")}</h1>
+      <p style={CARD_BODY_STYLE}>{t("unlock.subtitle")}</p>
       {/* Quick-unlock (PIN / Touch ID) affordance — rendered only when
           configured + usable this session; self-hides otherwise. The password
           form below stays the always-present escape hatch (MYND-329). */}
@@ -581,14 +582,14 @@ export function Unlock({
       >
         <input
           type="password"
-          placeholder="Password"
+          placeholder={t("unlock.passwordPlaceholder")}
           value={password}
           onChange={(e) => dispatch({ type: "set-password", value: e.currentTarget.value })}
           disabled={decrypting}
           autoFocus
           autoComplete="current-password"
           style={INPUT_STYLE}
-          aria-label="Password"
+          aria-label={t("unlock.passwordLabel")}
           aria-invalid={error != null ? true : undefined}
           data-testid="unlock.password-input"
         />
@@ -602,7 +603,7 @@ export function Unlock({
           data-testid="unlock.submit"
         >
           {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
-          <span>{decrypting ? "Decrypting…" : "Unlock"}</span>
+          <span>{decrypting ? t("unlock.decrypting") : t("unlock.submit")}</span>
         </button>
         {!decrypting && (
           <button
@@ -611,7 +612,7 @@ export function Unlock({
             style={RECOVER_LINK_STYLE}
             data-testid="unlock.recovery-link"
           >
-            Forgot your password? Unlock with recovery phrase
+            {t("unlock.recoveryLink")}
           </button>
         )}
         {!decrypting && (
@@ -621,7 +622,7 @@ export function Unlock({
             style={DELETE_VAULT_LINK_STYLE}
             data-testid="unlock.delete-link"
           >
-            Lost both password and recovery phrase? Delete vault and start over
+            {t("unlock.deleteLink")}
           </button>
         )}
       </form>

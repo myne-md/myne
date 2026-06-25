@@ -26,6 +26,7 @@ import {
   type CSSProperties,
 } from "react";
 import { ControlBlock } from "./ControlBlock";
+import { LanguageSelect } from "./LanguageSelect";
 import { Switch } from "../primitives/Switch";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 import {
@@ -215,6 +216,8 @@ export function AppearancePanel() {
 
   return (
     <div style={PANEL_ROOT_STYLE}>
+      <LanguageSelect />
+
       <ControlBlock
         label="Theme"
         helper="Switch between light and dark themes, or follow the system preference."

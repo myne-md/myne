@@ -1,0 +1,36 @@
+{
+  "settings": {
+    "language": {
+      "helper": "Uygulamanın görüntüleme dilini seçin.",
+      "label": "Dil"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Farklı bir kasa seçin",
+    "continue": "Devam et",
+    "decrypting": "Şifre çözülüyor…",
+    "deleteLink": "Hem parolanızı hem kurtarma ifadenizi mi kaybettiniz? Kasayı silip baştan başlayın",
+    "errors": {
+      "alreadyUnlocked": "Kasa zaten açık.",
+      "inProgress": "İşlem sürüyor.",
+      "unexpected": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
+      "vaultNotFound": "Kasa dosyası bulunamadı. Lütfen uygulamayı yeniden başlatın."
+    },
+    "passwordLabel": "Parola",
+    "passwordPlaceholder": "Parola",
+    "recoveryInterruptedBanner": "Kurtarma akışı yarıda kesildi. Önce yeni bir parola belirleyin.",
+    "recoveryInterruptedBody": "Önce yeni bir parola belirleyin, ardından kasanızı yeniden mühürleyin.",
+    "recoveryInterruptedTitle": "Kurtarma akışı yarıda kesildi.",
+    "recoveryLink": "Parolanızı mı unuttunuz? Kurtarma ifadesiyle açın",
+    "submit": "Kilidi aç",
+    "subtitle": "Devam etmek için parolanızı girin.",
+    "title": "Kasanızı açın."
+  },
+  "welcome": {
+    "createCta": "Yeni kasa oluştur",
+    "headlineLine1": "Şifreli markdown notları.",
+    "headlineLine2": "Kayıtta e-posta yok.",
+    "restoreCta": "Yedekten geri yükle",
+    "subtitle": "Notlarınız bu cihazdan çıkmadan önce şifrelenir. Sunucu yalnızca şifreli metni saklar."
+  }
+}

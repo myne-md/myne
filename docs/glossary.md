@@ -732,6 +732,18 @@ is correctly spelled.
 
 Used in: `spec/protocol.md` §9.13; MYND-266.
 
+### **internationalization (i18n)** &nbsp; 🛠️ *Tooling*
+
+The desktop UI localization layer: `react-i18next` over bundled flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the binary (no HTTP backend → no network egress for UI strings). Translated through self-hosted **Weblate**. Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
+
+Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25; `src/i18n/`.
+
+### **locale catalog** &nbsp; 🛠️ *Tooling*
+
+A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; every other catalog is **Weblate**-managed and must not be hand-edited in the repo (that races Weblate). New keys are added by `pnpm i18n:extract` (`i18next-cli`).
+
+Used in: `docs/dev/i18n.md`; `locales/`.
+
 ### **KDF (Key Derivation Function)** &nbsp; 🏗️ *Construction*
 
 The generic class of functions that derive cryptographic keys from input keying material plus context. Myne uses two KDFs: Argon2id for password-stretching at vault unlock, HKDF-SHA-256 for fast subkey derivation post-unlock.
@@ -1593,6 +1605,12 @@ Used in: `spec/markdown-dialect.md` §7; `dependency-policy.md`
 The `~x~` (subscript) and `^x^` (superscript) inline constructs, rendered with reduced-size, vertically-shifted typography (MYND-156, `.cm-sub` / `.cm-sup`). Use the pre-built `@lezer/markdown` Subscript/Superscript configs; single-run and space-free (Pandoc-style), disjoint from GFM strikethrough `~~…~~` and footnote `[^id]`. Recognize-and-render-only — never emitted; bytes preserved (§6 C1).
 
 Used in: `spec/markdown-dialect.md` §3.2
+
+### **Weblate** &nbsp; 🛠️ *Tooling*
+
+The self-hosted web translation platform at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only) that owns Myne's non-English **locale catalogs**. English source strings are authored in code and committed; Weblate reads the source, lets translators fill `tr`/`de`/`fr`, and flows translations back as commits to a dedicated push branch (merged via PR). File mask `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`.
+
+Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
 
 ### **wikilink** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 

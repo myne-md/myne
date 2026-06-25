@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
@@ -9,6 +10,7 @@ interface WelcomeProps {
 }
 
 export function Welcome({ onCreateVault, onRestoreBackup }: WelcomeProps) {
+  const { t } = useTranslation();
   return (
     <div
       data-testid="welcome.root"
@@ -52,9 +54,9 @@ export function Welcome({ onCreateVault, onRestoreBackup }: WelcomeProps) {
             color: "var(--fg-display)",
           }}
         >
-          Encrypted markdown notes.
+          {t("welcome.headlineLine1")}
           <br />
-          No email at signup.
+          {t("welcome.headlineLine2")}
         </div>
 
         <div
@@ -65,8 +67,7 @@ export function Welcome({ onCreateVault, onRestoreBackup }: WelcomeProps) {
             maxWidth: 360,
           }}
         >
-          Your notes are encrypted on this device before they leave it. The
-          server only stores ciphertext.
+          {t("welcome.subtitle")}
         </div>
 
         {/* Orphan-residue cleanup (MYND-159). Renders nothing unless a
@@ -88,14 +89,14 @@ export function Welcome({ onCreateVault, onRestoreBackup }: WelcomeProps) {
             onClick={onCreateVault}
             data-testid="welcome.create-cta"
           >
-            Create new vault
+            {t("welcome.createCta")}
           </Button>
           <Button
             variant="secondary"
             onClick={onRestoreBackup}
             data-testid="welcome.restore-cta"
           >
-            Restore from backup
+            {t("welcome.restoreCta")}
           </Button>
         </div>
 
