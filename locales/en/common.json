@@ -701,11 +701,11 @@
         "paragraph": "Paragraph"
       },
       "highlight": {
-        "blue": "Mavi",
-        "green": "Yeşil",
-        "pink": "Pembe",
-        "purple": "Mor",
-        "yellow": "Sarı"
+        "blue": "Blue",
+        "green": "Green",
+        "pink": "Pink",
+        "purple": "Purple",
+        "yellow": "Yellow"
       },
       "urlPlaceholder": "Paste link URL"
     },
@@ -1990,8 +1990,8 @@
         "weakPassword": "New password must be at least 12 characters."
       },
       "eyebrow": "Recovery · New password",
-      "helperBody": "Vault recovery phrase ile açıldı. Eski parola artık çalışmayacak — yeni master parolanı şimdi belirle.",
-      "helperEmphasis": "Recovery phrase aynı kalır.",
+      "helperBody": "Opened with your recovery phrase. Your old password no longer works — set a new master password now.",
+      "helperEmphasis": "Your recovery phrase stays the same.",
       "submit": "Set new password",
       "title": "Set a new master password"
     },

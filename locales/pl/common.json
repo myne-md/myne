@@ -2,152 +2,152 @@
   "attachments": {
     "cleanUnused": {
       "cancel": "Anuluj",
-      "cleaning": "Sprzątanie..",
+      "cleaning": "Czyszczenie…",
       "close": "Zamknij",
       "completeTitle": "Czyszczenie zakończone",
-      "deleteCta_few": "",
-      "deleteCta_many": "",
-      "deleteCta_one": "Usuń {{count}} nieużywane",
-      "error": "Nie mogłem posprzątać. Niektóre notatki mogą być nieczytelne - nic nie zostało usunięte.",
-      "intro_few": "",
-      "intro_many": "",
-      "intro_one": "",
-      "summaryFreed": " · uwolniony {{size}}",
+      "deleteCta_few": "Usuń {{count}} nieużywane",
+      "deleteCta_many": "Usuń {{count}} nieużywanych",
+      "deleteCta_one": "Usuń {{count}} nieużywany",
+      "error": "Nie udało się posprzątać. Niektóre notatki mogą być nieczytelne — nic nie zostało usunięte.",
+      "intro_few": "Te {{count}} załączniki nie są używane w żadnej notatce. Usunięcie ich jest trwałe i nie można go cofnąć.",
+      "intro_many": "Tych {{count}} załączników nie używa żadna notatka. Usunięcie ich jest trwałe i nie można go cofnąć.",
+      "intro_one": "Ten załącznik nie jest używany w żadnej notatce. Usunięcie go jest trwałe i nie można go cofnąć.",
+      "summaryFreed": " · zwolniono {{size}}",
       "summaryPeriod": ".",
-      "summaryRemoved_few": "",
-      "summaryRemoved_many": "",
-      "summaryRemoved_one": "",
-      "summarySkipped_few": "",
-      "summarySkipped_many": "",
-      "summarySkipped_one": " · {{count}} pominięty (teraz w użyciu)",
-      "title": "Czyszczenie niewykorzystanych załączników",
-      "willBeReclaimed": "{{size}} zostanie zwrócony."
+      "summaryRemoved_few": "Usunięto {{count}} załączniki",
+      "summaryRemoved_many": "Usunięto {{count}} załączników",
+      "summaryRemoved_one": "Usunięto {{count}} załącznik",
+      "summarySkipped_few": " · {{count}} pominięte (obecnie w użyciu)",
+      "summarySkipped_many": " · {{count}} pominiętych (obecnie w użyciu)",
+      "summarySkipped_one": " · {{count}} pominięty (obecnie w użyciu)",
+      "title": "Usuń nieużywane załączniki",
+      "willBeReclaimed": "Zostanie odzyskane {{size}}."
     },
     "coverPicker": {
       "close": "Zamknij",
-      "dropHint": "Rzuć obraz, aby użyć go jako okładki.",
-      "empty": "Nie ma tu jeszcze zdjęć. Wyślij jeden lub przeciągnij obraz tutaj.",
-      "loading": "",
-      "removeCover": "",
+      "dropHint": "Upuść obraz, aby użyć go jako okładki.",
+      "empty": "W tym skarbcu nie ma jeszcze obrazów. Prześlij jeden lub przeciągnij obraz tutaj.",
+      "loading": "Ładowanie…",
+      "removeCover": "Usuń okładkę",
       "title": "Wybierz obraz okładki",
-      "upload": "Wyślij"
+      "upload": "Prześlij"
     },
     "deleteDialog": {
-      "cancel": "",
-      "confirmPrompt": "Na stałe usunąć ten załącznik? Nie da się tego cofnąć.",
+      "cancel": "Anuluj",
+      "confirmPrompt": "Trwale usunąć ten załącznik? Nie można tego cofnąć.",
       "delete": "Usuń",
-      "deleting": "",
-      "error": "Nie mogłem usunąć załącznika. Spróbuj jeszcze raz.",
-      "notUsed": "Nieużywane w żadnej notatce.",
-      "stillUsed_few": "Jest nadal używany w notatkach. Usunięcie go pozostawia nagrobek, w którym został osadzony:",
-      "stillUsed_many": "Jest nadal używany w notatkach. Usunięcie go pozostawia nagrobek, w którym został osadzony:",
-      "stillUsed_one": "Jest nadal używany w notatce {{count}}. Usunięcie go pozostawia nagrobek, w którym został osadzony:",
+      "deleting": "Usuwanie…",
+      "error": "Nie udało się usunąć załącznika. Spróbuj ponownie.",
+      "notUsed": "Nieużywany w żadnej notatce.",
+      "stillUsed_few": "Jest wciąż używany w {{count}} notatkach. Usunięcie go pozostawia placeholder w miejscu, gdzie był osadzony:",
+      "stillUsed_many": "Jest wciąż używany w {{count}} notatkach. Usunięcie go pozostawia placeholder w miejscu, gdzie był osadzony:",
+      "stillUsed_one": "Jest wciąż używany w {{count}} notatce. Usunięcie go pozostawia placeholder w miejscu, gdzie był osadzony:",
       "title": "Usuń załącznik",
       "untitled": "Bez tytułu"
     },
     "library": {
-      "actionsAriaLabel": "Działania związane z dodawaniem",
+      "actionsAriaLabel": "Działania na załączniku",
       "actionsTitle": "Działania",
-      "checkUnusedFailedNotice": "Nie mogłem sprawdzić niewykorzystanych załączników. Spróbuj jeszcze raz.",
-      "checking": "Sprawdzam..",
-      "cleanUnused": "Czyste nieużywane",
-      "cleanUnusedTitle": "Usuń załączniki nie używane w żadnej notatce",
-      "colCreated": "Stworzony",
-      "colName": "",
+      "checkUnusedFailedNotice": "Nie udało się sprawdzić nieużywanych załączników. Spróbuj ponownie.",
+      "checking": "Sprawdzanie…",
+      "cleanUnused": "Usuń nieużywane",
+      "cleanUnusedTitle": "Usuń załączniki nieużywane w żadnej notatce",
+      "colCreated": "Utworzono",
+      "colName": "Nazwa",
       "colSize": "Rozmiar",
       "colType": "Typ",
-      "colUsedIn": "Stosowany w",
-      "decrypting": "Odszyfrowywanie załączników..",
-      "emptyImportHint": "Importuj plik, żeby go trzymać w skarbcu.",
-      "emptyLoadError": "Nie mogłem odczytać katalogu załączników.",
-      "emptyNoAttachments": "",
+      "colUsedIn": "Użyto w",
+      "decrypting": "Odszyfrowywanie załączników…",
+      "emptyImportHint": "Zaimportuj plik, aby przechowywać go w skarbcu.",
+      "emptyLoadError": "Nie udało się odczytać katalogu załączników.",
+      "emptyNoAttachments": "Brak załączników.",
       "filterAriaLabel": "Filtruj według typu",
       "gridView": "Widok siatki",
-      "import": "",
+      "import": "Importuj",
       "importDialogTitle": "Importuj załącznik",
-      "importFile": "Importuj plik",
-      "importing": "Importowanie..",
+      "importFile": "Zaimportuj plik",
+      "importing": "Importowanie…",
       "listView": "Widok listy",
       "menuDelete": "Usuń",
-      "menuExport": "Eksport",
+      "menuExport": "Eksportuj",
       "menuPreview": "Podgląd",
       "menuRename": "Zmień nazwę",
-      "noMatch": "",
-      "noUnusedNotice": "Brak niewykorzystanych załączników do czyszczenia.",
+      "noMatch": "Żaden załącznik nie pasuje do wyszukiwania.",
+      "noUnusedNotice": "Brak nieużywanych załączników do usunięcia.",
       "preview": "Podgląd",
       "previewAttachment": "Podgląd załącznika",
-      "searchAriaLabel": "Wyszukaj załączniki według nazwy pliku",
-      "searchPlaceholder": "Wyszukiwanie według nazwy pliku",
+      "searchAriaLabel": "Szukaj załączników według nazwy pliku",
+      "searchPlaceholder": "Szukaj według nazwy pliku",
       "sort": {
-        "createdAsc": "Najstarszy pierwszy",
-        "createdDesc": "Najpierw newest",
-        "nameAsc": "Nazwa A- Z",
-        "nameDesc": "Nazwa Z-"
+        "createdAsc": "Najpierw najstarsze",
+        "createdDesc": "Najpierw najnowsze",
+        "nameAsc": "Nazwa A–Z",
+        "nameDesc": "Nazwa Z–A"
       },
       "sortAriaLabel": "Sortuj załączniki",
       "supportedFilesFilter": "Obsługiwane pliki",
       "title": "Załączniki",
       "typeFilter": {
-        "all": "Wszystkie rodzaje",
+        "all": "Wszystkie typy",
         "audio": "Audio",
         "image": "Obrazy",
         "other": "Inne",
         "pdf": "PDF"
       },
-      "usedInCount_few": "Używane w notach {{count}}",
-      "usedInCount_many": "Używane w notach {{count}}",
-      "usedInCount_one": "Używane w uwadze {{count}}",
-      "usedInLoading": ".."
+      "usedInCount_few": "Użyto w {{count}} notatkach",
+      "usedInCount_many": "Użyto w {{count}} notatkach",
+      "usedInCount_one": "Użyto w {{count}} notatce",
+      "usedInLoading": "…"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
       "file": "Plik",
-      "pause": "Pauza",
+      "pause": "Wstrzymaj",
       "pdfDocument": "Dokument PDF",
-      "pdfFirstPage": "Strona pierwsza PDF",
-      "play": "Zagraj"
+      "pdfFirstPage": "Pierwsza strona PDF",
+      "play": "Odtwórz"
     },
     "usedInNotesPopover": {
-      "empty": "Nieużywane w żadnej notatce.",
+      "empty": "Nieużywany w żadnej notatce.",
       "untitled": "Bez tytułu"
     }
   },
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "Trwa kolejna operacja skarbca. Poczekaj aż skończy, a potem spróbuj jeszcze raz.",
-        "cancelled": "Wsparcie odwołane. Nie zostawiono żadnych akt.",
-        "invalidDestination": "Ten folder docelowy nie jest przydatny.",
-        "ioGeneric": "",
-        "ioNoSpace": "Za mało miejsca w miejscu przeznaczenia.",
-        "ioPermissionDenied": "Nie wolno pisać w miejscu przeznaczenia.",
-        "joinFailure": "Wsparcie nie powiodło się niespodziewanie. Nie zostawiono żadnych akt.",
-        "memberTooLarge": "Plik w tym skarbcu jest większy niż pozwala format kopii zapasowej.",
-        "vaultNotFound": "Nie znaleziono skarbca.",
-        "verifyFailed": "Pisemna kopia zapasowa nie zweryfikowała się, więc została odrzucona. Spróbuj jeszcze raz - na różnych nośnikach, jeśli się powtarza."
+        "authOperationInProgress": "Trwa inna operacja na skarbcu. Poczekaj na jej zakończenie, a potem spróbuj ponownie.",
+        "cancelled": "Kopia zapasowa anulowana. Nie pozostawiono żadnego pliku.",
+        "invalidDestination": "Ten folder docelowy nie nadaje się do użytku.",
+        "ioGeneric": "Nie udało się zapisać pliku kopii zapasowej.",
+        "ioNoSpace": "Za mało miejsca w lokalizacji docelowej.",
+        "ioPermissionDenied": "Brak uprawnień do zapisu w lokalizacji docelowej.",
+        "joinFailure": "Tworzenie kopii zapasowej nieoczekiwanie się nie powiodło. Nie pozostawiono żadnego pliku.",
+        "memberTooLarge": "Plik w tym skarbcu jest większy, niż dopuszcza format kopii zapasowej.",
+        "vaultNotFound": "Nie znaleziono skarbca do utworzenia kopii zapasowej.",
+        "verifyFailed": "Zapisana kopia zapasowa nie przeszła weryfikacji, więc została odrzucona. Spróbuj ponownie — na innym nośniku, jeśli problem się powtarza."
       },
       "restore": {
-        "authOperationInProgress": "Trwa kolejna operacja skarbca. Poczekaj aż skończy, a potem spróbuj jeszcze raz.",
-        "cancelled": "Przywrócenie anulowane. Nic się nie zmieniło.",
+        "authOperationInProgress": "Trwa inna operacja na skarbcu. Poczekaj na jej zakończenie, a potem spróbuj ponownie.",
+        "cancelled": "Przywracanie anulowane. Nic nie zostało zmienione.",
         "damagedBackup": "Plik kopii zapasowej jest uszkodzony.",
-        "futureVersionBackup": "To wsparcie zostało wykonane przez nowszą wersję Myne. Uaktualnij Myne, a potem przywróć.",
-        "invalidVaultMeta": "Metadane tego skarbca są nieczytelne, więc przywracanie nie może stworzyć działającego skarbca.",
-        "ioGeneric": "Nie można odczytać pliku kopii zapasowej.",
-        "ioPermissionDenied": "Brak pozwolenia na odczytanie pliku kopii zapasowej.",
-        "joinFailure": "Przywrócenie nieudane niespodziewanie. Nic się nie zmieniło.",
-        "missingVaultMeta": "Ta kopia nie ma swoich metadanych i nie może być przywrócona.",
-        "notABackupFile": "",
-        "vaultAlreadyExists": "Krypta z tego backupu już istnieje na tym urządzeniu."
+        "futureVersionBackup": "Ta kopia zapasowa została utworzona przez nowszą wersję Myne. Zaktualizuj Myne, a następnie ją przywróć.",
+        "invalidVaultMeta": "Metadane skarbca w tej kopii zapasowej są nieczytelne, więc jej przywrócenie nie mogło utworzyć działającego skarbca.",
+        "ioGeneric": "Nie udało się odczytać pliku kopii zapasowej.",
+        "ioPermissionDenied": "Brak uprawnień do odczytu pliku kopii zapasowej.",
+        "joinFailure": "Przywracanie nieoczekiwanie się nie powiodło. Nic nie zostało zmienione.",
+        "missingVaultMeta": "W tej kopii zapasowej brakuje metadanych skarbca i nie można jej przywrócić.",
+        "notABackupFile": "Ten plik nie jest kopią zapasową Myne.",
+        "vaultAlreadyExists": "Skarbiec z tej kopii zapasowej już istnieje na tym urządzeniu."
       }
     },
     "export": {
       "cancel": "Anuluj",
       "close": "Zamknij",
-      "copying": "Kopiowanie {{done}} z {{total}}..",
-      "preparing": "Przygotowuję..",
-      "successToast": "Backup zweryfikowany i zapisany.",
-      "title": "Krypta zapasowa",
-      "verifying": "Weryfikacja {{done}} z {{total}}.."
+      "copying": "Kopiowanie {{done}} z {{total}}…",
+      "preparing": "Przygotowywanie…",
+      "successToast": "Kopia zapasowa zweryfikowana i zapisana.",
+      "title": "Utwórz kopię zapasową skarbca",
+      "verifying": "Weryfikowanie {{done}} z {{total}}…"
     }
   },
   "clipper": {
@@ -155,7 +155,7 @@
       "accept": "Akceptuj",
       "close": "Zamknij",
       "codeAriaLabel": "Kod parowania",
-      "intro": "Potwierdź ten kod pasuje do tego pokazanego w rozszerzeniu, a następnie Akceptuj do pary.",
+      "intro": "Potwierdź, że ten kod jest taki sam jak pokazany w rozszerzeniu, a następnie wybierz Akceptuj, aby sparować.",
       "reject": "Odrzuć",
       "rejected": "Parowanie odrzucone.",
       "title": "Rozszerzenie przeglądarki chce się połączyć"
@@ -163,19 +163,19 @@
   },
   "commandPalette": {
     "archivedBadge": "Archiwum",
-    "archivedBadgeTitle": "Archiwizacja",
-    "dialogLabel": "",
-    "matchedInBody": "dopasowane do ciała",
+    "archivedBadgeTitle": "Zarchiwizowane",
+    "dialogLabel": "Paleta poleceń",
+    "matchedInBody": "↳ dopasowano w treści",
     "noMatches": "Brak dopasowań",
-    "searchPlaceholder": "Szukaj notatek lub uruchom polecenie - Esc do odrzucenia",
+    "searchPlaceholder": "Szukaj notatek lub uruchom polecenie — Esc, aby zamknąć",
     "sectionCommands": "Polecenia",
-    "sectionNotes": "",
+    "sectionNotes": "Notatki",
     "untitledNote": "Bez tytułu"
   },
   "commands": {
     "actions": {
       "backupVault": {
-        "label": "Krypta zapasowa.."
+        "label": "Utwórz kopię zapasową skarbca…"
       },
       "category": {
         "app": "Aplikacja",
@@ -184,135 +184,135 @@
         "view": "Widok"
       },
       "convertWikilinks": {
-        "label": "Przelicz importowane wycieraczki w tej notatce.."
+        "label": "Konwertuj zaimportowane wikilinki w tej notatce…"
       },
       "deleteWorkspace": {
-        "label": ""
+        "label": "Usuń obszar roboczy…"
       },
       "exportNoteHtml": {
-        "label": "Eksportuj notatkę jako HTML.."
+        "label": "Eksportuj notatkę jako HTML…"
       },
       "exportNoteMarkdown": {
-        "label": ""
+        "label": "Eksportuj notatkę jako Markdown…"
       },
       "exportNotePdf": {
-        "label": "Eksportuj notatkę jako PDF.."
+        "label": "Eksportuj notatkę jako PDF…"
       },
       "exportNoteTxt": {
-        "label": ""
+        "label": "Eksportuj notatkę jako zwykły tekst…"
       },
       "exportVaultMarkdown": {
-        "label": "Eksportuj skarbiec jako Markdown.."
+        "label": "Eksportuj skarbiec jako Markdown…"
       },
       "foldAll": {
-        "label": "Złóż wszystko"
+        "label": "Zwiń wszystko"
       },
       "importBaseView": {
-        "label": "Import .base view.."
+        "label": "Importuj widok .base…"
       },
       "importObsidian": {
-        "label": "Importuj skarbiec Obsidian.."
+        "label": "Importuj skarbiec Obsidian…"
       },
       "lockVault": {
         "label": "Zablokuj skarbiec"
       },
       "manageTemplates": {
-        "label": "Zarządzaj szablami.."
+        "label": "Zarządzaj szablonami…"
       },
       "newNoteFromTemplate": {
-        "label": "Nowa notatka z szablonu.."
+        "label": "Nowa notatka z szablonu…"
       },
       "openAttachments": {
-        "label": ""
+        "label": "Otwórz załączniki…"
       },
       "openSettings": {
-        "label": "Otwórz ustawienia.."
+        "label": "Otwórz ustawienia…"
       },
       "openSnapshots": {
-        "label": "Snapshoty.."
+        "label": "Migawki…"
       },
       "openTodayNote": {
         "label": "Otwórz dzisiejszą notatkę"
       },
       "randomNote": {
-        "label": "Otwórz notatkę losową"
+        "label": "Otwórz losową notatkę"
       },
       "renameWorkspace": {
-        "label": "Zmień nazwę miejsca pracy.."
+        "label": "Zmień nazwę obszaru roboczego…"
       },
       "saveWorkspaceAs": {
-        "label": "Zapisz przestrzeń roboczą jako.."
+        "label": "Zapisz obszar roboczy jako…"
       },
       "showGraph": {
-        "label": "Pokaż widok wykresu.."
+        "label": "Pokaż widok grafu…"
       },
       "showTags": {
-        "label": "Przeglądaj znaczniki.."
+        "label": "Przeglądaj tagi…"
       },
       "showViews": {
-        "label": "Przeglądaj widoki.."
+        "label": "Przeglądaj widoki…"
       },
       "switchWorkspace": {
-        "label": "Przełącz miejsce pracy.."
+        "label": "Przełącz obszar roboczy…"
       },
       "toggleFocus": {
-        "label": "Włączenie / wyłączenie trybu ostrości"
+        "label": "Przełącz tryb skupienia"
       },
       "toggleLeftSidebar": {
-        "label": "Włączenie / wyłączenie zapisu bocznego"
+        "label": "Przełącz panel boczny notatek"
       },
       "toggleReading": {
-        "label": "Włączenie / wyłączenie widoku odczytu"
+        "label": "Przełącz widok czytania"
       },
       "toggleRightSidebar": {
-        "label": "Włączenie / wyłączenie podłącza boczne"
+        "label": "Przełącz panel boczny odnośników zwrotnych"
       },
       "toggleSource": {
-        "label": ""
+        "label": "Przełącz tryb źródłowy"
       },
       "toggleStackedTabs": {
-        "label": "Włączenie / wyłączenie zakładek"
+        "label": "Przełącz karty ułożone w stos"
       },
       "unfoldAll": {
-        "label": "Rozwiń wszystkie"
+        "label": "Rozwiń wszystko"
       }
     },
     "hotkeys": {
       "command": {
-        "bold": "Śmiałe",
+        "bold": "Pogrubienie",
         "closeTab": "Zamknij kartę",
-        "cycleHeadingLevel": "",
-        "cycleTabs": "",
-        "deleteWorkspace": "Usuń miejsce pracy",
-        "focusNextPane": "Skup się na następnej szybie",
-        "focusPrevPane": "Skup poprzednią szybę",
-        "foldAll": "Złóż wszystko",
-        "inlineCode": "Kod inline",
+        "cycleHeadingLevel": "Przełączaj poziom nagłówka",
+        "cycleTabs": "Przełączaj karty",
+        "deleteWorkspace": "Usuń obszar roboczy",
+        "focusNextPane": "Przejdź do następnego panelu",
+        "focusPrevPane": "Przejdź do poprzedniego panelu",
+        "foldAll": "Zwiń wszystko",
+        "inlineCode": "Kod w wierszu",
         "insertWikilink": "Wstaw wikilink",
-        "italic": "",
-        "navigateBack": "Nawiguj",
-        "navigateForward": "Przejdź do przodu",
-        "newNote": "Nowa uwaga",
+        "italic": "Kursywa",
+        "navigateBack": "Przejdź wstecz",
+        "navigateForward": "Przejdź dalej",
+        "newNote": "Nowa notatka",
         "openSettings": "Otwórz ustawienia",
         "paletteToggle": "Otwórz paletę poleceń",
         "renameWorkspace": "Zmień nazwę obszaru roboczego",
-        "saveWorkspaceAs": "",
-        "selectAllScoped": "",
-        "showGraphView": "Pokaż widok wykresu",
-        "splitPaneDown": "Szyba podzielona (w dół)",
-        "splitPaneRight": "",
+        "saveWorkspaceAs": "Zapisz obszar roboczy jako",
+        "selectAllScoped": "Zaznacz wszystko (w zakresie)",
+        "showGraphView": "Pokaż widok grafu",
+        "splitPaneDown": "Podziel panel (w dół)",
+        "splitPaneRight": "Podziel panel (w prawo)",
         "switchWorkspace": "Przełącz obszar roboczy",
-        "toggleBulletList": "Włączenie / wyłączenie listy pocisków",
-        "toggleFocusMode": "Włączenie / wyłączenie trybu ostrości",
-        "toggleNumberedList": "Włączenie / wyłączenie listy",
-        "toggleReadingView": "Włączenie / wyłączenie widoku odczytu",
-        "toggleSourceMode": "Włączenie / wyłączenie trybu źródłowego",
-        "toggleTaskList": "Przełączanie listy zadań",
-        "unfoldAll": "Rozwiń wszystkie"
+        "toggleBulletList": "Przełącz listę punktowaną",
+        "toggleFocusMode": "Przełącz tryb skupienia",
+        "toggleNumberedList": "Przełącz listę numerowaną",
+        "toggleReadingView": "Przełącz widok czytania",
+        "toggleSourceMode": "Przełącz tryb źródłowy",
+        "toggleTaskList": "Przełącz listę zadań",
+        "unfoldAll": "Rozwiń wszystko"
       }
     },
     "rebind": {
-      "invalidChordReason": "Dodaj modyfikator (support, Ctrl lub Alt) - klucz nie może być skrótem."
+      "invalidChordReason": "Dodaj modyfikator (⌘, Ctrl lub Alt) — sam klawisz nie może być skrótem."
     }
   },
   "common": {
@@ -327,40 +327,40 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Nie mógł eksportować {{filename}}.",
-        "exported": "",
-        "renameFailed": "Nie mogłem zmienić nazwy.",
-        "renamed": "Nazwa zmieniona na {{name}}.",
-        "saveDialogFailed": "Nie mogłem otworzyć okna dialogowego."
+        "exportFailed": "Nie udało się wyeksportować {{filename}}.",
+        "exported": "Wyeksportowano {{filename}}.",
+        "renameFailed": "Nie udało się zmienić nazwy załącznika.",
+        "renamed": "Zmieniono nazwę na {{name}}.",
+        "saveDialogFailed": "Nie udało się otworzyć okna zapisu."
       },
       "convert": {
         "cancel": "Anuluj",
-        "confirm": "Przelicz",
-        "skipped": "pominięte - {{note}}",
-        "subtitleEmpty": "Nic do konwersji - nie pliki źródłowe rozwiązane.",
-        "subtitle_few": "{{count}} odniesienia zostaną przepisane. Przegląd przed zobowiązaniem.",
-        "subtitle_many": "{{count}} odniesienia zostaną przepisane. Przegląd przed zobowiązaniem.",
-        "subtitle_one": "1 odniesienie zostanie zmienione. Przegląd przed zobowiązaniem.",
-        "title": "Przelicz zaimportowane załączniki"
+        "confirm": "Konwertuj",
+        "skipped": "pominięto — {{note}}",
+        "subtitleEmpty": "Nie ma czego konwertować — nie znaleziono plików źródłowych.",
+        "subtitle_few": "{{count}} odwołania zostaną przepisane. Sprawdź przed zatwierdzeniem.",
+        "subtitle_many": "{{count}} odwołań zostanie przepisanych. Sprawdź przed zatwierdzeniem.",
+        "subtitle_one": "1 odwołanie zostanie przepisane. Sprawdź przed zatwierdzeniem.",
+        "title": "Konwertuj zaimportowane załączniki"
       },
       "convertCommand": {
         "pickerSourceFilter": "Źródło załącznika"
       },
       "convertCore": {
-        "converted_few": "",
-        "converted_many": "",
-        "converted_one": "{{count}} konwersja",
-        "noneToConvert": "Brak zaimportowanych załączników do przeliczenia w tej nocie.",
+        "converted_few": "{{count}} przekonwertowane",
+        "converted_many": "{{count}} przekonwertowanych",
+        "converted_one": "{{count}} przekonwertowany",
+        "noneToConvert": "Brak zaimportowanych załączników do konwersji w tej notatce.",
         "skipNote": {
-          "failed": "",
+          "failed": "import nie powiódł się",
           "locked": "skarbiec zablokowany",
-          "notFound": "źródło nie znaleziono",
-          "tooLarge": "zbyt duży (max 64 MiB)",
-          "unsupported": "typ nieobsługiwany"
+          "notFound": "nie znaleziono źródła",
+          "tooLarge": "za duży (maks. 64 MiB)",
+          "unsupported": "nieobsługiwany typ"
         },
-        "skippedSuffix_few": "",
-        "skippedSuffix_many": "",
-        "skippedSuffix_one": " · {{count}} pominięte"
+        "skippedSuffix_few": " · {{count}} pominięte",
+        "skippedSuffix_many": " · {{count}} pominiętych",
+        "skippedSuffix_one": " · {{count}} pominięty"
       },
       "fileKind": {
         "generic": "Plik",
@@ -369,69 +369,69 @@
           "audio": "Audio",
           "cHeader": "Nagłówek C",
           "cSource": "Źródło C",
-          "cppSource": "Źródło C + +",
-          "css": "",
+          "cppSource": "Źródło C++",
+          "css": "CSS",
           "csv": "CSV",
           "document": "Dokument",
-          "ebook": "Ebook",
-          "go": "Idź",
+          "ebook": "E-book",
+          "go": "Go",
           "html": "HTML",
           "image": "Obraz",
           "java": "Java",
           "javascript": "JavaScript",
           "json": "JSON",
-          "keynote": "Uwaga",
-          "log": "Zaloguj plik",
+          "keynote": "Keynote",
+          "log": "Plik dziennika",
           "markdown": "Markdown",
-          "numbers": "Arkusz kalkulacyjny liczb",
-          "pages": "Dokument stron",
+          "numbers": "Arkusz Numbers",
+          "pages": "Dokument Pages",
           "pdf": "PDF",
-          "presentation": "",
+          "presentation": "Prezentacja",
           "python": "Python",
-          "richText": "Bogaty dokument tekstowy",
-          "rust": "Rdza",
+          "richText": "Dokument sformatowany",
+          "rust": "Rust",
           "shell": "Skrypt powłoki",
           "spreadsheet": "Arkusz kalkulacyjny",
           "svg": "Obraz SVG",
-          "text": "Tekst dokumentu",
+          "text": "Dokument tekstowy",
           "toml": "TOML",
           "tsv": "TSV",
           "typescript": "TypeScript",
           "video": "Wideo",
-          "word": "Dokument słowny",
+          "word": "Dokument Word",
           "xml": "XML",
-          "yaml": "JAML"
+          "yaml": "YAML"
         },
         "unknown": "Plik {{ext}}"
       },
       "lightbox": {
         "close": "Zamknij podgląd",
-        "export": "Eksport",
+        "export": "Eksportuj",
         "exportAria": "Eksportuj załącznik",
-        "imagePreview": "Podgląd obrazka",
+        "imagePreview": "Podgląd obrazu",
         "pdfFallback": "PDF",
         "pdfPreview": "Podgląd PDF"
       },
       "menu": {
-        "actionsAria": "Działania związane z dodawaniem"
+        "actionsAria": "Działania na załączniku"
       },
       "pdf": {
-        "loading": "Ładowanie.."
+        "loading": "Ładowanie…"
       },
       "picker": {
-        "openFailed": "Nie mogłem otworzyć zbieracza plików."
+        "openFailed": "Nie udało się otworzyć okna wyboru plików."
       },
       "progress": {
-        "encrypting": "Szyfrowanie..",
-        "importing": "Importowanie..",
-        "loading": "Ładowanie.."
+        "encrypting": "Szyfrowanie…",
+        "importing": "Importowanie…",
+        "loading": "Ładowanie…"
       },
       "recording": {
-        "barAria": "Notatka głosowa rejestrująca",
+        "barAria": "Nagrywanie notatki głosowej",
         "cancel": "Anuluj",
-        "noAudio": "Nie wykryto dźwięku - sprawdź mikrofon.",
-        "saving": "Zapisywanie..",
-        "stop": "Stop"
+        "noAudio": "Nie wykryto dźwięku — sprawdź mikrofon.",
+        "saving": "Zapisywanie…",
+        "stop": "Zatrzymaj"
       },
       "rename": {
         "cancel": "Anuluj",
@@ -439,54 +439,54 @@
         "title": "Zmień nazwę załącznika"
       },
       "summary": {
-        "added_few": "",
-        "added_many": "",
+        "added_few": "{{count}} dodane",
+        "added_many": "{{count}} dodanych",
         "added_one": "{{count}} dodany",
         "reason": {
-          "failed": "nie powiodło się",
+          "failed": "niepowodzenie",
           "locked": "skarbiec zablokowany",
-          "tooLarge": "zbyt duży",
-          "unsupported": "typ nieobsługiwany"
+          "tooLarge": "za duży",
+          "unsupported": "nieobsługiwany typ"
         },
-        "skipped_few": "",
-        "skipped_many": "",
-        "skipped_one": "{{count}} pominięte: {{noun}}"
+        "skipped_few": "{{count}} pominięte: {{noun}}",
+        "skipped_many": "{{count}} pominiętych: {{noun}}",
+        "skipped_one": "{{count}} pominięty: {{noun}}"
       },
       "voice": {
         "startError": {
-          "alreadyRecording": "Nagrania są już w toku.",
-          "captureFailed": "Nie można było rozpocząć nagrywania - sprawdzić dostęp do mikrofonu w ustawieniach systemowych.",
-          "generic": "Nie mogłem zacząć nagrywać.",
-          "locked": "Odblokuj skarbiec, żeby nagrać notkę głosową.",
-          "noInputDevice": "Nie znaleziono mikrofonu. Połącz jeden i spróbuj jeszcze raz."
+          "alreadyRecording": "Nagrywanie już trwa.",
+          "captureFailed": "Nie udało się rozpocząć nagrywania — sprawdź dostęp do mikrofonu w Ustawieniach systemowych.",
+          "generic": "Nie udało się rozpocząć nagrywania.",
+          "locked": "Odblokuj skarbiec, aby nagrać notatkę głosową.",
+          "noInputDevice": "Nie znaleziono mikrofonu. Podłącz go i spróbuj ponownie."
         },
         "stopError": {
-          "captureFailed": "Nagrywanie nie powiodło się - sprawdź mikrofon.",
+          "captureFailed": "Nagrywanie nie powiodło się — sprawdź mikrofon.",
           "emptyRecording": "Nic nie zostało nagrane.",
-          "generic": "Nie mogłem zapisać nagrania.",
-          "silentRecording": "Nagranie było ciche i odrzucone - sprawdź mikrofon."
+          "generic": "Nie udało się zapisać nagrania.",
+          "silentRecording": "Nagranie było ciche i zostało odrzucone — sprawdź mikrofon."
         }
       },
       "widget": {
         "audio": {
-          "pause": "",
-          "play": "",
-          "seek": "Szukaj"
+          "pause": "Wstrzymaj",
+          "play": "Odtwórz",
+          "seek": "Przewiń"
         },
         "menu": {
-          "export": "",
+          "export": "Eksportuj",
           "remove": "Usuń",
           "rename": "Zmień nazwę",
-          "reveal": "Odkryj w bibliotece"
+          "reveal": "Pokaż w bibliotece"
         },
         "pdfFallback": "PDF",
         "tombstone": {
-          "brokenAria": "Odniesienie do rozbitego załącznika: {{filename}}",
-          "brokenLabel": "uszkodzone",
+          "brokenAria": "Uszkodzone odwołanie do załącznika: {{filename}}",
+          "brokenLabel": "uszkodzony",
           "deletedAria": "Usunięty załącznik: {{filename}}",
           "deletedLabel": "usunięty"
         },
-        "urlImageFallback": "obrazek"
+        "urlImageFallback": "obraz"
       }
     },
     "callout": {
@@ -502,198 +502,198 @@
         "hint": "Podpowiedź",
         "important": "Ważne",
         "info": "Informacja",
-        "missing": "Brak",
-        "note": "Uwaga",
+        "missing": "Brakujące",
+        "note": "Notatka",
         "question": "Pytanie",
         "quote": "Cytat",
         "success": "Sukces",
         "tip": "Wskazówka",
-        "todo": "Todo",
+        "todo": "Do zrobienia",
         "warning": "Ostrzeżenie"
       }
     },
     "chrome": {
       "backlinks": {
-        "archivedBadge": "Archiwizacja",
-        "empty": "Jeszcze nie ma powiązań.",
-        "linkedFrom_few": "",
-        "linkedFrom_many": "",
+        "archivedBadge": "Zarchiwizowane",
+        "empty": "Brak odnośników zwrotnych.",
+        "linkedFrom_few": "Powiązane z {{count}}",
+        "linkedFrom_many": "Powiązane z {{count}}",
         "linkedFrom_one": "Powiązane z {{count}}",
         "untitled": "Bez tytułu"
       },
       "barItems": {
-        "graph": "Wykres",
-        "lock": "Blokada",
-        "saveStatus": "Zapisz status",
+        "graph": "Graf",
+        "lock": "Zablokuj",
+        "saveStatus": "Stan zapisu",
         "settings": "Ustawienia",
-        "tags": "Tags",
+        "tags": "Tagi",
         "viewMode": "Tryb widoku",
         "views": "Widoki",
         "wordCount": "Liczba słów",
-        "workspace": "Przestrzeń robocza"
+        "workspace": "Obszar roboczy"
       },
       "baseImport": {
-        "droppedFiltersSuffix_few": "",
-        "droppedFiltersSuffix_many": "",
-        "droppedFiltersSuffix_one": " · {{count}} filtry opuszczone",
+        "droppedFiltersSuffix_few": " · {{count}} filtry pominięto",
+        "droppedFiltersSuffix_many": " · {{count}} filtrów pominięto",
+        "droppedFiltersSuffix_one": " · {{count}} filtr pominięto",
         "failed": "Import nie powiódł się.",
         "fileFilterName": "Obsidian Base",
-        "imported_few": "",
-        "imported_many": "",
-        "imported_one": "Przywożone widoki {{count}}",
-        "notValid": "Niepoprawny plik .base.",
-        "skippedSuffix_few": "",
-        "skippedSuffix_many": "",
-        "skippedSuffix_one": " · {{count}} pominięte",
-        "stoppedAfter_few": "",
-        "stoppedAfter_many": "",
-        "stoppedAfter_one": "Import zatrzymany po wyświetleniu (-ach) {{count}}."
+        "imported_few": "Zaimportowano {{count}} widoki",
+        "imported_many": "Zaimportowano {{count}} widoków",
+        "imported_one": "Zaimportowano {{count}} widok",
+        "notValid": "To nie jest prawidłowy plik .base.",
+        "skippedSuffix_few": " · {{count}} pominięte",
+        "skippedSuffix_many": " · {{count}} pominiętych",
+        "skippedSuffix_one": " · {{count}} pominięty",
+        "stoppedAfter_few": "Import zatrzymano po {{count}} widokach.",
+        "stoppedAfter_many": "Import zatrzymano po {{count}} widokach.",
+        "stoppedAfter_one": "Import zatrzymano po {{count}} widoku."
       },
       "bottomBar": {
-        "browseTags": "Przeglądaj znaczniki",
-        "browseViews": "",
-        "cycleViewMode": "Tryb przeglądania cyklu",
+        "browseTags": "Przeglądaj tagi",
+        "browseViews": "Przeglądaj widoki",
+        "cycleViewMode": "Przełączaj tryb widoku",
         "docStats": {
-          "summarySelectionSuffix": " sel",
-          "summary_few": "{{count}} słów · {{characters}} znaków",
+          "summarySelectionSuffix": " (zazn.)",
+          "summary_few": "{{count}} słowa · {{characters}} znaków",
           "summary_many": "{{count}} słów · {{characters}} znaków",
-          "summary_one": "{{count}} słowo · {{characters}} znaki",
-          "titleSelectionSuffix": " (wybór)",
-          "title_few": "{{characters}} znaki · {{words}} słowa · {{spaces}} spacje · {{count}} akapity",
-          "title_many": "{{characters}} znaki · {{words}} słowa · {{spaces}} spacje · {{count}} akapity",
-          "title_one": "{{characters}} znaki · {{words}} słowa · {{spaces}} spacje · {{count}} akapit"
+          "summary_one": "{{count}} słowo · {{characters}} znaków",
+          "titleSelectionSuffix": " (zaznaczenie)",
+          "title_few": "{{characters}} znaków · {{words}} słów · {{spaces}} spacji · {{count}} akapity",
+          "title_many": "{{characters}} znaków · {{words}} słów · {{spaces}} spacji · {{count}} akapitów",
+          "title_one": "{{characters}} znaków · {{words}} słów · {{spaces}} spacji · {{count}} akapit"
         },
-        "graphTitle": "Wykres (SIG)",
-        "lock": "Blokada",
+        "graphTitle": "Graf (⌘⇧G)",
+        "lock": "Zablokuj",
         "lockVault": "Zablokuj skarbiec",
         "openSettings": "Otwórz ustawienia",
-        "settingsTitle": "Ustawienia",
-        "showGraph": "Pokaż widok wykresu",
-        "syncStatus": "",
-        "tagsTitle": "Tags",
-        "togglePreview": "",
-        "viewModeTitle": "",
+        "settingsTitle": "Ustawienia (⌘,)",
+        "showGraph": "Pokaż widok grafu",
+        "syncStatus": "Tylko lokalnie · niezsynchronizowane",
+        "tagsTitle": "Tagi",
+        "togglePreview": "Przełącz podgląd obok siebie",
+        "viewModeTitle": "Tryb widoku: {{mode}} (kliknij, aby przełączyć)",
         "viewsTitle": "Widoki"
       },
       "import": {
-        "imported_few": "Przywożone uwagi {{count}} {{skipped}}",
-        "imported_many": "Przywożone uwagi {{count}} {{skipped}}",
-        "imported_one": "Przywożone uwagi {{count}} {{skipped}}",
-        "skippedSuffix_few": "",
-        "skippedSuffix_many": "",
-        "skippedSuffix_one": " · {{count}} pominięte"
+        "imported_few": "Zaimportowano {{count}} notatki{{skipped}}",
+        "imported_many": "Zaimportowano {{count}} notatek{{skipped}}",
+        "imported_one": "Zaimportowano {{count}} notatkę{{skipped}}",
+        "skippedSuffix_few": " · {{count}} pominięte",
+        "skippedSuffix_many": " · {{count}} pominiętych",
+        "skippedSuffix_one": " · {{count}} pominięty"
       },
       "nav": {
-        "goBack": "Wracaj",
-        "goForward": "Naprzód"
+        "goBack": "Wstecz",
+        "goForward": "Dalej"
       },
-      "noNotesToOpen": "Żadnych notatek do otwarcia.",
-      "resizeBacklinksSidebar": "Zmień wartość backlinków na pasku bocznym",
-      "resizeNotesSidebar": "Zmień rozmiar znaczników bocznych",
+      "noNotesToOpen": "Brak notatek do otwarcia.",
+      "resizeBacklinksSidebar": "Zmień rozmiar panelu odnośników zwrotnych",
+      "resizeNotesSidebar": "Zmień rozmiar panelu notatek",
       "sidebarToggle": {
-        "hideBacklinks": "Ukryj backlinks sidebar",
-        "hideNotes": "Ukryj znaczniki boczne",
-        "showBacklinks": "Pokaż pasek boczny",
-        "showNotes": "Pokaż pasek boczny"
+        "hideBacklinks": "Ukryj panel odnośników zwrotnych",
+        "hideNotes": "Ukryj panel notatek",
+        "showBacklinks": "Pokaż panel odnośników zwrotnych",
+        "showNotes": "Pokaż panel notatek"
       },
       "switchingOverlay": {
-        "saving": "Zapisywanie.."
+        "saving": "Zapisywanie…"
       },
       "viewMode": {
-        "live": "Żywe",
+        "live": "Na żywo",
         "reading": "Czytanie",
         "source": "Źródło"
       },
       "workspacePrompt": {
-        "namePlaceholder": "Nazwa miejsca pracy",
+        "namePlaceholder": "Nazwa obszaru roboczego",
         "renameConfirm": "Zmień nazwę",
         "renameTitle": "Zmień nazwę obszaru roboczego",
-        "saveAsTitle": "Zapisz przestrzeń roboczą jako",
+        "saveAsTitle": "Zapisz obszar roboczy jako",
         "saveConfirm": "Zapisz"
       },
       "workspaceSwitcher": {
-        "defaultName": "Przestrzeń robocza",
+        "defaultName": "Obszar roboczy",
         "renameItemLabel": "Zmień nazwę obszaru roboczego {{name}}",
         "renameTitle": "Zmień nazwę obszaru roboczego",
-        "saveCurrentAs": "Zapisz bieżący jako..",
+        "saveCurrentAs": "Zapisz bieżący jako…",
         "switchLabel": "Przełącz obszar roboczy",
-        "toggleTitle": "Miejsce pracy: {{name}}"
+        "toggleTitle": "Obszar roboczy: {{name}}"
       }
     },
     "codeBlock": {
-      "copyCode": "Kopiuj",
+      "copyCode": "Kopiuj kod",
       "defaultBadge": "kod"
     },
     "find": {
-      "close": "Znajdź",
-      "matchCase": "Przypadek dopasowania",
+      "close": "Zamknij wyszukiwanie",
+      "matchCase": "Uwzględnij wielkość liter",
       "matchCount": "{{current}} z {{total}}",
-      "nextMatch": "Następny mecz",
+      "nextMatch": "Następne dopasowanie",
       "noMatches": "Brak dopasowań",
       "placeholder": "Znajdź w notatce",
-      "previousMatch": "",
-      "replaceAll": "Zastąp wszystkie",
-      "replaceAllCount": "Zastąpić wszystkie ({{total}})",
-      "replaceOne": "Zastąp",
-      "replacePlaceholder": "Zastąpić",
-      "toggleReplace": "Włączenie / wyłączenie"
+      "previousMatch": "Poprzednie dopasowanie",
+      "replaceAll": "Zamień wszystko",
+      "replaceAllCount": "Zamień wszystko ({{total}})",
+      "replaceOne": "Zamień",
+      "replacePlaceholder": "Zamień na",
+      "toggleReplace": "Przełącz zamianę"
     },
     "folding": {
-      "clickToUnfold": "Kliknij, aby się rozwinąć",
+      "clickToUnfold": "Kliknij, aby rozwinąć",
       "unfold": "Rozwiń"
     },
     "footnote": {
       "heading": "Przypisy",
-      "unreferenced": "brak odniesienia"
+      "unreferenced": "bez odwołania"
     },
     "frontmatter": {
       "addProperty": "+ Dodaj właściwość",
-      "propertiesLabel": "",
-      "titleAriaLabel": "Tytuł uwagi",
+      "propertiesLabel": "Właściwości",
+      "titleAriaLabel": "Tytuł notatki",
       "titlePlaceholder": "Bez tytułu"
     },
     "mermaid": {
-      "rendering": ""
+      "rendering": "Renderowanie diagramu…"
     },
     "slash": {
       "attachFile": "Dołącz plik",
-      "bulletList": "Lista kul",
-      "callout": "Wywołanie",
+      "bulletList": "Lista punktowana",
+      "callout": "Wyróżnienie",
       "date": "Data",
       "day": "Dzień",
-      "divider": "Dzielnica",
-      "heading1": "Dział 1",
-      "heading2": "Dział 2",
-      "heading3": "Dział 3",
-      "heading4": "Dział 4",
-      "heading5": "Dział 5",
-      "heading6": "Dział 6",
-      "link": "Związek",
+      "divider": "Separator",
+      "heading1": "Nagłówek 1",
+      "heading2": "Nagłówek 2",
+      "heading3": "Nagłówek 3",
+      "heading4": "Nagłówek 4",
+      "heading5": "Nagłówek 5",
+      "heading6": "Nagłówek 6",
+      "link": "Łącze",
       "now": "Teraz",
-      "numberedList": "Lista numeryczna",
+      "numberedList": "Lista numerowana",
       "quote": "Cytat",
       "table": "Tabela",
-      "time": "Czas",
+      "time": "Godzina",
       "todoList": "Lista zadań",
-      "voiceNote": "Głos",
-      "wikiLink": "Link Wiki"
+      "voiceNote": "Notatka głosowa",
+      "wikiLink": "Wikilink"
     },
     "spell": {
       "menu": {
         "addToDictionary": "Dodaj do słownika",
         "ignoreInVault": "Ignoruj w tym skarbcu",
-        "ignoreThisSession": "Ignoruj tę sesję",
+        "ignoreThisSession": "Ignoruj w tej sesji",
         "noSuggestions": "Brak sugestii"
       }
     },
     "table": {
-      "addColumn": "Dodaj kolumnę w prawo",
+      "addColumn": "Dodaj kolumnę po prawej",
       "addRow": "Dodaj wiersz poniżej",
-      "cellAriaLabel": "Komórka stołowa",
+      "cellAriaLabel": "Komórka tabeli",
       "deleteColumn": "Usuń kolumnę",
       "deleteRow": "Usuń wiersz",
-      "reorderColumn": "Zmień kolejność",
-      "reorderRow": "Przeporządkuj wiersz"
+      "reorderColumn": "Zmień kolejność kolumn",
+      "reorderRow": "Zmień kolejność wierszy"
     },
     "toolbar": {
       "apply": "Zastosuj",
@@ -704,21 +704,21 @@
         "h4": "H4",
         "h5": "H5",
         "h6": "H6",
-        "paragraph": "Punkt"
+        "paragraph": "Akapit"
       },
       "highlight": {
-        "blue": "Mavi",
-        "green": "Yeşil Przewodniczący",
-        "pink": "Pembe Przewodniczący",
-        "purple": "Mor",
-        "yellow": "Sarı Przewodniczący"
+        "blue": "Niebieski",
+        "green": "Zielony",
+        "pink": "Różowy",
+        "purple": "Fioletowy",
+        "yellow": "Żółty"
       },
-      "urlPlaceholder": "Wklej adres łącza"
+      "urlPlaceholder": "Wklej adres URL łącza"
     },
     "typography": {
       "contentWidth": {
         "full": "Pełna",
-        "narrow": "Wąskie"
+        "narrow": "Wąska"
       },
       "font": {
         "mono": "Mono",
@@ -726,12 +726,12 @@
       },
       "lineSpacing": {
         "normal": "Normalny",
-        "relaxed": "Zrelaksowana",
-        "tight": "Ciasno"
+        "relaxed": "Luźny",
+        "tight": "Ciasny"
       },
       "textSize": {
-        "lg": "Duże",
-        "sm": "Małe",
+        "lg": "Duży",
+        "sm": "Mały",
         "xl": "Bardzo duży"
       }
     },
@@ -741,21 +741,21 @@
       },
       "convert": {
         "cancel": "Anuluj",
-        "choiceClause_few": " · {{count}} potrzebuje wyboru.",
-        "choiceClause_many": " · {{count}} potrzebuje wyboru.",
-        "choiceClause_one": " · {{count}} potrzebuje wyboru.",
-        "chooseTarget": "",
-        "convert": "Przelicz",
-        "convertedToast_few": "{{count}} Przeliczane wikilki",
-        "convertedToast_many": "{{count}} Przeliczane wikilki",
-        "convertedToast_one": "{{count}} konwertowany wikilink",
-        "noneToConvert": "Brak importowanych wycieczek do konwersji w tej notatce.",
-        "nothingToConvert": "Nic do konwersji - nie importowane wikilinki rozwiązać.",
-        "rewriteCount_few": "",
-        "rewriteCount_many": "",
-        "rewriteCount_one": "",
-        "skipped": "pominięte - {{reason}}",
-        "title": "Przelicz importowane wycieraczki w tej uwadze"
+        "choiceClause_few": " · {{count}} wymagają wyboru.",
+        "choiceClause_many": " · {{count}} wymaga wyboru.",
+        "choiceClause_one": " · {{count}} wymaga wyboru.",
+        "chooseTarget": "Wybierz cel…",
+        "convert": "Konwertuj",
+        "convertedToast_few": "Przekonwertowano {{count}} wikilinki",
+        "convertedToast_many": "Przekonwertowano {{count}} wikilinków",
+        "convertedToast_one": "Przekonwertowano {{count}} wikilink",
+        "noneToConvert": "Brak zaimportowanych wikilinków do konwersji w tej notatce.",
+        "nothingToConvert": "Nie ma czego konwertować — żaden zaimportowany wikilink się nie rozwiązuje.",
+        "rewriteCount_few": "{{count}} łącza zostaną przepisane",
+        "rewriteCount_many": "{{count}} łączy zostanie przepisanych",
+        "rewriteCount_one": "{{count}} łącze zostanie przepisane",
+        "skipped": "pominięto — {{reason}}",
+        "title": "Konwertuj zaimportowane wikilinki w tej notatce"
       },
       "convertCore": {
         "noMatch": "brak dopasowania"
@@ -764,118 +764,118 @@
   },
   "export": {
     "note": {
-      "documentTitleFallback": "Uwaga",
+      "documentTitleFallback": "Notatka",
       "errors": {
-        "attachmentCorrupt": "Nie można było odczytać załącznika, o którym mowa w tej notatce, więc nic nie zostało wywiezione.",
-        "attachmentMissing": "Brakuje załącznika, o którym mowa w tej notatce, więc nic nie zostało wywiezione.",
-        "cannotDecrypt": "Nie można było odczytać tej notatki.",
-        "destinationUnusable": "Ten folder docelowy nie jest przydatny.",
-        "fallback": "Eksport nie powiódł się niespodziewanie. Spróbuj jeszcze raz.",
-        "invalidAttachmentCatalog": "Katalog przywiązania skarbca nie mógł być przeczytany, więc nic nie zostało wywiezione.",
-        "invalidNoteFilename": "Ta nazwa pliku nie jest przydatna, więc nic nie zostało wywiezione.",
-        "invalidNoteId": "Ta notatka nie mogła zostać zidentyfikowana, więc nic nie zostało wywiezione.",
-        "invalidPlaintextEncoding": "Zawartość tej notatki wygląda na uszkodzoną, więc nic nie zostało wywiezione. Przywrócić z zapasowego.",
-        "ioNoSpace": "Za mało miejsca w miejscu przeznaczenia.",
-        "ioPermissionDenied": "Nie wolno pisać w miejscu przeznaczenia.",
-        "ioWriteDefault": "Nie można zapisać eksportowanego pliku.",
-        "noteNotFound": "Ta uwaga nie istnieje - mogła zostać usunięta.",
-        "pdfCaptureFailed": "PDF nie mógł być generowany, więc nic nie było eksportowane.",
-        "pdfExportInProgress": "Eksport PDF już działa. Poczekaj aż skończy, a potem spróbuj jeszcze raz.",
-        "pdfPayloadMissing": "Eksport został przerwany - jeśli skarbiec zamknięty, odblokować go i spróbować ponownie.",
-        "pdfRenderTimeout": "Notatka była zbyt długa, więc nic nie zostało wywiezione.",
-        "pdfWindowCreateFailed": "Okno eksportowe nie mogło zostać otwarte, więc nic nie zostało wywiezione.",
-        "targetExists": "Plik o tej nazwie istnieje już w miejscu docelowym.",
-        "vaultLocked": "Skarbiec jest zamknięty. Odblokuj, a potem spróbuj jeszcze raz."
+        "attachmentCorrupt": "Nie udało się odczytać załącznika, do którego odwołuje się ta notatka, więc nic nie zostało wyeksportowane.",
+        "attachmentMissing": "Brakuje załącznika, do którego odwołuje się ta notatka, więc nic nie zostało wyeksportowane.",
+        "cannotDecrypt": "Nie udało się odczytać tej notatki.",
+        "destinationUnusable": "Ten folder docelowy nie nadaje się do użytku.",
+        "fallback": "Eksport nieoczekiwanie się nie powiódł. Spróbuj ponownie.",
+        "invalidAttachmentCatalog": "Nie udało się odczytać katalogu załączników skarbca, więc nic nie zostało wyeksportowane.",
+        "invalidNoteFilename": "Ta nazwa pliku nie nadaje się do użytku, więc nic nie zostało wyeksportowane.",
+        "invalidNoteId": "Nie udało się zidentyfikować tej notatki, więc nic nie zostało wyeksportowane.",
+        "invalidPlaintextEncoding": "Treść tej notatki wygląda na uszkodzoną, więc nic nie zostało wyeksportowane. Przywróć ją z kopii zapasowej.",
+        "ioNoSpace": "Za mało miejsca w lokalizacji docelowej.",
+        "ioPermissionDenied": "Brak uprawnień do zapisu w lokalizacji docelowej.",
+        "ioWriteDefault": "Nie udało się zapisać wyeksportowanego pliku.",
+        "noteNotFound": "Ta notatka już nie istnieje — mogła zostać usunięta.",
+        "pdfCaptureFailed": "Nie udało się wygenerować pliku PDF, więc nic nie zostało wyeksportowane.",
+        "pdfExportInProgress": "Eksport PDF już trwa. Poczekaj na jego zakończenie, a potem spróbuj ponownie.",
+        "pdfPayloadMissing": "Eksport został przerwany — jeśli skarbiec się zablokował, odblokuj go i spróbuj ponownie.",
+        "pdfRenderTimeout": "Renderowanie notatki trwało zbyt długo, więc nic nie zostało wyeksportowane.",
+        "pdfWindowCreateFailed": "Nie udało się otworzyć okna eksportu, więc nic nie zostało wyeksportowane.",
+        "targetExists": "Plik o tej nazwie już istnieje w lokalizacji docelowej.",
+        "vaultLocked": "Skarbiec jest zablokowany. Odblokuj go, a potem spróbuj ponownie."
       },
       "flow": {
-        "couldNotRead": "Nie można było odczytać tej notatki.",
-        "exportedTo": "Eksportowane do {{filename}}",
-        "exportedToWithAttachments_few": "Eksportowane do załączników {{filename}} + {{count}}",
-        "exportedToWithAttachments_many": "Eksportowane do załączników {{filename}} + {{count}}",
-        "exportedToWithAttachments_one": "Eksportowane do {{filename}} + {{count}} załącznika",
-        "exportedToWithImages_few": "Eksportowane do obrazów {{filename}} + {{count}}",
-        "exportedToWithImages_many": "Eksportowane do obrazów {{filename}} + {{count}}",
-        "exportedToWithImages_one": "Eksportowany do {{filename}} + {{count}}",
+        "couldNotRead": "Nie udało się odczytać tej notatki.",
+        "exportedTo": "Wyeksportowano do {{filename}}",
+        "exportedToWithAttachments_few": "Wyeksportowano do {{filename}} + {{count}} załączniki",
+        "exportedToWithAttachments_many": "Wyeksportowano do {{filename}} + {{count}} załączników",
+        "exportedToWithAttachments_one": "Wyeksportowano do {{filename}} + {{count}} załącznik",
+        "exportedToWithImages_few": "Wyeksportowano do {{filename}} + {{count}} obrazy",
+        "exportedToWithImages_many": "Wyeksportowano do {{filename}} + {{count}} obrazów",
+        "exportedToWithImages_one": "Wyeksportowano do {{filename}} + {{count}} obraz",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
-        "filterPlainText": "Prosty tekst",
+        "filterPlainText": "Zwykły tekst",
         "showInFolder": "Pokaż w folderze"
       },
       "modal": {
         "cancel": "Anuluj",
-        "export": "Eksportuj..",
-        "includeAttachments_few": "Dołącz załączniki {{count}}",
-        "includeAttachments_many": "Dołącz załączniki {{count}}",
-        "includeAttachments_one": "Dołącz załącznik {{count}}",
-        "title": "Eksportuj jako markdown"
+        "export": "Eksportuj…",
+        "includeAttachments_few": "Dołącz {{count}} załączniki",
+        "includeAttachments_many": "Dołącz {{count}} załączników",
+        "includeAttachments_one": "Dołącz {{count}} załącznik",
+        "title": "Eksportuj jako Markdown"
       }
     },
     "pdf": {
       "cancel": "Anuluj",
-      "continue": "Kontynuuj..",
+      "continue": "Kontynuuj…",
       "title": "Eksportuj jako PDF"
     },
     "vault": {
-      "chooseDestinationDialogTitle": "Wybierz, gdzie umieścić wywóz",
+      "chooseDestinationDialogTitle": "Wybierz, gdzie umieścić eksport",
       "errors": {
-        "attachmentCorrupt": "Załącznik, o którym mowa w notatce, nie mógł zostać przeczytany, więc nic nie zostało wywiezione.",
-        "attachmentMissing": "Brakuje załącznika, o którym mowa w liście, więc nic nie zostało wywiezione.",
-        "authOperationInProgress": "Trwa kolejna operacja skarbca. Poczekaj aż skończy, a potem spróbuj jeszcze raz.",
-        "cancelled": "Eksport odwołany. Nic nie zostało na miejscu.",
-        "cannotDecrypt": "Nie można było odczytać notatki, więc nic nie było eksportowane.",
-        "destinationAlreadyExists": "Coś już tam istnieje. Wybierz świeże miejsce na eksport.",
-        "destinationNotAllowed": "To miejsce jest w magazynie Myne. Wybierz folder na zewnątrz.",
-        "invalidPlaintextEncoding": "Zawartość notatki wygląda na uszkodzoną, więc nic nie zostało wywiezione. Przywrócić z zapasowego.",
-        "invalidVaultMeta": "Metadane skarbca nie mogły być odczytane, więc nic nie było eksportowane.",
-        "ioWriteDefault": "Nie można zapisać eksportu.",
-        "joinFailure": "Eksport nie powiódł się niespodziewanie. Nic nie zostało na miejscu.",
-        "vaultLocked": "Skarbiec jest zamknięty. Odblokuj, a potem spróbuj jeszcze raz.",
-        "vaultNotFound": ""
+        "attachmentCorrupt": "Nie udało się odczytać załącznika, do którego odwołuje się notatka, więc nic nie zostało wyeksportowane.",
+        "attachmentMissing": "Brakuje załącznika, do którego odwołuje się notatka, więc nic nie zostało wyeksportowane.",
+        "authOperationInProgress": "Trwa inna operacja na skarbcu. Poczekaj na jej zakończenie, a potem spróbuj ponownie.",
+        "cancelled": "Eksport anulowany. Nic nie pozostawiono w lokalizacji docelowej.",
+        "cannotDecrypt": "Nie udało się odczytać notatki, więc nic nie zostało wyeksportowane.",
+        "destinationAlreadyExists": "Coś już istnieje w tej lokalizacji. Wybierz nowe miejsce na eksport.",
+        "destinationNotAllowed": "Ta lokalizacja znajduje się wewnątrz własnej pamięci Myne. Wybierz folder poza nią.",
+        "invalidPlaintextEncoding": "Treść notatki wygląda na uszkodzoną, więc nic nie zostało wyeksportowane. Przywróć ją z kopii zapasowej.",
+        "invalidVaultMeta": "Nie udało się odczytać metadanych skarbca, więc nic nie zostało wyeksportowane.",
+        "ioWriteDefault": "Nie udało się zapisać eksportu.",
+        "joinFailure": "Eksport nieoczekiwanie się nie powiódł. Nic nie pozostawiono w lokalizacji docelowej.",
+        "vaultLocked": "Skarbiec jest zablokowany. Odblokuj go, a potem spróbuj ponownie.",
+        "vaultNotFound": "Nie znaleziono skarbca do wyeksportowania."
       },
       "flow": {
-        "countAttachments_few": "",
-        "countAttachments_many": "",
-        "countAttachments_one": "",
+        "countAttachments_few": "{{count}} załączniki",
+        "countAttachments_many": "{{count}} załączników",
+        "countAttachments_one": "{{count}} załącznik",
         "countFolders_few": "{{count}} foldery",
-        "countFolders_many": "{{count}} foldery",
-        "countFolders_one": "Katalog {{count}}",
-        "countNotes_few": "{{count}} Uwagi",
-        "countNotes_many": "{{count}} Uwagi",
-        "countNotes_one": "{{count}} Uwaga",
-        "exclusionsHistory": "Historia wersji nie jest uwzględniona.",
-        "exclusionsTrashedAndHistory_few": "{{count}} Zdemolowane notatki i historia wersji nie są uwzględnione.",
-        "exclusionsTrashedAndHistory_many": "{{count}} Zdemolowane notatki i historia wersji nie są uwzględnione.",
-        "exclusionsTrashedAndHistory_one": "{{count}} Zdemolowana nuta i historia wersji nie są zawarte.",
-        "exclusionsTrashed_few": "{{count}} Zdemolowane notatki nie zawarte.",
-        "exclusionsTrashed_many": "{{count}} Zdemolowane notatki nie zawarte.",
-        "exclusionsTrashed_one": "{{count}} Zdemolowana nuta nie jest uwzględniona.",
-        "phaseAttachments": "",
-        "phaseNotes": "uwagi",
-        "preparing": "",
+        "countFolders_many": "{{count}} folderów",
+        "countFolders_one": "{{count}} folder",
+        "countNotes_few": "{{count}} notatki",
+        "countNotes_many": "{{count}} notatek",
+        "countNotes_one": "{{count}} notatka",
+        "exclusionsHistory": "Historia wersji nie została uwzględniona.",
+        "exclusionsTrashedAndHistory_few": "{{count}} notatki w koszu oraz historia wersji nie zostały uwzględnione.",
+        "exclusionsTrashedAndHistory_many": "{{count}} notatek w koszu oraz historia wersji nie zostały uwzględnione.",
+        "exclusionsTrashedAndHistory_one": "{{count}} notatka w koszu oraz historia wersji nie zostały uwzględnione.",
+        "exclusionsTrashed_few": "{{count}} notatki w koszu nie zostały uwzględnione.",
+        "exclusionsTrashed_many": "{{count}} notatek w koszu nie zostało uwzględnionych.",
+        "exclusionsTrashed_one": "{{count}} notatka w koszu nie została uwzględniona.",
+        "phaseAttachments": "załączniki",
+        "phaseNotes": "notatki",
+        "preparing": "Przygotowywanie…",
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
         "cancel": "Anuluj",
-        "cancelling": "Anulowanie..",
-        "title": "Eksportowanie.."
+        "cancelling": "Anulowanie…",
+        "title": "Eksportowanie…"
       },
       "setup": {
-        "cancel": "",
-        "choose": "Wybierz..",
-        "chooseFolder": "",
-        "destinationLabel": "Miejsce przeznaczenia",
-        "export": "Eksportuj..",
-        "folderSelectAriaLabel": "Katalog eksportu",
+        "cancel": "Anuluj",
+        "choose": "Wybierz…",
+        "chooseFolder": "Wybierz folder…",
+        "destinationLabel": "Lokalizacja docelowa",
+        "export": "Eksportuj…",
+        "folderSelectAriaLabel": "Folder do wyeksportowania",
         "noFolderChosen": "Nie wybrano folderu",
         "noFoldersInVault": "Brak folderów w tym skarbcu",
         "scopeFolder": "Jeden folder",
         "scopeLabel": "Zakres",
         "scopeWhole": "Cały skarbiec",
-        "title": "Eksportuj skarbiec jako markdown"
+        "title": "Eksportuj skarbiec jako Markdown"
       },
       "summary": {
-        "done": "",
+        "done": "Gotowe",
         "showInFolder": "Pokaż w folderze",
         "title": "Eksport zakończony"
       }
@@ -883,71 +883,71 @@
   },
   "failClosed": {
     "corrupted": {
-      "body": "Jeśli masz kopię zapasową, możesz ją przywrócić - Twoje bieżące pliki nie są dotykane; kopia zapasowa jest najpierw przywrócona jako oddzielny skarbiec.",
+      "body": "Jeśli masz kopię zapasową, możesz ją przywrócić — Twoje obecne pliki nie są naruszane; kopia zapasowa jest najpierw przywracana jako osobny skarbiec.",
       "cta": "Zamknij aplikację",
       "title": "Plik skarbca jest uszkodzony."
     },
     "invalidState": {
-      "body": "Proszę zacząć od nowa.",
-      "cta": "Blokada",
-      "title": "Niespodziewany stan."
+      "body": "Uruchom ponownie.",
+      "cta": "Zablokuj",
+      "title": "Nieoczekiwany stan."
     },
     "ioError": {
-      "body": "Może to być błąd dysku lub systemu plików.",
-      "cta": "",
+      "body": "To może być błąd dysku lub systemu plików.",
+      "cta": "Zamknij aplikację",
       "title": "Nie można odczytać pliku skarbca."
     },
     "permissionDenied": {
       "body": "Sprawdź uprawnienia do pliku.",
       "cta": "Zamknij aplikację",
-      "title": "Brak pozwolenia na dostęp do pliku skarbca."
+      "title": "Brak uprawnień dostępu do pliku skarbca."
     },
-    "restoreFromBackup": "Przywróć z kopii zapasowej.."
+    "restoreFromBackup": "Przywróć z kopii zapasowej…"
   },
   "notes": {
     "archive": {
       "close": "Zamknij",
       "countEmpty": "Pusty",
-      "count_few": "{{count}} Uwagi",
-      "count_many": "{{count}} Uwagi",
-      "count_one": "{{count}} Uwaga",
+      "count_few": "{{count}} notatki",
+      "count_many": "{{count}} notatek",
+      "count_one": "{{count}} notatka",
       "delete": "Usuń",
-      "deleteError": "Nie mogłem usunąć tej notatki. Spróbuj jeszcze raz.",
+      "deleteError": "Nie udało się usunąć tej notatki. Spróbuj ponownie.",
       "emptyState": "Archiwum jest puste.",
       "restore": "Przywróć",
-      "restoreError": "Nie mogłem przywrócić tej notatki. Spróbuj jeszcze raz.",
+      "restoreError": "Nie udało się przywrócić tej notatki. Spróbuj ponownie.",
       "title": "Archiwum",
       "untitled": "Bez tytułu"
     },
     "cardMenu": {
-      "copyLink": "Kopiuj link",
+      "copyLink": "Kopiuj łącze",
       "open": "Otwórz",
       "openInNewTab": "Otwórz w nowej karcie",
-      "revealInFolder": ""
+      "revealInFolder": "Pokaż w folderze"
     },
     "colorLabels": {
-      "clay": "Clay",
-      "moss": "Moss",
-      "ochre": "Ochre",
+      "clay": "Glina",
+      "moss": "Mech",
+      "ochre": "Ochra",
       "plum": "Śliwka",
       "slate": "Łupek",
       "stone": "Kamień"
     },
     "decoration": {
       "colorSection": "Kolor",
-      "default": "Domyślne",
+      "default": "Domyślny",
       "defaultFolderIcon": "Domyślna ikona folderu",
       "iconSection": "Ikona",
-      "menuLabel": "Etykieta kolorów",
+      "menuLabel": "Etykieta kolorystyczna",
       "noColor": "Brak koloru",
       "none": "Brak"
     },
     "deleteConfirm": {
       "cancel": "Anuluj",
       "delete": "Usuń",
-      "title": "Skasować ten list?",
+      "title": "Usunąć tę notatkę?",
       "untitled": "Bez tytułu",
-      "warning": "Tego nie da się cofnąć."
+      "warning": "Nie można tego cofnąć."
     },
     "filterBuilder": {
       "addCondition": "Dodaj warunek",
@@ -955,61 +955,61 @@
       "cancel": "Anuluj",
       "combinator": {
         "all": "wszystkie",
-        "any": "wszystkie"
+        "any": "dowolny"
       },
       "match": "Dopasuj",
       "negate": {
-        "is": "en",
-        "isNot": "nie"
+        "is": "jest",
+        "isNot": "nie jest"
       },
-      "noConditions": "Brak warunków - ten widok pokazuje wszystkie strony.",
-      "noteCount_few": "{{count}} Uwagi",
-      "noteCount_many": "{{count}} Uwagi",
-      "noteCount_one": "{{count}} Uwaga",
+      "noConditions": "Brak warunków — ten widok pokazuje wszystkie strony.",
+      "noteCount_few": "{{count}} notatki",
+      "noteCount_many": "{{count}} notatek",
+      "noteCount_one": "{{count}} notatka",
       "of": "z:",
-      "ofTheGroups": "grup:",
+      "ofTheGroups": "spośród grup:",
       "removeCondition": "Usuń warunek",
       "replaceFilter": "Zastąp filtr",
-      "save": "",
-      "searchTextPlaceholder": "tekst wyszukiwania",
-      "selectFolderPlaceholder": "wybierz folder..",
-      "selectTagPlaceholder": "wybierz znacznik..",
+      "save": "Zapisz",
+      "searchTextPlaceholder": "szukany tekst",
+      "selectFolderPlaceholder": "wybierz folder…",
+      "selectTagPlaceholder": "wybierz tag…",
       "type": {
-        "folder": "Katalog",
+        "folder": "Folder",
         "search": "Szukaj",
-        "tag": "Znacznik"
+        "tag": "Tag"
       },
-      "unrepresentable": "Ten filtr został wykonany z zaawansowanego edytora i nie można go tutaj edytować.",
-      "unresolved": ""
+      "unrepresentable": "Ten filtr został utworzony w zaawansowanym edytorze i nie można go tu edytować.",
+      "unresolved": "nierozwiązany"
     },
     "folderManagement": {
-      "illegalSegment": "Nazwa folderu nie może zawierać /\\ context 124; # ^ [] ani zaczynać / kończyć spacją.",
+      "illegalSegment": "Nazwa folderu nie może zawierać / \\ | # ^ [ ] ani zaczynać się/kończyć spacją.",
       "tooLong": "Ta ścieżka folderu jest za długa."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
     },
     "folderRow": {
-      "createFolderNote": "Utwórz notatkę katalogową",
+      "createFolderNote": "Utwórz notatkę folderu",
       "empty": "pusty",
-      "folderNote": "notatka katalogowa",
-      "openFolderNote": "Otwórz notatkę katalogową"
+      "folderNote": "notatka folderu",
+      "openFolderNote": "Otwórz notatkę folderu"
     },
     "graph": {
-      "allConnected": "Wszystko jest połączone - żadnych pojedynczych notatek.",
-      "building": "Graf budowlany..",
-      "depthToggleTitle": "Włączenie / wyłączenie głębokości sąsiedztwa (1 ↔ 2 chmiel)",
-      "filterAll": "",
+      "allConnected": "Wszystko jest połączone — brak izolowanych notatek.",
+      "building": "Budowanie grafu…",
+      "depthToggleTitle": "Przełącz głębokość sąsiedztwa (1 ↔ 2 przeskoki)",
+      "filterAll": "Wszystkie",
       "filterAroundNote": "Wokół tej notatki",
-      "filterByTag": "Filtruj według znacznika",
+      "filterByTag": "Filtruj według tagu",
       "filterIsolated": "Izolowane",
-      "hop": "{{depth}} hop",
-      "loading": "Graf załadowczy..",
-      "noNotes": "Żadnych notatek do wykresu.",
-      "overCap": "",
+      "hop": "{{depth}} przeskok",
+      "loading": "Ładowanie grafu…",
+      "noNotes": "Brak notatek do wyświetlenia w grafie.",
+      "overCap": "Ten skarbiec jest duży — graf całego skarbca jest ograniczony. Przefiltruj według tagu lub pokaż izolowane notatki, aby przeglądać.",
       "refresh": "Odśwież",
-      "refreshTitle": "Skarbiec się zmienił - odbudować wykres",
-      "tagPlaceholder": ""
+      "refreshTitle": "Skarbiec się zmienił — przebuduj graf",
+      "tagPlaceholder": "Tag…"
     },
     "import": {
       "base": {
@@ -1017,369 +1017,369 @@
       },
       "modal": {
         "cancel": "Anuluj",
-        "cancelledNotImported_few": "",
-        "cancelledNotImported_many": "",
-        "cancelledNotImported_one": "{{count}} nieprzywożone",
-        "cancelling": "Anulowanie..",
-        "chooseFolder": "Wybierz folder..",
+        "cancelledNotImported_few": "{{count}} niezaimportowane",
+        "cancelledNotImported_many": "{{count}} niezaimportowanych",
+        "cancelledNotImported_one": "{{count}} niezaimportowana",
+        "cancelling": "Anulowanie…",
+        "chooseFolder": "Wybierz folder…",
         "close": "Zamknij",
         "closeAriaLabel": "Zamknij",
-        "copied": "Kopiowane",
+        "copied": "Skopiowano",
         "copy": "Kopiuj",
         "done": "Gotowe",
-        "errorBody": "Import nie mógł się zakończyć. Wszelkie notatki już przywiezione były przechowywane i są bezpieczne do przechowywania lub usuwania.",
-        "flagDetail": "",
-        "flagKindFolder": "Katalog",
+        "errorBody": "Nie udało się ukończyć importu. Wszelkie już zaimportowane notatki zostały zachowane i można je bezpiecznie zatrzymać lub usunąć.",
+        "flagDetail": "{{kind}} „{{segment}}” {{reason}}.",
+        "flagKindFolder": "Folder",
         "flagKindTitle": "Tytuł",
-        "folderPickerTitle": "Wybierz swój folder skarbca Obsidian",
-        "hiddenIgnoredPrefix_few": "",
-        "hiddenIgnoredPrefix_many": "",
-        "hiddenIgnoredPrefix_one": "",
-        "hiddenIgnoredSuffix": ", dotfiles).",
+        "folderPickerTitle": "Wybierz folder skarbca Obsidian",
+        "hiddenIgnoredPrefix_few": "Zignorowano {{count}} elementy konfiguracyjne / ukryte (np. ",
+        "hiddenIgnoredPrefix_many": "Zignorowano {{count}} elementów konfiguracyjnych / ukrytych (np. ",
+        "hiddenIgnoredPrefix_one": "Zignorowano {{count}} element konfiguracyjny / ukryty (np. ",
+        "hiddenIgnoredSuffix": ", pliki ukryte).",
         "ifNoteExistsLabel": "Jeśli notatka już istnieje",
-        "import": "Import",
+        "import": "Importuj",
         "importFailed": "Import nie powiódł się.",
-        "importing": "Importowanie skarbca..",
-        "markDone": "Koniec",
-        "markedDone": "Zaznaczone",
-        "mediaImported_few": "",
-        "mediaImported_many": "",
-        "mediaImported_one": "{{count}} importowany",
-        "mediaOmittedSuffix_few": "",
-        "mediaOmittedSuffix_many": "",
-        "mediaOmittedSuffix_one": " · {{count}} pominięte",
-        "needsAttention": "",
-        "needsAttentionHelp": "",
+        "importing": "Importowanie skarbca…",
+        "markDone": "Oznacz jako wykonane",
+        "markedDone": "Oznaczono jako wykonane",
+        "mediaImported_few": "{{count}} zaimportowane",
+        "mediaImported_many": "{{count}} zaimportowanych",
+        "mediaImported_one": "{{count}} zaimportowany",
+        "mediaOmittedSuffix_few": " · {{count}} pominięte",
+        "mediaOmittedSuffix_many": " · {{count}} pominiętych",
+        "mediaOmittedSuffix_one": " · {{count}} pominięty",
+        "needsAttention": "Wymaga uwagi",
+        "needsAttentionHelp": "Te notatki zostały zaimportowane bez zmian. Sugerowane poprawki to punkt wyjścia — skopiuj jedną, a następnie zmień nazwę notatki po jej otwarciu.",
         "noFolderChosen": "Nie wybrano folderu",
-        "notesImported_few": "przywożone uwagi",
-        "notesImported_many": "przywożone uwagi",
-        "notesImported_one": "nota importowana",
-        "policyCopyHint": "Przynieś go obok istniejącej notatki.",
+        "notesImported_few": "notatki zaimportowane",
+        "notesImported_many": "notatek zaimportowanych",
+        "notesImported_one": "notatka zaimportowana",
+        "policyCopyHint": "Dodaj ją obok istniejącej notatki.",
         "policyCopyLabel": "Importuj jako kopię",
-        "policySkipHint": "Polecane - ponowne uruchomienie importu nigdy nie powiela lub nadpisuje.",
-        "policySkipLabel": "Pomiń to",
-        "preexistingDetail": "Ta notatka miała już swój własny folder: \"{{existing}}\", który przechowywał Myne - jej folder może się różnić od miejsca, w którym usiadł na dysku.",
-        "preparing": "Przygotowuję..",
-        "progressNotes": " uwagi",
-        "progressOf": "",
-        "reasonIllegalChar": "zawiera znak Myne nie może używać w nazwie",
-        "reasonPathTooLong": "ścieżka folderu + tytuł jest zbyt długa",
-        "reasonSegmentTooLong": "nazwa jest dłuższa niż pozwala Myne",
-        "scanning": "Skanowanie skarbca..",
-        "setupIntro": "Wyceluj Myne w swój istniejący folder skarbca Obsidian. Każda notatka Markdown jest importowana i szyfrowana na miejscu - nic nie opuszcza tego urządzenia, a oryginalne pliki pozostają nietknięte.",
-        "statCancelled": "Anulowane",
-        "statCanvasSkipped": ".difine plików pominięte",
-        "statEmptyFoldersKept": "Przechowywane puste foldery",
-        "statMedia": "Media",
-        "statOtherSkipped": "Inne pliki pominięte",
-        "statSkipped": "Pominięty (już istnieje)",
+        "policySkipHint": "Zalecane — ponowne uruchomienie importu nigdy nie powiela ani nie nadpisuje.",
+        "policySkipLabel": "Pomiń ją",
+        "preexistingDetail": "Ta notatka miała już własny folder: „{{existing}}”, który Myne zachowało — jego folder może różnić się od miejsca, w którym znajdowała się na dysku.",
+        "preparing": "Przygotowywanie…",
+        "progressNotes": " notatek",
+        "progressOf": " z ",
+        "reasonIllegalChar": "zawiera znak, którego Myne nie może użyć w nazwie",
+        "reasonPathTooLong": "ścieżka folderu + tytuł jest za długa",
+        "reasonSegmentTooLong": "nazwa jest dłuższa, niż dopuszcza Myne",
+        "scanning": "Skanowanie skarbca…",
+        "setupIntro": "Wskaż Myne swój istniejący folder skarbca Obsidian. Każda notatka Markdown jest importowana i szyfrowana na miejscu — nic nie opuszcza tego urządzenia, a Twoje oryginalne pliki pozostają nietknięte.",
+        "statCancelled": "Anulowano",
+        "statCanvasSkipped": "pominięte pliki .canvas",
+        "statEmptyFoldersKept": "Zachowane puste foldery",
+        "statMedia": "Multimedia",
+        "statOtherSkipped": "Inne pominięte pliki",
+        "statSkipped": "Pominięte (już istnieją)",
         "suggestedNameAriaLabel": "Sugerowana nazwa",
         "titleComplete": "Import zakończony",
-        "titleFailed": "Importuj nieudany",
+        "titleFailed": "Import nie powiódł się",
         "titleSetup": "Importuj skarbiec Obsidian",
-        "vaultFolderLabel": "Katalog skarbca",
-        "vaultRoot": "(korzeń skarbca)"
+        "vaultFolderLabel": "Folder skarbca",
+        "vaultRoot": "(katalog główny skarbca)"
       },
       "offer": {
-        "body": "Przynieś swoje notatki do Myne. Każdy z nich jest zaszyfrowany, jak jest importowany - nic nie opuszcza tego urządzenia, a oryginalne pliki pozostają dokładnie tam, gdzie są.",
-        "chooseFolder": "Wybierz folder..",
-        "laterHint": "Zawsze można importować później z ustawień → Storage.",
+        "body": "Przenieś swoje istniejące notatki do Myne. Każda z nich jest szyfrowana podczas importu — nic nie opuszcza tego urządzenia, a Twoje oryginalne pliki pozostają dokładnie tam, gdzie były.",
+        "chooseFolder": "Wybierz folder…",
+        "laterHint": "Zawsze możesz zaimportować później z Ustawienia → Pamięć.",
         "notNow": "Nie teraz",
-        "title": "Importujesz swój skarbiec Obsidian?"
+        "title": "Zaimportować skarbiec Obsidian?"
       }
     },
     "list": {
       "addToFavorites": "Dodaj do ulubionych",
-      "archive": "Archiwum",
-      "archiveBulkError": "Nie mogłem archiwizować notatek.",
-      "archiveNote": "Archiwum",
-      "archiveSingleError": "Nie mogłem archiwizować notatki.",
+      "archive": "Archiwizuj",
+      "archiveBulkError": "Nie udało się zarchiwizować notatek.",
+      "archiveNote": "Archiwizuj",
+      "archiveSingleError": "Nie udało się zarchiwizować notatki.",
       "attachments": "Załączniki",
-      "bulkArchive_few": "",
-      "bulkArchive_many": "",
-      "bulkArchive_one": "Archiwum {{count}} notatki",
-      "bulkDelete_few": "",
-      "bulkDelete_many": "",
-      "bulkDelete_one": "Usuń uwagi {{count}}",
-      "bulkMove_few": "",
-      "bulkMove_many": "",
-      "bulkMove_one": "Przenieś notatki {{count}} do..",
-      "caseMergeBody": "Folder o nazwie \"{{name}}\" już istnieje. Będą one łączyć - zmienić nazwę, aby utrzymać je oddzielnie?",
-      "color": "",
-      "createFirstNote": "+ Utwórz pierwszą nutę",
-      "createFolderNote": "Utwórz notatkę katalogową",
-      "customize": "",
+      "bulkArchive_few": "Zarchiwizuj {{count}} notatki",
+      "bulkArchive_many": "Zarchiwizuj {{count}} notatek",
+      "bulkArchive_one": "Zarchiwizuj {{count}} notatkę",
+      "bulkDelete_few": "Usuń {{count}} notatki",
+      "bulkDelete_many": "Usuń {{count}} notatek",
+      "bulkDelete_one": "Usuń {{count}} notatkę",
+      "bulkMove_few": "Przenieś {{count}} notatki do…",
+      "bulkMove_many": "Przenieś {{count}} notatek do…",
+      "bulkMove_one": "Przenieś {{count}} notatkę do…",
+      "caseMergeBody": "Folder o nazwie „{{name}}” już istnieje. Zostaną one scalone — zmienić nazwę jednego, aby zachować je osobno?",
+      "color": "Kolor…",
+      "createFirstNote": "+ Utwórz swoją pierwszą notatkę",
+      "createFolderNote": "Utwórz notatkę folderu",
+      "customize": "Dostosuj…",
       "delete": "Usuń",
-      "deleteFolderBody_few": "\"{{name}}\" i jego uwagi {{count}}",
-      "deleteFolderBody_many": "\"{{name}}\" i jego uwagi {{count}}",
-      "deleteFolderBody_one": "\"{{name}}\" i jego notatka {{count}}",
+      "deleteFolderBody_few": "„{{name}}” i jego {{count}} notatki",
+      "deleteFolderBody_many": "„{{name}}” i jego {{count}} notatek",
+      "deleteFolderBody_one": "„{{name}}” i jego {{count}} notatka",
       "deleteFolderConfirm": "Usuń folder",
       "deleteFolderTitle": "Usunąć ten folder?",
-      "deleteFolderWarning": "Notatki przechodzą do kosza - można je przywrócić później.",
-      "duplicate": "Powielanie",
+      "deleteFolderWarning": "Notatki zostaną przeniesione do Kosza — można je później przywrócić.",
+      "duplicate": "Duplikuj",
       "editFilterTitle": "Edytuj filtr",
-      "emptyState": "Jeszcze żadnych notatek.",
-      "exportHtml": "Eksportuj jako HTML..",
-      "exportMarkdown": "Eksportuj jako Markdown..",
-      "exportPdf": "Eksportuj jako PDF..",
-      "exportTxt": "Eksportuj jako zwykły tekst..",
+      "emptyState": "Brak notatek.",
+      "exportHtml": "Eksportuj jako HTML…",
+      "exportMarkdown": "Eksportuj jako Markdown…",
+      "exportPdf": "Eksportuj jako PDF…",
+      "exportTxt": "Eksportuj jako zwykły tekst…",
       "favoritesHeading": "Ulubione",
-      "mergeAnyway": "W każdym razie, połączenie",
+      "mergeAnyway": "Scal mimo to",
       "newFolder": "Nowy folder",
       "newFolderInPlaceholder": "Nowy folder w {{path}}",
       "newFolderPlaceholder": "Nowy folder",
-      "newNote": "Nowa uwaga",
-      "newNoteFromTemplate": "Nowa notatka z szablonu..",
-      "newNoteHere": "Nowa notatka",
-      "newNoteMenu": "Nowa uwaga",
-      "newNoteShortcut": "Nowa notatka (BELGN)",
+      "newNote": "Nowa notatka",
+      "newNoteFromTemplate": "Nowa notatka z szablonu…",
+      "newNoteHere": "Nowa notatka tutaj",
+      "newNoteMenu": "Nowa notatka",
+      "newNoteShortcut": "Nowa notatka (⌘N)",
       "newSubfolder": "Nowy podfolder",
       "newViewTitle": "Nowy widok",
-      "noteMovedToTrash": "Notatka przeniesiona do kosza",
-      "notesHeading": "",
-      "notesMovedToTrash_few": "{{count}} notatki przeniesione do kosza",
-      "notesMovedToTrash_many": "{{count}} notatki przeniesione do kosza",
-      "notesMovedToTrash_one": "{{count}} notatka przeniesiona do kosza",
+      "noteMovedToTrash": "Notatka przeniesiona do Kosza",
+      "notesHeading": "Notatki",
+      "notesMovedToTrash_few": "{{count}} notatki przeniesione do Kosza",
+      "notesMovedToTrash_many": "{{count}} notatek przeniesionych do Kosza",
+      "notesMovedToTrash_one": "{{count}} notatka przeniesiona do Kosza",
       "openArchive": "Otwórz archiwum",
       "openAttachments": "Otwórz załączniki",
-      "openFolderNote": "Otwórz notatkę katalogową",
+      "openFolderNote": "Otwórz notatkę folderu",
       "openInNewTab": "Otwórz w nowej karcie",
-      "openToSide": "Otwórz na bok",
-      "openTrash": "Otwórz śmieci",
-      "removeAsFolderNote": "",
+      "openToSide": "Otwórz obok",
+      "openTrash": "Otwórz kosz",
+      "removeAsFolderNote": "Usuń jako notatkę folderu",
       "removeFromFavorites": "Usuń z ulubionych",
       "rename": "Zmień nazwę",
-      "setAsFolderNote": "Ustaw jako notatkę katalogową",
-      "trash": "Śmietnik",
-      "trashBulkError": "Nie mogłem przenieść notatek do kosza.",
-      "trashSingleError": "Nie mogłem przenieść notatki do kosza.",
+      "setAsFolderNote": "Ustaw jako notatkę folderu",
+      "trash": "Kosz",
+      "trashBulkError": "Nie udało się przenieść notatek do Kosza.",
+      "trashSingleError": "Nie udało się przenieść notatki do Kosza.",
       "undo": "Cofnij",
-      "vaultRoot": "Korzeń skarbca",
+      "vaultRoot": "Katalog główny skarbca",
       "viewSettingsTitle": "Ustawienia widoku"
     },
     "newFromTemplate": {
-      "back": "Tył",
-      "blankNote": "Uwaga:",
+      "back": "Wstecz",
+      "blankNote": "Pusta notatka",
       "createNote": "Utwórz notatkę",
-      "emptyState": "Nie stworzyłeś jeszcze żadnych szablonów.",
+      "emptyState": "Nie utworzono jeszcze żadnych szablonów.",
       "listLabel": "Szablony",
-      "loading": "Ładowanie..",
-      "nameLabel": "Nazwa uwagi (z \"{{templateName}}\")",
+      "loading": "Ładowanie…",
+      "nameLabel": "Nazwa notatki (z „{{templateName}}”)",
       "namePlaceholder": "Bez tytułu",
-      "nameStepTitle": "Nazwa tej notatki",
+      "nameStepTitle": "Nazwij tę notatkę",
       "pickStepTitle": "Nowa notatka z szablonu",
       "untitledTemplate": "Szablon bez tytułu"
     },
     "newTab": {
       "createNote": "Utwórz nową notatkę",
-      "noNotesMatch": "Żadnych notatek.",
-      "noNotesYet": "Jeszcze żadnych notatek.",
+      "noNotesMatch": "Brak pasujących notatek.",
+      "noNotesYet": "Brak notatek.",
       "searchAriaLabel": "Szukaj notatek do otwarcia",
-      "searchPlaceholder": "Wyszukaj notatki..",
+      "searchPlaceholder": "Szukaj notatek…",
       "untitled": "Bez tytułu"
     },
     "pane": {
-      "graphTab": "Wykres",
-      "loading": "Ładowanie..",
+      "graphTab": "Graf",
+      "loading": "Ładowanie…",
       "untitledView": "Widok bez tytułu"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dni temu",
-      "hoursAgo": "{{h}} h temu",
-      "justNow": "właśnie teraz",
+      "hoursAgo": "{{h}} godz. temu",
+      "justNow": "przed chwilą",
       "minutesAgo": "{{m}} min temu",
-      "oneWeekAgo": "1 tydzień temu",
+      "oneWeekAgo": "tydzień temu",
       "weeksAgo": "{{w}} tygodnie temu",
       "yesterday": "wczoraj"
     },
     "row": {
       "addToFavorites": "Dodaj do ulubionych",
-      "folderIndexBadgeLabel": "Notatka katalogowa",
-      "folderIndexBadgeTitle": "Notatka katalogowa - indeks tego folderu",
-      "folderIndexConflictLabel": "",
-      "folderIndexConflictTitle": "Ten folder posiada już notatkę indeksową",
-      "loadError": "Nie mogłem załadować tej notatki",
+      "folderIndexBadgeLabel": "Notatka folderu",
+      "folderIndexBadgeTitle": "Notatka folderu — indeks tego folderu",
+      "folderIndexConflictLabel": "Folder ma już notatkę indeksu",
+      "folderIndexConflictTitle": "Ten folder ma już notatkę indeksu",
+      "loadError": "Nie udało się załadować tej notatki",
       "removeFromFavorites": "Usuń z ulubionych",
-      "renameAriaLabel": "Zmień nazwę",
+      "renameAriaLabel": "Zmień nazwę notatki",
       "untitled": "Bez tytułu"
     },
     "saveStatus": {
-      "editing": "Edycja",
-      "editingEllipsis": "Edycja..",
-      "editingTitle": "Edycja - autosave jest uzbrojony",
-      "justNow": "właśnie teraz",
-      "retry": "Retry",
-      "saveFailed": "Zapisz nieudany",
-      "saveFailedTitle": "Zapisz nieudany - kliknij przycisk Przywróć",
-      "saved": "Uratowana",
-      "savedRelative": "Uratowana {{rel}}",
+      "editing": "Edytowanie",
+      "editingEllipsis": "Edytowanie…",
+      "editingTitle": "Edytowanie — autozapis jest aktywny",
+      "justNow": "przed chwilą",
+      "retry": "Ponów",
+      "saveFailed": "Zapis nie powiódł się",
+      "saveFailedTitle": "Zapis nie powiódł się — kliknij Ponów",
+      "saved": "Zapisano",
+      "savedRelative": "Zapisano {{rel}}",
       "saving": "Zapisywanie",
-      "savingEllipsis": "Zapisywanie.."
+      "savingEllipsis": "Zapisywanie…"
     },
     "savedView": {
       "defaultName": "Widok filtrowany"
     },
     "snapshotFailed": {
-      "dismiss": "Rozejść się",
-      "message": "Nie można zapisać migawki - notatka jest zapisywana, ale jej historia wersji może być niekompletna (dysk może być pełny)."
+      "dismiss": "Zamknij",
+      "message": "Nie udało się zapisać migawki — Twoja notatka jest zapisana, ale jej historia wersji może być niekompletna (dysk może być pełny)."
     },
     "snapshots": {
       "cancel": "Anuluj",
-      "changeCount_few": "{{count}} zmienia się od tego zdjęcia",
-      "changeCount_many": "{{count}} zmienia się od tego zdjęcia",
-      "changeCount_one": "{{count}} zmienić od tego migawki",
+      "changeCount_few": "{{count}} zmiany od tej migawki",
+      "changeCount_many": "{{count}} zmian od tej migawki",
+      "changeCount_one": "{{count}} zmiana od tej migawki",
       "close": "Zamknij",
-      "confirmBody": "Twoja obecna notatka zostanie zapisana jako migawka, więc możesz to cofnąć.",
-      "confirmTitle": "Przywrócić to zdjęcie?",
-      "decrypting": "Odszyfrowywanie..",
-      "emptyState": "Nie ma jeszcze zdjęć. Zdjęcia snapshots są zapisywane automatycznie podczas edycji i przechowywane przez około 7 dni. Są zaszyfrowane i znikają, gdy notatka jest trwale usuwana.",
+      "confirmBody": "Twoja obecna notatka zostanie najpierw zapisana jako migawka, więc możesz to cofnąć.",
+      "confirmTitle": "Przywrócić tę migawkę?",
+      "decrypting": "Odszyfrowywanie…",
+      "emptyState": "Brak migawek. Migawki są zapisywane automatycznie podczas edycji i przechowywane przez około 7 dni. Są zaszyfrowane i znikają, gdy notatka zostaje trwale usunięta.",
       "encryptedSize": "Zaszyfrowane · {{size}}",
-      "errorCannotDecrypt": "To zdjęcie nie mogło być odszyfrowane.",
-      "errorGeneric": "Coś poszło nie tak. Spróbuj jeszcze raz.",
-      "errorIo": "Wystąpił błąd dysku - dysk może być pełny lub niezapisany.",
-      "errorNotFound": "To zdjęcie nie jest już dostępne.",
-      "errorStorageAccess": "Nie mogłem dostać się do magazynu ze zdjęciami.",
-      "errorVaultLocked": "Skarbiec jest zamknięty. Odblokuj go, aby zobaczyć zdjęcia.",
-      "justNow": "właśnie teraz",
+      "errorCannotDecrypt": "Nie udało się odszyfrować tej migawki.",
+      "errorGeneric": "Coś poszło nie tak. Spróbuj ponownie.",
+      "errorIo": "Wystąpił błąd dysku — dysk może być pełny lub niezapisywalny.",
+      "errorNotFound": "Ta migawka nie jest już dostępna.",
+      "errorStorageAccess": "Nie udało się uzyskać dostępu do pamięci migawek skarbca.",
+      "errorVaultLocked": "Skarbiec jest zablokowany. Odblokuj go, aby wyświetlić migawki.",
+      "justNow": "przed chwilą",
       "listLabel": "Lista migawek",
-      "loading": "",
-      "restore": "",
-      "restoreCta": "Przywróć to zdjęcie",
-      "restoredStatus": "Odnowiony. Wersja którą miałeś jest zapisywana jako migawka.",
-      "selectPlaceholder": "",
-      "title": "Szampony",
+      "loading": "Ładowanie…",
+      "restore": "Przywróć",
+      "restoreCta": "Przywróć tę migawkę",
+      "restoredStatus": "Przywrócono. Wersja, którą miałeś, jest zapisana jako migawka.",
+      "selectPlaceholder": "Wybierz migawkę, aby zobaczyć, co się od tego czasu zmieniło.",
+      "title": "Migawki",
       "untitled": "Bez tytułu"
     },
     "tabStrip": {
       "closeNewTab": "Zamknij nową kartę",
       "closeTab": "Zamknij {{title}}",
-      "newTab": "Nowa zakładka",
+      "newTab": "Nowa karta",
       "openNotes": "Otwarte notatki",
-      "pin": "Pin",
-      "pinned": "Pinned Przewodniczący",
-      "pinnedTitle": "Pinned - odpina do zamknięcia",
-      "unpin": "Rozepnij",
+      "pin": "Przypnij",
+      "pinned": "Przypięte",
+      "pinnedTitle": "Przypięte — odepnij, aby zamknąć",
+      "unpin": "Odepnij",
       "untitled": "Bez tytułu"
     },
     "tagBrowser": {
       "cancel": "Anuluj",
-      "clear": "Czysto",
-      "combineTagsWith": "Połącz znaczniki z",
-      "filtering": "Filtrowanie..",
+      "clear": "Wyczyść",
+      "combineTagsWith": "Łącz tagi za pomocą",
+      "filtering": "Filtrowanie…",
       "modeAll": "Wszystkie",
-      "modeAny": "Każdy",
-      "noNotesForFilter": "Brak notatek do tego filtra.",
-      "noTagsMatch": "Brak znaczników pasujących \"{{query}}\".",
-      "noTagsYet": "Nie ma jeszcze znaczników.",
-      "noteCount_few": "{{count}} Uwagi",
-      "noteCount_many": "{{count}} Uwagi",
-      "noteCount_one": "{{count}} Uwaga",
-      "notes": "Uwagi",
-      "pickTag": "Wybierz znacznik do filtrowania.",
+      "modeAny": "Dowolny",
+      "noNotesForFilter": "Brak notatek dla tego filtra.",
+      "noTagsMatch": "Brak tagów pasujących do „{{query}}”.",
+      "noTagsYet": "Brak tagów.",
+      "noteCount_few": "{{count}} notatki",
+      "noteCount_many": "{{count}} notatek",
+      "noteCount_one": "{{count}} notatka",
+      "notes": "Notatki",
+      "pickTag": "Wybierz tag do filtrowania.",
       "save": "Zapisz",
       "saveAsView": "Zapisz jako widok",
-      "searchPlaceholder": "Wyszukaj znaczniki..",
-      "title": "Tags",
+      "searchPlaceholder": "Szukaj tagów…",
+      "title": "Tagi",
       "untitled": "Bez tytułu",
-      "viewNamePlaceholder": ""
+      "viewNamePlaceholder": "Nazwa widoku"
     },
     "trash": {
       "close": "Zamknij",
       "countEmpty": "Pusty",
-      "count_few": "{{count}} Uwagi",
-      "count_many": "{{count}} Uwagi",
-      "count_one": "{{count}} Uwaga",
+      "count_few": "{{count}} notatki",
+      "count_many": "{{count}} notatek",
+      "count_one": "{{count}} notatka",
       "delete": "Usuń",
-      "deleteError": "Nie mogłem usunąć tej notatki. Spróbuj jeszcze raz.",
-      "empty": "Puste śmieci",
-      "emptyConfirmBody_few": "{{count}} Uwagi zostaną na stałe usunięte.",
-      "emptyConfirmBody_many": "{{count}} Uwagi zostaną na stałe usunięte.",
-      "emptyConfirmBody_one": "{{count}} Uwaga zostanie na stałe usunięta.",
-      "emptyConfirmCta": "Puste śmieci",
-      "emptyConfirmTitle": "Puste śmieci?",
-      "emptyPartialFailure_few": "{{count}} Notatki nie mogły zostać usunięte i pozostawały w śmieciach.",
-      "emptyPartialFailure_many": "{{count}} Notatki nie mogły zostać usunięte i pozostawały w śmieciach.",
-      "emptyPartialFailure_one": "{{count}} Notatka nie mogła zostać usunięta i pozostała w śmieciach.",
-      "emptyState": "Śmieci są puste.",
-      "purgeConfirmCta": "Usuń na stałe",
-      "purgeConfirmTitle": "Usunąć na stałe?",
+      "deleteError": "Nie udało się usunąć tej notatki. Spróbuj ponownie.",
+      "empty": "Opróżnij kosz",
+      "emptyConfirmBody_few": "{{count}} notatki zostaną trwale usunięte.",
+      "emptyConfirmBody_many": "{{count}} notatek zostanie trwale usuniętych.",
+      "emptyConfirmBody_one": "{{count}} notatka zostanie trwale usunięta.",
+      "emptyConfirmCta": "Opróżnij kosz",
+      "emptyConfirmTitle": "Opróżnić kosz?",
+      "emptyPartialFailure_few": "{{count}} notatki nie mogły zostać usunięte i pozostają w koszu.",
+      "emptyPartialFailure_many": "{{count}} notatek nie mogło zostać usuniętych i pozostają w koszu.",
+      "emptyPartialFailure_one": "{{count}} notatka nie mogła zostać usunięta i pozostaje w koszu.",
+      "emptyState": "Kosz jest pusty.",
+      "purgeConfirmCta": "Usuń trwale",
+      "purgeConfirmTitle": "Usunąć trwale?",
       "restore": "Przywróć",
-      "restoreError": "Nie mogłem przywrócić tej notatki. Spróbuj jeszcze raz.",
-      "title": "Śmietnik",
+      "restoreError": "Nie udało się przywrócić tej notatki. Spróbuj ponownie.",
+      "title": "Kosz",
       "untitled": "Bez tytułu"
     },
     "unlinkedMentions": {
-      "empty": "Żadnych niepowiązanych wzmianek.",
+      "empty": "Brak niepowiązanych wzmianek.",
       "heading": "Niepowiązane wzmianki",
-      "link": "Związek",
-      "linkTooltip": "Połącz tę wzmiankę z {{title}}",
-      "refresh": "Mencje mogły się zmienić - odświeżyć",
-      "searching": "Szukam..",
-      "thisNote": "niniejsza notatka",
+      "link": "Powiąż",
+      "linkTooltip": "Powiąż tę wzmiankę z {{title}}",
+      "refresh": "Wzmianki mogły się zmienić — odśwież",
+      "searching": "Wyszukiwanie…",
+      "thisNote": "ta notatka",
       "untitled": "Bez tytułu"
     },
     "viewSettings": {
       "aspect": {
-        "default": "Domyślne (16: 9)",
-        "fourThree": "4: 3",
-        "square": "1: 1 (kwadrat)",
-        "threeTwo": "3: 2",
-        "wide": "16: 9 (szeroki)"
+        "default": "Domyślne (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kwadrat)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (szeroki)"
       },
       "cancel": "Anuluj",
-      "cardSize": "Wielkość karty",
+      "cardSize": "Rozmiar karty",
       "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Własność pierwszorzędna, której wartością jest obraz - pokazana jako okładka każdej karty. Zostawić puste bez przykrywki.",
-      "coverImagePlaceholder": "np. pokrycie",
-      "coverImageProperty": "Pokryj właściwość obrazu",
-      "imageAspectRatio": "Stosunek aspektu obrazu",
-      "reset": "Reset",
+      "coverImageHint": "Właściwość frontmatter, której wartością jest obraz — pokazywany jako okładka każdej karty. Pozostaw puste, aby nie wyświetlać okładki.",
+      "coverImagePlaceholder": "np. cover",
+      "coverImageProperty": "Właściwość obrazu okładki",
+      "imageAspectRatio": "Proporcje obrazu",
+      "reset": "Resetuj",
       "save": "Zapisz"
     },
     "views": {
       "cards": {
-        "changeCover": "Zmiana pokrycia",
+        "changeCover": "Zmień okładkę",
         "changeCoverImage": "Zmień obraz okładki",
-        "empty": "Brak notatek pasuje do tego widoku",
+        "empty": "Brak notatek pasujących do tego widoku",
         "noValue": "Brak wartości",
         "setCover": "Ustaw okładkę",
         "setCoverImage": "Ustaw obraz okładki",
         "untitled": "Bez tytułu"
       },
-      "collapseViews": "Przeglądy zwijania",
-      "empty": "Nie ma jeszcze widoków. Zapisz bieżącą listę notatek jako widok.",
+      "collapseViews": "Zwiń widoki",
+      "empty": "Brak widoków. Zapisz bieżącą listę notatek jako widok.",
       "expandViews": "Rozwiń widoki",
       "heading": "Widoki",
       "host": {
-        "unsupported": "Ten typ widoku pojawia się w późniejszej aktualizacji."
+        "unsupported": "Ten typ widoku pojawi się w późniejszej aktualizacji."
       },
       "menu": {
         "deleteView": "Usuń widok",
-        "editFilter": "Edytuj filtr..",
+        "editFilter": "Edytuj filtr…",
         "moveDown": "Przesuń w dół",
-        "moveUp": "Przesuń się",
+        "moveUp": "Przesuń w górę",
         "rename": "Zmień nazwę",
-        "viewSettings": "Ustawienia widoku.."
+        "viewSettings": "Ustawienia widoku…"
       },
       "newView": "Nowy widok",
       "untitledView": "Widok bez tytułu"
     },
     "welcome": {
-      "body": "Witamy w Myne, twojej prywatnej przestrzeni do myślenia i pisania.\n\nWszystko co tu uratujesz jest zaszyfrowane i pozostaje na urządzeniu. Twoje * * hasło * * i * * zwrot * * są jedynymi kluczami do niego, więc trzymaj je w bezpiecznym miejscu. Jeśli oboje się zgubią, nikt nie odzyska twoich notatek, nawet my.\n\nTo zwykła notatka, więc niech będzie twoja. Edytuj, zmieniaj nazwę lub usuwaj, kiedy tylko chcesz, i dodawaj nowe notatki, gdy twoje pomysły rosną.\n\nCieszymy się, że tu jesteś. Aby dowiedzieć się więcej o Myne, odwiedź https: / / myne.md\n",
+      "body": "Witamy w Myne, Twojej prywatnej przestrzeni do myślenia i pisania.\n\nWszystko, co tu zapiszesz, jest zaszyfrowane i pozostaje na Twoim urządzeniu. Twoje **hasło** i **fraza odzyskiwania** to jedyne klucze do niego, więc przechowuj je w bezpiecznym miejscu. Jeśli oba kiedykolwiek zaginą, nikt nie odzyska Twoich notatek — nawet my.\n\nTo zwykła notatka, więc uczyń ją swoją. Edytuj ją, zmień jej nazwę lub usuń, kiedy tylko chcesz, i dodawaj nowe notatki w miarę rozwijania pomysłów.\n\nCieszymy się, że tu jesteś. Aby dowiedzieć się więcej o Myne, odwiedź https://myne.md\n",
       "title": "Witamy w Myne"
     },
     "workspace": {
-      "defaultSlotName": "Domyślne"
+      "defaultSlotName": "Domyślny"
     }
   },
   "password": {
     "createForm": {
-      "checkingStrength": "Sprawdzam siłę..",
+      "checkingStrength": "Sprawdzanie siły…",
       "confirmLabel": "Potwierdź hasło główne",
-      "defaultEmptyCaption": "Używane jako wejście do Argon2id (m = 256 MiB, t = 3, p = 2). Wybierz coś, co pamiętasz; nie możesz tego zresetować.",
-      "mismatch": "Hasła nie pasują.",
+      "defaultEmptyCaption": "Używane jako dane wejściowe do Argon2id (m=256 MiB, t=3, p=2). Wybierz coś, co zapamiętasz; nie można tego zresetować.",
+      "mismatch": "Hasła nie są zgodne.",
       "passwordLabel": "Hasło główne",
-      "suggestPassword": "Sugeruje hasło",
+      "suggestPassword": "Zasugeruj hasło",
       "tooShort": "Użyj co najmniej {{n}} znaków."
     },
     "input": {
@@ -1389,149 +1389,149 @@
   },
   "primitives": {
     "searchableSelect": {
-      "emptyText": "Żadnych zapałek.",
-      "placeholder": "Wybierz..",
-      "searchPlaceholder": "Szukaj.."
+      "emptyText": "Brak dopasowań.",
+      "placeholder": "Wybierz…",
+      "searchPlaceholder": "Szukaj…"
     }
   },
   "recover": {
     "errors": {
-      "cancelledVaultLocked": "Odzyskanie anulowane: skarbiec został zamknięty.",
-      "operationInProgress": "Operacja w toku. Proszę poczekać.",
-      "unexpected": "Niespodziewany błąd. Proszę spróbować jeszcze raz.",
-      "vaultNotFound": "Nie znaleziono pliku skarbca. Proszę uruchomić ponownie aplikację."
+      "cancelledVaultLocked": "Odzyskiwanie anulowane: skarbiec został zablokowany.",
+      "operationInProgress": "Operacja w toku. Poczekaj.",
+      "unexpected": "Nieoczekiwany błąd. Spróbuj ponownie.",
+      "vaultNotFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację."
     }
   },
   "restore": {
-    "backLabel": "Tył",
+    "backLabel": "Wstecz",
     "cancelLabel": "Anuluj",
     "collision": {
-      "body": "Krypta z tego backupu już istnieje na tym urządzeniu. Można zachować oba - odrestaurowana kopia pojawia się jako oddzielny skarbiec na liście skarbca - lub przywrócić teraz, a następnie usunąć istniejący skarbiec z listy skarbca samodzielnie (usunięcie prosi o wpisanie DELETE, i tylko po potwierdzeniu, że przywrócony skarbiec otwiera).",
-      "keepBoth": "Zachowaj obie",
-      "replaceExisting": "Przywrócić, a następnie zastąpić istniejące.."
+      "body": "Skarbiec z tej kopii zapasowej już istnieje na tym urządzeniu. Możesz zachować oba — przywrócona kopia pojawi się jako osobny skarbiec na liście skarbców — albo przywrócić teraz, a następnie samodzielnie usunąć istniejący skarbiec z listy (usunięcie wymaga wpisania DELETE i ma sens dopiero po potwierdzeniu, że przywrócony skarbiec się otwiera).",
+      "keepBoth": "Zachowaj oba",
+      "replaceExisting": "Przywróć, a następnie zastąp istniejący…"
     },
     "damaged": {
-      "body": "Plik zapasowy jest uszkodzony, więc nic nie zostało przywrócone. Jeśli jest to jedyna kopia, którą posiadasz, salvage może przywrócić nienaruszone notatki i listę dokładnie tego, czego nie można odczytać - wynik jest zawsze określany jako częściowa przywracanie.",
+      "body": "Plik kopii zapasowej jest uszkodzony, więc nic nie zostało przywrócone. Jeśli to jedyna kopia, jaką masz, odzyskiwanie może przywrócić nienaruszone notatki i wskazać dokładnie, czego nie udało się odczytać — wynik jest zawsze oznaczany jako częściowe przywrócenie.",
       "close": "Zamknij",
-      "salvage": "Ożywić nietknięte notatki.."
+      "salvage": "Odzyskaj nienaruszone notatki…"
     },
     "error": {
-      "tryAnotherFile": "Spróbuj innego pliku"
+      "tryAnotherFile": "Wypróbuj inny plik"
     },
     "pick": {
-      "body": "Wybierz plik <code> .myne- backup </code>. Backup jest sprawdzany zanim cokolwiek zostanie przywrócone; przywrócony skarbiec odblokowuje się z hasłem skarbca lub zwrotem - dokładnie jak odblokować.",
-      "chooseFile": "Wybierz plik kopii zapasowej..",
-      "corruptedSuffix": "Twój obecny skarbiec nie jest dotknięty: kopia zapasowa jest przywrócona jako oddzielny skarbiec pierwszy."
+      "body": "Wybierz plik <code>.myne-backup</code>. Kopia zapasowa jest weryfikowana, zanim cokolwiek zostanie przywrócone; przywrócony skarbiec odblokowuje się hasłem lub frazą odzyskiwania tego skarbca — dokładnie tak jak przy odblokowywaniu.",
+      "chooseFile": "Wybierz plik kopii zapasowej…",
+      "corruptedSuffix": "Twój obecny skarbiec nie jest naruszany: kopia zapasowa jest najpierw przywracana jako osobny skarbiec."
     },
     "summary": {
       "attachments": "Załączniki: {{n}}",
-      "collidedNote": "Dotychczasowa kopia tego skarbca jest nadal na liście. Po potwierdzeniu otwarcia odrestaurowanego skarbca, można usunąć stary z listy skarbca (poprosi o wpisanie DELETE).",
-      "notes": "Uwagi: {{n}}",
-      "openVaultList": "Otwórz listę skarbca",
-      "partialHeader_few": "Nie można odczytać elementów częściowo odtworzonych {{count}}.",
-      "partialHeader_many": "Nie można odczytać elementów częściowo odtworzonych {{count}}.",
-      "partialHeader_one": "Nie można odczytać ponownie elementu częściowo - {{count}}.",
+      "collidedNote": "Wcześniej istniejąca kopia tego skarbca nadal znajduje się na liście skarbców. Po potwierdzeniu, że przywrócony skarbiec się otwiera, możesz usunąć stary z listy (wymaga wpisania DELETE).",
+      "notes": "Notatki: {{n}}",
+      "openVaultList": "Otwórz listę skarbców",
+      "partialHeader_few": "Przywrócono częściowo — nie udało się odczytać {{count}} elementów.",
+      "partialHeader_many": "Przywrócono częściowo — nie udało się odczytać {{count}} elementów.",
+      "partialHeader_one": "Przywrócono częściowo — nie udało się odczytać {{count}} elementu.",
       "restored": "Skarbiec przywrócony.",
       "versionHistory": "Wpisy historii wersji: {{n}}"
     },
     "title": "Przywróć z kopii zapasowej",
     "working": {
-      "cancel": "",
-      "restoringProgress": "Przywracanie... {{done}} z {{total}}",
-      "verifying": "Sprawdzanie kopii zapasowej..",
-      "verifyingProgress": "Weryfikacja kopii zapasowej... {{done}} z {{total}}"
+      "cancel": "Anuluj",
+      "restoringProgress": "Przywracanie… {{done}} z {{total}}",
+      "verifying": "Weryfikowanie kopii zapasowej…",
+      "verifyingProgress": "Weryfikowanie kopii zapasowej… {{done}} z {{total}}"
     }
   },
   "settings": {
     "about": {
-      "buildChannelDevelopment": "Budowa rozwoju",
-      "buildChannelLabel": "Kanał budowlany",
+      "buildChannelDevelopment": "Kompilacja rozwojowa",
+      "buildChannelLabel": "Kanał kompilacji",
       "buildChannelStable": "Stabilny",
-      "changelogButton": "Widok changelog..",
-      "changelogHelper": "Notatki do wersji perowej. Pojawi się, gdy MYND- 119 wyląduje.",
-      "changelogLabel": "Changelog",
-      "licenseBody": "Przed -alfa · CC0 docs · AGPL- 3.0 kod aplikacji na wydaniu fazy 1.",
+      "changelogButton": "Wyświetl listę zmian…",
+      "changelogHelper": "Notatki dla poszczególnych wersji. Pojawią się po wdrożeniu MYND-119.",
+      "changelogLabel": "Lista zmian",
+      "licenseBody": "Pre-alfa · dokumentacja CC0 · kod aplikacji AGPL-3.0 w wydaniu Fazy 1.",
       "licenseLabel": "Licencja",
-      "tagline": "Przed -alfa · Klient pulpitu fazy 1",
-      "threatModelHelper": "Otwórz w swojej przeglądarce publiczny dokument typu personal-model.",
-      "threatModelLabel": "Model zagrożenia"
+      "tagline": "Pre-alfa · klient desktopowy Fazy 1",
+      "threatModelHelper": "Otwórz publiczny dokument modelu zagrożeń w przeglądarce.",
+      "threatModelLabel": "Model zagrożeń"
     },
     "account": {
-      "argon2idHeading": "Parametry argon2id",
+      "argon2idHeading": "Parametry Argon2id",
       "changePasswordButton": "Zmień hasło",
       "changePasswordError": {
-        "invalidCredentialOrVault": "Błędne aktualne hasło lub plik skarbca jest uszkodzony.",
-        "ioError": "Błąd dysku, proszę spróbować ponownie.",
-        "joinFailure": "",
-        "samePasswordRejected": "Nowe hasło pasuje do obecnego.",
+        "invalidCredentialOrVault": "Nieprawidłowe obecne hasło lub plik skarbca jest uszkodzony.",
+        "ioError": "Błąd dysku, spróbuj ponownie.",
+        "joinFailure": "Coś poszło nie tak, spróbuj ponownie.",
+        "samePasswordRejected": "Nowe hasło jest takie samo jak obecne.",
         "weakNewPassword": "Nowe hasło musi mieć co najmniej 12 znaków."
       },
       "changePasswordHeading": "Zmień hasło",
-      "changePasswordHelper": "Obróć hasło podczas przechowywania tego samego skarbca. Zwrot jest taki sam.",
-      "dangerZoneHeading": "Strefa zagrożenia",
-      "dangerZoneHelper": "",
-      "deleteVaultButton": "Usuń skarbiec..",
-      "memoryCost": "Koszty pamięci",
+      "changePasswordHelper": "Zmień hasło główne, zachowując ten sam skarbiec. Fraza odzyskiwania pozostaje bez zmian.",
+      "dangerZoneHeading": "Strefa niebezpieczna",
+      "dangerZoneHelper": "Trwale usuń ten skarbiec i wszystkie notatki. Nie można tego cofnąć. Fraza odzyskiwania nie przywróci skarbca.",
+      "deleteVaultButton": "Usuń skarbiec…",
+      "memoryCost": "Koszt pamięci",
       "parallelism": "Równoległość",
-      "timeCost": "",
-      "vaultLabelEyebrow": "ETYKIETA NA WAULT",
-      "vaultLabelHelper": "Nazwa tego skarbca pokazana w przełączniku in- app. Zaszyfrowany w skarbcu, nigdy nie zostawia urządzenia w zwykłym tekście.",
-      "vaultLabelPlaceholder": "Dodaj etykietę..",
+      "timeCost": "Koszt czasu",
+      "vaultLabelEyebrow": "ETYKIETA SKARBCA",
+      "vaultLabelHelper": "Nazwa tego skarbca pokazywana w przełączniku w aplikacji. Przechowywana w zaszyfrowanej postaci wewnątrz skarbca; nigdy nie opuszcza Twojego urządzenia jako zwykły tekst.",
+      "vaultLabelPlaceholder": "Dodaj etykietę…",
       "vaultLabelSave": "Zapisz"
     },
     "appearance": {
-      "showEditTimesAria": "Pokaż czasy edycji w pasku bocznym",
-      "showEditTimesHelper": "Wyświetla ostatnio edytowany czas każdej notatki pod tytułem w pasku bocznym.",
+      "showEditTimesAria": "Pokaż czasy edycji w panelu bocznym",
+      "showEditTimesHelper": "Wyświetla pod tytułem każdej notatki w panelu bocznym czas jej ostatniej edycji.",
       "showEditTimesLabel": "Pokaż czasy edycji",
       "theme": {
-        "amoled": "WYKONANE",
+        "amoled": "AMOLED",
         "dark": "Ciemny",
-        "light": "Światło",
-        "system": "System"
+        "light": "Jasny",
+        "system": "Systemowy"
       },
-      "themeHelper": "Przełączanie pomiędzy światłami i ciemnymi motywami lub podążanie za preferencjami systemu.",
+      "themeHelper": "Przełączaj między jasnym a ciemnym motywem lub podążaj za preferencjami systemu.",
       "themeLabel": "Motyw",
       "themeOptionAria": "Motyw {{label}}",
-      "themeSaveError": "Nie mogłem zapisać tematu. Proszę spróbować jeszcze raz.",
-      "timestampsSaveError": "Nie mogłem zachować preferencji. Proszę spróbować jeszcze raz."
+      "themeSaveError": "Nie udało się zapisać motywu. Spróbuj ponownie.",
+      "timestampsSaveError": "Nie udało się zapisać preferencji. Spróbuj ponownie."
     },
     "archive": {
-      "helper": "Niech notatki zostaną przeniesione do Archiwum, przechowywane poza główną listą. Wyłączając to, przywraca wszystkie zarchiwizowane notatki do swojego folderu i ukrywa kontrolę archiwum.",
+      "helper": "Pozwól na przenoszenie notatek do Archiwum, poza główną listę. Wyłączenie tej opcji przywraca każdą zarchiwizowaną notatkę do jej folderu i ukrywa elementy sterujące archiwum.",
       "label": "Archiwizacja",
-      "off": "Wyłącz",
-      "on": "On",
-      "saveError": "Nie można zaktualizować ustawienia archiwizacji."
+      "off": "Wył.",
+      "on": "Wł.",
+      "saveError": "Nie udało się zaktualizować ustawienia archiwizacji."
     },
     "autoBackup": {
-      "backupFolder": "Katalog kopii zapasowej",
-      "chooseFolder": "Wybierz folder..",
-      "chooseFolderDialogTitle": "Wybierz folder do automatycznego tworzenia kopii zapasowych",
-      "frequency": "Częstość występowania",
+      "backupFolder": "Folder kopii zapasowych",
+      "chooseFolder": "Wybierz folder…",
+      "chooseFolderDialogTitle": "Wybierz folder na automatyczne kopie zapasowe",
+      "frequency": "Częstotliwość",
       "frequencyAriaLabel": "Częstotliwość tworzenia kopii zapasowych",
-      "helper": "Napisz zaszyfrowaną kopię zapasową .myne- do folderu w harmonogramie, podczas gdy aplikacja jest otwarta i skarbiec jest odblokowany. Backups pozostają tak zaszyfrowane, jak twój skarbiec; Myne trzyma ostatnie kilka i nigdy nie wysyła nic z urządzenia.",
+      "helper": "Zapisuj zaszyfrowany plik .myne-backup do folderu według harmonogramu, gdy aplikacja jest otwarta, a skarbiec odblokowany. Kopie zapasowe pozostają tak samo zaszyfrowane jak Twój skarbiec; Myne zachowuje kilka najnowszych i nigdy nie wysyła niczego poza Twoje urządzenie.",
       "intervalDaily": "Codziennie",
-      "intervalEveryUnlock": "Każdy odblokuj",
-      "intervalWeekly": "Tygodniowo",
-      "keepLast": "Trzymaj się",
+      "intervalEveryUnlock": "Przy każdym odblokowaniu",
+      "intervalWeekly": "Co tydzień",
+      "keepLast": "Zachowaj ostatnie",
       "noFolderChosen": "Nie wybrano jeszcze folderu.",
-      "saveFailedToast": "Nie można zapisać ustawień kopii zapasowej.",
-      "searchEmpty": "Nie pasuje.",
-      "searchPlaceholder": "Szukaj..",
-      "statusFailed": "Automatyczna kopia zapasowa nie powiodła się - {{stamp}}",
+      "saveFailedToast": "Nie udało się zapisać ustawień kopii zapasowych.",
+      "searchEmpty": "Brak dopasowań.",
+      "searchPlaceholder": "Szukaj…",
+      "statusFailed": "Automatyczna kopia zapasowa nie powiodła się — {{stamp}}",
       "statusLastBackup": "Ostatnia kopia zapasowa: {{stamp}}",
-      "statusNever": "Nie ma jeszcze automatycznego wsparcia.",
+      "statusNever": "Brak automatycznych kopii zapasowych.",
       "title": "Automatyczne kopie zapasowe"
     },
     "changePassword": {
       "cancel": "Anuluj",
-      "checkingStrength": "Sprawdzam siłę..",
+      "checkingStrength": "Sprawdzanie siły…",
       "confirmLabel": "Potwierdź nowe hasło",
-      "currentLabel": "Aktualne hasło",
-      "mismatch": "Hasła nie pasują.",
+      "currentLabel": "Obecne hasło",
+      "mismatch": "Hasła nie są zgodne.",
       "newLabel": "Nowe hasło",
       "submit": "Zmień hasło",
-      "submitting": "Zmiana hasła..",
-      "title": "",
+      "submitting": "Zmienianie hasła…",
+      "title": "Zmień hasło",
       "tooShort": "Użyj co najmniej {{n}} znaków."
     },
     "connectedExtensions": {
@@ -1541,224 +1541,224 @@
         "generic": "Rozszerzenie przeglądarki"
       },
       "when": {
-        "bare": "Połączone",
-        "daysAgo_few": "Połączone {{count}} dni temu",
-        "daysAgo_many": "Połączone {{count}} dni temu",
-        "daysAgo_one": "Połączony {{count}} dzień temu",
-        "hoursAgo_few": "",
-        "hoursAgo_many": "",
-        "hoursAgo_one": "Połączone {{count}} h temu",
-        "justNow": "Połączony właśnie teraz",
-        "minutesAgo_few": "",
-        "minutesAgo_many": "",
-        "minutesAgo_one": "Połączony {{count}} min temu",
-        "onDate": "Połączone {{date}}"
+        "bare": "Połączono",
+        "daysAgo_few": "Połączono {{count}} dni temu",
+        "daysAgo_many": "Połączono {{count}} dni temu",
+        "daysAgo_one": "Połączono {{count}} dzień temu",
+        "hoursAgo_few": "Połączono {{count}} godz. temu",
+        "hoursAgo_many": "Połączono {{count}} godz. temu",
+        "hoursAgo_one": "Połączono {{count}} godz. temu",
+        "justNow": "Połączono przed chwilą",
+        "minutesAgo_few": "Połączono {{count}} min temu",
+        "minutesAgo_many": "Połączono {{count}} min temu",
+        "minutesAgo_one": "Połączono {{count}} min temu",
+        "onDate": "Połączono {{date}}"
       }
     },
     "customThemes": {
-      "appliedBadge": "Stosowane",
+      "appliedBadge": "Zastosowany",
       "apply": "Zastosuj",
-      "applyError": "Nie mogłem zastosować tego tematu. Proszę spróbować jeszcze raz.",
-      "cancel": "",
+      "applyError": "Nie udało się zastosować tego motywu. Spróbuj ponownie.",
+      "cancel": "Anuluj",
       "confirm": "Potwierdź",
       "delete": "Usuń",
-      "deleteError": "Nie mogłem usunąć tego tematu. Proszę spróbować jeszcze raz.",
-      "empty": "Nie ma jeszcze niestandardowych tematów. Importuj jeden lub otwórz folder motywów i dodaj plik motywu.",
+      "deleteError": "Nie udało się usunąć tego motywu. Spróbuj ponownie.",
+      "empty": "Brak własnych motywów. Zaimportuj jeden lub otwórz folder motywów i dodaj plik motywu.",
       "error": {
         "aColorFallback": "kolor",
-        "invalidFile": "Niepoprawny plik motywu.",
-        "invalidName": "Niebezpieczna nazwa tematu",
+        "invalidFile": "Nieprawidłowy plik motywu.",
+        "invalidName": "Niebezpieczna nazwa motywu",
         "invalidValue": "Nieprawidłowa wartość dla {{key}}",
-        "invalidValueWithLine": "Nieprawidłowa wartość dla {{key}} (linia {{line}})",
+        "invalidValueWithLine": "Nieprawidłowa wartość dla {{key}} (wiersz {{line}})",
         "missingKey": "Brak wymaganego koloru {{key}}",
         "parseError": "Nieprawidłowy JSON",
-        "parseErrorWithLine": ""
+        "parseErrorWithLine": "Nieprawidłowy JSON (wiersz {{line}})"
       },
       "fileFilterName": "Motyw Myne",
-      "helper": "Użyj własnej palety kolorów. Tematy są zatwierdzane na tym urządzeniu przed użyciem - nic nie jest wgrane.",
-      "importButton": "Importuj motyw..",
-      "importError": "Ten plik nie jest dobrym tematem. Otwórz odniesienie, aby zobaczyć format.",
-      "label": "Motywy własne",
+      "helper": "Użyj własnej palety kolorów. Motywy są weryfikowane na tym urządzeniu przed użyciem — nic nie jest przesyłane.",
+      "importButton": "Importuj motyw…",
+      "importError": "Ten plik nie jest prawidłowym motywem. Otwórz dokumentację, aby zobaczyć format.",
+      "label": "Własne motywy",
       "openFolderButton": "Otwórz folder motywów",
-      "openFolderError": "Nie mogłem otworzyć folderu tematycznego.",
-      "readError": "Nie mogłem odczytać twojego folderu motywów."
+      "openFolderError": "Nie udało się otworzyć folderu motywów.",
+      "readError": "Nie udało się odczytać Twojego folderu motywów."
     },
     "dailyNotes": {
-      "blankTemplate": "Pusty (bez wzoru)",
-      "dateFormatHelper": "",
-      "dateFormatLabel": "Format daty dziennej notatki",
-      "dateFormatSaveError": "Nie mogłem zapisać formatu daty. Proszę spróbować jeszcze raz.",
-      "folderHelper": "Gdzie są składane nowe notatki. Domyślnie {{default}} - folder jest przechowywany nawet wtedy, gdy jest pusty.",
-      "folderLabel": "Katalog dziennych notatek",
-      "folderSaveError": "Nie mogłem zapisać dziennej teczki. Proszę spróbować jeszcze raz.",
-      "searchEmpty": "Żadnych szablonów.",
-      "searchPlaceholder": "Szukaj szablonów..",
-      "templateHelper": "Wybierz szablon, aby rozpocząć każdą dzienną notatkę z, lub zostawić puste dla pustej notatki zatytułowanej z datą.",
-      "templateLabel": "Wzory formularzy na dzienną notę",
-      "templateSaveError": "Nie mogłem zapisać dziennego szablonu. Proszę spróbować jeszcze raz.",
+      "blankTemplate": "Pusty (bez szablonu)",
+      "dateFormatHelper": "Tytuł każdej notatki dziennej. Obsługuje YYYY, MM, DD. Domyślnie {{default}}.",
+      "dateFormatLabel": "Format daty notatki dziennej",
+      "dateFormatSaveError": "Nie udało się zapisać formatu daty. Spróbuj ponownie.",
+      "folderHelper": "Gdzie są zapisywane nowe notatki dzienne. Domyślnie {{default}} — folder jest zachowywany, nawet gdy jest pusty.",
+      "folderLabel": "Folder notatek dziennych",
+      "folderSaveError": "Nie udało się zapisać folderu notatek dziennych. Spróbuj ponownie.",
+      "searchEmpty": "Brak pasujących szablonów.",
+      "searchPlaceholder": "Szukaj szablonów…",
+      "templateHelper": "Wybierz szablon, od którego zacznie się każda notatka dzienna, lub pozostaw puste, aby utworzyć pustą notatkę z tytułem w postaci daty.",
+      "templateLabel": "Szablon notatki dziennej",
+      "templateSaveError": "Nie udało się zapisać szablonu notatki dziennej. Spróbuj ponownie.",
       "untitledTemplate": "Szablon bez tytułu"
     },
     "deleteVault": {
       "cancel": "Anuluj",
-      "caseSensitiveHint": "Wrażliwa na wypadek wypadku. Wpisz słowo dokładnie, aby umożliwić usunięcie.",
+      "caseSensitiveHint": "Rozróżnia wielkość liter. Wpisz słowo dokładnie, aby umożliwić usunięcie.",
       "continue": "Kontynuuj",
-      "copyPrimary": "To na stałe usuwa ten skarbiec i każdą notatkę wewnątrz niego. Działania nie można cofnąć, a zwrot nie przywróci danych.",
-      "copySecondary": "Klucze do skarbca są zerowane z pamięci, zanim pliki nie zostaną połączone; każdy tekst, który pozostaje na dysku pozostaje niemożliwy do odzyskania Argon2id- owinięty śmieci.",
-      "eyebrow": "NIEPOŻĄDANE",
+      "copyPrimary": "Spowoduje to trwałe usunięcie tego skarbca i każdej notatki w nim zawartej. Działania nie można cofnąć, a fraza odzyskiwania nie przywróci danych.",
+      "copySecondary": "Klucze skarbca są zerowane w pamięci, zanim pliki zostaną usunięte; wszelki osierocony szyfrogram, który pozostanie na dysku, pozostaje nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
+      "eyebrow": "NIEODWRACALNE",
       "heading": "Usuń skarbiec",
-      "ioFailBody": "Nie można uzyskać dostępu do plików skarbca do usunięcia. Klucze skarbca są już zerowane z pamięci; wszelkie dane skarbca, które pozostają na dysku jest nie do odzyskania Argon2id- owinięte śmieci.",
+      "ioFailBody": "Nie udało się uzyskać dostępu do plików skarbca w celu usunięcia. Klucze skarbca są już wyzerowane w pamięci; wszelkie dane skarbca pozostające na dysku są nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
       "ioFailTitle": "Błąd dysku podczas usuwania",
-      "partialFailBody_few": "Pliki {{count}} nie mogły zostać usunięte z dysku. Klucze do skarbca są już zerowane z pamięci, więc każdy tekst, który pozostaje jest nie do odzyskania Argon2id- owinięte śmieci.",
-      "partialFailBody_many": "Pliki {{count}} nie mogły zostać usunięte z dysku. Klucze do skarbca są już zerowane z pamięci, więc każdy tekst, który pozostaje jest nie do odzyskania Argon2id- owinięte śmieci.",
-      "partialFailBody_one": "Plik {{count}} nie mógł zostać usunięty z dysku. Klucze do skarbca są już zerowane z pamięci, więc każdy tekst, który pozostaje jest nie do odzyskania Argon2id- owinięte śmieci.",
-      "partialFailTitle": "Usunięcie skarbca częściowo nie powiodło się",
+      "partialFailBody_few": "Nie udało się usunąć z dysku {{count}} plików. Klucze skarbca są już wyzerowane w pamięci, więc wszelki osierocony szyfrogram, który pozostanie, jest nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
+      "partialFailBody_many": "Nie udało się usunąć z dysku {{count}} plików. Klucze skarbca są już wyzerowane w pamięci, więc wszelki osierocony szyfrogram, który pozostanie, jest nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
+      "partialFailBody_one": "Nie udało się usunąć z dysku {{count}} pliku. Klucze skarbca są już wyzerowane w pamięci, więc wszelki osierocony szyfrogram, który pozostanie, jest nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
+      "partialFailTitle": "Usuwanie skarbca częściowo się nie powiodło",
       "submit": "Usuń skarbiec",
-      "submitInFlight": "",
-      "typeToConfirmLabel": "Typ DELETE do potwierdzenia",
+      "submitInFlight": "Usuwanie skarbca…",
+      "typeToConfirmLabel": "Wpisz DELETE, aby potwierdzić",
       "vaultPath": "Ścieżka skarbca: {{path}}"
     },
     "focusMode": {
-      "dimAria": "Przyciemnianie nieaktywnych linii",
-      "dimHelper": "W trybie ostrości (XionF), przyciemniaj każdą linię z wyjątkiem tej, którą edytujesz.",
-      "dimLabel": "Tryb ostrości · przyciemnianie nieaktywnych linii",
-      "off": "Wyłącz",
-      "on": "On",
-      "saveError": "Nie można zapisać ustawienia trybu ostrości.",
-      "typewriterAria": "Zwój maszynisty do pisania",
-      "typewriterHelper": "",
-      "typewriterLabel": "Tryb ostrości · przewijanie maszyny do pisania"
+      "dimAria": "Przyciemnij nieaktywne wiersze",
+      "dimHelper": "W trybie skupienia (⇧⌘F) przyciemniaj każdy wiersz oprócz tego, który edytujesz.",
+      "dimLabel": "Tryb skupienia · przyciemnianie nieaktywnych wierszy",
+      "off": "Wył.",
+      "on": "Wł.",
+      "saveError": "Nie udało się zapisać ustawienia trybu skupienia.",
+      "typewriterAria": "Przewijanie jak w maszynie do pisania",
+      "typewriterHelper": "W trybie skupienia (⇧⌘F) utrzymuj aktywny wiersz wyśrodkowany w pionie podczas pisania.",
+      "typewriterLabel": "Tryb skupienia · przewijanie jak w maszynie do pisania"
     },
     "hotkeys": {
       "addBindingAria": "Dodaj skrót dla {{command}}",
       "cancel": "Anuluj",
-      "capturePrompt": "Naciśnij klawisz..",
-      "conflictIndicator": "konflikt interesów",
-      "conflictTitle": "Używane również przez {{commands}}",
-      "fixed": "stałe",
+      "capturePrompt": "Naciśnij klawisz…",
+      "conflictIndicator": "⚠ konflikt",
+      "conflictTitle": "Używany również przez {{commands}}",
+      "fixed": "stały",
       "group": {
         "editorFormatting": "Formatowanie edytora",
         "general": "Ogólne",
         "navigation": "Nawigacja",
-        "notes": "Uwagi",
-        "panesTabs": "Panele i tablice",
+        "notes": "Notatki",
+        "panesTabs": "Panele i karty",
         "view": "Widok"
       },
-      "helper": "Widok i zmiana skrótów klawiszowych. Formatowanie edytora i skrót cyklu tabelkowego są stałe.",
-      "notSet": "Nieustawione",
+      "helper": "Wyświetl i zmień skróty klawiszowe. Formatowanie edytora oraz skrót przełączania kart są stałe.",
+      "notSet": "Nieustawiony",
       "removeBindingAria": "Usuń {{chord}}",
-      "resetAll": "Resetuj wszystkie klawisze..",
-      "resetAllConfirm": "Przywróć każdy własny skrót do domyślnego?",
-      "resetAllYes": "Reset all",
-      "restoreDefaultAria": "Przywróć wartość domyślną dla {{command}}",
-      "searchAriaLabel": "Wyszukaj skróty",
-      "searchPlaceholder": "Wyszukaj skróty..",
-      "warnAlreadyUsed": "Już używane przez {{commands}} - dodano."
+      "resetAll": "Zresetuj wszystkie skróty…",
+      "resetAllConfirm": "Zresetować każdy własny skrót do wartości domyślnej?",
+      "resetAllYes": "Zresetuj wszystkie",
+      "restoreDefaultAria": "Przywróć domyślny dla {{command}}",
+      "searchAriaLabel": "Szukaj skrótów",
+      "searchPlaceholder": "Szukaj skrótów…",
+      "warnAlreadyUsed": "Już używany przez {{commands}} — dodano mimo to."
     },
     "language": {
       "helper": "Wybierz język wyświetlania aplikacji.",
       "label": "Język"
     },
     "lineNumbers": {
-      "errorSaveSetting": "Nie można zapisać ustawienia line- number.",
-      "helper": "Pokaż w edytorze rynnę z numerem line-. Jeden numer na linię; domyślnie wyłączony.",
-      "label": "Numery linii",
-      "off": "Wyłącz",
-      "on": "On"
+      "errorSaveSetting": "Nie udało się zapisać ustawienia numerów wierszy.",
+      "helper": "Pokaż w edytorze margines z numerami wierszy. Jeden numer na wiersz; domyślnie wyłączone.",
+      "label": "Numery wierszy",
+      "off": "Wył.",
+      "on": "Wł."
     },
     "prefs": {
-      "saveError": "Nie można zapisać preferencji - spróbuj ponownie"
+      "saveError": "Nie udało się zapisać preferencji — spróbuj ponownie"
     },
     "privacy": {
-      "autoLockHelper": "Zamknąć skarbiec po takiej nieaktywności.",
-      "autoLockLabel": "Autoblokada",
-      "autoLockSearchEmpty": "Nie ma czasu.",
-      "autoLockSearchPlaceholder": "Przeszukaj czas trwania..",
-      "screenCaptureHelperOff": "Ochrona zawsze ma zastosowanie przed odblokowaniem. Po odblokowaniu, następujące preferencje.",
-      "screenCaptureHelperOn": "Aktywny w systemie Mac OS i systemie Windows 10 (aktualizacja w maju 2020 r. lub później). Wsparcie Linuksa nadchodzi w przyszłym wydaniu.",
-      "screenCaptureLabel": "Ochrona przed wychwytywaniem ekranu"
+      "autoLockHelper": "Zablokuj skarbiec po takim okresie nieaktywności.",
+      "autoLockLabel": "Automatyczna blokada",
+      "autoLockSearchEmpty": "Brak pasujących czasów trwania.",
+      "autoLockSearchPlaceholder": "Szukaj czasów trwania…",
+      "screenCaptureHelperOff": "Ochrona zawsze obowiązuje przed odblokowaniem. Po odblokowaniu stosuje się ta preferencja.",
+      "screenCaptureHelperOn": "Aktywne w systemach macOS i Windows 10 (aktualizacja z maja 2020 lub nowsza). Obsługa systemu Linux pojawi się w przyszłym wydaniu.",
+      "screenCaptureLabel": "Ochrona przed przechwytywaniem ekranu"
     },
     "quickUnlock": {
-      "errorCancelled": "Anulowana.",
-      "errorGeneric": "",
-      "errorHardwareUnavailable": "Identyfikator dotykowy nie jest dostępny na tym urządzeniu.",
+      "errorCancelled": "Anulowano.",
+      "errorGeneric": "Nie udało się skonfigurować szybkiego odblokowania.",
+      "errorHardwareUnavailable": "Touch ID nie jest dostępny na tym urządzeniu.",
       "errorNotUnlocked": "Najpierw odblokuj skarbiec.",
-      "errorPinNotDigits": "",
-      "errorPinTooShort_few": "",
-      "errorPinTooShort_many": "",
-      "errorPinTooShort_one": "PIN musi mieć co najmniej {{count}} cyfry.",
-      "helperConfigured": "Skonfigurowane przez {{method}}. Ponowne wejście po auto- lock pomija hasło główne. Hasło główne jest nadal wymagane po ponownym uruchomieniu.",
-      "helperNotConfigured": "Wprowadź ponownie po autoblokady z identyfikatorem PIN lub Touch zamiast pełnego hasła głównego. Wygoda nad zaszyfrowanym skarbcem - hasło główne pozostaje wymagane po ponownym uruchomieniu.",
+      "errorPinNotDigits": "PIN może zawierać tylko cyfry.",
+      "errorPinTooShort_few": "PIN musi mieć co najmniej {{count}} cyfry.",
+      "errorPinTooShort_many": "PIN musi mieć co najmniej {{count}} cyfr.",
+      "errorPinTooShort_one": "PIN musi mieć co najmniej {{count}} cyfrę.",
+      "helperConfigured": "Skonfigurowano przez {{method}}. Ponowne wprowadzenie po automatycznej blokadzie pomija hasło główne. Hasło główne jest nadal wymagane po ponownym uruchomieniu.",
+      "helperNotConfigured": "Wprowadzaj ponownie po automatycznej blokadzie za pomocą PIN-u lub Touch ID zamiast pełnego hasła głównego. To udogodnienie wobec zaszyfrowanego skarbca — hasło główne pozostaje wymagane po ponownym uruchomieniu.",
       "methodPin": "PIN",
-      "methodTouchId": "Identyfikator dotykowy",
-      "pinAriaLabel": "Quick- odblokuj PIN",
-      "pinPlaceholder_few": "",
-      "pinPlaceholder_many": "",
-      "pinPlaceholder_one": "PIN (co najmniej {{count}} cyfry)",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN szybkiego odblokowania",
+      "pinPlaceholder_few": "PIN (co najmniej {{count}} cyfry)",
+      "pinPlaceholder_many": "PIN (co najmniej {{count}} cyfr)",
+      "pinPlaceholder_one": "PIN (co najmniej {{count}} cyfra)",
       "setPin": "Ustaw PIN",
-      "setupHelper": "Touch ID jest tylko macOS- i obecnie eksperymentalny (oczekujący na weryfikację sprzętu). PIN działa wszędzie.",
+      "setupHelper": "Touch ID jest dostępny tylko w macOS i obecnie eksperymentalny (oczekuje na weryfikację sprzętu). PIN działa wszędzie.",
       "title": "Szybkie odblokowanie",
-      "useTouchId": "Użyj ID dotykowego"
+      "useTouchId": "Użyj Touch ID"
     },
     "shell": {
       "closeLabel": "Zamknij ustawienia",
       "navLabel": "Panele ustawień",
       "panels": {
-        "about": "O",
+        "about": "O aplikacji",
         "account": "Konto",
         "appearance": "Wygląd",
         "editor": "Edytor",
-        "hotkeys": "Hotkeys",
+        "hotkeys": "Skróty klawiszowe",
         "privacy": "Prywatność",
-        "storage": "Przechowywanie"
+        "storage": "Pamięć"
       },
-      "passwordUpdatedToast": "Aktualizacja hasła",
+      "passwordUpdatedToast": "Hasło zaktualizowane",
       "title": "Ustawienia"
     },
     "spell": {
-      "errorSaveLanguages": "Nie można zapisać języków pisowni.",
-      "errorSaveSetting": "Nie można zapisać ustawienia sprawdzania pisowni.",
-      "helper": "Podkreśla źle napisane słowa, jak piszesz. W pełni wyłączone - twoje notatki nigdy nie opuszczają urządzenia.",
-      "label": "Kontrola pisowni",
+      "errorSaveLanguages": "Nie udało się zapisać języków sprawdzania pisowni.",
+      "errorSaveSetting": "Nie udało się zapisać ustawienia sprawdzania pisowni.",
+      "helper": "Podkreślaj błędnie napisane słowa podczas pisania. W pełni offline — Twoje notatki nigdy nie opuszczają urządzenia.",
+      "label": "Sprawdzanie pisowni",
       "languagesAriaLabel": "Języki sprawdzania pisowni",
-      "languagesHelper": "Słowo jest poprawne, jeśli jest ważne w dowolnym wybranym języku - przydatne do mieszania angielskich terminów do innych słów.",
+      "languagesHelper": "Słowo jest poprawne, jeśli jest prawidłowe w dowolnym wybranym języku — przydatne przy mieszaniu angielskich terminów z notatkami w innym języku.",
       "languagesLabel": "Języki",
-      "languagesPlaceholder": "Wybierz języki..",
-      "languagesSearchEmpty": "Żadnych języków.",
-      "languagesSearchPlaceholder": "Szukaj języków..",
-      "off": "Wyłącz",
-      "on": "On"
+      "languagesPlaceholder": "Wybierz języki…",
+      "languagesSearchEmpty": "Brak pasujących języków.",
+      "languagesSearchPlaceholder": "Szukaj języków…",
+      "off": "Wył.",
+      "on": "Wł."
     },
     "storage": {
-      "backUpVault": "Krypta zapasowa..",
-      "backupHelper": "Backups pozostają tak samo zaszyfrowane jak twój skarbiec, w jednym zweryfikowanym pliku .myne- backup. Przywracanie działa z hasłem skarbca lub zwrotem - dokładnie jak odblokowanie.",
+      "backUpVault": "Utwórz kopię zapasową skarbca…",
+      "backupHelper": "Kopie zapasowe pozostają dokładnie tak samo zaszyfrowane jak Twój skarbiec, w jednym zweryfikowanym pliku .myne-backup. Przywracanie działa z hasłem lub frazą odzyskiwania tego skarbca — dokładnie tak jak przy odblokowywaniu.",
       "backupLabel": "Kopia zapasowa",
-      "exportAction": "Eksportuj..",
-      "exportBody": "Eksportuj skarbiec jako markdown",
-      "exportHelper": "Plain markdown tree - nie zaszyfrowane.",
+      "exportAction": "Eksportuj…",
+      "exportBody": "Eksportuj skarbiec jako Markdown",
+      "exportHelper": "Zwykłe drzewo Markdown — niezaszyfrowane.",
       "exportLabel": "Eksport",
-      "importHelper": "Przynieś istniejący skarbiec Obsydian do Myne. Każda notatka Markdown jest importowana i szyfrowana na miejscu; oryginalne pliki pozostają nietknięte.",
+      "importHelper": "Przenieś istniejący skarbiec Obsidian do Myne. Każda notatka Markdown jest importowana i szyfrowana na miejscu; Twoje oryginalne pliki pozostają nietknięte.",
       "importLabel": "Import",
-      "importObsidian": "Importuj skarbiec Obsidian..",
-      "locationHelper": "Każdy skarbiec jest katalogiem zaszyfrowanych plików pod tą ścieżką. Preferuj poniższy przycisk Backup nad ręcznymi kopiami - weryfikuje zapisany plik.",
+      "importObsidian": "Importuj skarbiec Obsidian…",
+      "locationHelper": "Każdy skarbiec to folder zaszyfrowanych plików pod tą ścieżką. Zamiast ręcznego kopiowania używaj przycisku Kopia zapasowa poniżej — weryfikuje on zapisany plik.",
       "locationLabel": "Lokalizacja skarbca",
-      "openInFiles": "Otwórz w plikach",
+      "openInFiles": "Otwórz w Plikach",
       "pathUnavailable": "Ścieżka niedostępna",
-      "restoreBackup": "Przywróć z kopii zapasowej.."
+      "restoreBackup": "Przywróć z kopii zapasowej…"
     },
     "typography": {
-      "contentWidthHelper": "Maksymalna szerokość kolumny edycji. Niech tekst rozciąga szybę.",
-      "contentWidthLabel": "Szerokość zawartości",
-      "errorSave": "Nie mogłem zachować preferencji. Proszę spróbować jeszcze raz.",
-      "fontHelper": "Tekst monospace lub proporcjonalny (sans- serif).",
+      "contentWidthHelper": "Maksymalna szerokość kolumny edycji. Pełna pozwala tekstowi rozciągnąć się na cały panel.",
+      "contentWidthLabel": "Szerokość treści",
+      "errorSave": "Nie udało się zapisać preferencji. Spróbuj ponownie.",
+      "fontHelper": "Tekst o stałej szerokości (monospace) lub proporcjonalny (bezszeryfowy).",
       "fontLabel": "Czcionka",
-      "lineSpacingHelper": "Pionowa przestrzeń między wierszami.",
-      "lineSpacingLabel": "Odstęp między liniami",
-      "textSizeHelper": "Podstawowy rozmiar tekstu edytora. Skala nagłówek.",
+      "lineSpacingHelper": "Odstęp w pionie między wierszami.",
+      "lineSpacingLabel": "Odstęp między wierszami",
+      "textSizeHelper": "Podstawowy rozmiar tekstu edytora. Nagłówki skalują się wraz z nim.",
       "textSizeLabel": "Rozmiar tekstu"
     },
     "viewMode": {
-      "errorSave": "Nie można zapisać domyślnego trybu widoku.",
-      "helper": "Jak otwiera się notatka: podgląd na żywo (domyślnie), odczyt tylko do odczytu lub surowe źródło. Włączenie / wyłączenie notki z potwierdzeniem.",
+      "errorSave": "Nie udało się zapisać domyślnego trybu widoku.",
+      "helper": "Jak otwiera się notatka: podgląd na żywo (domyślnie), tylko do odczytu (Czytanie) lub surowe Źródło. Przełączaj notatkę skrótem ⇧⌘E.",
       "label": "Domyślny tryb widoku",
       "optionReading": "Czytanie",
       "optionSource": "Źródło"
@@ -1767,165 +1767,165 @@
   "templates": {
     "manager": {
       "closeLabel": "Zamknij szablony",
-      "deleteRowLabel": "Usuń szablon {{name}} (przejdź do kosza)",
+      "deleteRowLabel": "Usuń szablon {{name}} (przenieś do Kosza)",
       "editTemplateLabel": "Edytuj szablon {{name}}",
-      "emptyBody": "Stwórz szablon do ponownego użycia szkieletu notatki - notatki spotkania, dziennika dziennego, notatki do czytania. Wybierz, kiedy zrobisz nową notatkę.",
+      "emptyBody": "Utwórz szablon, aby wielokrotnie używać szkieletu notatki — notatki ze spotkania, dziennika, notatki z lektury. Wybierz go, gdy tworzysz nową notatkę.",
       "emptyTitle": "Brak szablonów",
       "listLabel": "Szablony",
-      "loading": "",
+      "loading": "Ładowanie…",
       "newTemplate": "Nowy szablon",
       "newTemplateName": "Szablon bez tytułu",
       "removeFromTemplates": "Usuń z szablonów",
-      "removeRowLabel": "Usuń {{name}} z szablonów (zachowuje notę)",
-      "title": "Szablony informacji"
+      "removeRowLabel": "Usuń {{name}} z szablonów (notatka pozostaje)",
+      "title": "Szablony notatek"
     }
   },
   "unlock": {
     "backToPicker": "Wybierz inny skarbiec",
     "continue": "Kontynuuj",
-    "decrypting": "Odszyfrowywanie..",
-    "deleteLink": "Zgubiłeś hasło i zwrot? Usuń skarbiec i zacznij od nowa",
+    "decrypting": "Odszyfrowywanie…",
+    "deleteLink": "Zgubiłeś hasło i frazę odzyskiwania? Usuń skarbiec i zacznij od nowa",
     "errors": {
-      "alreadyUnlocked": "Skarbiec jest już otwarty.",
+      "alreadyUnlocked": "Skarbiec jest już odblokowany.",
       "inProgress": "Operacja w toku.",
-      "unexpected": "Niespodziewany błąd. Proszę spróbować jeszcze raz.",
-      "vaultNotFound": "Nie znaleziono pliku skarbca. Proszę uruchomić ponownie aplikację."
+      "unexpected": "Nieoczekiwany błąd. Spróbuj ponownie.",
+      "vaultNotFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację."
     },
     "passwordLabel": "Hasło",
     "passwordPlaceholder": "Hasło",
     "quickUnlock": {
       "failed": "Szybkie odblokowanie nie powiodło się. Użyj hasła.",
-      "pinAriaLabel": "Quick- odblokuj PIN",
+      "pinAriaLabel": "PIN szybkiego odblokowania",
       "pinPlaceholder": "PIN",
-      "unlockWithPin": "Odblokuj z PIN",
-      "unlockWithTouchId": "Odblokuj z identyfikatorem dotykowym",
+      "unlockWithPin": "Odblokuj PIN-em",
+      "unlockWithTouchId": "Odblokuj za pomocą Touch ID",
       "usePasswordBelow": "lub użyj hasła poniżej",
-      "wrongCredential": "Nieprawidłowe."
+      "wrongCredential": "Nieprawidłowe. Pozostało prób: {{remaining}}."
     },
-    "recoveryInterruptedBanner": "Przerwano przepływ odzysku. Najpierw ustaw nowe hasło.",
-    "recoveryInterruptedBody": "Ustaw najpierw nowe hasło, a następnie ponownie uszczelnij swój skarbiec.",
-    "recoveryInterruptedTitle": "Przerwano przepływ odzysku.",
-    "recoveryLink": "Zapomniałeś hasła? Odblokuj ze zwrotem",
-    "submit": "",
+    "recoveryInterruptedBanner": "Proces odzyskiwania został przerwany. Najpierw ustaw nowe hasło.",
+    "recoveryInterruptedBody": "Najpierw ustaw nowe hasło, a następnie ponownie zabezpiecz swój skarbiec.",
+    "recoveryInterruptedTitle": "Proces odzyskiwania został przerwany.",
+    "recoveryLink": "Nie pamiętasz hasła? Odblokuj frazą odzyskiwania",
+    "submit": "Odblokuj",
     "subtitle": "Wprowadź hasło, aby kontynuować.",
     "suspicion": {
-      "lockedDuringChange": "Zmiana hasła anulowana: skarbiec został zamknięty.",
-      "metaChangedExternally": "Skarbiec został zmodyfikowany w innej sesji - proszę otworzyć ponownie."
+      "lockedDuringChange": "Zmiana hasła anulowana: skarbiec został zablokowany.",
+      "metaChangedExternally": "Skarbiec został zmodyfikowany w innej sesji — odblokuj ponownie."
     },
-    "title": "Otwórz skarbiec."
+    "title": "Odblokuj swój skarbiec."
   },
   "vault": {
     "ioBanner": {
       "cannotRead": "Nie można odczytać pliku skarbca.",
-      "notFound": "Nie znaleziono pliku skarbca. Proszę uruchomić ponownie aplikację.",
-      "permissionDenied": "Brak pozwolenia na dostęp do pliku skarbca. Sprawdź uprawnienia do pliku."
+      "notFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację.",
+      "permissionDenied": "Brak uprawnień dostępu do pliku skarbca. Sprawdź uprawnienia do pliku."
     }
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "Zapisałam numer konta, gdzie znajdę go później.",
-      "back": "Tył",
+      "ackLabel": "Zapisałem(-am) swój numer konta w miejscu, w którym później go znajdę.",
+      "back": "Wstecz",
       "commit": "Utwórz skarbiec",
-      "committing": "Zapisywanie..",
-      "copied": "",
+      "committing": "Zapisywanie…",
+      "copied": "Skopiowano",
       "copy": "Kopiuj",
-      "eyebrow": "Etap 4 z 4 - numer konta",
+      "eyebrow": "Krok 4 z 4 — numer konta",
       "heading": "Zapisz swój numer konta.",
-      "intro": "To jest twój żeton na okaziciela - traktuj go jak gotówkę.",
+      "intro": "To Twój token na okaziciela — traktuj go jak gotówkę.",
       "saveAsFile": "Zapisz jako plik",
-      "shownOnceBody": "Zachowaj to teraz - Myne nie może go odzyskać. Wymagane do rejestracji do synchronizacji później.",
-      "shownOnceEmphasis": "Pokazuje się to tylko raz."
+      "shownOnceBody": "Zapisz go teraz — Myne nie może go dla Ciebie odzyskać. Wymagany do późniejszej rejestracji synchronizacji.",
+      "shownOnceEmphasis": "Jest on pokazywany tylko raz."
     },
     "briefing": {
-      "back": "Tył",
-      "continue": "Kontynuuj tworzenie skarbca",
-      "eyebrow": "Zanim stworzysz swój skarbiec",
-      "heading": "Zanim stworzysz swój skarbiec",
-      "intro": "Myne szyfruje twoje notatki, więc tylko ty możesz je otworzyć. Trzy rzeczy z tego wynikają - przeczytaj je, a następnie kontynuuj.",
+      "back": "Wstecz",
+      "continue": "Przejdź do tworzenia skarbca",
+      "eyebrow": "Zanim utworzysz swój skarbiec",
+      "heading": "Zanim utworzysz swój skarbiec",
+      "intro": "Myne szyfruje Twoje notatki tak, że tylko Ty możesz je otworzyć. Wynikają z tego trzy rzeczy — przeczytaj je, a następnie kontynuuj.",
       "statements": {
         "no-email": {
-          "ackLabel": "Rozumiem, że nie ma emaili.",
-          "statement": "Nie ma odzyskiwania poczty elektronicznej. Nigdy nie będzie.",
-          "why": "Nigdy nie prosimy o e-mail, więc nie ma reset link i konta dla wsparcia do odblokowania. To nie jest brakująca cecha - to gwarancja. Odzyskiwanie e-maili oznaczałoby, że moglibyśmy przeczytać twoje notatki, a Myne jest zbudowana, więc nie możemy."
+          "ackLabel": "Rozumiem, że nie ma odzyskiwania przez e-mail.",
+          "statement": "Nie ma odzyskiwania przez e-mail. I nigdy nie będzie.",
+          "why": "Nigdy nie prosimy o Twój e-mail, więc nie ma linku resetującego ani konta, które wsparcie mogłoby odblokować. To nie brakująca funkcja — to gwarancja. Odzyskiwanie przez e-mail oznaczałoby, że moglibyśmy czytać Twoje notatki, a Myne jest zbudowane tak, żebyśmy nie mogli."
         },
         "no-store": {
           "ackLabel": "Rozumiem, że Myne nie może odzyskać mojego hasła.",
-          "statement": "Hasło otwiera skarbiec. Nie przechowujemy go.",
-          "why": "Twoje hasło jest wejściem do klucza, który odszyfrowuje twoje notatki. Nigdy nie opuszcza tego urządzenia i nic na naszych serwerach nie może go odtworzyć. Dlatego twoje notatki są prywatne i dlatego nie możemy ich zresetować."
+          "statement": "Twoje hasło odblokowuje Twój skarbiec. Nie przechowujemy go.",
+          "why": "Twoje hasło jest danymi wejściowymi do klucza, który odszyfrowuje Twoje notatki. Nigdy nie opuszcza tego urządzenia i nic na naszych serwerach nie może go odtworzyć. To właśnie chroni prywatność Twoich notatek — i dlatego nie możemy go dla Ciebie zresetować."
         },
         "phrase-backup": {
-          "ackLabel": "Rozumiem, że mój zwrot jest jedynym wsparciem.",
-          "statement": "Twoje zwroty są twoim jedynym wsparciem.",
-          "why": "Jeśli zapomnisz hasła, zwrot 24- słowo jest jedyną drogą powrotną. {{lostBothSecrets}} Zapisz to i trzymaj w bezpiecznym miejscu."
+          "ackLabel": "Rozumiem, że moja fraza odzyskiwania to jedyna kopia zapasowa.",
+          "statement": "Twoja fraza odzyskiwania to Twoja jedyna kopia zapasowa.",
+          "why": "Jeśli zapomnisz hasła, 24-słowna fraza odzyskiwania to jedyna droga powrotu. {{lostBothSecrets}} Zapisz tę frazę i przechowuj ją w bezpiecznym miejscu."
         }
       },
       "why": "Dlaczego?"
     },
     "confirm": {
-      "back": "Tył",
+      "back": "Wstecz",
       "continue": "Kontynuuj",
-      "eyebrow": "Krok 3 z 4 - potwierdzić zdanie",
-      "heading": "",
-      "intro": "Poprosimy o konkretne pozycje, które potwierdzą, że go uratowałeś.",
-      "mismatch": "Nie pasuje do słowa # {{pos}}.",
+      "eyebrow": "Krok 3 z 4 — potwierdź frazę",
+      "heading": "Wpisz ponownie cztery słowa ze swojej frazy.",
+      "intro": "Poprosimy o konkretne pozycje, aby zweryfikować, że ją zapisałeś.",
+      "mismatch": "Nie pasuje do słowa nr {{pos}}.",
       "wordAtPosition": "Słowo na pozycji {{pos}}"
     },
     "encrypting": {
-      "caption": "To zajmie chwilę.",
+      "caption": "To chwilę potrwa.",
       "footerHint": "Jeśli zajmie to dłużej niż 30 sekund, zamknij okno i spróbuj ponownie.",
-      "heading": "Szyfrowanie skarbca"
+      "heading": "Szyfrowanie Twojego skarbca"
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "Spróbuj jeszcze raz.",
-        "title": ""
+        "body": "Spróbuj ponownie.",
+        "title": "Nieprawidłowy numer konta"
       },
       "aeadFailure": {
-        "body": "Spróbuj jeszcze raz.",
-        "title": "Nie powiodło się szyfrowanie"
+        "body": "Spróbuj ponownie.",
+        "title": "Szyfrowanie nie powiodło się"
       },
       "csprng": {
-        "body": "Spróbuj jeszcze raz.",
-        "title": "Nie można wygenerować bezpiecznych danych losowych"
+        "body": "Spróbuj ponownie.",
+        "title": "Nie udało się wygenerować bezpiecznych danych losowych"
       },
       "invalidPassword": {
-        "body": "Spróbuj jeszcze raz.",
+        "body": "Spróbuj ponownie.",
         "title": "Nieprawidłowe hasło"
       },
       "invalidVaultMeta": {
-        "body": "Spróbuj jeszcze raz.",
-        "title": "Błąd formatu skryptu"
+        "body": "Spróbuj ponownie.",
+        "title": "Błąd formatu skarbca"
       },
       "ioOther": {
-        "body": "Spróbuj jeszcze raz.",
-        "title": "Nie mogłem uratować skarbca"
+        "body": "Spróbuj ponownie.",
+        "title": "Nie udało się zapisać skarbca"
       },
       "joinFailure": {
-        "body": "Spróbuj jeszcze raz.",
+        "body": "Spróbuj ponownie.",
         "title": "Coś poszło nie tak"
       },
       "kdfFailure": {
-        "body": "",
-        "title": "Nie można skonfigurować szyfrowania"
+        "body": "Spróbuj ponownie. Jeśli to się powtarza, w Twoim systemie może brakować pamięci.",
+        "title": "Nie udało się skonfigurować szyfrowania"
       },
       "noSpace": {
-        "body": "",
-        "title": "Brak miejsca na dysku"
+        "body": "Zwolnij miejsce na dysku i spróbuj ponownie.",
+        "title": "Za mało miejsca na dysku"
       },
       "notFound": {
-        "body": "Spróbuj jeszcze raz.",
+        "body": "Spróbuj ponownie.",
         "title": "Brak folderu skarbca"
       },
       "passwordTooShort": {
         "body": "Użyj co najmniej 12 znaków.",
-        "title": "Hasło zbyt krótkie"
+        "title": "Hasło za krótkie"
       },
       "permissionDenied": {
-        "body": "Upewnij się, że Myne ma prawo pisać do folderu danych aplikacji.",
-        "title": "Nie można zapisać do folderu skarbca"
+        "body": "Upewnij się, że Myne ma uprawnienia do zapisu w folderze danych aplikacji.",
+        "title": "Nie udało się zapisać w folderze skarbca"
       },
       "sessionExpired": {
-        "body": "Dla bezpieczeństwa, czas tworzenia skarbca po 10 minutach. Zacznij od nowa.",
+        "body": "Dla Twojego bezpieczeństwa tworzenie skarbca wygasa po 10 minutach. Zacznij od nowa.",
         "title": "Sesja wygasła"
       },
       "sessionNotFound": {
@@ -1934,55 +1934,55 @@
       },
       "tooManyConcurrentSessions": {
         "body": "Zamknij inne okna Myne i spróbuj ponownie.",
-        "title": "Zbyt wiele kreacji skarbca naraz"
+        "title": "Zbyt wiele tworzonych skarbców naraz"
       },
       "vaultArtifactsPresent": {
-        "body": "Nie można utworzyć nowego skarbca, ponieważ na tym urządzeniu istnieją już dane o skarbcu. Zamknij aplikację i uruchom ponownie - ekran startowy przeprowadzi Cię do przepływu odblokowania.",
-        "title": ""
+        "body": "Nie można utworzyć nowego skarbca, ponieważ na tym urządzeniu istnieją już dane skarbca. Zamknij aplikację i uruchom ją ponownie — ekran startowy przekieruje Cię do procesu odblokowywania.",
+        "title": "Skarbiec już istnieje"
       },
       "vaultBusyAuth": {
-        "body": "Trwa kolejna operacja skarbca. Spróbuj jeszcze raz za chwilę.",
-        "title": "Krypta zajęta"
+        "body": "Trwa inna operacja na skarbcu. Spróbuj ponownie za chwilę.",
+        "title": "Skarbiec zajęty"
       }
     },
     "orchestrator": {
       "closePrompt": {
-        "cancelLabel": "",
-        "message": "Zamknięcie odrzuci twoje zdanie. Kontynuować zamykanie?",
-        "okLabel": "I tak się zamknij",
-        "title": "Wyrzucić tworzenie skarbca?"
+        "cancelLabel": "Anuluj",
+        "message": "Zamknięcie odrzuci Twoją frazę odzyskiwania. Kontynuować zamykanie?",
+        "okLabel": "Zamknij mimo to",
+        "title": "Odrzucić tworzenie skarbca?"
       },
       "genericError": {
-        "body": "Spróbuj jeszcze raz.",
+        "body": "Spróbuj ponownie.",
         "title": "Coś poszło nie tak"
       }
     },
     "password": {
-      "back": "Tył",
-      "eyebrow": "Krok 1 z 4 - hasło główne",
+      "back": "Wstecz",
+      "eyebrow": "Krok 1 z 4 — hasło główne",
       "heading": "Utwórz skarbiec",
-      "helperLead": "Myne nie zapisuje hasła ani zwrotu.",
-      "submit": "Generuj zwrot"
+      "helperLead": "Myne nie przechowuje Twojego hasła ani frazy odzyskiwania.",
+      "submit": "Wygeneruj frazę odzyskiwania"
     },
     "phrase": {
-      "back": "Tył",
-      "continue": "Zachowałem to - potwierdź zdanie",
+      "back": "Wstecz",
+      "continue": "Zapisałem to — potwierdź frazę",
       "copy": "Kopiuj",
-      "eyebrow": "Krok 2 z 4 - zwrot",
+      "eyebrow": "Krok 2 z 4 — fraza odzyskiwania",
       "heading": "Zapisz te 24 słowa.",
-      "intro": "To wyrażenie, wraz z hasłem, jest jedynym sposobem na odzyskanie skarbca. Przechowuj w trybie offline - papier, menedżer haseł, portfel sprzętowy. Traktuj to jak gotówkę.",
-      "reveal": "Wyrażenie objawiające",
+      "intro": "Ta fraza, wraz z Twoim hasłem, jest jedynym sposobem odzyskania skarbca. Przechowuj ją offline — na papierze, w menedżerze haseł, w portfelu sprzętowym. Traktuj ją jak gotówkę.",
+      "reveal": "Pokaż frazę",
       "saveAsFile": "Zapisz jako plik"
     },
     "ready": {
-      "backUpNow": "Cofnij ten skarbiec",
-      "backedUp": "Wypakowana",
-      "backingUp": "Odpakowywanie..",
-      "backupDefaultFilename": "Myne backup. Myne-backup",
-      "backupError": "Backup nie ukończył - nie zostawiono żadnych akt. Możesz wykonać kopię zapasową w każdej chwili z ustawień → Storage.",
-      "backupFilterName": "Backup Myne",
-      "body": "Myne napisała twój skarbiec do folderu danych aplikacji. Twoje hasło i zwrot są jedynym sposobem powrotu - upewnij się, że oba są zapisane w bezpiecznym miejscu.",
-      "decrypting": "Odszyfrowywanie..",
+      "backUpNow": "Utwórz teraz kopię zapasową tego skarbca",
+      "backedUp": "Utworzono kopię zapasową ✓",
+      "backingUp": "Tworzenie kopii zapasowej…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Tworzenie kopii zapasowej nie zostało ukończone — nie pozostawiono żadnego pliku. Możesz utworzyć kopię zapasową w dowolnej chwili w Ustawienia → Pamięć.",
+      "backupFilterName": "Kopia zapasowa Myne",
+      "body": "Myne zapisało Twój skarbiec w folderze danych aplikacji. Twoje hasło główne i fraza odzyskiwania to jedyny sposób powrotu — upewnij się, że oba są zapisane w bezpiecznym miejscu.",
+      "decrypting": "Odszyfrowywanie…",
       "done": "Gotowe",
       "heading": "Twój skarbiec jest gotowy.",
       "showFolder": "Pokaż folder skarbca"
@@ -1994,53 +1994,53 @@
   "vaultPicker": {
     "createAnother": "Utwórz kolejny skarbiec",
     "heading": "Wybierz skarbiec",
-    "loading": "Ładowanie skarbca..",
-    "noneLoaded": "Żadne skarby nie mogą być teraz załadowane.",
-    "openedRelative": "otwarte {{rel}}",
+    "loading": "Ładowanie Twoich skarbców…",
+    "noneLoaded": "Nie udało się teraz załadować żadnych skarbców.",
+    "openedRelative": "otwarto {{rel}}",
     "restoreFromBackup": "Przywróć z kopii zapasowej",
-    "subline": "Masz więcej niż jeden skarbiec na tym urządzeniu. Wybierz jedną do odblokowania.",
+    "subline": "Masz więcej niż jeden skarbiec na tym urządzeniu. Wybierz jeden do odblokowania.",
     "vaultFallback": "Skarbiec {{n}}"
   },
   "vaultRecover": {
     "decrypting": {
-      "caption": "To zajmie chwilę.",
-      "eyebrow": "ODZYSKANIE · ORZECZENIE",
+      "caption": "To chwilę potrwa.",
+      "eyebrow": "ODZYSKIWANIE · ODSZYFROWYWANIE",
       "footerHint": "Jeśli zajmie to dłużej niż 30 sekund, zamknij okno i spróbuj ponownie.",
-      "heading": "Odszyfrowanie skarbca",
-      "subCaption": "Argon2id m = 256 MiB, t = 3, p = 2"
+      "heading": "Odszyfrowywanie Twojego skarbca",
+      "subCaption": "Trwa praca… Argon2id m=256 MiB, t=3, p=2"
     },
     "passwordReset": {
       "errors": {
-        "cancelledVaultLocked": "Odzyskanie anulowane: skarbiec został zamknięty.",
-        "operationInProgress": "Operacja w toku. Proszę poczekać.",
-        "unexpected": "Niespodziewany błąd. Proszę spróbować jeszcze raz.",
+        "cancelledVaultLocked": "Odzyskiwanie anulowane: skarbiec został zablokowany.",
+        "operationInProgress": "Operacja w toku. Poczekaj.",
+        "unexpected": "Nieoczekiwany błąd. Spróbuj ponownie.",
         "weakPassword": "Nowe hasło musi mieć co najmniej 12 znaków."
       },
       "eyebrow": "Odzyskiwanie · Nowe hasło",
-      "helperBody": "Zwrot z odzysku skarbca ile açıldı. Eski parola artık çalışmayacak - yeni master paralanı şimdi belirle.",
-      "helperEmphasis": "Zwrot: aynı kalır.",
-      "submit": "",
-      "title": "Ustaw nowe hasło master"
+      "helperBody": "Otwarto za pomocą Twojej frazy odzyskiwania. Twoje stare hasło już nie działa — ustaw teraz nowe hasło główne.",
+      "helperEmphasis": "Twoja fraza odzyskiwania pozostaje bez zmian.",
+      "submit": "Ustaw nowe hasło",
+      "title": "Ustaw nowe hasło główne"
     },
     "phrase": {
-      "back": "← Powrót",
-      "body": "Wprowadź swoje zdanie. 24 BIP- 39 słów.",
+      "back": "← Wstecz",
+      "body": "Wprowadź swoją frazę odzyskiwania. 24 słowa BIP-39.",
       "cellLabel": "Słowo {{index}}",
       "deleteLink": "Usuń skarbiec i zacznij od nowa",
-      "eyebrow": "Odzyskanie",
+      "eyebrow": "Odzyskiwanie",
       "submit": "Odblokuj",
-      "title": "Odzyskaj skarbiec."
+      "title": "Odzyskaj swój skarbiec."
     },
     "select": {
-      "accountInvalid": "Nieprawidłowy numer konta. Proszę sprawdzić i spróbować ponownie.",
-      "accountLabel": "",
-      "accountPlaceholder": "MY- XXXX- XXXX- XXXX- XXXX- X (nieobowiązkowo)",
-      "body": "Wybierz skarbiec, który chcesz odzyskać ze swoim 24-słownym zwrotem odzyskiwania. Możesz również wpisać swój numer konta, aby przejść prosto do niego.",
+      "accountInvalid": "Nieprawidłowy numer konta. Sprawdź i spróbuj ponownie.",
+      "accountLabel": "Numer konta (opcjonalnie)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (opcjonalnie)",
+      "body": "Wybierz skarbiec, który chcesz odzyskać za pomocą 24-słownej frazy odzyskiwania. Możesz też wpisać numer konta, aby przejść prosto do niego.",
       "cancel": "Anuluj",
-      "checking": "Sprawdzam..",
-      "loadFailed": "Żadne skarby nie mogą być teraz załadowane.",
-      "loading": "Ładowanie skarbca..",
-      "openedRelative": "otwarte {{rel}}",
+      "checking": "Sprawdzanie…",
+      "loadFailed": "Nie udało się teraz załadować żadnych skarbców.",
+      "loading": "Ładowanie Twoich skarbców…",
+      "openedRelative": "otwarto {{rel}}",
       "or": "lub",
       "title": "Wybierz skarbiec do odzyskania",
       "useAccountNumber": "Użyj numeru konta",
@@ -2049,39 +2049,39 @@
   },
   "vaultSwitcher": {
     "chipFallback": "Skarbiec",
-    "createAnother": "",
-    "switchVaultLabel": "Przełącznik",
-    "switching": "przełączanie..",
-    "vaultFallback": ""
+    "createAnother": "Utwórz kolejny skarbiec",
+    "switchVaultLabel": "Przełącz skarbiec",
+    "switching": "przełączanie…",
+    "vaultFallback": "Skarbiec {{n}}"
   },
   "welcome": {
     "createCta": "Utwórz nowy skarbiec",
-    "headlineLine1": "Zaszyfrowane notatki.",
-    "headlineLine2": "Żadnych e-maili przy rejestracji.",
+    "headlineLine1": "Zaszyfrowane notatki Markdown.",
+    "headlineLine2": "Bez e-maila przy rejestracji.",
     "repairResidue": {
       "cancel": "Anuluj",
       "cleanUp": "Posprzątaj",
-      "cleaningUp": "Sprzątanie..",
-      "confirmBody_few": "Pliki {{count}} zostaną usunięte. Są już nieczytelne, nic nie jest stracone.",
-      "confirmBody_many": "Pliki {{count}} zostaną usunięte. Są już nieczytelne, nic nie jest stracone.",
-      "confirmBody_one": "{{count}} plik zostanie usunięty. Są już nieczytelne, nic nie jest stracone.",
-      "confirmTitle": "Posprzątać resztki?",
-      "doneBody_few": "Usunięto pozostałe pliki {{count}}. Możesz teraz stworzyć nowy skarbiec.",
-      "doneBody_many": "Usunięto pozostałe pliki {{count}}. Możesz teraz stworzyć nowy skarbiec.",
-      "doneBody_one": "Usunięty plik {{count}}. Możesz teraz stworzyć nowy skarbiec.",
-      "doneTitle": "Oczyszczone",
+      "cleaningUp": "Sprzątanie…",
+      "confirmBody_few": "Zostaną usunięte {{count}} pliki. Są już nieczytelne; nic, co da się odzyskać, nie zostanie utracone.",
+      "confirmBody_many": "Zostanie usuniętych {{count}} plików. Są już nieczytelne; nic, co da się odzyskać, nie zostanie utracone.",
+      "confirmBody_one": "Zostanie usunięty {{count}} plik. Jest już nieczytelny; nic, co da się odzyskać, nie zostanie utracone.",
+      "confirmTitle": "Posprzątać pozostałe pliki?",
+      "doneBody_few": "Usunięto {{count}} pozostałe pliki. Możesz teraz utworzyć nowy skarbiec.",
+      "doneBody_many": "Usunięto {{count}} pozostałych plików. Możesz teraz utworzyć nowy skarbiec.",
+      "doneBody_one": "Usunięto {{count}} pozostały plik. Możesz teraz utworzyć nowy skarbiec.",
+      "doneTitle": "Posprzątano",
       "errorBody": "Coś poszło nie tak. Zamknij aplikację i spróbuj ponownie.",
-      "errorTitle": "Czyszczenie nie powiodło się",
-      "foundBody_few": "{{count}} pozostałości z poprzedniego usunięcia, które się nie skończyło. Są już nieczytelne - nie stracisz niczego do odzyskania.",
-      "foundBody_many": "{{count}} pozostałości z poprzedniego usunięcia, które się nie skończyło. Są już nieczytelne - nie stracisz niczego do odzyskania.",
-      "foundBody_one": "{{count}} pozostałości z poprzedniego usunięcia, które się nie skończyło. Są już nieczytelne - nie stracisz niczego do odzyskania.",
-      "foundTitle": "Pozostawienie plików z niekompletnego usunięcia",
-      "partialBody_few": "Pliki {{count}} mogą być zablokowane przez inną aplikację (program antywirusowy, synchronizacja plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę, lub ręcznie usuń folder skarbca.",
-      "partialBody_many": "Pliki {{count}} mogą być zablokowane przez inną aplikację (program antywirusowy, synchronizacja plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę, lub ręcznie usuń folder skarbca.",
-      "partialBody_one": "{{count}} Plik może być zablokowany przez inną aplikację (program antywirusowy, synchronizacja plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę, lub ręcznie usuń folder skarbca.",
-      "partialTitle": "Niektóre pliki nie mogły zostać usunięte"
+      "errorTitle": "Sprzątanie nie powiodło się",
+      "foundBody_few": "{{count}} pozostałe pliki z poprzedniego usuwania, które się nie zakończyło. Są już nieczytelne — nie stracisz niczego, co da się odzyskać.",
+      "foundBody_many": "{{count}} pozostałych plików z poprzedniego usuwania, które się nie zakończyło. Są już nieczytelne — nie stracisz niczego, co da się odzyskać.",
+      "foundBody_one": "{{count}} pozostały plik z poprzedniego usuwania, które się nie zakończyło. Jest już nieczytelny — nie stracisz niczego, co da się odzyskać.",
+      "foundTitle": "Pozostałe pliki z niedokończonego usuwania",
+      "partialBody_few": "{{count}} pliki mogą być zablokowane przez inną aplikację (program antywirusowy, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę albo usuń folder skarbca ręcznie.",
+      "partialBody_many": "{{count}} plików może być zablokowanych przez inną aplikację (program antywirusowy, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę albo usuń folder skarbca ręcznie.",
+      "partialBody_one": "{{count}} plik może być zablokowany przez inną aplikację (program antywirusowy, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę albo usuń folder skarbca ręcznie.",
+      "partialTitle": "Niektórych plików nie udało się usunąć"
     },
     "restoreCta": "Przywróć z kopii zapasowej",
-    "subtitle": "Twoje notatki są zaszyfrowane na tym urządzeniu zanim je opuszczą. Serwer przechowuje tylko szyfr."
+    "subtitle": "Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą. Serwer przechowuje wyłącznie szyfrogram."
   }
 }
