@@ -1,1926 +1,2034 @@
 {
   "attachments": {
     "cleanUnused": {
-      "cancel": "",
-      "cleaning": "",
-      "close": "",
-      "completeTitle": "",
-      "deleteCta_one": "",
+      "cancel": "Ακύρωση",
+      "cleaning": "Καθαρισμός..",
+      "close": "Κλείσιμο",
+      "completeTitle": "Ο καθαρισμός ολοκληρώθηκε",
+      "deleteCta_one": "Διαγραφή {{count}} που δεν έχει χρησιμοποιηθεί",
       "deleteCta_other": "",
-      "error": "",
-      "intro_one": "",
-      "intro_other": "",
-      "summaryFreed": "",
-      "summaryPeriod": "",
-      "summaryRemoved_one": "",
-      "summaryRemoved_other": "",
-      "summarySkipped_one": "",
+      "error": "Δεν μπορούσα να καθαρίσω. Μερικές σημειώσεις μπορεί να μην είναι αναγνώσιμες — τίποτα δεν διαγράφηκε.",
+      "intro_one": "Αυτό το συνημμένο δεν χρησιμοποιείται σε καμία σημείωση. Η διαγραφή είναι μόνιμη και δεν μπορεί να αναιρεθεί.",
+      "intro_other": "Αυτά τα συνημμένα {{count}} δεν χρησιμοποιούνται σε καμία σημείωση. Η διαγραφή τους είναι μόνιμη και δεν μπορεί να αναιρεθεί.",
+      "summaryFreed": " · ελευθερώθηκε {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "Αφαίρεση συνημμένου {{count}}",
+      "summaryRemoved_other": "Αφαιρέθηκαν τα συνημμένα {{count}}",
+      "summarySkipped_one": " · {{count}} παραλείπεται (τώρα σε χρήση)",
       "summarySkipped_other": "",
-      "title": "",
-      "willBeReclaimed": ""
+      "title": "Καθαρισμός μη χρησιμοποιηθέντων συνημμένων",
+      "willBeReclaimed": "Θα ανακτηθεί."
     },
     "coverPicker": {
-      "close": "",
-      "dropHint": "",
-      "empty": "",
-      "loading": "",
-      "removeCover": "",
-      "title": "",
-      "upload": ""
+      "close": "Κλείσιμο",
+      "dropHint": "Ρίξε μια εικόνα για να την χρησιμοποιήσεις ως εξώφυλλο.",
+      "empty": "Δεν υπάρχουν ακόμα εικόνες σε αυτό το θησαυροφυλάκιο. Ανεβάστε ένα ή σύρετε μια εικόνα εδώ.",
+      "loading": "Φόρτωση..",
+      "removeCover": "Αφαίρεση καλύμματος",
+      "title": "Επιλέξτε μια εικόνα κάλυψης",
+      "upload": "Αποστολή"
     },
     "deleteDialog": {
-      "cancel": "",
-      "confirmPrompt": "",
-      "delete": "",
-      "deleting": "",
-      "error": "",
-      "notUsed": "",
-      "stillUsed_one": "",
-      "stillUsed_other": "",
-      "title": "",
-      "untitled": ""
+      "cancel": "Ακύρωση",
+      "confirmPrompt": "Μόνιμη διαγραφή αυτού του συνημμένου; Αυτό δεν μπορεί να αναιρεθεί.",
+      "delete": "Διαγραφή",
+      "deleting": "Διαγραφή..",
+      "error": "Δεν μπόρεσε να διαγράψει το συνημμένο. Προσπάθησε ξανά.",
+      "notUsed": "Δεν χρησιμοποιείται σε καμία σημείωση.",
+      "stillUsed_one": "Χρησιμοποιείται ακόμα στη σημείωση {{count}}. Διαγράφοντάς το αφήνει μια ταφόπλακα όπου ήταν ενσωματωμένη:",
+      "stillUsed_other": "Χρησιμοποιείται ακόμα στις σημειώσεις {{count}}. Διαγράφοντάς το αφήνει μια ταφόπλακα όπου ήταν ενσωματωμένη:",
+      "title": "Διαγραφή συνημμένου",
+      "untitled": "Χωρίς τίτλο"
     },
     "library": {
-      "actionsAriaLabel": "",
-      "actionsTitle": "",
-      "checking": "",
-      "checkUnusedFailedNotice": "",
-      "cleanUnused": "",
-      "cleanUnusedTitle": "",
-      "colCreated": "",
-      "colName": "",
-      "colSize": "",
-      "colType": "",
-      "colUsedIn": "",
-      "decrypting": "",
-      "emptyImportHint": "",
-      "emptyLoadError": "",
-      "emptyNoAttachments": "",
-      "filterAriaLabel": "",
-      "gridView": "",
-      "import": "",
-      "importDialogTitle": "",
-      "importFile": "",
-      "importing": "",
-      "listView": "",
-      "menuDelete": "",
-      "menuExport": "",
-      "menuPreview": "",
-      "menuRename": "",
-      "noMatch": "",
-      "noUnusedNotice": "",
-      "preview": "",
-      "previewAttachment": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "sortAriaLabel": "",
-      "supportedFilesFilter": "",
-      "title": "",
-      "usedInCount_one": "",
-      "usedInCount_other": "",
-      "usedInLoading": ""
+      "actionsAriaLabel": "Προσαρτήσεις",
+      "actionsTitle": "Δράσεις",
+      "checkUnusedFailedNotice": "Δεν μπορούσε να ελέγξει για αχρησιμοποίητα συνημμένα. Προσπάθησε ξανά.",
+      "checking": "Έλεγχος..",
+      "cleanUnused": "Καθαρισμός αχρησιμοποίητου",
+      "cleanUnusedTitle": "Διαγραφή συνημμένων που δεν χρησιμοποιούνται σε καμία σημείωση",
+      "colCreated": "Δημιουργήθηκε",
+      "colName": "Όνομα",
+      "colSize": "Μέγεθος",
+      "colType": "Τύπος",
+      "colUsedIn": "Χρήση σε",
+      "decrypting": "Αποκρυπτογράφηση συνημμένων..",
+      "emptyImportHint": "Εισήγαγε ένα αρχείο για να το κρατήσεις στο θησαυροφυλάκιο σου.",
+      "emptyLoadError": "Δεν μπορούσα να διαβάσω τον κατάλογο συνημμένων.",
+      "emptyNoAttachments": "Δεν υπάρχουν προσκολλήσεις ακόμα.",
+      "filterAriaLabel": "Φίλτρο κατά τύπο",
+      "gridView": "Προβολή καννάβου",
+      "import": "Εισαγωγή",
+      "importDialogTitle": "Εισαγωγή συνημμένου",
+      "importFile": "Εισαγωγή αρχείου",
+      "importing": "Εισαγωγή..",
+      "listView": "Προβολή λίστας",
+      "menuDelete": "Διαγραφή",
+      "menuExport": "Εξαγωγή",
+      "menuPreview": "Προεπισκόπηση",
+      "menuRename": "Μετονομασία",
+      "noMatch": "Κανένα συνημμένο δεν ταιριάζει με την αναζήτησή σας.",
+      "noUnusedNotice": "Δεν έχουν χρησιμοποιηθεί εξαρτήματα για τον καθαρισμό.",
+      "preview": "Προεπισκόπηση",
+      "previewAttachment": "Συνημμένο προεπισκόπησης",
+      "searchAriaLabel": "Αναζήτηση συνημμένων με όνομα αρχείου",
+      "searchPlaceholder": "Αναζήτηση με όνομα αρχείου",
+      "sort": {
+        "createdAsc": "Ο παλιότερος πρώτος",
+        "createdDesc": "Το νεότερο πρώτο",
+        "nameAsc": "Όνομα A–Z",
+        "nameDesc": "Όνομα Z–A"
+      },
+      "sortAriaLabel": "Ταξινόμηση συνημμένων",
+      "supportedFilesFilter": "Υποστηριγμένα αρχεία",
+      "title": "Συνημμένα",
+      "typeFilter": {
+        "all": "Όλοι οι τύποι",
+        "audio": "Ήχος",
+        "image": "Εικόνες",
+        "other": "Άλλα",
+        "pdf": "PDF"
+      },
+      "usedInCount_one": "Χρησιμοποιείται στη σημείωση {{count}}",
+      "usedInCount_other": "Χρησιμοποιείται σε σημειώσεις {{count}}",
+      "usedInLoading": ".."
     },
     "thumbnail": {
-      "audioLabel": "",
-      "file": "",
-      "pause": "",
-      "pdfDocument": "",
-      "pdfFirstPage": "",
-      "play": ""
+      "audioLabel": "Ήχος: {{filename}}",
+      "file": "Αρχείο",
+      "pause": "Παύση",
+      "pdfDocument": "Έγγραφο PDF",
+      "pdfFirstPage": "PDF πρώτη σελίδα",
+      "play": "Αναπαραγωγή"
     },
     "usedInNotesPopover": {
-      "empty": "",
-      "untitled": ""
+      "empty": "Δεν χρησιμοποιείται σε καμία σημείωση.",
+      "untitled": "Χωρίς τίτλο"
     }
   },
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "invalidDestination": "",
-        "ioGeneric": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "memberTooLarge": "",
-        "vaultNotFound": "",
-        "verifyFailed": ""
+        "authOperationInProgress": "Μια άλλη επιχείρηση στο θησαυροφυλάκιο είναι σε εξέλιξη. Περίμενε να τελειώσει και ξαναδοκίμασε.",
+        "cancelled": "Το αντίγραφο ασφαλείας ακυρώθηκε. Κανένα αρχείο δεν έμεινε πίσω.",
+        "invalidDestination": "Αυτός ο φάκελος προορισμού δεν είναι χρήσιμος.",
+        "ioGeneric": "Αδυναμία εγγραφής του αρχείου αντιγράφων ασφαλείας.",
+        "ioNoSpace": "Δεν υπάρχει αρκετός χώρος στον προορισμό.",
+        "ioPermissionDenied": "Δεν υπάρχει άδεια να γράψω στον προορισμό.",
+        "joinFailure": "Το αντίγραφο ασφαλείας απέτυχε απροσδόκητα. Κανένα αρχείο δεν έμεινε πίσω.",
+        "memberTooLarge": "Ένα αρχείο σε αυτό το θησαυροφυλάκιο είναι μεγαλύτερο από ό, τι επιτρέπει η εφεδρική μορφή.",
+        "vaultNotFound": "Δεν βρέθηκε κανένα χρηματοκιβώτιο να κάνει πίσω.",
+        "verifyFailed": "Το γραπτό αντίγραφο ασφαλείας δεν επαληθεύτηκε, οπότε απορρίφθηκε. Δοκιμάστε ξανά — σε διαφορετικά μέσα αν επαναληφθεί."
       },
       "restore": {
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "damagedBackup": "",
-        "futureVersionBackup": "",
-        "invalidVaultMeta": "",
-        "ioGeneric": "",
-        "ioPermissionDenied": "",
-        "joinFailure": "",
-        "missingVaultMeta": "",
-        "notABackupFile": "",
-        "vaultAlreadyExists": ""
+        "authOperationInProgress": "Μια άλλη επιχείρηση στο θησαυροφυλάκιο είναι σε εξέλιξη. Περίμενε να τελειώσει και ξαναδοκίμασε.",
+        "cancelled": "Η επαναφορά ακυρώθηκε. Τίποτα δεν άλλαξε.",
+        "damagedBackup": "Το εφεδρικό αρχείο έχει καταστραφεί.",
+        "futureVersionBackup": "Αυτό το αντίγραφο ασφαλείας έγινε από μια νεότερη έκδοση του Myne. Ενημέρωσε τον Μάιν και μετά αποκατέστησέ τον.",
+        "invalidVaultMeta": "Τα μεταδεδομένα του χρηματοκιβωτίου είναι δυσανάγνωστα, οπότε η αποκατάστασή του δεν θα μπορούσε να παράγει ένα λειτουργικό θησαυροφυλάκιο.",
+        "ioGeneric": "Αδυναμία ανάγνωσης του αρχείου αντιγράφων ασφαλείας.",
+        "ioPermissionDenied": "Δεν έχει άδεια να διαβάσει το αρχείο αντιγράφων ασφαλείας.",
+        "joinFailure": "Η επαναφορά απέτυχε απροσδόκητα. Τίποτα δεν άλλαξε.",
+        "missingVaultMeta": "Αυτό το αντίγραφο ασφαλείας λείπει μεταδεδομένα του θησαυροφυλακίου και δεν μπορεί να αποκατασταθεί.",
+        "notABackupFile": "Αυτό το αρχείο δεν είναι εφεδρικό.",
+        "vaultAlreadyExists": "Ένα χρηματοκιβώτιο από αυτό το εφεδρικό υπάρχει ήδη σε αυτή τη συσκευή."
       }
     },
     "export": {
-      "cancel": "",
-      "close": "",
-      "copying": "",
-      "preparing": "",
-      "successToast": "",
-      "title": "",
-      "verifying": ""
+      "cancel": "Ακύρωση",
+      "close": "Κλείσιμο",
+      "copying": "Αντιγραφή {{done}} του {{total}}..",
+      "preparing": "Προετοιμασία..",
+      "successToast": "Η υποστήριξη επαληθεύτηκε και αποθηκεύτηκε.",
+      "title": "Πίσω στο χρηματοκιβώτιο",
+      "verifying": "Επαλήθευση {{done}} του {{total}}.."
     }
   },
   "clipper": {
     "pairing": {
-      "accept": "",
-      "close": "",
-      "codeAriaLabel": "",
-      "intro": "",
-      "reject": "",
-      "rejected": "",
-      "title": ""
+      "accept": "Αποδοχή",
+      "close": "Κλείσιμο",
+      "codeAriaLabel": "Κωδικός ζεύξης",
+      "intro": "Επιβεβαιώστε ότι αυτός ο κωδικός ταιριάζει με αυτόν που εμφανίζεται στην επέκταση, και μετά δεχτείτε να ζευγαρώσετε.",
+      "reject": "Απόρριψη",
+      "rejected": "Η πληρωμή απορρίφθηκε.",
+      "title": "Μια επέκταση περιηγητή θέλει να συνδεθεί"
     }
   },
   "commandPalette": {
-    "archivedBadge": "",
-    "archivedBadgeTitle": "",
-    "dialogLabel": "",
-    "matchedInBody": "",
-    "noMatches": "",
-    "searchPlaceholder": "",
-    "sectionCommands": "",
-    "sectionNotes": "",
-    "untitledNote": ""
+    "archivedBadge": "Αρχείο",
+    "archivedBadgeTitle": "Αρχειοθετήθηκε",
+    "dialogLabel": "Παλέτα εντολών",
+    "matchedInBody": "↳ ταιριάζουν στο σώμα",
+    "noMatches": "Χωρίς ταίριασμα",
+    "searchPlaceholder": "Αναζήτηση σημειώσεων ή εκτέλεση εντολής — Esc για απόρριψη",
+    "sectionCommands": "Εντολές",
+    "sectionNotes": "Σημειώσεις",
+    "untitledNote": "Χωρίς τίτλο"
   },
   "commands": {
     "actions": {
       "backupVault": {
-        "label": ""
+        "label": "Πίσω στο θησαυροφυλάκιο.."
       },
       "category": {
-        "app": "",
-        "editor": "",
-        "vault": "",
-        "view": ""
+        "app": "Εφαρμογή",
+        "editor": "Επεξεργασία",
+        "vault": "Θήκη",
+        "view": "Προβολή"
       },
       "convertWikilinks": {
-        "label": ""
+        "label": "Μετατροπή εισαγόμενων wikilinks σε αυτό το σημείωμα.."
       },
       "deleteWorkspace": {
-        "label": ""
+        "label": "Διαγραφή χώρου εργασίας.."
       },
       "exportNoteHtml": {
-        "label": ""
+        "label": "Εξαγωγή σημείωσης ως HTML.."
       },
       "exportNoteMarkdown": {
-        "label": ""
+        "label": "Εξαγωγή σημείωσης ως Markdown.."
       },
       "exportNotePdf": {
-        "label": ""
+        "label": "Εξαγωγή σημείωσης ως PDF.."
       },
       "exportNoteTxt": {
-        "label": ""
+        "label": "Εξαγωγή σημείωσης ως απλό κείμενο.."
       },
       "exportVaultMarkdown": {
-        "label": ""
+        "label": "Εξαγωγή θησαυροφυλακίου ως Markdown.."
       },
       "foldAll": {
-        "label": ""
+        "label": "Διπλώστε όλα"
       },
       "importBaseView": {
-        "label": ""
+        "label": "Εισαγωγή προβολής . base.."
       },
       "importObsidian": {
-        "label": ""
+        "label": "Εισαγωγή θησαυροφυλακίου Οψιδιανού.."
       },
       "lockVault": {
-        "label": ""
+        "label": "Κλείδωμα θησαυροφυλακίου"
       },
       "manageTemplates": {
-        "label": ""
+        "label": "Διαχείριση προτύπων.."
       },
       "newNoteFromTemplate": {
-        "label": ""
+        "label": "Νέα σημείωση από το πρότυπο.."
       },
       "openAttachments": {
-        "label": ""
+        "label": "Άνοιγμα συνημμένων.."
       },
       "openSettings": {
-        "label": ""
+        "label": "Άνοιγμα ρυθμίσεων.."
       },
       "openSnapshots": {
-        "label": ""
+        "label": "Στιγμές.."
       },
       "openTodayNote": {
-        "label": ""
+        "label": "Άνοιγμα σημερινής σημείωσης"
       },
       "randomNote": {
-        "label": ""
+        "label": "Άνοιγμα τυχαίας σημείωσης"
       },
       "renameWorkspace": {
-        "label": ""
+        "label": "Μετονομασία χώρου εργασίας.."
       },
       "saveWorkspaceAs": {
-        "label": ""
+        "label": "Αποθήκευση χώρου εργασίας ως.."
       },
       "showGraph": {
-        "label": ""
+        "label": "Εμφάνιση προβολής γραφήματος.."
       },
       "showTags": {
-        "label": ""
+        "label": "Περιήγηση ετικετών.."
       },
       "showViews": {
-        "label": ""
+        "label": "Προβολή προβολών.."
       },
       "switchWorkspace": {
-        "label": ""
+        "label": "Εναλλαγή χώρου εργασίας.."
       },
       "toggleFocus": {
-        "label": ""
+        "label": "Εναλλαγή λειτουργίας εστίασης"
       },
       "toggleLeftSidebar": {
-        "label": ""
+        "label": "Εναλλαγή σημείωσης"
       },
       "toggleReading": {
-        "label": ""
+        "label": "Εναλλαγή προβολής ανάγνωσης"
       },
       "toggleRightSidebar": {
-        "label": ""
+        "label": "Εναλλαγή backlinks sidebar"
       },
       "toggleSource": {
-        "label": ""
+        "label": "Εναλλαγή λειτουργίας πηγής"
       },
       "toggleStackedTabs": {
-        "label": ""
+        "label": "Εναλλαγή στοιβαγμένων καρτελών"
       },
       "unfoldAll": {
-        "label": ""
+        "label": "Ξεδιπλώστε όλα"
       }
     },
     "hotkeys": {
       "command": {
-        "bold": "",
-        "closeTab": "",
-        "cycleHeadingLevel": "",
-        "cycleTabs": "",
-        "deleteWorkspace": "",
-        "focusNextPane": "",
-        "focusPrevPane": "",
-        "foldAll": "",
-        "inlineCode": "",
-        "insertWikilink": "",
-        "italic": "",
-        "navigateBack": "",
-        "navigateForward": "",
-        "newNote": "",
-        "openSettings": "",
-        "paletteToggle": "",
-        "renameWorkspace": "",
-        "saveWorkspaceAs": "",
-        "selectAllScoped": "",
-        "showGraphView": "",
-        "splitPaneDown": "",
-        "splitPaneRight": "",
-        "switchWorkspace": "",
-        "toggleBulletList": "",
-        "toggleFocusMode": "",
-        "toggleNumberedList": "",
-        "toggleReadingView": "",
-        "toggleSourceMode": "",
-        "toggleTaskList": "",
-        "unfoldAll": ""
+        "bold": "Έντονα",
+        "closeTab": "Κλείσιμο καρτέλας",
+        "cycleHeadingLevel": "Επίπεδο κατεύθυνσης κύκλου",
+        "cycleTabs": "Καρτέλες κύκλου",
+        "deleteWorkspace": "Διαγραφή χώρου εργασίας",
+        "focusNextPane": "Εστίαση επόμενου υαλοπίνακα",
+        "focusPrevPane": "Εστίαση προηγούμενου υαλοπίνακα",
+        "foldAll": "Διπλώστε όλα",
+        "inlineCode": "Κωδικός γραμμής",
+        "insertWikilink": "Εισαγωγή wikilink",
+        "italic": "Πλάγιο",
+        "navigateBack": "Πλοηγηθείτε πίσω",
+        "navigateForward": "Πλοήγηση προς τα εμπρός",
+        "newNote": "Νέα σημείωση",
+        "openSettings": "Άνοιγμα ρυθμίσεων",
+        "paletteToggle": "Άνοιγμα παλέτας εντολών",
+        "renameWorkspace": "Μετονομασία χώρου εργασίας",
+        "saveWorkspaceAs": "Αποθήκευση χώρου εργασίας ως",
+        "selectAllScoped": "Επιλέξτε όλα (προγραμματισμένα)",
+        "showGraphView": "Εμφάνιση προβολής γραφήματος",
+        "splitPaneDown": "Χωρισμός υαλοπινάκων (κάτω)",
+        "splitPaneRight": "Χωρισμός υαλοπινάκων (δεξιά)",
+        "switchWorkspace": "Εναλλαγή χώρου εργασίας",
+        "toggleBulletList": "Εναλλαγή λίστας σφαιρών",
+        "toggleFocusMode": "Εναλλαγή λειτουργίας εστίασης",
+        "toggleNumberedList": "Εναλλαγή λίστας αριθμών",
+        "toggleReadingView": "Εναλλαγή προβολής ανάγνωσης",
+        "toggleSourceMode": "Εναλλαγή λειτουργίας πηγής",
+        "toggleTaskList": "Εναλλαγή λίστας εργασιών",
+        "unfoldAll": "Ξεδιπλώστε όλα"
       }
     },
     "rebind": {
-      "invalidChordReason": ""
+      "invalidChordReason": "Προσθήκη ενός τροποποιητή (⌘, Ctrl, ή Alt) - ένα κλειδί από μόνο του δεν μπορεί να είναι μια συντόμευση."
     }
   },
   "common": {
     "prompt": {
-      "cancel": "",
-      "confirmDefault": ""
+      "cancel": "Ακύρωση",
+      "confirmDefault": "ΕΝΤΆΞΕΙ"
     },
     "spinner": {
-      "loadingLabel": ""
+      "loadingLabel": "Φόρτωση"
     }
   },
   "editor": {
     "attachment": {
       "actions": {
-        "exported": "",
-        "exportFailed": "",
-        "renamed": "",
-        "renameFailed": "",
-        "saveDialogFailed": ""
+        "exportFailed": "Δεν μπορούσε να εξάγει {{filename}}.",
+        "exported": "Εξαγωγή {{filename}}.",
+        "renameFailed": "Δεν μπορούσε να μετονομάσει το συνημμένο.",
+        "renamed": "Μετονομασία σε {{name}}.",
+        "saveDialogFailed": "Δεν μπόρεσε να ανοίξει το διάλογο αποθήκευσης."
       },
       "convert": {
-        "cancel": "",
-        "confirm": "",
-        "skipped": "",
-        "subtitle_one": "",
-        "subtitle_other": "",
-        "subtitleEmpty": "",
-        "title": ""
+        "cancel": "Ακύρωση",
+        "confirm": "Μετατροπή",
+        "skipped": "παραλείπεται — {{note}}",
+        "subtitleEmpty": "Τίποτα για να μετατρέψετε — κανένα πηγαίο αρχείο δεν λύθηκε.",
+        "subtitle_one": "1 αναφορά θα ξαναγραφεί. Επανεξέταση πριν από τη δέσμευση.",
+        "subtitle_other": "Οι αναφορές θα ξαναγραφτούν. Επανεξέταση πριν από τη δέσμευση.",
+        "title": "Μετάτρεψε εισαγόμενα συνημμένα"
       },
       "convertCommand": {
-        "pickerSourceFilter": ""
+        "pickerSourceFilter": "Πηγή συνημμένου"
       },
       "convertCore": {
-        "converted_one": "",
+        "converted_one": "{{count}}",
         "converted_other": "",
-        "noneToConvert": "",
+        "noneToConvert": "Δεν υπάρχουν εισαγόμενα συνημμένα για μετατροπή σε αυτό το σημείωμα.",
         "skipNote": {
-          "failed": "",
-          "locked": "",
-          "notFound": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "η εισαγωγή απέτυχε",
+          "locked": "χρηματοκιβώτιο κλειδωμένο",
+          "notFound": "η πηγή δε βρέθηκε",
+          "tooLarge": "υπερβολικά μεγάλο (max 64 MiB)",
+          "unsupported": "μη υποστηριζόμενος τύπος"
         },
-        "skippedSuffix_one": "",
+        "skippedSuffix_one": " · {{count}} παραλείπεται",
         "skippedSuffix_other": ""
       },
       "fileKind": {
-        "generic": "",
+        "generic": "Αρχείο",
         "label": {
-          "archive": "",
-          "audio": "",
-          "cHeader": "",
-          "cppSource": "",
-          "cSource": "",
-          "css": "",
-          "csv": "",
-          "document": "",
-          "ebook": "",
-          "go": "",
-          "html": "",
-          "image": "",
-          "java": "",
-          "javascript": "",
-          "json": "",
-          "keynote": "",
-          "log": "",
-          "markdown": "",
-          "numbers": "",
-          "pages": "",
-          "pdf": "",
-          "presentation": "",
-          "python": "",
-          "richText": "",
-          "rust": "",
-          "shell": "",
-          "spreadsheet": "",
-          "svg": "",
-          "text": "",
-          "toml": "",
-          "tsv": "",
-          "typescript": "",
-          "video": "",
-          "word": "",
-          "xml": "",
-          "yaml": ""
+          "archive": "Αρχείο",
+          "audio": "Ήχος",
+          "cHeader": "Κεφαλίδα Γ",
+          "cSource": "Πηγή Γ",
+          "cppSource": "Πηγή C++",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Έγγραφο",
+          "ebook": "Ebook",
+          "go": "Πήγαινε",
+          "html": "HTML",
+          "image": "Εικόνα",
+          "java": "Ιάβα",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Βασική σημείωση",
+          "log": "Αρχείο καταγραφής",
+          "markdown": "Προσάρτηση",
+          "numbers": "Λογιστικό φύλλο αριθμών",
+          "pages": "Έγγραφο σελίδων",
+          "pdf": "PDF",
+          "presentation": "Παρουσίαση",
+          "python": "Πάιθον",
+          "richText": "Πλούσιο έγγραφο κειμένου",
+          "rust": "Ρίζα",
+          "shell": "Σενάριο κελύφους",
+          "spreadsheet": "Λογιστικό φύλλο",
+          "svg": "Εικόνα SVG",
+          "text": "Έγγραφο κειμένου",
+          "toml": "ΤΟΜΛ",
+          "tsv": "TSV",
+          "typescript": "ΤύποςScript",
+          "video": "Βίντεο",
+          "word": "Έγγραφο κειμένου",
+          "xml": "XML",
+          "yaml": "ΥΑΜΛ"
         },
-        "unknown": ""
+        "unknown": "{{ext}} αρχείο"
       },
       "lightbox": {
-        "close": "",
-        "export": "",
-        "exportAria": "",
-        "imagePreview": "",
-        "pdfFallback": "",
-        "pdfPreview": ""
+        "close": "Κλείσιμο προεπισκόπησης",
+        "export": "Εξαγωγή",
+        "exportAria": "Εξαγωγή συνημμένου",
+        "imagePreview": "Προεπισκόπηση εικόνας",
+        "pdfFallback": "PDF",
+        "pdfPreview": "Προεπισκόπηση PDF"
       },
       "menu": {
-        "actionsAria": ""
+        "actionsAria": "Προσαρτήσεις"
       },
       "pdf": {
-        "loading": ""
+        "loading": "Φόρτωση.."
       },
       "picker": {
-        "openFailed": ""
+        "openFailed": "Δεν μπορούσα να ανοίξω τον επιλογέα αρχείων."
       },
       "progress": {
-        "encrypting": "",
-        "importing": "",
-        "loading": ""
+        "encrypting": "Κρυπτογράφηση..",
+        "importing": "Εισαγωγή..",
+        "loading": "Φόρτωση.."
       },
       "recording": {
-        "barAria": "",
-        "cancel": "",
-        "noAudio": "",
-        "saving": "",
-        "stop": ""
+        "barAria": "Καταγραφή φωνητικού σημειώματος",
+        "cancel": "Ακύρωση",
+        "noAudio": "Δεν ανιχνεύεται ήχος — ελέγξτε το μικρόφωνο σας.",
+        "saving": "Αποθήκευση..",
+        "stop": "Σταμάτημα"
       },
       "rename": {
-        "cancel": "",
-        "confirm": "",
-        "title": ""
+        "cancel": "Ακύρωση",
+        "confirm": "Μετονομασία",
+        "title": "Μετονομασία συνημμένου"
       },
       "summary": {
-        "added_one": "",
+        "added_one": "{{count}}",
         "added_other": "",
         "reason": {
-          "failed": "",
-          "locked": "",
-          "tooLarge": "",
-          "unsupported": ""
+          "failed": "αποτυχία",
+          "locked": "χρηματοκιβώτιο κλειδωμένο",
+          "tooLarge": "πολύ μεγάλο",
+          "unsupported": "μη υποστηριζόμενος τύπος"
         },
-        "skipped_one": "",
+        "skipped_one": "{{count}} παραλείπεται: {{noun}}",
         "skipped_other": ""
       },
       "voice": {
         "startError": {
-          "alreadyRecording": "",
-          "captureFailed": "",
-          "generic": "",
-          "locked": "",
-          "noInputDevice": ""
+          "alreadyRecording": "Μια ηχογράφηση είναι ήδη σε εξέλιξη.",
+          "captureFailed": "Δεν μπόρεσε να ξεκινήσει την εγγραφή — ελέγξτε την πρόσβαση μικροφώνου στις Settings συστήματος.",
+          "generic": "Δεν μπορούσα να αρχίσω να ηχογραφώ.",
+          "locked": "Ξεκλείδωσε το θησαυροφυλάκιο σου για να καταγράψεις ένα φωνητικό σημείωμα.",
+          "noInputDevice": "Δεν βρέθηκε μικρόφωνο. Συνδέστε ένα και προσπαθήστε ξανά."
         },
         "stopError": {
-          "captureFailed": "",
-          "emptyRecording": "",
-          "generic": "",
-          "silentRecording": ""
+          "captureFailed": "Η εγγραφή απέτυχε — ελέγξτε το μικρόφωνο σας.",
+          "emptyRecording": "Τίποτα δεν καταγράφηκε.",
+          "generic": "Δεν μπόρεσα να σώσω την ηχογράφηση.",
+          "silentRecording": "Η ηχογράφηση ήταν σιωπηλή και απορρίφθηκε — ελέγξτε το μικρόφωνό σας."
         }
       },
       "widget": {
         "audio": {
-          "pause": "",
-          "play": "",
-          "seek": ""
+          "pause": "Παύση",
+          "play": "Αναπαραγωγή",
+          "seek": "Αναζήτηση"
         },
         "menu": {
-          "export": "",
-          "remove": "",
-          "rename": "",
-          "reveal": ""
+          "export": "Εξαγωγή",
+          "remove": "Αφαίρεση",
+          "rename": "Μετονομασία",
+          "reveal": "Αποκάλυψη στη βιβλιοθήκη"
         },
-        "pdfFallback": "",
+        "pdfFallback": "PDF",
         "tombstone": {
-          "brokenAria": "",
-          "brokenLabel": "",
-          "deletedAria": "",
-          "deletedLabel": ""
+          "brokenAria": "Σπασμένη αναφορά συνημμένου: {{filename}}",
+          "brokenLabel": "σπασμένη",
+          "deletedAria": "Διαγράφεται συνημμένο: {{filename}}",
+          "deletedLabel": "διαγράφεται"
         },
-        "urlImageFallback": ""
+        "urlImageFallback": "εικόνα"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Προσοχή",
+        "bug": "Σφάλμα",
+        "caution": "Προσοχή",
+        "danger": "Κίνδυνος",
+        "done": "Έγινε",
+        "error": "Σφάλμα",
+        "example": "Παράδειγμα",
+        "failure": "Αποτυχία",
+        "faq": "ΣΥΧΝΈΣ ΕΡΩΤΉΣΕΙΣ",
+        "hint": "Υπόδειξη",
+        "important": "Σημαντικό",
+        "info": "Πληροφορίες",
+        "missing": "Λείπει",
+        "note": "Σημείωση",
+        "question": "Ερώτηση",
+        "quote": "Τιμή",
+        "success": "Επιτυχία",
+        "tip": "Συμβουλή",
+        "todo": "Todo",
+        "warning": "Προειδοποίηση"
       }
     },
     "chrome": {
       "backlinks": {
-        "archivedBadge": "",
-        "empty": "",
-        "linkedFrom_one": "",
+        "archivedBadge": "Αρχειοθετήθηκε",
+        "empty": "Δεν υπάρχουν backlinks ακόμα.",
+        "linkedFrom_one": "Συνδεδεμένο από {{count}}",
         "linkedFrom_other": "",
-        "untitled": ""
+        "untitled": "Χωρίς τίτλο"
+      },
+      "barItems": {
+        "graph": "Γράφημα",
+        "lock": "Κλείδωμα",
+        "saveStatus": "Αποθήκευση κατάστασης",
+        "settings": "Settings",
+        "syncStatus": "Κατάσταση συγχρονισμού",
+        "tags": "Ετικέτες",
+        "viewMode": "Λειτουργία προβολής",
+        "views": "Προβολές",
+        "wordCount": "Αριθμός λέξεων",
+        "workspace": "Χώρος εργασίας"
       },
       "baseImport": {
-        "droppedFiltersSuffix_one": "",
+        "droppedFiltersSuffix_one": " · τα φίλτρα {{count}} έπεσαν",
         "droppedFiltersSuffix_other": "",
-        "failed": "",
-        "fileFilterName": "",
-        "imported_one": "",
+        "failed": "Η εισαγωγή απέτυχε.",
+        "fileFilterName": "Βάση Οψιδιανού",
+        "imported_one": "Εισαγόμενη(-ες) προβολή(-εις) {{count}}",
         "imported_other": "",
-        "notValid": "",
-        "skippedSuffix_one": "",
+        "notValid": "Δεν είναι έγκυρο αρχείο .base.",
+        "skippedSuffix_one": " · {{count}} παραλείπεται",
         "skippedSuffix_other": "",
-        "stoppedAfter_one": "",
+        "stoppedAfter_one": "Η εισαγωγή σταμάτησε μετά την προβολή(ες) {{count}}.",
         "stoppedAfter_other": ""
       },
       "bottomBar": {
-        "browseTags": "",
-        "browseViews": "",
-        "cycleViewMode": "",
+        "browseTags": "Περιήγηση ετικετών",
+        "browseViews": "Προβολή προβολών",
+        "cycleViewMode": "Λειτουργία προβολής κύκλου",
         "docStats": {
-          "summary_one": "",
-          "summary_other": "",
-          "summarySelectionSuffix": "",
-          "title_one": "",
-          "title_other": "",
-          "titleSelectionSuffix": ""
+          "summarySelectionSuffix": " (sel)",
+          "summary_one": "{{count}} λέξη · {{characters}} χαρακτήρες",
+          "summary_other": "{{count}} λέξεις · {{characters}} χαρακτήρες",
+          "titleSelectionSuffix": " (επιλογή)",
+          "title_one": "{{characters}} χαρακτήρες · {{words}} λέξεις · {{spaces}} κενά · {{count}} παράγραφος",
+          "title_other": "{{characters}} χαρακτήρες · {{words}} λέξεις · {{spaces}} κενά · {{count}} παράγραφοι"
         },
-        "graphTitle": "",
-        "lock": "",
-        "lockVault": "",
-        "openSettings": "",
-        "settingsTitle": "",
-        "showGraph": "",
-        "syncStatus": "",
-        "tagsTitle": "",
-        "togglePreview": "",
-        "viewModeTitle": "",
-        "viewsTitle": ""
+        "graphTitle": "Γράφημα (⌘⇧Ζ)",
+        "lock": "Κλείδωμα",
+        "lockVault": "Κλείδωμα θησαυροφυλακίου",
+        "openSettings": "Άνοιγμα ρυθμίσεων",
+        "settingsTitle": "Settings (⌘,)",
+        "showGraph": "Εμφάνιση προβολής γραφήματος",
+        "syncStatus": "Τοπική μόνο · δεν συγχρονίστηκε",
+        "tagsTitle": "Ετικέτες",
+        "togglePreview": "Εναλλαγή προεπισκόπησης πλευρικής όψης",
+        "viewModeTitle": "Λειτουργία προβολής: {{mode}} (κλικ για κύκλο)",
+        "viewsTitle": "Προβολές"
       },
       "import": {
-        "imported_one": "",
-        "imported_other": "",
-        "skippedSuffix_one": "",
+        "imported_one": "Εισαγόμενη σημείωση {{count}}{{skipped}}",
+        "imported_other": "Εισαγόμενες σημειώσεις {{count}}{{skipped}}",
+        "skippedSuffix_one": " · {{count}} παραλείπεται",
         "skippedSuffix_other": ""
       },
       "nav": {
-        "goBack": "",
-        "goForward": ""
+        "goBack": "Πήγαινε πίσω",
+        "goForward": "Πήγαινε μπροστά"
       },
-      "noNotesToOpen": "",
-      "resizeBacklinksSidebar": "",
-      "resizeNotesSidebar": "",
+      "noNotesToOpen": "Δεν υπάρχουν σημειώσεις για άνοιγμα.",
+      "resizeBacklinksSidebar": "Αλλαγή μεγέθους backlinks sidebar",
+      "resizeNotesSidebar": "Αλλαγή μεγέθους της πλευρικής γραμμής σημειώσεων",
       "sidebarToggle": {
-        "hideBacklinks": "",
-        "hideNotes": "",
-        "showBacklinks": "",
-        "showNotes": ""
+        "hideBacklinks": "Απόκρυψη πλευρικών δεσμών",
+        "hideNotes": "Απόκρυψη πλευρικής γραμμής σημειώσεων",
+        "showBacklinks": "Εμφάνιση backlinks sidebar",
+        "showNotes": "Εμφάνιση πλευρικής γραμμής σημειώσεων"
       },
       "switchingOverlay": {
-        "saving": ""
+        "saving": "Αποθήκευση.."
       },
       "viewMode": {
-        "live": "",
-        "reading": "",
-        "source": ""
+        "live": "Ζωντανά",
+        "reading": "Ανάγνωση",
+        "source": "Πηγή"
       },
       "workspacePrompt": {
-        "namePlaceholder": "",
-        "renameConfirm": "",
-        "renameTitle": "",
-        "saveAsTitle": "",
-        "saveConfirm": ""
+        "namePlaceholder": "Όνομα χώρου εργασίας",
+        "renameConfirm": "Μετονομασία",
+        "renameTitle": "Μετονομασία χώρου εργασίας",
+        "saveAsTitle": "Αποθήκευση χώρου εργασίας ως",
+        "saveConfirm": "Αποθήκευση"
       },
       "workspaceSwitcher": {
-        "defaultName": "",
-        "renameItemLabel": "",
-        "renameTitle": "",
-        "saveCurrentAs": "",
-        "switchLabel": "",
-        "toggleTitle": ""
+        "defaultName": "Χώρος εργασίας",
+        "renameItemLabel": "Μετονομασία χώρου εργασίας {{name}}",
+        "renameTitle": "Μετονομασία χώρου εργασίας",
+        "saveCurrentAs": "Αποθήκευση τρέχοντος ως..",
+        "switchLabel": "Εναλλαγή χώρου εργασίας",
+        "toggleTitle": "Χώρος εργασίας: {{name}}"
       }
     },
     "codeBlock": {
-      "copyCode": "",
-      "defaultBadge": ""
+      "copyCode": "Αντιγραφή κώδικα",
+      "defaultBadge": "κωδικός"
     },
     "find": {
-      "close": "",
-      "matchCase": "",
-      "matchCount": "",
-      "nextMatch": "",
-      "noMatches": "",
-      "placeholder": "",
-      "previousMatch": "",
-      "replaceAll": "",
-      "replaceAllCount": "",
-      "replaceOne": "",
-      "replacePlaceholder": "",
-      "toggleReplace": ""
+      "close": "Κλείσιμο εύρεσης",
+      "matchCase": "Ταίριασμα πεζών/ κεφαλαίων",
+      "matchCount": "{{current}} του {{total}}",
+      "nextMatch": "Επόμενο ταίριασμα",
+      "noMatches": "Χωρίς ταίριασμα",
+      "placeholder": "Αναζήτηση στη σημείωση",
+      "previousMatch": "Προηγούμενο παιχνίδι",
+      "replaceAll": "Αντικατάσταση όλων",
+      "replaceAllCount": "Αντικατάσταση όλων ({{total}})",
+      "replaceOne": "Αντικατάσταση",
+      "replacePlaceholder": "Αντικατάσταση με",
+      "toggleReplace": "Εναλλαγή αντικατάστασης"
     },
     "folding": {
-      "clickToUnfold": "",
-      "unfold": ""
+      "clickToUnfold": "Κλικ για ξεδίπλωση",
+      "unfold": "Ξεδιπλωμένο"
     },
     "footnote": {
-      "heading": "",
-      "unreferenced": ""
+      "heading": "Υποσημειώσει",
+      "unreferenced": "χωρίς αναφορά"
     },
     "frontmatter": {
-      "addProperty": "",
-      "propertiesLabel": "",
-      "titleAriaLabel": "",
-      "titlePlaceholder": ""
+      "addProperty": "+ Προσθήκη ιδιότητας",
+      "propertiesLabel": "Ιδιότητες",
+      "titleAriaLabel": "Τίτλος σημείωσης",
+      "titlePlaceholder": "Χωρίς τίτλο"
     },
     "mermaid": {
-      "rendering": ""
+      "rendering": "Διάγραμμα αποτύπωσης.."
     },
     "slash": {
-      "attachFile": "",
-      "bulletList": "",
-      "callout": "",
-      "date": "",
-      "day": "",
-      "divider": "",
-      "heading1": "",
-      "heading2": "",
-      "heading3": "",
-      "heading4": "",
-      "heading5": "",
-      "heading6": "",
-      "link": "",
-      "now": "",
-      "numberedList": "",
-      "quote": "",
-      "table": "",
-      "time": "",
-      "todoList": "",
-      "voiceNote": "",
-      "wikiLink": ""
+      "attachFile": "Επισύναψη αρχείου",
+      "bulletList": "Λίστα σφαιρών",
+      "callout": "Φωνή",
+      "date": "Ημερομηνία",
+      "day": "Ημέρα",
+      "divider": "Διαίρεση",
+      "heading1": "Τομέας 1",
+      "heading2": "Τομέας 2",
+      "heading3": "Τομέας 3",
+      "heading4": "Τομέας 4",
+      "heading5": "Τομέας 5",
+      "heading6": "Τομέας 6",
+      "link": "Δεσμός",
+      "now": "Τώρα",
+      "numberedList": "Αριθμημένη λίστα",
+      "quote": "Τιμή",
+      "table": "Πίνακας",
+      "time": "Χρόνος",
+      "todoList": "Λίστα προς υλοποίηση εργασιών",
+      "voiceNote": "Φωνητική σημείωση",
+      "wikiLink": "Σύνδεσμος Wiki"
     },
     "spell": {
       "menu": {
-        "addToDictionary": "",
-        "ignoreInVault": "",
-        "ignoreThisSession": "",
-        "noSuggestions": ""
+        "addToDictionary": "Προσθήκη στο λεξικό",
+        "ignoreInVault": "Αγνοήστε σε αυτό το θησαυροφυλάκιο",
+        "ignoreThisSession": "Αγνόηση αυτής της συνεδρίας",
+        "noSuggestions": "Καμία πρόταση"
       }
     },
     "table": {
-      "addColumn": "",
-      "addRow": "",
-      "cellAriaLabel": "",
-      "deleteColumn": "",
-      "deleteRow": "",
-      "reorderColumn": "",
-      "reorderRow": ""
+      "addColumn": "Προσθήκη στήλης στα δεξιά",
+      "addRow": "Προσθήκη γραμμής παρακάτω",
+      "cellAriaLabel": "Επιτραπέζιο κελί",
+      "deleteColumn": "Διαγραφή στήλης",
+      "deleteRow": "Διαγραφή γραμμής",
+      "reorderColumn": "Αναδιάταξη στήλης",
+      "reorderRow": "Επαναπαραγγελία γραμμής"
     },
     "toolbar": {
-      "apply": "",
+      "apply": "Εφαρμογή",
       "heading": {
-        "h1": "",
-        "h2": "",
-        "h3": "",
-        "h4": "",
-        "h5": "",
-        "h6": "",
-        "paragraph": ""
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "Η6",
+        "paragraph": "Παράγραφος"
       },
-      "urlPlaceholder": ""
+      "highlight": {
+        "blue": "Μάβι",
+        "green": "Γεσίλ",
+        "pink": "Πέμπε",
+        "purple": "Μορ",
+        "yellow": "Σαρί"
+      },
+      "urlPlaceholder": "Επικόλληση URL δεσμού"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Πλήρης",
+        "narrow": "Στενό",
+        "normal": "Κανονικό",
+        "wide": "Ευρεία"
+      },
+      "font": {
+        "mono": "Μονό",
+        "sans": "Σανς"
+      },
+      "lineSpacing": {
+        "normal": "Κανονικό",
+        "relaxed": "Χαλαρώστε",
+        "tight": "Σφιχτό"
+      },
+      "textSize": {
+        "lg": "Μεγάλο",
+        "md": "Προκαθορισμένο",
+        "sm": "Μικρό",
+        "xl": "Πολύ μεγάλη"
+      }
     },
     "wikilink": {
       "chip": {
-        "embed": ""
+        "embed": "Ενσωματωμένο: {{label}}"
       },
       "convert": {
-        "cancel": "",
-        "choiceClause_one": "",
-        "choiceClause_other": "",
-        "chooseTarget": "",
-        "convert": "",
-        "convertedToast_one": "",
-        "convertedToast_other": "",
-        "noneToConvert": "",
-        "nothingToConvert": "",
-        "rewriteCount_one": "",
-        "rewriteCount_other": "",
-        "skipped": "",
-        "title": ""
+        "cancel": "Ακύρωση",
+        "choiceClause_one": " · {{count}} χρειάζεται μια επιλογή.",
+        "choiceClause_other": " · {{count}} χρειάζονται μια επιλογή.",
+        "chooseTarget": "Επιλογή στόχου..",
+        "convert": "Μετατροπή",
+        "convertedToast_one": "{{count}} wikilink μετατρέπεται",
+        "convertedToast_other": "{{count}} wikilinks που μετατρέπονται",
+        "noneToConvert": "Δεν εισάγονται wikilinks για να μετατρέψετε σε αυτό το σημείωμα.",
+        "nothingToConvert": "Τίποτα για να μετατρέψετε — δεν εισάγονται wikilinks επίλυση.",
+        "rewriteCount_one": "Ο σύνδεσμος θα ξαναγραφτεί",
+        "rewriteCount_other": "Οι σύνδεσμοι θα ξαναγραφτούν",
+        "skipped": "παραλείπεται — {{reason}}",
+        "title": "Μετατροπή εισαγόμενων wikilinks σε αυτή τη σημείωση"
       },
       "convertCore": {
-        "noMatch": ""
+        "noMatch": "κανένα ταίριασμα"
       }
     }
   },
   "export": {
     "note": {
-      "documentTitleFallback": "",
+      "documentTitleFallback": "Σημείωση",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "cannotDecrypt": "",
-        "destinationUnusable": "",
-        "fallback": "",
-        "invalidAttachmentCatalog": "",
-        "invalidNoteFilename": "",
-        "invalidNoteId": "",
-        "invalidPlaintextEncoding": "",
-        "ioNoSpace": "",
-        "ioPermissionDenied": "",
-        "ioWriteDefault": "",
-        "noteNotFound": "",
-        "pdfCaptureFailed": "",
-        "pdfExportInProgress": "",
-        "pdfPayloadMissing": "",
-        "pdfRenderTimeout": "",
-        "pdfWindowCreateFailed": "",
-        "targetExists": "",
-        "vaultLocked": ""
+        "attachmentCorrupt": "Ένα συνημμένο που αναφέρεται σε αυτό το σημείωμα δεν μπορούσε να διαβαστεί, οπότε τίποτα δεν εξήχθη.",
+        "attachmentMissing": "Ένα συνημμένο που αναφέρεται από αυτό το σημείωμα λείπει, οπότε τίποτα δεν εξήχθη.",
+        "cannotDecrypt": "Αυτό το σημείωμα δεν μπορούσε να διαβαστεί.",
+        "destinationUnusable": "Αυτός ο φάκελος προορισμού δεν είναι χρήσιμος.",
+        "fallback": "Η εξαγωγή απέτυχε απροσδόκητα. Προσπάθησε ξανά.",
+        "invalidAttachmentCatalog": "Ο κατάλογος συνημμένων του θησαυροφυλακίου δεν μπορούσε να διαβαστεί, οπότε τίποτα δεν εξήχθη.",
+        "invalidNoteFilename": "Αυτό το όνομα αρχείου δεν είναι χρησιμοποιήσιμο, οπότε τίποτα δεν εξήχθη.",
+        "invalidNoteId": "Αυτό το σημείωμα δεν μπορούσε να αναγνωριστεί, οπότε τίποτα δεν εξήχθη.",
+        "invalidPlaintextEncoding": "Το περιεχόμενο αυτού του σημειώματος φαίνεται κατεστραμμένο, οπότε τίποτα δεν εξήχθη. Επαναφορά από ένα εφεδρικό.",
+        "ioNoSpace": "Δεν υπάρχει αρκετός χώρος στον προορισμό.",
+        "ioPermissionDenied": "Δεν υπάρχει άδεια να γράψω στον προορισμό.",
+        "ioWriteDefault": "Αδυναμία εγγραφής του εξαγόμενου αρχείου.",
+        "noteNotFound": "Το σημείωμα αυτό δεν υπάρχει πλέον — μπορεί να έχει διαγραφεί.",
+        "pdfCaptureFailed": "Το PDF δεν μπόρεσε να δημιουργηθεί, οπότε τίποτα δεν εξήχθη.",
+        "pdfExportInProgress": "Μια εξαγωγή PDF εκτελείται ήδη. Περίμενε να τελειώσει και ξαναδοκίμασε.",
+        "pdfPayloadMissing": "Η εξαγωγή διακόπηκε — αν το θησαυροφυλάκιο κλειδωθεί, ξεκλειδώστε το και προσπαθήστε ξανά.",
+        "pdfRenderTimeout": "Το σημείωμα άργησε πολύ να αποδώσει, οπότε τίποτα δεν εξήχθη.",
+        "pdfWindowCreateFailed": "Το παράθυρο εξαγωγής δεν μπορούσε να ανοιχτεί, οπότε τίποτα δεν εξήχθη.",
+        "targetExists": "Ένα αρχείο με αυτό το όνομα υπάρχει ήδη στον προορισμό.",
+        "vaultLocked": "Το θησαυροφυλάκιο είναι κλειδωμένο. Ξεκλείδωσε το και ξαναπροσπάθησε."
       },
       "flow": {
-        "couldNotRead": "",
-        "exportedTo": "",
-        "exportedToWithAttachments_one": "",
-        "exportedToWithAttachments_other": "",
-        "exportedToWithImages_one": "",
-        "exportedToWithImages_other": "",
-        "filterHtml": "",
-        "filterMarkdown": "",
-        "filterPdf": "",
-        "filterPlainText": "",
-        "showInFolder": ""
+        "couldNotRead": "Αυτό το σημείωμα δεν μπορούσε να διαβαστεί.",
+        "exportedTo": "Εξαγωγή σε {{filename}}",
+        "exportedToWithAttachments_one": "Εξαγωγή στο συνημμένο {{filename}} + {{count}}",
+        "exportedToWithAttachments_other": "Εξαγωγή σε {{filename}} + {{count}} συνημμένα",
+        "exportedToWithImages_one": "Εξαγωγή σε {{filename}} + {{count}} εικόνα",
+        "exportedToWithImages_other": "Εξαγωγή σε {{filename}} + {{count}} εικόνες",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Προσάρτηση",
+        "filterPdf": "PDF",
+        "filterPlainText": "Απλό κείμενο",
+        "showInFolder": "Εμφάνιση στο φάκελο"
       },
       "modal": {
-        "cancel": "",
-        "export": "",
-        "includeAttachments_one": "",
-        "includeAttachments_other": "",
-        "title": ""
+        "cancel": "Ακύρωση",
+        "export": "Εξαγωγή..",
+        "includeAttachments_one": "Συμπερίληψη συνημμένου {{count}}",
+        "includeAttachments_other": "Συμπερίληψη συνημμένων {{count}}",
+        "title": "Εξαγωγή ως μαρκάρισμα"
       }
     },
     "pdf": {
-      "cancel": "",
-      "continue": "",
-      "title": ""
+      "cancel": "Ακύρωση",
+      "continue": "Συνέχισε..",
+      "title": "Εξαγωγή ως PDF"
     },
     "vault": {
-      "chooseDestinationDialogTitle": "",
+      "chooseDestinationDialogTitle": "Επιλέξτε πού θα γίνει η εξαγωγή",
       "errors": {
-        "attachmentCorrupt": "",
-        "attachmentMissing": "",
-        "authOperationInProgress": "",
-        "cancelled": "",
-        "cannotDecrypt": "",
-        "destinationAlreadyExists": "",
-        "destinationNotAllowed": "",
-        "invalidPlaintextEncoding": "",
-        "invalidVaultMeta": "",
-        "ioWriteDefault": "",
-        "joinFailure": "",
-        "vaultLocked": "",
-        "vaultNotFound": ""
+        "attachmentCorrupt": "Ένα συνημμένο που αναφέρεται από ένα σημείωμα δεν μπορούσε να διαβαστεί, οπότε τίποτα δεν εξήχθη.",
+        "attachmentMissing": "Λείπει ένα συνημμένο που αναφέρεται από σημείωμα, οπότε δεν εξήχθη τίποτα.",
+        "authOperationInProgress": "Μια άλλη επιχείρηση στο θησαυροφυλάκιο είναι σε εξέλιξη. Περίμενε να τελειώσει και ξαναδοκίμασε.",
+        "cancelled": "Η εξαγωγή ακυρώθηκε. Τίποτα δεν έμεινε στον προορισμό.",
+        "cannotDecrypt": "Ένα σημείωμα δεν μπορούσε να διαβαστεί, οπότε τίποτα δεν εξήχθη.",
+        "destinationAlreadyExists": "Κάτι υπάρχει ήδη σε αυτή την τοποθεσία. Επιλέξτε ένα φρέσκο σημείο για την εξαγωγή.",
+        "destinationNotAllowed": "Αυτή η τοποθεσία είναι μέσα στην αποθήκη του Μάιλς. Επιλέξτε ένα φάκελο έξω από αυτό.",
+        "invalidPlaintextEncoding": "Το περιεχόμενο ενός σημειώματος φαίνεται κατεστραμμένο, οπότε τίποτα δεν εξήχθη. Επαναφορά από ένα εφεδρικό.",
+        "invalidVaultMeta": "Τα μεταδεδομένα του θησαυροφυλακίου δεν μπορούσαν να διαβαστούν, οπότε τίποτα δεν εξήχθη.",
+        "ioWriteDefault": "Αδυναμία εγγραφής της εξαγωγής.",
+        "joinFailure": "Η εξαγωγή απέτυχε απροσδόκητα. Τίποτα δεν έμεινε στον προορισμό.",
+        "vaultLocked": "Το θησαυροφυλάκιο είναι κλειδωμένο. Ξεκλείδωσε το και ξαναπροσπάθησε.",
+        "vaultNotFound": "Δεν βρέθηκε χρηματοκιβώτιο για εξαγωγή."
       },
       "flow": {
-        "countAttachments_one": "",
-        "countAttachments_other": "",
-        "countFolders_one": "",
-        "countFolders_other": "",
-        "countNotes_one": "",
-        "countNotes_other": "",
-        "exclusionsHistory": "",
-        "exclusionsTrashed_one": "",
-        "exclusionsTrashed_other": "",
-        "exclusionsTrashedAndHistory_one": "",
-        "exclusionsTrashedAndHistory_other": "",
-        "phaseAttachments": "",
-        "phaseNotes": "",
-        "preparing": "",
-        "runningCounts": ""
+        "countAttachments_one": "Συνημμένο {{count}}",
+        "countAttachments_other": "Συνημμένα {{count}}",
+        "countFolders_one": "{{count}} φάκελος",
+        "countFolders_other": "Φάκελοι {{count}}",
+        "countNotes_one": "{{count}} σημείωση",
+        "countNotes_other": "{{count}} σημειώσεις",
+        "exclusionsHistory": "Το ιστορικό έκδοσης δεν περιλαμβάνεται.",
+        "exclusionsTrashedAndHistory_one": "{{count}} δεν συμπεριλαμβάνεται το κατεστραμμένο σημείωμα και το ιστορικό έκδοσης.",
+        "exclusionsTrashedAndHistory_other": "{{count}} φθαρμένες σημειώσεις και ιστορία έκδοσης δεν περιλαμβάνονται.",
+        "exclusionsTrashed_one": "{{count}} δεν συμπεριλαμβάνεται η φθαρμένη σημείωση.",
+        "exclusionsTrashed_other": "{{count}} φθαρμένα χαρτονομίσματα δεν περιλαμβάνονται.",
+        "phaseAttachments": "συνημμένα",
+        "phaseNotes": "σημειώσεις",
+        "preparing": "Προετοιμασία..",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "",
-        "cancelling": "",
-        "title": ""
+        "cancel": "Ακύρωση",
+        "cancelling": "Ακύρωση..",
+        "title": "Εξαγωγή.."
       },
       "setup": {
-        "cancel": "",
-        "choose": "",
-        "chooseFolder": "",
-        "destinationLabel": "",
-        "export": "",
-        "folderSelectAriaLabel": "",
-        "noFolderChosen": "",
-        "noFoldersInVault": "",
-        "scopeFolder": "",
-        "scopeLabel": "",
-        "scopeWhole": "",
-        "title": ""
+        "cancel": "Ακύρωση",
+        "choose": "Επιλογή..",
+        "chooseFolder": "Επιλέξτε ένα φάκελο..",
+        "destinationLabel": "Προορισμός",
+        "export": "Εξαγωγή..",
+        "folderSelectAriaLabel": "Φάκελος για εξαγωγή",
+        "noFolderChosen": "Δεν επιλέχθηκε φάκελος",
+        "noFoldersInVault": "Δεν υπάρχουν φάκελοι σε αυτό το θησαυροφυλάκιο",
+        "scopeFolder": "Ένας φάκελος",
+        "scopeLabel": "Πεδίο εφαρμογής",
+        "scopeWhole": "Ολόκληρο το θησαυροφυλάκιο",
+        "title": "Εξαγωγή θησαυροφυλακίου ως Markdown"
       },
       "summary": {
-        "done": "",
-        "showInFolder": "",
-        "title": ""
+        "done": "Έγινε",
+        "showInFolder": "Εμφάνιση στο φάκελο",
+        "title": "Η εξαγωγή ολοκληρώθηκε"
       }
     }
   },
   "failClosed": {
     "corrupted": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Αν έχετε ένα αντίγραφο ασφαλείας, μπορείτε να το επαναφέρετε — τα τρέχοντα αρχεία σας δεν αγγίζονται · το αντίγραφο ασφαλείας αποκαθίσταται ως ξεχωριστό θησαυροφυλάκιο πρώτα.",
+      "cta": "Κλείσιμο εφαρμογής",
+      "title": "Το αρχείο Vault είναι κατεστραμμένο."
     },
     "invalidState": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Παρακαλώ επανεκκινήστε.",
+      "cta": "Κλείδωμα",
+      "title": "Απροσδόκητη κατάσταση."
     },
     "ioError": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Αυτό μπορεί να είναι ένα λάθος δίσκου ή συστήματος αρχείων.",
+      "cta": "Κλείσιμο εφαρμογής",
+      "title": "Αδυναμία ανάγνωσης του αρχείου του θησαυροφυλακίου."
     },
     "permissionDenied": {
-      "body": "",
-      "cta": "",
-      "title": ""
+      "body": "Ελέγξτε τις άδειες αρχείων.",
+      "cta": "Κλείσιμο εφαρμογής",
+      "title": "Δεν υπάρχει άδεια πρόσβασης στο αρχείο του θησαυροφυλακίου."
     },
-    "restoreFromBackup": ""
+    "restoreFromBackup": "Επαναφορά από το εφεδρικό.."
   },
   "notes": {
     "archive": {
-      "close": "",
-      "count_one": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "emptyState": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "close": "Κλείσιμο",
+      "countEmpty": "Κενό",
+      "count_one": "{{count}} σημείωση",
+      "count_other": "{{count}} σημειώσεις",
+      "delete": "Διαγραφή",
+      "deleteError": "Δεν μπόρεσα να διαγράψω το σημείωμα. Προσπάθησε ξανά.",
+      "emptyState": "Το αρχείο είναι άδειο.",
+      "restore": "Επαναφορά",
+      "restoreError": "Δεν μπόρεσα να επαναφέρω αυτό το σημείωμα. Προσπάθησε ξανά.",
+      "title": "Αρχείο",
+      "untitled": "Χωρίς τίτλο"
     },
     "cardMenu": {
-      "copyLink": "",
-      "open": "",
-      "openInNewTab": "",
-      "revealInFolder": ""
+      "copyLink": "Αντιγραφή δεσμού",
+      "open": "Άνοιγμα",
+      "openInNewTab": "Άνοιγμα σε νέα καρτέλα",
+      "revealInFolder": "Αποκάλυψη στο φάκελο"
     },
     "colorLabels": {
-      "clay": "",
-      "moss": "",
-      "ochre": "",
-      "plum": "",
-      "slate": "",
-      "stone": ""
+      "clay": "Άργιλος",
+      "moss": "Μος",
+      "ochre": "Οχρέ",
+      "plum": "Δαμάσκηνο",
+      "slate": "Σχήμα",
+      "stone": "Πέτρα"
     },
     "decoration": {
-      "colorSection": "",
-      "default": "",
-      "defaultFolderIcon": "",
-      "iconSection": "",
-      "menuLabel": "",
-      "noColor": "",
-      "none": ""
+      "colorSection": "Χρώμα",
+      "default": "Προκαθορισμένο",
+      "defaultFolderIcon": "Προκαθορισμένο εικονίδιο φακέλου",
+      "iconSection": "Εικονίδιο",
+      "menuLabel": "Ετικέτα χρώματος",
+      "noColor": "Χωρίς χρώμα",
+      "none": "Καμία"
     },
     "deleteConfirm": {
-      "cancel": "",
-      "delete": "",
-      "title": "",
-      "untitled": "",
-      "warning": ""
+      "cancel": "Ακύρωση",
+      "delete": "Διαγραφή",
+      "title": "Να διαγράψω αυτό το σημείωμα?",
+      "untitled": "Χωρίς τίτλο",
+      "warning": "Αυτό δεν μπορεί να αναιρεθεί."
     },
     "filterBuilder": {
-      "addCondition": "",
-      "addFilterGroup": "",
-      "cancel": "",
+      "addCondition": "Προσθήκη κατάστασης",
+      "addFilterGroup": "Προσθήκη ομάδας φίλτρου",
+      "cancel": "Ακύρωση",
       "combinator": {
-        "all": "",
-        "any": ""
+        "all": "όλα",
+        "any": "οποιοδήποτε"
       },
-      "match": "",
+      "match": "Ταίριασμα",
       "negate": {
-        "is": "",
-        "isNot": ""
+        "is": "λέ",
+        "isNot": "δεν είναι"
       },
-      "noConditions": "",
-      "noteCount_one": "",
-      "noteCount_other": "",
-      "of": "",
-      "ofTheGroups": "",
-      "removeCondition": "",
-      "replaceFilter": "",
-      "save": "",
-      "searchTextPlaceholder": "",
-      "selectFolderPlaceholder": "",
-      "selectTagPlaceholder": "",
+      "noConditions": "Δεν υπάρχουν ακόμη όροι — αυτή η άποψη δείχνει όλες τις σελίδες.",
+      "noteCount_one": "{{count}} σημείωση",
+      "noteCount_other": "{{count}} σημειώσεις",
+      "of": "του:",
+      "ofTheGroups": "των ομάδων:",
+      "removeCondition": "Αφαίρεση κατάστασης",
+      "replaceFilter": "Αντικατάσταση φίλτρου",
+      "save": "Αποθήκευση",
+      "searchTextPlaceholder": "κείμενο αναζήτησης",
+      "selectFolderPlaceholder": "επιλέξτε ένα φάκελο..",
+      "selectTagPlaceholder": "επιλέξτε μια ετικέτα..",
       "type": {
-        "folder": "",
-        "search": "",
-        "tag": ""
+        "folder": "Φάκελος",
+        "search": "Αναζήτηση",
+        "tag": "Ετικέτα"
       },
-      "unrepresentable": "",
-      "unresolved": ""
+      "unrepresentable": "Αυτό το φίλτρο φτιάχτηκε με έναν προηγμένο επεξεργαστή και δεν μπορεί να επεξεργαστεί εδώ.",
+      "unresolved": "ανεπίλυτο"
     },
     "folderManagement": {
-      "illegalSegment": "",
-      "tooLong": ""
+      "illegalSegment": "Ένα όνομα φακέλου δεν μπορεί να περιέχει / \\ .",
+      "tooLong": "Αυτή η διαδρομή είναι πολύ μεγάλη."
     },
     "folderNote": {
-      "defaultTitle": ""
+      "defaultTitle": "Ευρετήριο"
     },
     "folderRow": {
-      "createFolderNote": "",
-      "empty": "",
-      "folderNote": "",
-      "openFolderNote": ""
+      "createFolderNote": "Δημιουργία σημείωσης φακέλου",
+      "empty": "κενό",
+      "folderNote": "σημείωση φακέλου",
+      "openFolderNote": "Άνοιγμα σημείωσης φακέλου"
     },
     "graph": {
-      "allConnected": "",
-      "building": "",
-      "depthToggleTitle": "",
-      "filterAll": "",
-      "filterAroundNote": "",
-      "filterByTag": "",
-      "filterIsolated": "",
-      "hop": "",
-      "loading": "",
-      "noNotes": "",
-      "overCap": "",
-      "refresh": "",
-      "refreshTitle": "",
-      "tagPlaceholder": ""
+      "allConnected": "Όλα συνδέονται — δεν υπάρχουν μεμονωμένες σημειώσεις.",
+      "building": "Γράφημα κατασκευής..",
+      "depthToggleTitle": "Εναλλαγή βάθους γειτονιάς (1 ↔ 2 λυκίσκου)",
+      "filterAll": "Όλα",
+      "filterAroundNote": "Γύρω από αυτό το σημείωμα",
+      "filterByTag": "Φίλτρο ανά ετικέτα",
+      "filterIsolated": "Απομονωμένο",
+      "hop": "{{depth}} hop",
+      "loading": "Φόρτωση γραφήματος..",
+      "noNotes": "Δεν υπάρχουν ακόμα σημειώσεις.",
+      "overCap": "Αυτή η κρύπτη είναι μεγάλη — το σύνολο-vault γράφημα είναι κλεισμένο. Φίλτρο σε μια ετικέτα ή εμφάνιση μεμονωμένων σημειώσεων για εξερεύνηση.",
+      "refresh": "Ανανέωση",
+      "refreshTitle": "Το θησαυροφυλάκιο άλλαξε — ξαναχτίστε το γράφημα",
+      "tagPlaceholder": "Ταγκ.."
     },
     "import": {
       "base": {
-        "untitledView": ""
+        "untitledView": "Άτιτλη προβολή"
       },
       "modal": {
-        "cancel": "",
-        "cancelledNotImported_one": "",
+        "cancel": "Ακύρωση",
+        "cancelledNotImported_one": "{{count}} δεν εισήχθη",
         "cancelledNotImported_other": "",
-        "cancelling": "",
-        "chooseFolder": "",
-        "close": "",
-        "closeAriaLabel": "",
-        "copied": "",
-        "copy": "",
-        "done": "",
-        "errorBody": "",
-        "flagDetail": "",
-        "flagKindFolder": "",
-        "flagKindTitle": "",
-        "folderPickerTitle": "",
-        "hiddenIgnoredPrefix_one": "",
-        "hiddenIgnoredPrefix_other": "",
-        "hiddenIgnoredSuffix": "",
-        "ifNoteExistsLabel": "",
-        "import": "",
-        "importFailed": "",
-        "importing": "",
-        "markDone": "",
-        "markedDone": "",
-        "mediaImported_one": "",
+        "cancelling": "Ακύρωση..",
+        "chooseFolder": "Επιλογή φακέλου..",
+        "close": "Κλείσιμο",
+        "closeAriaLabel": "Κλείσιμο",
+        "copied": "Αντιγραφή",
+        "copy": "Αντιγραφή",
+        "done": "Έγινε",
+        "errorBody": "Η εισαγωγή δεν μπορούσε να ολοκληρωθεί. Τυχόν χαρτονομίσματα που έχουν ήδη εισαχθεί κρατήθηκαν και είναι ασφαλή για να διατηρηθούν ή να διαγραφούν.",
+        "flagDetail": "{{kind}} «{{segment}}» {{reason}}.",
+        "flagKindFolder": "Φάκελος",
+        "flagKindTitle": "Τίτλος",
+        "folderPickerTitle": "Επιλέξτε το φάκελο Obsidian θησαυροφυλακίου σας",
+        "hiddenIgnoredPrefix_one": "{{count}} το config / κρυφό αντικείμενο αγνοείται (π.χ. ",
+        "hiddenIgnoredPrefix_other": "{{count}} config / κρυμμένα αντικείμενα αγνοούνται (π.χ. ",
+        "hiddenIgnoredSuffix": ", dotfiles).",
+        "ifNoteExistsLabel": "Εάν μια σημείωση υπάρχει ήδη",
+        "import": "Εισαγωγή",
+        "importFailed": "Η εισαγωγή απέτυχε.",
+        "importing": "Εισάγοντας το θησαυροφυλάκιο σας..",
+        "markDone": "Το σήμα έγινε",
+        "markedDone": "Επισήμανση",
+        "mediaImported_one": "{{count}}",
         "mediaImported_other": "",
-        "mediaOmittedSuffix_one": "",
+        "mediaOmittedSuffix_one": " · {{count}} παραλείπεται",
         "mediaOmittedSuffix_other": "",
-        "needsAttention": "",
-        "needsAttentionHelp": "",
-        "noFolderChosen": "",
-        "notesImported_one": "",
-        "notesImported_other": "",
-        "policyCopyHint": "",
-        "policyCopyLabel": "",
-        "policySkipHint": "",
-        "policySkipLabel": "",
-        "preexistingDetail": "",
-        "preparing": "",
-        "progressNotes": "",
-        "progressOf": "",
-        "reasonIllegalChar": "",
-        "reasonPathTooLong": "",
-        "reasonSegmentTooLong": "",
-        "scanning": "",
-        "setupIntro": "",
-        "statCancelled": "",
-        "statCanvasSkipped": "",
-        "statEmptyFoldersKept": "",
-        "statMedia": "",
-        "statOtherSkipped": "",
-        "statSkipped": "",
-        "suggestedNameAriaLabel": "",
-        "titleComplete": "",
-        "titleFailed": "",
-        "titleSetup": "",
-        "vaultFolderLabel": "",
-        "vaultRoot": ""
+        "needsAttention": "Χρειάζεται προσοχή",
+        "needsAttentionHelp": "Αυτά τα χαρτονομίσματα εισήχθησαν αμετάβλητα. Οι προτεινόμενες διορθώσεις είναι τα σημεία εκκίνησης — αντιγράψτε ένα και μετά μετονομάστε το σημείωμα όταν το ανοίξετε.",
+        "noFolderChosen": "Δεν επιλέχθηκε φάκελος",
+        "notesImported_one": "σημείωση που εισάγεται",
+        "notesImported_other": "εισαγόμενα χαρτονομίσματα",
+        "policyCopyHint": "Φέρτε το δίπλα στο υπάρχον σημείωμα.",
+        "policyCopyLabel": "Εισαγωγή ως αντίγραφο",
+        "policySkipHint": "Συνιστάται — η επαναλειτουργία μιας εισαγωγής δεν αναπαράγει ποτέ ή αντικαθιστά.",
+        "policySkipLabel": "Παράλειψέ το",
+        "preexistingDetail": "Αυτή η σημείωση είχε ήδη το δικό της φάκελο: «{{existing}}», το οποίο ο Myne κρατούσε — ο φάκελος του μπορεί να διαφέρει από εκεί που καθόταν στο δίσκο.",
+        "preparing": "Προετοιμασία..",
+        "progressNotes": " σημειώσεις",
+        "progressOf": " του ",
+        "reasonIllegalChar": "περιέχει χαρακτήρα Myne δεν μπορεί να χρησιμοποιήσει σε ένα όνομα",
+        "reasonPathTooLong": "ο φάκελος + η διαδρομή τίτλου είναι πολύ μεγάλη",
+        "reasonSegmentTooLong": "το όνομα είναι μεγαλύτερο από ό, τι επιτρέπει ο Myne",
+        "scanning": "Σαρώνω το θησαυροφυλάκιο σου..",
+        "setupIntro": "Σημάδεψε τον Μάιν στον φάκελο του θησαυροφυλακίου Οψιδιανού. Κάθε σημείωμα Markdown εισάγεται και κρυπτογραφείται επί τόπου — τίποτα δεν αφήνει αυτή τη συσκευή, και τα αρχικά αρχεία σας παραμένουν ανέγγιχτα.",
+        "statCancelled": "Ακύρωση",
+        "statCanvasSkipped": ". αρχεία canvas παραλείπονται",
+        "statEmptyFoldersKept": "Αποθήκευση κενών φακέλων",
+        "statMedia": "Μέσα ενημέρωσης",
+        "statOtherSkipped": "Άλλα αρχεία παραλείπονται",
+        "statSkipped": "Παράκαμψη (υπάρχει ήδη)",
+        "suggestedNameAriaLabel": "Προτεινόμενη ονομασία",
+        "titleComplete": "Η εισαγωγή ολοκληρώθηκε",
+        "titleFailed": "Αποτυχία εισαγωγής",
+        "titleSetup": "Εισαγωγή θησαυροφυλακίου Obsidian",
+        "vaultFolderLabel": "Φάκελος Vault",
+        "vaultRoot": "(ράφι)"
       },
       "offer": {
-        "body": "",
-        "chooseFolder": "",
-        "laterHint": "",
-        "notNow": "",
-        "title": ""
+        "body": "Φέρε τις υπάρχουσες σημειώσεις σου στον Μάιν. Το καθένα είναι κρυπτογραφημένο καθώς εισάγεται — τίποτα δεν αφήνει αυτή τη συσκευή, και τα αρχικά σας αρχεία παραμένουν ακριβώς εκεί που βρίσκονται.",
+        "chooseFolder": "Επιλογή φακέλου..",
+        "laterHint": "Μπορείτε πάντα να εισαγάγετε αργότερα από τις Settings → Αποθήκευση.",
+        "notNow": "Όχι τώρα",
+        "title": "Εισήγαγες το θησαυροφυλάκιο του Οψιδιανού?"
       }
     },
     "list": {
-      "addToFavorites": "",
-      "archive": "",
-      "archiveBulkError": "",
-      "archiveNote": "",
-      "archiveSingleError": "",
-      "attachments": "",
-      "bulkArchive_one": "",
+      "addToFavorites": "Προσθήκη στα αγαπημένα",
+      "archive": "Αρχείο",
+      "archiveBulkError": "Δεν μπόρεσα να αρχειοθετήσω τις σημειώσεις.",
+      "archiveNote": "Αρχείο",
+      "archiveSingleError": "Δεν μπόρεσα να αρχειοθετήσω το σημείωμα.",
+      "attachments": "Συνημμένα",
+      "bulkArchive_one": "Αρχείο [Χ8X] σημειώσεις",
       "bulkArchive_other": "",
-      "bulkDelete_one": "",
+      "bulkDelete_one": "Διαγραφή σημειώσεων {{count}}",
       "bulkDelete_other": "",
-      "bulkMove_one": "",
+      "bulkMove_one": "Μετακίνηση σημειώσεων {{count}} σε..",
       "bulkMove_other": "",
-      "caseMergeBody": "",
-      "color": "",
-      "createFirstNote": "",
-      "createFolderNote": "",
-      "customize": "",
-      "delete": "",
-      "deleteFolderBody_one": "",
-      "deleteFolderBody_other": "",
-      "deleteFolderConfirm": "",
-      "deleteFolderTitle": "",
-      "deleteFolderWarning": "",
-      "duplicate": "",
-      "editFilterTitle": "",
-      "emptyState": "",
-      "exportHtml": "",
-      "exportMarkdown": "",
-      "exportPdf": "",
-      "exportTxt": "",
-      "favoritesHeading": "",
-      "mergeAnyway": "",
-      "newFolder": "",
-      "newFolderInPlaceholder": "",
-      "newFolderPlaceholder": "",
-      "newNote": "",
-      "newNoteFromTemplate": "",
-      "newNoteHere": "",
-      "newNoteMenu": "",
-      "newNoteShortcut": "",
-      "newSubfolder": "",
-      "newViewTitle": "",
-      "noteMovedToTrash": "",
-      "notesHeading": "",
-      "notesMovedToTrash_one": "",
-      "notesMovedToTrash_other": "",
-      "openArchive": "",
-      "openAttachments": "",
-      "openFolderNote": "",
-      "openInNewTab": "",
-      "openToSide": "",
-      "openTrash": "",
-      "removeAsFolderNote": "",
-      "removeFromFavorites": "",
-      "rename": "",
-      "setAsFolderNote": "",
-      "trash": "",
-      "trashBulkError": "",
-      "trashSingleError": "",
-      "undo": "",
-      "vaultRoot": "",
-      "viewSettingsTitle": ""
+      "caseMergeBody": "Ένας φάκελος με το όνομα “{{name}}” υπάρχει ήδη. Αυτά θα συγχωνευθούν — θα μετονομάσουν κάποιον για να τους κρατήσουν χωριστούς?",
+      "color": "Χρώμα..",
+      "createFirstNote": "+ Δημιουργία της πρώτης σημείωσης",
+      "createFolderNote": "Δημιουργία σημείωσης φακέλου",
+      "customize": "Προσαρμογή..",
+      "delete": "Διαγραφή",
+      "deleteFolderBody_one": "“{{name}}” και η σημείωση {{count}}",
+      "deleteFolderBody_other": "“{{name}}” και οι σημειώσεις {{count}}",
+      "deleteFolderConfirm": "Διαγραφή φακέλου",
+      "deleteFolderTitle": "Διαγραφή αυτού του φακέλου?",
+      "deleteFolderWarning": "Οι σημειώσεις μετακινούνται στα σκουπίδια — μπορείτε να τις επαναφέρετε αργότερα.",
+      "duplicate": "Αντίγραφο",
+      "editFilterTitle": "Επεξεργασία φίλτρου",
+      "emptyState": "Δεν υπάρχουν σημειώσεις ακόμα.",
+      "exportHtml": "Εξαγωγή ως HTML..",
+      "exportMarkdown": "Εξαγωγή ως Markdown..",
+      "exportPdf": "Εξαγωγή ως PDF..",
+      "exportTxt": "Εξαγωγή ως απλό κείμενο..",
+      "favoritesHeading": "Αγαπημένα",
+      "mergeAnyway": "Συγχώνευση ούτως ή άλλως",
+      "newFolder": "Νέος φάκελος",
+      "newFolderInPlaceholder": "Νέος φάκελος στο {{path}}",
+      "newFolderPlaceholder": "Νέος φάκελος",
+      "newNote": "Νέα σημείωση",
+      "newNoteFromTemplate": "Νέα σημείωση από το πρότυπο..",
+      "newNoteHere": "Νέα σημείωση εδώ",
+      "newNoteMenu": "Νέα σημείωση",
+      "newNoteShortcut": "Νέα σημείωση (⌘Ν)",
+      "newSubfolder": "Νέος υποφάκελος",
+      "newViewTitle": "Νέα προβολή",
+      "noteMovedToTrash": "Σημείωση που μεταφέρεται στα απορρίμματα",
+      "notesHeading": "Σημειώσεις",
+      "notesMovedToTrash_one": "{{count}} σημείωμα μεταφέρθηκε σε σκουπίδια",
+      "notesMovedToTrash_other": "{{count}} σημειώσεις μετακινήθηκαν στα σκουπίδια",
+      "openArchive": "Άνοιγμα της αρχειοθήκης",
+      "openAttachments": "Άνοιγμα συνημμένων",
+      "openFolderNote": "Άνοιγμα σημείωσης φακέλου",
+      "openInNewTab": "Άνοιγμα σε νέα καρτέλα",
+      "openToSide": "Άνοιγμα στο πλάι",
+      "openTrash": "Άνοιξε τα σκουπίδια",
+      "removeAsFolderNote": "Αφαίρεση ως σημείωση φακέλου",
+      "removeFromFavorites": "Αφαίρεση από τα αγαπημένα",
+      "rename": "Μετονομασία",
+      "setAsFolderNote": "Ορισμός ως σημείωση φακέλου",
+      "trash": "Απορρίμματα",
+      "trashBulkError": "Δεν μπορούσα να μεταφέρω τις σημειώσεις στα σκουπίδια.",
+      "trashSingleError": "Δεν μπορούσα να μεταφέρω το σημείωμα στα σκουπίδια.",
+      "undo": "Αναίρεση",
+      "vaultRoot": "Ρίζα θώρακος",
+      "viewSettingsTitle": "Settings προβολής"
     },
     "newFromTemplate": {
-      "back": "",
-      "blankNote": "",
-      "createNote": "",
-      "emptyState": "",
-      "listLabel": "",
-      "loading": "",
-      "nameLabel": "",
-      "namePlaceholder": "",
-      "nameStepTitle": "",
-      "pickStepTitle": "",
-      "untitledTemplate": ""
+      "back": "Πίσω",
+      "blankNote": "Κενή σημείωση",
+      "createNote": "Δημιουργία σημείωσης",
+      "emptyState": "Δεν έχετε δημιουργήσει κανένα πρότυπο ακόμα.",
+      "listLabel": "Πρότυπα",
+      "loading": "Φόρτωση..",
+      "nameLabel": "Όνομα της σημείωσης (από “{{templateName}}”)",
+      "namePlaceholder": "Χωρίς τίτλο",
+      "nameStepTitle": "Όνομα αυτής της σημείωσης",
+      "pickStepTitle": "Νέα σημείωση από το πρότυπο",
+      "untitledTemplate": "Χωρίς τίτλο πρότυπο"
     },
     "newTab": {
-      "createNote": "",
-      "noNotesMatch": "",
-      "noNotesYet": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "untitled": ""
+      "createNote": "Δημιουργία νέας σημείωσης",
+      "noNotesMatch": "Δεν ταιριάζουν οι σημειώσεις.",
+      "noNotesYet": "Δεν υπάρχουν σημειώσεις ακόμα.",
+      "searchAriaLabel": "Αναζήτηση σημειώσεων για άνοιγμα",
+      "searchPlaceholder": "Αναζήτηση σημειώσεων..",
+      "untitled": "Χωρίς τίτλο"
     },
     "pane": {
-      "graphTab": "",
-      "loading": "",
-      "untitledView": ""
+      "graphTab": "Γράφημα",
+      "loading": "Φόρτωση..",
+      "untitledView": "Άτιτλη προβολή"
     },
     "relativeTime": {
-      "daysAgo": "",
-      "hoursAgo": "",
-      "justNow": "",
-      "minutesAgo": "",
-      "oneWeekAgo": "",
-      "weeksAgo": "",
-      "yesterday": ""
+      "daysAgo": "{{d}} ημέρες πριν",
+      "hoursAgo": "{{h}} h πριν",
+      "justNow": "μόλις τώρα",
+      "minutesAgo": "{{m}} λεπτά πριν",
+      "oneWeekAgo": "πριν από 1 εβδομάδα",
+      "weeksAgo": "{{w}} εβδομάδες πριν",
+      "yesterday": "χθες"
     },
     "row": {
-      "addToFavorites": "",
-      "folderIndexBadgeLabel": "",
-      "folderIndexBadgeTitle": "",
-      "folderIndexConflictLabel": "",
-      "folderIndexConflictTitle": "",
-      "loadError": "",
-      "removeFromFavorites": "",
-      "renameAriaLabel": "",
-      "untitled": ""
-    },
-    "savedView": {
-      "defaultName": ""
+      "addToFavorites": "Προσθήκη στα αγαπημένα",
+      "folderIndexBadgeLabel": "Σημείωση φακέλου",
+      "folderIndexBadgeTitle": "Σημείωση φακέλου — το ευρετήριο αυτού του φακέλου",
+      "folderIndexConflictLabel": "Ο φάκελος έχει ήδη μια σημείωση ευρετηρίου",
+      "folderIndexConflictTitle": "Αυτός ο φάκελος έχει ήδη μια σημείωση ευρετηρίου",
+      "loadError": "Δεν μπορούσα να φορτώσω αυτό το σημείωμα",
+      "removeFromFavorites": "Αφαίρεση από τα αγαπημένα",
+      "renameAriaLabel": "Μετονομασία σημείωσης",
+      "untitled": "Χωρίς τίτλο"
     },
     "saveStatus": {
-      "editing": "",
-      "editingEllipsis": "",
-      "editingTitle": "",
-      "justNow": "",
-      "retry": "",
-      "saved": "",
-      "savedRelative": "",
-      "saveFailed": "",
-      "saveFailedTitle": "",
-      "saving": "",
-      "savingEllipsis": ""
+      "editing": "Επεξεργασία",
+      "editingEllipsis": "Επεξεργασία..",
+      "editingTitle": "Επεξεργασία — αυτόματη αποθήκευση είναι οπλισμένη",
+      "justNow": "μόλις τώρα",
+      "retry": "Επανάληψη",
+      "saveFailed": "Αποτυχία αποθήκευσης",
+      "saveFailedTitle": "Αποτυχία αποθήκευσης — κλικ στο Retry",
+      "saved": "Αποθήκευση",
+      "savedRelative": "Αποθηκεύθηκε {{rel}}",
+      "saving": "Αποθήκευση",
+      "savingEllipsis": "Αποθήκευση.."
+    },
+    "savedView": {
+      "defaultName": "Φιλτραρισμένη προβολή"
     },
     "snapshotFailed": {
-      "dismiss": "",
-      "message": ""
+      "dismiss": "Ελεύθεροι",
+      "message": "Δεν θα μπορούσε να σώσει ένα στιγμιότυπο — το σημείωμά σας αποθηκεύεται, αλλά η ιστορία έκδοσής του μπορεί να είναι ελλιπής (ο δίσκος μπορεί να είναι πλήρης)."
     },
     "snapshots": {
-      "cancel": "",
-      "changeCount_one": "",
-      "changeCount_other": "",
-      "close": "",
-      "confirmBody": "",
-      "confirmTitle": "",
-      "decrypting": "",
-      "emptyState": "",
-      "encryptedSize": "",
-      "errorCannotDecrypt": "",
-      "errorGeneric": "",
-      "errorIo": "",
-      "errorNotFound": "",
-      "errorStorageAccess": "",
-      "errorVaultLocked": "",
-      "justNow": "",
-      "listLabel": "",
-      "loading": "",
-      "restore": "",
-      "restoreCta": "",
-      "restoredStatus": "",
-      "selectPlaceholder": "",
-      "title": "",
-      "untitled": ""
+      "cancel": "Ακύρωση",
+      "changeCount_one": "{{count}} αλλαγή από αυτή τη φωτογραφία",
+      "changeCount_other": "{{count}} αλλαγές από αυτή τη φωτογραφία",
+      "close": "Κλείσιμο",
+      "confirmBody": "Η τρέχουσα νότα σας θα αποθηκευτεί ως στιγμιότυπο πρώτα, ώστε να μπορέσετε να αναιρέσετε αυτό.",
+      "confirmTitle": "Να επαναφέρω αυτό το στιγμιότυπο?",
+      "decrypting": "Αποκρυπτογράφηση..",
+      "emptyState": "Δεν υπάρχουν ακόμα φωτογραφίες. Τα snapshots αποθηκεύονται αυτόματα καθώς επεξεργάζεστε και διατηρείτε για περίπου 7 ημέρες. Είναι κρυπτογραφημένα, και εξαφανίζονται όταν το σημείωμα διαγράφεται οριστικά.",
+      "encryptedSize": "Κρυπτογραφημένο · {{size}}",
+      "errorCannotDecrypt": "Αυτή η φωτογραφία δεν μπορούσε να αποκρυπτογραφηθεί.",
+      "errorGeneric": "Κάτι πήγε στραβά. Προσπάθησε ξανά.",
+      "errorIo": "Συνέβη ένα σφάλμα στο δίσκο — ο δίσκος μπορεί να είναι πλήρης ή μη εγγράψιμος.",
+      "errorNotFound": "Αυτή η φωτογραφία δεν είναι πλέον διαθέσιμη.",
+      "errorStorageAccess": "Δεν είχε πρόσβαση στην αποθήκη στιγμιότυπων του θησαυροφυλακίου.",
+      "errorVaultLocked": "Το θησαυροφυλάκιο είναι κλειδωμένο. Ξεκλειδώστε το για να δείτε στιγμιότυπα.",
+      "justNow": "μόλις τώρα",
+      "listLabel": "Λίστα στιγμιότυπου",
+      "loading": "Φόρτωση..",
+      "restore": "Επαναφορά",
+      "restoreCta": "Επαναφορά αυτού του στιγμιότυπου",
+      "restoredStatus": "Αποκαταστάθηκε. Η έκδοση που είχατε αποθηκεύεται ως στιγμιότυπο.",
+      "selectPlaceholder": "Επιλέξτε ένα στιγμιότυπο για προεπισκόπηση του τι άλλαξε από τότε.",
+      "title": "Στιγμιότυποι",
+      "untitled": "Χωρίς τίτλο"
     },
     "tabStrip": {
-      "closeNewTab": "",
-      "closeTab": "",
-      "newTab": "",
-      "openNotes": "",
-      "pin": "",
-      "pinned": "",
-      "pinnedTitle": "",
-      "unpin": "",
-      "untitled": ""
+      "closeNewTab": "Κλείσιμο νέας καρτέλας",
+      "closeTab": "Κλείσιμο {{title}}",
+      "newTab": "Νέα καρτέλα",
+      "openNotes": "Άνοιγμα σημειώσεων",
+      "pin": "Καρφί",
+      "pinned": "Καρφωμένο",
+      "pinnedTitle": "Καρφωμένο — χωρίς καρφίτσα για κλείσιμο",
+      "unpin": "Αναίρεση",
+      "untitled": "Χωρίς τίτλο"
     },
     "tagBrowser": {
-      "cancel": "",
-      "clear": "",
-      "combineTagsWith": "",
-      "filtering": "",
-      "modeAll": "",
-      "modeAny": "",
-      "noNotesForFilter": "",
-      "noTagsMatch": "",
-      "noTagsYet": "",
-      "noteCount_one": "",
-      "noteCount_other": "",
-      "notes": "",
-      "pickTag": "",
-      "save": "",
-      "saveAsView": "",
-      "searchPlaceholder": "",
-      "title": "",
-      "untitled": "",
-      "viewNamePlaceholder": ""
+      "cancel": "Ακύρωση",
+      "clear": "Καθαρισμός",
+      "combineTagsWith": "Συνδυάστε ετικέτες με",
+      "filtering": "Φιλτράρισμα..",
+      "modeAll": "Όλα",
+      "modeAny": "Οποιοδήποτε",
+      "noNotesForFilter": "Δεν υπάρχουν σημειώσεις για αυτό το φίλτρο.",
+      "noTagsMatch": "Δεν υπάρχουν ετικέτες που να ταιριάζουν με το “{{query}}”.",
+      "noTagsYet": "Δεν υπάρχουν ακόμα ετικέτες.",
+      "noteCount_one": "{{count}} σημείωση",
+      "noteCount_other": "{{count}} σημειώσεις",
+      "notes": "Σημειώσεις",
+      "pickTag": "Επιλέξτε μια ετικέτα για να φιλτράρετε.",
+      "save": "Αποθήκευση",
+      "saveAsView": "Αποθήκευση ως προβολή",
+      "searchPlaceholder": "Αναζήτηση ετικετών..",
+      "title": "Ετικέτες",
+      "untitled": "Χωρίς τίτλο",
+      "viewNamePlaceholder": "Προβολή ονόματος"
     },
     "trash": {
-      "close": "",
-      "count_one": "",
-      "count_other": "",
-      "countEmpty": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
-      "emptyConfirmBody_one": "",
-      "emptyConfirmBody_other": "",
-      "emptyConfirmCta": "",
-      "emptyConfirmTitle": "",
-      "emptyPartialFailure_one": "",
-      "emptyPartialFailure_other": "",
-      "emptyState": "",
-      "purgeConfirmCta": "",
-      "purgeConfirmTitle": "",
-      "restore": "",
-      "restoreError": "",
-      "title": "",
-      "untitled": ""
+      "close": "Κλείσιμο",
+      "countEmpty": "Κενό",
+      "count_one": "{{count}} σημείωση",
+      "count_other": "{{count}} σημειώσεις",
+      "delete": "Διαγραφή",
+      "deleteError": "Δεν μπόρεσα να διαγράψω το σημείωμα. Προσπάθησε ξανά.",
+      "empty": "Κενά σκουπίδια",
+      "emptyConfirmBody_one": "Η σημείωση θα διαγραφεί οριστικά.",
+      "emptyConfirmBody_other": "Οι σημειώσεις θα διαγραφούν οριστικά.",
+      "emptyConfirmCta": "Κενά σκουπίδια",
+      "emptyConfirmTitle": "'δεια σκουπίδια?",
+      "emptyPartialFailure_one": "Το σημείωμα δεν μπορούσε να διαγραφεί και να παραμείνει στα σκουπίδια.",
+      "emptyPartialFailure_other": "Οι σημειώσεις δεν μπορούσαν να διαγραφούν και να παραμείνουν στα σκουπίδια.",
+      "emptyState": "Τα σκουπίδια είναι άδεια.",
+      "purgeConfirmCta": "Διαγραφή οριστικά",
+      "purgeConfirmTitle": "Διαγραφή μόνιμα?",
+      "restore": "Επαναφορά",
+      "restoreError": "Δεν μπόρεσα να επαναφέρω αυτό το σημείωμα. Προσπάθησε ξανά.",
+      "title": "Απορρίμματα",
+      "untitled": "Χωρίς τίτλο"
     },
     "unlinkedMentions": {
-      "empty": "",
-      "heading": "",
-      "link": "",
-      "linkTooltip": "",
-      "refresh": "",
-      "searching": "",
-      "thisNote": "",
-      "untitled": ""
-    },
-    "views": {
-      "cards": {
-        "changeCover": "",
-        "changeCoverImage": "",
-        "empty": "",
-        "noValue": "",
-        "setCover": "",
-        "setCoverImage": "",
-        "untitled": ""
-      },
-      "collapseViews": "",
-      "empty": "",
-      "expandViews": "",
-      "heading": "",
-      "host": {
-        "unsupported": ""
-      },
-      "menu": {
-        "deleteView": "",
-        "editFilter": "",
-        "moveDown": "",
-        "moveUp": "",
-        "rename": "",
-        "viewSettings": ""
-      },
-      "newView": "",
-      "untitledView": ""
+      "empty": "Καμία μη συνδεδεμένη αναφορά.",
+      "heading": "Μη συνδεδεμένες αναφορές",
+      "link": "Δεσμός",
+      "linkTooltip": "Σύνδεση με αυτή την αναφορά {{title}}",
+      "refresh": "Οι αναφορές μπορεί να έχουν αλλάξει — αναψυχή",
+      "searching": "Αναζήτηση..",
+      "thisNote": "αυτό το σημείωμα",
+      "untitled": "Χωρίς τίτλο"
     },
     "viewSettings": {
       "aspect": {
-        "default": "",
-        "fourThree": "",
-        "square": "",
-        "threeTwo": "",
-        "wide": ""
+        "default": "Προκαθορισμένο (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (τετράγωνο)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (ευρεία)"
       },
-      "cancel": "",
-      "cardSize": "",
-      "cardSizeValue": "",
-      "coverImageHint": "",
-      "coverImagePlaceholder": "",
-      "coverImageProperty": "",
-      "imageAspectRatio": "",
-      "reset": "",
-      "save": ""
+      "cancel": "Ακύρωση",
+      "cardSize": "Μέγεθος κάρτας",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Η ιδιότητα της πρώτης ύλης της οποίας η αξία είναι μια εικόνα — εμφανίζεται ως το κάλυμμα κάθε κάρτας. Αφήστε το κενό χωρίς κάλυψη.",
+      "coverImagePlaceholder": "π.χ. κάλυψη",
+      "coverImageProperty": "Κάλυψη ιδιότητας εικόνας",
+      "imageAspectRatio": "Λόγος διαστάσεων εικόνας",
+      "reset": "Επαναφορά",
+      "save": "Αποθήκευση"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Αλλαγή κάλυψης",
+        "changeCoverImage": "Τροποποίηση εικόνας κάλυψης",
+        "empty": "Δεν υπάρχουν σημειώσεις που να ταιριάζουν με αυτή την προβολή",
+        "noValue": "Χωρίς τιμή",
+        "setCover": "Ορισμός καλύμματος",
+        "setCoverImage": "Ορισμός εικόνας κάλυψης",
+        "untitled": "Χωρίς τίτλο"
+      },
+      "collapseViews": "Καταρρέουσες απόψεις",
+      "empty": "Δεν έχω δει ακόμα. Αποθήκευση της τρέχουσας λίστας σημειώσεων ως προβολή.",
+      "expandViews": "Ανάπτυξη προβολών",
+      "heading": "Προβολές",
+      "host": {
+        "unsupported": "Αυτός ο τύπος προβολής φτάνει σε μεταγενέστερη ενημέρωση."
+      },
+      "menu": {
+        "deleteView": "Διαγραφή προβολής",
+        "editFilter": "Επεξεργασία φίλτρου..",
+        "moveDown": "Μετακίνηση κάτω",
+        "moveUp": "Μετακίνηση πάνω",
+        "rename": "Μετονομασία",
+        "viewSettings": "Προβολή ρυθμίσεων.."
+      },
+      "newView": "Νέα προβολή",
+      "untitledView": "Άτιτλη προβολή"
     },
     "welcome": {
-      "body": "",
-      "title": ""
+      "body": "Καλώς ήρθατε στον Μάιν, τον ιδιωτικό σας χώρο για να σκεφτείτε και να γράψετε.\n\nΌ,τι αποθηκεύετε εδώ είναι κρυπτογραφημένο και παραμένει στη συσκευή σας. Η φράση της ανάκτησης είναι τα μόνα κλειδιά γι' αυτό κράτα τα κάπου ασφαλή. Αν χαθούν και τα δύο, κανείς δεν μπορεί να πάρει πίσω τις σημειώσεις σου, ούτε καν εμείς.\n\nΑυτό είναι ένα συνηθισμένο σημείωμα, οπότε κάντο δικό σου. Επεξεργασία, μετονομασία ή διαγραφή όποτε θέλετε, και προσθήκη νέων σημειώσεων καθώς οι ιδέες σας μεγαλώνουν.\n\nΧαιρόμαστε που είστε εδώ. Για να μάθετε περισσότερα για το Myne, επισκεφθείτε το https://myne.md\n",
+      "title": "Καλώς ήρθατε στο Myne"
     },
     "workspace": {
-      "defaultSlotName": ""
+      "defaultSlotName": "Προκαθορισμένο"
     }
   },
   "password": {
     "createForm": {
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "defaultEmptyCaption": "",
-      "mismatch": "",
-      "passwordLabel": "",
-      "suggestPassword": "",
-      "tooShort": ""
+      "checkingStrength": "Έλεγχος δύναμης..",
+      "confirmLabel": "Επιβεβαίωση κύριου κωδικού πρόσβασης",
+      "defaultEmptyCaption": "Χρησιμοποιείται ως είσοδος στο Argon2id (m=256 MiB, t=3, p=2). Επιλέξτε κάτι που μπορείτε να θυμηθείτε, δεν μπορείτε να το επαναφέρετε.",
+      "mismatch": "Οι κωδικοί πρόσβασης δεν ταιριάζουν.",
+      "passwordLabel": "Κύριος κωδικός πρόσβασης",
+      "suggestPassword": "Πρόταση κωδικού πρόσβασης",
+      "tooShort": "Χρησιμοποιήστε τουλάχιστον χαρακτήρες {{n}}."
     },
     "input": {
-      "hide": "",
-      "show": ""
+      "hide": "Απόκρυψη κωδικού πρόσβασης",
+      "show": "Εμφάνιση κωδικού πρόσβασης"
     }
   },
   "primitives": {
     "searchableSelect": {
-      "emptyText": "",
-      "placeholder": "",
-      "searchPlaceholder": ""
+      "emptyText": "Όχι σπίρτα.",
+      "placeholder": "Επιλογή..",
+      "searchPlaceholder": "Αναζήτηση.."
     }
   },
   "recover": {
     "errors": {
-      "cancelledVaultLocked": "",
-      "operationInProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "cancelledVaultLocked": "Η ανάκτηση ακυρώθηκε: το χρηματοκιβώτιο ήταν κλειδωμένο.",
+      "operationInProgress": "Επιχείρηση σε εξέλιξη. Παρακαλώ περιμένετε.",
+      "unexpected": "Αναμενόμενο λάθος. Παρακαλώ προσπαθήστε ξανά.",
+      "vaultNotFound": "Το αρχείο Vault δε βρέθηκε. Παρακαλώ επανεκκινήστε την εφαρμογή."
     }
   },
   "restore": {
-    "backLabel": "",
-    "cancelLabel": "",
+    "backLabel": "Πίσω",
+    "cancelLabel": "Ακύρωση",
     "collision": {
-      "body": "",
-      "keepBoth": "",
-      "replaceExisting": ""
+      "body": "Ένα χρηματοκιβώτιο από αυτό το εφεδρικό υπάρχει ήδη σε αυτή τη συσκευή. Μπορείτε να κρατήσετε και τα δύο — το αποκαταστημένο αντίγραφο εμφανίζεται ως ξεχωριστό θησαυροφυλάκιο στη λίστα του θησαυροφυλακίου σας — ή να αποκαταστήσετε τώρα και στη συνέχεια να αφαιρέσετε το υπάρχον θησαυροφυλάκιο από τη λίστα του θησαυροφυλακίου μόνοι σας (η αποσκευή σας ζητά να πληκτρολογήσετε DELETE, και έχει νόημα μόνο αφού επιβεβαιώσετε το αποκαταστημένο θησαυροφυλάκιο ανοίγει).",
+      "keepBoth": "Κράτα και τα δύο",
+      "replaceExisting": "Επαναφορά, μετά αντικατάσταση των υπαρχόντων.."
     },
     "damaged": {
-      "body": "",
-      "close": "",
-      "salvage": ""
+      "body": "Το εφεδρικό αρχείο έχει καταστραφεί, οπότε τίποτα δεν αποκαταστάθηκε. Αν αυτό είναι το μόνο αντίγραφο που έχετε, η διάσωση μπορεί να αποκαταστήσει τις ανέπαφες σημειώσεις και να απαριθμήσει ακριβώς τι δεν μπορούσε να διαβαστεί — το αποτέλεσμα χαρακτηρίζεται πάντα ως μερική αποκατάσταση.",
+      "close": "Κλείσιμο",
+      "salvage": "Διατήρηση ανέπαφων σημειώσεων.."
     },
     "error": {
-      "tryAnotherFile": ""
+      "tryAnotherFile": "Δοκιμάστε άλλο αρχείο"
     },
     "pick": {
-      "body": "",
-      "chooseFile": "",
-      "corruptedSuffix": ""
+      "body": "Επιλέξτε ένα αρχείο <code>.myne-backup</code>. Το αντίγραφο ασφαλείας επαληθεύεται προτού αποκατασταθεί οτιδήποτε · το αποκαταστημένο θησαυροφυλάκιο ξεκλειδώνει με τον κωδικό πρόσβασης ή τη φράση ανάκτησης αυτού του θησαυροφυλακίου — ακριβώς όπως ξεκλειδώνεται.",
+      "chooseFile": "Επιλογή αρχείου αντιγράφων ασφαλείας..",
+      "corruptedSuffix": "Η τρέχουσα κρύπτη σας δεν είναι συγκινημένη: το εφεδρικό αποκαθίσταται ως ξεχωριστό θησαυροφυλάκιο πρώτα."
     },
     "summary": {
-      "attachments": "",
-      "collidedNote": "",
-      "notes": "",
-      "openVaultList": "",
-      "partialHeader_one": "",
-      "partialHeader_other": "",
-      "restored": "",
-      "versionHistory": ""
+      "attachments": "Συνημμένα: {{n}}",
+      "collidedNote": "Το προηγούμενο αντίγραφο αυτού του θησαυροφυλακίου είναι ακόμα στη λίστα σου. Μόλις επιβεβαιώσετε το αποκαταστημένο θησαυροφυλάκιο ανοίγει, μπορείτε να αφαιρέσετε το παλιό από τη λίστα του θησαυροφυλακίου (θα σας ζητήσει να πληκτρολογήσετε DELETE).",
+      "notes": "Σημειώσεις: {{n}}",
+      "openVaultList": "Άνοιγμα λίστας θησαυροφυλακίου",
+      "partialHeader_one": "Αποκατάσταση μερικώς - {{count}} στοιχείο δεν μπορούσε να διαβαστεί.",
+      "partialHeader_other": "Αποκατάσταση μερικώς — {{count}} δεν ήταν δυνατή η ανάγνωση στοιχείων.",
+      "restored": "Αποκαταστάθηκε ο θόλος.",
+      "versionHistory": "Καταχωρήσεις ιστορικού έκδοσης: {{n}}"
     },
-    "title": "",
+    "title": "Επαναφορά από το αντίγραφο ασφαλείας",
     "working": {
-      "cancel": "",
-      "restoringProgress": "",
-      "verifying": "",
-      "verifyingProgress": ""
+      "cancel": "Ακύρωση",
+      "restoringProgress": "Αποκατάσταση... {{done}} του {{total}}",
+      "verifying": "Επαλήθευση αντιγράφων ασφαλείας..",
+      "verifyingProgress": "Επαλήθευση αντιγράφων ασφαλείας... {{done}} του {{total}}"
     }
   },
   "settings": {
     "about": {
-      "buildChannelDevelopment": "",
-      "buildChannelLabel": "",
-      "buildChannelStable": "",
-      "changelogButton": "",
-      "changelogHelper": "",
-      "changelogLabel": "",
-      "licenseBody": "",
-      "licenseLabel": "",
-      "tagline": "",
-      "threatModelHelper": "",
-      "threatModelLabel": ""
+      "buildChannelDevelopment": "Ανάπτυξη",
+      "buildChannelLabel": "Κατασκευή καναλιού",
+      "buildChannelStable": "Σταθερή",
+      "changelogButton": "Προβολή log αλλαγών..",
+      "changelogHelper": "Σημειώσεις αναμετάδοσης. Θα εμφανιστεί όταν το MYND-119 προσγειωθεί.",
+      "changelogLabel": "Τροποποίηση log",
+      "licenseBody": "Προ-άλφα · CC0 docs · κωδικός εφαρμογής AGPL-3.0 για την απελευθέρωση της Φάσης 1.",
+      "licenseLabel": "Άδεια",
+      "tagline": "Προ-άλφα · Πελάτης επιφάνειας εργασίας φάσης 1",
+      "threatModelHelper": "Ανοίξτε το έγγραφο του δημόσιου μοντέλου απειλής στον browser σας.",
+      "threatModelLabel": "Μοντέλο απειλής"
     },
     "account": {
-      "argon2idHeading": "",
-      "changePasswordButton": "",
+      "argon2idHeading": "Παράμετροι Argon2id",
+      "changePasswordButton": "Αλλαγή κωδικού πρόσβασης",
       "changePasswordError": {
-        "invalidCredentialOrVault": "",
-        "ioError": "",
-        "joinFailure": "",
-        "samePasswordRejected": "",
-        "weakNewPassword": ""
+        "invalidCredentialOrVault": "Λάθος τρέχων κωδικός πρόσβασης ή αρχείο θησαυροφυλακίου είναι κατεστραμμένο.",
+        "ioError": "Σφάλμα δίσκου, παρακαλώ προσπαθήστε ξανά.",
+        "joinFailure": "Κάτι πήγε στραβά, σε παρακαλώ προσπάθησε ξανά.",
+        "samePasswordRejected": "Ο νέος κωδικός ταιριάζει με τον τρέχοντα.",
+        "weakNewPassword": "Ο νέος κωδικός πρόσβασης πρέπει να είναι τουλάχιστον 12 χαρακτήρες."
       },
-      "changePasswordHeading": "",
-      "changePasswordHelper": "",
-      "dangerZoneHeading": "",
-      "dangerZoneHelper": "",
-      "deleteVaultButton": "",
-      "memoryCost": "",
-      "parallelism": "",
-      "timeCost": "",
-      "vaultLabelEyebrow": "",
-      "vaultLabelHelper": "",
-      "vaultLabelPlaceholder": "",
-      "vaultLabelSave": ""
+      "changePasswordHeading": "Αλλαγή κωδικού πρόσβασης",
+      "changePasswordHelper": "Περιστρέψτε τον κύριο κωδικό σας ενώ κρατάτε το ίδιο θησαυροφυλάκιο. Η φράση ανάκτησης παραμένει η ίδια.",
+      "dangerZoneHeading": "Ζώνη κινδύνου",
+      "dangerZoneHelper": "Διαγράψτε μόνιμα αυτό το θησαυροφυλάκιο και όλες τις σημειώσεις. Δεν μπορεί να αναιρεθεί. Η φράση ανάκτησης δεν θα επαναφέρει το θησαυροφυλάκιο.",
+      "deleteVaultButton": "Διαγραφή θησαυροφυλακίου..",
+      "memoryCost": "Κόστος μνήμης",
+      "parallelism": "Παραλληλισμός",
+      "timeCost": "Χρονικό κόστος",
+      "vaultLabelEyebrow": "ΕΤΙΚΕΤΑ ΦΩΤΟΣ",
+      "vaultLabelHelper": "Ένα όνομα γι' αυτό το θησαυροφυλάκιο που φαίνεται στον διακόπτη της εφαρμογής. Αποθηκευμένη κρυπτογραφημένη μέσα στο θησαυροφυλάκιο. Ποτέ μην αφήνεις τη συσκευή σου σε απλό κείμενο.",
+      "vaultLabelPlaceholder": "Προσθήκη μιας ετικέτας..",
+      "vaultLabelSave": "Αποθήκευση"
     },
     "appearance": {
-      "showEditTimesAria": "",
-      "showEditTimesHelper": "",
-      "showEditTimesLabel": "",
-      "themeHelper": "",
-      "themeLabel": "",
-      "themeOptionAria": "",
-      "themeSaveError": "",
-      "timestampsSaveError": ""
+      "showEditTimesAria": "Εμφάνιση χρόνου επεξεργασίας στην πλευρική μπάρα",
+      "showEditTimesHelper": "Εμφάνιση του τελευταίου χρόνου κάθε σημείωσης κάτω από τον τίτλο του στην πλευρική μπάρα.",
+      "showEditTimesLabel": "Εμφάνιση ωρών επεξεργασίας",
+      "theme": {
+        "amoled": "ΑΝΑΛΥΤΙΚΗ",
+        "dark": "Σκούρο",
+        "light": "Φως",
+        "system": "Σύστημα"
+      },
+      "themeHelper": "Εναλλαγή μεταξύ του φωτός και των σκοτεινών θεμάτων, ή ακολουθήστε την προτίμηση του συστήματος.",
+      "themeLabel": "Θέμα",
+      "themeOptionAria": "Θέμα {{label}}",
+      "themeSaveError": "Δεν μπόρεσα να αποθηκεύσω το θέμα. Παρακαλώ προσπαθήστε ξανά.",
+      "timestampsSaveError": "Δεν μπόρεσα να σώσω την προτίμηση. Παρακαλώ προσπαθήστε ξανά."
     },
     "archive": {
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": "",
-      "saveError": ""
+      "helper": "Αφήστε τις σημειώσεις να μεταφερθούν σε ένα Αρχείο, κρατηθεί έξω από την κύρια λίστα. Ενεργοποιώντας αυτό το off αποκαθιστά κάθε αρχειοθετημένο σημείωμα στο φάκελο του και κρύβει τα χειριστήρια αρχειοθέτησης.",
+      "label": "Αρχειοθέτηση",
+      "off": "Κλείσιμο",
+      "on": "Εμπρός",
+      "saveError": "Αδυναμία ενημέρωσης της ρύθμισης αρχειοθέτησης."
     },
     "autoBackup": {
-      "backupFolder": "",
-      "chooseFolder": "",
-      "chooseFolderDialogTitle": "",
-      "frequency": "",
-      "frequencyAriaLabel": "",
-      "helper": "",
-      "keepLast": "",
-      "noFolderChosen": "",
-      "saveFailedToast": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "statusFailed": "",
-      "statusLastBackup": "",
-      "statusNever": "",
-      "title": ""
+      "backupFolder": "Φάκελος αντιγράφων ασφαλείας",
+      "chooseFolder": "Επιλογή φακέλου..",
+      "chooseFolderDialogTitle": "Επιλέξτε ένα φάκελο για αυτόματα αντίγραφα ασφαλείας",
+      "frequency": "Συχνότητα",
+      "frequencyAriaLabel": "Συχνότητα αντιγράφων ασφαλείας",
+      "helper": "Γράψτε ένα κρυπτογραφημένο .myne-backup σε ένα φάκελο σε ένα πρόγραμμα, ενώ η εφαρμογή είναι ανοιχτή και το θησαυροφυλάκιο είναι ξεκλειδωμένο. Οι ενισχύσεις παραμένουν τόσο κρυπτογραφημένες όσο και το θησαυροφυλάκιο σας, ο Μάιν κρατά τους πιο πρόσφατους και ποτέ δεν στέλνει τίποτα από τη συσκευή σας.",
+      "intervalDaily": "Καθημερινά",
+      "intervalEveryUnlock": "Κάθε ξεκλείδωμα",
+      "intervalWeekly": "Εβδομαδιαία",
+      "keepLast": "Διατήρηση τελευταίας",
+      "noFolderChosen": "Δεν επιλέχθηκε ακόμα φάκελος.",
+      "saveFailedToast": "Αδυναμία αποθήκευσης των ρυθμίσεων αντιγράφων ασφαλείας.",
+      "searchEmpty": "Δεν ταιριάζει.",
+      "searchPlaceholder": "Αναζήτηση..",
+      "statusFailed": "Αυτόματο αντίγραφο ασφαλείας απέτυχε - {{stamp}}",
+      "statusLastBackup": "Τελευταίο αντίγραφο ασφαλείας: {{stamp}}",
+      "statusNever": "Δεν υπάρχουν αυτόματα αντίγραφα ασφαλείας ακόμα.",
+      "title": "Αυτόματα αντίγραφα ασφαλείας"
     },
     "changePassword": {
-      "cancel": "",
-      "checkingStrength": "",
-      "confirmLabel": "",
-      "currentLabel": "",
-      "mismatch": "",
-      "newLabel": "",
-      "submit": "",
-      "submitting": "",
-      "title": "",
-      "tooShort": ""
+      "cancel": "Ακύρωση",
+      "checkingStrength": "Έλεγχος δύναμης..",
+      "confirmLabel": "Επιβεβαίωση νέου κωδικού πρόσβασης",
+      "currentLabel": "Τρέχων κωδικός πρόσβασης",
+      "mismatch": "Οι κωδικοί πρόσβασης δεν ταιριάζουν.",
+      "newLabel": "Νέος κωδικός πρόσβασης",
+      "submit": "Αλλαγή κωδικού πρόσβασης",
+      "submitting": "Αλλαγή κωδικού πρόσβασης..",
+      "title": "Αλλαγή κωδικού πρόσβασης",
+      "tooShort": "Χρησιμοποιήστε τουλάχιστον χαρακτήρες {{n}}."
     },
     "connectedExtensions": {
       "browser": {
-        "chromium": "",
-        "firefox": "",
-        "generic": ""
+        "chromium": "Chrome / άκρη",
+        "firefox": "Firefox",
+        "generic": "Επέκταση περιηγητή"
       },
       "when": {
-        "bare": "",
-        "daysAgo_one": "",
-        "daysAgo_other": "",
-        "hoursAgo_one": "",
+        "bare": "Σύνδεση",
+        "daysAgo_one": "Συνδέθηκε {{count}} ημέρα πριν",
+        "daysAgo_other": "Συνδέθηκε {{count}} ημέρες πριν",
+        "hoursAgo_one": "Σύνδεση {{count}} h πριν",
         "hoursAgo_other": "",
-        "justNow": "",
-        "minutesAgo_one": "",
+        "justNow": "Συνδέθηκε μόλις τώρα",
+        "minutesAgo_one": "Συνδεδεμένο {{count}} min",
         "minutesAgo_other": "",
-        "onDate": ""
+        "onDate": "Συνδεδεμένο {{date}}"
       }
     },
     "customThemes": {
-      "appliedBadge": "",
-      "apply": "",
-      "applyError": "",
-      "cancel": "",
-      "confirm": "",
-      "delete": "",
-      "deleteError": "",
-      "empty": "",
+      "appliedBadge": "Εφαρμόζεται",
+      "apply": "Εφαρμογή",
+      "applyError": "Δεν μπορούσα να εφαρμόσω αυτό το θέμα. Παρακαλώ προσπαθήστε ξανά.",
+      "cancel": "Ακύρωση",
+      "confirm": "Επιβεβαίωση",
+      "delete": "Διαγραφή",
+      "deleteError": "Δεν μπορούσα να διαγράψω αυτό το θέμα. Παρακαλώ προσπαθήστε ξανά.",
+      "empty": "Δεν υπάρχουν ακόμα προσαρμοσμένα θέματα. Εισαγωγή ενός ή άνοιγμα του φακέλου θεμάτων και προσθήκη ενός αρχείου θέματος.",
       "error": {
-        "aColorFallback": "",
-        "invalidFile": "",
-        "invalidName": "",
-        "invalidValue": "",
-        "invalidValueWithLine": "",
-        "missingKey": "",
-        "parseError": "",
-        "parseErrorWithLine": ""
+        "aColorFallback": "χρώμα",
+        "invalidFile": "Μη έγκυρο αρχείο θέματος.",
+        "invalidName": "Μη ασφαλές όνομα θέματος",
+        "invalidValue": "Μη έγκυρη τιμή για {{key}}",
+        "invalidValueWithLine": "Μη έγκυρη τιμή για {{key}} (γραμμή {{line}})",
+        "missingKey": "Λείπει το απαιτούμενο χρώμα {{key}}",
+        "parseError": "Μη έγκυρο JSON",
+        "parseErrorWithLine": "Μη έγκυρο JSON (γραμμή {{line}})"
       },
-      "fileFilterName": "",
-      "helper": "",
-      "importButton": "",
-      "importError": "",
-      "label": "",
-      "openFolderButton": "",
-      "openFolderError": "",
-      "readError": ""
+      "fileFilterName": "Θέμα Myne",
+      "helper": "Χρησιμοποίησε τη δική σου παλέτα χρωμάτων. Τα θέματα επικυρώνονται σε αυτή τη συσκευή πριν από τη χρήση — τίποτα δεν φορτώνεται.",
+      "importButton": "Εισαγωγή θέματος..",
+      "importError": "Αυτό το αρχείο δεν είναι έγκυρο θέμα. Ανοίξτε την αναφορά για να δείτε τη μορφή.",
+      "label": "Προσαρμοσμένα θέματα",
+      "openFolderButton": "Άνοιγμα φακέλου θεμάτων",
+      "openFolderError": "Δεν μπορούσε να ανοίξει το φάκελο θεμάτων.",
+      "readError": "Δεν μπορούσα να διαβάσω το φάκελο των θεμάτων σου."
     },
     "dailyNotes": {
-      "blankTemplate": "",
-      "dateFormatHelper": "",
-      "dateFormatLabel": "",
-      "dateFormatSaveError": "",
-      "folderHelper": "",
-      "folderLabel": "",
-      "folderSaveError": "",
-      "searchEmpty": "",
-      "searchPlaceholder": "",
-      "templateHelper": "",
-      "templateLabel": "",
-      "templateSaveError": "",
-      "untitledTemplate": ""
+      "blankTemplate": "Κενό (χωρίς πρότυπο)",
+      "dateFormatHelper": "Ο τίτλος κάθε καθημερινής νότας. Υποστηρίζει YYYY, MM, DD. Προκαθορισμένα σε {{default}}.",
+      "dateFormatLabel": "Μορφή ημερησίων σημειώσεων",
+      "dateFormatSaveError": "Δεν μπόρεσα να αποθηκεύσω τη μορφή ημερομηνίας. Παρακαλώ προσπαθήστε ξανά.",
+      "folderHelper": "Όπου αρχειοθετούνται νέες ημερήσιες σημειώσεις. Προκαθορισμένα στο {{default}} — ο φάκελος διατηρείται ακόμη και όταν είναι κενός.",
+      "folderLabel": "Καθημερινός φάκελος σημειώσεων",
+      "folderSaveError": "Δεν μπόρεσα να σώσω τον καθημερινό φάκελο. Παρακαλώ προσπαθήστε ξανά.",
+      "searchEmpty": "Δεν ταιριάζουν τα πρότυπα.",
+      "searchPlaceholder": "Αναζήτηση προτύπων..",
+      "templateHelper": "Επιλέξτε ένα πρότυπο για να ξεκινήσετε κάθε ημερήσια σημείωση από, ή αφήστε κενό για μια άδεια σημείωση με τίτλο με την ημερομηνία.",
+      "templateLabel": "Πρότυπο ημερήσιας σημείωσης",
+      "templateSaveError": "Δεν μπόρεσε να σώσει το καθημερινό πρότυπο. Παρακαλώ προσπαθήστε ξανά.",
+      "untitledTemplate": "Χωρίς τίτλο πρότυπο"
     },
     "deleteVault": {
-      "cancel": "",
-      "caseSensitiveHint": "",
-      "continue": "",
-      "copyPrimary": "",
-      "copySecondary": "",
-      "eyebrow": "",
-      "heading": "",
-      "ioFailBody": "",
-      "ioFailTitle": "",
-      "partialFailBody_one": "",
-      "partialFailBody_other": "",
-      "partialFailTitle": "",
-      "submit": "",
-      "submitInFlight": "",
-      "typeToConfirmLabel": "",
-      "vaultPath": ""
+      "cancel": "Ακύρωση",
+      "caseSensitiveHint": "Ευαίσθητη υπόθεση. Πληκτρολογήστε τη λέξη ακριβώς για να ενεργοποιήσετε τη διαγραφή.",
+      "continue": "Συνέχεια",
+      "copyPrimary": "Αυτό διαγράφει μόνιμα αυτό το θησαυροφυλάκιο και κάθε σημείωμα μέσα του. Η ενέργεια δεν μπορεί να αναιρεθεί, και η φράση ανάκτησης σας δεν θα αποκαταστήσει τα δεδομένα.",
+      "copySecondary": "Τα πλήκτρα Vault μηδενίζονται από τη μνήμη πριν τα αρχεία είναι ασυνδετά.",
+      "eyebrow": "ΛΑΘΟΣ",
+      "heading": "Διαγραφή θησαυροφυλακίου",
+      "ioFailBody": "Αδυναμία πρόσβασης στα αρχεία του θησαυροφυλακίου για διαγραφή. Τα πλήκτρα Vault έχουν ήδη μηδενιστεί από τη μνήμη.",
+      "ioFailTitle": "Σφάλμα δίσκου κατά τη διαγραφή",
+      "partialFailBody_one": "Το αρχείο {{count}} δεν μπόρεσε να διαγραφεί από το δίσκο. Τα κλειδιά του θησαυρού έχουν ήδη μηδενιστεί από τη μνήμη, οπότε κάθε ορφανό κρυπτογραφημένο κείμενο που παραμένει δεν μπορεί να ανακτηθεί.",
+      "partialFailBody_other": "Τα αρχεία {{count}} δεν μπορούσαν να διαγραφούν από το δίσκο. Τα κλειδιά του θησαυρού έχουν ήδη μηδενιστεί από τη μνήμη, οπότε κάθε ορφανό κρυπτογραφημένο κείμενο που παραμένει δεν μπορεί να ανακτηθεί.",
+      "partialFailTitle": "Αποτυχία διαγραφής κενών",
+      "submit": "Διαγραφή θησαυροφυλακίου",
+      "submitInFlight": "Διαγραφή θησαυροφυλακίου..",
+      "typeToConfirmLabel": "Τύπος DELETE για επιβεβαίωση",
+      "vaultPath": "Διαδρομή θόλου: {{path}}"
     },
     "focusMode": {
-      "dimAria": "",
-      "dimHelper": "",
-      "dimLabel": "",
-      "off": "",
-      "on": "",
-      "saveError": "",
-      "typewriterAria": "",
-      "typewriterHelper": "",
-      "typewriterLabel": ""
+      "dimAria": "Μη ενεργές γραμμές",
+      "dimHelper": "Σε λειτουργία εστίασης (⇧⌘F), αμβλύνετε κάθε γραμμή εκτός από αυτή που επεξεργάζεστε.",
+      "dimLabel": "Λειτουργία εστίασης · αμυδρές αδρανείς γραμμές",
+      "off": "Κλείσιμο",
+      "on": "Εμπρός",
+      "saveError": "Αδυναμία αποθήκευσης της λειτουργίας εστίασης.",
+      "typewriterAria": "Κύλιση γραφομηχανής",
+      "typewriterHelper": "Στη λειτουργία εστίασης (⇧⌘F), διατηρήστε την ενεργό γραμμή κάθετα στο κέντρο καθώς πληκτρολογείτε.",
+      "typewriterLabel": "Λειτουργία εστίασης · κύλιση γραφομηχανής"
     },
     "hotkeys": {
-      "addBindingAria": "",
-      "cancel": "",
-      "capturePrompt": "",
-      "conflictIndicator": "",
-      "conflictTitle": "",
-      "fixed": "",
+      "addBindingAria": "Προσθήκη συντόμευσης για {{command}}",
+      "cancel": "Ακύρωση",
+      "capturePrompt": "Πατήστε ένα πλήκτρο..",
+      "conflictIndicator": "⚠ σύγκρουση",
+      "conflictTitle": "Χρησιμοποιείται επίσης από {{commands}}",
+      "fixed": "σταθερό",
       "group": {
-        "editorFormatting": "",
-        "general": "",
-        "navigation": "",
-        "notes": "",
-        "panesTabs": "",
-        "view": ""
+        "editorFormatting": "Μορφοποίηση επεξεργαστή",
+        "general": "Γενικά",
+        "navigation": "Πλοήγηση",
+        "notes": "Σημειώσεις",
+        "panesTabs": "Πινέλα & καρτέλες",
+        "view": "Προβολή"
       },
-      "helper": "",
-      "notSet": "",
-      "removeBindingAria": "",
-      "resetAll": "",
-      "resetAllConfirm": "",
-      "resetAllYes": "",
-      "restoreDefaultAria": "",
-      "searchAriaLabel": "",
-      "searchPlaceholder": "",
-      "warnAlreadyUsed": ""
+      "helper": "Προβολή και αλλαγή συντομεύσεων πληκτρολογίου. Η μορφοποίηση του επεξεργαστή και η συντόμευση του κύκλου καρτελών είναι σταθερές.",
+      "notSet": "Δεν έχει οριστεί",
+      "removeBindingAria": "Αφαίρεση {{chord}}",
+      "resetAll": "Επαναφορά όλων των συντομεύσεων..",
+      "resetAllConfirm": "Επαναφορά κάθε προσαρμοσμένης συντόμευσης στην προεπιλογή της?",
+      "resetAllYes": "Επαναφορά όλων",
+      "restoreDefaultAria": "Επαναφορά προεπιλογής για {{command}}",
+      "searchAriaLabel": "Αναζήτηση συντομεύσεων",
+      "searchPlaceholder": "Αναζήτηση συντομεύσεων..",
+      "warnAlreadyUsed": "Ήδη χρησιμοποιείται από {{commands}} — προστίθεται ούτως ή άλλως."
     },
     "language": {
-      "helper": "",
-      "label": ""
+      "helper": "Επιλέξτε τη γλώσσα εμφάνισης της εφαρμογής.",
+      "label": "Γλώσσα"
     },
     "lineNumbers": {
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "off": "",
-      "on": ""
+      "errorSaveSetting": "Αδυναμία αποθήκευσης της ρύθμισης αριθμού γραμμής.",
+      "helper": "Δείξε έναν αριθμό γραμμής στον εκδότη. Ένας αριθμός ανά γραμμή, εκτός προεπιλογής.",
+      "label": "Αριθμοί γραμμής",
+      "off": "Κλείσιμο",
+      "on": "Εμπρός"
     },
     "prefs": {
-      "saveError": ""
+      "saveError": "Δεν μπορούσε να σώσει την προτίμηση - προσπαθήστε ξανά"
     },
     "privacy": {
-      "autoLockHelper": "",
-      "autoLockLabel": "",
-      "autoLockSearchEmpty": "",
-      "autoLockSearchPlaceholder": "",
-      "screenCaptureHelperOff": "",
-      "screenCaptureHelperOn": "",
-      "screenCaptureLabel": ""
+      "autoLockHelper": "Κλείδωσε το θησαυροφυλάκιο μετά από τόση αδράνεια.",
+      "autoLockLabel": "Αυτόματη κλειδαριά",
+      "autoLockSearchEmpty": "Καμία διάρκεια δεν ταιριάζει.",
+      "autoLockSearchPlaceholder": "Διάρκεια αναζήτησης..",
+      "screenCaptureHelperOff": "Η προστασία ισχύει πάντα πριν ξεκλειδώσετε. Αφού ξεκλειδώσετε, ακολουθεί αυτή την προτίμηση.",
+      "screenCaptureHelperOn": "Ενεργό σε macOS και Windows 10 (Ενημέρωση Μαΐου 2020 ή αργότερα). Υποστήριξη Linux έρχεται σε μια μελλοντική κυκλοφορία.",
+      "screenCaptureLabel": "Προστασία από δέσμευση οθόνης"
     },
     "quickUnlock": {
-      "errorCancelled": "",
-      "errorGeneric": "",
-      "errorHardwareUnavailable": "",
-      "errorNotUnlocked": "",
-      "errorPinNotDigits": "",
-      "errorPinTooShort_one": "",
+      "errorCancelled": "Ακυρώθηκε.",
+      "errorGeneric": "Αδυναμία ρύθμισης του γρήγορου ξεκλειδώματος.",
+      "errorHardwareUnavailable": "Touch ID δεν είναι διαθέσιμο σε αυτή τη συσκευή.",
+      "errorNotUnlocked": "Ξεκλείδωσε το χρηματοκιβώτιο πρώτα.",
+      "errorPinNotDigits": "Το PIN πρέπει να είναι μόνο ψηφία.",
+      "errorPinTooShort_one": "Το PIN πρέπει να είναι τουλάχιστον ψηφία {{count}}.",
       "errorPinTooShort_other": "",
-      "helperConfigured": "",
-      "helperNotConfigured": "",
-      "methodPin": "",
-      "methodTouchId": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder_one": "",
+      "helperConfigured": "Configure μέσω {{method}}. Επανεισόδου μετά auto-lock παραλείπει τον κύριο κωδικό πρόσβασης. Ο κύριος κωδικός πρόσβασης εξακολουθεί να απαιτείται μετά την επανεκκίνηση.",
+      "helperNotConfigured": "Ξαναμπείτε μετά την αυτόματη κλειδαριά με PIN ή Touch ID αντί του πλήρους κύριου κωδικού πρόσβασης. Μια ευκολία πάνω από το κρυπτογραφημένο θησαυροφυλάκιο — ο κύριος κωδικός πρόσβασης παραμένει απαραίτητη μετά την επανεκκίνηση.",
+      "methodPin": "PIN",
+      "methodTouchId": "Ταυτότητα αφής",
+      "pinAriaLabel": "Γρήγορη απενεργοποίηση PIN",
+      "pinPlaceholder_one": "PIN (τουλάχιστον {{count}} ψηφία)",
       "pinPlaceholder_other": "",
-      "setPin": "",
-      "setupHelper": "",
-      "title": "",
-      "useTouchId": ""
+      "setPin": "Ορισμός PIN",
+      "setupHelper": "To Touch ID είναι μόνο macOS και αυτή τη στιγμή πειραματικό (εν αναμονή της επαλήθευσης υλικού). Το PIN λειτουργεί παντού.",
+      "title": "Γρήγορη ξεκλείδωμα",
+      "useTouchId": "Χρήση ID αφής"
     },
     "shell": {
-      "closeLabel": "",
-      "navLabel": "",
-      "passwordUpdatedToast": "",
-      "title": ""
+      "closeLabel": "Κλείσιμο ρυθμίσεων",
+      "navLabel": "Settings πινάκων",
+      "panels": {
+        "about": "Σχετικά",
+        "account": "Λογαριασμός",
+        "appearance": "Εμφάνιση",
+        "editor": "Επεξεργασία",
+        "hotkeys": "Κλειδαριές",
+        "privacy": "Ιδιωτικότητα",
+        "storage": "Αποθήκευση"
+      },
+      "passwordUpdatedToast": "Ενημέρωση κωδικού πρόσβασης",
+      "title": "Settings"
     },
     "spell": {
-      "errorSaveLanguages": "",
-      "errorSaveSetting": "",
-      "helper": "",
-      "label": "",
-      "languagesAriaLabel": "",
-      "languagesHelper": "",
-      "languagesLabel": "",
-      "languagesPlaceholder": "",
-      "languagesSearchEmpty": "",
-      "languagesSearchPlaceholder": "",
-      "off": "",
-      "on": ""
+      "errorSaveLanguages": "Αδυναμία αποθήκευσης των γλωσσών ορθογραφικού ελέγχου.",
+      "errorSaveSetting": "Αδυναμία αποθήκευσης της ρύθμισης του ορθογραφικού ελέγχου.",
+      "helper": "Υπογράμμισες τις λέξεις όπως πληκτρολογείς. Εντελώς εκτός σύνδεσης — οι σημειώσεις σας δεν αφήνουν ποτέ τη συσκευή.",
+      "label": "Έλεγχος ορθογραφίας",
+      "languagesAriaLabel": "Γλώσσες ορθογραφικού ελέγχου",
+      "languagesHelper": "Μια λέξη είναι σωστή αν είναι έγκυρη σε οποιαδήποτε επιλεγμένη γλώσσα - εύχρηστη για την ανάμειξη των αγγλικών όρων σε άλλες γλώσσες νότες.",
+      "languagesLabel": "Γλώσσες",
+      "languagesPlaceholder": "Επιλογή γλωσσών..",
+      "languagesSearchEmpty": "Δεν ταιριάζουν οι γλώσσες.",
+      "languagesSearchPlaceholder": "Γλώσσες αναζήτησης..",
+      "off": "Κλείσιμο",
+      "on": "Εμπρός"
     },
     "storage": {
-      "backupHelper": "",
-      "backupLabel": "",
-      "backUpVault": "",
-      "exportAction": "",
-      "exportBody": "",
-      "exportHelper": "",
-      "exportLabel": "",
-      "importHelper": "",
-      "importLabel": "",
-      "importObsidian": "",
-      "locationHelper": "",
-      "locationLabel": "",
-      "openInFiles": "",
-      "pathUnavailable": "",
-      "restoreBackup": ""
+      "backUpVault": "Πίσω στο θησαυροφυλάκιο..",
+      "backupHelper": "Οι ενισχύσεις παραμένουν τόσο κρυπτογραφημένες όσο και η κρύπτη σας, σε ένα μόνο εξακριβωμένο αρχείο .myne-backup. Η αποκατάσταση λειτουργεί με τον κωδικό πρόσβασης ή τη φράση ανάκτησης αυτού του θησαυροφυλακίου — ακριβώς όπως ξεκλειδώστε.",
+      "backupLabel": "Δημιουργία αντιγράφων ασφαλείας",
+      "exportAction": "Εξαγωγή..",
+      "exportBody": "Εξαγωγή θησαυροφυλακίου ως Markdown",
+      "exportHelper": "Ένα απλό δέντρο — όχι κρυπτογραφημένο.",
+      "exportLabel": "Εξαγωγή",
+      "importHelper": "Φέρτε ένα υπάρχον θησαυροφυλάκιο Obsidian στο Myne. Κάθε σημείωση Markdown εισάγεται και κρυπτογραφείται επί τόπου· τα αρχικά αρχεία σας είναι άθικτα.",
+      "importLabel": "Εισαγωγή",
+      "importObsidian": "Εισαγωγή θησαυροφυλακίου Οψιδιανού..",
+      "locationHelper": "Κάθε θησαυροφυλάκιο είναι ένας φάκελος κρυπτογραφημένων αρχείων κάτω από αυτή τη διαδρομή. Προτιμήστε το κουμπί αντιγράφων ασφαλείας παρακάτω πάνω από χειρωνακτικά αντίγραφα — επαληθεύει το γραπτό αρχείο.",
+      "locationLabel": "Θέση του θόλου",
+      "openInFiles": "Άνοιγμα σε αρχεία",
+      "pathUnavailable": "Μη διαθέσιμη διαδρομή",
+      "restoreBackup": "Επαναφορά από το εφεδρικό.."
     },
     "typography": {
-      "errorSave": ""
+      "contentWidthHelper": "Μέγιστο πλάτος της στήλης επεξεργασίας. Πλήρης επιτρέπει κείμενο καλύπτει το τζάμι.",
+      "contentWidthLabel": "Πλάτος περιεχομένου",
+      "errorSave": "Δεν μπόρεσα να σώσω την προτίμηση. Παρακαλώ προσπαθήστε ξανά.",
+      "fontHelper": "Μονοδιαστημικό ή αναλογικό (sans-serif) κείμενο.",
+      "fontLabel": "Γραμματοσειρά",
+      "lineSpacingHelper": "Κάθετος χώρος μεταξύ των γραμμών.",
+      "lineSpacingLabel": "Διαπόσταση γραμμής",
+      "textSizeHelper": "Μέγεθος βάσης του κειμένου του επεξεργαστή. Οι επικεφαλίδες με αυτό.",
+      "textSizeLabel": "Μέγεθος κειμένου"
     },
     "viewMode": {
-      "errorSave": "",
-      "helper": "",
-      "label": ""
+      "errorSave": "Αδυναμία αποθήκευσης της προκαθορισμένης λειτουργίας προβολής.",
+      "helper": "Πώς ανοίγει μια σημείωση: Ζωντανή προεπισκόπηση (προεπιλεγμένη), ανάγνωση μόνο ανάγνωση, ή ακατέργαστη πηγή. Εναλλαγή σημείωσης με ⇧⌘E.",
+      "label": "Προκαθορισμένη λειτουργία προβολής",
+      "optionLive": "Ζωντανή προεπισκόπηση",
+      "optionReading": "Ανάγνωση",
+      "optionSource": "Πηγή"
     }
   },
   "templates": {
     "manager": {
-      "closeLabel": "",
-      "deleteRowLabel": "",
-      "editTemplateLabel": "",
-      "emptyBody": "",
-      "emptyTitle": "",
-      "listLabel": "",
-      "loading": "",
-      "newTemplate": "",
-      "newTemplateName": "",
-      "removeFromTemplates": "",
-      "removeRowLabel": "",
-      "title": ""
+      "closeLabel": "Κλείσιμο προτύπων",
+      "deleteRowLabel": "Διαγραφή προτύπου {{name}} (μετακίνηση σε απορρίμματα)",
+      "editTemplateLabel": "Επεξεργασία προτύπου {{name}}",
+      "emptyBody": "Δημιουργήστε ένα πρότυπο για την επαναχρησιμοποίηση ενός σκελετού σημειώσεων — ένα σημείωμα, ένα καθημερινό ημερολόγιο, ένα σημείωμα ανάγνωσης. Διαλέξτε ένα όταν κάνετε μια νέα σημείωση.",
+      "emptyTitle": "Δεν υπάρχουν πρότυπα ακόμα",
+      "listLabel": "Πρότυπα",
+      "loading": "Φόρτωση..",
+      "newTemplate": "Νέο πρότυπο",
+      "newTemplateName": "Χωρίς τίτλο πρότυπο",
+      "removeFromTemplates": "Αφαίρεση από πρότυπα",
+      "removeRowLabel": "Αφαίρεση {{name}} από πρότυπα (διατηρεί τη σημείωση)",
+      "title": "Πρότυπα σημειώσεων"
     }
   },
   "unlock": {
-    "backToPicker": "",
-    "continue": "",
-    "decrypting": "",
-    "deleteLink": "",
+    "backToPicker": "Επιλέξτε ένα διαφορετικό θησαυροφυλάκιο",
+    "continue": "Συνέχεια",
+    "decrypting": "Αποκρυπτογράφηση..",
+    "deleteLink": "Έχασες και τον κωδικό και τη φράση ανάκτησης; Διαγραφή θησαυροφυλακίου και εκκίνηση από την αρχή",
     "errors": {
-      "alreadyUnlocked": "",
-      "inProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "alreadyUnlocked": "Το θησαυροφυλάκιο είναι ήδη ξεκλείδωτο.",
+      "inProgress": "Επιχείρηση σε εξέλιξη.",
+      "unexpected": "Αναμενόμενο λάθος. Παρακαλώ προσπαθήστε ξανά.",
+      "vaultNotFound": "Το αρχείο Vault δε βρέθηκε. Παρακαλώ επανεκκινήστε την εφαρμογή."
     },
-    "passwordLabel": "",
-    "passwordPlaceholder": "",
+    "passwordLabel": "Κωδικός πρόσβασης",
+    "passwordPlaceholder": "Κωδικός πρόσβασης",
     "quickUnlock": {
-      "failed": "",
-      "pinAriaLabel": "",
-      "pinPlaceholder": "",
-      "unlockWithPin": "",
-      "unlockWithTouchId": "",
-      "usePasswordBelow": "",
-      "wrongCredential": ""
+      "failed": "Το γρήγορο ξεκλείδωμα απέτυχε. Χρησιμοποίησε τον κωδικό σου.",
+      "pinAriaLabel": "Γρήγορη απενεργοποίηση PIN",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "Ξεκλείδωμα με PIN",
+      "unlockWithTouchId": "Ξεκλείδωμα με ταυτότητα αφής",
+      "usePasswordBelow": "ή χρησιμοποιήστε τον κωδικό σας παρακάτω",
+      "wrongCredential": "Λάθος. {{remaining}} απόπειρα(ες) αριστερά."
     },
-    "recoveryInterruptedBanner": "",
-    "recoveryInterruptedBody": "",
-    "recoveryInterruptedTitle": "",
-    "recoveryLink": "",
-    "submit": "",
-    "subtitle": "",
+    "recoveryInterruptedBanner": "Η ροή ανάκτησης διακόπηκε. Ορίστε ένα νέο κωδικό πρόσβασης πρώτα.",
+    "recoveryInterruptedBody": "Θέστε ένα νέο κωδικό πρόσβασης πρώτα, μετά ξανασφραγίστε το θησαυροφυλάκιο σας.",
+    "recoveryInterruptedTitle": "Η ροή ανάκτησης διακόπηκε.",
+    "recoveryLink": "Ξέχασες τον κωδικό σου; Ξεκλείδωμα με φράση ανάκτησης",
+    "submit": "Ξεκλείδωμα",
+    "subtitle": "Εισάγετε τον κωδικό σας για να συνεχίσετε.",
     "suspicion": {
-      "lockedDuringChange": "",
-      "metaChangedExternally": ""
+      "lockedDuringChange": "Ακυρώθηκε η αλλαγή κωδικού: το χρηματοκιβώτιο ήταν κλειδωμένο.",
+      "metaChangedExternally": "Το Vault τροποποιήθηκε σε άλλη συνεδρία — παρακαλώ ξεκλειδώστε ξανά."
     },
-    "title": ""
+    "title": "Ξεκλείδωσε το θησαυροφυλάκιο σου."
   },
   "vault": {
     "ioBanner": {
-      "cannotRead": "",
-      "notFound": "",
-      "permissionDenied": ""
+      "cannotRead": "Αδυναμία ανάγνωσης του αρχείου του θησαυροφυλακίου.",
+      "notFound": "Το αρχείο Vault δε βρέθηκε. Παρακαλώ επανεκκινήστε την εφαρμογή.",
+      "permissionDenied": "Δεν υπάρχει άδεια πρόσβασης στο αρχείο του θησαυροφυλακίου. Ελέγξτε τις άδειες αρχείων."
     }
   },
   "vaultCreation": {
     "account": {
-      "ackLabel": "",
-      "back": "",
-      "commit": "",
-      "committing": "",
-      "copied": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "saveAsFile": "",
-      "shownOnceBody": "",
-      "shownOnceEmphasis": ""
+      "ackLabel": "Κράτησα τον αριθμό του λογαριασμού μου για να τον βρω αργότερα.",
+      "back": "Πίσω",
+      "commit": "Δημιουργία θησαυροφυλακίου",
+      "committing": "Αποθήκευση..",
+      "copied": "Αντιγραφή",
+      "copy": "Αντιγραφή",
+      "eyebrow": "Στάδιο 4 από 4 — αριθμός λογαριασμού",
+      "heading": "Αποθήκευση αριθμού λογαριασμού σας.",
+      "intro": "Αυτό είναι το δώρο που σας αξίζει — να το αντιμετωπίζετε σαν μετρητά.",
+      "saveAsFile": "Αποθήκευση ως αρχείο",
+      "shownOnceBody": "Σώσε το τώρα. Ο Μάιλς δεν μπορεί να το ανακτήσει για σένα. Απαιτείται να εγγραφείτε για συγχρονισμό αργότερα.",
+      "shownOnceEmphasis": "Αυτό φαίνεται μόνο μία φορά."
     },
     "briefing": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
+      "back": "Πίσω",
+      "continue": "Συνεχίστε τη δημιουργία του θησαυροφυλακίου",
+      "eyebrow": "Πριν δημιουργήσετε το θησαυροφυλάκιο σας",
+      "heading": "Πριν δημιουργήσετε το θησαυροφυλάκιο σας",
+      "intro": "Ο Μάιν κρυπτογραφεί τις σημειώσεις σου ώστε μόνο εσύ να μπορείς να τις ανοίξεις. Τρία πράγματα ακολουθούν από αυτό — διαβάστε τα και συνεχίστε.",
       "statements": {
         "no-email": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Καταλαβαίνω ότι δεν υπάρχει ανάκτηση email.",
+          "statement": "Δεν υπάρχει ανάκτηση email. Ποτέ δεν θα υπάρξει.",
+          "why": "Δεν ζητάμε ποτέ το email σας, οπότε δεν υπάρχει σύνδεση επαναφοράς και δεν υπάρχει λογαριασμός για υποστήριξη για ξεκλείδωμα. Αυτό δεν είναι ένα χαρακτηριστικό που λείπει - είναι η εγγύηση. Η ανάκτηση με email θα σήμαινε ότι θα μπορούσαμε να διαβάσουμε τις σημειώσεις σας, και ο Μάιλς είναι φτιαγμένος έτσι ώστε να μην μπορούμε."
         },
         "no-store": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Καταλαβαίνω ότι ο Μάιλς δεν μπορεί να ανακτήσει τον κωδικό μου.",
+          "statement": "Ο κωδικός σου ξεκλειδώνει το χρηματοκιβώτιο. Δεν το αποθηκεύουμε.",
+          "why": "Ο κωδικός πρόσβασης σας είναι η είσοδος στο κλειδί που αποκρυπτογραφεί τις σημειώσεις σας. Ποτέ δεν αφήνει αυτή τη συσκευή, και τίποτα στους διακομιστές μας δεν μπορεί να την αναπαράγει. Αυτό είναι που κρατά τις σημειώσεις σας ιδιωτικές — και γιατί δεν μπορούμε να τις επαναφέρουμε για σας."
         },
         "phrase-backup": {
-          "ackLabel": "",
-          "statement": "",
-          "why": ""
+          "ackLabel": "Καταλαβαίνω ότι η φράση μου είναι η μόνη εφεδρική.",
+          "statement": "Η φράση σου για την ανάρρωση είναι η μόνη σου υποστήριξη.",
+          "why": "Εάν ξεχάσετε τον κωδικό σας, η φράση για την ανάκτηση 24 λέξεων είναι ο μοναδικός τρόπος για να επιστρέψετε. {{lostBothSecrets}} Γράψε τη φράση και κράτα την κάπου ασφαλή."
         }
       },
-      "why": ""
+      "why": "Γιατί?"
     },
     "confirm": {
-      "back": "",
-      "continue": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "mismatch": "",
-      "wordAtPosition": ""
+      "back": "Πίσω",
+      "continue": "Συνέχεια",
+      "eyebrow": "Βήμα 3 από 4 — επιβεβαιώστε τη φράση",
+      "heading": "Γράψε τέσσερις λέξεις από τη φράση σου.",
+      "intro": "Θα ζητήσουμε συγκεκριμένες θέσεις για να επιβεβαιώσουμε ότι το έσωσες.",
+      "mismatch": "Δεν ταιριάζει με τη λέξη #{{pos}}.",
+      "wordAtPosition": "Λέξη στη θέση {{pos}}"
     },
     "encrypting": {
-      "caption": "",
-      "footerHint": "",
-      "heading": ""
+      "caption": "Αυτό παίρνει ένα λεπτό.",
+      "footerHint": "Αν αυτό πάρει περισσότερο από 30 δευτερόλεπτα, κλείσε το παράθυρο και δοκίμασε ξανά.",
+      "heading": "Κρυπτογράφηση του θησαυροφυλακίου σας"
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Μη έγκυρος αριθμός λογαριασμού"
       },
       "aeadFailure": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Η κρυπτογράφηση απέτυχε"
       },
       "csprng": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Δεν μπόρεσε να δημιουργήσει ασφαλή τυχαία δεδομένα"
       },
       "invalidPassword": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Μη έγκυρος κωδικός πρόσβασης"
       },
       "invalidVaultMeta": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Σφάλμα μορφής Vault"
       },
       "ioOther": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Δεν μπόρεσα να σώσω το θησαυροφυλάκιο"
       },
       "joinFailure": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Κάτι πήγε στραβά"
       },
       "kdfFailure": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά. Αν αυτό συνεχίσει να συμβαίνει, το σύστημά σας μπορεί να έχει χαμηλή μνήμη.",
+        "title": "Αδύνατη η δημιουργία κρυπτογράφησης"
       },
       "noSpace": {
-        "body": "",
-        "title": ""
+        "body": "Ελευθερώστε χώρο στο δίσκο και προσπαθήστε ξανά.",
+        "title": "Δεν υπάρχει αρκετός χώρος στο δίσκο"
       },
       "notFound": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Λείπει ο φάκελος Vault"
       },
       "passwordTooShort": {
-        "body": "",
-        "title": ""
+        "body": "Χρησιμοποιήστε τουλάχιστον 12 χαρακτήρες.",
+        "title": "Κωδικός πρόσβασης πολύ σύντομος"
       },
       "permissionDenied": {
-        "body": "",
-        "title": ""
+        "body": "Βεβαιωθείτε ότι ο Myne έχει άδεια να γράψει στο φάκελο δεδομένων της εφαρμογής σας.",
+        "title": "Δεν μπορούσα να γράψω στο φάκελο του θησαυροφυλακίου"
       },
       "sessionExpired": {
-        "body": "",
-        "title": ""
+        "body": "Για την ασφάλειά σου, η δημιουργία του θησαυροφυλακίου είναι μετά από 10 λεπτά. Ξεκίνα από την αρχή.",
+        "title": "Λήξη συνεδρίας"
       },
       "sessionNotFound": {
-        "body": "",
-        "title": ""
+        "body": "Ξεκίνα από την αρχή.",
+        "title": "Η συνεδρία δε βρέθηκε"
       },
       "tooManyConcurrentSessions": {
-        "body": "",
-        "title": ""
+        "body": "Κλείσε άλλα παράθυρα του Myne και προσπάθησε ξανά.",
+        "title": "Πάρα πολλές δημιουργίες θησαυροφυλακίου ταυτόχρονα"
       },
       "vaultArtifactsPresent": {
-        "body": "",
-        "title": ""
+        "body": "Ένα νέο θησαυροφυλάκιο δεν μπορεί να δημιουργηθεί επειδή τα δεδομένα του θησαυροφυλακίου υπάρχουν ήδη σε αυτή τη συσκευή. Κλείστε την εφαρμογή και επανεκκινήστε — η οθόνη εκκίνησης θα σας οδηγήσει στη ροή ξεκλειδώματος.",
+        "title": "Ο θόλος υπάρχει ήδη"
       },
       "vaultBusyAuth": {
-        "body": "",
-        "title": ""
+        "body": "Μια άλλη επιχείρηση στο θησαυροφυλάκιο είναι σε εξέλιξη. Προσπάθησε ξανά σε ένα λεπτό.",
+        "title": "Θήκη απασχολημένος"
       }
     },
     "orchestrator": {
       "closePrompt": {
-        "cancelLabel": "",
-        "message": "",
-        "okLabel": "",
-        "title": ""
+        "cancelLabel": "Ακύρωση",
+        "message": "Το κλείσιμο θα απορρίψει τη φράση ανάκαμψης. Συνεχίστε να κλείνετε?",
+        "okLabel": "Τέλος πάντων",
+        "title": "Να πετάξουμε τη δημιουργία του θησαυροφυλακίου?"
       },
       "genericError": {
-        "body": "",
-        "title": ""
+        "body": "Προσπάθησε ξανά.",
+        "title": "Κάτι πήγε στραβά"
       }
     },
     "password": {
-      "back": "",
-      "eyebrow": "",
-      "heading": "",
-      "helperLead": "",
-      "submit": ""
+      "back": "Πίσω",
+      "eyebrow": "Βήμα 1 από 4 — κύριος κωδικός πρόσβασης",
+      "heading": "Δημιουργία θησαυροφυλακίου",
+      "helperLead": "Ο Myne δεν αποθηκεύει τον κωδικό σας ή τη φράση ανάκτησης.",
+      "submit": "Δημιουργία φράσης ανάκτησης"
     },
     "phrase": {
-      "back": "",
-      "continue": "",
-      "copy": "",
-      "eyebrow": "",
-      "heading": "",
-      "intro": "",
-      "reveal": "",
-      "saveAsFile": ""
+      "back": "Πίσω",
+      "continue": "Έχω σώσει αυτό - επιβεβαιώστε φράση",
+      "copy": "Αντιγραφή",
+      "eyebrow": "Στάδιο 2 του 4 — φράση ανάκτησης",
+      "heading": "Γράψε αυτές τις 24 λέξεις.",
+      "intro": "Αυτή η φράση, μαζί με τον κωδικό σας, είναι ο μόνος τρόπος να ανακτήσετε το θησαυροφυλάκιο σας. Αποθήκευση offline — χαρτί, διαχειριστής κωδικού πρόσβασης, πορτοφόλι υλικού. Να το αντιμετωπίζεις σαν μετρητά.",
+      "reveal": "Αποκαλυπτική φράση",
+      "saveAsFile": "Αποθήκευση ως αρχείο"
     },
     "ready": {
-      "backedUp": "",
-      "backingUp": "",
-      "backupDefaultFilename": "",
-      "backupError": "",
-      "backupFilterName": "",
-      "backUpNow": "",
-      "body": "",
-      "decrypting": "",
-      "done": "",
-      "heading": "",
-      "showFolder": ""
+      "backUpNow": "Πίσω στο θησαυροφυλάκιο τώρα",
+      "backedUp": "✓",
+      "backingUp": "Αντικατάσταση..",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Το αντίγραφο ασφαλείας δεν ολοκληρώθηκε — δεν έμεινε κανένα αρχείο πίσω. Μπορείτε να δημιουργήσετε αντίγραφα ασφαλείας οποιαδήποτε στιγμή από τις Settings → Αποθήκευση.",
+      "backupFilterName": "Δημιουργία αντιγράφων ασφαλείας Myne",
+      "body": "Ο Μάιλς έγραψε την κρύπτη σου στο φάκελο της εφαρμογής σου. Ο κύριος κωδικός πρόσβασης και η φράση της ανάκτησης είναι ο μόνος τρόπος για να επιστρέψετε — βεβαιωθείτε ότι και οι δύο σώθηκαν κάπου ασφαλή.",
+      "decrypting": "Αποκρυπτογράφηση..",
+      "done": "Έγινε",
+      "heading": "Το θησαυροφυλάκιο σας είναι έτοιμο.",
+      "showFolder": "Εμφάνιση φακέλου θησαυροφυλακίου"
     },
     "sessionLost": {
-      "startOver": ""
+      "startOver": "Ξεκίνα από την αρχή"
     }
   },
   "vaultPicker": {
-    "createAnother": "",
-    "heading": "",
-    "loading": "",
-    "noneLoaded": "",
-    "openedRelative": "",
-    "restoreFromBackup": "",
-    "subline": "",
-    "vaultFallback": ""
+    "createAnother": "Δημιουργία νέου θησαυροφυλακίου",
+    "heading": "Επιλέξτε ένα θησαυροφυλάκιο",
+    "loading": "Φόρτωση θησαυροφυλακίων σας..",
+    "noneLoaded": "Κανένα χρηματοκιβώτιο δεν μπορεί να φορτωθεί τώρα.",
+    "openedRelative": "άνοιξε {{rel}}",
+    "restoreFromBackup": "Επαναφορά από το αντίγραφο ασφαλείας",
+    "subline": "Έχεις πάνω από ένα θησαυροφυλάκιο στη συσκευή. Διάλεξε ένα για να ξεκλειδώσεις.",
+    "vaultFallback": "Θήκη {{n}}"
   },
   "vaultRecover": {
     "decrypting": {
-      "caption": "",
-      "eyebrow": "",
-      "footerHint": "",
-      "heading": "",
-      "subCaption": ""
+      "caption": "Αυτό παίρνει ένα λεπτό.",
+      "eyebrow": "ΑΝΑΚΤΗΣΗ · ΚΑΤΑΝΑΛΩΣΗ",
+      "footerHint": "Αν αυτό πάρει περισσότερο από 30 δευτερόλεπτα, κλείσε το παράθυρο και δοκίμασε ξανά.",
+      "heading": "Αποκρυπτογράφηση του θησαυροφυλακίου σας",
+      "subCaption": "Εργασία... Argon2id m=256 MiB, t=3, p=2"
     },
     "passwordReset": {
       "errors": {
-        "cancelledVaultLocked": "",
-        "operationInProgress": "",
-        "unexpected": "",
-        "weakPassword": ""
+        "cancelledVaultLocked": "Η ανάκτηση ακυρώθηκε: το χρηματοκιβώτιο ήταν κλειδωμένο.",
+        "operationInProgress": "Επιχείρηση σε εξέλιξη. Παρακαλώ περιμένετε.",
+        "unexpected": "Αναμενόμενο λάθος. Παρακαλώ προσπαθήστε ξανά.",
+        "weakPassword": "Ο νέος κωδικός πρόσβασης πρέπει να είναι τουλάχιστον 12 χαρακτήρες."
       },
-      "eyebrow": "",
-      "helperBody": "",
-      "helperEmphasis": "",
-      "submit": "",
-      "title": ""
+      "eyebrow": "Ανάκτηση · Νέος κωδικός πρόσβασης",
+      "helperBody": "Vault φράση ανάκτησης ile açıldı. Eski parola artık çalışmayacak — yeni master parolanı şimdi belirle. (στα Αγγλικά).",
+      "helperEmphasis": "Φράση ανάκτησης aynı kalır.",
+      "submit": "Ορισμός νέου κωδικού πρόσβασης",
+      "title": "Ορισμός νέου κύριου κωδικού πρόσβασης"
     },
     "phrase": {
-      "back": "",
-      "body": "",
-      "cellLabel": "",
-      "deleteLink": "",
-      "eyebrow": "",
-      "submit": "",
-      "title": ""
+      "back": "← Πίσω",
+      "body": "Εισάγετε τη φράση ανάκτησης. 24 λέξεις BIP-39.",
+      "cellLabel": "Λέξη {{index}}",
+      "deleteLink": "Διαγραφή θησαυροφυλακίου και εκκίνηση από την αρχή",
+      "eyebrow": "Ανάκτηση",
+      "submit": "Ξεκλείδωμα",
+      "title": "Ανακτήστε το θησαυροφυλάκιο σας."
     },
     "select": {
-      "accountInvalid": "",
-      "accountLabel": "",
-      "accountPlaceholder": "",
-      "body": "",
-      "cancel": "",
-      "checking": "",
-      "loadFailed": "",
-      "loading": "",
-      "openedRelative": "",
-      "or": "",
-      "title": "",
-      "useAccountNumber": "",
-      "vaultFallback": ""
+      "accountInvalid": "Μη έγκυρος αριθμός λογαριασμού. Παρακαλώ ελέγξτε και ξαναδοκιμάστε.",
+      "accountLabel": "Αριθμός λογαριασμού (προαιρετικό)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X-X (προαιρετικό)",
+      "body": "Διάλεξε το θησαυροφυλάκιο που θέλεις να ανακτήσεις με τη φράση σου για την ανάκτηση 24 λέξεων. Μπορείτε επίσης να πληκτρολογήσετε τον αριθμό λογαριασμού σας για να μεταβείτε κατευθείαν σε αυτόν.",
+      "cancel": "Ακύρωση",
+      "checking": "Έλεγχος..",
+      "loadFailed": "Κανένα χρηματοκιβώτιο δεν μπορεί να φορτωθεί τώρα.",
+      "loading": "Φόρτωση θησαυροφυλακίων σας..",
+      "openedRelative": "άνοιξε {{rel}}",
+      "or": "ή",
+      "title": "Επιλέξτε ένα θησαυροφυλάκιο για ανάκτηση",
+      "useAccountNumber": "Χρήση αριθμού λογαριασμού",
+      "vaultFallback": "Θήκη {{index}}"
     }
   },
   "vaultSwitcher": {
-    "chipFallback": "",
-    "createAnother": "",
-    "switching": "",
-    "switchVaultLabel": "",
-    "vaultFallback": ""
+    "chipFallback": "Θήκη",
+    "createAnother": "Δημιουργία νέου θησαυροφυλακίου",
+    "switchVaultLabel": "Εναλλαγή θησαυροφυλακίου",
+    "switching": "αλλαγή..",
+    "vaultFallback": "Θήκη {{n}}"
   },
   "welcome": {
-    "createCta": "",
-    "headlineLine1": "",
-    "headlineLine2": "",
+    "createCta": "Δημιουργία νέου θησαυροφυλακίου",
+    "headlineLine1": "Κρυπτογραφημένες σημειώσεις.",
+    "headlineLine2": "Δεν υπάρχει email κατά την εγγραφή.",
     "repairResidue": {
-      "cancel": "",
-      "cleaningUp": "",
-      "cleanUp": "",
-      "confirmBody_one": "",
-      "confirmBody_other": "",
-      "confirmTitle": "",
-      "doneBody_one": "",
-      "doneBody_other": "",
-      "doneTitle": "",
-      "errorBody": "",
-      "errorTitle": "",
-      "foundBody_one": "",
-      "foundBody_other": "",
-      "foundTitle": "",
-      "partialBody_one": "",
-      "partialBody_other": "",
-      "partialTitle": ""
+      "cancel": "Ακύρωση",
+      "cleanUp": "Καθαρισμός",
+      "cleaningUp": "Καθαρισμός..",
+      "confirmBody_one": "Το αρχείο {{count}} θα αφαιρεθεί. Είναι ήδη δυσανάγνωστα. Τίποτα ανακτήσιμο δεν χάνεται.",
+      "confirmBody_other": "Τα αρχεία θα αφαιρεθούν. Είναι ήδη δυσανάγνωστα. Τίποτα ανακτήσιμο δεν χάνεται.",
+      "confirmTitle": "Να καθαρίσω τα αρχεία που απέμειναν?",
+      "doneBody_one": "Αφαιρέθηκε το αρχείο που έχει απομείνει {{count}}. Μπορείτε να δημιουργήσετε ένα νέο θησαυροφυλάκιο τώρα.",
+      "doneBody_other": "Αφαιρέθηκαν τα αρχεία που είχαν απομείνει {{count}}. Μπορείτε να δημιουργήσετε ένα νέο θησαυροφυλάκιο τώρα.",
+      "doneTitle": "Καθαρισμός",
+      "errorBody": "Κάτι πήγε στραβά. Κλείστε την εφαρμογή και προσπαθήστε ξανά.",
+      "errorTitle": "Αποτυχία καθαρισμού",
+      "foundBody_one": "{{count}} αρχείο από προηγούμενη διαγραφή που δεν τελείωσε. Είναι ήδη δυσανάγνωστα — δεν θα χάσετε τίποτα ανακτήσιμο.",
+      "foundBody_other": "{{count}} αρχεία από προηγούμενη διαγραφή που δεν τελείωσε. Είναι ήδη δυσανάγνωστα — δεν θα χάσετε τίποτα ανακτήσιμο.",
+      "foundTitle": "Απομεινάρια αρχείων από μια ελλιπή διαγραφή",
+      "partialBody_one": "Το αρχείο {{count}} μπορεί να κλειδωθεί από άλλη εφαρμογή (αντιϊός, συγχρονισμός αρχείων ή ευρετηρίαση αναζήτησης). Κλείστε την εφαρμογή και προσπαθήστε ξανά σε ένα λεπτό, ή αφαιρέστε το φάκελο θησαυροφυλάκιο με το χέρι.",
+      "partialBody_other": "Τα αρχεία {{count}} μπορεί να κλειδωθούν από άλλη εφαρμογή (αντιϊός, συγχρονισμός αρχείων ή ευρετηρίαση αναζήτησης). Κλείστε την εφαρμογή και προσπαθήστε ξανά σε ένα λεπτό, ή αφαιρέστε το φάκελο θησαυροφυλάκιο με το χέρι.",
+      "partialTitle": "Μερικά αρχεία δεν μπορούσαν να αφαιρεθούν"
     },
-    "restoreCta": "",
-    "subtitle": ""
+    "restoreCta": "Επαναφορά από το αντίγραφο ασφαλείας",
+    "subtitle": "Οι σημειώσεις σας είναι κρυπτογραφημένες σε αυτή τη συσκευή πριν την αφήσουν. Ο διακομιστής αποθηκεύει μόνο κρυπτογραφημένο κείμενο."
   }
 }
