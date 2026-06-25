@@ -1,0 +1,1926 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "",
+      "cleaning": "",
+      "close": "",
+      "completeTitle": "",
+      "deleteCta_one": "",
+      "deleteCta_other": "",
+      "error": "",
+      "intro_one": "",
+      "intro_other": "",
+      "summaryFreed": "",
+      "summaryPeriod": "",
+      "summaryRemoved_one": "",
+      "summaryRemoved_other": "",
+      "summarySkipped_one": "",
+      "summarySkipped_other": "",
+      "title": "",
+      "willBeReclaimed": ""
+    },
+    "coverPicker": {
+      "close": "",
+      "dropHint": "",
+      "empty": "",
+      "loading": "",
+      "removeCover": "",
+      "title": "",
+      "upload": ""
+    },
+    "deleteDialog": {
+      "cancel": "",
+      "confirmPrompt": "",
+      "delete": "",
+      "deleting": "",
+      "error": "",
+      "notUsed": "",
+      "stillUsed_one": "",
+      "stillUsed_other": "",
+      "title": "",
+      "untitled": ""
+    },
+    "library": {
+      "actionsAriaLabel": "",
+      "actionsTitle": "",
+      "checking": "",
+      "checkUnusedFailedNotice": "",
+      "cleanUnused": "",
+      "cleanUnusedTitle": "",
+      "colCreated": "",
+      "colName": "",
+      "colSize": "",
+      "colType": "",
+      "colUsedIn": "",
+      "decrypting": "",
+      "emptyImportHint": "",
+      "emptyLoadError": "",
+      "emptyNoAttachments": "",
+      "filterAriaLabel": "",
+      "gridView": "",
+      "import": "",
+      "importDialogTitle": "",
+      "importFile": "",
+      "importing": "",
+      "listView": "",
+      "menuDelete": "",
+      "menuExport": "",
+      "menuPreview": "",
+      "menuRename": "",
+      "noMatch": "",
+      "noUnusedNotice": "",
+      "preview": "",
+      "previewAttachment": "",
+      "searchAriaLabel": "",
+      "searchPlaceholder": "",
+      "sortAriaLabel": "",
+      "supportedFilesFilter": "",
+      "title": "",
+      "usedInCount_one": "",
+      "usedInCount_other": "",
+      "usedInLoading": ""
+    },
+    "thumbnail": {
+      "audioLabel": "",
+      "file": "",
+      "pause": "",
+      "pdfDocument": "",
+      "pdfFirstPage": "",
+      "play": ""
+    },
+    "usedInNotesPopover": {
+      "empty": "",
+      "untitled": ""
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "",
+        "cancelled": "",
+        "invalidDestination": "",
+        "ioGeneric": "",
+        "ioNoSpace": "",
+        "ioPermissionDenied": "",
+        "joinFailure": "",
+        "memberTooLarge": "",
+        "vaultNotFound": "",
+        "verifyFailed": ""
+      },
+      "restore": {
+        "authOperationInProgress": "",
+        "cancelled": "",
+        "damagedBackup": "",
+        "futureVersionBackup": "",
+        "invalidVaultMeta": "",
+        "ioGeneric": "",
+        "ioPermissionDenied": "",
+        "joinFailure": "",
+        "missingVaultMeta": "",
+        "notABackupFile": "",
+        "vaultAlreadyExists": ""
+      }
+    },
+    "export": {
+      "cancel": "",
+      "close": "",
+      "copying": "",
+      "preparing": "",
+      "successToast": "",
+      "title": "",
+      "verifying": ""
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "",
+      "close": "",
+      "codeAriaLabel": "",
+      "intro": "",
+      "reject": "",
+      "rejected": "",
+      "title": ""
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "",
+    "archivedBadgeTitle": "",
+    "dialogLabel": "",
+    "matchedInBody": "",
+    "noMatches": "",
+    "searchPlaceholder": "",
+    "sectionCommands": "",
+    "sectionNotes": "",
+    "untitledNote": ""
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": ""
+      },
+      "category": {
+        "app": "",
+        "editor": "",
+        "vault": "",
+        "view": ""
+      },
+      "convertWikilinks": {
+        "label": ""
+      },
+      "deleteWorkspace": {
+        "label": ""
+      },
+      "exportNoteHtml": {
+        "label": ""
+      },
+      "exportNoteMarkdown": {
+        "label": ""
+      },
+      "exportNotePdf": {
+        "label": ""
+      },
+      "exportNoteTxt": {
+        "label": ""
+      },
+      "exportVaultMarkdown": {
+        "label": ""
+      },
+      "foldAll": {
+        "label": ""
+      },
+      "importBaseView": {
+        "label": ""
+      },
+      "importObsidian": {
+        "label": ""
+      },
+      "lockVault": {
+        "label": ""
+      },
+      "manageTemplates": {
+        "label": ""
+      },
+      "newNoteFromTemplate": {
+        "label": ""
+      },
+      "openAttachments": {
+        "label": ""
+      },
+      "openSettings": {
+        "label": ""
+      },
+      "openSnapshots": {
+        "label": ""
+      },
+      "openTodayNote": {
+        "label": ""
+      },
+      "randomNote": {
+        "label": ""
+      },
+      "renameWorkspace": {
+        "label": ""
+      },
+      "saveWorkspaceAs": {
+        "label": ""
+      },
+      "showGraph": {
+        "label": ""
+      },
+      "showTags": {
+        "label": ""
+      },
+      "showViews": {
+        "label": ""
+      },
+      "switchWorkspace": {
+        "label": ""
+      },
+      "toggleFocus": {
+        "label": ""
+      },
+      "toggleLeftSidebar": {
+        "label": ""
+      },
+      "toggleReading": {
+        "label": ""
+      },
+      "toggleRightSidebar": {
+        "label": ""
+      },
+      "toggleSource": {
+        "label": ""
+      },
+      "toggleStackedTabs": {
+        "label": ""
+      },
+      "unfoldAll": {
+        "label": ""
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "",
+        "closeTab": "",
+        "cycleHeadingLevel": "",
+        "cycleTabs": "",
+        "deleteWorkspace": "",
+        "focusNextPane": "",
+        "focusPrevPane": "",
+        "foldAll": "",
+        "inlineCode": "",
+        "insertWikilink": "",
+        "italic": "",
+        "navigateBack": "",
+        "navigateForward": "",
+        "newNote": "",
+        "openSettings": "",
+        "paletteToggle": "",
+        "renameWorkspace": "",
+        "saveWorkspaceAs": "",
+        "selectAllScoped": "",
+        "showGraphView": "",
+        "splitPaneDown": "",
+        "splitPaneRight": "",
+        "switchWorkspace": "",
+        "toggleBulletList": "",
+        "toggleFocusMode": "",
+        "toggleNumberedList": "",
+        "toggleReadingView": "",
+        "toggleSourceMode": "",
+        "toggleTaskList": "",
+        "unfoldAll": ""
+      }
+    },
+    "rebind": {
+      "invalidChordReason": ""
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "",
+      "confirmDefault": ""
+    },
+    "spinner": {
+      "loadingLabel": ""
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "",
+        "exportFailed": "",
+        "renamed": "",
+        "renameFailed": "",
+        "saveDialogFailed": ""
+      },
+      "convert": {
+        "cancel": "",
+        "confirm": "",
+        "skipped": "",
+        "subtitle_one": "",
+        "subtitle_other": "",
+        "subtitleEmpty": "",
+        "title": ""
+      },
+      "convertCommand": {
+        "pickerSourceFilter": ""
+      },
+      "convertCore": {
+        "converted_one": "",
+        "converted_other": "",
+        "noneToConvert": "",
+        "skipNote": {
+          "failed": "",
+          "locked": "",
+          "notFound": "",
+          "tooLarge": "",
+          "unsupported": ""
+        },
+        "skippedSuffix_one": "",
+        "skippedSuffix_other": ""
+      },
+      "fileKind": {
+        "generic": "",
+        "label": {
+          "archive": "",
+          "audio": "",
+          "cHeader": "",
+          "cppSource": "",
+          "cSource": "",
+          "css": "",
+          "csv": "",
+          "document": "",
+          "ebook": "",
+          "go": "",
+          "html": "",
+          "image": "",
+          "java": "",
+          "javascript": "",
+          "json": "",
+          "keynote": "",
+          "log": "",
+          "markdown": "",
+          "numbers": "",
+          "pages": "",
+          "pdf": "",
+          "presentation": "",
+          "python": "",
+          "richText": "",
+          "rust": "",
+          "shell": "",
+          "spreadsheet": "",
+          "svg": "",
+          "text": "",
+          "toml": "",
+          "tsv": "",
+          "typescript": "",
+          "video": "",
+          "word": "",
+          "xml": "",
+          "yaml": ""
+        },
+        "unknown": ""
+      },
+      "lightbox": {
+        "close": "",
+        "export": "",
+        "exportAria": "",
+        "imagePreview": "",
+        "pdfFallback": "",
+        "pdfPreview": ""
+      },
+      "menu": {
+        "actionsAria": ""
+      },
+      "pdf": {
+        "loading": ""
+      },
+      "picker": {
+        "openFailed": ""
+      },
+      "progress": {
+        "encrypting": "",
+        "importing": "",
+        "loading": ""
+      },
+      "recording": {
+        "barAria": "",
+        "cancel": "",
+        "noAudio": "",
+        "saving": "",
+        "stop": ""
+      },
+      "rename": {
+        "cancel": "",
+        "confirm": "",
+        "title": ""
+      },
+      "summary": {
+        "added_one": "",
+        "added_other": "",
+        "reason": {
+          "failed": "",
+          "locked": "",
+          "tooLarge": "",
+          "unsupported": ""
+        },
+        "skipped_one": "",
+        "skipped_other": ""
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "",
+          "captureFailed": "",
+          "generic": "",
+          "locked": "",
+          "noInputDevice": ""
+        },
+        "stopError": {
+          "captureFailed": "",
+          "emptyRecording": "",
+          "generic": "",
+          "silentRecording": ""
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "",
+          "play": "",
+          "seek": ""
+        },
+        "menu": {
+          "export": "",
+          "remove": "",
+          "rename": "",
+          "reveal": ""
+        },
+        "pdfFallback": "",
+        "tombstone": {
+          "brokenAria": "",
+          "brokenLabel": "",
+          "deletedAria": "",
+          "deletedLabel": ""
+        },
+        "urlImageFallback": ""
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "",
+        "empty": "",
+        "linkedFrom_one": "",
+        "linkedFrom_other": "",
+        "untitled": ""
+      },
+      "baseImport": {
+        "droppedFiltersSuffix_one": "",
+        "droppedFiltersSuffix_other": "",
+        "failed": "",
+        "fileFilterName": "",
+        "imported_one": "",
+        "imported_other": "",
+        "notValid": "",
+        "skippedSuffix_one": "",
+        "skippedSuffix_other": "",
+        "stoppedAfter_one": "",
+        "stoppedAfter_other": ""
+      },
+      "bottomBar": {
+        "browseTags": "",
+        "browseViews": "",
+        "cycleViewMode": "",
+        "docStats": {
+          "summary_one": "",
+          "summary_other": "",
+          "summarySelectionSuffix": "",
+          "title_one": "",
+          "title_other": "",
+          "titleSelectionSuffix": ""
+        },
+        "graphTitle": "",
+        "lock": "",
+        "lockVault": "",
+        "openSettings": "",
+        "settingsTitle": "",
+        "showGraph": "",
+        "syncStatus": "",
+        "tagsTitle": "",
+        "togglePreview": "",
+        "viewModeTitle": "",
+        "viewsTitle": ""
+      },
+      "import": {
+        "imported_one": "",
+        "imported_other": "",
+        "skippedSuffix_one": "",
+        "skippedSuffix_other": ""
+      },
+      "nav": {
+        "goBack": "",
+        "goForward": ""
+      },
+      "noNotesToOpen": "",
+      "resizeBacklinksSidebar": "",
+      "resizeNotesSidebar": "",
+      "sidebarToggle": {
+        "hideBacklinks": "",
+        "hideNotes": "",
+        "showBacklinks": "",
+        "showNotes": ""
+      },
+      "switchingOverlay": {
+        "saving": ""
+      },
+      "viewMode": {
+        "live": "",
+        "reading": "",
+        "source": ""
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "",
+        "renameConfirm": "",
+        "renameTitle": "",
+        "saveAsTitle": "",
+        "saveConfirm": ""
+      },
+      "workspaceSwitcher": {
+        "defaultName": "",
+        "renameItemLabel": "",
+        "renameTitle": "",
+        "saveCurrentAs": "",
+        "switchLabel": "",
+        "toggleTitle": ""
+      }
+    },
+    "codeBlock": {
+      "copyCode": "",
+      "defaultBadge": ""
+    },
+    "find": {
+      "close": "",
+      "matchCase": "",
+      "matchCount": "",
+      "nextMatch": "",
+      "noMatches": "",
+      "placeholder": "",
+      "previousMatch": "",
+      "replaceAll": "",
+      "replaceAllCount": "",
+      "replaceOne": "",
+      "replacePlaceholder": "",
+      "toggleReplace": ""
+    },
+    "folding": {
+      "clickToUnfold": "",
+      "unfold": ""
+    },
+    "footnote": {
+      "heading": "",
+      "unreferenced": ""
+    },
+    "frontmatter": {
+      "addProperty": "",
+      "propertiesLabel": "",
+      "titleAriaLabel": "",
+      "titlePlaceholder": ""
+    },
+    "mermaid": {
+      "rendering": ""
+    },
+    "slash": {
+      "attachFile": "",
+      "bulletList": "",
+      "callout": "",
+      "date": "",
+      "day": "",
+      "divider": "",
+      "heading1": "",
+      "heading2": "",
+      "heading3": "",
+      "heading4": "",
+      "heading5": "",
+      "heading6": "",
+      "link": "",
+      "now": "",
+      "numberedList": "",
+      "quote": "",
+      "table": "",
+      "time": "",
+      "todoList": "",
+      "voiceNote": "",
+      "wikiLink": ""
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "",
+        "ignoreInVault": "",
+        "ignoreThisSession": "",
+        "noSuggestions": ""
+      }
+    },
+    "table": {
+      "addColumn": "",
+      "addRow": "",
+      "cellAriaLabel": "",
+      "deleteColumn": "",
+      "deleteRow": "",
+      "reorderColumn": "",
+      "reorderRow": ""
+    },
+    "toolbar": {
+      "apply": "",
+      "heading": {
+        "h1": "",
+        "h2": "",
+        "h3": "",
+        "h4": "",
+        "h5": "",
+        "h6": "",
+        "paragraph": ""
+      },
+      "urlPlaceholder": ""
+    },
+    "wikilink": {
+      "chip": {
+        "embed": ""
+      },
+      "convert": {
+        "cancel": "",
+        "choiceClause_one": "",
+        "choiceClause_other": "",
+        "chooseTarget": "",
+        "convert": "",
+        "convertedToast_one": "",
+        "convertedToast_other": "",
+        "noneToConvert": "",
+        "nothingToConvert": "",
+        "rewriteCount_one": "",
+        "rewriteCount_other": "",
+        "skipped": "",
+        "title": ""
+      },
+      "convertCore": {
+        "noMatch": ""
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "",
+      "errors": {
+        "attachmentCorrupt": "",
+        "attachmentMissing": "",
+        "cannotDecrypt": "",
+        "destinationUnusable": "",
+        "fallback": "",
+        "invalidAttachmentCatalog": "",
+        "invalidNoteFilename": "",
+        "invalidNoteId": "",
+        "invalidPlaintextEncoding": "",
+        "ioNoSpace": "",
+        "ioPermissionDenied": "",
+        "ioWriteDefault": "",
+        "noteNotFound": "",
+        "pdfCaptureFailed": "",
+        "pdfExportInProgress": "",
+        "pdfPayloadMissing": "",
+        "pdfRenderTimeout": "",
+        "pdfWindowCreateFailed": "",
+        "targetExists": "",
+        "vaultLocked": ""
+      },
+      "flow": {
+        "couldNotRead": "",
+        "exportedTo": "",
+        "exportedToWithAttachments_one": "",
+        "exportedToWithAttachments_other": "",
+        "exportedToWithImages_one": "",
+        "exportedToWithImages_other": "",
+        "filterHtml": "",
+        "filterMarkdown": "",
+        "filterPdf": "",
+        "filterPlainText": "",
+        "showInFolder": ""
+      },
+      "modal": {
+        "cancel": "",
+        "export": "",
+        "includeAttachments_one": "",
+        "includeAttachments_other": "",
+        "title": ""
+      }
+    },
+    "pdf": {
+      "cancel": "",
+      "continue": "",
+      "title": ""
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "",
+      "errors": {
+        "attachmentCorrupt": "",
+        "attachmentMissing": "",
+        "authOperationInProgress": "",
+        "cancelled": "",
+        "cannotDecrypt": "",
+        "destinationAlreadyExists": "",
+        "destinationNotAllowed": "",
+        "invalidPlaintextEncoding": "",
+        "invalidVaultMeta": "",
+        "ioWriteDefault": "",
+        "joinFailure": "",
+        "vaultLocked": "",
+        "vaultNotFound": ""
+      },
+      "flow": {
+        "countAttachments_one": "",
+        "countAttachments_other": "",
+        "countFolders_one": "",
+        "countFolders_other": "",
+        "countNotes_one": "",
+        "countNotes_other": "",
+        "exclusionsHistory": "",
+        "exclusionsTrashed_one": "",
+        "exclusionsTrashed_other": "",
+        "exclusionsTrashedAndHistory_one": "",
+        "exclusionsTrashedAndHistory_other": "",
+        "phaseAttachments": "",
+        "phaseNotes": "",
+        "preparing": "",
+        "runningCounts": ""
+      },
+      "running": {
+        "cancel": "",
+        "cancelling": "",
+        "title": ""
+      },
+      "setup": {
+        "cancel": "",
+        "choose": "",
+        "chooseFolder": "",
+        "destinationLabel": "",
+        "export": "",
+        "folderSelectAriaLabel": "",
+        "noFolderChosen": "",
+        "noFoldersInVault": "",
+        "scopeFolder": "",
+        "scopeLabel": "",
+        "scopeWhole": "",
+        "title": ""
+      },
+      "summary": {
+        "done": "",
+        "showInFolder": "",
+        "title": ""
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "",
+      "cta": "",
+      "title": ""
+    },
+    "invalidState": {
+      "body": "",
+      "cta": "",
+      "title": ""
+    },
+    "ioError": {
+      "body": "",
+      "cta": "",
+      "title": ""
+    },
+    "permissionDenied": {
+      "body": "",
+      "cta": "",
+      "title": ""
+    },
+    "restoreFromBackup": ""
+  },
+  "notes": {
+    "archive": {
+      "close": "",
+      "count_one": "",
+      "count_other": "",
+      "countEmpty": "",
+      "delete": "",
+      "deleteError": "",
+      "emptyState": "",
+      "restore": "",
+      "restoreError": "",
+      "title": "",
+      "untitled": ""
+    },
+    "cardMenu": {
+      "copyLink": "",
+      "open": "",
+      "openInNewTab": "",
+      "revealInFolder": ""
+    },
+    "colorLabels": {
+      "clay": "",
+      "moss": "",
+      "ochre": "",
+      "plum": "",
+      "slate": "",
+      "stone": ""
+    },
+    "decoration": {
+      "colorSection": "",
+      "default": "",
+      "defaultFolderIcon": "",
+      "iconSection": "",
+      "menuLabel": "",
+      "noColor": "",
+      "none": ""
+    },
+    "deleteConfirm": {
+      "cancel": "",
+      "delete": "",
+      "title": "",
+      "untitled": "",
+      "warning": ""
+    },
+    "filterBuilder": {
+      "addCondition": "",
+      "addFilterGroup": "",
+      "cancel": "",
+      "combinator": {
+        "all": "",
+        "any": ""
+      },
+      "match": "",
+      "negate": {
+        "is": "",
+        "isNot": ""
+      },
+      "noConditions": "",
+      "noteCount_one": "",
+      "noteCount_other": "",
+      "of": "",
+      "ofTheGroups": "",
+      "removeCondition": "",
+      "replaceFilter": "",
+      "save": "",
+      "searchTextPlaceholder": "",
+      "selectFolderPlaceholder": "",
+      "selectTagPlaceholder": "",
+      "type": {
+        "folder": "",
+        "search": "",
+        "tag": ""
+      },
+      "unrepresentable": "",
+      "unresolved": ""
+    },
+    "folderManagement": {
+      "illegalSegment": "",
+      "tooLong": ""
+    },
+    "folderNote": {
+      "defaultTitle": ""
+    },
+    "folderRow": {
+      "createFolderNote": "",
+      "empty": "",
+      "folderNote": "",
+      "openFolderNote": ""
+    },
+    "graph": {
+      "allConnected": "",
+      "building": "",
+      "depthToggleTitle": "",
+      "filterAll": "",
+      "filterAroundNote": "",
+      "filterByTag": "",
+      "filterIsolated": "",
+      "hop": "",
+      "loading": "",
+      "noNotes": "",
+      "overCap": "",
+      "refresh": "",
+      "refreshTitle": "",
+      "tagPlaceholder": ""
+    },
+    "import": {
+      "base": {
+        "untitledView": ""
+      },
+      "modal": {
+        "cancel": "",
+        "cancelledNotImported_one": "",
+        "cancelledNotImported_other": "",
+        "cancelling": "",
+        "chooseFolder": "",
+        "close": "",
+        "closeAriaLabel": "",
+        "copied": "",
+        "copy": "",
+        "done": "",
+        "errorBody": "",
+        "flagDetail": "",
+        "flagKindFolder": "",
+        "flagKindTitle": "",
+        "folderPickerTitle": "",
+        "hiddenIgnoredPrefix_one": "",
+        "hiddenIgnoredPrefix_other": "",
+        "hiddenIgnoredSuffix": "",
+        "ifNoteExistsLabel": "",
+        "import": "",
+        "importFailed": "",
+        "importing": "",
+        "markDone": "",
+        "markedDone": "",
+        "mediaImported_one": "",
+        "mediaImported_other": "",
+        "mediaOmittedSuffix_one": "",
+        "mediaOmittedSuffix_other": "",
+        "needsAttention": "",
+        "needsAttentionHelp": "",
+        "noFolderChosen": "",
+        "notesImported_one": "",
+        "notesImported_other": "",
+        "policyCopyHint": "",
+        "policyCopyLabel": "",
+        "policySkipHint": "",
+        "policySkipLabel": "",
+        "preexistingDetail": "",
+        "preparing": "",
+        "progressNotes": "",
+        "progressOf": "",
+        "reasonIllegalChar": "",
+        "reasonPathTooLong": "",
+        "reasonSegmentTooLong": "",
+        "scanning": "",
+        "setupIntro": "",
+        "statCancelled": "",
+        "statCanvasSkipped": "",
+        "statEmptyFoldersKept": "",
+        "statMedia": "",
+        "statOtherSkipped": "",
+        "statSkipped": "",
+        "suggestedNameAriaLabel": "",
+        "titleComplete": "",
+        "titleFailed": "",
+        "titleSetup": "",
+        "vaultFolderLabel": "",
+        "vaultRoot": ""
+      },
+      "offer": {
+        "body": "",
+        "chooseFolder": "",
+        "laterHint": "",
+        "notNow": "",
+        "title": ""
+      }
+    },
+    "list": {
+      "addToFavorites": "",
+      "archive": "",
+      "archiveBulkError": "",
+      "archiveNote": "",
+      "archiveSingleError": "",
+      "attachments": "",
+      "bulkArchive_one": "",
+      "bulkArchive_other": "",
+      "bulkDelete_one": "",
+      "bulkDelete_other": "",
+      "bulkMove_one": "",
+      "bulkMove_other": "",
+      "caseMergeBody": "",
+      "color": "",
+      "createFirstNote": "",
+      "createFolderNote": "",
+      "customize": "",
+      "delete": "",
+      "deleteFolderBody_one": "",
+      "deleteFolderBody_other": "",
+      "deleteFolderConfirm": "",
+      "deleteFolderTitle": "",
+      "deleteFolderWarning": "",
+      "duplicate": "",
+      "editFilterTitle": "",
+      "emptyState": "",
+      "exportHtml": "",
+      "exportMarkdown": "",
+      "exportPdf": "",
+      "exportTxt": "",
+      "favoritesHeading": "",
+      "mergeAnyway": "",
+      "newFolder": "",
+      "newFolderInPlaceholder": "",
+      "newFolderPlaceholder": "",
+      "newNote": "",
+      "newNoteFromTemplate": "",
+      "newNoteHere": "",
+      "newNoteMenu": "",
+      "newNoteShortcut": "",
+      "newSubfolder": "",
+      "newViewTitle": "",
+      "noteMovedToTrash": "",
+      "notesHeading": "",
+      "notesMovedToTrash_one": "",
+      "notesMovedToTrash_other": "",
+      "openArchive": "",
+      "openAttachments": "",
+      "openFolderNote": "",
+      "openInNewTab": "",
+      "openToSide": "",
+      "openTrash": "",
+      "removeAsFolderNote": "",
+      "removeFromFavorites": "",
+      "rename": "",
+      "setAsFolderNote": "",
+      "trash": "",
+      "trashBulkError": "",
+      "trashSingleError": "",
+      "undo": "",
+      "vaultRoot": "",
+      "viewSettingsTitle": ""
+    },
+    "newFromTemplate": {
+      "back": "",
+      "blankNote": "",
+      "createNote": "",
+      "emptyState": "",
+      "listLabel": "",
+      "loading": "",
+      "nameLabel": "",
+      "namePlaceholder": "",
+      "nameStepTitle": "",
+      "pickStepTitle": "",
+      "untitledTemplate": ""
+    },
+    "newTab": {
+      "createNote": "",
+      "noNotesMatch": "",
+      "noNotesYet": "",
+      "searchAriaLabel": "",
+      "searchPlaceholder": "",
+      "untitled": ""
+    },
+    "pane": {
+      "graphTab": "",
+      "loading": "",
+      "untitledView": ""
+    },
+    "relativeTime": {
+      "daysAgo": "",
+      "hoursAgo": "",
+      "justNow": "",
+      "minutesAgo": "",
+      "oneWeekAgo": "",
+      "weeksAgo": "",
+      "yesterday": ""
+    },
+    "row": {
+      "addToFavorites": "",
+      "folderIndexBadgeLabel": "",
+      "folderIndexBadgeTitle": "",
+      "folderIndexConflictLabel": "",
+      "folderIndexConflictTitle": "",
+      "loadError": "",
+      "removeFromFavorites": "",
+      "renameAriaLabel": "",
+      "untitled": ""
+    },
+    "savedView": {
+      "defaultName": ""
+    },
+    "saveStatus": {
+      "editing": "",
+      "editingEllipsis": "",
+      "editingTitle": "",
+      "justNow": "",
+      "retry": "",
+      "saved": "",
+      "savedRelative": "",
+      "saveFailed": "",
+      "saveFailedTitle": "",
+      "saving": "",
+      "savingEllipsis": ""
+    },
+    "snapshotFailed": {
+      "dismiss": "",
+      "message": ""
+    },
+    "snapshots": {
+      "cancel": "",
+      "changeCount_one": "",
+      "changeCount_other": "",
+      "close": "",
+      "confirmBody": "",
+      "confirmTitle": "",
+      "decrypting": "",
+      "emptyState": "",
+      "encryptedSize": "",
+      "errorCannotDecrypt": "",
+      "errorGeneric": "",
+      "errorIo": "",
+      "errorNotFound": "",
+      "errorStorageAccess": "",
+      "errorVaultLocked": "",
+      "justNow": "",
+      "listLabel": "",
+      "loading": "",
+      "restore": "",
+      "restoreCta": "",
+      "restoredStatus": "",
+      "selectPlaceholder": "",
+      "title": "",
+      "untitled": ""
+    },
+    "tabStrip": {
+      "closeNewTab": "",
+      "closeTab": "",
+      "newTab": "",
+      "openNotes": "",
+      "pin": "",
+      "pinned": "",
+      "pinnedTitle": "",
+      "unpin": "",
+      "untitled": ""
+    },
+    "tagBrowser": {
+      "cancel": "",
+      "clear": "",
+      "combineTagsWith": "",
+      "filtering": "",
+      "modeAll": "",
+      "modeAny": "",
+      "noNotesForFilter": "",
+      "noTagsMatch": "",
+      "noTagsYet": "",
+      "noteCount_one": "",
+      "noteCount_other": "",
+      "notes": "",
+      "pickTag": "",
+      "save": "",
+      "saveAsView": "",
+      "searchPlaceholder": "",
+      "title": "",
+      "untitled": "",
+      "viewNamePlaceholder": ""
+    },
+    "trash": {
+      "close": "",
+      "count_one": "",
+      "count_other": "",
+      "countEmpty": "",
+      "delete": "",
+      "deleteError": "",
+      "empty": "",
+      "emptyConfirmBody_one": "",
+      "emptyConfirmBody_other": "",
+      "emptyConfirmCta": "",
+      "emptyConfirmTitle": "",
+      "emptyPartialFailure_one": "",
+      "emptyPartialFailure_other": "",
+      "emptyState": "",
+      "purgeConfirmCta": "",
+      "purgeConfirmTitle": "",
+      "restore": "",
+      "restoreError": "",
+      "title": "",
+      "untitled": ""
+    },
+    "unlinkedMentions": {
+      "empty": "",
+      "heading": "",
+      "link": "",
+      "linkTooltip": "",
+      "refresh": "",
+      "searching": "",
+      "thisNote": "",
+      "untitled": ""
+    },
+    "views": {
+      "cards": {
+        "changeCover": "",
+        "changeCoverImage": "",
+        "empty": "",
+        "noValue": "",
+        "setCover": "",
+        "setCoverImage": "",
+        "untitled": ""
+      },
+      "collapseViews": "",
+      "empty": "",
+      "expandViews": "",
+      "heading": "",
+      "host": {
+        "unsupported": ""
+      },
+      "menu": {
+        "deleteView": "",
+        "editFilter": "",
+        "moveDown": "",
+        "moveUp": "",
+        "rename": "",
+        "viewSettings": ""
+      },
+      "newView": "",
+      "untitledView": ""
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "",
+        "fourThree": "",
+        "square": "",
+        "threeTwo": "",
+        "wide": ""
+      },
+      "cancel": "",
+      "cardSize": "",
+      "cardSizeValue": "",
+      "coverImageHint": "",
+      "coverImagePlaceholder": "",
+      "coverImageProperty": "",
+      "imageAspectRatio": "",
+      "reset": "",
+      "save": ""
+    },
+    "welcome": {
+      "body": "",
+      "title": ""
+    },
+    "workspace": {
+      "defaultSlotName": ""
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "",
+      "confirmLabel": "",
+      "defaultEmptyCaption": "",
+      "mismatch": "",
+      "passwordLabel": "",
+      "suggestPassword": "",
+      "tooShort": ""
+    },
+    "input": {
+      "hide": "",
+      "show": ""
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "",
+      "placeholder": "",
+      "searchPlaceholder": ""
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "",
+      "operationInProgress": "",
+      "unexpected": "",
+      "vaultNotFound": ""
+    }
+  },
+  "restore": {
+    "backLabel": "",
+    "cancelLabel": "",
+    "collision": {
+      "body": "",
+      "keepBoth": "",
+      "replaceExisting": ""
+    },
+    "damaged": {
+      "body": "",
+      "close": "",
+      "salvage": ""
+    },
+    "error": {
+      "tryAnotherFile": ""
+    },
+    "pick": {
+      "body": "",
+      "chooseFile": "",
+      "corruptedSuffix": ""
+    },
+    "summary": {
+      "attachments": "",
+      "collidedNote": "",
+      "notes": "",
+      "openVaultList": "",
+      "partialHeader_one": "",
+      "partialHeader_other": "",
+      "restored": "",
+      "versionHistory": ""
+    },
+    "title": "",
+    "working": {
+      "cancel": "",
+      "restoringProgress": "",
+      "verifying": "",
+      "verifyingProgress": ""
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "",
+      "buildChannelLabel": "",
+      "buildChannelStable": "",
+      "changelogButton": "",
+      "changelogHelper": "",
+      "changelogLabel": "",
+      "licenseBody": "",
+      "licenseLabel": "",
+      "tagline": "",
+      "threatModelHelper": "",
+      "threatModelLabel": ""
+    },
+    "account": {
+      "argon2idHeading": "",
+      "changePasswordButton": "",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "",
+        "ioError": "",
+        "joinFailure": "",
+        "samePasswordRejected": "",
+        "weakNewPassword": ""
+      },
+      "changePasswordHeading": "",
+      "changePasswordHelper": "",
+      "dangerZoneHeading": "",
+      "dangerZoneHelper": "",
+      "deleteVaultButton": "",
+      "memoryCost": "",
+      "parallelism": "",
+      "timeCost": "",
+      "vaultLabelEyebrow": "",
+      "vaultLabelHelper": "",
+      "vaultLabelPlaceholder": "",
+      "vaultLabelSave": ""
+    },
+    "appearance": {
+      "showEditTimesAria": "",
+      "showEditTimesHelper": "",
+      "showEditTimesLabel": "",
+      "themeHelper": "",
+      "themeLabel": "",
+      "themeOptionAria": "",
+      "themeSaveError": "",
+      "timestampsSaveError": ""
+    },
+    "archive": {
+      "helper": "",
+      "label": "",
+      "off": "",
+      "on": "",
+      "saveError": ""
+    },
+    "autoBackup": {
+      "backupFolder": "",
+      "chooseFolder": "",
+      "chooseFolderDialogTitle": "",
+      "frequency": "",
+      "frequencyAriaLabel": "",
+      "helper": "",
+      "keepLast": "",
+      "noFolderChosen": "",
+      "saveFailedToast": "",
+      "searchEmpty": "",
+      "searchPlaceholder": "",
+      "statusFailed": "",
+      "statusLastBackup": "",
+      "statusNever": "",
+      "title": ""
+    },
+    "changePassword": {
+      "cancel": "",
+      "checkingStrength": "",
+      "confirmLabel": "",
+      "currentLabel": "",
+      "mismatch": "",
+      "newLabel": "",
+      "submit": "",
+      "submitting": "",
+      "title": "",
+      "tooShort": ""
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "",
+        "firefox": "",
+        "generic": ""
+      },
+      "when": {
+        "bare": "",
+        "daysAgo_one": "",
+        "daysAgo_other": "",
+        "hoursAgo_one": "",
+        "hoursAgo_other": "",
+        "justNow": "",
+        "minutesAgo_one": "",
+        "minutesAgo_other": "",
+        "onDate": ""
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "",
+      "apply": "",
+      "applyError": "",
+      "cancel": "",
+      "confirm": "",
+      "delete": "",
+      "deleteError": "",
+      "empty": "",
+      "error": {
+        "aColorFallback": "",
+        "invalidFile": "",
+        "invalidName": "",
+        "invalidValue": "",
+        "invalidValueWithLine": "",
+        "missingKey": "",
+        "parseError": "",
+        "parseErrorWithLine": ""
+      },
+      "fileFilterName": "",
+      "helper": "",
+      "importButton": "",
+      "importError": "",
+      "label": "",
+      "openFolderButton": "",
+      "openFolderError": "",
+      "readError": ""
+    },
+    "dailyNotes": {
+      "blankTemplate": "",
+      "dateFormatHelper": "",
+      "dateFormatLabel": "",
+      "dateFormatSaveError": "",
+      "folderHelper": "",
+      "folderLabel": "",
+      "folderSaveError": "",
+      "searchEmpty": "",
+      "searchPlaceholder": "",
+      "templateHelper": "",
+      "templateLabel": "",
+      "templateSaveError": "",
+      "untitledTemplate": ""
+    },
+    "deleteVault": {
+      "cancel": "",
+      "caseSensitiveHint": "",
+      "continue": "",
+      "copyPrimary": "",
+      "copySecondary": "",
+      "eyebrow": "",
+      "heading": "",
+      "ioFailBody": "",
+      "ioFailTitle": "",
+      "partialFailBody_one": "",
+      "partialFailBody_other": "",
+      "partialFailTitle": "",
+      "submit": "",
+      "submitInFlight": "",
+      "typeToConfirmLabel": "",
+      "vaultPath": ""
+    },
+    "focusMode": {
+      "dimAria": "",
+      "dimHelper": "",
+      "dimLabel": "",
+      "off": "",
+      "on": "",
+      "saveError": "",
+      "typewriterAria": "",
+      "typewriterHelper": "",
+      "typewriterLabel": ""
+    },
+    "hotkeys": {
+      "addBindingAria": "",
+      "cancel": "",
+      "capturePrompt": "",
+      "conflictIndicator": "",
+      "conflictTitle": "",
+      "fixed": "",
+      "group": {
+        "editorFormatting": "",
+        "general": "",
+        "navigation": "",
+        "notes": "",
+        "panesTabs": "",
+        "view": ""
+      },
+      "helper": "",
+      "notSet": "",
+      "removeBindingAria": "",
+      "resetAll": "",
+      "resetAllConfirm": "",
+      "resetAllYes": "",
+      "restoreDefaultAria": "",
+      "searchAriaLabel": "",
+      "searchPlaceholder": "",
+      "warnAlreadyUsed": ""
+    },
+    "language": {
+      "helper": "",
+      "label": ""
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "",
+      "helper": "",
+      "label": "",
+      "off": "",
+      "on": ""
+    },
+    "prefs": {
+      "saveError": ""
+    },
+    "privacy": {
+      "autoLockHelper": "",
+      "autoLockLabel": "",
+      "autoLockSearchEmpty": "",
+      "autoLockSearchPlaceholder": "",
+      "screenCaptureHelperOff": "",
+      "screenCaptureHelperOn": "",
+      "screenCaptureLabel": ""
+    },
+    "quickUnlock": {
+      "errorCancelled": "",
+      "errorGeneric": "",
+      "errorHardwareUnavailable": "",
+      "errorNotUnlocked": "",
+      "errorPinNotDigits": "",
+      "errorPinTooShort_one": "",
+      "errorPinTooShort_other": "",
+      "helperConfigured": "",
+      "helperNotConfigured": "",
+      "methodPin": "",
+      "methodTouchId": "",
+      "pinAriaLabel": "",
+      "pinPlaceholder_one": "",
+      "pinPlaceholder_other": "",
+      "setPin": "",
+      "setupHelper": "",
+      "title": "",
+      "useTouchId": ""
+    },
+    "shell": {
+      "closeLabel": "",
+      "navLabel": "",
+      "passwordUpdatedToast": "",
+      "title": ""
+    },
+    "spell": {
+      "errorSaveLanguages": "",
+      "errorSaveSetting": "",
+      "helper": "",
+      "label": "",
+      "languagesAriaLabel": "",
+      "languagesHelper": "",
+      "languagesLabel": "",
+      "languagesPlaceholder": "",
+      "languagesSearchEmpty": "",
+      "languagesSearchPlaceholder": "",
+      "off": "",
+      "on": ""
+    },
+    "storage": {
+      "backupHelper": "",
+      "backupLabel": "",
+      "backUpVault": "",
+      "exportAction": "",
+      "exportBody": "",
+      "exportHelper": "",
+      "exportLabel": "",
+      "importHelper": "",
+      "importLabel": "",
+      "importObsidian": "",
+      "locationHelper": "",
+      "locationLabel": "",
+      "openInFiles": "",
+      "pathUnavailable": "",
+      "restoreBackup": ""
+    },
+    "typography": {
+      "errorSave": ""
+    },
+    "viewMode": {
+      "errorSave": "",
+      "helper": "",
+      "label": ""
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "",
+      "deleteRowLabel": "",
+      "editTemplateLabel": "",
+      "emptyBody": "",
+      "emptyTitle": "",
+      "listLabel": "",
+      "loading": "",
+      "newTemplate": "",
+      "newTemplateName": "",
+      "removeFromTemplates": "",
+      "removeRowLabel": "",
+      "title": ""
+    }
+  },
+  "unlock": {
+    "backToPicker": "",
+    "continue": "",
+    "decrypting": "",
+    "deleteLink": "",
+    "errors": {
+      "alreadyUnlocked": "",
+      "inProgress": "",
+      "unexpected": "",
+      "vaultNotFound": ""
+    },
+    "passwordLabel": "",
+    "passwordPlaceholder": "",
+    "quickUnlock": {
+      "failed": "",
+      "pinAriaLabel": "",
+      "pinPlaceholder": "",
+      "unlockWithPin": "",
+      "unlockWithTouchId": "",
+      "usePasswordBelow": "",
+      "wrongCredential": ""
+    },
+    "recoveryInterruptedBanner": "",
+    "recoveryInterruptedBody": "",
+    "recoveryInterruptedTitle": "",
+    "recoveryLink": "",
+    "submit": "",
+    "subtitle": "",
+    "suspicion": {
+      "lockedDuringChange": "",
+      "metaChangedExternally": ""
+    },
+    "title": ""
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "",
+      "notFound": "",
+      "permissionDenied": ""
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "",
+      "back": "",
+      "commit": "",
+      "committing": "",
+      "copied": "",
+      "copy": "",
+      "eyebrow": "",
+      "heading": "",
+      "intro": "",
+      "saveAsFile": "",
+      "shownOnceBody": "",
+      "shownOnceEmphasis": ""
+    },
+    "briefing": {
+      "back": "",
+      "continue": "",
+      "eyebrow": "",
+      "heading": "",
+      "intro": "",
+      "statements": {
+        "no-email": {
+          "ackLabel": "",
+          "statement": "",
+          "why": ""
+        },
+        "no-store": {
+          "ackLabel": "",
+          "statement": "",
+          "why": ""
+        },
+        "phrase-backup": {
+          "ackLabel": "",
+          "statement": "",
+          "why": ""
+        }
+      },
+      "why": ""
+    },
+    "confirm": {
+      "back": "",
+      "continue": "",
+      "eyebrow": "",
+      "heading": "",
+      "intro": "",
+      "mismatch": "",
+      "wordAtPosition": ""
+    },
+    "encrypting": {
+      "caption": "",
+      "footerHint": "",
+      "heading": ""
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "",
+        "title": ""
+      },
+      "aeadFailure": {
+        "body": "",
+        "title": ""
+      },
+      "csprng": {
+        "body": "",
+        "title": ""
+      },
+      "invalidPassword": {
+        "body": "",
+        "title": ""
+      },
+      "invalidVaultMeta": {
+        "body": "",
+        "title": ""
+      },
+      "ioOther": {
+        "body": "",
+        "title": ""
+      },
+      "joinFailure": {
+        "body": "",
+        "title": ""
+      },
+      "kdfFailure": {
+        "body": "",
+        "title": ""
+      },
+      "noSpace": {
+        "body": "",
+        "title": ""
+      },
+      "notFound": {
+        "body": "",
+        "title": ""
+      },
+      "passwordTooShort": {
+        "body": "",
+        "title": ""
+      },
+      "permissionDenied": {
+        "body": "",
+        "title": ""
+      },
+      "sessionExpired": {
+        "body": "",
+        "title": ""
+      },
+      "sessionNotFound": {
+        "body": "",
+        "title": ""
+      },
+      "tooManyConcurrentSessions": {
+        "body": "",
+        "title": ""
+      },
+      "vaultArtifactsPresent": {
+        "body": "",
+        "title": ""
+      },
+      "vaultBusyAuth": {
+        "body": "",
+        "title": ""
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "",
+        "message": "",
+        "okLabel": "",
+        "title": ""
+      },
+      "genericError": {
+        "body": "",
+        "title": ""
+      }
+    },
+    "password": {
+      "back": "",
+      "eyebrow": "",
+      "heading": "",
+      "helperLead": "",
+      "submit": ""
+    },
+    "phrase": {
+      "back": "",
+      "continue": "",
+      "copy": "",
+      "eyebrow": "",
+      "heading": "",
+      "intro": "",
+      "reveal": "",
+      "saveAsFile": ""
+    },
+    "ready": {
+      "backedUp": "",
+      "backingUp": "",
+      "backupDefaultFilename": "",
+      "backupError": "",
+      "backupFilterName": "",
+      "backUpNow": "",
+      "body": "",
+      "decrypting": "",
+      "done": "",
+      "heading": "",
+      "showFolder": ""
+    },
+    "sessionLost": {
+      "startOver": ""
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "",
+    "heading": "",
+    "loading": "",
+    "noneLoaded": "",
+    "openedRelative": "",
+    "restoreFromBackup": "",
+    "subline": "",
+    "vaultFallback": ""
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "",
+      "eyebrow": "",
+      "footerHint": "",
+      "heading": "",
+      "subCaption": ""
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "",
+        "operationInProgress": "",
+        "unexpected": "",
+        "weakPassword": ""
+      },
+      "eyebrow": "",
+      "helperBody": "",
+      "helperEmphasis": "",
+      "submit": "",
+      "title": ""
+    },
+    "phrase": {
+      "back": "",
+      "body": "",
+      "cellLabel": "",
+      "deleteLink": "",
+      "eyebrow": "",
+      "submit": "",
+      "title": ""
+    },
+    "select": {
+      "accountInvalid": "",
+      "accountLabel": "",
+      "accountPlaceholder": "",
+      "body": "",
+      "cancel": "",
+      "checking": "",
+      "loadFailed": "",
+      "loading": "",
+      "openedRelative": "",
+      "or": "",
+      "title": "",
+      "useAccountNumber": "",
+      "vaultFallback": ""
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "",
+    "createAnother": "",
+    "switching": "",
+    "switchVaultLabel": "",
+    "vaultFallback": ""
+  },
+  "welcome": {
+    "createCta": "",
+    "headlineLine1": "",
+    "headlineLine2": "",
+    "repairResidue": {
+      "cancel": "",
+      "cleaningUp": "",
+      "cleanUp": "",
+      "confirmBody_one": "",
+      "confirmBody_other": "",
+      "confirmTitle": "",
+      "doneBody_one": "",
+      "doneBody_other": "",
+      "doneTitle": "",
+      "errorBody": "",
+      "errorTitle": "",
+      "foundBody_one": "",
+      "foundBody_other": "",
+      "foundTitle": "",
+      "partialBody_one": "",
+      "partialBody_other": "",
+      "partialTitle": ""
+    },
+    "restoreCta": "",
+    "subtitle": ""
+  }
+}

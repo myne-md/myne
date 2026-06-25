@@ -11,18 +11,28 @@
 // literal equality. Those constants are rendered verbatim regardless of locale.
 // See `docs/dev/i18n.md` "Load-bearing copy".
 
-import i18n from "i18next";
+import i18n, { type Resource } from "i18next";
 import { initReactI18next } from "react-i18next";
-import enCommon from "../../locales/en/common.json";
-import trCommon from "../../locales/tr/common.json";
-import deCommon from "../../locales/de/common.json";
-import frCommon from "../../locales/fr/common.json";
 import {
   FALLBACK_LANGUAGE,
   LANGUAGE_STORAGE_KEY,
   SUPPORTED_CODES,
   type LanguageCode,
 } from "./config";
+
+// Glob-import every locale catalog (eager → bundled, no async). Adding a
+// language is then just a new `locales/<code>/common.json` file plus a
+// `SUPPORTED_LANGUAGES` entry — no edit here. The locale code comes from the
+// path. Empty catalogs are fine: i18next falls back to English per key.
+const catalogs = import.meta.glob<{ default: Record<string, unknown> }>(
+  "../../locales/*/common.json",
+  { eager: true },
+);
+const resources: Resource = {};
+for (const [path, mod] of Object.entries(catalogs)) {
+  const code = /\/locales\/([^/]+)\/common\.json$/.exec(path)?.[1];
+  if (code) resources[code] = { common: mod.default };
+}
 
 /**
  * Pick the boot language: an explicit device-local override wins; else the
@@ -49,12 +59,7 @@ function detectInitialLanguage(): LanguageCode {
 }
 
 void i18n.use(initReactI18next).init({
-  resources: {
-    en: { common: enCommon },
-    tr: { common: trCommon },
-    de: { common: deCommon },
-    fr: { common: frCommon },
-  },
+  resources,
   lng: detectInitialLanguage(),
   fallbackLng: FALLBACK_LANGUAGE,
   defaultNS: "common",
