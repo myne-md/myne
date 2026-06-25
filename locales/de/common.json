@@ -1520,7 +1520,7 @@
     },
     "language": {
       "helper": "Wählen Sie die Anzeigesprache für die App aus.",
-      "label": ""
+      "label": "Sprache"
     },
     "lineNumbers": {
       "errorSaveSetting": "",
@@ -1624,18 +1624,18 @@
     }
   },
   "unlock": {
-    "backToPicker": "",
-    "continue": "",
-    "decrypting": "",
-    "deleteLink": "",
+    "backToPicker": "Wählen Sie ein anderes Gewölbe",
+    "continue": "Weiterfahren",
+    "decrypting": "Entschlüsselung..",
+    "deleteLink": "Haben Sie sowohl Passwort als auch Wiederherstellungsphrase verloren? Vault löschen und neu starten",
     "errors": {
-      "alreadyUnlocked": "",
-      "inProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "alreadyUnlocked": "Vault ist bereits entsperrt.",
+      "inProgress": "Operation in Arbeit.",
+      "unexpected": "Unerwarteter Fehler. Bitte versuchen Sie es noch einmal.",
+      "vaultNotFound": "Vault-Datei nicht gefunden. Bitte starten Sie die App neu."
     },
-    "passwordLabel": "",
-    "passwordPlaceholder": "",
+    "passwordLabel": "Passwort",
+    "passwordPlaceholder": "Passwort",
     "quickUnlock": {
       "failed": "",
       "pinAriaLabel": "",
@@ -1645,17 +1645,17 @@
       "usePasswordBelow": "",
       "wrongCredential": ""
     },
-    "recoveryInterruptedBanner": "",
-    "recoveryInterruptedBody": "",
-    "recoveryInterruptedTitle": "",
-    "recoveryLink": "",
-    "submit": "",
-    "subtitle": "",
+    "recoveryInterruptedBanner": "Der Erholungsfluss wurde unterbrochen. Legen Sie zuerst ein neues Passwort fest.",
+    "recoveryInterruptedBody": "Legen Sie zuerst ein neues Passwort fest und versiegeln Sie dann Ihren Tresor.",
+    "recoveryInterruptedTitle": "Der Erholungsfluss wurde unterbrochen.",
+    "recoveryLink": "Haben Sie Ihr Passwort vergessen? Entsperren mit Recovery Phrase",
+    "submit": "Entsperrung",
+    "subtitle": "Geben Sie Ihr Passwort ein, um fortzufahren.",
     "suspicion": {
       "lockedDuringChange": "",
       "metaChangedExternally": ""
     },
-    "title": ""
+    "title": "Entsperren Sie Ihr Gewölbe."
   },
   "vault": {
     "ioBanner": {
@@ -1898,9 +1898,9 @@
     "vaultFallback": ""
   },
   "welcome": {
-    "createCta": "",
-    "headlineLine1": "",
-    "headlineLine2": "",
+    "createCta": "Erstellen Sie ein neues Vault",
+    "headlineLine1": "Verschlüsselte Markdown Notes.",
+    "headlineLine2": "Keine E-Mail bei der Anmeldung.",
     "repairResidue": {
       "cancel": "",
       "cleaningUp": "",
@@ -1920,7 +1920,7 @@
       "partialBody_other": "",
       "partialTitle": ""
     },
-    "restoreCta": "",
-    "subtitle": ""
+    "restoreCta": "Wiederherstellen aus dem Backup",
+    "subtitle": "Ihre Notizen werden auf diesem Gerät verschlüsselt, bevor sie es verlassen. Der Server speichert nur Ciphertext."
   }
 }

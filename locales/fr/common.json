@@ -1572,8 +1572,8 @@
       "warnAlreadyUsed": ""
     },
     "language": {
-      "helper": "",
-      "label": ""
+      "helper": "Choisissez la langue d'affichage de l'application.",
+      "label": "Langue"
     },
     "lineNumbers": {
       "errorSaveSetting": "",
@@ -1679,18 +1679,18 @@
     }
   },
   "unlock": {
-    "backToPicker": "",
-    "continue": "",
-    "decrypting": "",
-    "deleteLink": "",
+    "backToPicker": "Choisissez une chambre forte différente",
+    "continue": "Continuer",
+    "decrypting": "Décryptage..",
+    "deleteLink": "Mot de passe perdu et phrase de récupération ? Supprimer le coffre et recommencer",
     "errors": {
-      "alreadyUnlocked": "",
-      "inProgress": "",
-      "unexpected": "",
-      "vaultNotFound": ""
+      "alreadyUnlocked": "Vault est déjà déverrouillé.",
+      "inProgress": "Opération en cours.",
+      "unexpected": "Erreur inattendue. Veuillez réessayer.",
+      "vaultNotFound": "Fichier Vault introuvable. Veuillez redémarrer l'application."
     },
-    "passwordLabel": "",
-    "passwordPlaceholder": "",
+    "passwordLabel": "Mot de passe",
+    "passwordPlaceholder": "Mot de passe",
     "quickUnlock": {
       "failed": "",
       "pinAriaLabel": "",
@@ -1700,17 +1700,17 @@
       "usePasswordBelow": "",
       "wrongCredential": ""
     },
-    "recoveryInterruptedBanner": "",
-    "recoveryInterruptedBody": "",
-    "recoveryInterruptedTitle": "",
-    "recoveryLink": "",
-    "submit": "",
-    "subtitle": "",
+    "recoveryInterruptedBanner": "Le flux de récupération a été interrompu. Définir un nouveau mot de passe d'abord.",
+    "recoveryInterruptedBody": "Définissez d'abord un nouveau mot de passe, puis re-scellez votre chambre forte.",
+    "recoveryInterruptedTitle": "Le flux de récupération a été interrompu.",
+    "recoveryLink": "Vous avez oublié votre mot de passe ? Débloquer avec la phrase de récupération",
+    "submit": "Déverrouillage",
+    "subtitle": "Saisissez votre mot de passe pour continuer.",
     "suspicion": {
       "lockedDuringChange": "",
       "metaChangedExternally": ""
     },
-    "title": ""
+    "title": "Déverrouillez votre coffre."
   },
   "vault": {
     "ioBanner": {
@@ -1953,9 +1953,9 @@
     "vaultFallback": ""
   },
   "welcome": {
-    "createCta": "",
-    "headlineLine1": "",
-    "headlineLine2": "",
+    "createCta": "Créer une nouvelle chambre forte",
+    "headlineLine1": "Notes chiffrées.",
+    "headlineLine2": "Pas d'email à l'inscription.",
     "repairResidue": {
       "cancel": "",
       "cleaningUp": "",
@@ -1979,7 +1979,7 @@
       "partialBody_other": "",
       "partialTitle": ""
     },
-    "restoreCta": "",
-    "subtitle": ""
+    "restoreCta": "Restaurer depuis la sauvegarde",
+    "subtitle": "Vos notes sont cryptées sur ce périphérique avant qu'ils ne le quittent. Le serveur ne stocke que le chiffrement."
   }
 }
