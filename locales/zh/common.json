@@ -306,7 +306,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "关闭",
     "prompt": {
       "cancel": "取消",
       "confirmDefault": "确定"
@@ -1627,7 +1627,8 @@
         "editor": "编辑器",
         "hotkeys": "快捷键",
         "privacy": "隐私",
-        "storage": "存储"
+        "storage": "存储",
+        "sync": "同步"
       },
       "passwordUpdatedToast": "密码已更新",
       "title": "设置"
@@ -1686,119 +1687,119 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "正在下载 {{name}}",
+        "uploading": "正在上传 {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "暂无正在进行的传输。",
+      "heading": "附件同步",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "已完成",
+        "failedWillRetry": "失败——将重试",
+        "paused": "已暂停"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "正在构建搜索索引…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "丢弃",
+      "empty": "没有冲突——你的设备已同步。",
+      "groupTitle_other": "{{original}} 有 {{count}} 个冲突副本",
+      "keepAsSeparate": "保留为独立副本",
+      "untitled": "无标题（{{hex}}）"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "批准",
+      "awaitingApproval_other": "{{count}} 台设备等待批准",
+      "loading": "正在加载…",
+      "noDevices": "尚未同步任何设备。",
+      "notEnrolled": "此设备尚未连接。如果你刚刚添加它，请等待另一台设备批准；否则请通过上方的“添加设备”表单进行添加。",
+      "remove": "移除",
+      "removedElsewhere": "此设备已在另一台设备上被从你的账号中移除。",
+      "resetAndReAdd": "重置并重新添加此设备",
+      "resetSyncOnThisDevice": "在此设备上重置同步",
+      "shortName": "设备 {{hex}}",
+      "syncedHere": "已在此同步",
+      "thisDevice": "此设备",
+      "transportHint": "如果服务器已迁移或其证书已更改，请在上方的“同步服务器”中重新输入服务器 URL 以重新信任它。",
+      "unreachable": "无法连接到同步（{{error}}）。",
+      "yourDevices": "你的设备"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "连接",
+      "connectedLocal": "已连接（本地，无 TLS）。",
+      "connectedTls": "已连接。请确认此指纹与你另一台设备上显示的一致。",
+      "connecting": "正在连接…",
+      "fingerprintLabel": "服务器证书指纹：",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "无法连接到该服务器——请检查 URL 以及它是否正在运行。"
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "账号",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "正在连接…",
+      "credentialTypeAria": "凭据类型",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "请先在设置中设定同步服务器，然后再添加此设备。",
+        "transport": "无法连接到同步服务器。请检查你的网络连接后重试。"
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "密码",
+        "recovery": "恢复短语"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "密码",
+      "recoveryPhraseHint": "请输入你的 24 个单词的恢复短语。",
+      "recoveryPhraseLabel": "恢复短语",
+      "signInWith": "登录方式",
+      "submit": "添加此设备",
+      "wordAria": "第 {{number}} 个单词"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "账号",
+      "cancel": "取消",
+      "error": "无法添加此设备。请检查服务器 URL、账号和密码——以及服务器是否可以连接。",
+      "help": "使用你的账号和密码登录。在某台现有设备批准后，此设备便会同步你的笔记。无需恢复短语。",
+      "passwordLabel": "密码",
+      "serverLabel": "同步服务器",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "添加设备",
+      "submitting": "正在添加…",
+      "title": "将此设备添加到账号"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "在新设备上使用你的账号和密码或恢复短语登录。设备在某台现有设备批准之前会一直处于待批准状态。",
+        "label": "添加设备"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "当同一篇笔记同时在两台设备上被编辑时，Myne 会保留两份副本，确保不丢失任何内容。请在此处解决它们。",
+        "label": "冲突"
       },
       "devices": {
-        "label": ""
+        "label": "设备"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "请在每台设备上输入相同的服务器 URL。对于自托管服务器，请使用它的 <1>https://</1> 地址；并确认证书指纹在你的各台设备上一致。",
+        "label": "同步服务器"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne 会在你的各台设备之间同步加密后的笔记。服务器仅存储它无法读取的密文。",
+        "label": "同步状态"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "此设备离线了一段时间——正在追赶同步进度。你的笔记很安全。"
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "等待批准",
+      "conflicts_other": "{{count}} 个冲突待处理",
+      "error": "同步出错",
+      "loading": "正在获取同步状态…",
+      "notEnrolled": "未加入",
+      "off": "同步已关闭",
+      "synced": "已同步",
+      "syncing": "正在同步…",
+      "syncNow": "立即同步"
     }
   },
   "templates": {

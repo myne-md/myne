@@ -316,7 +316,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Ignora",
     "prompt": {
       "cancel": "Annulla",
       "confirmDefault": "OK"
@@ -1715,7 +1715,8 @@
         "editor": "Editor",
         "hotkeys": "Scorciatoie",
         "privacy": "Privacy",
-        "storage": "Archiviazione"
+        "storage": "Archiviazione",
+        "sync": "Sincronizzazione"
       },
       "passwordUpdatedToast": "Password aggiornata",
       "title": "Impostazioni"
@@ -1774,125 +1775,125 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Download di {{name}} in corso",
+        "uploading": "Caricamento di {{name}} in corso"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Nessun trasferimento in corso.",
+      "heading": "Sincronizzazione degli allegati",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "completato",
+        "failedWillRetry": "non riuscito — verrà ritentato",
+        "paused": "in pausa"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Creazione dell'indice di ricerca…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_many": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Scarta",
+      "empty": "Nessun conflitto — i tuoi dispositivi sono sincronizzati.",
+      "groupTitle_one": "{{count}} copia in conflitto di {{original}}",
+      "groupTitle_many": "{{count}} copie in conflitto di {{original}}",
+      "groupTitle_other": "{{count}} copie in conflitto di {{original}}",
+      "keepAsSeparate": "Mantieni separate",
+      "untitled": "Senza titolo ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_many": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Approva",
+      "awaitingApproval_one": "{{count}} dispositivo in attesa di approvazione",
+      "awaitingApproval_many": "{{count}} dispositivi in attesa di approvazione",
+      "awaitingApproval_other": "{{count}} dispositivi in attesa di approvazione",
+      "loading": "Caricamento…",
+      "noDevices": "Ancora nessun dispositivo sincronizzato.",
+      "notEnrolled": "Questo dispositivo non è ancora connesso. Se l'hai appena aggiunto, attendi l'approvazione da un altro dispositivo; altrimenti aggiungilo con il modulo “Aggiungi un dispositivo” qui sopra.",
+      "remove": "Rimuovi",
+      "removedElsewhere": "Questo dispositivo è stato rimosso dal tuo account da un altro dispositivo.",
+      "resetAndReAdd": "Reimposta e aggiungi di nuovo questo dispositivo",
+      "resetSyncOnThisDevice": "Reimposta la sincronizzazione su questo dispositivo",
+      "shortName": "Dispositivo {{hex}}",
+      "syncedHere": "Sincronizzato qui",
+      "thisDevice": "Questo dispositivo",
+      "transportHint": "Se il server è stato spostato o il suo certificato è cambiato, reinserisci l'URL del server in “Server di sincronizzazione” qui sopra per considerarlo di nuovo attendibile.",
+      "unreachable": "Impossibile raggiungere la sincronizzazione ({{error}}).",
+      "yourDevices": "I tuoi dispositivi"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Connetti",
+      "connectedLocal": "Connesso (locale, senza TLS).",
+      "connectedTls": "Connesso. Verifica che questa impronta corrisponda sull'altro dispositivo.",
+      "connecting": "Connessione…",
+      "fingerprintLabel": "Impronta del certificato del server:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Impossibile raggiungere quel server — controlla l'URL e che sia in esecuzione."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Numero di account",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Connessione…",
+      "credentialTypeAria": "Tipo di credenziale",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Imposta un server di sincronizzazione nelle impostazioni prima di aggiungere questo dispositivo.",
+        "transport": "Impossibile raggiungere il server di sincronizzazione. Controlla la connessione e riprova."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Password",
+        "recovery": "Frase di recupero"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Password",
+      "recoveryPhraseHint": "Inserisci la tua frase di recupero di 24 parole.",
+      "recoveryPhraseLabel": "Frase di recupero",
+      "signInWith": "Accedi con",
+      "submit": "Aggiungi questo dispositivo",
+      "wordAria": "Parola {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Numero di account",
+      "cancel": "Annulla",
+      "error": "Impossibile aggiungere questo dispositivo. Controlla l'URL del server, il numero di account e la password — e che il server sia raggiungibile.",
+      "help": "Accedi con il tuo numero di account e la password. Questo dispositivo sincronizzerà le tue note non appena un dispositivo esistente lo approva. Non serve la frase di recupero.",
+      "passwordLabel": "Password",
+      "serverLabel": "Server di sincronizzazione",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Aggiungi dispositivo",
+      "submitting": "Aggiunta in corso…",
+      "title": "Aggiungi questo dispositivo a un account"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Accedi su un nuovo dispositivo con il tuo numero di account e la password o la frase di recupero. Un dispositivo resta in attesa finché un dispositivo esistente non lo approva.",
+        "label": "Aggiungi un dispositivo"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Quando la stessa nota viene modificata su due dispositivi contemporaneamente, Myne conserva entrambe le copie così non si perde nulla. Risolvi i conflitti qui.",
+        "label": "Conflitti"
       },
       "devices": {
-        "label": ""
+        "label": "Dispositivi"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Inserisci lo stesso URL del server su ogni dispositivo. Per un server self-hosted usa il suo indirizzo <1>https://</1>; verifica che l'impronta del certificato corrisponda su tutti i tuoi dispositivi.",
+        "label": "Server di sincronizzazione"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne sincronizza le tue note crittografate tra i tuoi dispositivi. Il server memorizza solo testo cifrato che non può leggere.",
+        "label": "Stato della sincronizzazione"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Questo dispositivo è rimasto offline per un po' — sincronizzazione in corso. Le tue note sono al sicuro."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_many": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "In attesa di approvazione",
+      "conflicts_one": "{{count}} conflitto da esaminare",
+      "conflicts_many": "{{count}} conflitti da esaminare",
+      "conflicts_other": "{{count}} conflitti da esaminare",
+      "error": "Errore di sincronizzazione",
+      "loading": "Stato della sincronizzazione…",
+      "notEnrolled": "Non registrato",
+      "off": "Sincronizzazione disattivata",
+      "synced": "Sincronizzato",
+      "syncing": "Sincronizzazione…",
+      "syncNow": "Sincronizza ora"
     }
   },
   "templates": {

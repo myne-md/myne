@@ -306,7 +306,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Tutup",
     "prompt": {
       "cancel": "Batal",
       "confirmDefault": "OK"
@@ -1627,7 +1627,8 @@
         "editor": "Penyunting",
         "hotkeys": "Pintasan",
         "privacy": "Privasi",
-        "storage": "Penyimpanan"
+        "storage": "Penyimpanan",
+        "sync": "Sinkronisasi"
       },
       "passwordUpdatedToast": "Kata sandi diperbarui",
       "title": "Pengaturan"
@@ -1686,119 +1687,119 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Mengunduh {{name}}",
+        "uploading": "Mengunggah {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Tidak ada transfer yang berlangsung.",
+      "heading": "Sinkronisasi lampiran",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "selesai",
+        "failedWillRetry": "gagal — akan dicoba lagi",
+        "paused": "dijeda"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Membangun indeks pencarian…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Buang",
+      "empty": "Tidak ada konflik — perangkat Anda telah tersinkron.",
+      "groupTitle_other": "{{count}} salinan {{original}} yang berkonflik",
+      "keepAsSeparate": "Simpan terpisah",
+      "untitled": "Tanpa judul ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Setujui",
+      "awaitingApproval_other": "{{count}} perangkat menunggu persetujuan",
+      "loading": "Memuat…",
+      "noDevices": "Belum ada perangkat yang tersinkron.",
+      "notEnrolled": "Perangkat ini belum terhubung. Jika Anda baru saja menambahkannya, tunggu persetujuan dari perangkat lain; jika tidak, tambahkan dengan formulir “Tambah perangkat” di atas.",
+      "remove": "Hapus",
+      "removedElsewhere": "Perangkat ini dihapus dari akun Anda melalui perangkat lain.",
+      "resetAndReAdd": "Setel ulang dan tambahkan kembali perangkat ini",
+      "resetSyncOnThisDevice": "Setel ulang sinkronisasi di perangkat ini",
+      "shortName": "Perangkat {{hex}}",
+      "syncedHere": "Tersinkron di sini",
+      "thisDevice": "Perangkat ini",
+      "transportHint": "Jika server berpindah atau sertifikatnya berubah, masukkan kembali URL server di bagian “Server sinkronisasi” di atas untuk memercayainya lagi.",
+      "unreachable": "Tidak dapat menjangkau sinkronisasi ({{error}}).",
+      "yourDevices": "Perangkat Anda"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Hubungkan",
+      "connectedLocal": "Terhubung (lokal, tanpa TLS).",
+      "connectedTls": "Terhubung. Pastikan sidik jari ini cocok di perangkat Anda yang lain.",
+      "connecting": "Menghubungkan…",
+      "fingerprintLabel": "Sidik jari sertifikat server:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Tidak dapat menjangkau server itu — periksa URL-nya dan pastikan server berjalan."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Nomor akun",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Menghubungkan…",
+      "credentialTypeAria": "Tipe kredensial",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Atur server sinkronisasi di pengaturan sebelum menambahkan perangkat ini.",
+        "transport": "Tidak dapat menjangkau server sinkronisasi. Periksa koneksi Anda lalu coba lagi."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Kata sandi",
+        "recovery": "Frasa pemulihan"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Kata sandi",
+      "recoveryPhraseHint": "Masukkan frasa pemulihan 24 kata Anda.",
+      "recoveryPhraseLabel": "Frasa pemulihan",
+      "signInWith": "Masuk dengan",
+      "submit": "Tambahkan perangkat ini",
+      "wordAria": "Kata {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Nomor akun",
+      "cancel": "Batal",
+      "error": "Tidak dapat menambahkan perangkat ini. Periksa URL server, nomor akun, dan kata sandi — serta pastikan server dapat dijangkau.",
+      "help": "Masuk dengan nomor akun dan kata sandi Anda. Perangkat ini akan menyinkronkan catatan Anda setelah perangkat yang sudah ada menyetujuinya. Tidak perlu frasa pemulihan.",
+      "passwordLabel": "Kata sandi",
+      "serverLabel": "Server sinkronisasi",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Tambah perangkat",
+      "submitting": "Menambahkan…",
+      "title": "Tambahkan perangkat ini ke akun"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Masuk di perangkat baru dengan nomor akun dan kata sandi atau frasa pemulihan Anda. Sebuah perangkat tetap tertunda hingga perangkat yang sudah ada menyetujuinya.",
+        "label": "Tambah perangkat"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Ketika catatan yang sama disunting di dua perangkat sekaligus, Myne menyimpan kedua salinan agar tidak ada yang hilang. Selesaikan di sini.",
+        "label": "Konflik"
       },
       "devices": {
-        "label": ""
+        "label": "Perangkat"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Masukkan URL server yang sama di setiap perangkat. Untuk server yang Anda kelola sendiri, gunakan alamat <1>https://</1>-nya; pastikan sidik jari sertifikat cocok di seluruh perangkat Anda.",
+        "label": "Server sinkronisasi"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne menyinkronkan catatan terenkripsi Anda di seluruh perangkat. Server hanya menyimpan ciphertext yang tidak dapat dibacanya.",
+        "label": "Status sinkronisasi"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Perangkat ini sempat luring beberapa saat — sedang menyusul sinkronisasi. Catatan Anda aman."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Menunggu persetujuan",
+      "conflicts_other": "{{count}} konflik untuk ditinjau",
+      "error": "Galat sinkronisasi",
+      "loading": "Status sinkronisasi…",
+      "notEnrolled": "Belum terdaftar",
+      "off": "Sinkronisasi nonaktif",
+      "synced": "Tersinkron",
+      "syncing": "Menyinkronkan…",
+      "syncNow": "Sinkronkan sekarang"
     }
   },
   "templates": {

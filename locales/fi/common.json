@@ -310,7 +310,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Hylkää",
     "prompt": {
       "cancel": "Peruuta",
       "confirmDefault": "OK"
@@ -1660,7 +1660,8 @@
         "editor": "Muokkain",
         "hotkeys": "Pikanäppäimet",
         "privacy": "Yksityisyys",
-        "storage": "Tallennus"
+        "storage": "Tallennus",
+        "sync": "Synkronointi"
       },
       "passwordUpdatedToast": "Salasana päivitetty",
       "title": "Asetukset"
@@ -1719,122 +1720,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Ladataan: {{name}}",
+        "uploading": "Lähetetään: {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Ei käynnissä olevia siirtoja.",
+      "heading": "Liitteiden synkronointi",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "valmis",
+        "failedWillRetry": "epäonnistui — yritetään uudelleen",
+        "paused": "keskeytetty"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Rakennetaan hakuindeksiä…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Hylkää",
+      "empty": "Ei ristiriitoja — laitteesi ovat synkronissa.",
+      "groupTitle_one": "{{count}} ristiriitainen kopio kohteesta {{original}}",
+      "groupTitle_other": "{{count}} ristiriitaista kopiota kohteesta {{original}}",
+      "keepAsSeparate": "Säilytä erillisinä",
+      "untitled": "Nimetön ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Hyväksy",
+      "awaitingApproval_one": "{{count}} laite odottaa hyväksyntää",
+      "awaitingApproval_other": "{{count}} laitetta odottaa hyväksyntää",
+      "loading": "Ladataan…",
+      "noDevices": "Ei vielä synkronoituja laitteita.",
+      "notEnrolled": "Tätä laitetta ei ole vielä yhdistetty. Jos lisäsit sen juuri, odota hyväksyntää toiselta laitteelta; muussa tapauksessa lisää se yllä olevalla ”Lisää laite” -lomakkeella.",
+      "remove": "Poista",
+      "removedElsewhere": "Tämä laite poistettiin tililtäsi toisella laitteella.",
+      "resetAndReAdd": "Nollaa ja lisää tämä laite uudelleen",
+      "resetSyncOnThisDevice": "Nollaa synkronointi tällä laitteella",
+      "shortName": "Laite {{hex}}",
+      "syncedHere": "Synkronoitu täällä",
+      "thisDevice": "Tämä laite",
+      "transportHint": "Jos palvelin vaihtoi sijaintia tai sen varmenne muuttui, syötä palvelimen osoite uudelleen yllä kohdassa ”Synkronointipalvelin” luottaaksesi siihen jälleen.",
+      "unreachable": "Synkronointiin ei saatu yhteyttä ({{error}}).",
+      "yourDevices": "Laitteesi"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Yhdistä",
+      "connectedLocal": "Yhdistetty (paikallinen, ei TLS:ää).",
+      "connectedTls": "Yhdistetty. Varmista, että tämä sormenjälki täsmää toisella laitteellasi.",
+      "connecting": "Yhdistetään…",
+      "fingerprintLabel": "Palvelinvarmenteen sormenjälki:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Palvelimeen ei saatu yhteyttä — tarkista osoite ja että palvelin on käynnissä."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Tilinumero",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Yhdistetään…",
+      "credentialTypeAria": "Tunnistautumistapa",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Aseta synkronointipalvelin asetuksiin ennen tämän laitteen lisäämistä.",
+        "transport": "Synkronointipalvelimeen ei saatu yhteyttä. Tarkista yhteytesi ja yritä uudelleen."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Salasana",
+        "recovery": "Palautuslause"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Salasana",
+      "recoveryPhraseHint": "Syötä 24-sanainen palautuslauseesi.",
+      "recoveryPhraseLabel": "Palautuslause",
+      "signInWith": "Kirjaudu tavalla",
+      "submit": "Lisää tämä laite",
+      "wordAria": "Sana {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Tilinumero",
+      "cancel": "Peruuta",
+      "error": "Tämän laitteen lisääminen ei onnistunut. Tarkista palvelimen osoite, tilinumero ja salasana — ja että palvelimeen saa yhteyden.",
+      "help": "Kirjaudu tilinumerollasi ja salasanallasi. Tämä laite synkronoi muistiinpanosi, kun jokin olemassa oleva laite hyväksyy sen. Palautuslausetta ei tarvita.",
+      "passwordLabel": "Salasana",
+      "serverLabel": "Synkronointipalvelin",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Lisää laite",
+      "submitting": "Lisätään…",
+      "title": "Lisää tämä laite tiliin"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Kirjaudu uudella laitteella tilinumerollasi ja salasanallasi tai palautuslauseellasi. Laite pysyy odottavana, kunnes jokin olemassa oleva laite hyväksyy sen.",
+        "label": "Lisää laite"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Kun samaa muistiinpanoa muokataan kahdella laitteella yhtä aikaa, Myne säilyttää molemmat kopiot, jottei mitään katoa. Ratkaise ne täällä.",
+        "label": "Ristiriidat"
       },
       "devices": {
-        "label": ""
+        "label": "Laitteet"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Syötä sama palvelimen osoite jokaiselle laitteelle. Itse ylläpidetyllä palvelimella käytä sen <1>https://</1>-osoitetta; varmista, että varmenteen sormenjälki täsmää laitteidesi välillä.",
+        "label": "Synkronointipalvelin"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne synkronoi salatut muistiinpanosi laitteidesi välillä. Palvelin tallentaa vain salatekstiä, jota se ei voi lukea.",
+        "label": "Synkronoinnin tila"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Tämä laite oli jonkin aikaa offline-tilassa — synkronointi otetaan kiinni. Muistiinpanosi ovat turvassa."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Odottaa hyväksyntää",
+      "conflicts_one": "{{count}} ristiriita tarkistettavana",
+      "conflicts_other": "{{count}} ristiriitaa tarkistettavana",
+      "error": "Synkronointivirhe",
+      "loading": "Synkronoinnin tila…",
+      "notEnrolled": "Ei rekisteröity",
+      "off": "Synkronointi pois käytöstä",
+      "synced": "Synkronoitu",
+      "syncing": "Synkronoidaan…",
+      "syncNow": "Synkronoi nyt"
     }
   },
   "templates": {

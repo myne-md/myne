@@ -312,7 +312,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Avfärda",
     "prompt": {
       "cancel": "Avbryt",
       "confirmDefault": "OK"
@@ -1666,7 +1666,8 @@
         "editor": "Redigerare",
         "hotkeys": "Kortkommandon",
         "privacy": "Sekretess",
-        "storage": "Lagring"
+        "storage": "Lagring",
+        "sync": "Synkronisering"
       },
       "passwordUpdatedToast": "Lösenord uppdaterat",
       "title": "Inställningar"
@@ -1725,122 +1726,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Laddar ner {{name}}",
+        "uploading": "Laddar upp {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Inga överföringar pågår.",
+      "heading": "Synkronisering av bilagor",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "klar",
+        "failedWillRetry": "misslyckades — försöker igen",
+        "paused": "pausad"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Bygger sökindex…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Kassera",
+      "empty": "Inga konflikter — dina enheter är synkroniserade.",
+      "groupTitle_one": "{{count}} motstridig kopia av {{original}}",
+      "groupTitle_other": "{{count}} motstridiga kopior av {{original}}",
+      "keepAsSeparate": "Behåll som separata",
+      "untitled": "Namnlös ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Godkänn",
+      "awaitingApproval_one": "{{count}} enhet väntar på godkännande",
+      "awaitingApproval_other": "{{count}} enheter väntar på godkännande",
+      "loading": "Läser in…",
+      "noDevices": "Inga enheter synkroniserade ännu.",
+      "notEnrolled": "Den här enheten är inte ansluten ännu. Om du precis lade till den, vänta på godkännande från en annan enhet. Annars lägger du till den med formuläret ”Lägg till en enhet” ovan.",
+      "remove": "Ta bort",
+      "removedElsewhere": "Den här enheten togs bort från ditt konto på en annan enhet.",
+      "resetAndReAdd": "Återställ och lägg till den här enheten igen",
+      "resetSyncOnThisDevice": "Återställ synkronisering på den här enheten",
+      "shortName": "Enhet {{hex}}",
+      "syncedHere": "Synkroniserad här",
+      "thisDevice": "Den här enheten",
+      "transportHint": "Om servern flyttades eller dess certifikat ändrades anger du serveradressen på nytt under ”Synkserver” ovan för att lita på den igen.",
+      "unreachable": "Kunde inte nå synkroniseringen ({{error}}).",
+      "yourDevices": "Dina enheter"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Anslut",
+      "connectedLocal": "Ansluten (lokalt, ingen TLS).",
+      "connectedTls": "Ansluten. Kontrollera att det här fingeravtrycket matchar på din andra enhet.",
+      "connecting": "Ansluter…",
+      "fingerprintLabel": "Serverns certifikatfingeravtryck:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Kunde inte nå den servern — kontrollera adressen och att den är igång."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Kontonummer",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Ansluter…",
+      "credentialTypeAria": "Typ av inloggningsuppgift",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Ange en synkserver i inställningarna innan du lägger till den här enheten.",
+        "transport": "Kunde inte nå synkservern. Kontrollera din anslutning och försök igen."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Lösenord",
+        "recovery": "Återställningsfras"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Lösenord",
+      "recoveryPhraseHint": "Ange din återställningsfras med 24 ord.",
+      "recoveryPhraseLabel": "Återställningsfras",
+      "signInWith": "Logga in med",
+      "submit": "Lägg till den här enheten",
+      "wordAria": "Ord {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Kontonummer",
+      "cancel": "Avbryt",
+      "error": "Kunde inte lägga till den här enheten. Kontrollera serveradressen, kontonumret och lösenordet — och att servern går att nå.",
+      "help": "Logga in med ditt kontonummer och lösenord. Den här enheten synkroniserar dina anteckningar så snart en befintlig enhet godkänner den. Ingen återställningsfras behövs.",
+      "passwordLabel": "Lösenord",
+      "serverLabel": "Synkserver",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Lägg till enhet",
+      "submitting": "Lägger till…",
+      "title": "Lägg till den här enheten till ett konto"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Logga in på en ny enhet med ditt kontonummer och lösenord eller din återställningsfras. En enhet förblir väntande tills en befintlig enhet godkänner den.",
+        "label": "Lägg till en enhet"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "När samma anteckning redigeras på två enheter samtidigt behåller Myne båda kopiorna så att inget går förlorat. Lös dem här.",
+        "label": "Konflikter"
       },
       "devices": {
-        "label": ""
+        "label": "Enheter"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Ange samma serveradress på varje enhet. För en egenhostad server använder du dess <1>https://</1>-adress; kontrollera att certifikatfingeravtrycket matchar mellan dina enheter.",
+        "label": "Synkserver"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne synkroniserar dina krypterade anteckningar mellan dina enheter. Servern lagrar bara chiffertext som den inte kan läsa.",
+        "label": "Synkstatus"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Den här enheten var offline ett tag — hämtar ikapp synkroniseringen. Dina anteckningar är trygga."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Väntar på godkännande",
+      "conflicts_one": "{{count}} konflikt att granska",
+      "conflicts_other": "{{count}} konflikter att granska",
+      "error": "Synkfel",
+      "loading": "Synkstatus…",
+      "notEnrolled": "Inte registrerad",
+      "off": "Synk av",
+      "synced": "Synkroniserad",
+      "syncing": "Synkroniserar…",
+      "syncNow": "Synkronisera nu"
     }
   },
   "templates": {

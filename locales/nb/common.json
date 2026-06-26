@@ -312,7 +312,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Lukk",
     "prompt": {
       "cancel": "Avbryt",
       "confirmDefault": "OK"
@@ -1682,7 +1682,8 @@
         "editor": "Redigering",
         "hotkeys": "Hurtigtaster",
         "privacy": "Personvern",
-        "storage": "Lagring"
+        "storage": "Lagring",
+        "sync": "Synkronisering"
       },
       "passwordUpdatedToast": "Passord oppdatert",
       "title": "Innstillinger"
@@ -1741,122 +1742,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Laster ned {{name}}",
+        "uploading": "Laster opp {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Ingen overføringer pågår.",
+      "heading": "Synkronisering av vedlegg",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "ferdig",
+        "failedWillRetry": "mislyktes — prøver igjen",
+        "paused": "satt på pause"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Bygger søkeindeks…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Forkast",
+      "empty": "Ingen konflikter — enhetene dine er synkronisert.",
+      "groupTitle_one": "{{count}} motstridende kopi av {{original}}",
+      "groupTitle_other": "{{count}} motstridende kopier av {{original}}",
+      "keepAsSeparate": "Behold som adskilt",
+      "untitled": "Uten tittel ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Godkjenn",
+      "awaitingApproval_one": "{{count}} enhet venter på godkjenning",
+      "awaitingApproval_other": "{{count}} enheter venter på godkjenning",
+      "loading": "Laster…",
+      "noDevices": "Ingen enheter synkronisert ennå.",
+      "notEnrolled": "Denne enheten er ikke tilkoblet ennå. Hvis du nettopp la den til, vent på godkjenning fra en annen enhet; ellers legger du den til med skjemaet «Legg til en enhet» ovenfor.",
+      "remove": "Fjern",
+      "removedElsewhere": "Denne enheten ble fjernet fra kontoen din på en annen enhet.",
+      "resetAndReAdd": "Tilbakestill og legg til denne enheten på nytt",
+      "resetSyncOnThisDevice": "Tilbakestill synkronisering på denne enheten",
+      "shortName": "Enhet {{hex}}",
+      "syncedHere": "Synkronisert her",
+      "thisDevice": "Denne enheten",
+      "transportHint": "Hvis serveren har flyttet eller sertifikatet har endret seg, skriv inn server-URL-en på nytt under «Synkroniseringsserver» ovenfor for å stole på den igjen.",
+      "unreachable": "Kunne ikke nå synkroniseringen ({{error}}).",
+      "yourDevices": "Enhetene dine"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Koble til",
+      "connectedLocal": "Tilkoblet (lokalt, uten TLS).",
+      "connectedTls": "Tilkoblet. Kontroller at dette fingeravtrykket stemmer på den andre enheten din.",
+      "connecting": "Kobler til…",
+      "fingerprintLabel": "Fingeravtrykk for serversertifikat:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Kunne ikke nå den serveren — sjekk URL-en og at den kjører."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Kontonummer",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Kobler til…",
+      "credentialTypeAria": "Legitimasjonstype",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Angi en synkroniseringsserver i innstillingene før du legger til denne enheten.",
+        "transport": "Kunne ikke nå synkroniseringsserveren. Sjekk tilkoblingen din og prøv igjen."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Passord",
+        "recovery": "Gjenopprettingsfrase"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Passord",
+      "recoveryPhraseHint": "Skriv inn den 24-ord lange gjenopprettingsfrasen din.",
+      "recoveryPhraseLabel": "Gjenopprettingsfrase",
+      "signInWith": "Logg inn med",
+      "submit": "Legg til denne enheten",
+      "wordAria": "Ord {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Kontonummer",
+      "cancel": "Avbryt",
+      "error": "Kunne ikke legge til denne enheten. Sjekk server-URL-en, kontonummeret og passordet — og at serveren er tilgjengelig.",
+      "help": "Logg inn med kontonummeret og passordet ditt. Denne enheten synkroniserer notatene dine så snart en eksisterende enhet godkjenner den. Ingen gjenopprettingsfrase nødvendig.",
+      "passwordLabel": "Passord",
+      "serverLabel": "Synkroniseringsserver",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Legg til enhet",
+      "submitting": "Legger til…",
+      "title": "Legg til denne enheten på en konto"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Logg inn på en ny enhet med kontonummeret og passordet eller gjenopprettingsfrasen din. En enhet forblir ventende til en eksisterende enhet godkjenner den.",
+        "label": "Legg til en enhet"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Når det samme notatet redigeres på to enheter samtidig, beholder Myne begge kopiene så ingenting går tapt. Løs dem her.",
+        "label": "Konflikter"
       },
       "devices": {
-        "label": ""
+        "label": "Enheter"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Skriv inn den samme server-URL-en på hver enhet. For en selvhostet server bruker du dens <1>https://</1>-adresse; kontroller at sertifikatets fingeravtrykk stemmer på tvers av enhetene dine.",
+        "label": "Synkroniseringsserver"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne synkroniserer de krypterte notatene dine på tvers av enhetene dine. Serveren lagrer bare chiffertekst den ikke kan lese.",
+        "label": "Synkroniseringsstatus"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Denne enheten var frakoblet en stund — tar igjen synkroniseringen. Notatene dine er trygge."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Venter på godkjenning",
+      "conflicts_one": "{{count}} konflikt å gjennomgå",
+      "conflicts_other": "{{count}} konflikter å gjennomgå",
+      "error": "Synkroniseringsfeil",
+      "loading": "Synkroniseringsstatus…",
+      "notEnrolled": "Ikke registrert",
+      "off": "Synkronisering av",
+      "synced": "Synkronisert",
+      "syncing": "Synkroniserer…",
+      "syncNow": "Synkroniser nå"
     }
   },
   "templates": {

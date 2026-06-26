@@ -322,7 +322,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Закрити",
     "prompt": {
       "cancel": "Скасувати",
       "confirmDefault": "OK"
@@ -1770,7 +1770,8 @@
         "editor": "Редактор",
         "hotkeys": "Комбінації клавіш",
         "privacy": "Конфіденційність",
-        "storage": "Сховище"
+        "storage": "Сховище",
+        "sync": "Синхронізація"
       },
       "passwordUpdatedToast": "Пароль оновлено",
       "title": "Налаштування"
@@ -1829,128 +1830,128 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Завантаження {{name}}",
+        "uploading": "Вивантаження {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Немає активних передавань.",
+      "heading": "Синхронізація вкладень",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "готово",
+        "failedWillRetry": "помилка — буде повторено",
+        "paused": "призупинено"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Побудова пошукового індексу…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_few": "",
-      "groupTitle_many": "",
+      "discard": "Відхилити",
+      "empty": "Конфліктів немає — ваші пристрої синхронізовано.",
+      "groupTitle_one": "{{count}} конфліктна копія {{original}}",
+      "groupTitle_few": "{{count}} конфліктні копії {{original}}",
+      "groupTitle_many": "{{count}} конфліктних копій {{original}}",
       "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "keepAsSeparate": "Зберегти окремо",
+      "untitled": "Без назви ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_few": "",
-      "awaitingApproval_many": "",
+      "approve": "Схвалити",
+      "awaitingApproval_one": "{{count}} пристрій очікує схвалення",
+      "awaitingApproval_few": "{{count}} пристрої очікують схвалення",
+      "awaitingApproval_many": "{{count}} пристроїв очікують схвалення",
       "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "loading": "Завантаження…",
+      "noDevices": "Жодного пристрою ще не синхронізовано.",
+      "notEnrolled": "Цей пристрій ще не під’єднано. Якщо ви щойно додали його, дочекайтеся схвалення з іншого пристрою; інакше додайте його за допомогою форми «Додати пристрій» вище.",
+      "remove": "Вилучити",
+      "removedElsewhere": "Цей пристрій було вилучено з вашого облікового запису на іншому пристрої.",
+      "resetAndReAdd": "Скинути й додати цей пристрій знову",
+      "resetSyncOnThisDevice": "Скинути синхронізацію на цьому пристрої",
+      "shortName": "Пристрій {{hex}}",
+      "syncedHere": "Синхронізовано тут",
+      "thisDevice": "Цей пристрій",
+      "transportHint": "Якщо сервер змінив адресу або його сертифікат змінився, повторно введіть URL-адресу сервера в розділі «Сервер синхронізації» вище, щоб знову довіряти йому.",
+      "unreachable": "Не вдалося зв’язатися із синхронізацією ({{error}}).",
+      "yourDevices": "Ваші пристрої"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Під’єднати",
+      "connectedLocal": "Під’єднано (локально, без TLS).",
+      "connectedTls": "Під’єднано. Переконайтеся, що цей відбиток збігається на вашому іншому пристрої.",
+      "connecting": "З’єднання…",
+      "fingerprintLabel": "Відбиток сертифіката сервера:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Не вдалося зв’язатися з цим сервером — перевірте URL-адресу та чи він запущений."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Номер облікового запису",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "З’єднання…",
+      "credentialTypeAria": "Тип облікових даних",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Перш ніж додавати цей пристрій, укажіть сервер синхронізації в налаштуваннях.",
+        "transport": "Не вдалося зв’язатися із сервером синхронізації. Перевірте з’єднання та спробуйте ще раз."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Пароль",
+        "recovery": "Фраза відновлення"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Пароль",
+      "recoveryPhraseHint": "Уведіть свою фразу відновлення з 24 слів.",
+      "recoveryPhraseLabel": "Фраза відновлення",
+      "signInWith": "Увійти за допомогою",
+      "submit": "Додати цей пристрій",
+      "wordAria": "Слово {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Номер облікового запису",
+      "cancel": "Скасувати",
+      "error": "Не вдалося додати цей пристрій. Перевірте URL-адресу сервера, номер облікового запису й пароль — і чи доступний сервер.",
+      "help": "Увійдіть за допомогою номера облікового запису та пароля. Цей пристрій синхронізує ваші нотатки, щойно його схвалить наявний пристрій. Фраза відновлення не потрібна.",
+      "passwordLabel": "Пароль",
+      "serverLabel": "Сервер синхронізації",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Додати пристрій",
+      "submitting": "Додавання…",
+      "title": "Додати цей пристрій до облікового запису"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Увійдіть на новому пристрої за допомогою номера облікового запису та пароля або фрази відновлення. Пристрій залишається в очікуванні, доки його не схвалить наявний пристрій.",
+        "label": "Додати пристрій"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Коли ту саму нотатку редагують одночасно на двох пристроях, Myne зберігає обидві копії, щоб нічого не втратилося. Розв’яжіть їх тут.",
+        "label": "Конфлікти"
       },
       "devices": {
-        "label": ""
+        "label": "Пристрої"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Уведіть однакову URL-адресу сервера на кожному пристрої. Для самостійно розміщеного сервера використовуйте його <1>https://</1> адресу; переконайтеся, що відбиток сертифіката збігається на всіх ваших пристроях.",
+        "label": "Сервер синхронізації"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne синхронізує ваші зашифровані нотатки між пристроями. Сервер зберігає лише шифротекст, який не може прочитати.",
+        "label": "Стан синхронізації"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Цей пристрій певний час був офлайн — наздоганяємо синхронізацію. Ваші нотатки в безпеці."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_few": "",
-      "conflicts_many": "",
+      "awaitingApproval": "Очікування схвалення",
+      "conflicts_one": "{{count}} конфлікт на розгляд",
+      "conflicts_few": "{{count}} конфлікти на розгляд",
+      "conflicts_many": "{{count}} конфліктів на розгляд",
       "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "error": "Помилка синхронізації",
+      "loading": "Стан синхронізації…",
+      "notEnrolled": "Не під’єднано",
+      "off": "Синхронізацію вимкнено",
+      "synced": "Синхронізовано",
+      "syncing": "Синхронізація…",
+      "syncNow": "Синхронізувати зараз"
     }
   },
   "templates": {

@@ -312,7 +312,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Sluiten",
     "prompt": {
       "cancel": "Annuleren",
       "confirmDefault": "OK"
@@ -1682,7 +1682,8 @@
         "editor": "Editor",
         "hotkeys": "Sneltoetsen",
         "privacy": "Privacy",
-        "storage": "Opslag"
+        "storage": "Opslag",
+        "sync": "Synchronisatie"
       },
       "passwordUpdatedToast": "Wachtwoord bijgewerkt",
       "title": "Instellingen"
@@ -1741,122 +1742,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "{{name}} downloaden",
+        "uploading": "{{name}} uploaden"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Geen overdrachten bezig.",
+      "heading": "Bijlagen synchroniseren",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "klaar",
+        "failedWillRetry": "mislukt — opnieuw proberen",
+        "paused": "gepauzeerd"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Zoekindex opbouwen…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Weggooien",
+      "empty": "Geen conflicten — je apparaten zijn gesynchroniseerd.",
+      "groupTitle_one": "{{count}} conflicterende kopie van {{original}}",
+      "groupTitle_other": "{{count}} conflicterende kopieën van {{original}}",
+      "keepAsSeparate": "Apart bewaren",
+      "untitled": "Naamloos ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Goedkeuren",
+      "awaitingApproval_one": "{{count}} apparaat wacht op goedkeuring",
+      "awaitingApproval_other": "{{count}} apparaten wachten op goedkeuring",
+      "loading": "Laden…",
+      "noDevices": "Nog geen apparaten gesynchroniseerd.",
+      "notEnrolled": "Dit apparaat is nog niet verbonden. Als je het zojuist hebt toegevoegd, wacht dan op goedkeuring vanaf een ander apparaat; voeg het anders toe via het formulier “Een apparaat toevoegen” hierboven.",
+      "remove": "Verwijderen",
+      "removedElsewhere": "Dit apparaat is op een ander apparaat uit je account verwijderd.",
+      "resetAndReAdd": "Dit apparaat opnieuw instellen en opnieuw toevoegen",
+      "resetSyncOnThisDevice": "Synchronisatie op dit apparaat opnieuw instellen",
+      "shortName": "Apparaat {{hex}}",
+      "syncedHere": "Hier gesynchroniseerd",
+      "thisDevice": "Dit apparaat",
+      "transportHint": "Als de server is verplaatst of het certificaat is gewijzigd, voer de server-URL dan opnieuw in onder “Synchronisatieserver” hierboven om hem opnieuw te vertrouwen.",
+      "unreachable": "Synchronisatie was niet bereikbaar ({{error}}).",
+      "yourDevices": "Je apparaten"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Verbinden",
+      "connectedLocal": "Verbonden (lokaal, geen TLS).",
+      "connectedTls": "Verbonden. Controleer of deze vingerafdruk overeenkomt met die op je andere apparaat.",
+      "connecting": "Verbinden…",
+      "fingerprintLabel": "Vingerafdruk van servercertificaat:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Die server was niet bereikbaar — controleer de URL en of de server draait."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Accountnummer",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Verbinden…",
+      "credentialTypeAria": "Type aanmeldgegeven",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Stel een synchronisatieserver in via de instellingen voordat je dit apparaat toevoegt.",
+        "transport": "De synchronisatieserver was niet bereikbaar. Controleer je verbinding en probeer het opnieuw."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Wachtwoord",
+        "recovery": "Herstelzin"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Wachtwoord",
+      "recoveryPhraseHint": "Voer je herstelzin van 24 woorden in.",
+      "recoveryPhraseLabel": "Herstelzin",
+      "signInWith": "Aanmelden met",
+      "submit": "Dit apparaat toevoegen",
+      "wordAria": "Woord {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Accountnummer",
+      "cancel": "Annuleren",
+      "error": "Dit apparaat kon niet worden toegevoegd. Controleer de server-URL, het accountnummer en het wachtwoord — en of de server bereikbaar is.",
+      "help": "Meld je aan met je accountnummer en wachtwoord. Dit apparaat synchroniseert je notities zodra een bestaand apparaat het goedkeurt. Er is geen herstelzin nodig.",
+      "passwordLabel": "Wachtwoord",
+      "serverLabel": "Synchronisatieserver",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Apparaat toevoegen",
+      "submitting": "Toevoegen…",
+      "title": "Dit apparaat aan een account toevoegen"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Meld je op een nieuw apparaat aan met je accountnummer en wachtwoord of herstelzin. Een apparaat blijft in afwachting totdat een bestaand apparaat het goedkeurt.",
+        "label": "Een apparaat toevoegen"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Wanneer dezelfde notitie tegelijk op twee apparaten wordt bewerkt, bewaart Myne beide kopieën zodat er niets verloren gaat. Los ze hier op.",
+        "label": "Conflicten"
       },
       "devices": {
-        "label": ""
+        "label": "Apparaten"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Voer op elk apparaat dezelfde server-URL in. Gebruik voor een zelf-gehoste server het <1>https://</1>-adres ervan; controleer of de vingerafdruk van het certificaat op al je apparaten overeenkomt.",
+        "label": "Synchronisatieserver"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne synchroniseert je versleutelde notities tussen je apparaten. De server bewaart alleen ciphertext die hij niet kan lezen.",
+        "label": "Synchronisatiestatus"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Dit apparaat is een tijd offline geweest — de synchronisatie wordt bijgewerkt. Je notities zijn veilig."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Wacht op goedkeuring",
+      "conflicts_one": "{{count}} conflict te beoordelen",
+      "conflicts_other": "{{count}} conflicten te beoordelen",
+      "error": "Synchronisatiefout",
+      "loading": "Synchronisatiestatus…",
+      "notEnrolled": "Niet aangemeld",
+      "off": "Synchronisatie uit",
+      "synced": "Gesynchroniseerd",
+      "syncing": "Synchroniseren…",
+      "syncNow": "Nu synchroniseren"
     }
   },
   "templates": {

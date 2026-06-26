@@ -305,7 +305,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "閉じる",
     "prompt": {
       "cancel": "キャンセル",
       "confirmDefault": "OK"
@@ -1623,7 +1623,8 @@
         "editor": "エディタ",
         "hotkeys": "ホットキー",
         "privacy": "プライバシー",
-        "storage": "ストレージ"
+        "storage": "ストレージ",
+        "sync": "同期"
       },
       "passwordUpdatedToast": "パスワードを更新しました",
       "title": "設定"
@@ -1682,119 +1683,119 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "{{name}}をダウンロード中",
+        "uploading": "{{name}}をアップロード中"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "進行中の転送はありません。",
+      "heading": "添付ファイルの同期",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "完了",
+        "failedWillRetry": "失敗 — 再試行します",
+        "paused": "一時停止中"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "検索インデックスを構築中…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "破棄",
+      "empty": "競合はありません — デバイス間で同期がとれています。",
+      "groupTitle_other": "「{{original}}」の競合するコピー{{count}}件",
+      "keepAsSeparate": "別々に保持",
+      "untitled": "無題（{{hex}}）"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "承認",
+      "awaitingApproval_other": "承認待ちのデバイス{{count}}件",
+      "loading": "読み込み中…",
+      "noDevices": "同期されているデバイスはまだありません。",
+      "notEnrolled": "このデバイスはまだ接続されていません。追加したばかりの場合は、別のデバイスからの承認をお待ちください。そうでない場合は、上の「デバイスを追加」フォームから追加してください。",
+      "remove": "削除",
+      "removedElsewhere": "このデバイスは別のデバイスからアカウントの登録を解除されました。",
+      "resetAndReAdd": "このデバイスをリセットして再追加",
+      "resetSyncOnThisDevice": "このデバイスの同期をリセット",
+      "shortName": "デバイス{{hex}}",
+      "syncedHere": "ここで同期済み",
+      "thisDevice": "このデバイス",
+      "transportHint": "サーバーが移転したか証明書が変更された場合は、上の「同期サーバー」でサーバーURLを再入力して、改めて信頼してください。",
+      "unreachable": "同期に接続できませんでした（{{error}}）。",
+      "yourDevices": "お使いのデバイス"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "接続",
+      "connectedLocal": "接続済み（ローカル、TLSなし）。",
+      "connectedTls": "接続しました。このフィンガープリントが他のデバイスと一致することを確認してください。",
+      "connecting": "接続中…",
+      "fingerprintLabel": "サーバー証明書のフィンガープリント：",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "そのサーバーに接続できませんでした — URLと、サーバーが稼働しているかを確認してください。"
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "アカウント番号",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "接続中…",
+      "credentialTypeAria": "認証情報の種類",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "このデバイスを追加する前に、設定で同期サーバーを指定してください。",
+        "transport": "同期サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "パスワード",
+        "recovery": "復元フレーズ"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "パスワード",
+      "recoveryPhraseHint": "24語の復元フレーズを入力してください。",
+      "recoveryPhraseLabel": "復元フレーズ",
+      "signInWith": "サインイン方法",
+      "submit": "このデバイスを追加",
+      "wordAria": "{{number}}語目"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "アカウント番号",
+      "cancel": "キャンセル",
+      "error": "このデバイスを追加できませんでした。サーバーURL、アカウント番号、パスワード、そしてサーバーに接続できるかを確認してください。",
+      "help": "アカウント番号とパスワードでサインインしてください。既存のデバイスが承認すると、このデバイスでノートが同期されます。復元フレーズは必要ありません。",
+      "passwordLabel": "パスワード",
+      "serverLabel": "同期サーバー",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "デバイスを追加",
+      "submitting": "追加中…",
+      "title": "このデバイスをアカウントに追加"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "新しいデバイスで、アカウント番号とパスワード、または復元フレーズを使ってサインインします。デバイスは、既存のデバイスが承認するまで保留状態になります。",
+        "label": "デバイスを追加"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "同じノートが2台のデバイスで同時に編集されると、Myneは何も失われないよう両方のコピーを保持します。ここで解消してください。",
+        "label": "競合"
       },
       "devices": {
-        "label": ""
+        "label": "デバイス"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "すべてのデバイスで同じサーバーURLを入力してください。セルフホストのサーバーの場合は<1>https://</1>のアドレスを使い、証明書のフィンガープリントがデバイス間で一致することを確認してください。",
+        "label": "同期サーバー"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myneは暗号化されたノートをデバイス間で同期します。サーバーには、読み取ることのできない暗号文だけが保存されます。",
+        "label": "同期ステータス"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "このデバイスはしばらくオフラインでした — 同期に追いついています。ノートは安全です。"
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "承認待ち",
+      "conflicts_other": "確認が必要な競合{{count}}件",
+      "error": "同期エラー",
+      "loading": "同期ステータスを確認中…",
+      "notEnrolled": "未登録",
+      "off": "同期オフ",
+      "synced": "同期済み",
+      "syncing": "同期中…",
+      "syncNow": "今すぐ同期"
     }
   },
   "templates": {

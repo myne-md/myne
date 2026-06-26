@@ -322,7 +322,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Zavřít",
     "prompt": {
       "cancel": "Zrušit",
       "confirmDefault": "OK"
@@ -1770,7 +1770,8 @@
         "editor": "Editor",
         "hotkeys": "Klávesové zkratky",
         "privacy": "Soukromí",
-        "storage": "Úložiště"
+        "storage": "Úložiště",
+        "sync": "Synchronizace"
       },
       "passwordUpdatedToast": "Heslo aktualizováno",
       "title": "Nastavení"
@@ -1829,128 +1830,128 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Stahuje se {{name}}",
+        "uploading": "Nahrává se {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Neprobíhají žádné přenosy.",
+      "heading": "Synchronizace příloh",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "hotovo",
+        "failedWillRetry": "selhalo — zkusí se znovu",
+        "paused": "pozastaveno"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Sestavuje se index vyhledávání…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_few": "",
+      "discard": "Zahodit",
+      "empty": "Žádné konflikty — vaše zařízení jsou synchronizovaná.",
+      "groupTitle_one": "{{count}} konfliktní kopie poznámky {{original}}",
+      "groupTitle_few": "{{count}} konfliktní kopie poznámky {{original}}",
       "groupTitle_many": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "groupTitle_other": "{{count}} konfliktních kopií poznámky {{original}}",
+      "keepAsSeparate": "Ponechat zvlášť",
+      "untitled": "Bez názvu ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_few": "",
+      "approve": "Schválit",
+      "awaitingApproval_one": "{{count}} zařízení čeká na schválení",
+      "awaitingApproval_few": "{{count}} zařízení čekají na schválení",
       "awaitingApproval_many": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "awaitingApproval_other": "{{count}} zařízení čeká na schválení",
+      "loading": "Načítá se…",
+      "noDevices": "Zatím nejsou synchronizovaná žádná zařízení.",
+      "notEnrolled": "Toto zařízení zatím není připojené. Pokud jste ho právě přidali, počkejte na schválení z jiného zařízení; jinak ho přidejte pomocí formuláře „Přidat zařízení“ výše.",
+      "remove": "Odebrat",
+      "removedElsewhere": "Toto zařízení bylo z vašeho účtu odebráno na jiném zařízení.",
+      "resetAndReAdd": "Obnovit a znovu přidat toto zařízení",
+      "resetSyncOnThisDevice": "Obnovit synchronizaci na tomto zařízení",
+      "shortName": "Zařízení {{hex}}",
+      "syncedHere": "Synchronizováno zde",
+      "thisDevice": "Toto zařízení",
+      "transportHint": "Pokud se server přesunul nebo se změnil jeho certifikát, zadejte znovu adresu serveru v sekci „Synchronizační server“ výše, aby mu bylo opět možné důvěřovat.",
+      "unreachable": "Synchronizace je nedostupná ({{error}}).",
+      "yourDevices": "Vaše zařízení"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Připojit",
+      "connectedLocal": "Připojeno (místně, bez TLS).",
+      "connectedTls": "Připojeno. Zkontrolujte, že se tento otisk shoduje s vaším druhým zařízením.",
+      "connecting": "Připojuje se…",
+      "fingerprintLabel": "Otisk certifikátu serveru:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Tento server je nedostupný — zkontrolujte adresu URL a že je server spuštěný."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Číslo účtu",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Připojuje se…",
+      "credentialTypeAria": "Typ přihlašovacích údajů",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Než přidáte toto zařízení, nastavte v nastavení synchronizační server.",
+        "transport": "Synchronizační server je nedostupný. Zkontrolujte připojení a zkuste to znovu."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Heslo",
+        "recovery": "Fráze pro obnovení"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Heslo",
+      "recoveryPhraseHint": "Zadejte svou 24slovnou frázi pro obnovení.",
+      "recoveryPhraseLabel": "Fráze pro obnovení",
+      "signInWith": "Přihlásit se pomocí",
+      "submit": "Přidat toto zařízení",
+      "wordAria": "Slovo {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Číslo účtu",
+      "cancel": "Zrušit",
+      "error": "Toto zařízení se nepodařilo přidat. Zkontrolujte adresu serveru, číslo účtu a heslo — a že je server dostupný.",
+      "help": "Přihlaste se pomocí čísla účtu a hesla. Toto zařízení začne synchronizovat vaše poznámky, jakmile ho schválí některé stávající zařízení. Fráze pro obnovení není potřeba.",
+      "passwordLabel": "Heslo",
+      "serverLabel": "Synchronizační server",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Přidat zařízení",
+      "submitting": "Přidává se…",
+      "title": "Přidat toto zařízení k účtu"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Přihlaste se na novém zařízení pomocí čísla účtu a hesla nebo fráze pro obnovení. Zařízení zůstane ve stavu čekání, dokud ho neschválí některé stávající zařízení.",
+        "label": "Přidat zařízení"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Když je stejná poznámka současně upravena na dvou zařízeních, Myne zachová obě kopie, aby se nic neztratilo. Vyřešte je zde.",
+        "label": "Konflikty"
       },
       "devices": {
-        "label": ""
+        "label": "Zařízení"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Na každém zařízení zadejte stejnou adresu serveru. U vlastního serveru použijte jeho adresu <1>https://</1>; ověřte, že se otisk certifikátu na všech vašich zařízeních shoduje.",
+        "label": "Synchronizační server"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne synchronizuje vaše zašifrované poznámky mezi vašimi zařízeními. Server ukládá pouze šifrovaný text, který nedokáže přečíst.",
+        "label": "Stav synchronizace"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Toto zařízení bylo nějakou dobu offline — dohání synchronizaci. Vaše poznámky jsou v bezpečí."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_few": "",
+      "awaitingApproval": "Čeká na schválení",
+      "conflicts_one": "{{count}} konflikt k vyřešení",
+      "conflicts_few": "{{count}} konflikty k vyřešení",
       "conflicts_many": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "conflicts_other": "{{count}} konfliktů k vyřešení",
+      "error": "Chyba synchronizace",
+      "loading": "Stav synchronizace…",
+      "notEnrolled": "Neregistrováno",
+      "off": "Synchronizace vypnuta",
+      "synced": "Synchronizováno",
+      "syncing": "Synchronizuje se…",
+      "syncNow": "Synchronizovat nyní"
     }
   },
   "templates": {

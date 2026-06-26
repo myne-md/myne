@@ -312,7 +312,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Kapat",
     "prompt": {
       "cancel": "İptal",
       "confirmDefault": "Tamam"
@@ -1682,7 +1682,8 @@
         "editor": "Düzenleyici",
         "hotkeys": "Kısayollar",
         "privacy": "Gizlilik",
-        "storage": "Depolama"
+        "storage": "Depolama",
+        "sync": "Eşitleme"
       },
       "passwordUpdatedToast": "Parola güncellendi",
       "title": "Ayarlar"
@@ -1741,122 +1742,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "{{name}} indiriliyor",
+        "uploading": "{{name}} yükleniyor"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Süren aktarım yok.",
+      "heading": "Ek eşitlemesi",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "tamamlandı",
+        "failedWillRetry": "başarısız — yeniden denenecek",
+        "paused": "duraklatıldı"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Arama dizini oluşturuluyor…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Sil",
+      "empty": "Çakışma yok — cihazlarınız eşitlenmiş durumda.",
+      "groupTitle_one": "{{original}} için {{count}} çakışan kopya",
+      "groupTitle_other": "{{original}} için {{count}} çakışan kopya",
+      "keepAsSeparate": "Ayrı olarak tut",
+      "untitled": "Başlıksız ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Onayla",
+      "awaitingApproval_one": "{{count}} cihaz onay bekliyor",
+      "awaitingApproval_other": "{{count}} cihaz onay bekliyor",
+      "loading": "Yükleniyor…",
+      "noDevices": "Henüz eşitlenmiş cihaz yok.",
+      "notEnrolled": "Bu cihaz henüz bağlı değil. Az önce eklediyseniz başka bir cihazdan onaylanmasını bekleyin; aksi hâlde yukarıdaki “Cihaz ekle” formuyla ekleyin.",
+      "remove": "Kaldır",
+      "removedElsewhere": "Bu cihaz, başka bir cihazdan hesabınızdan kaldırıldı.",
+      "resetAndReAdd": "Bu cihazı sıfırla ve yeniden ekle",
+      "resetSyncOnThisDevice": "Bu cihazda eşitlemeyi sıfırla",
+      "shortName": "Cihaz {{hex}}",
+      "syncedHere": "Burada eşitlendi",
+      "thisDevice": "Bu cihaz",
+      "transportHint": "Sunucu taşındıysa veya sertifikası değiştiyse, yeniden güvenmek için yukarıdaki “Eşitleme sunucusu” altına sunucu URL’sini yeniden girin.",
+      "unreachable": "Eşitlemeye ulaşılamadı ({{error}}).",
+      "yourDevices": "Cihazlarınız"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Bağlan",
+      "connectedLocal": "Bağlandı (yerel, TLS yok).",
+      "connectedTls": "Bağlandı. Bu parmak izinin diğer cihazınızdakiyle eşleştiğini doğrulayın.",
+      "connecting": "Bağlanıyor…",
+      "fingerprintLabel": "Sunucu sertifikası parmak izi:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "O sunucuya ulaşılamadı — URL’yi ve sunucunun çalıştığını kontrol edin."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Hesap numarası",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Bağlanıyor…",
+      "credentialTypeAria": "Kimlik bilgisi türü",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Bu cihazı eklemeden önce ayarlardan bir eşitleme sunucusu belirleyin.",
+        "transport": "Eşitleme sunucusuna ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Parola",
+        "recovery": "Kurtarma ifadesi"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Parola",
+      "recoveryPhraseHint": "24 sözcüklük kurtarma ifadenizi girin.",
+      "recoveryPhraseLabel": "Kurtarma ifadesi",
+      "signInWith": "Şununla giriş yap",
+      "submit": "Bu cihazı ekle",
+      "wordAria": "Sözcük {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Hesap numarası",
+      "cancel": "İptal",
+      "error": "Bu cihaz eklenemedi. Sunucu URL’sini, hesap numarasını ve parolayı — ve sunucuya erişilebildiğini — kontrol edin.",
+      "help": "Hesap numaranız ve parolanızla giriş yapın. Mevcut bir cihaz onayladığında bu cihaz notlarınızı eşitlemeye başlar. Kurtarma ifadesi gerekmez.",
+      "passwordLabel": "Parola",
+      "serverLabel": "Eşitleme sunucusu",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Cihaz ekle",
+      "submitting": "Ekleniyor…",
+      "title": "Bu cihazı bir hesaba ekle"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Yeni bir cihazda hesap numaranız ve parolanız ya da kurtarma ifadenizle giriş yapın. Mevcut bir cihaz onaylayana kadar cihaz beklemede kalır.",
+        "label": "Cihaz ekle"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Aynı not iki cihazda aynı anda düzenlendiğinde, Myne hiçbir şey kaybolmasın diye her iki kopyayı da saklar. Bunları buradan çözün.",
+        "label": "Çakışmalar"
       },
       "devices": {
-        "label": ""
+        "label": "Cihazlar"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Her cihaza aynı sunucu URL’sini girin. Kendi barındırdığınız bir sunucu için onun <1>https://</1> adresini kullanın; sertifika parmak izinin tüm cihazlarınızda eşleştiğini doğrulayın.",
+        "label": "Eşitleme sunucusu"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne, şifreli notlarınızı cihazlarınız arasında eşitler. Sunucu yalnızca okuyamadığı şifreli metni saklar.",
+        "label": "Eşitleme durumu"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Bu cihaz bir süre çevrimdışıydı — eşitlemede gecikme kapatılıyor. Notlarınız güvende."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Onay bekleniyor",
+      "conflicts_one": "Gözden geçirilecek {{count}} çakışma",
+      "conflicts_other": "Gözden geçirilecek {{count}} çakışma",
+      "error": "Eşitleme hatası",
+      "loading": "Eşitleme durumu…",
+      "notEnrolled": "Kaydedilmedi",
+      "off": "Eşitleme kapalı",
+      "synced": "Eşitlendi",
+      "syncing": "Eşitleniyor…",
+      "syncNow": "Şimdi eşitle"
     }
   },
   "templates": {
