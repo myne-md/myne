@@ -16,6 +16,7 @@ import {
   type SuspicionReason,
   type VaultId,
 } from "./lib/stage";
+import { PairingDialog } from "./components/PairingDialog";
 import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { switchVault } from "./lib/vault-switch";
@@ -277,6 +278,11 @@ function App() {
           <Unlock
             initialStatus={stage.initialStatus}
             vaultId={stage.vaultId}
+            // Back-to-picker affordance, shown only when this unlock was
+            // reached by picking a row on the ≥2-vault picker (MYND-204
+            // follow-up: the picker → unlock hop was one-way). Absent on every
+            // other entry path — there is no picker to return to.
+            onBack={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
@@ -368,6 +374,18 @@ function App() {
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {screen}
       </div>
+      {/* Browser-extension pairing prompt (ext-foundation-handoff task 4,
+          TB10). Mounted globally so a connect request from the extension
+          surfaces over whatever stage is showing; renders nothing unless the
+          core has a pending pairing session. */}
+      <PairingDialog />
+      {/* The browser-extension clip dispatch listener (desktop-ingest, MYND-442,
+          TB10) is NOT mounted here. It lives inside `Editor.tsx` — within the
+          workspace providers — so the success notice's "view" affordance can
+          open the newly-clipped note via the workspace note-open. Clips only
+          land when the vault is unlocked (the Rust relay short-circuits a locked
+          vault before emitting), i.e. exactly when the Editor is mounted, so the
+          listener never needs to exist pre-unlock. */}
     </div>
   );
 }

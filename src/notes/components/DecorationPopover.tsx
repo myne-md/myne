@@ -19,7 +19,8 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { LABEL_SLOTS, LABEL_SLOT_NAMES, labelColorVar } from "../decorations";
+import { useTranslation } from "react-i18next";
+import { LABEL_SLOTS, labelSlotName, labelColorVar } from "../decorations";
 import { FOLDER_ICON_NAMES } from "../folderIcons";
 import { FolderGlyph } from "./FolderGlyph";
 
@@ -108,6 +109,7 @@ export function DecorationPopover({
   icon,
   onClose,
 }: DecorationPopoverProps) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number }>({
     left: x,
@@ -168,14 +170,14 @@ export function DecorationPopover({
       ref={ref}
       style={{ ...POPOVER_STYLE, left: position.left, top: position.top }}
       role="menu"
-      aria-label="Color label"
+      aria-label={t("notes.decoration.menuLabel")}
     >
-      <div style={SECTION_LABEL_STYLE}>Color</div>
+      <div style={SECTION_LABEL_STYLE}>{t("notes.decoration.colorSection")}</div>
       <div style={SWATCH_ROW_STYLE}>
         <button
           type="button"
-          title="None"
-          aria-label="No color"
+          title={t("notes.decoration.none")}
+          aria-label={t("notes.decoration.noColor")}
           aria-pressed={color === null}
           data-color-slot="none"
           style={{
@@ -190,8 +192,8 @@ export function DecorationPopover({
           <button
             key={slot}
             type="button"
-            title={LABEL_SLOT_NAMES[slot]}
-            aria-label={LABEL_SLOT_NAMES[slot]}
+            title={labelSlotName(slot)}
+            aria-label={labelSlotName(slot)}
             aria-pressed={color === slot}
             data-color-slot={slot}
             style={{
@@ -214,13 +216,13 @@ export function DecorationPopover({
       {icon !== undefined && (
         <>
           <div style={{ ...SECTION_LABEL_STYLE, padding: "12px 2px 6px" }}>
-            Icon
+            {t("notes.decoration.iconSection")}
           </div>
           <div style={ICON_GRID_STYLE}>
             <button
               type="button"
-              title="Default"
-              aria-label="Default folder icon"
+              title={t("notes.decoration.default")}
+              aria-label={t("notes.decoration.defaultFolderIcon")}
               aria-pressed={icon.value === null}
               data-icon-name="default"
               style={{

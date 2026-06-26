@@ -6,6 +6,9 @@
 //         to Trash (archive ⊥ trash). Mirrors the nc3 soft-trash lifecycle.
 //   ar2 — an archived note STAYS in full-text search (archive ≠ soft-trash) and
 //         its palette hit carries the archive badge, while a live note does not.
+//   ar3 — disabling archiving in Settings → Editor auto-unarchives every archived
+//         note (back into the live tree) and hides the Archive footer button
+//         (archive-disable, MYND-…).
 //
 // All driving is real: context menus via the W3C Actions API right-click
 // (`contextMenuPick`), the palette via the Control+k chord. No test hooks.
@@ -14,8 +17,10 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  closeSettings,
   createNote,
   dismissImporterOffer,
+  openSettings,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -156,6 +161,50 @@ describeE2E("ar2 archived note stays searchable with a badge (MYND-331)", () => 
         );
         await (await s.byTestId("palette.input")).sendKeys("\uE00C"); // Escape
         await s.waitForGone(testIdSelector("palette.input"));
+      },
+    );
+  });
+});
+
+describeE2E("ar3 disabling archiving empties the archive (archive-disable)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("Settings toggle off auto-unarchives the note and hides the Archive button", async () => {
+    let password = "";
+    await scenario(
+      "ar3-disable-archiving",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Ar\u015Fiv Aday\u0131");
+
+        // Archive the note \u2192 it leaves the live tree; the Archive footer button
+        // is now present (one archived note).
+        await contextMenuPick(s, await s.byTestId("notes.row"), "archive");
+        await s.waitForGone(testIdSelector("notes.row"));
+        await s.byTestId("notes.archive-open");
+
+        // Disable archiving from Settings \u2192 Editor. The toggle starts "On"
+        // (archiving enabled); clicking it empties the Archive first, then
+        // persists the disable flag.
+        await openSettings(s, "editor");
+        await (await s.byTestId("settings.archive-disabled")).click();
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("settings.archive-disabled")).attribute(
+              "aria-checked",
+            )) === "false"
+              ? true
+              : null,
+          { label: "archiving toggle flips to off" },
+        );
+        await closeSettings(s);
+
+        // The archived note is back in the live tree (auto-unarchived) and the
+        // Archive footer button is gone (archive empty + feature disabled).
+        await s.byTestId("notes.row");
+        await s.waitForGone(testIdSelector("notes.archive-open"));
       },
     );
   });

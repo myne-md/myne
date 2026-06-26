@@ -1,0 +1,2093 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Annulla",
+      "cleaning": "Pulizia in corso…",
+      "close": "Chiudi",
+      "completeTitle": "Pulizia completata",
+      "deleteCta_many": "Elimina {{count}} inutilizzati",
+      "deleteCta_one": "Elimina {{count}} inutilizzato",
+      "deleteCta_other": "Elimina {{count}} inutilizzati",
+      "error": "Impossibile completare la pulizia. Alcune note potrebbero essere illeggibili: non è stato eliminato nulla.",
+      "intro_many": "Questi {{count}} allegati non sono usati in nessuna nota. L'eliminazione è permanente e non può essere annullata.",
+      "intro_one": "Questo allegato non è usato in nessuna nota. L'eliminazione è permanente e non può essere annullata.",
+      "intro_other": "Questi {{count}} allegati non sono usati in nessuna nota. L'eliminazione è permanente e non può essere annullata.",
+      "summaryFreed": " · liberati {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_many": "Rimossi {{count}} allegati",
+      "summaryRemoved_one": "Rimosso {{count}} allegato",
+      "summaryRemoved_other": "Rimossi {{count}} allegati",
+      "summarySkipped_many": " · {{count}} ignorati (ora in uso)",
+      "summarySkipped_one": " · {{count}} ignorato (ora in uso)",
+      "summarySkipped_other": " · {{count}} ignorati (ora in uso)",
+      "title": "Pulisci gli allegati inutilizzati",
+      "willBeReclaimed": "Verranno recuperati {{size}}."
+    },
+    "coverPicker": {
+      "close": "Chiudi",
+      "dropHint": "Trascina un'immagine per usarla come copertina.",
+      "empty": "Ancora nessuna immagine in questa cassaforte. Caricane una o trascina qui un'immagine.",
+      "loading": "Caricamento…",
+      "removeCover": "Rimuovi la copertina",
+      "title": "Scegli un'immagine di copertina",
+      "upload": "Carica"
+    },
+    "deleteDialog": {
+      "cancel": "Annulla",
+      "confirmPrompt": "Eliminare definitivamente questo allegato? L'operazione non può essere annullata.",
+      "delete": "Elimina",
+      "deleting": "Eliminazione in corso…",
+      "error": "Impossibile eliminare l'allegato. Riprova.",
+      "notUsed": "Non usato in nessuna nota.",
+      "stillUsed_many": "È ancora usato in {{count}} note. Eliminandolo resterà un segnaposto dov'era incorporato:",
+      "stillUsed_one": "È ancora usato in {{count}} nota. Eliminandolo resterà un segnaposto dov'era incorporato:",
+      "stillUsed_other": "È ancora usato in {{count}} note. Eliminandolo resterà un segnaposto dov'era incorporato:",
+      "title": "Elimina allegato",
+      "untitled": "Senza titolo"
+    },
+    "library": {
+      "actionsAriaLabel": "Azioni allegato",
+      "actionsTitle": "Azioni",
+      "checkUnusedFailedNotice": "Impossibile verificare gli allegati inutilizzati. Riprova.",
+      "checking": "Verifica in corso…",
+      "cleanUnused": "Pulisci inutilizzati",
+      "cleanUnusedTitle": "Elimina gli allegati non usati in nessuna nota",
+      "colCreated": "Creato",
+      "colName": "Nome",
+      "colSize": "Dimensione",
+      "colType": "Tipo",
+      "colUsedIn": "Usato in",
+      "decrypting": "Decifratura degli allegati…",
+      "emptyImportHint": "Importa un file per conservarlo nella tua cassaforte.",
+      "emptyLoadError": "Impossibile leggere il catalogo degli allegati.",
+      "emptyNoAttachments": "Ancora nessun allegato.",
+      "filterAriaLabel": "Filtra per tipo",
+      "gridView": "Vista a griglia",
+      "import": "Importa",
+      "importDialogTitle": "Importa allegato",
+      "importFile": "Importa un file",
+      "importing": "Importazione in corso…",
+      "listView": "Vista a elenco",
+      "menuDelete": "Elimina",
+      "menuExport": "Esporta",
+      "menuPreview": "Anteprima",
+      "menuRename": "Rinomina",
+      "noMatch": "Nessun allegato corrisponde alla tua ricerca.",
+      "noUnusedNotice": "Nessun allegato inutilizzato da pulire.",
+      "preview": "Anteprima",
+      "previewAttachment": "Anteprima allegato",
+      "searchAriaLabel": "Cerca allegati per nome file",
+      "searchPlaceholder": "Cerca per nome file",
+      "sort": {
+        "createdAsc": "Prima i meno recenti",
+        "createdDesc": "Prima i più recenti",
+        "nameAsc": "Nome A–Z",
+        "nameDesc": "Nome Z–A"
+      },
+      "sortAriaLabel": "Ordina allegati",
+      "supportedFilesFilter": "File supportati",
+      "title": "Allegati",
+      "typeFilter": {
+        "all": "Tutti i tipi",
+        "audio": "Audio",
+        "image": "Immagini",
+        "other": "Altro",
+        "pdf": "PDF"
+      },
+      "usedInCount_many": "Usato in {{count}} note",
+      "usedInCount_one": "Usato in {{count}} nota",
+      "usedInCount_other": "Usato in {{count}} note",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Audio: {{filename}}",
+      "file": "File",
+      "pause": "Pausa",
+      "pdfDocument": "Documento PDF",
+      "pdfFirstPage": "Prima pagina del PDF",
+      "play": "Riproduci"
+    },
+    "usedInNotesPopover": {
+      "empty": "Non usato in nessuna nota.",
+      "untitled": "Senza titolo"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "È in corso un'altra operazione sulla cassaforte. Attendi che termini, poi riprova.",
+        "cancelled": "Backup annullato. Non è stato lasciato alcun file.",
+        "invalidDestination": "La cartella di destinazione non è utilizzabile.",
+        "ioGeneric": "Impossibile scrivere il file di backup.",
+        "ioNoSpace": "Spazio insufficiente nella destinazione.",
+        "ioPermissionDenied": "Permessi insufficienti per scrivere nella destinazione.",
+        "joinFailure": "Il backup è fallito in modo imprevisto. Non è stato lasciato alcun file.",
+        "memberTooLarge": "Un file in questa cassaforte supera la dimensione consentita dal formato di backup.",
+        "vaultNotFound": "Nessuna cassaforte da salvare.",
+        "verifyFailed": "Il backup scritto non ha superato la verifica ed è stato scartato. Riprova, su un supporto diverso se l'errore si ripete."
+      },
+      "restore": {
+        "authOperationInProgress": "È in corso un'altra operazione sulla cassaforte. Attendi che termini, poi riprova.",
+        "cancelled": "Ripristino annullato. Non è stato modificato nulla.",
+        "damagedBackup": "Il file di backup è danneggiato.",
+        "futureVersionBackup": "Questo backup è stato creato da una versione più recente di Myne. Aggiorna Myne, poi ripristinalo.",
+        "invalidVaultMeta": "I metadati della cassaforte di questo backup sono illeggibili, quindi il ripristino non potrebbe produrre una cassaforte funzionante.",
+        "ioGeneric": "Impossibile leggere il file di backup.",
+        "ioPermissionDenied": "Permessi insufficienti per leggere il file di backup.",
+        "joinFailure": "Il ripristino è fallito in modo imprevisto. Non è stato modificato nulla.",
+        "missingVaultMeta": "A questo backup mancano i metadati della cassaforte e non può essere ripristinato.",
+        "notABackupFile": "Questo file non è un backup di Myne.",
+        "vaultAlreadyExists": "Una cassaforte di questo backup esiste già su questo dispositivo."
+      }
+    },
+    "export": {
+      "cancel": "Annulla",
+      "close": "Chiudi",
+      "copying": "Copia di {{done}} di {{total}}…",
+      "preparing": "Preparazione…",
+      "successToast": "Backup verificato e salvato.",
+      "title": "Esegui il backup della cassaforte",
+      "verifying": "Verifica di {{done}} di {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Accetta",
+      "close": "Chiudi",
+      "codeAriaLabel": "Codice di abbinamento",
+      "intro": "Verifica che questo codice corrisponda a quello mostrato nell'estensione, poi tocca Accetta per abbinare.",
+      "reject": "Rifiuta",
+      "rejected": "Abbinamento rifiutato.",
+      "title": "Un'estensione del browser vuole connettersi"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Archivio",
+    "archivedBadgeTitle": "Archiviata",
+    "dialogLabel": "Tavolozza dei comandi",
+    "matchedInBody": "↳ trovato nel corpo",
+    "noMatches": "Nessuna corrispondenza",
+    "searchPlaceholder": "Cerca note o esegui un comando — Esc per chiudere",
+    "sectionCommands": "Comandi",
+    "sectionNotes": "Note",
+    "untitledNote": "Senza titolo"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Esegui il backup della cassaforte…"
+      },
+      "category": {
+        "app": "App",
+        "editor": "Editor",
+        "vault": "Cassaforte",
+        "view": "Vista"
+      },
+      "convertWikilinks": {
+        "label": "Converti i wikilink importati in questa nota…"
+      },
+      "deleteWorkspace": {
+        "label": "Elimina spazio di lavoro…"
+      },
+      "exportNoteHtml": {
+        "label": "Esporta nota come HTML…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Esporta nota come Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "Esporta nota come PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "Esporta nota come testo semplice…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Esporta cassaforte come Markdown…"
+      },
+      "foldAll": {
+        "label": "Comprimi tutto"
+      },
+      "importBaseView": {
+        "label": "Importa vista .base…"
+      },
+      "importObsidian": {
+        "label": "Importa cassaforte Obsidian…"
+      },
+      "lockVault": {
+        "label": "Blocca cassaforte"
+      },
+      "manageTemplates": {
+        "label": "Gestisci modelli…"
+      },
+      "newNoteFromTemplate": {
+        "label": "Nuova nota da modello…"
+      },
+      "openAttachments": {
+        "label": "Apri allegati…"
+      },
+      "openSettings": {
+        "label": "Apri impostazioni…"
+      },
+      "openSnapshots": {
+        "label": "Istantanee…"
+      },
+      "openTodayNote": {
+        "label": "Apri la nota di oggi"
+      },
+      "randomNote": {
+        "label": "Apri una nota casuale"
+      },
+      "renameWorkspace": {
+        "label": "Rinomina spazio di lavoro…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Salva spazio di lavoro come…"
+      },
+      "showGraph": {
+        "label": "Mostra vista grafico…"
+      },
+      "showTags": {
+        "label": "Sfoglia i tag…"
+      },
+      "showViews": {
+        "label": "Sfoglia le viste…"
+      },
+      "switchWorkspace": {
+        "label": "Cambia spazio di lavoro…"
+      },
+      "toggleFocus": {
+        "label": "Attiva/disattiva modalità concentrazione"
+      },
+      "toggleLeftSidebar": {
+        "label": "Mostra/nascondi barra laterale delle note"
+      },
+      "toggleReading": {
+        "label": "Attiva/disattiva vista lettura"
+      },
+      "toggleRightSidebar": {
+        "label": "Mostra/nascondi barra laterale dei backlink"
+      },
+      "toggleSource": {
+        "label": "Attiva/disattiva modalità sorgente"
+      },
+      "toggleStackedTabs": {
+        "label": "Attiva/disattiva schede impilate"
+      },
+      "unfoldAll": {
+        "label": "Espandi tutto"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "Grassetto",
+        "closeTab": "Chiudi scheda",
+        "cycleHeadingLevel": "Scorri livello titolo",
+        "cycleTabs": "Scorri schede",
+        "deleteWorkspace": "Elimina spazio di lavoro",
+        "focusNextPane": "Vai al riquadro successivo",
+        "focusPrevPane": "Vai al riquadro precedente",
+        "foldAll": "Comprimi tutto",
+        "inlineCode": "Codice inline",
+        "insertWikilink": "Inserisci wikilink",
+        "italic": "Corsivo",
+        "navigateBack": "Vai indietro",
+        "navigateForward": "Vai avanti",
+        "newNote": "Nuova nota",
+        "openSettings": "Apri impostazioni",
+        "paletteToggle": "Apri tavolozza dei comandi",
+        "renameWorkspace": "Rinomina spazio di lavoro",
+        "saveWorkspaceAs": "Salva spazio di lavoro come",
+        "selectAllScoped": "Seleziona tutto (nell'ambito)",
+        "showGraphView": "Mostra vista grafico",
+        "splitPaneDown": "Dividi riquadro (in basso)",
+        "splitPaneRight": "Dividi riquadro (a destra)",
+        "switchWorkspace": "Cambia spazio di lavoro",
+        "toggleBulletList": "Attiva/disattiva elenco puntato",
+        "toggleFocusMode": "Attiva/disattiva modalità concentrazione",
+        "toggleNumberedList": "Attiva/disattiva elenco numerato",
+        "toggleReadingView": "Attiva/disattiva vista lettura",
+        "toggleSourceMode": "Attiva/disattiva modalità sorgente",
+        "toggleTaskList": "Attiva/disattiva elenco attività",
+        "unfoldAll": "Espandi tutto"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Aggiungi un modificatore (⌘, Ctrl o Alt) — un tasto da solo non può essere una scorciatoia."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Annulla",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Caricamento"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exportFailed": "Impossibile esportare {{filename}}.",
+        "exported": "{{filename}} esportato.",
+        "renameFailed": "Impossibile rinominare l'allegato.",
+        "renamed": "Rinominato in {{name}}.",
+        "saveDialogFailed": "Impossibile aprire la finestra di salvataggio."
+      },
+      "convert": {
+        "cancel": "Annulla",
+        "confirm": "Converti",
+        "skipped": "ignorato — {{note}}",
+        "subtitleEmpty": "Niente da convertire — nessun file sorgente risolto.",
+        "subtitle_many": "Verranno riscritti {{count}} riferimenti. Controlla prima di confermare.",
+        "subtitle_one": "Verrà riscritto 1 riferimento. Controlla prima di confermare.",
+        "subtitle_other": "Verranno riscritti {{count}} riferimenti. Controlla prima di confermare.",
+        "title": "Converti gli allegati importati"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Sorgente allegato"
+      },
+      "convertCore": {
+        "converted_many": "{{count}} convertiti",
+        "converted_one": "{{count}} convertito",
+        "converted_other": "{{count}} convertiti",
+        "noneToConvert": "Nessun allegato importato da convertire in questa nota.",
+        "skipNote": {
+          "failed": "importazione fallita",
+          "locked": "cassaforte bloccata",
+          "notFound": "sorgente non trovata",
+          "tooLarge": "troppo grande (max 64 MiB)",
+          "unsupported": "tipo non supportato"
+        },
+        "skippedSuffix_many": " · {{count}} ignorati",
+        "skippedSuffix_one": " · {{count}} ignorato",
+        "skippedSuffix_other": " · {{count}} ignorati"
+      },
+      "fileKind": {
+        "generic": "File",
+        "label": {
+          "archive": "Archivio",
+          "audio": "Audio",
+          "cHeader": "Header C",
+          "cSource": "Sorgente C",
+          "cppSource": "Sorgente C++",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Documento",
+          "ebook": "Ebook",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Immagine",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "File di log",
+          "markdown": "Markdown",
+          "numbers": "Foglio di calcolo Numbers",
+          "pages": "Documento Pages",
+          "pdf": "PDF",
+          "presentation": "Presentazione",
+          "python": "Python",
+          "richText": "Documento di testo formattato",
+          "rust": "Rust",
+          "shell": "Script shell",
+          "spreadsheet": "Foglio di calcolo",
+          "svg": "Immagine SVG",
+          "text": "Documento di testo",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Documento Word",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "File {{ext}}"
+      },
+      "lightbox": {
+        "close": "Chiudi anteprima",
+        "export": "Esporta",
+        "exportAria": "Esporta allegato",
+        "imagePreview": "Anteprima immagine",
+        "pdfFallback": "PDF",
+        "pdfPreview": "Anteprima PDF"
+      },
+      "menu": {
+        "actionsAria": "Azioni allegato"
+      },
+      "pdf": {
+        "loading": "Caricamento…"
+      },
+      "picker": {
+        "openFailed": "Impossibile aprire il selettore di file."
+      },
+      "progress": {
+        "encrypting": "Crittografia…",
+        "importing": "Importazione…",
+        "loading": "Caricamento…"
+      },
+      "recording": {
+        "barAria": "Registrazione nota vocale",
+        "cancel": "Annulla",
+        "noAudio": "Nessun audio rilevato — controlla il microfono.",
+        "saving": "Salvataggio…",
+        "stop": "Interrompi"
+      },
+      "rename": {
+        "cancel": "Annulla",
+        "confirm": "Rinomina",
+        "title": "Rinomina allegato"
+      },
+      "summary": {
+        "added_many": "{{count}} aggiunti",
+        "added_one": "{{count}} aggiunto",
+        "added_other": "{{count}} aggiunti",
+        "reason": {
+          "failed": "non riuscito",
+          "locked": "cassaforte bloccata",
+          "tooLarge": "troppo grande",
+          "unsupported": "tipo non supportato"
+        },
+        "skipped_many": "{{count}} ignorati: {{noun}}",
+        "skipped_one": "{{count}} ignorato: {{noun}}",
+        "skipped_other": "{{count}} ignorati: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "Una registrazione è già in corso.",
+          "captureFailed": "Impossibile avviare la registrazione — controlla l'accesso al microfono nelle Impostazioni di sistema.",
+          "generic": "Impossibile avviare la registrazione.",
+          "locked": "Sblocca la cassaforte per registrare una nota vocale.",
+          "noInputDevice": "Nessun microfono trovato. Collegane uno e riprova."
+        },
+        "stopError": {
+          "captureFailed": "Registrazione non riuscita — controlla il microfono.",
+          "emptyRecording": "Non è stato registrato nulla.",
+          "generic": "Impossibile salvare la registrazione.",
+          "silentRecording": "La registrazione era silenziosa ed è stata scartata — controlla il microfono."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Pausa",
+          "play": "Riproduci",
+          "seek": "Cerca posizione"
+        },
+        "menu": {
+          "export": "Esporta",
+          "remove": "Rimuovi",
+          "rename": "Rinomina",
+          "reveal": "Mostra nella libreria"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Riferimento allegato non valido: {{filename}}",
+          "brokenLabel": "non valido",
+          "deletedAria": "Allegato eliminato: {{filename}}",
+          "deletedLabel": "eliminato"
+        },
+        "urlImageFallback": "immagine"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Attenzione",
+        "bug": "Bug",
+        "caution": "Cautela",
+        "danger": "Pericolo",
+        "done": "Fatto",
+        "error": "Errore",
+        "example": "Esempio",
+        "failure": "Errore",
+        "faq": "FAQ",
+        "hint": "Suggerimento",
+        "important": "Importante",
+        "info": "Info",
+        "missing": "Mancante",
+        "note": "Nota",
+        "question": "Domanda",
+        "quote": "Citazione",
+        "success": "Successo",
+        "tip": "Consiglio",
+        "todo": "Da fare",
+        "warning": "Avviso"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Archiviata",
+        "empty": "Ancora nessun backlink.",
+        "linkedFrom_many": "Collegata da {{count}}",
+        "linkedFrom_one": "Collegata da {{count}}",
+        "linkedFrom_other": "Collegata da {{count}}",
+        "untitled": "Senza titolo"
+      },
+      "barItems": {
+        "graph": "Grafico",
+        "lock": "Blocca",
+        "saveStatus": "Stato salvataggio",
+        "settings": "Impostazioni",
+        "syncStatus": "Stato sincronizzazione",
+        "tags": "Tag",
+        "viewMode": "Modalità di visualizzazione",
+        "views": "Viste",
+        "wordCount": "Conteggio parole",
+        "workspace": "Spazio di lavoro"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix_many": " · {{count}} filtri scartati",
+        "droppedFiltersSuffix_one": " · {{count}} filtro scartato",
+        "droppedFiltersSuffix_other": " · {{count}} filtri scartati",
+        "failed": "Importazione non riuscita.",
+        "fileFilterName": "Base Obsidian",
+        "imported_many": "Importate {{count}} viste",
+        "imported_one": "Importata {{count}} vista",
+        "imported_other": "Importate {{count}} viste",
+        "notValid": "Non è un file .base valido.",
+        "skippedSuffix_many": " · {{count}} ignorate",
+        "skippedSuffix_one": " · {{count}} ignorata",
+        "skippedSuffix_other": " · {{count}} ignorate",
+        "stoppedAfter_many": "Importazione interrotta dopo {{count}} viste.",
+        "stoppedAfter_one": "Importazione interrotta dopo {{count}} vista.",
+        "stoppedAfter_other": "Importazione interrotta dopo {{count}} viste."
+      },
+      "bottomBar": {
+        "browseTags": "Sfoglia i tag",
+        "browseViews": "Sfoglia le viste",
+        "cycleViewMode": "Scorri modalità di visualizzazione",
+        "docStats": {
+          "summarySelectionSuffix": " (sel.)",
+          "summary_many": "{{count}} parole · {{characters}} caratteri",
+          "summary_one": "{{count}} parola · {{characters}} caratteri",
+          "summary_other": "{{count}} parole · {{characters}} caratteri",
+          "titleSelectionSuffix": " (selezione)",
+          "title_many": "{{characters}} caratteri · {{words}} parole · {{spaces}} spazi · {{count}} paragrafi",
+          "title_one": "{{characters}} caratteri · {{words}} parole · {{spaces}} spazi · {{count}} paragrafo",
+          "title_other": "{{characters}} caratteri · {{words}} parole · {{spaces}} spazi · {{count}} paragrafi"
+        },
+        "graphTitle": "Grafico (⌘⇧G)",
+        "lock": "Blocca",
+        "lockVault": "Blocca cassaforte",
+        "openSettings": "Apri impostazioni",
+        "settingsTitle": "Impostazioni (⌘,)",
+        "showGraph": "Mostra vista grafico",
+        "syncStatus": "Solo locale · non sincronizzato",
+        "tagsTitle": "Tag",
+        "togglePreview": "Attiva/disattiva anteprima affiancata",
+        "viewModeTitle": "Modalità di visualizzazione: {{mode}} (clicca per scorrere)",
+        "viewsTitle": "Viste"
+      },
+      "import": {
+        "imported_many": "Importate {{count}} note{{skipped}}",
+        "imported_one": "Importata {{count}} nota{{skipped}}",
+        "imported_other": "Importate {{count}} note{{skipped}}",
+        "skippedSuffix_many": " · {{count}} ignorate",
+        "skippedSuffix_one": " · {{count}} ignorata",
+        "skippedSuffix_other": " · {{count}} ignorate"
+      },
+      "nav": {
+        "goBack": "Vai indietro",
+        "goForward": "Vai avanti"
+      },
+      "noNotesToOpen": "Nessuna nota da aprire.",
+      "resizeBacklinksSidebar": "Ridimensiona barra laterale dei backlink",
+      "resizeNotesSidebar": "Ridimensiona barra laterale delle note",
+      "sidebarToggle": {
+        "hideBacklinks": "Nascondi barra laterale dei backlink",
+        "hideNotes": "Nascondi barra laterale delle note",
+        "showBacklinks": "Mostra barra laterale dei backlink",
+        "showNotes": "Mostra barra laterale delle note"
+      },
+      "switchingOverlay": {
+        "saving": "Salvataggio…"
+      },
+      "viewMode": {
+        "live": "Live",
+        "reading": "Lettura",
+        "source": "Sorgente"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Nome dello spazio di lavoro",
+        "renameConfirm": "Rinomina",
+        "renameTitle": "Rinomina spazio di lavoro",
+        "saveAsTitle": "Salva spazio di lavoro come",
+        "saveConfirm": "Salva"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Spazio di lavoro",
+        "renameItemLabel": "Rinomina spazio di lavoro {{name}}",
+        "renameTitle": "Rinomina spazio di lavoro",
+        "saveCurrentAs": "Salva l'attuale come…",
+        "switchLabel": "Cambia spazio di lavoro",
+        "toggleTitle": "Spazio di lavoro: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Copia codice",
+      "defaultBadge": "codice"
+    },
+    "find": {
+      "close": "Chiudi ricerca",
+      "matchCase": "Maiuscole/minuscole",
+      "matchCount": "{{current}} di {{total}}",
+      "nextMatch": "Corrispondenza successiva",
+      "noMatches": "Nessuna corrispondenza",
+      "placeholder": "Trova nella nota",
+      "previousMatch": "Corrispondenza precedente",
+      "replaceAll": "Sostituisci tutto",
+      "replaceAllCount": "Sostituisci tutto ({{total}})",
+      "replaceOne": "Sostituisci",
+      "replacePlaceholder": "Sostituisci con",
+      "toggleReplace": "Attiva/disattiva sostituzione"
+    },
+    "folding": {
+      "clickToUnfold": "Clicca per espandere",
+      "unfold": "Espandi"
+    },
+    "footnote": {
+      "heading": "Note a piè di pagina",
+      "unreferenced": "senza riferimento"
+    },
+    "frontmatter": {
+      "addProperty": "+ Aggiungi proprietà",
+      "propertiesLabel": "Proprietà",
+      "titleAriaLabel": "Titolo della nota",
+      "titlePlaceholder": "Senza titolo"
+    },
+    "mermaid": {
+      "rendering": "Rendering del diagramma…"
+    },
+    "slash": {
+      "attachFile": "Allega file",
+      "bulletList": "Elenco puntato",
+      "callout": "Riquadro evidenziato",
+      "date": "Data",
+      "day": "Giorno",
+      "divider": "Separatore",
+      "heading1": "Titolo 1",
+      "heading2": "Titolo 2",
+      "heading3": "Titolo 3",
+      "heading4": "Titolo 4",
+      "heading5": "Titolo 5",
+      "heading6": "Titolo 6",
+      "link": "Collegamento",
+      "now": "Adesso",
+      "numberedList": "Elenco numerato",
+      "quote": "Citazione",
+      "table": "Tabella",
+      "time": "Ora",
+      "todoList": "Elenco attività",
+      "voiceNote": "Nota vocale",
+      "wikiLink": "Wikilink"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Aggiungi al dizionario",
+        "ignoreInVault": "Ignora in questa cassaforte",
+        "ignoreThisSession": "Ignora in questa sessione",
+        "noSuggestions": "Nessun suggerimento"
+      }
+    },
+    "table": {
+      "addColumn": "Aggiungi colonna a destra",
+      "addRow": "Aggiungi riga sotto",
+      "cellAriaLabel": "Cella della tabella",
+      "deleteColumn": "Elimina colonna",
+      "deleteRow": "Elimina riga",
+      "reorderColumn": "Riordina colonna",
+      "reorderRow": "Riordina riga"
+    },
+    "toolbar": {
+      "apply": "Applica",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Paragrafo"
+      },
+      "highlight": {
+        "blue": "Blu",
+        "green": "Verde",
+        "pink": "Rosa",
+        "purple": "Viola",
+        "yellow": "Giallo"
+      },
+      "urlPlaceholder": "Incolla l'URL del collegamento"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Piena",
+        "narrow": "Stretta",
+        "normal": "Normale",
+        "wide": "Larga"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normale",
+        "relaxed": "Ampia",
+        "tight": "Stretta"
+      },
+      "textSize": {
+        "lg": "Grande",
+        "md": "Predefinita",
+        "sm": "Piccola",
+        "xl": "Molto grande"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Incorpora: {{label}}"
+      },
+      "convert": {
+        "cancel": "Annulla",
+        "choiceClause_many": " · {{count}} richiedono una scelta.",
+        "choiceClause_one": " · {{count}} richiede una scelta.",
+        "choiceClause_other": " · {{count}} richiedono una scelta.",
+        "chooseTarget": "Scegli destinazione…",
+        "convert": "Converti",
+        "convertedToast_many": "{{count}} wikilink convertiti",
+        "convertedToast_one": "{{count}} wikilink convertito",
+        "convertedToast_other": "{{count}} wikilink convertiti",
+        "noneToConvert": "Nessun wikilink importato da convertire in questa nota.",
+        "nothingToConvert": "Niente da convertire — nessun wikilink importato risolto.",
+        "rewriteCount_many": "Verranno riscritti {{count}} collegamenti",
+        "rewriteCount_one": "Verrà riscritto {{count}} collegamento",
+        "rewriteCount_other": "Verranno riscritti {{count}} collegamenti",
+        "skipped": "ignorato — {{reason}}",
+        "title": "Converti i wikilink importati in questa nota"
+      },
+      "convertCore": {
+        "noMatch": "nessuna corrispondenza"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Nota",
+      "errors": {
+        "attachmentCorrupt": "Un allegato a cui questa nota fa riferimento non è leggibile, quindi non è stato esportato nulla.",
+        "attachmentMissing": "Manca un allegato a cui questa nota fa riferimento, quindi non è stato esportato nulla.",
+        "cannotDecrypt": "Impossibile leggere questa nota.",
+        "destinationUnusable": "La cartella di destinazione non è utilizzabile.",
+        "fallback": "L'esportazione è fallita in modo imprevisto. Riprova.",
+        "invalidAttachmentCatalog": "Impossibile leggere il catalogo degli allegati della cassaforte, quindi non è stato esportato nulla.",
+        "invalidNoteFilename": "Quel nome file non è utilizzabile, quindi non è stato esportato nulla.",
+        "invalidNoteId": "Impossibile identificare questa nota, quindi non è stato esportato nulla.",
+        "invalidPlaintextEncoding": "Il contenuto di questa nota sembra danneggiato, quindi non è stato esportato nulla. Ripristinalo da un backup.",
+        "ioNoSpace": "Spazio insufficiente nella destinazione.",
+        "ioPermissionDenied": "Permessi insufficienti per scrivere nella destinazione.",
+        "ioWriteDefault": "Impossibile scrivere il file esportato.",
+        "noteNotFound": "Questa nota non esiste più — potrebbe essere stata eliminata.",
+        "pdfCaptureFailed": "Impossibile generare il PDF, quindi non è stato esportato nulla.",
+        "pdfExportInProgress": "Un'esportazione PDF è già in corso. Attendi che termini, poi riprova.",
+        "pdfPayloadMissing": "L'esportazione è stata interrotta — se la cassaforte si è bloccata, sbloccala e riprova.",
+        "pdfRenderTimeout": "Il rendering della nota ha richiesto troppo tempo, quindi non è stato esportato nulla.",
+        "pdfWindowCreateFailed": "Impossibile aprire la finestra di esportazione, quindi non è stato esportato nulla.",
+        "targetExists": "Un file con quel nome esiste già nella destinazione.",
+        "vaultLocked": "La cassaforte è bloccata. Sbloccala, poi riprova."
+      },
+      "flow": {
+        "couldNotRead": "Impossibile leggere questa nota.",
+        "exportedTo": "Esportato in {{filename}}",
+        "exportedToWithAttachments_many": "Esportato in {{filename}} + {{count}} allegati",
+        "exportedToWithAttachments_one": "Esportato in {{filename}} + {{count}} allegato",
+        "exportedToWithAttachments_other": "Esportato in {{filename}} + {{count}} allegati",
+        "exportedToWithImages_many": "Esportato in {{filename}} + {{count}} immagini",
+        "exportedToWithImages_one": "Esportato in {{filename}} + {{count}} immagine",
+        "exportedToWithImages_other": "Esportato in {{filename}} + {{count}} immagini",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Testo semplice",
+        "showInFolder": "Mostra nella cartella"
+      },
+      "modal": {
+        "cancel": "Annulla",
+        "export": "Esporta…",
+        "includeAttachments_many": "Includi {{count}} allegati",
+        "includeAttachments_one": "Includi {{count}} allegato",
+        "includeAttachments_other": "Includi {{count}} allegati",
+        "title": "Esporta come Markdown"
+      }
+    },
+    "pdf": {
+      "cancel": "Annulla",
+      "continue": "Continua…",
+      "title": "Esporta come PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Scegli dove salvare l'esportazione",
+      "errors": {
+        "attachmentCorrupt": "Un allegato a cui una nota fa riferimento non è leggibile, quindi non è stato esportato nulla.",
+        "attachmentMissing": "Manca un allegato a cui una nota fa riferimento, quindi non è stato esportato nulla.",
+        "authOperationInProgress": "È in corso un'altra operazione sulla cassaforte. Attendi che termini, poi riprova.",
+        "cancelled": "Esportazione annullata. Non è rimasto nulla nella destinazione.",
+        "cannotDecrypt": "Impossibile leggere una nota, quindi non è stato esportato nulla.",
+        "destinationAlreadyExists": "In quella posizione esiste già qualcosa. Scegli una nuova posizione per l'esportazione.",
+        "destinationNotAllowed": "Quella posizione si trova all'interno dell'archivio di Myne. Scegli una cartella esterna.",
+        "invalidPlaintextEncoding": "Il contenuto di una nota sembra danneggiato, quindi non è stato esportato nulla. Ripristinala da un backup.",
+        "invalidVaultMeta": "Impossibile leggere i metadati della cassaforte, quindi non è stato esportato nulla.",
+        "ioWriteDefault": "Impossibile scrivere l'esportazione.",
+        "joinFailure": "L'esportazione è fallita in modo imprevisto. Non è rimasto nulla nella destinazione.",
+        "vaultLocked": "La cassaforte è bloccata. Sbloccala, poi riprova.",
+        "vaultNotFound": "Nessuna cassaforte da esportare."
+      },
+      "flow": {
+        "countAttachments_many": "{{count}} allegati",
+        "countAttachments_one": "{{count}} allegato",
+        "countAttachments_other": "{{count}} allegati",
+        "countFolders_many": "{{count}} cartelle",
+        "countFolders_one": "{{count}} cartella",
+        "countFolders_other": "{{count}} cartelle",
+        "countNotes_many": "{{count}} note",
+        "countNotes_one": "{{count}} nota",
+        "countNotes_other": "{{count}} note",
+        "exclusionsHistory": "Cronologia delle versioni non inclusa.",
+        "exclusionsTrashedAndHistory_many": "{{count}} note nel cestino e cronologia delle versioni non incluse.",
+        "exclusionsTrashedAndHistory_one": "{{count}} nota nel cestino e cronologia delle versioni non incluse.",
+        "exclusionsTrashedAndHistory_other": "{{count}} note nel cestino e cronologia delle versioni non incluse.",
+        "exclusionsTrashed_many": "{{count}} note nel cestino non incluse.",
+        "exclusionsTrashed_one": "{{count}} nota nel cestino non inclusa.",
+        "exclusionsTrashed_other": "{{count}} note nel cestino non incluse.",
+        "phaseAttachments": "allegati",
+        "phaseNotes": "note",
+        "preparing": "Preparazione…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Annulla",
+        "cancelling": "Annullamento…",
+        "title": "Esportazione…"
+      },
+      "setup": {
+        "cancel": "Annulla",
+        "choose": "Scegli…",
+        "chooseFolder": "Scegli una cartella…",
+        "destinationLabel": "Destinazione",
+        "export": "Esporta…",
+        "folderSelectAriaLabel": "Cartella da esportare",
+        "noFolderChosen": "Nessuna cartella scelta",
+        "noFoldersInVault": "Nessuna cartella in questa cassaforte",
+        "scopeFolder": "Una cartella",
+        "scopeLabel": "Ambito",
+        "scopeWhole": "Intera cassaforte",
+        "title": "Esporta cassaforte come Markdown"
+      },
+      "summary": {
+        "done": "Fatto",
+        "showInFolder": "Mostra nella cartella",
+        "title": "Esportazione completata"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "Se hai un backup, puoi ripristinarlo — i tuoi file attuali non vengono toccati; il backup viene prima ripristinato come cassaforte separata.",
+      "cta": "Chiudi app",
+      "title": "Il file della cassaforte è danneggiato."
+    },
+    "invalidState": {
+      "body": "Riavvia l'applicazione.",
+      "cta": "Blocca",
+      "title": "Stato imprevisto."
+    },
+    "ioError": {
+      "body": "Potrebbe trattarsi di un errore del disco o del file system.",
+      "cta": "Chiudi app",
+      "title": "Impossibile leggere il file della cassaforte."
+    },
+    "permissionDenied": {
+      "body": "Controlla i permessi dei file.",
+      "cta": "Chiudi app",
+      "title": "Permessi insufficienti per accedere al file della cassaforte."
+    },
+    "restoreFromBackup": "Ripristina da backup…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Chiudi",
+      "countEmpty": "Vuoto",
+      "count_many": "{{count}} note",
+      "count_one": "{{count}} nota",
+      "count_other": "{{count}} note",
+      "delete": "Elimina",
+      "deleteError": "Impossibile eliminare quella nota. Riprova.",
+      "emptyState": "L'archivio è vuoto.",
+      "restore": "Ripristina",
+      "restoreError": "Impossibile ripristinare quella nota. Riprova.",
+      "title": "Archivio",
+      "untitled": "Senza titolo"
+    },
+    "cardMenu": {
+      "copyLink": "Copia collegamento",
+      "open": "Apri",
+      "openInNewTab": "Apri in una nuova scheda",
+      "revealInFolder": "Mostra nella cartella"
+    },
+    "colorLabels": {
+      "clay": "Argilla",
+      "moss": "Muschio",
+      "ochre": "Ocra",
+      "plum": "Prugna",
+      "slate": "Ardesia",
+      "stone": "Pietra"
+    },
+    "decoration": {
+      "colorSection": "Colore",
+      "default": "Predefinito",
+      "defaultFolderIcon": "Icona cartella predefinita",
+      "iconSection": "Icona",
+      "menuLabel": "Etichetta colore",
+      "noColor": "Nessun colore",
+      "none": "Nessuna"
+    },
+    "deleteConfirm": {
+      "cancel": "Annulla",
+      "delete": "Elimina",
+      "title": "Eliminare questa nota?",
+      "untitled": "Senza titolo",
+      "warning": "Questa operazione non può essere annullata."
+    },
+    "filterBuilder": {
+      "addCondition": "Aggiungi condizione",
+      "addFilterGroup": "Aggiungi gruppo di filtri",
+      "cancel": "Annulla",
+      "combinator": {
+        "all": "tutte",
+        "any": "una qualsiasi"
+      },
+      "match": "Corrispondenza",
+      "negate": {
+        "is": "è",
+        "isNot": "non è"
+      },
+      "noConditions": "Ancora nessuna condizione — questa vista mostra tutte le pagine.",
+      "noteCount_many": "{{count}} note",
+      "noteCount_one": "{{count}} nota",
+      "noteCount_other": "{{count}} note",
+      "of": "di:",
+      "ofTheGroups": "dei gruppi:",
+      "removeCondition": "Rimuovi condizione",
+      "replaceFilter": "Sostituisci filtro",
+      "save": "Salva",
+      "searchTextPlaceholder": "testo da cercare",
+      "selectFolderPlaceholder": "seleziona una cartella…",
+      "selectTagPlaceholder": "seleziona un tag…",
+      "type": {
+        "folder": "Cartella",
+        "search": "Ricerca",
+        "tag": "Tag"
+      },
+      "unrepresentable": "Questo filtro è stato creato con un editor avanzato e non può essere modificato qui.",
+      "unresolved": "non risolto"
+    },
+    "folderManagement": {
+      "illegalSegment": "Il nome di una cartella non può contenere / \\ | # ^ [ ] né iniziare o terminare con uno spazio.",
+      "tooLong": "Quel percorso di cartella è troppo lungo."
+    },
+    "folderNote": {
+      "defaultTitle": "Indice"
+    },
+    "folderRow": {
+      "createFolderNote": "Crea una nota cartella",
+      "empty": "vuota",
+      "folderNote": "nota cartella",
+      "openFolderNote": "Apri nota cartella"
+    },
+    "graph": {
+      "allConnected": "Tutto è collegato — nessuna nota isolata.",
+      "building": "Creazione del grafico…",
+      "depthToggleTitle": "Attiva/disattiva profondità del vicinato (1 ↔ 2 salti)",
+      "filterAll": "Tutte",
+      "filterAroundNote": "Attorno a questa nota",
+      "filterByTag": "Filtra per tag",
+      "filterIsolated": "Isolate",
+      "hop": "{{depth}} salto",
+      "loading": "Caricamento del grafico…",
+      "noNotes": "Ancora nessuna nota da rappresentare nel grafico.",
+      "overCap": "Questa cassaforte è grande — il grafico dell'intera cassaforte è limitato. Filtra per un tag o mostra le note isolate per esplorare.",
+      "refresh": "Aggiorna",
+      "refreshTitle": "La cassaforte è cambiata — ricostruisci il grafico",
+      "tagPlaceholder": "Tag…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Vista senza titolo"
+      },
+      "modal": {
+        "cancel": "Annulla",
+        "cancelledNotImported_many": "{{count}} non importate",
+        "cancelledNotImported_one": "{{count}} non importata",
+        "cancelledNotImported_other": "{{count}} non importate",
+        "cancelling": "Annullamento…",
+        "chooseFolder": "Scegli cartella…",
+        "close": "Chiudi",
+        "closeAriaLabel": "Chiudi",
+        "copied": "Copiato",
+        "copy": "Copia",
+        "done": "Fatto",
+        "errorBody": "Impossibile completare l'importazione. Le note già importate sono state conservate e puoi tranquillamente mantenerle o eliminarle.",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
+        "flagKindFolder": "Cartella",
+        "flagKindTitle": "Titolo",
+        "folderPickerTitle": "Scegli la cartella della cassaforte Obsidian",
+        "hiddenIgnoredPrefix_many": "{{count}} elementi di configurazione / nascosti ignorati (es. ",
+        "hiddenIgnoredPrefix_one": "{{count}} elemento di configurazione / nascosto ignorato (es. ",
+        "hiddenIgnoredPrefix_other": "{{count}} elementi di configurazione / nascosti ignorati (es. ",
+        "hiddenIgnoredSuffix": ", file nascosti).",
+        "ifNoteExistsLabel": "Se una nota esiste già",
+        "import": "Importa",
+        "importFailed": "Importazione non riuscita.",
+        "importing": "Importazione della tua cassaforte…",
+        "markDone": "Segna come completata",
+        "markedDone": "Completata",
+        "mediaImported_many": "{{count}} importati",
+        "mediaImported_one": "{{count}} importato",
+        "mediaImported_other": "{{count}} importati",
+        "mediaOmittedSuffix_many": " · {{count}} omessi",
+        "mediaOmittedSuffix_one": " · {{count}} omesso",
+        "mediaOmittedSuffix_other": " · {{count}} omessi",
+        "needsAttention": "Richiede attenzione",
+        "needsAttentionHelp": "Queste note sono state importate senza modifiche. Le correzioni suggerite sono punti di partenza — copiane una, poi rinomina la nota quando la apri.",
+        "noFolderChosen": "Nessuna cartella scelta",
+        "notesImported_many": "note importate",
+        "notesImported_one": "nota importata",
+        "notesImported_other": "note importate",
+        "policyCopyHint": "Importala accanto alla nota esistente.",
+        "policyCopyLabel": "Importa come copia",
+        "policySkipHint": "Consigliato — rieseguire un'importazione non crea mai duplicati né sovrascrive.",
+        "policySkipLabel": "Ignorala",
+        "preexistingDetail": "Questa nota aveva già la propria cartella: “{{existing}}”, che Myne ha mantenuto — può differire da dove si trovava sul disco.",
+        "preparing": "Preparazione…",
+        "progressNotes": " note",
+        "progressOf": " di ",
+        "reasonIllegalChar": "contiene un carattere che Myne non può usare in un nome",
+        "reasonPathTooLong": "il percorso cartella + titolo è troppo lungo",
+        "reasonSegmentTooLong": "il nome è più lungo di quanto Myne consenta",
+        "scanning": "Scansione della tua cassaforte…",
+        "setupIntro": "Indica a Myne la cartella della tua cassaforte Obsidian esistente. Ogni nota Markdown viene importata e crittografata sul posto — nulla lascia questo dispositivo e i tuoi file originali restano intatti.",
+        "statCancelled": "Annullate",
+        "statCanvasSkipped": "file .canvas ignorati",
+        "statEmptyFoldersKept": "Cartelle vuote mantenute",
+        "statMedia": "Media",
+        "statOtherSkipped": "Altri file ignorati",
+        "statSkipped": "Ignorate (già esistenti)",
+        "suggestedNameAriaLabel": "Nome consigliato",
+        "titleComplete": "Importazione completata",
+        "titleFailed": "Importazione non riuscita",
+        "titleSetup": "Importa cassaforte Obsidian",
+        "vaultFolderLabel": "Cartella della cassaforte",
+        "vaultRoot": "(radice della cassaforte)"
+      },
+      "offer": {
+        "body": "Porta le tue note esistenti in Myne. Ognuna viene crittografata durante l'importazione — nulla lascia questo dispositivo e i tuoi file originali restano esattamente dove sono.",
+        "chooseFolder": "Scegli cartella…",
+        "laterHint": "Puoi sempre importare in seguito da Impostazioni → Archiviazione.",
+        "notNow": "Non ora",
+        "title": "Importare la tua cassaforte Obsidian?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Aggiungi ai preferiti",
+      "archive": "Archivia",
+      "archiveBulkError": "Impossibile archiviare le note.",
+      "archiveNote": "Archivia",
+      "archiveSingleError": "Impossibile archiviare la nota.",
+      "attachments": "Allegati",
+      "bulkArchive_many": "Archivia {{count}} note",
+      "bulkArchive_one": "Archivia {{count}} nota",
+      "bulkArchive_other": "Archivia {{count}} note",
+      "bulkDelete_many": "Elimina {{count}} note",
+      "bulkDelete_one": "Elimina {{count}} nota",
+      "bulkDelete_other": "Elimina {{count}} note",
+      "bulkMove_many": "Sposta {{count}} note in…",
+      "bulkMove_one": "Sposta {{count}} nota in…",
+      "bulkMove_other": "Sposta {{count}} note in…",
+      "caseMergeBody": "Esiste già una cartella di nome “{{name}}”. Queste verranno unite — vuoi rinominarne una per tenerle separate?",
+      "color": "Colore…",
+      "createFirstNote": "+ Crea la tua prima nota",
+      "createFolderNote": "Crea nota cartella",
+      "customize": "Personalizza…",
+      "delete": "Elimina",
+      "deleteFolderBody_many": "“{{name}}” e le sue {{count}} note",
+      "deleteFolderBody_one": "“{{name}}” e la sua {{count}} nota",
+      "deleteFolderBody_other": "“{{name}}” e le sue {{count}} note",
+      "deleteFolderConfirm": "Elimina cartella",
+      "deleteFolderTitle": "Eliminare questa cartella?",
+      "deleteFolderWarning": "Le note vengono spostate nel Cestino — potrai ripristinarle in seguito.",
+      "duplicate": "Duplica",
+      "editFilterTitle": "Modifica filtro",
+      "emptyState": "Ancora nessuna nota.",
+      "exportHtml": "Esporta come HTML…",
+      "exportMarkdown": "Esporta come Markdown…",
+      "exportPdf": "Esporta come PDF…",
+      "exportTxt": "Esporta come testo semplice…",
+      "favoritesHeading": "Preferiti",
+      "mergeAnyway": "Unisci comunque",
+      "newFolder": "Nuova cartella",
+      "newFolderInPlaceholder": "Nuova cartella in {{path}}",
+      "newFolderPlaceholder": "Nuova cartella",
+      "newNote": "Nuova nota",
+      "newNoteFromTemplate": "Nuova nota da modello…",
+      "newNoteHere": "Nuova nota qui",
+      "newNoteMenu": "Nuova nota",
+      "newNoteShortcut": "Nuova nota (⌘N)",
+      "newSubfolder": "Nuova sottocartella",
+      "newViewTitle": "Nuova vista",
+      "noteMovedToTrash": "Nota spostata nel Cestino",
+      "notesHeading": "Note",
+      "notesMovedToTrash_many": "{{count}} note spostate nel Cestino",
+      "notesMovedToTrash_one": "{{count}} nota spostata nel Cestino",
+      "notesMovedToTrash_other": "{{count}} note spostate nel Cestino",
+      "openArchive": "Apri l'archivio",
+      "openAttachments": "Apri allegati",
+      "openFolderNote": "Apri nota cartella",
+      "openInNewTab": "Apri in una nuova scheda",
+      "openToSide": "Apri di fianco",
+      "openTrash": "Apri il cestino",
+      "removeAsFolderNote": "Rimuovi come nota cartella",
+      "removeFromFavorites": "Rimuovi dai preferiti",
+      "rename": "Rinomina",
+      "setAsFolderNote": "Imposta come nota cartella",
+      "trash": "Cestino",
+      "trashBulkError": "Impossibile spostare le note nel Cestino.",
+      "trashSingleError": "Impossibile spostare la nota nel Cestino.",
+      "undo": "Annulla",
+      "vaultRoot": "Radice della cassaforte",
+      "viewSettingsTitle": "Impostazioni vista"
+    },
+    "newFromTemplate": {
+      "back": "Indietro",
+      "blankNote": "Nota vuota",
+      "createNote": "Crea nota",
+      "emptyState": "Non hai ancora creato alcun modello.",
+      "listLabel": "Modelli",
+      "loading": "Caricamento…",
+      "nameLabel": "Nome della nota (da “{{templateName}}”)",
+      "namePlaceholder": "Senza titolo",
+      "nameStepTitle": "Assegna un nome alla nota",
+      "pickStepTitle": "Nuova nota da modello",
+      "untitledTemplate": "Modello senza titolo"
+    },
+    "newTab": {
+      "createNote": "Crea una nuova nota",
+      "noNotesMatch": "Nessuna nota corrisponde.",
+      "noNotesYet": "Ancora nessuna nota.",
+      "searchAriaLabel": "Cerca note da aprire",
+      "searchPlaceholder": "Cerca note…",
+      "untitled": "Senza titolo"
+    },
+    "pane": {
+      "graphTab": "Grafico",
+      "loading": "Caricamento…",
+      "untitledView": "Vista senza titolo"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} giorni fa",
+      "hoursAgo": "{{h}} h fa",
+      "justNow": "proprio ora",
+      "minutesAgo": "{{m}} min fa",
+      "oneWeekAgo": "1 settimana fa",
+      "weeksAgo": "{{w}} settimane fa",
+      "yesterday": "ieri"
+    },
+    "row": {
+      "addToFavorites": "Aggiungi ai preferiti",
+      "folderIndexBadgeLabel": "Nota cartella",
+      "folderIndexBadgeTitle": "Nota cartella — l'indice di questa cartella",
+      "folderIndexConflictLabel": "La cartella ha già una nota indice",
+      "folderIndexConflictTitle": "Questa cartella ha già una nota indice",
+      "loadError": "Impossibile caricare questa nota",
+      "removeFromFavorites": "Rimuovi dai preferiti",
+      "renameAriaLabel": "Rinomina nota",
+      "untitled": "Senza titolo"
+    },
+    "saveStatus": {
+      "editing": "Modifica",
+      "editingEllipsis": "Modifica…",
+      "editingTitle": "Modifica — salvataggio automatico attivo",
+      "justNow": "proprio ora",
+      "retry": "Riprova",
+      "saveFailed": "Salvataggio non riuscito",
+      "saveFailedTitle": "Salvataggio non riuscito — clicca su Riprova",
+      "saved": "Salvata",
+      "savedRelative": "Salvata {{rel}}",
+      "saving": "Salvataggio",
+      "savingEllipsis": "Salvataggio…"
+    },
+    "savedView": {
+      "defaultName": "Vista filtrata"
+    },
+    "snapshotFailed": {
+      "dismiss": "Ignora",
+      "message": "Impossibile salvare un'istantanea — la tua nota è salvata, ma la cronologia delle versioni potrebbe essere incompleta (il disco potrebbe essere pieno)."
+    },
+    "snapshots": {
+      "cancel": "Annulla",
+      "changeCount_many": "{{count}} modifiche da questa istantanea",
+      "changeCount_one": "{{count}} modifica da questa istantanea",
+      "changeCount_other": "{{count}} modifiche da questa istantanea",
+      "close": "Chiudi",
+      "confirmBody": "La tua nota attuale verrà prima salvata come istantanea, così potrai annullare questa operazione.",
+      "confirmTitle": "Ripristinare questa istantanea?",
+      "decrypting": "Decifratura…",
+      "emptyState": "Ancora nessuna istantanea. Le istantanee vengono salvate automaticamente mentre modifichi e conservate per circa 7 giorni. Sono crittografate e scompaiono quando la nota viene eliminata definitivamente.",
+      "encryptedSize": "Crittografata · {{size}}",
+      "errorCannotDecrypt": "Impossibile decifrare questa istantanea.",
+      "errorGeneric": "Qualcosa è andato storto. Riprova.",
+      "errorIo": "Si è verificato un errore del disco — potrebbe essere pieno o non scrivibile.",
+      "errorNotFound": "Quell'istantanea non è più disponibile.",
+      "errorStorageAccess": "Impossibile accedere all'archivio delle istantanee della cassaforte.",
+      "errorVaultLocked": "La cassaforte è bloccata. Sbloccala per visualizzare le istantanee.",
+      "justNow": "proprio ora",
+      "listLabel": "Elenco delle istantanee",
+      "loading": "Caricamento…",
+      "restore": "Ripristina",
+      "restoreCta": "Ripristina questa istantanea",
+      "restoredStatus": "Ripristinata. La versione che avevi è stata salvata come istantanea.",
+      "selectPlaceholder": "Seleziona un'istantanea per vedere in anteprima cosa è cambiato da allora.",
+      "title": "Istantanee",
+      "untitled": "Senza titolo"
+    },
+    "tabStrip": {
+      "closeNewTab": "Chiudi nuova scheda",
+      "closeTab": "Chiudi {{title}}",
+      "newTab": "Nuova scheda",
+      "openNotes": "Apri note",
+      "pin": "Fissa",
+      "pinned": "Fissata",
+      "pinnedTitle": "Fissata — rimuovi il fissaggio per chiudere",
+      "unpin": "Rimuovi fissaggio",
+      "untitled": "Senza titolo"
+    },
+    "tagBrowser": {
+      "cancel": "Annulla",
+      "clear": "Cancella",
+      "combineTagsWith": "Combina i tag con",
+      "filtering": "Filtraggio…",
+      "modeAll": "Tutti",
+      "modeAny": "Uno qualsiasi",
+      "noNotesForFilter": "Nessuna nota per questo filtro.",
+      "noTagsMatch": "Nessun tag corrisponde a “{{query}}”.",
+      "noTagsYet": "Ancora nessun tag.",
+      "noteCount_many": "{{count}} note",
+      "noteCount_one": "{{count}} nota",
+      "noteCount_other": "{{count}} note",
+      "notes": "Note",
+      "pickTag": "Scegli un tag per filtrare.",
+      "save": "Salva",
+      "saveAsView": "Salva come vista",
+      "searchPlaceholder": "Cerca tag…",
+      "title": "Tag",
+      "untitled": "Senza titolo",
+      "viewNamePlaceholder": "Nome vista"
+    },
+    "trash": {
+      "close": "Chiudi",
+      "countEmpty": "Vuoto",
+      "count_many": "{{count}} note",
+      "count_one": "{{count}} nota",
+      "count_other": "{{count}} note",
+      "delete": "Elimina",
+      "deleteError": "Impossibile eliminare quella nota. Riprova.",
+      "empty": "Svuota cestino",
+      "emptyConfirmBody_many": "{{count}} note verranno eliminate definitivamente.",
+      "emptyConfirmBody_one": "{{count}} nota verrà eliminata definitivamente.",
+      "emptyConfirmBody_other": "{{count}} note verranno eliminate definitivamente.",
+      "emptyConfirmCta": "Svuota cestino",
+      "emptyConfirmTitle": "Svuotare il cestino?",
+      "emptyPartialFailure_many": "Impossibile eliminare {{count}} note, che restano nel cestino.",
+      "emptyPartialFailure_one": "Impossibile eliminare {{count}} nota, che resta nel cestino.",
+      "emptyPartialFailure_other": "Impossibile eliminare {{count}} note, che restano nel cestino.",
+      "emptyState": "Il cestino è vuoto.",
+      "purgeConfirmCta": "Elimina definitivamente",
+      "purgeConfirmTitle": "Eliminare definitivamente?",
+      "restore": "Ripristina",
+      "restoreError": "Impossibile ripristinare quella nota. Riprova.",
+      "title": "Cestino",
+      "untitled": "Senza titolo"
+    },
+    "unlinkedMentions": {
+      "empty": "Nessuna menzione non collegata.",
+      "heading": "Menzioni non collegate",
+      "link": "Collega",
+      "linkTooltip": "Collega questa menzione a {{title}}",
+      "refresh": "Le menzioni potrebbero essere cambiate — aggiorna",
+      "searching": "Ricerca in corso…",
+      "thisNote": "questa nota",
+      "untitled": "Senza titolo"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Predefinito (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (quadrato)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (panoramico)"
+      },
+      "cancel": "Annulla",
+      "cardSize": "Dimensione scheda",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "La proprietà del frontmatter il cui valore è un'immagine — mostrata come copertina di ogni scheda. Lascia vuoto per nessuna copertina.",
+      "coverImagePlaceholder": "es. cover",
+      "coverImageProperty": "Proprietà immagine di copertina",
+      "imageAspectRatio": "Proporzioni dell'immagine",
+      "reset": "Ripristina",
+      "save": "Salva"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Cambia copertina",
+        "changeCoverImage": "Cambia immagine di copertina",
+        "empty": "Nessuna nota corrisponde a questa vista",
+        "noValue": "Nessun valore",
+        "setCover": "Imposta copertina",
+        "setCoverImage": "Imposta immagine di copertina",
+        "untitled": "Senza titolo"
+      },
+      "collapseViews": "Comprimi viste",
+      "empty": "Ancora nessuna vista. Salva l'elenco note attuale come vista.",
+      "expandViews": "Espandi viste",
+      "heading": "Viste",
+      "host": {
+        "unsupported": "Questo tipo di vista arriverà in un aggiornamento successivo."
+      },
+      "menu": {
+        "deleteView": "Elimina vista",
+        "editFilter": "Modifica filtro…",
+        "moveDown": "Sposta giù",
+        "moveUp": "Sposta su",
+        "rename": "Rinomina",
+        "viewSettings": "Impostazioni vista…"
+      },
+      "newView": "Nuova vista",
+      "untitledView": "Vista senza titolo"
+    },
+    "welcome": {
+      "body": "Benvenuto in Myne, il tuo spazio privato per pensare e scrivere.\n\nTutto ciò che salvi qui è crittografato e resta sul tuo dispositivo. La tua **password** e la tua **frase di recupero** sono le uniche chiavi per accedervi, quindi conservale in un luogo sicuro. Se le perdi entrambe, nessuno potrà recuperare le tue note, nemmeno noi.\n\nQuesta è solo una normale nota, quindi rendila tua. Modificala, rinominala o eliminala quando vuoi, e aggiungi nuove note man mano che le tue idee crescono.\n\nSiamo felici che tu sia qui. Per saperne di più su Myne, visita https://myne.md\n",
+      "title": "Benvenuto in Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "Predefinito"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Verifica della robustezza…",
+      "confirmLabel": "Conferma la password principale",
+      "defaultEmptyCaption": "Usata come input per Argon2id (m=256 MiB, t=3, p=2). Scegline una che puoi ricordare; non potrai reimpostarla.",
+      "mismatch": "Le password non corrispondono.",
+      "passwordLabel": "Password principale",
+      "suggestPassword": "Suggerisci una password",
+      "tooShort": "Usa almeno {{n}} caratteri."
+    },
+    "input": {
+      "hide": "Nascondi password",
+      "show": "Mostra password"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "Nessuna corrispondenza.",
+      "placeholder": "Seleziona…",
+      "searchPlaceholder": "Cerca…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Recupero annullato: la cassaforte era bloccata.",
+      "operationInProgress": "Operazione in corso. Attendi.",
+      "unexpected": "Errore imprevisto. Riprova.",
+      "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app."
+    }
+  },
+  "restore": {
+    "backLabel": "Indietro",
+    "cancelLabel": "Annulla",
+    "collision": {
+      "body": "Una cassaforte di questo backup esiste già su questo dispositivo. Puoi mantenerle entrambe — la copia ripristinata compare come cassaforte separata nell'elenco delle casseforti — oppure ripristinare ora e poi rimuovere tu stesso la cassaforte esistente dall'elenco (la rimozione ti chiede di digitare DELETE e ha senso solo dopo aver confermato che la cassaforte ripristinata si apre).",
+      "keepBoth": "Mantieni entrambe",
+      "replaceExisting": "Ripristina, poi sostituisci l'esistente…"
+    },
+    "damaged": {
+      "body": "Il file di backup è danneggiato, quindi non è stato ripristinato nulla. Se questa è l'unica copia che hai, il recupero può ripristinare le note intatte ed elencare esattamente ciò che non è stato possibile leggere — il risultato è sempre indicato come ripristino parziale.",
+      "close": "Chiudi",
+      "salvage": "Recupera le note intatte…"
+    },
+    "error": {
+      "tryAnotherFile": "Prova un altro file"
+    },
+    "pick": {
+      "body": "Scegli un file <code>.myne-backup</code>. Il backup viene verificato prima di ripristinare qualsiasi cosa; la cassaforte ripristinata si sblocca con la password o la frase di recupero di quella cassaforte — esattamente come lo sblocco.",
+      "chooseFile": "Scegli il file di backup…",
+      "corruptedSuffix": "La tua cassaforte attuale non viene toccata: il backup viene prima ripristinato come cassaforte separata."
+    },
+    "summary": {
+      "attachments": "Allegati: {{n}}",
+      "collidedNote": "La copia precedentemente esistente di questa cassaforte è ancora nel tuo elenco delle casseforti. Una volta confermato che la cassaforte ripristinata si apre, puoi rimuovere quella vecchia dall'elenco (ti verrà chiesto di digitare DELETE).",
+      "notes": "Note: {{n}}",
+      "openVaultList": "Apri l'elenco delle casseforti",
+      "partialHeader_many": "Ripristino parziale — impossibile leggere {{count}} elementi.",
+      "partialHeader_one": "Ripristino parziale — impossibile leggere {{count}} elemento.",
+      "partialHeader_other": "Ripristino parziale — impossibile leggere {{count}} elementi.",
+      "restored": "Cassaforte ripristinata.",
+      "versionHistory": "Voci della cronologia delle versioni: {{n}}"
+    },
+    "title": "Ripristina da backup",
+    "working": {
+      "cancel": "Annulla",
+      "restoringProgress": "Ripristino… {{done}} di {{total}}",
+      "verifying": "Verifica del backup…",
+      "verifyingProgress": "Verifica del backup… {{done}} di {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Build di sviluppo",
+      "buildChannelLabel": "Canale di build",
+      "buildChannelStable": "Stabile",
+      "changelogButton": "Visualizza changelog…",
+      "changelogHelper": "Note per versione. Saranno disponibili quando verrà rilasciato MYND-119.",
+      "changelogLabel": "Changelog",
+      "licenseBody": "Pre-alpha · documentazione CC0 · codice dell'app AGPL-3.0 al rilascio della Fase 1.",
+      "licenseLabel": "Licenza",
+      "tagline": "Pre-alpha · client desktop della Fase 1",
+      "threatModelHelper": "Apri il documento pubblico del modello di minaccia nel browser.",
+      "threatModelLabel": "Modello di minaccia"
+    },
+    "account": {
+      "argon2idHeading": "Parametri Argon2id",
+      "changePasswordButton": "Cambia password",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Password attuale errata oppure il file della cassaforte è danneggiato.",
+        "ioError": "Errore del disco, riprova.",
+        "joinFailure": "Qualcosa è andato storto, riprova.",
+        "samePasswordRejected": "La nuova password coincide con quella attuale.",
+        "weakNewPassword": "La nuova password deve avere almeno 12 caratteri."
+      },
+      "changePasswordHeading": "Cambia password",
+      "changePasswordHelper": "Cambia la tua password principale mantenendo la stessa cassaforte. La frase di recupero resta invariata.",
+      "dangerZoneHeading": "Zona pericolosa",
+      "dangerZoneHelper": "Elimina definitivamente questa cassaforte e tutte le note. L'operazione non può essere annullata. La frase di recupero non ripristinerà la cassaforte.",
+      "deleteVaultButton": "Elimina cassaforte…",
+      "memoryCost": "Costo di memoria",
+      "parallelism": "Parallelismo",
+      "timeCost": "Costo di tempo",
+      "vaultLabelEyebrow": "ETICHETTA CASSAFORTE",
+      "vaultLabelHelper": "Un nome per questa cassaforte mostrato nel selettore interno all'app. Memorizzato crittografato all'interno della cassaforte; non lascia mai il tuo dispositivo in chiaro.",
+      "vaultLabelPlaceholder": "Aggiungi un'etichetta…",
+      "vaultLabelSave": "Salva"
+    },
+    "appearance": {
+      "showEditTimesAria": "Mostra gli orari di modifica nella barra laterale",
+      "showEditTimesHelper": "Mostra l'orario dell'ultima modifica di ogni nota sotto il suo titolo nella barra laterale.",
+      "showEditTimesLabel": "Mostra gli orari di modifica",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Scuro",
+        "light": "Chiaro",
+        "system": "Sistema"
+      },
+      "themeHelper": "Passa dal tema chiaro a quello scuro, oppure segui la preferenza di sistema.",
+      "themeLabel": "Tema",
+      "themeOptionAria": "Tema {{label}}",
+      "themeSaveError": "Impossibile salvare il tema. Riprova.",
+      "timestampsSaveError": "Impossibile salvare la preferenza. Riprova."
+    },
+    "archive": {
+      "helper": "Consenti di spostare le note in un Archivio, tenendole fuori dall'elenco principale. Disattivando questa opzione ogni nota archiviata torna nella sua cartella e i controlli dell'archivio vengono nascosti.",
+      "label": "Archiviazione",
+      "off": "Disattivata",
+      "on": "Attivata",
+      "saveError": "Impossibile aggiornare l'impostazione di archiviazione."
+    },
+    "autoBackup": {
+      "backupFolder": "Cartella di backup",
+      "chooseFolder": "Scegli cartella…",
+      "chooseFolderDialogTitle": "Scegli una cartella per i backup automatici",
+      "frequency": "Frequenza",
+      "frequencyAriaLabel": "Frequenza di backup",
+      "helper": "Scrive un file .myne-backup crittografato in una cartella secondo una pianificazione, mentre l'app è aperta e la cassaforte è sbloccata. I backup restano crittografati come la tua cassaforte; Myne conserva solo i più recenti e non invia mai nulla fuori dal tuo dispositivo.",
+      "intervalDaily": "Ogni giorno",
+      "intervalEveryUnlock": "A ogni sblocco",
+      "intervalWeekly": "Ogni settimana",
+      "keepLast": "Conserva gli ultimi",
+      "noFolderChosen": "Nessuna cartella ancora scelta.",
+      "saveFailedToast": "Impossibile salvare le impostazioni di backup.",
+      "searchEmpty": "Nessuna corrispondenza.",
+      "searchPlaceholder": "Cerca…",
+      "statusFailed": "Backup automatico non riuscito — {{stamp}}",
+      "statusLastBackup": "Ultimo backup: {{stamp}}",
+      "statusNever": "Ancora nessun backup automatico.",
+      "title": "Backup automatici"
+    },
+    "changePassword": {
+      "cancel": "Annulla",
+      "checkingStrength": "Verifica della robustezza…",
+      "confirmLabel": "Conferma la nuova password",
+      "currentLabel": "Password attuale",
+      "mismatch": "Le password non corrispondono.",
+      "newLabel": "Nuova password",
+      "submit": "Cambia password",
+      "submitting": "Modifica della password…",
+      "title": "Cambia password",
+      "tooShort": "Usa almeno {{n}} caratteri."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Estensione del browser"
+      },
+      "when": {
+        "bare": "Connessa",
+        "daysAgo_many": "Connessa {{count}} giorni fa",
+        "daysAgo_one": "Connessa {{count}} giorno fa",
+        "daysAgo_other": "Connessa {{count}} giorni fa",
+        "hoursAgo_many": "Connessa {{count}} h fa",
+        "hoursAgo_one": "Connessa {{count}} h fa",
+        "hoursAgo_other": "Connessa {{count}} h fa",
+        "justNow": "Connessa proprio ora",
+        "minutesAgo_many": "Connessa {{count}} min fa",
+        "minutesAgo_one": "Connessa {{count}} min fa",
+        "minutesAgo_other": "Connessa {{count}} min fa",
+        "onDate": "Connessa il {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Applicato",
+      "apply": "Applica",
+      "applyError": "Impossibile applicare quel tema. Riprova.",
+      "cancel": "Annulla",
+      "confirm": "Conferma",
+      "delete": "Elimina",
+      "deleteError": "Impossibile eliminare quel tema. Riprova.",
+      "empty": "Ancora nessun tema personalizzato. Importane uno, oppure apri la cartella dei temi e aggiungi un file di tema.",
+      "error": {
+        "aColorFallback": "un colore",
+        "invalidFile": "File del tema non valido.",
+        "invalidName": "Nome del tema non sicuro",
+        "invalidValue": "Valore non valido per {{key}}",
+        "invalidValueWithLine": "Valore non valido per {{key}} (riga {{line}})",
+        "missingKey": "Manca il colore obbligatorio {{key}}",
+        "parseError": "JSON non valido",
+        "parseErrorWithLine": "JSON non valido (riga {{line}})"
+      },
+      "fileFilterName": "Tema Myne",
+      "helper": "Usa la tua tavolozza di colori. I temi vengono convalidati su questo dispositivo prima dell'uso — nulla viene caricato.",
+      "importButton": "Importa tema…",
+      "importError": "Quel file non è un tema valido. Apri il riferimento per vedere il formato.",
+      "label": "Temi personalizzati",
+      "openFolderButton": "Apri cartella dei temi",
+      "openFolderError": "Impossibile aprire la cartella dei temi.",
+      "readError": "Impossibile leggere la cartella dei temi."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Vuoto (nessun modello)",
+      "dateFormatHelper": "Il titolo di ogni nota giornaliera. Supporta YYYY, MM, DD. Predefinito: {{default}}.",
+      "dateFormatLabel": "Formato data della nota giornaliera",
+      "dateFormatSaveError": "Impossibile salvare il formato data. Riprova.",
+      "folderHelper": "Dove vengono archiviate le nuove note giornaliere. Predefinito: {{default}} — la cartella viene mantenuta anche quando è vuota.",
+      "folderLabel": "Cartella delle note giornaliere",
+      "folderSaveError": "Impossibile salvare la cartella giornaliera. Riprova.",
+      "searchEmpty": "Nessun modello corrisponde.",
+      "searchPlaceholder": "Cerca modelli…",
+      "templateHelper": "Scegli un modello da cui partire per ogni nota giornaliera, oppure lascia vuoto per una nota vuota intitolata con la data.",
+      "templateLabel": "Modello della nota giornaliera",
+      "templateSaveError": "Impossibile salvare il modello giornaliero. Riprova.",
+      "untitledTemplate": "Modello senza titolo"
+    },
+    "deleteVault": {
+      "cancel": "Annulla",
+      "caseSensitiveHint": "Distingue maiuscole e minuscole. Digita la parola esattamente per abilitare l'eliminazione.",
+      "continue": "Continua",
+      "copyPrimary": "Questo elimina definitivamente questa cassaforte e ogni nota al suo interno. L'azione non può essere annullata e la tua frase di recupero non ripristinerà i dati.",
+      "copySecondary": "Le chiavi della cassaforte vengono azzerate dalla memoria prima che i file vengano eliminati; qualsiasi testo cifrato orfano che resta sul disco rimane materiale inutilizzabile protetto da Argon2id.",
+      "eyebrow": "IRREVERSIBILE",
+      "heading": "Elimina cassaforte",
+      "ioFailBody": "Impossibile accedere ai file della cassaforte per l'eliminazione. Le chiavi della cassaforte sono già azzerate dalla memoria; qualsiasi dato della cassaforte che resta sul disco è materiale inutilizzabile protetto da Argon2id.",
+      "ioFailTitle": "Errore del disco durante l'eliminazione",
+      "partialFailBody_many": "Impossibile eliminare {{count}} file dal disco. Le chiavi della cassaforte sono già azzerate dalla memoria, quindi qualsiasi testo cifrato orfano che resta è materiale inutilizzabile protetto da Argon2id.",
+      "partialFailBody_one": "Impossibile eliminare {{count}} file dal disco. Le chiavi della cassaforte sono già azzerate dalla memoria, quindi qualsiasi testo cifrato orfano che resta è materiale inutilizzabile protetto da Argon2id.",
+      "partialFailBody_other": "Impossibile eliminare {{count}} file dal disco. Le chiavi della cassaforte sono già azzerate dalla memoria, quindi qualsiasi testo cifrato orfano che resta è materiale inutilizzabile protetto da Argon2id.",
+      "partialFailTitle": "Eliminazione della cassaforte parzialmente non riuscita",
+      "submit": "Elimina cassaforte",
+      "submitInFlight": "Eliminazione della cassaforte…",
+      "typeToConfirmLabel": "Digita DELETE per confermare",
+      "vaultPath": "Percorso della cassaforte: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Attenua le righe inattive",
+      "dimHelper": "In modalità concentrazione (⇧⌘F), attenua ogni riga tranne quella che stai modificando.",
+      "dimLabel": "Modalità concentrazione · attenua le righe inattive",
+      "off": "Disattivata",
+      "on": "Attivata",
+      "saveError": "Impossibile salvare l'impostazione della modalità concentrazione.",
+      "typewriterAria": "Scorrimento a macchina da scrivere",
+      "typewriterHelper": "In modalità concentrazione (⇧⌘F), mantieni la riga attiva centrata verticalmente mentre scrivi.",
+      "typewriterLabel": "Modalità concentrazione · scorrimento a macchina da scrivere"
+    },
+    "hotkeys": {
+      "addBindingAria": "Aggiungi una scorciatoia per {{command}}",
+      "cancel": "Annulla",
+      "capturePrompt": "Premi un tasto…",
+      "conflictIndicator": "⚠ conflitto",
+      "conflictTitle": "Usata anche da {{commands}}",
+      "fixed": "fissa",
+      "group": {
+        "editorFormatting": "Formattazione editor",
+        "general": "Generali",
+        "navigation": "Navigazione",
+        "notes": "Note",
+        "panesTabs": "Riquadri e schede",
+        "view": "Vista"
+      },
+      "helper": "Visualizza e modifica le scorciatoie da tastiera. La formattazione dell'editor e la scorciatoia per scorrere le schede sono fisse.",
+      "notSet": "Non impostata",
+      "removeBindingAria": "Rimuovi {{chord}}",
+      "resetAll": "Reimposta tutte le scorciatoie…",
+      "resetAllConfirm": "Reimpostare ogni scorciatoia personalizzata al valore predefinito?",
+      "resetAllYes": "Reimposta tutte",
+      "restoreDefaultAria": "Ripristina il valore predefinito per {{command}}",
+      "searchAriaLabel": "Cerca scorciatoie",
+      "searchPlaceholder": "Cerca scorciatoie…",
+      "warnAlreadyUsed": "Già usata da {{commands}} — aggiunta comunque."
+    },
+    "language": {
+      "helper": "Scegli la lingua di visualizzazione dell'app.",
+      "label": "Lingua"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Impossibile salvare l'impostazione dei numeri di riga.",
+      "helper": "Mostra una colonna con i numeri di riga nell'editor. Un numero per riga; disattivata per impostazione predefinita.",
+      "label": "Numeri di riga",
+      "off": "Disattivati",
+      "on": "Attivati"
+    },
+    "prefs": {
+      "saveError": "Impossibile salvare la preferenza — riprova"
+    },
+    "privacy": {
+      "autoLockHelper": "Blocca la cassaforte dopo questo periodo di inattività.",
+      "autoLockLabel": "Blocco automatico",
+      "autoLockSearchEmpty": "Nessuna durata corrisponde.",
+      "autoLockSearchPlaceholder": "Cerca durate…",
+      "screenCaptureHelperOff": "La protezione si applica sempre prima dello sblocco. Dopo lo sblocco, segue questa preferenza.",
+      "screenCaptureHelperOn": "Attiva su macOS e Windows 10 (aggiornamento di maggio 2020 o successivo). Il supporto per Linux arriverà in una versione futura.",
+      "screenCaptureLabel": "Protezione dalla cattura schermo"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Annullato.",
+      "errorGeneric": "Impossibile configurare lo sblocco rapido.",
+      "errorHardwareUnavailable": "Touch ID non è disponibile su questo dispositivo.",
+      "errorNotUnlocked": "Sblocca prima la cassaforte.",
+      "errorPinNotDigits": "Il PIN deve contenere solo cifre.",
+      "errorPinTooShort_many": "Il PIN deve avere almeno {{count}} cifre.",
+      "errorPinTooShort_one": "Il PIN deve avere almeno {{count}} cifra.",
+      "errorPinTooShort_other": "Il PIN deve avere almeno {{count}} cifre.",
+      "helperConfigured": "Configurato tramite {{method}}. Dopo il blocco automatico, il reinserimento salta la password principale. La password principale è comunque richiesta dopo il riavvio.",
+      "helperNotConfigured": "Dopo il blocco automatico, reinserisci un PIN o usa Touch ID invece della password principale completa. È una comodità rispetto alla cassaforte crittografata — la password principale resta richiesta dopo il riavvio.",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN di sblocco rapido",
+      "pinPlaceholder_many": "PIN (almeno {{count}} cifre)",
+      "pinPlaceholder_one": "PIN (almeno {{count}} cifra)",
+      "pinPlaceholder_other": "PIN (almeno {{count}} cifre)",
+      "setPin": "Imposta PIN",
+      "setupHelper": "Touch ID è disponibile solo su macOS e attualmente sperimentale (in attesa di verifica hardware). Il PIN funziona ovunque.",
+      "title": "Sblocco rapido",
+      "useTouchId": "Usa Touch ID"
+    },
+    "shell": {
+      "closeLabel": "Chiudi impostazioni",
+      "navLabel": "Pannelli delle impostazioni",
+      "panels": {
+        "about": "Informazioni",
+        "account": "Account",
+        "appearance": "Aspetto",
+        "editor": "Editor",
+        "hotkeys": "Scorciatoie",
+        "privacy": "Privacy",
+        "storage": "Archiviazione"
+      },
+      "passwordUpdatedToast": "Password aggiornata",
+      "title": "Impostazioni"
+    },
+    "spell": {
+      "errorSaveLanguages": "Impossibile salvare le lingue del controllo ortografico.",
+      "errorSaveSetting": "Impossibile salvare l'impostazione del controllo ortografico.",
+      "helper": "Sottolinea le parole con errori di ortografia mentre scrivi. Completamente offline — le tue note non lasciano mai il dispositivo.",
+      "label": "Controllo ortografico",
+      "languagesAriaLabel": "Lingue del controllo ortografico",
+      "languagesHelper": "Una parola è corretta se è valida in una qualsiasi delle lingue selezionate — utile per inserire termini inglesi in note di altre lingue.",
+      "languagesLabel": "Lingue",
+      "languagesPlaceholder": "Seleziona le lingue…",
+      "languagesSearchEmpty": "Nessuna lingua corrisponde.",
+      "languagesSearchPlaceholder": "Cerca lingue…",
+      "off": "Disattivato",
+      "on": "Attivato"
+    },
+    "storage": {
+      "backUpVault": "Esegui il backup della cassaforte…",
+      "backupHelper": "I backup restano crittografati esattamente come la tua cassaforte, in un unico file .myne-backup verificato. Il ripristino funziona con la password o la frase di recupero di quella cassaforte — esattamente come lo sblocco.",
+      "backupLabel": "Backup",
+      "exportAction": "Esporta…",
+      "exportBody": "Esporta cassaforte come Markdown",
+      "exportHelper": "Albero Markdown semplice — non crittografato.",
+      "exportLabel": "Esporta",
+      "importHelper": "Porta una cassaforte Obsidian esistente in Myne. Ogni nota Markdown viene importata e crittografata sul posto; i tuoi file originali restano intatti.",
+      "importLabel": "Importa",
+      "importObsidian": "Importa cassaforte Obsidian…",
+      "locationHelper": "Ogni cassaforte è una cartella di file crittografati sotto questo percorso. Preferisci il pulsante Backup qui sotto alle copie manuali — verifica il file scritto.",
+      "locationLabel": "Posizione della cassaforte",
+      "openInFiles": "Apri nei file",
+      "pathUnavailable": "Percorso non disponibile",
+      "restoreBackup": "Ripristina da backup…"
+    },
+    "typography": {
+      "contentWidthHelper": "Larghezza massima della colonna di scrittura. Piena consente al testo di estendersi su tutto il riquadro.",
+      "contentWidthLabel": "Larghezza dei contenuti",
+      "errorSave": "Impossibile salvare la preferenza. Riprova.",
+      "fontHelper": "Testo a spaziatura fissa (monospace) o proporzionale (sans-serif).",
+      "fontLabel": "Carattere",
+      "lineSpacingHelper": "Spazio verticale tra le righe.",
+      "lineSpacingLabel": "Interlinea",
+      "textSizeHelper": "Dimensione base del testo dell'editor. I titoli si ridimensionano di conseguenza.",
+      "textSizeLabel": "Dimensione del testo"
+    },
+    "viewMode": {
+      "errorSave": "Impossibile salvare la modalità di visualizzazione predefinita.",
+      "helper": "Come si apre una nota: anteprima Live (predefinita), Lettura in sola lettura, o Sorgente grezzo. Cambia per una nota con ⇧⌘E.",
+      "label": "Modalità di visualizzazione predefinita",
+      "optionLive": "Anteprima live",
+      "optionReading": "Lettura",
+      "optionSource": "Sorgente"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Chiudi modelli",
+      "deleteRowLabel": "Elimina il modello {{name}} (sposta nel Cestino)",
+      "editTemplateLabel": "Modifica il modello {{name}}",
+      "emptyBody": "Crea un modello per riutilizzare lo scheletro di una nota — una nota di riunione, un registro giornaliero, una nota di lettura. Scegline uno quando crei una nuova nota.",
+      "emptyTitle": "Ancora nessun modello",
+      "listLabel": "Modelli",
+      "loading": "Caricamento…",
+      "newTemplate": "Nuovo modello",
+      "newTemplateName": "Modello senza titolo",
+      "removeFromTemplates": "Rimuovi dai modelli",
+      "removeRowLabel": "Rimuovi {{name}} dai modelli (mantiene la nota)",
+      "title": "Modelli di note"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Scegli una cassaforte diversa",
+    "continue": "Continua",
+    "decrypting": "Decifratura…",
+    "deleteLink": "Hai perso sia la password che la frase di recupero? Elimina la cassaforte e ricomincia",
+    "errors": {
+      "alreadyUnlocked": "La cassaforte è già sbloccata.",
+      "inProgress": "Operazione in corso.",
+      "unexpected": "Errore imprevisto. Riprova.",
+      "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app."
+    },
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Password",
+    "quickUnlock": {
+      "failed": "Sblocco rapido non riuscito. Usa la tua password.",
+      "pinAriaLabel": "PIN di sblocco rapido",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "Sblocca con il PIN",
+      "unlockWithTouchId": "Sblocca con Touch ID",
+      "usePasswordBelow": "oppure usa la password qui sotto",
+      "wrongCredential": "Errato. {{remaining}} tentativi rimasti."
+    },
+    "recoveryInterruptedBanner": "Il processo di recupero è stato interrotto. Imposta prima una nuova password.",
+    "recoveryInterruptedBody": "Imposta prima una nuova password, poi risigilla la tua cassaforte.",
+    "recoveryInterruptedTitle": "Il processo di recupero è stato interrotto.",
+    "recoveryLink": "Hai dimenticato la password? Sblocca con la frase di recupero",
+    "submit": "Sblocca",
+    "subtitle": "Inserisci la password per continuare.",
+    "suspicion": {
+      "lockedDuringChange": "Cambio password annullato: la cassaforte era bloccata.",
+      "metaChangedExternally": "La cassaforte è stata modificata in un'altra sessione — sbloccala di nuovo."
+    },
+    "title": "Sblocca la tua cassaforte."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Impossibile leggere il file della cassaforte.",
+      "notFound": "File della cassaforte non trovato. Riavvia l'app.",
+      "permissionDenied": "Permessi insufficienti per accedere al file della cassaforte. Controlla i permessi dei file."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "Ho salvato il mio numero di account in un luogo dove potrò ritrovarlo.",
+      "back": "Indietro",
+      "commit": "Crea cassaforte",
+      "committing": "Salvataggio…",
+      "copied": "Copiato",
+      "copy": "Copia",
+      "eyebrow": "Passaggio 4 di 4 — numero di account",
+      "heading": "Salva il tuo numero di account.",
+      "intro": "Questo è il tuo token al portatore — trattalo come contanti.",
+      "saveAsFile": "Salva come file",
+      "shownOnceBody": "Salvalo ora — Myne non può recuperarlo per te. È necessario per registrarti alla sincronizzazione più avanti.",
+      "shownOnceEmphasis": "Viene mostrato una sola volta."
+    },
+    "briefing": {
+      "back": "Indietro",
+      "continue": "Continua alla creazione della cassaforte",
+      "eyebrow": "Prima di creare la tua cassaforte",
+      "heading": "Prima di creare la tua cassaforte",
+      "intro": "Myne crittografa le tue note in modo che solo tu possa aprirle. Da questo derivano tre cose — leggile, poi continua.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "Ho capito che non esiste il recupero tramite email.",
+          "statement": "Non esiste il recupero tramite email. Non esisterà mai.",
+          "why": "Non ti chiediamo mai la tua email, quindi non c'è alcun link di reimpostazione né alcun account che il supporto possa sbloccare. Non è una funzione mancante — è la garanzia. Il recupero tramite email significherebbe che potremmo leggere le tue note, e Myne è costruito in modo che non possiamo."
+        },
+        "no-store": {
+          "ackLabel": "Ho capito che Myne non può recuperare la mia password.",
+          "statement": "La tua password sblocca la tua cassaforte. Noi non la memorizziamo.",
+          "why": "La tua password è l'input della chiave che decifra le tue note. Non lascia mai questo dispositivo e nulla sui nostri server può riprodurla. È ciò che mantiene private le tue note — ed è il motivo per cui non possiamo reimpostarla per te."
+        },
+        "phrase-backup": {
+          "ackLabel": "Ho capito che la mia frase di recupero è l'unico backup.",
+          "statement": "La tua frase di recupero è il tuo unico backup.",
+          "why": "Se dimentichi la password, la frase di recupero di 24 parole è l'unico modo per rientrare. {{lostBothSecrets}} Trascrivi la frase e conservala in un luogo sicuro."
+        }
+      },
+      "why": "Perché?"
+    },
+    "confirm": {
+      "back": "Indietro",
+      "continue": "Continua",
+      "eyebrow": "Passaggio 3 di 4 — conferma la frase",
+      "heading": "Ridigita quattro parole della tua frase.",
+      "intro": "Ti chiederemo posizioni specifiche per verificare che tu l'abbia salvata.",
+      "mismatch": "Non corrisponde alla parola n. {{pos}}.",
+      "wordAtPosition": "Parola in posizione {{pos}}"
+    },
+    "encrypting": {
+      "caption": "Richiede un momento.",
+      "footerHint": "Se richiede più di 30 secondi, chiudi la finestra e riprova.",
+      "heading": "Crittografia della tua cassaforte"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Riprova.",
+        "title": "Numero di account non valido"
+      },
+      "aeadFailure": {
+        "body": "Riprova.",
+        "title": "Crittografia non riuscita"
+      },
+      "csprng": {
+        "body": "Riprova.",
+        "title": "Impossibile generare dati casuali sicuri"
+      },
+      "invalidPassword": {
+        "body": "Riprova.",
+        "title": "Password non valida"
+      },
+      "invalidVaultMeta": {
+        "body": "Riprova.",
+        "title": "Errore nel formato della cassaforte"
+      },
+      "ioOther": {
+        "body": "Riprova.",
+        "title": "Impossibile salvare la cassaforte"
+      },
+      "joinFailure": {
+        "body": "Riprova.",
+        "title": "Qualcosa è andato storto"
+      },
+      "kdfFailure": {
+        "body": "Riprova. Se il problema persiste, il tuo sistema potrebbe avere poca memoria disponibile.",
+        "title": "Impossibile configurare la crittografia"
+      },
+      "noSpace": {
+        "body": "Libera spazio su disco e riprova.",
+        "title": "Spazio su disco insufficiente"
+      },
+      "notFound": {
+        "body": "Riprova.",
+        "title": "Cartella della cassaforte mancante"
+      },
+      "passwordTooShort": {
+        "body": "Usa almeno 12 caratteri.",
+        "title": "Password troppo breve"
+      },
+      "permissionDenied": {
+        "body": "Assicurati che Myne abbia il permesso di scrivere nella cartella dei dati dell'applicazione.",
+        "title": "Impossibile scrivere nella cartella della cassaforte"
+      },
+      "sessionExpired": {
+        "body": "Per la tua sicurezza, la creazione della cassaforte scade dopo 10 minuti. Ricomincia.",
+        "title": "Sessione scaduta"
+      },
+      "sessionNotFound": {
+        "body": "Ricomincia dall'inizio.",
+        "title": "Sessione non trovata"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Chiudi le altre finestre di Myne e riprova.",
+        "title": "Troppe creazioni di casseforti contemporanee"
+      },
+      "vaultArtifactsPresent": {
+        "body": "Impossibile creare una nuova cassaforte perché su questo dispositivo esistono già dati di una cassaforte. Chiudi l'app e riavviala — la schermata iniziale ti indirizzerà al flusso di sblocco.",
+        "title": "La cassaforte esiste già"
+      },
+      "vaultBusyAuth": {
+        "body": "È in corso un'altra operazione sulla cassaforte. Riprova tra un momento.",
+        "title": "Cassaforte occupata"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Annulla",
+        "message": "Chiudendo scarterai la tua frase di recupero. Vuoi continuare a chiudere?",
+        "okLabel": "Chiudi comunque",
+        "title": "Scartare la creazione della cassaforte?"
+      },
+      "genericError": {
+        "body": "Riprova.",
+        "title": "Qualcosa è andato storto"
+      }
+    },
+    "password": {
+      "back": "Indietro",
+      "eyebrow": "Passaggio 1 di 4 — password principale",
+      "heading": "Crea cassaforte",
+      "helperLead": "Myne non memorizza la tua password né la tua frase di recupero.",
+      "submit": "Genera frase di recupero"
+    },
+    "phrase": {
+      "back": "Indietro",
+      "continue": "L'ho salvata — conferma la frase",
+      "copy": "Copia",
+      "eyebrow": "Passaggio 2 di 4 — frase di recupero",
+      "heading": "Trascrivi queste 24 parole.",
+      "intro": "Questa frase, insieme alla tua password, è l'unico modo per recuperare la tua cassaforte. Conservala offline — su carta, in un gestore di password, in un hardware wallet. Trattala come contanti.",
+      "reveal": "Mostra la frase",
+      "saveAsFile": "Salva come file"
+    },
+    "ready": {
+      "backUpNow": "Esegui ora il backup di questa cassaforte",
+      "backedUp": "Backup eseguito ✓",
+      "backingUp": "Backup in corso…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Il backup non è stato completato — non è stato lasciato alcun file. Puoi eseguire il backup in qualsiasi momento da Impostazioni → Archiviazione.",
+      "backupFilterName": "Backup Myne",
+      "body": "Myne ha scritto la tua cassaforte nella cartella dei dati dell'applicazione. La tua password principale e la tua frase di recupero sono l'unico modo per rientrare — assicurati di averle salvate entrambe in un luogo sicuro.",
+      "decrypting": "Decifratura…",
+      "done": "Fatto",
+      "heading": "La tua cassaforte è pronta.",
+      "showFolder": "Mostra la cartella della cassaforte"
+    },
+    "sessionLost": {
+      "startOver": "Ricomincia"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Crea un'altra cassaforte",
+    "heading": "Scegli una cassaforte",
+    "loading": "Caricamento delle tue casseforti…",
+    "noneLoaded": "Al momento non è stato possibile caricare alcuna cassaforte.",
+    "openedRelative": "aperta {{rel}}",
+    "restoreFromBackup": "Ripristina da backup",
+    "subline": "Hai più di una cassaforte su questo dispositivo. Scegline una da sbloccare.",
+    "vaultFallback": "Cassaforte {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "Richiede un momento.",
+      "eyebrow": "RECUPERO · DECIFRATURA",
+      "footerHint": "Se richiede più di 30 secondi, chiudi la finestra e riprova.",
+      "heading": "Decifratura della tua cassaforte",
+      "subCaption": "In corso… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Recupero annullato: la cassaforte era bloccata.",
+        "operationInProgress": "Operazione in corso. Attendi.",
+        "unexpected": "Errore imprevisto. Riprova.",
+        "weakPassword": "La nuova password deve avere almeno 12 caratteri."
+      },
+      "eyebrow": "Recupero · Nuova password",
+      "helperBody": "Aperta con la tua frase di recupero. La tua vecchia password non funziona più — imposta ora una nuova password principale.",
+      "helperEmphasis": "La tua frase di recupero resta invariata.",
+      "submit": "Imposta nuova password",
+      "title": "Imposta una nuova password principale"
+    },
+    "phrase": {
+      "back": "← Indietro",
+      "body": "Inserisci la tua frase di recupero. 24 parole BIP-39.",
+      "cellLabel": "Parola {{index}}",
+      "deleteLink": "Elimina la cassaforte e ricomincia",
+      "eyebrow": "Recupero",
+      "submit": "Sblocca",
+      "title": "Recupera la tua cassaforte."
+    },
+    "select": {
+      "accountInvalid": "Numero di account non valido. Controlla e riprova.",
+      "accountLabel": "Numero di account (facoltativo)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (facoltativo)",
+      "body": "Scegli la cassaforte che vuoi recuperare con la tua frase di recupero di 24 parole. Puoi anche digitare il tuo numero di account per arrivarci direttamente.",
+      "cancel": "Annulla",
+      "checking": "Verifica in corso…",
+      "loadFailed": "Al momento non è stato possibile caricare alcuna cassaforte.",
+      "loading": "Caricamento delle tue casseforti…",
+      "openedRelative": "aperta {{rel}}",
+      "or": "oppure",
+      "title": "Scegli una cassaforte da recuperare",
+      "useAccountNumber": "Usa il numero di account",
+      "vaultFallback": "Cassaforte {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Cassaforte",
+    "createAnother": "Crea un'altra cassaforte",
+    "switchVaultLabel": "Cambia cassaforte",
+    "switching": "cambio in corso…",
+    "vaultFallback": "Cassaforte {{n}}"
+  },
+  "welcome": {
+    "createCta": "Crea nuova cassaforte",
+    "headlineLine1": "Note Markdown crittografate.",
+    "headlineLine2": "Nessuna email all'iscrizione.",
+    "repairResidue": {
+      "cancel": "Annulla",
+      "cleanUp": "Pulisci",
+      "cleaningUp": "Pulizia in corso…",
+      "confirmBody_many": "Verranno rimossi {{count}} file. Sono già illeggibili; non si perde nulla di recuperabile.",
+      "confirmBody_one": "Verrà rimosso {{count}} file. Sono già illeggibili; non si perde nulla di recuperabile.",
+      "confirmBody_other": "Verranno rimossi {{count}} file. Sono già illeggibili; non si perde nulla di recuperabile.",
+      "confirmTitle": "Rimuovere i file residui?",
+      "doneBody_many": "Rimossi {{count}} file residui. Ora puoi creare una nuova cassaforte.",
+      "doneBody_one": "Rimosso {{count}} file residuo. Ora puoi creare una nuova cassaforte.",
+      "doneBody_other": "Rimossi {{count}} file residui. Ora puoi creare una nuova cassaforte.",
+      "doneTitle": "Pulizia completata",
+      "errorBody": "Qualcosa è andato storto. Chiudi l'app e riprova.",
+      "errorTitle": "Pulizia non riuscita",
+      "foundBody_many": "{{count}} file residui di un'eliminazione precedente non andata a buon fine. Sono già illeggibili — non perderai nulla di recuperabile.",
+      "foundBody_one": "{{count}} file residuo di un'eliminazione precedente non andata a buon fine. È già illeggibile — non perderai nulla di recuperabile.",
+      "foundBody_other": "{{count}} file residui di un'eliminazione precedente non andata a buon fine. Sono già illeggibili — non perderai nulla di recuperabile.",
+      "foundTitle": "File residui di un'eliminazione incompleta",
+      "partialBody_many": "{{count}} file potrebbero essere bloccati da un'altra app (antivirus, sincronizzazione file o indicizzazione di ricerca). Chiudi l'app e riprova tra un momento, oppure rimuovi manualmente la cartella della cassaforte.",
+      "partialBody_one": "{{count}} file potrebbe essere bloccato da un'altra app (antivirus, sincronizzazione file o indicizzazione di ricerca). Chiudi l'app e riprova tra un momento, oppure rimuovi manualmente la cartella della cassaforte.",
+      "partialBody_other": "{{count}} file potrebbero essere bloccati da un'altra app (antivirus, sincronizzazione file o indicizzazione di ricerca). Chiudi l'app e riprova tra un momento, oppure rimuovi manualmente la cartella della cassaforte.",
+      "partialTitle": "Impossibile rimuovere alcuni file"
+    },
+    "restoreCta": "Ripristina da backup",
+    "subtitle": "Le tue note vengono crittografate su questo dispositivo prima di lasciarlo. Il server memorizza solo testo cifrato."
+  }
+}

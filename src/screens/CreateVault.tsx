@@ -25,6 +25,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
+import i18n from "../i18n";
 import { HAS_TAURI } from "../lib/app-window";
 import {
   vaultCreationReducer,
@@ -201,11 +202,13 @@ export function CreateVault({
         let proceed: boolean;
         try {
           proceed = await dialogConfirm(
-            "Closing will discard your recovery phrase. Continue closing?",
+            i18n.t("vaultCreation.orchestrator.closePrompt.message"),
             {
-              title: "Discard vault creation?",
-              okLabel: "Close anyway",
-              cancelLabel: "Cancel",
+              title: i18n.t("vaultCreation.orchestrator.closePrompt.title"),
+              okLabel: i18n.t("vaultCreation.orchestrator.closePrompt.okLabel"),
+              cancelLabel: i18n.t(
+                "vaultCreation.orchestrator.closePrompt.cancelLabel",
+              ),
             },
           );
         } catch (e) {
@@ -322,7 +325,7 @@ export function CreateVault({
         passwordRef.current = null;
         if (!isAppError(e)) {
           logErrorKind(e, "begin-unknown-error");
-          dispatch({ type: "BEGIN_ERR", error: GENERIC_ERROR });
+          dispatch({ type: "BEGIN_ERR", error: genericError() });
           return;
         }
         logErrorKind(e, "begin");
@@ -365,7 +368,7 @@ export function CreateVault({
         passwordRef.current = null;
         if (!isAppError(e)) {
           logErrorKind(e, "commit-unknown-error");
-          dispatch({ type: "COMMIT_ERR", error: GENERIC_ERROR });
+          dispatch({ type: "COMMIT_ERR", error: genericError() });
           return;
         }
         logErrorKind(e, "commit");
@@ -450,9 +453,14 @@ export function CreateVault({
   }
 }
 
-const GENERIC_ERROR = {
-  title: "Something went wrong",
-  body: "Try again.",
-  primaryAction: "retry",
-  displayMode: "inline",
-} as const;
+// Resolved per-call (never frozen at import) so a language switch is
+// reflected — `i18n.t()` reads the active language at the moment the error
+// is built, not at module load.
+function genericError() {
+  return {
+    title: i18n.t("vaultCreation.orchestrator.genericError.title"),
+    body: i18n.t("vaultCreation.orchestrator.genericError.body"),
+    primaryAction: "retry",
+    displayMode: "inline",
+  } as const;
+}

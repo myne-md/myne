@@ -26,6 +26,8 @@
 // password death (`recovery-flow.md` §4.4).
 
 import { useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { DestructiveBanner } from "../../components/DestructiveBanner";
 import { PasswordCreateForm } from "../../components/PasswordCreateForm";
 import { completeRecovery } from "../../lib/vault-recover";
@@ -52,7 +54,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // Semaphore busy — stay put, retry shortly.
       return {
         kind: "banner-retry",
-        banner: "Operation in progress. Please wait.",
+        banner: i18n.t("vaultRecover.passwordReset.errors.operationInProgress"),
       };
     case "IoError":
       // Atomic write failed; slot is now Empty (recovering material
@@ -74,7 +76,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // phrase-entry.
       return {
         kind: "io-failure",
-        banner: "Unexpected error. Please try again.",
+        banner: i18n.t("vaultRecover.passwordReset.errors.unexpected"),
       };
     case "VaultAlreadyUnlocked":
       // Defensive — A8f shouldn't see Unlocked slot, but the
@@ -87,7 +89,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // peek and take. Generic banner.
       return {
         kind: "banner-retry",
-        banner: "Unexpected error. Please try again.",
+        banner: i18n.t("vaultRecover.passwordReset.errors.unexpected"),
       };
     case "InvalidCredentialOrVault":
       // Defensive — A8f doesn't return this variant in practice
@@ -96,7 +98,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // banner if surfaces.
       return {
         kind: "banner-retry",
-        banner: "Unexpected error. Please try again.",
+        banner: i18n.t("vaultRecover.passwordReset.errors.unexpected"),
       };
     case "RecoveryAbortedByLock":
       // vault_lock raced complete_recovery's Argon2id window — the
@@ -108,7 +110,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // during decrypting) — pinned for any future Cancel.
       return {
         kind: "io-failure",
-        banner: "Recovery cancelled: vault was locked.",
+        banner: i18n.t("vaultRecover.passwordReset.errors.cancelledVaultLocked"),
       };
     case "WeakNewPassword":
       // Backend MIN_PASSWORD_LEN floor (belt+suspenders behind the
@@ -116,7 +118,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // change-password surface.
       return {
         kind: "banner-retry",
-        banner: "New password must be at least 12 characters.",
+        banner: i18n.t("vaultRecover.passwordReset.errors.weakPassword"),
       };
   }
 }
@@ -170,6 +172,7 @@ export function PasswordResetStep({
   dispatch,
   onCompleteSuccess,
 }: PasswordResetStepProps) {
+  const { t } = useTranslation();
   const [inFlight, setInFlight] = useState(false);
 
   const handleSubmit = (newPassword: string) => {
@@ -197,11 +200,11 @@ export function PasswordResetStep({
   return (
     <div style={ROOT_STYLE}>
       <div style={COLUMN_STYLE}>
-        <div style={EYEBROW_STYLE}>Recovery · New password</div>
-        <h1 style={TITLE_STYLE}>Set a new master password</h1>
+        <div style={EYEBROW_STYLE}>{t("vaultRecover.passwordReset.eyebrow")}</div>
+        <h1 style={TITLE_STYLE}>{t("vaultRecover.passwordReset.title")}</h1>
 
         <PasswordCreateForm
-          submitLabel="Set new password"
+          submitLabel={t("vaultRecover.passwordReset.submit")}
           onSubmit={handleSubmit}
           disabled={inFlight}
           testIdPrefix="recover.reset"
@@ -214,10 +217,9 @@ export function PasswordResetStep({
           }
           helperCopy={
             <div style={INFO_BOX_STYLE}>
-              Vault recovery phrase ile açıldı. Eski parola artık çalışmayacak —
-              yeni master parolanı şimdi belirle.{" "}
+              {t("vaultRecover.passwordReset.helperBody")}{" "}
               <strong style={{ color: "var(--fg-1)" }}>
-                Recovery phrase aynı kalır.
+                {t("vaultRecover.passwordReset.helperEmphasis")}
               </strong>
             </div>
           }

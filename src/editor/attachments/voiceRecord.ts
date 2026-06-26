@@ -10,6 +10,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { EditorView } from "@codemirror/view";
+import i18n from "../../i18n";
 import { emitAttachmentEmbed } from "../../notes/attachmentRef";
 import { addCatalogRows } from "./catalog";
 import { fileNameTimestamp } from "./insert";
@@ -139,28 +140,28 @@ function errorKind(err: unknown): string {
 function startErrorMessage(err: unknown): string {
   switch (errorKind(err)) {
     case "locked":
-      return "Unlock your vault to record a voice note.";
+      return i18n.t("editor.attachment.voice.startError.locked");
     case "alreadyRecording":
-      return "A recording is already in progress.";
+      return i18n.t("editor.attachment.voice.startError.alreadyRecording");
     case "noInputDevice":
-      return "No microphone found. Connect one and try again.";
+      return i18n.t("editor.attachment.voice.startError.noInputDevice");
     case "captureFailed":
-      return "Couldn't start recording — check microphone access in System Settings.";
+      return i18n.t("editor.attachment.voice.startError.captureFailed");
     default:
-      return "Couldn't start recording.";
+      return i18n.t("editor.attachment.voice.startError.generic");
   }
 }
 
 function stopErrorMessage(err: unknown): string {
   switch (errorKind(err)) {
     case "emptyRecording":
-      return "Nothing was recorded.";
+      return i18n.t("editor.attachment.voice.stopError.emptyRecording");
     case "silentRecording":
-      return "Recording was silent and discarded — check your microphone.";
+      return i18n.t("editor.attachment.voice.stopError.silentRecording");
     case "noInputDevice":
     case "captureFailed":
-      return "Recording failed — check your microphone.";
+      return i18n.t("editor.attachment.voice.stopError.captureFailed");
     default:
-      return "Couldn't save the recording.";
+      return i18n.t("editor.attachment.voice.stopError.generic");
   }
 }

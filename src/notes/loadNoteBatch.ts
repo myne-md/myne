@@ -118,6 +118,16 @@ export type TitleRecord = {
    * `null`. The Conflicts view groups copies by this value.
    */
   conflictOf: string | null;
+  /**
+   * `true` iff the note's frontmatter carries a top-level, **unmanaged**
+   * `source:` provenance key (url-bookmark / SYNC-16) — the signal that the note
+   * is a clipped link-only bookmark. Unlike the value-strict managed markers
+   * above, this is mere *presence* detection: `source:` is a plain preserved
+   * key the clipper writes (markdown-dialect §3.6, NOT promoted to the canonical
+   * set), so any value counts. Drives the per-note tab glyph (`bookmark` instead
+   * of `file-text`); carries no other display semantics.
+   */
+  hasSource: boolean;
   error?: NoteTitleError;
 };
 
@@ -222,6 +232,12 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // — same rationale as `template:` (js-yaml would coerce the boolean).
   const conflict = readConflictFromFmBody(slice.frontmatter_bytes ?? "");
   const conflictOf = readConflictOfFromFmBody(slice.frontmatter_bytes ?? "");
+  // `source:` is an UNMANAGED provenance key the clipper writes (url-bookmark /
+  // SYNC-16) — presence, not value, signals "this is a bookmark". Reuse the
+  // already-parsed js-yaml object (same source as `folder:`/`updated:`); a
+  // malformed-YAML body parses to `{}` here, so a bookmark with broken FM falls
+  // back to the ordinary `file-text` glyph rather than throwing.
+  const hasSource = Object.prototype.hasOwnProperty.call(parsed, "source");
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
@@ -233,6 +249,7 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
     folderIndex,
     conflict,
     conflictOf,
+    hasSource,
   };
 }
 
@@ -282,6 +299,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       folderIndex: false,
       conflict: false,
       conflictOf: null,
+      hasSource: false,
       error: r.Err,
     };
   });

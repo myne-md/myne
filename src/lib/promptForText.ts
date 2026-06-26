@@ -9,6 +9,9 @@
 // when cancelled. First introduced for the named-workspaces save-as / rename
 // commands (MYND-308), kept generic so other text prompts can reuse it.
 
+import i18n from "../i18n";
+import { trapFocus } from "./imperative-focus-trap";
+
 /** Options for {@link promptForText}. */
 export interface PromptForTextOptions {
   /** The dialog heading (e.g. "Save workspace as"). */
@@ -35,16 +38,18 @@ export function promptForText(
   const {
     title,
     initialValue = "",
-    confirmLabel = "OK",
+    confirmLabel = i18n.t("common.prompt.confirmDefault"),
     placeholder = "",
     testIdPrefix = "text-prompt",
   } = options;
 
   return new Promise<string | null>((resolve) => {
     let settled = false;
+    let releaseTrap: (() => void) | null = null;
     const finish = (value: string | null) => {
       if (settled) return;
       settled = true;
+      releaseTrap?.();
       document.removeEventListener("keydown", onKey, true);
       backdrop.remove();
       resolve(value);
@@ -132,7 +137,7 @@ export function promptForText(
 
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "Cancel";
+    cancel.textContent = i18n.t("common.prompt.cancel");
     cancel.setAttribute("data-testid", `${testIdPrefix}.cancel`);
     Object.assign(cancel.style, {
       fontFamily: "var(--font-sans)",
@@ -169,7 +174,8 @@ export function promptForText(
     document.body.append(backdrop);
 
     document.addEventListener("keydown", onKey, true);
-    input.focus();
+    // Trap + restore focus (MYND-93); initial focus is the input, then select.
+    releaseTrap = trapFocus(dialog, { initialFocus: input });
     input.select();
   });
 }

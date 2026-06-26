@@ -261,13 +261,25 @@ pub(crate) async fn snapshot_restore_in(
     // Step 3: overwrite the live note with the snapshot content. The creation
     // hook inside note_update is coalesced (within the window of step 2's
     // flush) → no double snapshot.
+    // (Capture vault_dir before note_update_with_dir moves notes_dir — needed
+    // for the MYND-328 attachment-text fold below.)
+    let vault_dir = notes_dir.parent().map(std::path::Path::to_path_buf);
     note_update_with_dir(notes_dir, state, note_id.clone(), (*plaintext).clone())
         .await
         .map_err(map_note_update_err)?;
 
-    // Step 4: keep the live in-RAM search index correct.
+    // Step 4: keep the live in-RAM search index correct. MYND-328: fold the
+    // restored note's attachment text in (parity with note_create/update/batch)
+    // so a restore doesn't drop attachment searchability until the next unlock.
     let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-    search.upsert(&note_id, &title, &plaintext);
+    let body = match vault_dir {
+        Some(ref vd) => {
+            crate::plugins::notes::search_sync::fold_note_body_for_index(state, vd, &plaintext)
+                .await
+        }
+        None => (*plaintext).clone(),
+    };
+    search.upsert(&note_id, &title, &body);
 
     Ok(())
 }

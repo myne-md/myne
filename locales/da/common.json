@@ -1,0 +1,2034 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Annullér",
+      "cleaning": "Rydder op…",
+      "close": "Luk",
+      "completeTitle": "Oprydning fuldført",
+      "deleteCta_one": "Slet {{count}} ubrugt",
+      "deleteCta_other": "Slet {{count}} ubrugte",
+      "error": "Kunne ikke rydde op. Nogle noter kan være ulæselige — intet blev slettet.",
+      "intro_one": "Denne vedhæftede fil bruges ikke i nogen note. Sletning er permanent og kan ikke fortrydes.",
+      "intro_other": "Disse {{count}} vedhæftede filer bruges ikke i nogen note. Sletning er permanent og kan ikke fortrydes.",
+      "summaryFreed": " · frigjorde {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "Fjernede {{count}} vedhæftet fil",
+      "summaryRemoved_other": "Fjernede {{count}} vedhæftede filer",
+      "summarySkipped_one": " · {{count}} sprunget over (nu i brug)",
+      "summarySkipped_other": " · {{count}} sprunget over (nu i brug)",
+      "title": "Ryd op i ubrugte vedhæftede filer",
+      "willBeReclaimed": "{{size}} bliver frigjort."
+    },
+    "coverPicker": {
+      "close": "Luk",
+      "dropHint": "Slip et billede for at bruge det som forside.",
+      "empty": "Ingen billeder i denne boks endnu. Upload et, eller træk et billede hertil.",
+      "loading": "Indlæser…",
+      "removeCover": "Fjern forside",
+      "title": "Vælg et forsidebillede",
+      "upload": "Upload"
+    },
+    "deleteDialog": {
+      "cancel": "Annullér",
+      "confirmPrompt": "Slet denne vedhæftede fil permanent? Det kan ikke fortrydes.",
+      "delete": "Slet",
+      "deleting": "Sletter…",
+      "error": "Kunne ikke slette den vedhæftede fil. Prøv igen.",
+      "notUsed": "Bruges ikke i nogen note.",
+      "stillUsed_one": "Den bruges stadig i {{count}} note. Hvis du sletter den, efterlades en markering, hvor den var indlejret:",
+      "stillUsed_other": "Den bruges stadig i {{count}} noter. Hvis du sletter den, efterlades en markering, hvor den var indlejret:",
+      "title": "Slet vedhæftet fil",
+      "untitled": "Uden titel"
+    },
+    "library": {
+      "actionsAriaLabel": "Handlinger for vedhæftet fil",
+      "actionsTitle": "Handlinger",
+      "checkUnusedFailedNotice": "Kunne ikke tjekke for ubrugte vedhæftede filer. Prøv igen.",
+      "checking": "Tjekker…",
+      "cleanUnused": "Ryd op i ubrugte",
+      "cleanUnusedTitle": "Slet vedhæftede filer, der ikke bruges i nogen note",
+      "colCreated": "Oprettet",
+      "colName": "Navn",
+      "colSize": "Størrelse",
+      "colType": "Type",
+      "colUsedIn": "Bruges i",
+      "decrypting": "Dekrypterer vedhæftede filer…",
+      "emptyImportHint": "Importér en fil for at gemme den i din boks.",
+      "emptyLoadError": "Kunne ikke læse kataloget over vedhæftede filer.",
+      "emptyNoAttachments": "Ingen vedhæftede filer endnu.",
+      "filterAriaLabel": "Filtrér efter type",
+      "gridView": "Gittervisning",
+      "import": "Importér",
+      "importDialogTitle": "Importér vedhæftet fil",
+      "importFile": "Importér en fil",
+      "importing": "Importerer…",
+      "listView": "Listevisning",
+      "menuDelete": "Slet",
+      "menuExport": "Eksportér",
+      "menuPreview": "Forhåndsvis",
+      "menuRename": "Omdøb",
+      "noMatch": "Ingen vedhæftede filer matcher din søgning.",
+      "noUnusedNotice": "Ingen ubrugte vedhæftede filer at rydde op i.",
+      "preview": "Forhåndsvis",
+      "previewAttachment": "Forhåndsvis vedhæftet fil",
+      "searchAriaLabel": "Søg i vedhæftede filer efter filnavn",
+      "searchPlaceholder": "Søg efter filnavn",
+      "sort": {
+        "createdAsc": "Ældste først",
+        "createdDesc": "Nyeste først",
+        "nameAsc": "Navn A–Å",
+        "nameDesc": "Navn Å–A"
+      },
+      "sortAriaLabel": "Sortér vedhæftede filer",
+      "supportedFilesFilter": "Understøttede filer",
+      "title": "Vedhæftede filer",
+      "typeFilter": {
+        "all": "Alle typer",
+        "audio": "Lyd",
+        "image": "Billeder",
+        "other": "Andre",
+        "pdf": "PDF-filer"
+      },
+      "usedInCount_one": "Bruges i {{count}} note",
+      "usedInCount_other": "Bruges i {{count}} noter",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Lyd: {{filename}}",
+      "file": "Fil",
+      "pause": "Pause",
+      "pdfDocument": "PDF-dokument",
+      "pdfFirstPage": "PDF-forside",
+      "play": "Afspil"
+    },
+    "usedInNotesPopover": {
+      "empty": "Bruges ikke i nogen note.",
+      "untitled": "Uden titel"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "En anden boks-handling er i gang. Vent, til den er færdig, og prøv igen.",
+        "cancelled": "Sikkerhedskopiering annulleret. Der blev ikke efterladt nogen fil.",
+        "invalidDestination": "Den destinationsmappe kan ikke bruges.",
+        "ioGeneric": "Kunne ikke skrive sikkerhedskopifilen.",
+        "ioNoSpace": "Der er ikke plads nok på destinationen.",
+        "ioPermissionDenied": "Ingen tilladelse til at skrive på destinationen.",
+        "joinFailure": "Sikkerhedskopiering mislykkedes uventet. Der blev ikke efterladt nogen fil.",
+        "memberTooLarge": "En fil i denne boks er større, end sikkerhedskopiformatet tillader.",
+        "vaultNotFound": "Ingen boks fundet at sikkerhedskopiere.",
+        "verifyFailed": "Den skrevne sikkerhedskopi kunne ikke verificeres, så den blev kasseret. Prøv igen — på et andet medie, hvis det gentager sig."
+      },
+      "restore": {
+        "authOperationInProgress": "En anden boks-handling er i gang. Vent, til den er færdig, og prøv igen.",
+        "cancelled": "Gendannelse annulleret. Intet blev ændret.",
+        "damagedBackup": "Sikkerhedskopifilen er beskadiget.",
+        "futureVersionBackup": "Denne sikkerhedskopi blev lavet af en nyere version af Myne. Opdatér Myne, og gendan den så.",
+        "invalidVaultMeta": "Denne sikkerhedskopis boks-metadata er ulæselige, så gendannelse kunne ikke skabe en fungerende boks.",
+        "ioGeneric": "Kunne ikke læse sikkerhedskopifilen.",
+        "ioPermissionDenied": "Ingen tilladelse til at læse sikkerhedskopifilen.",
+        "joinFailure": "Gendannelse mislykkedes uventet. Intet blev ændret.",
+        "missingVaultMeta": "Denne sikkerhedskopi mangler sine boks-metadata og kan ikke gendannes.",
+        "notABackupFile": "Denne fil er ikke en Myne-sikkerhedskopi.",
+        "vaultAlreadyExists": "En boks fra denne sikkerhedskopi findes allerede på denne enhed."
+      }
+    },
+    "export": {
+      "cancel": "Annullér",
+      "close": "Luk",
+      "copying": "Kopierer {{done}} af {{total}}…",
+      "preparing": "Forbereder…",
+      "successToast": "Sikkerhedskopi verificeret og gemt.",
+      "title": "Sikkerhedskopiér boks",
+      "verifying": "Verificerer {{done}} af {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Acceptér",
+      "close": "Luk",
+      "codeAriaLabel": "Parringskode",
+      "intro": "Bekræft, at denne kode matcher den, der vises i udvidelsen, og vælg så Acceptér for at parre.",
+      "reject": "Afvis",
+      "rejected": "Parring afvist.",
+      "title": "En browserudvidelse vil oprette forbindelse"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Arkiv",
+    "archivedBadgeTitle": "Arkiveret",
+    "dialogLabel": "Kommandopalet",
+    "matchedInBody": "↳ matchet i brødtekst",
+    "noMatches": "Ingen resultater",
+    "searchPlaceholder": "Søg i noter, eller kør en kommando — Esc for at lukke",
+    "sectionCommands": "Kommandoer",
+    "sectionNotes": "Noter",
+    "untitledNote": "Uden titel"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Sikkerhedskopiér boks…"
+      },
+      "category": {
+        "app": "App",
+        "editor": "Editor",
+        "vault": "Boks",
+        "view": "Vis"
+      },
+      "convertWikilinks": {
+        "label": "Konvertér importerede wikilinks i denne note…"
+      },
+      "deleteWorkspace": {
+        "label": "Slet arbejdsområde…"
+      },
+      "exportNoteHtml": {
+        "label": "Eksportér note som HTML…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Eksportér note som Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "Eksportér note som PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "Eksportér note som almindelig tekst…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Eksportér boks som Markdown…"
+      },
+      "foldAll": {
+        "label": "Fold alt sammen"
+      },
+      "importBaseView": {
+        "label": "Importér .base-visning…"
+      },
+      "importObsidian": {
+        "label": "Importér Obsidian-boks…"
+      },
+      "lockVault": {
+        "label": "Lås boks"
+      },
+      "manageTemplates": {
+        "label": "Administrér skabeloner…"
+      },
+      "newNoteFromTemplate": {
+        "label": "Ny note fra skabelon…"
+      },
+      "openAttachments": {
+        "label": "Åbn vedhæftede filer…"
+      },
+      "openSettings": {
+        "label": "Åbn indstillinger…"
+      },
+      "openSnapshots": {
+        "label": "Øjebliksbilleder…"
+      },
+      "openTodayNote": {
+        "label": "Åbn dagens note"
+      },
+      "randomNote": {
+        "label": "Åbn tilfældig note"
+      },
+      "renameWorkspace": {
+        "label": "Omdøb arbejdsområde…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Gem arbejdsområde som…"
+      },
+      "showGraph": {
+        "label": "Vis grafvisning…"
+      },
+      "showTags": {
+        "label": "Gennemse tags…"
+      },
+      "showViews": {
+        "label": "Gennemse visninger…"
+      },
+      "switchWorkspace": {
+        "label": "Skift arbejdsområde…"
+      },
+      "toggleFocus": {
+        "label": "Slå fokustilstand til/fra"
+      },
+      "toggleLeftSidebar": {
+        "label": "Slå notepanel til/fra"
+      },
+      "toggleReading": {
+        "label": "Slå læsevisning til/fra"
+      },
+      "toggleRightSidebar": {
+        "label": "Slå tilbagelinkspanel til/fra"
+      },
+      "toggleSource": {
+        "label": "Slå kildetilstand til/fra"
+      },
+      "toggleStackedTabs": {
+        "label": "Slå stablede faneblade til/fra"
+      },
+      "unfoldAll": {
+        "label": "Fold alt ud"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "Fed",
+        "closeTab": "Luk faneblad",
+        "cycleHeadingLevel": "Skift overskriftsniveau",
+        "cycleTabs": "Skift mellem faneblade",
+        "deleteWorkspace": "Slet arbejdsområde",
+        "focusNextPane": "Fokusér næste rude",
+        "focusPrevPane": "Fokusér forrige rude",
+        "foldAll": "Fold alt sammen",
+        "inlineCode": "Indlejret kode",
+        "insertWikilink": "Indsæt wikilink",
+        "italic": "Kursiv",
+        "navigateBack": "Naviger tilbage",
+        "navigateForward": "Naviger frem",
+        "newNote": "Ny note",
+        "openSettings": "Åbn indstillinger",
+        "paletteToggle": "Åbn kommandopalet",
+        "renameWorkspace": "Omdøb arbejdsområde",
+        "saveWorkspaceAs": "Gem arbejdsområde som",
+        "selectAllScoped": "Markér alt (afgrænset)",
+        "showGraphView": "Vis grafvisning",
+        "splitPaneDown": "Opdel rude (nedad)",
+        "splitPaneRight": "Opdel rude (mod højre)",
+        "switchWorkspace": "Skift arbejdsområde",
+        "toggleBulletList": "Slå punktliste til/fra",
+        "toggleFocusMode": "Slå fokustilstand til/fra",
+        "toggleNumberedList": "Slå nummereret liste til/fra",
+        "toggleReadingView": "Slå læsevisning til/fra",
+        "toggleSourceMode": "Slå kildetilstand til/fra",
+        "toggleTaskList": "Slå opgaveliste til/fra",
+        "unfoldAll": "Fold alt ud"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Tilføj en modifikatortast (⌘, Ctrl eller Alt) — en tast alene kan ikke være en genvej."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Annullér",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Indlæser"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exportFailed": "Kunne ikke eksportere {{filename}}.",
+        "exported": "Eksporterede {{filename}}.",
+        "renameFailed": "Kunne ikke omdøbe den vedhæftede fil.",
+        "renamed": "Omdøbt til {{name}}.",
+        "saveDialogFailed": "Kunne ikke åbne dialogen Gem."
+      },
+      "convert": {
+        "cancel": "Annullér",
+        "confirm": "Konvertér",
+        "skipped": "sprunget over — {{note}}",
+        "subtitleEmpty": "Intet at konvertere — ingen kildefiler blev fundet.",
+        "subtitle_one": "1 henvisning bliver omskrevet. Gennemgå, før du bekræfter.",
+        "subtitle_other": "{{count}} henvisninger bliver omskrevet. Gennemgå, før du bekræfter.",
+        "title": "Konvertér importerede vedhæftede filer"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Kilde til vedhæftet fil"
+      },
+      "convertCore": {
+        "converted_one": "{{count}} konverteret",
+        "converted_other": "{{count}} konverteret",
+        "noneToConvert": "Ingen importerede vedhæftede filer at konvertere i denne note.",
+        "skipNote": {
+          "failed": "import mislykkedes",
+          "locked": "boks låst",
+          "notFound": "kilde ikke fundet",
+          "tooLarge": "for stor (maks. 64 MiB)",
+          "unsupported": "type ikke understøttet"
+        },
+        "skippedSuffix_one": " · {{count}} sprunget over",
+        "skippedSuffix_other": " · {{count}} sprunget over"
+      },
+      "fileKind": {
+        "generic": "Fil",
+        "label": {
+          "archive": "Arkiv",
+          "audio": "Lyd",
+          "cHeader": "C-header",
+          "cSource": "C-kildekode",
+          "cppSource": "C++-kildekode",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Dokument",
+          "ebook": "E-bog",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Billede",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "Logfil",
+          "markdown": "Markdown",
+          "numbers": "Numbers-regneark",
+          "pages": "Pages-dokument",
+          "pdf": "PDF",
+          "presentation": "Præsentation",
+          "python": "Python",
+          "richText": "Rich text-dokument",
+          "rust": "Rust",
+          "shell": "Shell-script",
+          "spreadsheet": "Regneark",
+          "svg": "SVG-billede",
+          "text": "Tekstdokument",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Word-dokument",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "{{ext}}-fil"
+      },
+      "lightbox": {
+        "close": "Luk forhåndsvisning",
+        "export": "Eksportér",
+        "exportAria": "Eksportér vedhæftet fil",
+        "imagePreview": "Billedforhåndsvisning",
+        "pdfFallback": "PDF",
+        "pdfPreview": "PDF-forhåndsvisning"
+      },
+      "menu": {
+        "actionsAria": "Handlinger for vedhæftet fil"
+      },
+      "pdf": {
+        "loading": "Indlæser…"
+      },
+      "picker": {
+        "openFailed": "Kunne ikke åbne filvælgeren."
+      },
+      "progress": {
+        "encrypting": "Krypterer…",
+        "importing": "Importerer…",
+        "loading": "Indlæser…"
+      },
+      "recording": {
+        "barAria": "Optager talenote",
+        "cancel": "Annullér",
+        "noAudio": "Ingen lyd registreret — tjek din mikrofon.",
+        "saving": "Gemmer…",
+        "stop": "Stop"
+      },
+      "rename": {
+        "cancel": "Annullér",
+        "confirm": "Omdøb",
+        "title": "Omdøb vedhæftet fil"
+      },
+      "summary": {
+        "added_one": "{{count}} tilføjet",
+        "added_other": "{{count}} tilføjet",
+        "reason": {
+          "failed": "mislykkedes",
+          "locked": "boks låst",
+          "tooLarge": "for stor",
+          "unsupported": "type ikke understøttet"
+        },
+        "skipped_one": "{{count}} sprunget over: {{noun}}",
+        "skipped_other": "{{count}} sprunget over: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "En optagelse er allerede i gang.",
+          "captureFailed": "Kunne ikke starte optagelsen — tjek mikrofonadgang i Systemindstillinger.",
+          "generic": "Kunne ikke starte optagelsen.",
+          "locked": "Lås din boks op for at optage en talenote.",
+          "noInputDevice": "Ingen mikrofon fundet. Tilslut en, og prøv igen."
+        },
+        "stopError": {
+          "captureFailed": "Optagelsen mislykkedes — tjek din mikrofon.",
+          "emptyRecording": "Intet blev optaget.",
+          "generic": "Kunne ikke gemme optagelsen.",
+          "silentRecording": "Optagelsen var tavs og blev kasseret — tjek din mikrofon."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Pause",
+          "play": "Afspil",
+          "seek": "Spol"
+        },
+        "menu": {
+          "export": "Eksportér",
+          "remove": "Fjern",
+          "rename": "Omdøb",
+          "reveal": "Vis i biblioteket"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Brudt henvisning til vedhæftet fil: {{filename}}",
+          "brokenLabel": "brudt",
+          "deletedAria": "Slettet vedhæftet fil: {{filename}}",
+          "deletedLabel": "slettet"
+        },
+        "urlImageFallback": "billede"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Bemærk",
+        "bug": "Fejl",
+        "caution": "Pas på",
+        "danger": "Fare",
+        "done": "Færdig",
+        "error": "Fejl",
+        "example": "Eksempel",
+        "failure": "Fejl",
+        "faq": "FAQ",
+        "hint": "Hint",
+        "important": "Vigtigt",
+        "info": "Info",
+        "missing": "Mangler",
+        "note": "Note",
+        "question": "Spørgsmål",
+        "quote": "Citat",
+        "success": "Fuldført",
+        "tip": "Tip",
+        "todo": "Gøremål",
+        "warning": "Advarsel"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Arkiveret",
+        "empty": "Ingen tilbagelinks endnu.",
+        "linkedFrom_one": "Linket fra {{count}}",
+        "linkedFrom_other": "Linket fra {{count}}",
+        "untitled": "Uden titel"
+      },
+      "barItems": {
+        "graph": "Graf",
+        "lock": "Lås",
+        "saveStatus": "Gemmestatus",
+        "settings": "Indstillinger",
+        "syncStatus": "Synkroniseringsstatus",
+        "tags": "Tags",
+        "viewMode": "Visningstilstand",
+        "views": "Visninger",
+        "wordCount": "Ordtælling",
+        "workspace": "Arbejdsområde"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix_one": " · {{count}} filter udeladt",
+        "droppedFiltersSuffix_other": " · {{count}} filtre udeladt",
+        "failed": "Import mislykkedes.",
+        "fileFilterName": "Obsidian Base",
+        "imported_one": "Importerede {{count}} visning",
+        "imported_other": "Importerede {{count}} visninger",
+        "notValid": "Ikke en gyldig .base-fil.",
+        "skippedSuffix_one": " · {{count}} sprunget over",
+        "skippedSuffix_other": " · {{count}} sprunget over",
+        "stoppedAfter_one": "Import stoppet efter {{count}} visning.",
+        "stoppedAfter_other": "Import stoppet efter {{count}} visninger."
+      },
+      "bottomBar": {
+        "browseTags": "Gennemse tags",
+        "browseViews": "Gennemse visninger",
+        "cycleViewMode": "Skift visningstilstand",
+        "docStats": {
+          "summarySelectionSuffix": " (markeret)",
+          "summary_one": "{{count}} ord · {{characters}} tegn",
+          "summary_other": "{{count}} ord · {{characters}} tegn",
+          "titleSelectionSuffix": " (markering)",
+          "title_one": "{{characters}} tegn · {{words}} ord · {{spaces}} mellemrum · {{count}} afsnit",
+          "title_other": "{{characters}} tegn · {{words}} ord · {{spaces}} mellemrum · {{count}} afsnit"
+        },
+        "graphTitle": "Graf (⌘⇧G)",
+        "lock": "Lås",
+        "lockVault": "Lås boks",
+        "openSettings": "Åbn indstillinger",
+        "settingsTitle": "Indstillinger (⌘,)",
+        "showGraph": "Vis grafvisning",
+        "syncStatus": "Kun lokal · ikke synkroniseret",
+        "tagsTitle": "Tags",
+        "togglePreview": "Slå forhåndsvisning side om side til/fra",
+        "viewModeTitle": "Visningstilstand: {{mode}} (klik for at skifte)",
+        "viewsTitle": "Visninger"
+      },
+      "import": {
+        "imported_one": "Importerede {{count}} note{{skipped}}",
+        "imported_other": "Importerede {{count}} noter{{skipped}}",
+        "skippedSuffix_one": " · {{count}} sprunget over",
+        "skippedSuffix_other": " · {{count}} sprunget over"
+      },
+      "nav": {
+        "goBack": "Gå tilbage",
+        "goForward": "Gå frem"
+      },
+      "noNotesToOpen": "Ingen noter at åbne.",
+      "resizeBacklinksSidebar": "Ændr størrelse på tilbagelinkspanelet",
+      "resizeNotesSidebar": "Ændr størrelse på notepanelet",
+      "sidebarToggle": {
+        "hideBacklinks": "Skjul tilbagelinkspanel",
+        "hideNotes": "Skjul notepanel",
+        "showBacklinks": "Vis tilbagelinkspanel",
+        "showNotes": "Vis notepanel"
+      },
+      "switchingOverlay": {
+        "saving": "Gemmer…"
+      },
+      "viewMode": {
+        "live": "Live",
+        "reading": "Læsning",
+        "source": "Kilde"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Navn på arbejdsområde",
+        "renameConfirm": "Omdøb",
+        "renameTitle": "Omdøb arbejdsområde",
+        "saveAsTitle": "Gem arbejdsområde som",
+        "saveConfirm": "Gem"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Arbejdsområde",
+        "renameItemLabel": "Omdøb arbejdsområde {{name}}",
+        "renameTitle": "Omdøb arbejdsområde",
+        "saveCurrentAs": "Gem nuværende som…",
+        "switchLabel": "Skift arbejdsområde",
+        "toggleTitle": "Arbejdsområde: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Kopiér kode",
+      "defaultBadge": "kode"
+    },
+    "find": {
+      "close": "Luk søgning",
+      "matchCase": "Forskel på store/små bogstaver",
+      "matchCount": "{{current}} af {{total}}",
+      "nextMatch": "Næste resultat",
+      "noMatches": "Ingen resultater",
+      "placeholder": "Find i note",
+      "previousMatch": "Forrige resultat",
+      "replaceAll": "Erstat alle",
+      "replaceAllCount": "Erstat alle ({{total}})",
+      "replaceOne": "Erstat",
+      "replacePlaceholder": "Erstat med",
+      "toggleReplace": "Slå erstat til/fra"
+    },
+    "folding": {
+      "clickToUnfold": "Klik for at folde ud",
+      "unfold": "Fold ud"
+    },
+    "footnote": {
+      "heading": "Fodnoter",
+      "unreferenced": "uden henvisning"
+    },
+    "frontmatter": {
+      "addProperty": "+ Tilføj egenskab",
+      "propertiesLabel": "Egenskaber",
+      "titleAriaLabel": "Notetitel",
+      "titlePlaceholder": "Uden titel"
+    },
+    "mermaid": {
+      "rendering": "Gengiver diagram…"
+    },
+    "slash": {
+      "attachFile": "Vedhæft fil",
+      "bulletList": "Punktliste",
+      "callout": "Fremhævning",
+      "date": "Dato",
+      "day": "Dag",
+      "divider": "Skillelinje",
+      "heading1": "Overskrift 1",
+      "heading2": "Overskrift 2",
+      "heading3": "Overskrift 3",
+      "heading4": "Overskrift 4",
+      "heading5": "Overskrift 5",
+      "heading6": "Overskrift 6",
+      "link": "Link",
+      "now": "Nu",
+      "numberedList": "Nummereret liste",
+      "quote": "Citat",
+      "table": "Tabel",
+      "time": "Klokkeslæt",
+      "todoList": "Opgaveliste",
+      "voiceNote": "Talenote",
+      "wikiLink": "Wikilink"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Tilføj til ordbog",
+        "ignoreInVault": "Ignorér i denne boks",
+        "ignoreThisSession": "Ignorér i denne session",
+        "noSuggestions": "Ingen forslag"
+      }
+    },
+    "table": {
+      "addColumn": "Tilføj kolonne til højre",
+      "addRow": "Tilføj række nedenfor",
+      "cellAriaLabel": "Tabelcelle",
+      "deleteColumn": "Slet kolonne",
+      "deleteRow": "Slet række",
+      "reorderColumn": "Flyt kolonne",
+      "reorderRow": "Flyt række"
+    },
+    "toolbar": {
+      "apply": "Anvend",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Afsnit"
+      },
+      "highlight": {
+        "blue": "Blå",
+        "green": "Grøn",
+        "pink": "Lyserød",
+        "purple": "Lilla",
+        "yellow": "Gul"
+      },
+      "urlPlaceholder": "Indsæt link-URL"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Fuld",
+        "narrow": "Smal",
+        "normal": "Normal",
+        "wide": "Bred"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normal",
+        "relaxed": "Afslappet",
+        "tight": "Tæt"
+      },
+      "textSize": {
+        "lg": "Stor",
+        "md": "Standard",
+        "sm": "Lille",
+        "xl": "Ekstra stor"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Indlejr: {{label}}"
+      },
+      "convert": {
+        "cancel": "Annullér",
+        "choiceClause_one": " · {{count}} kræver et valg.",
+        "choiceClause_other": " · {{count}} kræver et valg.",
+        "chooseTarget": "Vælg mål…",
+        "convert": "Konvertér",
+        "convertedToast_one": "{{count}} wikilink konverteret",
+        "convertedToast_other": "{{count}} wikilinks konverteret",
+        "noneToConvert": "Ingen importerede wikilinks at konvertere i denne note.",
+        "nothingToConvert": "Intet at konvertere — ingen importerede wikilinks blev fundet.",
+        "rewriteCount_one": "{{count}} link bliver omskrevet",
+        "rewriteCount_other": "{{count}} links bliver omskrevet",
+        "skipped": "sprunget over — {{reason}}",
+        "title": "Konvertér importerede wikilinks i denne note"
+      },
+      "convertCore": {
+        "noMatch": "intet match"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Note",
+      "errors": {
+        "attachmentCorrupt": "En vedhæftet fil, der henvises til i denne note, kunne ikke læses, så intet blev eksporteret.",
+        "attachmentMissing": "En vedhæftet fil, der henvises til i denne note, mangler, så intet blev eksporteret.",
+        "cannotDecrypt": "Denne note kunne ikke læses.",
+        "destinationUnusable": "Den destinationsmappe kan ikke bruges.",
+        "fallback": "Eksport mislykkedes uventet. Prøv igen.",
+        "invalidAttachmentCatalog": "Boksens katalog over vedhæftede filer kunne ikke læses, så intet blev eksporteret.",
+        "invalidNoteFilename": "Det filnavn kan ikke bruges, så intet blev eksporteret.",
+        "invalidNoteId": "Denne note kunne ikke identificeres, så intet blev eksporteret.",
+        "invalidPlaintextEncoding": "Denne notes indhold ser beskadiget ud, så intet blev eksporteret. Gendan det fra en sikkerhedskopi.",
+        "ioNoSpace": "Der er ikke plads nok på destinationen.",
+        "ioPermissionDenied": "Ingen tilladelse til at skrive på destinationen.",
+        "ioWriteDefault": "Kunne ikke skrive den eksporterede fil.",
+        "noteNotFound": "Denne note findes ikke længere — den kan være blevet slettet.",
+        "pdfCaptureFailed": "PDF'en kunne ikke genereres, så intet blev eksporteret.",
+        "pdfExportInProgress": "En PDF-eksport kører allerede. Vent, til den er færdig, og prøv igen.",
+        "pdfPayloadMissing": "Eksporten blev afbrudt — hvis boksen blev låst, så lås den op og prøv igen.",
+        "pdfRenderTimeout": "Noten tog for lang tid at gengive, så intet blev eksporteret.",
+        "pdfWindowCreateFailed": "Eksportvinduet kunne ikke åbnes, så intet blev eksporteret.",
+        "targetExists": "En fil med det navn findes allerede på destinationen.",
+        "vaultLocked": "Boksen er låst. Lås den op, og prøv igen."
+      },
+      "flow": {
+        "couldNotRead": "Denne note kunne ikke læses.",
+        "exportedTo": "Eksporteret til {{filename}}",
+        "exportedToWithAttachments_one": "Eksporteret til {{filename}} + {{count}} vedhæftet fil",
+        "exportedToWithAttachments_other": "Eksporteret til {{filename}} + {{count}} vedhæftede filer",
+        "exportedToWithImages_one": "Eksporteret til {{filename}} + {{count}} billede",
+        "exportedToWithImages_other": "Eksporteret til {{filename}} + {{count}} billeder",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Almindelig tekst",
+        "showInFolder": "Vis i mappe"
+      },
+      "modal": {
+        "cancel": "Annullér",
+        "export": "Eksportér…",
+        "includeAttachments_one": "Medtag {{count}} vedhæftet fil",
+        "includeAttachments_other": "Medtag {{count}} vedhæftede filer",
+        "title": "Eksportér som Markdown"
+      }
+    },
+    "pdf": {
+      "cancel": "Annullér",
+      "continue": "Fortsæt…",
+      "title": "Eksportér som PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Vælg, hvor eksporten skal placeres",
+      "errors": {
+        "attachmentCorrupt": "En vedhæftet fil, der henvises til i en note, kunne ikke læses, så intet blev eksporteret.",
+        "attachmentMissing": "En vedhæftet fil, der henvises til i en note, mangler, så intet blev eksporteret.",
+        "authOperationInProgress": "En anden boks-handling er i gang. Vent, til den er færdig, og prøv igen.",
+        "cancelled": "Eksport annulleret. Der blev ikke efterladt noget på destinationen.",
+        "cannotDecrypt": "En note kunne ikke læses, så intet blev eksporteret.",
+        "destinationAlreadyExists": "Der findes allerede noget på den placering. Vælg et nyt sted til eksporten.",
+        "destinationNotAllowed": "Den placering ligger inde i Mynes egen lagerplads. Vælg en mappe uden for den.",
+        "invalidPlaintextEncoding": "En notes indhold ser beskadiget ud, så intet blev eksporteret. Gendan det fra en sikkerhedskopi.",
+        "invalidVaultMeta": "Boksens metadata kunne ikke læses, så intet blev eksporteret.",
+        "ioWriteDefault": "Kunne ikke skrive eksporten.",
+        "joinFailure": "Eksport mislykkedes uventet. Der blev ikke efterladt noget på destinationen.",
+        "vaultLocked": "Boksen er låst. Lås den op, og prøv igen.",
+        "vaultNotFound": "Ingen boks fundet at eksportere."
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} vedhæftet fil",
+        "countAttachments_other": "{{count}} vedhæftede filer",
+        "countFolders_one": "{{count}} mappe",
+        "countFolders_other": "{{count}} mapper",
+        "countNotes_one": "{{count}} note",
+        "countNotes_other": "{{count}} noter",
+        "exclusionsHistory": "Versionshistorik er ikke medtaget.",
+        "exclusionsTrashedAndHistory_one": "{{count}} slettet note og versionshistorik er ikke medtaget.",
+        "exclusionsTrashedAndHistory_other": "{{count}} slettede noter og versionshistorik er ikke medtaget.",
+        "exclusionsTrashed_one": "{{count}} slettet note er ikke medtaget.",
+        "exclusionsTrashed_other": "{{count}} slettede noter er ikke medtaget.",
+        "phaseAttachments": "vedhæftede filer",
+        "phaseNotes": "noter",
+        "preparing": "Forbereder…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Annullér",
+        "cancelling": "Annullerer…",
+        "title": "Eksporterer…"
+      },
+      "setup": {
+        "cancel": "Annullér",
+        "choose": "Vælg…",
+        "chooseFolder": "Vælg en mappe…",
+        "destinationLabel": "Destination",
+        "export": "Eksportér…",
+        "folderSelectAriaLabel": "Mappe, der skal eksporteres",
+        "noFolderChosen": "Ingen mappe valgt",
+        "noFoldersInVault": "Ingen mapper i denne boks",
+        "scopeFolder": "Én mappe",
+        "scopeLabel": "Omfang",
+        "scopeWhole": "Hele boksen",
+        "title": "Eksportér boks som Markdown"
+      },
+      "summary": {
+        "done": "Færdig",
+        "showInFolder": "Vis i mappe",
+        "title": "Eksport fuldført"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "Hvis du har en sikkerhedskopi, kan du gendanne den — dine nuværende filer røres ikke; sikkerhedskopien gendannes først som en separat boks.",
+      "cta": "Luk app",
+      "title": "Boks-filen er beskadiget."
+    },
+    "invalidState": {
+      "body": "Genstart venligst.",
+      "cta": "Lås",
+      "title": "Uventet tilstand."
+    },
+    "ioError": {
+      "body": "Dette kan være en disk- eller filsystemfejl.",
+      "cta": "Luk app",
+      "title": "Kan ikke læse boks-filen."
+    },
+    "permissionDenied": {
+      "body": "Tjek filtilladelser.",
+      "cta": "Luk app",
+      "title": "Ingen tilladelse til at få adgang til boks-filen."
+    },
+    "restoreFromBackup": "Gendan fra sikkerhedskopi…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Luk",
+      "countEmpty": "Tom",
+      "count_one": "{{count}} note",
+      "count_other": "{{count}} noter",
+      "delete": "Slet",
+      "deleteError": "Kunne ikke slette den note. Prøv igen.",
+      "emptyState": "Arkivet er tomt.",
+      "restore": "Gendan",
+      "restoreError": "Kunne ikke gendanne den note. Prøv igen.",
+      "title": "Arkiv",
+      "untitled": "Uden titel"
+    },
+    "cardMenu": {
+      "copyLink": "Kopiér link",
+      "open": "Åbn",
+      "openInNewTab": "Åbn i nyt faneblad",
+      "revealInFolder": "Vis i mappe"
+    },
+    "colorLabels": {
+      "clay": "Ler",
+      "moss": "Mos",
+      "ochre": "Okker",
+      "plum": "Blomme",
+      "slate": "Skifer",
+      "stone": "Sten"
+    },
+    "decoration": {
+      "colorSection": "Farve",
+      "default": "Standard",
+      "defaultFolderIcon": "Standardmappeikon",
+      "iconSection": "Ikon",
+      "menuLabel": "Farvemærkat",
+      "noColor": "Ingen farve",
+      "none": "Ingen"
+    },
+    "deleteConfirm": {
+      "cancel": "Annullér",
+      "delete": "Slet",
+      "title": "Slet denne note?",
+      "untitled": "Uden titel",
+      "warning": "Dette kan ikke fortrydes."
+    },
+    "filterBuilder": {
+      "addCondition": "Tilføj betingelse",
+      "addFilterGroup": "Tilføj filtergruppe",
+      "cancel": "Annullér",
+      "combinator": {
+        "all": "alle",
+        "any": "en eller flere"
+      },
+      "match": "Match",
+      "negate": {
+        "is": "er",
+        "isNot": "er ikke"
+      },
+      "noConditions": "Ingen betingelser endnu — denne visning viser alle sider.",
+      "noteCount_one": "{{count}} note",
+      "noteCount_other": "{{count}} noter",
+      "of": "af:",
+      "ofTheGroups": "af grupperne:",
+      "removeCondition": "Fjern betingelse",
+      "replaceFilter": "Erstat filter",
+      "save": "Gem",
+      "searchTextPlaceholder": "søgetekst",
+      "selectFolderPlaceholder": "vælg en mappe…",
+      "selectTagPlaceholder": "vælg et tag…",
+      "type": {
+        "folder": "Mappe",
+        "search": "Søgning",
+        "tag": "Tag"
+      },
+      "unrepresentable": "Dette filter blev lavet med en avanceret editor og kan ikke redigeres her.",
+      "unresolved": "uafklaret"
+    },
+    "folderManagement": {
+      "illegalSegment": "Et mappenavn kan ikke indeholde / \\ | # ^ [ ] eller begynde/slutte med et mellemrum.",
+      "tooLong": "Den mappesti er for lang."
+    },
+    "folderNote": {
+      "defaultTitle": "Indeks"
+    },
+    "folderRow": {
+      "createFolderNote": "Opret en mappenote",
+      "empty": "tom",
+      "folderNote": "mappenote",
+      "openFolderNote": "Åbn mappenote"
+    },
+    "graph": {
+      "allConnected": "Alt er forbundet — ingen isolerede noter.",
+      "building": "Bygger graf…",
+      "depthToggleTitle": "Skift nabolagsdybde (1 ↔ 2 spring)",
+      "filterAll": "Alle",
+      "filterAroundNote": "Omkring denne note",
+      "filterByTag": "Filtrér efter tag",
+      "filterIsolated": "Isolerede",
+      "hop": "{{depth}} spring",
+      "loading": "Indlæser graf…",
+      "noNotes": "Ingen noter at vise i grafen endnu.",
+      "overCap": "Denne boks er stor — grafen over hele boksen er begrænset. Filtrér efter et tag, eller vis isolerede noter for at udforske.",
+      "refresh": "Opdatér",
+      "refreshTitle": "Boksen ændrede sig — genopbyg grafen",
+      "tagPlaceholder": "Tag…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Visning uden titel"
+      },
+      "modal": {
+        "cancel": "Annullér",
+        "cancelledNotImported_one": "{{count}} ikke importeret",
+        "cancelledNotImported_other": "{{count}} ikke importeret",
+        "cancelling": "Annullerer…",
+        "chooseFolder": "Vælg mappe…",
+        "close": "Luk",
+        "closeAriaLabel": "Luk",
+        "copied": "Kopieret",
+        "copy": "Kopiér",
+        "done": "Færdig",
+        "errorBody": "Importen kunne ikke fuldføres. Alle allerede importerede noter blev bevaret og kan trygt beholdes eller slettes.",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
+        "flagKindFolder": "Mappe",
+        "flagKindTitle": "Titel",
+        "folderPickerTitle": "Vælg din Obsidian-boksmappe",
+        "hiddenIgnoredPrefix_one": "{{count}} konfigurations-/skjult element ignoreret (fx ",
+        "hiddenIgnoredPrefix_other": "{{count}} konfigurations-/skjulte elementer ignoreret (fx ",
+        "hiddenIgnoredSuffix": ", dotfiler).",
+        "ifNoteExistsLabel": "Hvis der allerede findes en note",
+        "import": "Importér",
+        "importFailed": "Import mislykkedes.",
+        "importing": "Importerer din boks…",
+        "markDone": "Markér som færdig",
+        "markedDone": "Markeret som færdig",
+        "mediaImported_one": "{{count}} importeret",
+        "mediaImported_other": "{{count}} importeret",
+        "mediaOmittedSuffix_one": " · {{count}} udeladt",
+        "mediaOmittedSuffix_other": " · {{count}} udeladt",
+        "needsAttention": "Kræver opmærksomhed",
+        "needsAttentionHelp": "Disse noter blev importeret uændret. De foreslåede rettelser er udgangspunkter — kopiér en, og omdøb så noten, når du åbner den.",
+        "noFolderChosen": "Ingen mappe valgt",
+        "notesImported_one": "note importeret",
+        "notesImported_other": "noter importeret",
+        "policyCopyHint": "Hent den ind ved siden af den eksisterende note.",
+        "policyCopyLabel": "Importér som en kopi",
+        "policySkipHint": "Anbefalet — en gentaget import duplikerer eller overskriver aldrig.",
+        "policySkipLabel": "Spring den over",
+        "preexistingDetail": "Denne note havde allerede sin egen mappe: “{{existing}}”, som Myne beholdt — dens mappe kan afvige fra, hvor den lå på disken.",
+        "preparing": "Forbereder…",
+        "progressNotes": " noter",
+        "progressOf": " af ",
+        "reasonIllegalChar": "indeholder et tegn, Myne ikke kan bruge i et navn",
+        "reasonPathTooLong": "stien med mappe + titel er for lang",
+        "reasonSegmentTooLong": "navnet er længere, end Myne tillader",
+        "scanning": "Scanner din boks…",
+        "setupIntro": "Peg Myne på din eksisterende Obsidian-boksmappe. Hver Markdown-note importeres og krypteres med det samme — intet forlader denne enhed, og dine oprindelige filer røres ikke.",
+        "statCancelled": "Annulleret",
+        "statCanvasSkipped": ".canvas-filer sprunget over",
+        "statEmptyFoldersKept": "Tomme mapper beholdt",
+        "statMedia": "Medier",
+        "statOtherSkipped": "Andre filer sprunget over",
+        "statSkipped": "Sprunget over (findes allerede)",
+        "suggestedNameAriaLabel": "Foreslået navn",
+        "titleComplete": "Import fuldført",
+        "titleFailed": "Import mislykkedes",
+        "titleSetup": "Importér Obsidian-boks",
+        "vaultFolderLabel": "Boksmappe",
+        "vaultRoot": "(boksens rod)"
+      },
+      "offer": {
+        "body": "Hent dine eksisterende noter ind i Myne. Hver enkelt krypteres, mens den importeres — intet forlader denne enhed, og dine oprindelige filer bliver præcis, hvor de er.",
+        "chooseFolder": "Vælg mappe…",
+        "laterHint": "Du kan altid importere senere fra Indstillinger → Opbevaring.",
+        "notNow": "Ikke nu",
+        "title": "Importér din Obsidian-boks?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Tilføj til favoritter",
+      "archive": "Arkivér",
+      "archiveBulkError": "Kunne ikke arkivere noterne.",
+      "archiveNote": "Arkivér",
+      "archiveSingleError": "Kunne ikke arkivere noten.",
+      "attachments": "Vedhæftede filer",
+      "bulkArchive_one": "Arkivér {{count}} note",
+      "bulkArchive_other": "Arkivér {{count}} noter",
+      "bulkDelete_one": "Slet {{count}} note",
+      "bulkDelete_other": "Slet {{count}} noter",
+      "bulkMove_one": "Flyt {{count}} note til…",
+      "bulkMove_other": "Flyt {{count}} noter til…",
+      "caseMergeBody": "En mappe ved navn “{{name}}” findes allerede. Disse flettes sammen — vil du omdøbe den ene for at holde dem adskilt?",
+      "color": "Farve…",
+      "createFirstNote": "+ Opret din første note",
+      "createFolderNote": "Opret mappenote",
+      "customize": "Tilpas…",
+      "delete": "Slet",
+      "deleteFolderBody_one": "“{{name}}” og dens {{count}} note",
+      "deleteFolderBody_other": "“{{name}}” og dens {{count}} noter",
+      "deleteFolderConfirm": "Slet mappe",
+      "deleteFolderTitle": "Slet denne mappe?",
+      "deleteFolderWarning": "Noterne flyttes til papirkurven — du kan gendanne dem senere.",
+      "duplicate": "Dublér",
+      "editFilterTitle": "Redigér filter",
+      "emptyState": "Ingen noter endnu.",
+      "exportHtml": "Eksportér som HTML…",
+      "exportMarkdown": "Eksportér som Markdown…",
+      "exportPdf": "Eksportér som PDF…",
+      "exportTxt": "Eksportér som almindelig tekst…",
+      "favoritesHeading": "Favoritter",
+      "mergeAnyway": "Flet alligevel",
+      "newFolder": "Ny mappe",
+      "newFolderInPlaceholder": "Ny mappe i {{path}}",
+      "newFolderPlaceholder": "Ny mappe",
+      "newNote": "Ny note",
+      "newNoteFromTemplate": "Ny note fra skabelon…",
+      "newNoteHere": "Ny note her",
+      "newNoteMenu": "Ny note",
+      "newNoteShortcut": "Ny note (⌘N)",
+      "newSubfolder": "Ny undermappe",
+      "newViewTitle": "Ny visning",
+      "noteMovedToTrash": "Note flyttet til papirkurven",
+      "notesHeading": "Noter",
+      "notesMovedToTrash_one": "{{count}} note flyttet til papirkurven",
+      "notesMovedToTrash_other": "{{count}} noter flyttet til papirkurven",
+      "openArchive": "Åbn arkivet",
+      "openAttachments": "Åbn vedhæftede filer",
+      "openFolderNote": "Åbn mappenote",
+      "openInNewTab": "Åbn i nyt faneblad",
+      "openToSide": "Åbn ved siden af",
+      "openTrash": "Åbn papirkurven",
+      "removeAsFolderNote": "Fjern som mappenote",
+      "removeFromFavorites": "Fjern fra favoritter",
+      "rename": "Omdøb",
+      "setAsFolderNote": "Angiv som mappenote",
+      "trash": "Papirkurv",
+      "trashBulkError": "Kunne ikke flytte noterne til papirkurven.",
+      "trashSingleError": "Kunne ikke flytte noten til papirkurven.",
+      "undo": "Fortryd",
+      "vaultRoot": "Boksens rod",
+      "viewSettingsTitle": "Visningsindstillinger"
+    },
+    "newFromTemplate": {
+      "back": "Tilbage",
+      "blankNote": "Tom note",
+      "createNote": "Opret note",
+      "emptyState": "Du har ikke oprettet nogen skabeloner endnu.",
+      "listLabel": "Skabeloner",
+      "loading": "Indlæser…",
+      "nameLabel": "Navn på noten (fra “{{templateName}}”)",
+      "namePlaceholder": "Uden titel",
+      "nameStepTitle": "Navngiv denne note",
+      "pickStepTitle": "Ny note fra skabelon",
+      "untitledTemplate": "Skabelon uden titel"
+    },
+    "newTab": {
+      "createNote": "Opret en ny note",
+      "noNotesMatch": "Ingen noter matcher.",
+      "noNotesYet": "Ingen noter endnu.",
+      "searchAriaLabel": "Søg i noter, der skal åbnes",
+      "searchPlaceholder": "Søg i noter…",
+      "untitled": "Uden titel"
+    },
+    "pane": {
+      "graphTab": "Graf",
+      "loading": "Indlæser…",
+      "untitledView": "Visning uden titel"
+    },
+    "relativeTime": {
+      "daysAgo": "for {{d}} dage siden",
+      "hoursAgo": "for {{h}} t siden",
+      "justNow": "lige nu",
+      "minutesAgo": "for {{m}} min siden",
+      "oneWeekAgo": "for 1 uge siden",
+      "weeksAgo": "for {{w}} uger siden",
+      "yesterday": "i går"
+    },
+    "row": {
+      "addToFavorites": "Tilføj til favoritter",
+      "folderIndexBadgeLabel": "Mappenote",
+      "folderIndexBadgeTitle": "Mappenote — denne mappes indeks",
+      "folderIndexConflictLabel": "Mappen har allerede en indeksnote",
+      "folderIndexConflictTitle": "Denne mappe har allerede en indeksnote",
+      "loadError": "Kunne ikke indlæse denne note",
+      "removeFromFavorites": "Fjern fra favoritter",
+      "renameAriaLabel": "Omdøb note",
+      "untitled": "Uden titel"
+    },
+    "saveStatus": {
+      "editing": "Redigerer",
+      "editingEllipsis": "Redigerer…",
+      "editingTitle": "Redigerer — automatisk gem er aktivt",
+      "justNow": "lige nu",
+      "retry": "Prøv igen",
+      "saveFailed": "Gem mislykkedes",
+      "saveFailedTitle": "Gem mislykkedes — klik på Prøv igen",
+      "saved": "Gemt",
+      "savedRelative": "Gemt {{rel}}",
+      "saving": "Gemmer",
+      "savingEllipsis": "Gemmer…"
+    },
+    "savedView": {
+      "defaultName": "Filtreret visning"
+    },
+    "snapshotFailed": {
+      "dismiss": "Afvis",
+      "message": "Kunne ikke gemme et øjebliksbillede — din note er gemt, men dens versionshistorik kan være ufuldstændig (disken kan være fuld)."
+    },
+    "snapshots": {
+      "cancel": "Annullér",
+      "changeCount_one": "{{count}} ændring siden dette øjebliksbillede",
+      "changeCount_other": "{{count}} ændringer siden dette øjebliksbillede",
+      "close": "Luk",
+      "confirmBody": "Din nuværende note gemmes som et øjebliksbillede først, så du kan fortryde dette.",
+      "confirmTitle": "Gendan dette øjebliksbillede?",
+      "decrypting": "Dekrypterer…",
+      "emptyState": "Ingen øjebliksbilleder endnu. Øjebliksbilleder gemmes automatisk, mens du redigerer, og opbevares i omkring 7 dage. De er krypterede og forsvinder, når noten slettes permanent.",
+      "encryptedSize": "Krypteret · {{size}}",
+      "errorCannotDecrypt": "Dette øjebliksbillede kunne ikke dekrypteres.",
+      "errorGeneric": "Noget gik galt. Prøv igen.",
+      "errorIo": "Der opstod en diskfejl — disken kan være fuld eller skrivebeskyttet.",
+      "errorNotFound": "Det øjebliksbillede er ikke længere tilgængeligt.",
+      "errorStorageAccess": "Kunne ikke få adgang til boksens lager til øjebliksbilleder.",
+      "errorVaultLocked": "Boksen er låst. Lås den op for at se øjebliksbilleder.",
+      "justNow": "lige nu",
+      "listLabel": "Liste over øjebliksbilleder",
+      "loading": "Indlæser…",
+      "restore": "Gendan",
+      "restoreCta": "Gendan dette øjebliksbillede",
+      "restoredStatus": "Gendannet. Den version, du havde, er gemt som et øjebliksbillede.",
+      "selectPlaceholder": "Vælg et øjebliksbillede for at se, hvad der er ændret siden da.",
+      "title": "Øjebliksbilleder",
+      "untitled": "Uden titel"
+    },
+    "tabStrip": {
+      "closeNewTab": "Luk nyt faneblad",
+      "closeTab": "Luk {{title}}",
+      "newTab": "Nyt faneblad",
+      "openNotes": "Åbne noter",
+      "pin": "Fastgør",
+      "pinned": "Fastgjort",
+      "pinnedTitle": "Fastgjort — frigør for at lukke",
+      "unpin": "Frigør",
+      "untitled": "Uden titel"
+    },
+    "tagBrowser": {
+      "cancel": "Annullér",
+      "clear": "Ryd",
+      "combineTagsWith": "Kombinér tags med",
+      "filtering": "Filtrerer…",
+      "modeAll": "Alle",
+      "modeAny": "En eller flere",
+      "noNotesForFilter": "Ingen noter til dette filter.",
+      "noTagsMatch": "Ingen tags matcher “{{query}}”.",
+      "noTagsYet": "Ingen tags endnu.",
+      "noteCount_one": "{{count}} note",
+      "noteCount_other": "{{count}} noter",
+      "notes": "Noter",
+      "pickTag": "Vælg et tag at filtrere efter.",
+      "save": "Gem",
+      "saveAsView": "Gem som visning",
+      "searchPlaceholder": "Søg i tags…",
+      "title": "Tags",
+      "untitled": "Uden titel",
+      "viewNamePlaceholder": "Visningsnavn"
+    },
+    "trash": {
+      "close": "Luk",
+      "countEmpty": "Tom",
+      "count_one": "{{count}} note",
+      "count_other": "{{count}} noter",
+      "delete": "Slet",
+      "deleteError": "Kunne ikke slette den note. Prøv igen.",
+      "empty": "Tøm papirkurv",
+      "emptyConfirmBody_one": "{{count}} note slettes permanent.",
+      "emptyConfirmBody_other": "{{count}} noter slettes permanent.",
+      "emptyConfirmCta": "Tøm papirkurv",
+      "emptyConfirmTitle": "Tøm papirkurv?",
+      "emptyPartialFailure_one": "{{count}} note kunne ikke slettes og bliver i papirkurven.",
+      "emptyPartialFailure_other": "{{count}} noter kunne ikke slettes og bliver i papirkurven.",
+      "emptyState": "Papirkurven er tom.",
+      "purgeConfirmCta": "Slet permanent",
+      "purgeConfirmTitle": "Slet permanent?",
+      "restore": "Gendan",
+      "restoreError": "Kunne ikke gendanne den note. Prøv igen.",
+      "title": "Papirkurv",
+      "untitled": "Uden titel"
+    },
+    "unlinkedMentions": {
+      "empty": "Ingen ikke-linkede omtaler.",
+      "heading": "Ikke-linkede omtaler",
+      "link": "Link",
+      "linkTooltip": "Link denne omtale til {{title}}",
+      "refresh": "Omtaler kan være ændret — opdatér",
+      "searching": "Søger…",
+      "thisNote": "denne note",
+      "untitled": "Uden titel"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Standard (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kvadratisk)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (bred)"
+      },
+      "cancel": "Annullér",
+      "cardSize": "Kortstørrelse",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Den frontmatter-egenskab, hvis værdi er et billede — vises som hvert korts forside. Lad være tom for ingen forside.",
+      "coverImagePlaceholder": "fx cover",
+      "coverImageProperty": "Egenskab for forsidebillede",
+      "imageAspectRatio": "Billedformat",
+      "reset": "Nulstil",
+      "save": "Gem"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Skift forside",
+        "changeCoverImage": "Skift forsidebillede",
+        "empty": "Ingen noter matcher denne visning",
+        "noValue": "Ingen værdi",
+        "setCover": "Vælg forside",
+        "setCoverImage": "Vælg forsidebillede",
+        "untitled": "Uden titel"
+      },
+      "collapseViews": "Skjul visninger",
+      "empty": "Ingen visninger endnu. Gem den aktuelle noteliste som en visning.",
+      "expandViews": "Udvid visninger",
+      "heading": "Visninger",
+      "host": {
+        "unsupported": "Denne visningstype kommer i en senere opdatering."
+      },
+      "menu": {
+        "deleteView": "Slet visning",
+        "editFilter": "Redigér filter…",
+        "moveDown": "Flyt ned",
+        "moveUp": "Flyt op",
+        "rename": "Omdøb",
+        "viewSettings": "Visningsindstillinger…"
+      },
+      "newView": "Ny visning",
+      "untitledView": "Visning uden titel"
+    },
+    "welcome": {
+      "body": "Velkommen til Myne, dit private sted til at tænke og skrive.\n\nAlt, du gemmer her, er krypteret og bliver på din enhed. Din **adgangskode** og **gendannelsessætning** er de eneste nøgler til det, så opbevar dem et sikkert sted. Hvis begge går tabt, kan ingen få dine noter tilbage — heller ikke os.\n\nDette er bare en helt almindelig note, så gør den til din egen. Redigér den, omdøb den eller slet den, når du vil, og tilføj nye noter, efterhånden som dine idéer vokser.\n\nVi er glade for, at du er her. Besøg https://myne.md for at lære mere om Myne.\n",
+      "title": "Velkommen til Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "Standard"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Tjekker styrke…",
+      "confirmLabel": "Bekræft hovedadgangskode",
+      "defaultEmptyCaption": "Bruges som input til Argon2id (m=256 MiB, t=3, p=2). Vælg noget, du kan huske; du kan ikke nulstille den.",
+      "mismatch": "Adgangskoderne er ikke ens.",
+      "passwordLabel": "Hovedadgangskode",
+      "suggestPassword": "Foreslå adgangskode",
+      "tooShort": "Brug mindst {{n}} tegn."
+    },
+    "input": {
+      "hide": "Skjul adgangskode",
+      "show": "Vis adgangskode"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "Ingen resultater.",
+      "placeholder": "Vælg…",
+      "searchPlaceholder": "Søg…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Gendannelse annulleret: boksen blev låst.",
+      "operationInProgress": "Handling i gang. Vent venligst.",
+      "unexpected": "Uventet fejl. Prøv igen.",
+      "vaultNotFound": "Boks-filen blev ikke fundet. Genstart appen."
+    }
+  },
+  "restore": {
+    "backLabel": "Tilbage",
+    "cancelLabel": "Annullér",
+    "collision": {
+      "body": "En boks fra denne sikkerhedskopi findes allerede på denne enhed. Du kan beholde begge — den gendannede kopi vises som en separat boks på din boksliste — eller gendanne nu og derefter selv fjerne den eksisterende boks fra bokslisten (fjernelse beder dig skrive DELETE og giver kun mening, når du har bekræftet, at den gendannede boks åbner).",
+      "keepBoth": "Behold begge",
+      "replaceExisting": "Gendan, og erstat så den eksisterende…"
+    },
+    "damaged": {
+      "body": "Sikkerhedskopifilen er beskadiget, så intet blev gendannet. Hvis det er den eneste kopi, du har, kan en redningsproces gendanne de intakte noter og vise præcis, hvad der ikke kunne læses — resultatet markeres altid som en delvis gendannelse.",
+      "close": "Luk",
+      "salvage": "Red de intakte noter…"
+    },
+    "error": {
+      "tryAnotherFile": "Prøv en anden fil"
+    },
+    "pick": {
+      "body": "Vælg en <code>.myne-backup</code>-fil. Sikkerhedskopien verificeres, før noget gendannes; den gendannede boks låses op med den boks' adgangskode eller gendannelsessætning — præcis som ved oplåsning.",
+      "chooseFile": "Vælg sikkerhedskopifil…",
+      "corruptedSuffix": "Din nuværende boks røres ikke: sikkerhedskopien gendannes først som en separat boks."
+    },
+    "summary": {
+      "attachments": "Vedhæftede filer: {{n}}",
+      "collidedNote": "Den tidligere kopi af denne boks er stadig på din boksliste. Når du har bekræftet, at den gendannede boks åbner, kan du fjerne den gamle fra bokslisten (den vil bede dig skrive DELETE).",
+      "notes": "Noter: {{n}}",
+      "openVaultList": "Åbn boksliste",
+      "partialHeader_one": "Delvist gendannet — {{count}} element kunne ikke læses.",
+      "partialHeader_other": "Delvist gendannet — {{count}} elementer kunne ikke læses.",
+      "restored": "Boks gendannet.",
+      "versionHistory": "Poster i versionshistorik: {{n}}"
+    },
+    "title": "Gendan fra sikkerhedskopi",
+    "working": {
+      "cancel": "Annullér",
+      "restoringProgress": "Gendanner… {{done}} af {{total}}",
+      "verifying": "Verificerer sikkerhedskopi…",
+      "verifyingProgress": "Verificerer sikkerhedskopi… {{done}} af {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Udviklingsbuild",
+      "buildChannelLabel": "Build-kanal",
+      "buildChannelStable": "Stabil",
+      "changelogButton": "Vis ændringslog…",
+      "changelogHelper": "Noter pr. version. Vises, når MYND-119 lander.",
+      "changelogLabel": "Ændringslog",
+      "licenseBody": "Pre-alfa · CC0-dokumenter · AGPL-3.0-programkode ved fase 1-udgivelse.",
+      "licenseLabel": "Licens",
+      "tagline": "Pre-alfa · Fase 1 desktopklient",
+      "threatModelHelper": "Åbn det offentlige trusselsmodel-dokument i din browser.",
+      "threatModelLabel": "Trusselsmodel"
+    },
+    "account": {
+      "argon2idHeading": "Argon2id-parametre",
+      "changePasswordButton": "Skift adgangskode",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Forkert nuværende adgangskode, eller boks-filen er beskadiget.",
+        "ioError": "Diskfejl, prøv igen.",
+        "joinFailure": "Noget gik galt, prøv igen.",
+        "samePasswordRejected": "Den nye adgangskode er den samme som den nuværende.",
+        "weakNewPassword": "Den nye adgangskode skal være mindst 12 tegn."
+      },
+      "changePasswordHeading": "Skift adgangskode",
+      "changePasswordHelper": "Skift din hovedadgangskode, men behold den samme boks. Gendannelsessætningen forbliver den samme.",
+      "dangerZoneHeading": "Farezone",
+      "dangerZoneHelper": "Slet denne boks og alle noter permanent. Kan ikke fortrydes. Gendannelsessætningen vil ikke gendanne boksen.",
+      "deleteVaultButton": "Slet boks…",
+      "memoryCost": "Hukommelsesomkostning",
+      "parallelism": "Parallelitet",
+      "timeCost": "Tidsomkostning",
+      "vaultLabelEyebrow": "BOKSMÆRKAT",
+      "vaultLabelHelper": "Et navn på denne boks, der vises i app-skifteren. Gemmes krypteret inde i boksen; forlader aldrig din enhed i klartekst.",
+      "vaultLabelPlaceholder": "Tilføj et mærkat…",
+      "vaultLabelSave": "Gem"
+    },
+    "appearance": {
+      "showEditTimesAria": "Vis redigeringstidspunkter i sidepanelet",
+      "showEditTimesHelper": "Vis hver notes sidste redigeringstidspunkt under titlen i sidepanelet.",
+      "showEditTimesLabel": "Vis redigeringstidspunkter",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Mørk",
+        "light": "Lys",
+        "system": "System"
+      },
+      "themeHelper": "Skift mellem lyse og mørke temaer, eller følg systemets indstilling.",
+      "themeLabel": "Tema",
+      "themeOptionAria": "{{label}} tema",
+      "themeSaveError": "Kunne ikke gemme tema. Prøv igen.",
+      "timestampsSaveError": "Kunne ikke gemme indstillingen. Prøv igen."
+    },
+    "archive": {
+      "helper": "Lad noter blive flyttet til et arkiv, så de holdes ude af hovedlisten. Slår du dette fra, gendannes alle arkiverede noter til deres mappe, og arkivknapperne skjules.",
+      "label": "Arkivering",
+      "off": "Fra",
+      "on": "Til",
+      "saveError": "Kunne ikke opdatere arkiveringsindstillingen."
+    },
+    "autoBackup": {
+      "backupFolder": "Sikkerhedskopimappe",
+      "chooseFolder": "Vælg mappe…",
+      "chooseFolderDialogTitle": "Vælg en mappe til automatiske sikkerhedskopier",
+      "frequency": "Hyppighed",
+      "frequencyAriaLabel": "Hyppighed for sikkerhedskopi",
+      "helper": "Skriv en krypteret .myne-backup til en mappe efter en tidsplan, mens appen er åben og boksen er låst op. Sikkerhedskopier forbliver lige så krypterede som din boks; Myne beholder de seneste få og sender aldrig noget væk fra din enhed.",
+      "intervalDaily": "Dagligt",
+      "intervalEveryUnlock": "Ved hver oplåsning",
+      "intervalWeekly": "Ugentligt",
+      "keepLast": "Behold seneste",
+      "noFolderChosen": "Ingen mappe valgt endnu.",
+      "saveFailedToast": "Kunne ikke gemme indstillinger for sikkerhedskopi.",
+      "searchEmpty": "Ingen resultater.",
+      "searchPlaceholder": "Søg…",
+      "statusFailed": "Automatisk sikkerhedskopi mislykkedes — {{stamp}}",
+      "statusLastBackup": "Seneste sikkerhedskopi: {{stamp}}",
+      "statusNever": "Ingen automatisk sikkerhedskopi endnu.",
+      "title": "Automatiske sikkerhedskopier"
+    },
+    "changePassword": {
+      "cancel": "Annullér",
+      "checkingStrength": "Tjekker styrke…",
+      "confirmLabel": "Bekræft ny adgangskode",
+      "currentLabel": "Nuværende adgangskode",
+      "mismatch": "Adgangskoderne er ikke ens.",
+      "newLabel": "Ny adgangskode",
+      "submit": "Skift adgangskode",
+      "submitting": "Skifter adgangskode…",
+      "title": "Skift adgangskode",
+      "tooShort": "Brug mindst {{n}} tegn."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Browserudvidelse"
+      },
+      "when": {
+        "bare": "Forbundet",
+        "daysAgo_one": "Forbundet for {{count}} dag siden",
+        "daysAgo_other": "Forbundet for {{count}} dage siden",
+        "hoursAgo_one": "Forbundet for {{count}} t siden",
+        "hoursAgo_other": "Forbundet for {{count}} t siden",
+        "justNow": "Forbundet lige nu",
+        "minutesAgo_one": "Forbundet for {{count}} min siden",
+        "minutesAgo_other": "Forbundet for {{count}} min siden",
+        "onDate": "Forbundet {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Anvendt",
+      "apply": "Anvend",
+      "applyError": "Kunne ikke anvende det tema. Prøv igen.",
+      "cancel": "Annullér",
+      "confirm": "Bekræft",
+      "delete": "Slet",
+      "deleteError": "Kunne ikke slette det tema. Prøv igen.",
+      "empty": "Ingen brugerdefinerede temaer endnu. Importér et, eller åbn temamappen og tilføj en temafil.",
+      "error": {
+        "aColorFallback": "en farve",
+        "invalidFile": "Ugyldig temafil.",
+        "invalidName": "Usikkert temanavn",
+        "invalidValue": "Ugyldig værdi for {{key}}",
+        "invalidValueWithLine": "Ugyldig værdi for {{key}} (linje {{line}})",
+        "missingKey": "Manglende påkrævet farve {{key}}",
+        "parseError": "Ikke gyldig JSON",
+        "parseErrorWithLine": "Ikke gyldig JSON (linje {{line}})"
+      },
+      "fileFilterName": "Myne-tema",
+      "helper": "Brug din egen farvepalet. Temaer valideres på denne enhed før brug — intet uploades.",
+      "importButton": "Importér tema…",
+      "importError": "Den fil er ikke et gyldigt tema. Åbn referencen for at se formatet.",
+      "label": "Brugerdefinerede temaer",
+      "openFolderButton": "Åbn temamappe",
+      "openFolderError": "Kunne ikke åbne temamappen.",
+      "readError": "Kunne ikke læse din temamappe."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Tom (ingen skabelon)",
+      "dateFormatHelper": "Titlen på hver daglig note. Understøtter ÅÅÅÅ, MM, DD. Standard er {{default}}.",
+      "dateFormatLabel": "Datoformat for daglige noter",
+      "dateFormatSaveError": "Kunne ikke gemme datoformatet. Prøv igen.",
+      "folderHelper": "Hvor nye daglige noter placeres. Standard er {{default}} — mappen beholdes, også når den er tom.",
+      "folderLabel": "Mappe til daglige noter",
+      "folderSaveError": "Kunne ikke gemme den daglige mappe. Prøv igen.",
+      "searchEmpty": "Ingen skabeloner matcher.",
+      "searchPlaceholder": "Søg i skabeloner…",
+      "templateHelper": "Vælg en skabelon, som hver daglig note skal starte fra, eller lad være tom for en tom note med datoen som titel.",
+      "templateLabel": "Skabelon til daglige noter",
+      "templateSaveError": "Kunne ikke gemme den daglige skabelon. Prøv igen.",
+      "untitledTemplate": "Skabelon uden titel"
+    },
+    "deleteVault": {
+      "cancel": "Annullér",
+      "caseSensitiveHint": "Der er forskel på store og små bogstaver. Skriv ordet præcist for at aktivere sletning.",
+      "continue": "Fortsæt",
+      "copyPrimary": "Dette sletter permanent denne boks og hver note i den. Handlingen kan ikke fortrydes, og din gendannelsessætning vil ikke gendanne dataene.",
+      "copySecondary": "Boksens nøgler nulstilles i hukommelsen, før filerne fjernes; eventuel forældreløs chiffertekst, der bliver tilbage på disken, forbliver uigenkaldelig Argon2id-indpakket affald.",
+      "eyebrow": "UIGENKALDELIGT",
+      "heading": "Slet boks",
+      "ioFailBody": "Kunne ikke få adgang til boks-filerne for at slette dem. Boksens nøgler er allerede nulstillet i hukommelsen; eventuelle boks-data, der bliver tilbage på disken, er uigenkaldeligt Argon2id-indpakket affald.",
+      "ioFailTitle": "Diskfejl under sletning",
+      "partialFailBody_one": "{{count}} fil kunne ikke slettes fra disken. Boksens nøgler er allerede nulstillet i hukommelsen, så eventuel forældreløs chiffertekst, der er tilbage, er uigenkaldeligt Argon2id-indpakket affald.",
+      "partialFailBody_other": "{{count}} filer kunne ikke slettes fra disken. Boksens nøgler er allerede nulstillet i hukommelsen, så eventuel forældreløs chiffertekst, der er tilbage, er uigenkaldeligt Argon2id-indpakket affald.",
+      "partialFailTitle": "Sletning af boks mislykkedes delvist",
+      "submit": "Slet boks",
+      "submitInFlight": "Sletter boks…",
+      "typeToConfirmLabel": "Skriv DELETE for at bekræfte",
+      "vaultPath": "Boks-sti: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Dæmp inaktive linjer",
+      "dimHelper": "I fokustilstand (⇧⌘F) dæmpes alle linjer undtagen den, du redigerer.",
+      "dimLabel": "Fokustilstand · dæmp inaktive linjer",
+      "off": "Fra",
+      "on": "Til",
+      "saveError": "Kunne ikke gemme indstillingen for fokustilstand.",
+      "typewriterAria": "Skrivemaskinerulning",
+      "typewriterHelper": "I fokustilstand (⇧⌘F) holdes den aktive linje lodret centreret, mens du skriver.",
+      "typewriterLabel": "Fokustilstand · skrivemaskinerulning"
+    },
+    "hotkeys": {
+      "addBindingAria": "Tilføj en genvej for {{command}}",
+      "cancel": "Annullér",
+      "capturePrompt": "Tryk på en tast…",
+      "conflictIndicator": "⚠ konflikt",
+      "conflictTitle": "Bruges også af {{commands}}",
+      "fixed": "fast",
+      "group": {
+        "editorFormatting": "Editorformatering",
+        "general": "Generelt",
+        "navigation": "Navigation",
+        "notes": "Noter",
+        "panesTabs": "Ruder og faneblade",
+        "view": "Vis"
+      },
+      "helper": "Se og skift tastaturgenveje. Editorformatering og genvejen til at skifte faneblad er faste.",
+      "notSet": "Ikke angivet",
+      "removeBindingAria": "Fjern {{chord}}",
+      "resetAll": "Nulstil alle genveje…",
+      "resetAllConfirm": "Nulstil hver brugerdefineret genvej til dens standard?",
+      "resetAllYes": "Nulstil alle",
+      "restoreDefaultAria": "Gendan standard for {{command}}",
+      "searchAriaLabel": "Søg i genveje",
+      "searchPlaceholder": "Søg i genveje…",
+      "warnAlreadyUsed": "Bruges allerede af {{commands}} — tilføjet alligevel."
+    },
+    "language": {
+      "helper": "Vælg appens visningssprog.",
+      "label": "Sprog"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Kunne ikke gemme indstillingen for linjenumre.",
+      "helper": "Vis en margen med linjenumre i editoren. Ét nummer pr. linje; slået fra som standard.",
+      "label": "Linjenumre",
+      "off": "Fra",
+      "on": "Til"
+    },
+    "prefs": {
+      "saveError": "Kunne ikke gemme indstillingen — prøv igen"
+    },
+    "privacy": {
+      "autoLockHelper": "Lås boksen efter så lang tids inaktivitet.",
+      "autoLockLabel": "Automatisk lås",
+      "autoLockSearchEmpty": "Ingen varigheder matcher.",
+      "autoLockSearchPlaceholder": "Søg i varigheder…",
+      "screenCaptureHelperOff": "Beskyttelsen gælder altid før oplåsning. Efter oplåsning følger den denne indstilling.",
+      "screenCaptureHelperOn": "Aktiv på macOS og Windows 10 (May 2020 Update eller nyere). Linux-understøttelse kommer i en fremtidig udgivelse.",
+      "screenCaptureLabel": "Beskyttelse mod skærmoptagelse"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Annulleret.",
+      "errorGeneric": "Kunne ikke konfigurere hurtig oplåsning.",
+      "errorHardwareUnavailable": "Touch ID er ikke tilgængelig på denne enhed.",
+      "errorNotUnlocked": "Lås boksen op først.",
+      "errorPinNotDigits": "PIN-koden må kun bestå af cifre.",
+      "errorPinTooShort_one": "PIN-koden skal være mindst {{count}} ciffer.",
+      "errorPinTooShort_other": "PIN-koden skal være mindst {{count}} cifre.",
+      "helperConfigured": "Konfigureret via {{method}}. Genindtastning efter automatisk lås springer hovedadgangskoden over. Hovedadgangskoden kræves stadig efter genstart.",
+      "helperNotConfigured": "Indtast igen efter automatisk lås med en PIN-kode eller Touch ID i stedet for den fulde hovedadgangskode. En bekvemmelighed oven på den krypterede boks — hovedadgangskoden kræves stadig efter genstart.",
+      "methodPin": "PIN-kode",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN-kode til hurtig oplåsning",
+      "pinPlaceholder_one": "PIN-kode (mindst {{count}} ciffer)",
+      "pinPlaceholder_other": "PIN-kode (mindst {{count}} cifre)",
+      "setPin": "Angiv PIN-kode",
+      "setupHelper": "Touch ID findes kun på macOS og er i øjeblikket eksperimentel (afventer hardwareverifikation). PIN-kode virker overalt.",
+      "title": "Hurtig oplåsning",
+      "useTouchId": "Brug Touch ID"
+    },
+    "shell": {
+      "closeLabel": "Luk indstillinger",
+      "navLabel": "Indstillingspaneler",
+      "panels": {
+        "about": "Om",
+        "account": "Konto",
+        "appearance": "Udseende",
+        "editor": "Editor",
+        "hotkeys": "Genveje",
+        "privacy": "Privatliv",
+        "storage": "Opbevaring"
+      },
+      "passwordUpdatedToast": "Adgangskode opdateret",
+      "title": "Indstillinger"
+    },
+    "spell": {
+      "errorSaveLanguages": "Kunne ikke gemme sprogene til stavekontrol.",
+      "errorSaveSetting": "Kunne ikke gemme indstillingen for stavekontrol.",
+      "helper": "Understreg forkert stavede ord, mens du skriver. Helt offline — dine noter forlader aldrig enheden.",
+      "label": "Stavekontrol",
+      "languagesAriaLabel": "Sprog til stavekontrol",
+      "languagesHelper": "Et ord er korrekt, hvis det er gyldigt på et af de valgte sprog — praktisk til at blande engelske udtryk ind i noter på andre sprog.",
+      "languagesLabel": "Sprog",
+      "languagesPlaceholder": "Vælg sprog…",
+      "languagesSearchEmpty": "Ingen sprog matcher.",
+      "languagesSearchPlaceholder": "Søg i sprog…",
+      "off": "Fra",
+      "on": "Til"
+    },
+    "storage": {
+      "backUpVault": "Sikkerhedskopiér boks…",
+      "backupHelper": "Sikkerhedskopier forbliver præcis lige så krypterede som din boks, i en enkelt verificeret .myne-backup-fil. Gendannelse fungerer med den boks' adgangskode eller gendannelsessætning — præcis som ved oplåsning.",
+      "backupLabel": "Sikkerhedskopi",
+      "exportAction": "Eksportér…",
+      "exportBody": "Eksportér boks som Markdown",
+      "exportHelper": "Almindeligt markdown-træ — ikke krypteret.",
+      "exportLabel": "Eksport",
+      "importHelper": "Hent en eksisterende Obsidian-boks ind i Myne. Hver Markdown-note importeres og krypteres med det samme; dine oprindelige filer røres ikke.",
+      "importLabel": "Import",
+      "importObsidian": "Importér Obsidian-boks…",
+      "locationHelper": "Hver boks er en mappe med krypterede filer under denne sti. Brug hellere knappen Sikkerhedskopi nedenfor end manuelle kopier — den verificerer den skrevne fil.",
+      "locationLabel": "Boksens placering",
+      "openInFiles": "Åbn i Finder",
+      "pathUnavailable": "Sti ikke tilgængelig",
+      "restoreBackup": "Gendan fra sikkerhedskopi…"
+    },
+    "typography": {
+      "contentWidthHelper": "Maksimal bredde på redigeringskolonnen. Fuld lader teksten fylde hele ruden.",
+      "contentWidthLabel": "Indholdsbredde",
+      "errorSave": "Kunne ikke gemme indstillingen. Prøv igen.",
+      "fontHelper": "Monospace eller proportional (sans-serif) tekst.",
+      "fontLabel": "Skrifttype",
+      "lineSpacingHelper": "Lodret afstand mellem linjer.",
+      "lineSpacingLabel": "Linjeafstand",
+      "textSizeHelper": "Editor-tekstens basisstørrelse. Overskrifter skaleres med den.",
+      "textSizeLabel": "Tekststørrelse"
+    },
+    "viewMode": {
+      "errorSave": "Kunne ikke gemme standardvisningstilstanden.",
+      "helper": "Hvordan en note åbnes: Live-forhåndsvisning (standard), skrivebeskyttet Læsning eller rå Kilde. Skift en note med ⇧⌘E.",
+      "label": "Standardvisningstilstand",
+      "optionLive": "Live-forhåndsvisning",
+      "optionReading": "Læsning",
+      "optionSource": "Kilde"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Luk skabeloner",
+      "deleteRowLabel": "Slet skabelon {{name}} (flyt til papirkurven)",
+      "editTemplateLabel": "Redigér skabelon {{name}}",
+      "emptyBody": "Opret en skabelon for at genbruge et noteskelet — en mødenote, en daglig log, en læsenote. Vælg en, når du opretter en ny note.",
+      "emptyTitle": "Ingen skabeloner endnu",
+      "listLabel": "Skabeloner",
+      "loading": "Indlæser…",
+      "newTemplate": "Ny skabelon",
+      "newTemplateName": "Skabelon uden titel",
+      "removeFromTemplates": "Fjern fra skabeloner",
+      "removeRowLabel": "Fjern {{name}} fra skabeloner (beholder noten)",
+      "title": "Noteskabeloner"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Vælg en anden boks",
+    "continue": "Fortsæt",
+    "decrypting": "Dekrypterer…",
+    "deleteLink": "Mistet både adgangskode og gendannelsessætning? Slet boksen og start forfra",
+    "errors": {
+      "alreadyUnlocked": "Boksen er allerede låst op.",
+      "inProgress": "Handling i gang.",
+      "unexpected": "Uventet fejl. Prøv igen.",
+      "vaultNotFound": "Boks-filen blev ikke fundet. Genstart appen."
+    },
+    "passwordLabel": "Adgangskode",
+    "passwordPlaceholder": "Adgangskode",
+    "quickUnlock": {
+      "failed": "Hurtig oplåsning mislykkedes. Brug din adgangskode.",
+      "pinAriaLabel": "PIN-kode til hurtig oplåsning",
+      "pinPlaceholder": "PIN-kode",
+      "unlockWithPin": "Lås op med PIN-kode",
+      "unlockWithTouchId": "Lås op med Touch ID",
+      "usePasswordBelow": "eller brug din adgangskode nedenfor",
+      "wrongCredential": "Forkert. {{remaining}} forsøg tilbage."
+    },
+    "recoveryInterruptedBanner": "Gendannelsesforløbet blev afbrudt. Angiv en ny adgangskode først.",
+    "recoveryInterruptedBody": "Angiv en ny adgangskode først, og forsegl så din boks igen.",
+    "recoveryInterruptedTitle": "Gendannelsesforløbet blev afbrudt.",
+    "recoveryLink": "Glemt din adgangskode? Lås op med gendannelsessætning",
+    "submit": "Lås op",
+    "subtitle": "Indtast din adgangskode for at fortsætte.",
+    "suspicion": {
+      "lockedDuringChange": "Ændring af adgangskode annulleret: boksen blev låst.",
+      "metaChangedExternally": "Boksen blev ændret i en anden session — lås op igen."
+    },
+    "title": "Lås din boks op."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Kan ikke læse boks-filen.",
+      "notFound": "Boks-filen blev ikke fundet. Genstart appen.",
+      "permissionDenied": "Ingen tilladelse til at få adgang til boks-filen. Tjek filtilladelser."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "Jeg har gemt mit kontonummer et sted, hvor jeg kan finde det senere.",
+      "back": "Tilbage",
+      "commit": "Opret boks",
+      "committing": "Gemmer…",
+      "copied": "Kopieret",
+      "copy": "Kopiér",
+      "eyebrow": "Trin 4 af 4 — kontonummer",
+      "heading": "Gem dit kontonummer.",
+      "intro": "Dette er din ihændehaver-nøgle — behandl den som kontanter.",
+      "saveAsFile": "Gem som fil",
+      "shownOnceBody": "Gem det nu — Myne kan ikke gendanne det for dig. Det kræves for at registrere dig til synkronisering senere.",
+      "shownOnceEmphasis": "Dette vises kun én gang."
+    },
+    "briefing": {
+      "back": "Tilbage",
+      "continue": "Fortsæt til oprettelse af boks",
+      "eyebrow": "Før du opretter din boks",
+      "heading": "Før du opretter din boks",
+      "intro": "Myne krypterer dine noter, så kun du kan åbne dem. Tre ting følger af det — læs dem, og fortsæt derefter.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "Jeg forstår, at der ikke findes e-mailgendannelse.",
+          "statement": "Der er ingen e-mailgendannelse. Det bliver der aldrig.",
+          "why": "Vi beder aldrig om din e-mail, så der er intet nulstillingslink og ingen konto, som support kan låse op. Dette er ikke en manglende funktion — det er garantien. E-mailgendannelse ville betyde, at vi kunne læse dine noter, og Myne er bygget, så vi ikke kan."
+        },
+        "no-store": {
+          "ackLabel": "Jeg forstår, at Myne ikke kan gendanne min adgangskode.",
+          "statement": "Din adgangskode låser din boks op. Vi gemmer den ikke.",
+          "why": "Din adgangskode er input til den nøgle, der dekrypterer dine noter. Den forlader aldrig denne enhed, og intet på vores servere kan genskabe den. Det er det, der holder dine noter private — og derfor kan vi ikke nulstille den for dig."
+        },
+        "phrase-backup": {
+          "ackLabel": "Jeg forstår, at min gendannelsessætning er den eneste sikkerhedskopi.",
+          "statement": "Din gendannelsessætning er din eneste sikkerhedskopi.",
+          "why": "Hvis du glemmer din adgangskode, er gendannelsessætningen på 24 ord den eneste vej tilbage. {{lostBothSecrets}} Skriv sætningen ned, og opbevar den et sikkert sted."
+        }
+      },
+      "why": "Hvorfor?"
+    },
+    "confirm": {
+      "back": "Tilbage",
+      "continue": "Fortsæt",
+      "eyebrow": "Trin 3 af 4 — bekræft sætning",
+      "heading": "Skriv fire ord fra din sætning igen.",
+      "intro": "Vi spørger om bestemte positioner for at bekræfte, at du har gemt den.",
+      "mismatch": "Matcher ikke ord nr. {{pos}}.",
+      "wordAtPosition": "Ord på position {{pos}}"
+    },
+    "encrypting": {
+      "caption": "Dette tager et øjeblik.",
+      "footerHint": "Hvis dette tager mere end 30 sekunder, så luk vinduet og prøv igen.",
+      "heading": "Krypterer din boks"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Prøv igen.",
+        "title": "Kontonummer ugyldigt"
+      },
+      "aeadFailure": {
+        "body": "Prøv igen.",
+        "title": "Kryptering mislykkedes"
+      },
+      "csprng": {
+        "body": "Prøv igen.",
+        "title": "Kunne ikke generere sikre tilfældige data"
+      },
+      "invalidPassword": {
+        "body": "Prøv igen.",
+        "title": "Ugyldig adgangskode"
+      },
+      "invalidVaultMeta": {
+        "body": "Prøv igen.",
+        "title": "Fejl i boksformat"
+      },
+      "ioOther": {
+        "body": "Prøv igen.",
+        "title": "Kunne ikke gemme boksen"
+      },
+      "joinFailure": {
+        "body": "Prøv igen.",
+        "title": "Noget gik galt"
+      },
+      "kdfFailure": {
+        "body": "Prøv igen. Hvis dette bliver ved med at ske, har dit system måske for lidt hukommelse.",
+        "title": "Kunne ikke opsætte kryptering"
+      },
+      "noSpace": {
+        "body": "Frigør diskplads, og prøv igen.",
+        "title": "Ikke nok diskplads"
+      },
+      "notFound": {
+        "body": "Prøv igen.",
+        "title": "Boksmappe mangler"
+      },
+      "passwordTooShort": {
+        "body": "Brug mindst 12 tegn.",
+        "title": "Adgangskode for kort"
+      },
+      "permissionDenied": {
+        "body": "Sørg for, at Myne har tilladelse til at skrive til din mappe med programdata.",
+        "title": "Kunne ikke skrive til boksmappen"
+      },
+      "sessionExpired": {
+        "body": "Af sikkerhedshensyn udløber oprettelse af en boks efter 10 minutter. Begynd forfra.",
+        "title": "Session udløbet"
+      },
+      "sessionNotFound": {
+        "body": "Begynd forfra fra start.",
+        "title": "Session ikke fundet"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Luk andre Myne-vinduer, og prøv igen.",
+        "title": "For mange oprettelser af bokse på én gang"
+      },
+      "vaultArtifactsPresent": {
+        "body": "En ny boks kan ikke oprettes, fordi der allerede findes boks-data på denne enhed. Luk appen og genstart — startskærmen leder dig til oplåsningsforløbet.",
+        "title": "Boks findes allerede"
+      },
+      "vaultBusyAuth": {
+        "body": "En anden boks-handling er i gang. Prøv igen om et øjeblik.",
+        "title": "Boks optaget"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Annullér",
+        "message": "Hvis du lukker, kasseres din gendannelsessætning. Vil du lukke alligevel?",
+        "okLabel": "Luk alligevel",
+        "title": "Kassér oprettelse af boks?"
+      },
+      "genericError": {
+        "body": "Prøv igen.",
+        "title": "Noget gik galt"
+      }
+    },
+    "password": {
+      "back": "Tilbage",
+      "eyebrow": "Trin 1 af 4 — hovedadgangskode",
+      "heading": "Opret boks",
+      "helperLead": "Myne gemmer ikke din adgangskode eller gendannelsessætning.",
+      "submit": "Generér gendannelsessætning"
+    },
+    "phrase": {
+      "back": "Tilbage",
+      "continue": "Jeg har gemt dette — bekræft sætning",
+      "copy": "Kopiér",
+      "eyebrow": "Trin 2 af 4 — gendannelsessætning",
+      "heading": "Skriv disse 24 ord ned.",
+      "intro": "Denne sætning er sammen med din adgangskode den eneste måde at gendanne din boks på. Opbevar den offline — på papir, i en adgangskodemanager eller en hardware-wallet. Behandl den som kontanter.",
+      "reveal": "Vis sætning",
+      "saveAsFile": "Gem som fil"
+    },
+    "ready": {
+      "backUpNow": "Sikkerhedskopiér denne boks nu",
+      "backedUp": "Sikkerhedskopieret ✓",
+      "backingUp": "Sikkerhedskopierer…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Sikkerhedskopiering blev ikke fuldført — der blev ikke efterladt nogen fil. Du kan sikkerhedskopiere når som helst fra Indstillinger → Opbevaring.",
+      "backupFilterName": "Myne-sikkerhedskopi",
+      "body": "Myne skrev din boks til din mappe med programdata. Din hovedadgangskode og gendannelsessætning er den eneste vej tilbage — sørg for, at begge er gemt et sikkert sted.",
+      "decrypting": "Dekrypterer…",
+      "done": "Færdig",
+      "heading": "Din boks er klar.",
+      "showFolder": "Vis boksmappe"
+    },
+    "sessionLost": {
+      "startOver": "Start forfra"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Opret en anden boks",
+    "heading": "Vælg en boks",
+    "loading": "Indlæser dine bokse…",
+    "noneLoaded": "Ingen bokse kunne indlæses lige nu.",
+    "openedRelative": "åbnet {{rel}}",
+    "restoreFromBackup": "Gendan fra sikkerhedskopi",
+    "subline": "Du har mere end én boks på denne enhed. Vælg en at låse op.",
+    "vaultFallback": "Boks {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "Dette tager et øjeblik.",
+      "eyebrow": "GENDANNELSE · DEKRYPTERER",
+      "footerHint": "Hvis dette tager mere end 30 sekunder, så luk vinduet og prøv igen.",
+      "heading": "Dekrypterer din boks",
+      "subCaption": "Arbejder… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Gendannelse annulleret: boksen blev låst.",
+        "operationInProgress": "Handling i gang. Vent venligst.",
+        "unexpected": "Uventet fejl. Prøv igen.",
+        "weakPassword": "Den nye adgangskode skal være mindst 12 tegn."
+      },
+      "eyebrow": "Gendannelse · Ny adgangskode",
+      "helperBody": "Åbnet med din gendannelsessætning. Din gamle adgangskode virker ikke længere — angiv en ny hovedadgangskode nu.",
+      "helperEmphasis": "Din gendannelsessætning forbliver den samme.",
+      "submit": "Angiv ny adgangskode",
+      "title": "Angiv en ny hovedadgangskode"
+    },
+    "phrase": {
+      "back": "← Tilbage",
+      "body": "Indtast din gendannelsessætning. 24 BIP-39-ord.",
+      "cellLabel": "Ord {{index}}",
+      "deleteLink": "Slet boksen og start forfra",
+      "eyebrow": "Gendannelse",
+      "submit": "Lås op",
+      "title": "Gendan din boks."
+    },
+    "select": {
+      "accountInvalid": "Ugyldigt kontonummer. Tjek det, og prøv igen.",
+      "accountLabel": "Kontonummer (valgfrit)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (valgfrit)",
+      "body": "Vælg den boks, du vil gendanne med din gendannelsessætning på 24 ord. Du kan også skrive dit kontonummer for at springe direkte til den.",
+      "cancel": "Annullér",
+      "checking": "Tjekker…",
+      "loadFailed": "Ingen bokse kunne indlæses lige nu.",
+      "loading": "Indlæser dine bokse…",
+      "openedRelative": "åbnet {{rel}}",
+      "or": "eller",
+      "title": "Vælg en boks at gendanne",
+      "useAccountNumber": "Brug kontonummer",
+      "vaultFallback": "Boks {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Boks",
+    "createAnother": "Opret en anden boks",
+    "switchVaultLabel": "Skift boks",
+    "switching": "skifter…",
+    "vaultFallback": "Boks {{n}}"
+  },
+  "welcome": {
+    "createCta": "Opret ny boks",
+    "headlineLine1": "Krypterede markdown-noter.",
+    "headlineLine2": "Ingen e-mail ved tilmelding.",
+    "repairResidue": {
+      "cancel": "Annullér",
+      "cleanUp": "Ryd op",
+      "cleaningUp": "Rydder op…",
+      "confirmBody_one": "{{count}} fil bliver fjernet. De er allerede ulæselige; intet, der kan gendannes, går tabt.",
+      "confirmBody_other": "{{count}} filer bliver fjernet. De er allerede ulæselige; intet, der kan gendannes, går tabt.",
+      "confirmTitle": "Ryd op i tiloversblevne filer?",
+      "doneBody_one": "Fjernede {{count}} tiloversbleven fil. Du kan oprette en ny boks nu.",
+      "doneBody_other": "Fjernede {{count}} tiloversblevne filer. Du kan oprette en ny boks nu.",
+      "doneTitle": "Ryddet op",
+      "errorBody": "Noget gik galt. Luk appen, og prøv igen.",
+      "errorTitle": "Oprydning mislykkedes",
+      "foundBody_one": "{{count}} tiloversbleven fil fra en tidligere sletning, der ikke blev færdig. De er allerede ulæselige — du mister ikke noget, der kan gendannes.",
+      "foundBody_other": "{{count}} tiloversblevne filer fra en tidligere sletning, der ikke blev færdig. De er allerede ulæselige — du mister ikke noget, der kan gendannes.",
+      "foundTitle": "Tiloversblevne filer fra en ufuldstændig sletning",
+      "partialBody_one": "{{count}} fil kan være låst af en anden app (antivirus, filsynkronisering eller søgeindeksering). Luk appen og prøv igen om et øjeblik, eller fjern boksmappen manuelt.",
+      "partialBody_other": "{{count}} filer kan være låst af en anden app (antivirus, filsynkronisering eller søgeindeksering). Luk appen og prøv igen om et øjeblik, eller fjern boksmappen manuelt.",
+      "partialTitle": "Nogle filer kunne ikke fjernes"
+    },
+    "restoreCta": "Gendan fra sikkerhedskopi",
+    "subtitle": "Dine noter krypteres på denne enhed, før de forlader den. Serveren gemmer kun chiffertekst."
+  }
+}

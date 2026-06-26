@@ -124,7 +124,9 @@ pub struct ImportedAttachment {
 
 /// Lowercase-hex-encode a byte slice (no separators). Used for the
 /// on-disk attachment filename + the catalog key + the IPC id string.
-fn hex_encode(bytes: &[u8]) -> String {
+/// `pub(crate)` for cross-module reuse (e.g. `text_cache` for the
+/// `attachments-text/<id-hex>` cache path), mirroring `hex_decode_id`.
+pub(crate) fn hex_encode(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
         s.push(char::from_digit((b >> 4) as u32, 16).expect("high nibble < 16"));
@@ -354,6 +356,12 @@ pub(crate) async fn attachment_import_with_dir(
     let attachments_dir = vault_dir.join("attachments");
     let blob_path = attachments_dir.join(&id_hex);
     let content_type_owned = content_type.to_string();
+    // MYND-328: eager text extraction → MYE1 cache, done on the same blocking
+    // thread (extraction is CPU work) right after the source blob lands. Derive
+    // the attachment-text KEK + clone the inputs the closure needs.
+    let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+    let filename_for_extract = filename.clone();
+    let vault_dir_for_cache = vault_dir.to_path_buf();
     let join = tokio::task::spawn_blocking(move || -> Result<(), AttachmentImportError> {
         let blob = encode_attachment_blob(
             &items_key,
@@ -369,10 +377,37 @@ pub(crate) async fn attachment_import_with_dir(
         // benign already-stored, not an error).
         std::fs::create_dir_all(&attachments_dir)?;
         match crate::atomic_write::atomic_write(&blob_path, &blob, /* replace = */ false) {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-            Err(e) => Err(AttachmentImportError::from(e)),
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(AttachmentImportError::from(e)),
         }
+
+        // MYND-328: extract text from the (still-in-scope) plaintext and cache
+        // it under MYE1. Best-effort + non-fatal — a failed extraction or cache
+        // write must never fail the import; the lazy backfill (search rebuild)
+        // retries. Unsupported formats (e.g. images) are NOT cached — their
+        // O(1) dispatch is cheap to repeat and a cache blob per image is waste.
+        let extracted = crate::plugins::attachments::extract::extract(
+            &content_type_owned,
+            &filename_for_extract,
+            &file_bytes,
+        );
+        if extracted.status != crate::plugins::attachments::extract::ExtractStatus::Unsupported
+            && crate::plugins::attachments::text_cache::write_extracted(
+                &vault_dir_for_cache,
+                &attachment_text_key,
+                &account_number_hash,
+                &attachment_id,
+                &extracted,
+            )
+            .is_err()
+        {
+            tracing::debug!(
+                stage = "text_cache_write",
+                "MYE1 cache write failed (non-fatal; lazy backfill retries)"
+            );
+        }
+        Ok(())
     })
     .await;
     match join {
@@ -1017,6 +1052,20 @@ pub(crate) async fn attachment_delete_with_dir(
         }
     }
 
+    // MYND-328: remove the extracted-text cache blob too. It holds plaintext-
+    // derived text under a `root_key` subkey (NOT the erased per-attachment
+    // key), so leaving it behind is decryptable residue of a deleted file —
+    // delete it for cryptographic-erase parity with the MYA1 source (§9.15.4).
+    if let Err(e) = super::text_cache::remove_extracted(vault_dir, &attachment_id) {
+        tracing::error!(
+            stage = "text_cache_unlink",
+            error_kind = "Io",
+            io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+            "attachment_delete extracted-text cache unlink failed"
+        );
+        return Err(AttachmentDeleteError::from(e));
+    }
+
     // Rewrite the catalog only if we actually removed an entry — avoids a
     // pointless disk write (and a nonce churn) on an already-absent id.
     if was_present {
@@ -1408,6 +1457,108 @@ mod tests {
         seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let state = unlocked_state().await;
         (tmp, state)
+    }
+
+    // ---- eager text extraction → MYE1 cache (MYND-328, Task 5) ----------
+
+    #[test]
+    fn import_eagerly_caches_extracted_text() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"searchable attachment body alpha".to_vec(),
+                    filename: Some("note.txt".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+
+            let id = hex_decode_id(&imported.id).expect("valid id");
+            let key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentTextKey);
+            let cached = crate::plugins::attachments::text_cache::read_extracted(
+                tmp.path(),
+                &key,
+                &[SEED_ACCOUNT_HASH; 16],
+                &id,
+            )
+            .expect("MYE1 cache written at import");
+            assert_eq!(
+                cached.status,
+                crate::plugins::attachments::extract::ExtractStatus::Ok
+            );
+            assert!(cached.text.contains("searchable attachment body alpha"));
+        });
+    }
+
+    #[test]
+    fn import_unsupported_writes_no_text_cache() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            // Opaque bytes + an unsupported extension → octet-stream + Unsupported
+            // → no cache blob (images/binaries are not text-cached).
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"\x00\x01\x02 binary blob".to_vec(),
+                    filename: Some("thing.bin".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+
+            let id = hex_decode_id(&imported.id).expect("valid id");
+            assert!(
+                !crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
+                "no MYE1 cache blob for an unsupported attachment"
+            );
+        });
+    }
+
+    #[test]
+    fn delete_removes_the_extracted_text_cache() {
+        // MYND-328 Task 8: permanent delete erases the MYE1 cache (crypto-erase
+        // parity with the MYA1 source).
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"deletable searchable text body".to_vec(),
+                    filename: Some("d.txt".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+            let id = hex_decode_id(&imported.id).expect("valid id");
+            let key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentTextKey);
+
+            // Cache present after the eager import...
+            assert!(
+                crate::plugins::attachments::text_cache::read_extracted(
+                    tmp.path(),
+                    &key,
+                    &[SEED_ACCOUNT_HASH; 16],
+                    &id,
+                )
+                .is_some(),
+                "import eager-cached the text"
+            );
+
+            attachment_delete_with_dir(tmp.path(), &state, imported.id.clone())
+                .await
+                .expect("delete succeeds");
+
+            // ...and gone after delete.
+            assert!(
+                !crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
+                "delete removed the MYE1 cache blob"
+            );
+        });
     }
 
     // ---- hex round-trip ------------------------------------------------

@@ -340,6 +340,21 @@ pub struct PrefsView {
     #[serde(default)]
     pub active_workspace: Option<alloc::string::String>,
 
+    /// User toggle that disables the note-archive feature (archive-disable,
+    /// MYND-…). `None` ≡ unset → the host applies the default-OFF policy
+    /// (archiving enabled — the pre-feature behaviour). Omitted entirely from
+    /// the canonical JSON when `None`, so a vault that never touched the toggle
+    /// is byte-identical to a pre-feature `vault.prefs` (existing golden vectors
+    /// unaffected — migration-less additive field on `MYP1`, the
+    /// `editor_line_numbers` precedent class). **Non-load-bearing** (a tampered /
+    /// replayed value can at worst show or hide the archive entry points; the
+    /// underlying `archived:` frontmatter surgery is untouched) — no
+    /// protective-envelope clamp. Canonical key `archive_disabled` — sorts after
+    /// `active_workspace` (`ac` < `ar`), before `auto_lock_seconds`
+    /// (`ar` < `au`).
+    #[serde(default)]
+    pub archive_disabled: Option<bool>,
+
     /// Editor three-pane layout (sidebar widths + collapsed flags,
     /// MYND-137). `None` = the user never customized the layout → the
     /// field is omitted entirely from the canonical JSON, so a vault
@@ -590,6 +605,30 @@ pub struct PrefsView {
     #[serde(default)]
     pub spell_languages: Vec<String>,
 
+    /// Browser-clipper paired-extension records (MYND-443,
+    /// `ext-foundation-handoff` task 7) — the on-disk projection of the
+    /// pairing-token registry (issued + revoked tokens, each bound to an exact
+    /// extension ID). Persisted here as a nested array of canonical
+    /// [`crate::paired_extension::PairedExtension`] objects so pairing survives a
+    /// desktop restart and a revocation stays durable (`decisions.md` 2026-06-20
+    /// "Browser-clipper pairing-token persistence: encrypted prefs-family blob").
+    /// **Authored/declarative state**, not derived — it rides the existing prefs
+    /// AEAD envelope (no new magic, no new KEK role, zero new crypto), the
+    /// `saved_views` precedent class. Default empty; **omitted entirely from the
+    /// canonical JSON when empty**, so a vault that never paired an extension is
+    /// byte-identical to a pre-MYND-443 `vault.prefs` (existing golden vectors
+    /// unaffected — migration-less additive field on `MYP1`). The array is encoded
+    /// sorted by `(extension_id, token_value)` (set-canonical). A
+    /// tampered/absent/replayed blob falls back to the empty registry → the
+    /// extension must re-pair, never a partial/injected grant (the token's scope
+    /// ceiling is structurally append-only host-side, so a replay can never widen
+    /// a grant; `threat-model.md` § 7 local-prefs-replay). AS-low correlation tags
+    /// (extension id + token value) — never logged. **Non-load-bearing** (no
+    /// protective-envelope clamp). Canonical key `paired_extensions` — sorts after
+    /// `last_backup_at` (`l` < `p`), before `saved_views` (`p` < `sav`).
+    #[serde(default)]
+    pub paired_extensions: Vec<crate::paired_extension::PairedExtension>,
+
     /// Saved-view definitions (MYND-273, Saved Views epic) — authored content
     /// (a hand-built filter / sort / group projection), persisted as a nested
     /// array of canonical [`crate::saved_view::SavedView`] objects. **Authored,
@@ -647,6 +686,7 @@ impl Default for PrefsView {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -658,6 +698,7 @@ impl Default for PrefsView {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -802,6 +843,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if let Some(ref slot) = prefs.active_workspace {
         out.extend_from_slice(b"\"active_workspace\":");
         push_json_string(&mut out, &slot.nfc().collect::<String>());
+        out.push(b',');
+    }
+
+    // archive_disabled (canonical key 'a', AFTER active_workspace
+    // ['ar' > 'ac'] and BEFORE auto_lock_seconds ['ar' < 'au']). A bool;
+    // omitted entirely when None so a vault that never touched the archive
+    // toggle is byte-identical to a pre-feature vault.prefs (preserves existing
+    // KAT vectors).
+    if let Some(on) = prefs.archive_disabled {
+        out.extend_from_slice(b"\"archive_disabled\":");
+        out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
     }
 
@@ -1046,6 +1098,19 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // paired_extensions (canonical key 'p' — after last_backup_at [l < p], before
+    // saved_views [p < sav]). A nested array of canonical PairedExtension objects,
+    // sorted by (extension_id, token_value) (MYND-443); omitted entirely when empty
+    // so a vault that never paired an extension is byte-identical to a pre-MYND-443
+    // vault.prefs (existing golden vectors unaffected).
+    if !prefs.paired_extensions.is_empty() {
+        out.extend_from_slice(b"\"paired_extensions\":");
+        out.extend_from_slice(
+            &crate::paired_extension::canonical_encode_paired_extensions(&prefs.paired_extensions),
+        );
+        out.push(b',');
+    }
+
     // saved_views (canonical key 'sav' — after last_backup_at, before
     // screen_capture_protection ['sav' < 'scr']). A nested array of canonical
     // SavedView objects, sorted by id (MYND-273); omitted entirely when empty so
@@ -1278,14 +1343,40 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         None => (None, stripped),
     };
 
-    // ---- auto_lock_seconds (optional, after active_workspace) ----
+    // ---- archive_disabled (optional, after active_workspace) ----
+    // Canonical key order is active_workspace < archive_disabled <
+    // auto_lock_seconds, so when present this field is a literal PREFIX of the
+    // post-active_workspace bytes — matched by `strip_prefix` rather than
+    // `find_subslice`, so a later folder name containing an
+    // `"archive_disabled":`-looking substring cannot fool it. The bool value
+    // MUST be followed by `,` — screen_capture_protection is mandatory and
+    // canonically last, so a further field always follows.
+    let archive_marker = b"\"archive_disabled\":";
+    let (archive_disabled, post_archive) = match post_active.strip_prefix(archive_marker) {
+        Some(after) => {
+            let (val, after_val) = if let Some(r) = after.strip_prefix(b"true") {
+                (true, r)
+            } else if let Some(r) = after.strip_prefix(b"false") {
+                (false, r)
+            } else {
+                return Err(PrefsBlobError::PlaintextParseFailed);
+            };
+            let rest = after_val
+                .strip_prefix(b",")
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            (Some(val), rest)
+        }
+        None => (None, post_active),
+    };
+
+    // ---- auto_lock_seconds (optional, after archive_disabled) ----
     // Canonical key order is auto_lock_seconds < deliberate_folders <
-    // screen_capture_protection (and after active_workspace), so when present
-    // this field is a literal PREFIX of the post-active_workspace bytes —
+    // screen_capture_protection (and after archive_disabled), so when present
+    // this field is a literal PREFIX of the post-archive_disabled bytes —
     // matched by `strip_prefix` rather than `find_subslice`, so a later folder
     // name containing a `"auto_lock_seconds":`-looking substring cannot fool it.
     let auto_marker = b"\"auto_lock_seconds\":";
-    let (auto_lock_seconds, rest) = match post_active.strip_prefix(auto_marker) {
+    let (auto_lock_seconds, rest) = match post_archive.strip_prefix(auto_marker) {
         Some(after) => {
             let (val, consumed) = parse_json_uint(after)?;
             // The integer MUST be followed by `,` — screen_capture_protection
@@ -1384,6 +1475,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // spec § 9.5.2 float ban (screen_capture_protection is mandatory and
     // canonically later, so a comma always follows a well-formed value).
     let last_backup_at = parse_optional_uint64_field(rest, &mut cursor, b"\"last_backup_at\":")?;
+    // paired_extensions (key 'p' — after last_backup_at [l < p], before
+    // saved_views [p < sav], MYND-443). A nested array of canonical
+    // PairedExtension objects; parsed from the same monotonic cursor so the
+    // following saved_views / screen_capture_protection finds are never fooled by
+    // a token value or extension id that literally contains a later marker text.
+    let paired_extensions =
+        parse_optional_paired_extensions_field(rest, &mut cursor, b"\"paired_extensions\":")?;
     // saved_views (key 'sav' — after last_backup_at, before
     // screen_capture_protection ['sav' < 'scr'], MYND-273). A nested array of
     // canonical SavedView objects; parsed from the same monotonic cursor so the
@@ -1456,6 +1554,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         item_order,
         keymap,
         active_workspace,
+        archive_disabled,
         editor_layout,
         editor_line_numbers,
         editor_content_width,
@@ -1468,6 +1567,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         theme,
         label,
         last_backup_at,
+        paired_extensions,
         spell_enabled,
         spell_languages,
         saved_views,
@@ -1497,6 +1597,35 @@ fn parse_optional_saved_views_field(
                 .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
             *cursor = val_start + consumed;
             Ok(views)
+        }
+        None => Ok(Vec::new()),
+    }
+}
+
+/// Parse the OPTIONAL `paired_extensions` nested-array-of-objects field
+/// (MYND-443), searching `rest` from `*cursor` onward. On a hit, decodes the
+/// canonical [`crate::paired_extension::PairedExtension`] array via
+/// [`crate::paired_extension::parse_paired_extensions_array`] and advances
+/// `*cursor` past the closing `]`; on a miss returns an empty `Vec` and leaves
+/// `*cursor` unchanged. A malformed array (a record that fails to decode, or a
+/// non-array value) collapses to [`PrefsBlobError::PlaintextParseFailed`] (the
+/// caller falls back to defaults — an empty registry → the extension re-pairs,
+/// § 9.5.5). The monotonic cursor keeps the canonical key-order discipline: the
+/// following `saved_views` / `screen_capture_protection` finds never match
+/// inside a record's content.
+fn parse_optional_paired_extensions_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Vec<crate::paired_extension::PairedExtension>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (records, consumed) =
+                crate::paired_extension::parse_paired_extensions_array(&rest[val_start..])
+                    .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = val_start + consumed;
+            Ok(records)
         }
         None => Ok(Vec::new()),
     }
@@ -2160,6 +2289,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -2171,6 +2301,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -2199,6 +2330,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -2210,6 +2342,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -2361,6 +2494,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -2372,6 +2506,7 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 saved_views: Vec::new(),
@@ -2402,6 +2537,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -2413,6 +2549,7 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 saved_views: Vec::new(),
@@ -2757,6 +2894,86 @@ mod tests {
         }
     }
 
+    // ---- archive_disabled (archive-disable, MYND-…) --------------------
+
+    #[test]
+    fn encode_omits_archive_disabled_when_none_byte_identical_to_pre_feature() {
+        // A vault that never touched the archive toggle encodes byte-identically
+        // to the bare pre-feature form (migration-less additive field — existing
+        // golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView {
+            archive_disabled: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_archive_disabled_between_active_workspace_and_auto_lock() {
+        // Canonical key order: active_workspace < archive_disabled <
+        // auto_lock_seconds (`ac` < `ar` < `au`).
+        let on = canonical_json_encode(&PrefsView {
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            on.as_slice(),
+            br#"{"archive_disabled":true,"screen_capture_protection":true}"#,
+        );
+        // The non-default `false` is persisted explicitly (Some(false) != None).
+        let off = canonical_json_encode(&PrefsView {
+            archive_disabled: Some(false),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            off.as_slice(),
+            br#"{"archive_disabled":false,"screen_capture_protection":true}"#,
+        );
+        // With active_workspace + auto_lock_seconds present, the new key sorts
+        // strictly between them.
+        let with_neighbors = canonical_json_encode(&PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-1")),
+            archive_disabled: Some(true),
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        });
+        let s = core::str::from_utf8(&with_neighbors).unwrap();
+        let aw = s.find("active_workspace").unwrap();
+        let ar = s.find("archive_disabled").unwrap();
+        let al = s.find("auto_lock_seconds").unwrap();
+        assert!(aw < ar && ar < al, "canonical order: {s}");
+    }
+
+    #[test]
+    fn archive_disabled_round_trips_through_decode() {
+        for value in [Some(true), Some(false), None] {
+            let original = PrefsView {
+                archive_disabled: value,
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded, original);
+            assert_eq!(decoded.archive_disabled, value);
+        }
+    }
+
+    #[test]
+    fn archive_disabled_round_trips_alongside_neighbors() {
+        // Exercise the strip_prefix decode path with both canonical neighbors
+        // present, so a regression in the post_active → post_archive threading
+        // (e.g. auto_lock_seconds stripping from the wrong slice) is caught.
+        let original = PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-1")),
+            archive_disabled: Some(true),
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
     // ---- active_workspace (MYND-308) -----------------------------------
 
     #[test]
@@ -2943,6 +3160,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -2957,6 +3175,7 @@ mod tests {
     fn last_backup_at_round_trips_through_decode() {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -2972,6 +3191,7 @@ mod tests {
         // survive (no silent truncation).
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -3045,6 +3265,7 @@ mod tests {
             editor_line_numbers: None,
             theme: Some(ThemeChoice::Dark),
             active_workspace: None,
+            archive_disabled: None,
             editor_content_width: None,
             editor_default_view_mode: None,
             editor_focus_dim_inactive: None,
@@ -3054,6 +3275,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3181,6 +3403,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            paired_extensions: Vec::new(),
             spell_enabled: Some(true),
             spell_languages: alloc::vec![String::from("en-US"), String::from("tr")],
             ..PrefsView::default()
@@ -3226,6 +3449,7 @@ mod tests {
     #[test]
     fn spell_enabled_false_round_trips() {
         let original = PrefsView {
+            paired_extensions: Vec::new(),
             spell_enabled: Some(false),
             ..PrefsView::default()
         };
@@ -3315,6 +3539,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3326,6 +3551,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3361,6 +3587,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3372,6 +3599,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3405,6 +3633,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3416,6 +3645,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3448,6 +3678,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3459,6 +3690,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3554,6 +3786,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3565,6 +3798,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3625,6 +3859,7 @@ mod tests {
                 alloc::string::String::from("n2"),
             ],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3636,6 +3871,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3675,6 +3911,7 @@ mod tests {
                 alloc::string::String::from("zzz"),
             ],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3686,6 +3923,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3760,6 +3998,7 @@ mod tests {
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
             ],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3771,6 +4010,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3821,6 +4061,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3832,6 +4073,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3882,6 +4124,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3893,6 +4136,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3925,6 +4169,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3936,6 +4181,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -3970,6 +4216,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -3981,6 +4228,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -4083,6 +4331,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4094,6 +4343,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -4170,6 +4420,7 @@ mod tests {
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: Some(sample_layout()),
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4181,6 +4432,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -4447,6 +4699,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4458,6 +4711,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -4494,6 +4748,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4505,6 +4760,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -4802,6 +5058,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -4813,6 +5070,7 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 saved_views: Vec::new(),
@@ -4842,6 +5100,7 @@ mod tests {
                 daily_folder: None,
                 daily_template: None,
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -4853,6 +5112,7 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 saved_views: Vec::new(),
@@ -4896,6 +5156,7 @@ mod tests {
             active_workspace: Some(alloc::string::String::from(
                 "0190a000-0000-7000-8000-0000000000ff",
             )),
+            archive_disabled: None,
             editor_layout: Some(EditorLayout {
                 left_width: 312,
                 right_width: 288,
@@ -4912,6 +5173,7 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             saved_views: Vec::new(),
@@ -5294,6 +5556,159 @@ mod tests {
             .expect("write label prefs vectors dump");
     }
 
+    /// Generator for the `paired_extensions` vector pair (appended to the
+    /// companion repo's `vault-prefs` family; per-feature generator, keeps the
+    /// originals byte-stable):
+    ///
+    /// `cargo test -p protocol --lib emit_paired_extensions_prefs_vectors -- --ignored`
+    ///
+    /// Pins the MYND-443 browser-clipper pairing-token persistence + the
+    /// MYND-442 `paired_at` additive field (`docs/decisions.md` 2026-06-21):
+    ///
+    /// - `encrypt-paired-extensions`: a `PrefsView` carrying a two-record
+    ///   `paired_extensions` array — one record WITHOUT `paired_at` (the
+    ///   pre-feature, byte-identical encoding; `revoked: true`) and one WITH
+    ///   `paired_at` (`revoked: false`). Pins (a) the canonical record key
+    ///   order `extension_id < paired_at < revoked < token_value` with
+    ///   `paired_at` emitted as a bare decimal u64 in its canonical slot, (b)
+    ///   the omitted-when-`None` rule (record 1 is identical to a pre-MYND-442
+    ///   record), (c) the array sort by `(extension_id, token_value)` — the
+    ///   records are constructed out of sort order here so the encoder's sort
+    ///   is load-bearing — and (d) the `paired_extensions` (p) < `screen_
+    ///   capture_protection` (s) field order on `PrefsView`.
+    /// - `decrypt-paired-extensions`: round-trip of the blob above; decoders
+    ///   must surface both records, including the `paired_at` on record 2 and
+    ///   its absence (`None`) on record 1.
+    ///
+    /// Nonce `0xB1` is the next free entry in the family's nonce registry
+    /// (0x77–0xF5 partially taken; 0xB1/0xB2 free).
+    #[test]
+    #[ignore]
+    fn emit_paired_extensions_prefs_vectors() {
+        extern crate std;
+        use crate::paired_extension::PairedExtension;
+
+        // Same fixed vault-A inputs as the sibling generators.
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce_paired: [u8; AEAD_NONCE_LEN] = [0xB1; AEAD_NONCE_LEN];
+
+        // 64-hex token values (hex of 32 CSPRNG bytes); fixed test patterns.
+        let token_a =
+            String::from("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let token_b =
+            String::from("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        // Constructed OUT of canonical sort order (Firefox record first) so the
+        // encoder's `(extension_id, token_value)` sort is exercised: the Chrome
+        // record (`abcd…` < `clipper@…`) must lead in the emitted bytes.
+        let prefs_paired = PrefsView {
+            paired_extensions: alloc::vec![
+                PairedExtension {
+                    extension_id: String::from("clipper@myne.md"),
+                    token_value: token_a.clone(),
+                    revoked: false,
+                    paired_at: Some(1_750_000_000),
+                },
+                PairedExtension {
+                    extension_id: String::from("abcdefghijklmnopabcdefghijklmnop"),
+                    token_value: token_b.clone(),
+                    revoked: true,
+                    paired_at: None,
+                },
+            ],
+            ..PrefsView::default()
+        };
+        let canonical_paired = canonical_json_encode(&prefs_paired);
+        // The Chrome record (no `paired_at`, `revoked:true`) leads; the Firefox
+        // record carries `paired_at` in its canonical slot between extension_id
+        // and revoked. `paired_extensions` (p) sorts before screen_capture (s).
+        assert_eq!(
+            core::str::from_utf8(&canonical_paired).unwrap(),
+            "{\"paired_extensions\":[\
+{\"extension_id\":\"abcdefghijklmnopabcdefghijklmnop\",\"revoked\":true,\
+\"token_value\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\
+{\"extension_id\":\"clipper@myne.md\",\"paired_at\":1750000000,\"revoked\":false,\
+\"token_value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}\
+],\"screen_capture_protection\":true}",
+            "paired_at omitted on record 1, present (bare u64) on record 2; array sorted; p<s",
+        );
+        let blob_paired =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_paired, &nonce_paired)
+                .expect("encode paired");
+        // Round-trip: decoder surfaces both records incl. the paired_at split.
+        let decoded_paired =
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_paired).expect("decode");
+        assert_eq!(decoded_paired.paired_extensions.len(), 2);
+        // Decoded order follows the canonical (sorted) bytes: Chrome then Firefox.
+        assert_eq!(decoded_paired.paired_extensions[0].paired_at, None);
+        assert_eq!(
+            decoded_paired.paired_extensions[1].paired_at,
+            Some(1_750_000_000)
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin paired_extensions prefs vectors---\n\n");
+
+        dump.push_str(
+            "# case 1/2: encrypt-paired-extensions (MYND-443/442; paired_at omitted|present; sort; p<s)\n",
+        );
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_paired)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical_paired).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!(
+            "prefs_nonce_hex: {}\n",
+            hex_lower(&nonce_paired)
+        ));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob_paired)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-paired-extensions (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!(
+            "input_blob_hex: {}\n",
+            hex_lower(&blob_paired)
+        ));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_paired)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"paired_extensions\": [ \
+{ \"extension_id\": \"abcdefghijklmnopabcdefghijklmnop\", \"revoked\": true, \"token_value\": \"bbbb…(64)\" }, \
+{ \"extension_id\": \"clipper@myne.md\", \"paired_at\": 1750000000, \"revoked\": false, \"token_value\": \"aaaa…(64)\" } \
+], \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str("---end paired_extensions prefs vectors---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_paired_extensions_vectors.txt",
+            dump.as_bytes(),
+        )
+        .expect("write paired_extensions prefs vectors dump");
+    }
+
     /// Generator for the AMOLED `theme` vector case (appended to the companion
     /// repo's `vault-prefs` family; per-feature generator, keeps the originals
     /// byte-stable):
@@ -5514,6 +5929,7 @@ mod tests {
         let prefs = PrefsView {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
+            paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -5673,6 +6089,99 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write line_numbers prefs vector dump");
+    }
+
+    /// Generator for the `archive_disabled` (archive-disable) vector cases —
+    /// appended to the companion repo's `vault-prefs` family (per-feature
+    /// generator, keeps the originals byte-stable — the
+    /// [`emit_line_numbers_prefs_vector`] pattern):
+    ///
+    /// `cargo test -p protocol --lib emit_archive_disabled_prefs_vector -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
+    /// optional archive-disable toggle (`archive_disabled: Some(true)` → canonical
+    /// `"archive_disabled":true`). Pins the bool encoding and its canonical key
+    /// slot (after `active_workspace`, before `auto_lock_seconds`) plus the
+    /// round-trip back through the decoder. Nonce `0xA7` is a free entry in the
+    /// family's nonce registry. Omit-when-`None` keeps an untouched vault
+    /// byte-identical to a pre-feature blob (no encrypt case needed for that —
+    /// `encrypt-default` already pins the bare form).
+    #[test]
+    #[ignore]
+    fn emit_archive_disabled_prefs_vector() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xA7; AEAD_NONCE_LEN];
+        let prefs = PrefsView {
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"archive_disabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "canonical plaintext must place archive_disabled before screen_capture_protection as a bare bool",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode archive_disabled");
+        // Round-trip self-validation.
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+        assert_eq!(decoded.archive_disabled, Some(true));
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin archive_disabled prefs vectors (archive-disable)---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-archive-disabled\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-archive-disabled (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!("input_blob_hex: {}\n", hex_lower(&blob)));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"archive_disabled\": true, \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str("---end archive_disabled prefs vectors---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_archive_disabled_vector.txt",
+            dump.as_bytes(),
+        )
+        .expect("write archive_disabled prefs vector dump");
     }
 
     /// Generator for the batch editor-prefs (MYND-308 / MYND-299 / MYND-348)
@@ -6388,5 +6897,122 @@ mod tests {
         // §9.5.5 fall-back-to-defaults yields an empty saved-views set.
         assert!(PrefsView::default().saved_views.is_empty());
         assert!(PrefsView::default().view_order.is_empty());
+    }
+
+    // ---- paired_extensions (MYND-443, browser-clipper pairing-token persistence) ----
+
+    fn sample_paired(
+        ext: &str,
+        tok: &str,
+        revoked: bool,
+    ) -> crate::paired_extension::PairedExtension {
+        crate::paired_extension::PairedExtension {
+            extension_id: String::from(ext),
+            token_value: String::from(tok),
+            revoked,
+            paired_at: None,
+        }
+    }
+
+    #[test]
+    fn paired_extensions_round_trip_through_blob() {
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let original = PrefsView {
+            paired_extensions: alloc::vec![
+                sample_paired("ext-a", "aa11", false),
+                sample_paired("ext-b", "bb22", true),
+            ],
+            ..PrefsView::default()
+        };
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &hash, &original, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded.paired_extensions.len(), 2);
+        // Encoded sorted by (extension_id, token_value): ext-a then ext-b.
+        assert_eq!(decoded.paired_extensions[0].extension_id, "ext-a");
+        assert!(!decoded.paired_extensions[0].revoked);
+        assert_eq!(decoded.paired_extensions[1].extension_id, "ext-b");
+        assert!(decoded.paired_extensions[1].revoked);
+    }
+
+    #[test]
+    fn empty_paired_extensions_is_byte_identical_to_pre_feature() {
+        // A vault that never paired an extension emits NO "paired_extensions"
+        // key, so it is byte-identical to a pre-MYND-443 vault.prefs (existing
+        // golden vectors unaffected — migration-less additive field).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert!(find_subslice(&encoded, b"paired_extensions").is_none());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn paired_extensions_canonical_key_position() {
+        // paired_extensions sorts after last_backup_at and before saved_views.
+        let original = PrefsView {
+            last_backup_at: Some(1_700_000_000),
+            paired_extensions: alloc::vec![sample_paired("e", "t", false)],
+            saved_views: alloc::vec![sample_view("v1", "A")],
+            ..PrefsView::default()
+        };
+        let s = String::from_utf8(canonical_json_encode(&original)).unwrap();
+        let lba = s.find("\"last_backup_at\":").unwrap();
+        let pe = s.find("\"paired_extensions\":").unwrap();
+        let sv = s.find("\"saved_views\":").unwrap();
+        assert!(lba < pe, "paired_extensions after last_backup_at");
+        assert!(pe < sv, "paired_extensions before saved_views");
+    }
+
+    #[test]
+    fn malformed_paired_extension_collapses_to_parse_failed() {
+        // A structurally-bad record (missing token_value) makes the whole prefs
+        // plaintext fail to parse — the caller falls back to the empty registry
+        // (§9.5.5), so the extension must re-pair (never a partial grant).
+        let bad = br#"{"paired_extensions":[{"extension_id":"x","revoked":false}],"screen_capture_protection":true}"#;
+        assert_eq!(
+            canonical_json_decode(bad),
+            Err(PrefsBlobError::PlaintextParseFailed)
+        );
+    }
+
+    #[test]
+    fn default_prefs_has_empty_paired_extensions() {
+        // §9.5.5 fall-back-to-defaults yields an empty paired-extensions set.
+        assert!(PrefsView::default().paired_extensions.is_empty());
+    }
+
+    #[test]
+    fn prefs_view_serde_serialization_omits_token_value() {
+        // H1 regression: `prefs_read` returns `PrefsView` to the WebView via
+        // serde. The bearer `token_value` must NEVER cross that IPC boundary
+        // (`#[serde(skip_serializing)]` on `PairedExtension.token_value`); a
+        // WebView that could read it would replay it to the 0600 relay and mint
+        // clips without the pairing dialog. The Settings UI gets ids/timestamps
+        // through the dedicated `pairing_list_paired` command, not `prefs_read`.
+        // (On-disk persistence is hand-rolled canonical JSON and is unaffected —
+        // `paired_extensions_round_trip_through_blob` covers that direction.)
+        let view = PrefsView {
+            paired_extensions: alloc::vec![sample_paired(
+                "ext-a",
+                "SECRET-bearer-token-must-not-leak",
+                false,
+            )],
+            ..PrefsView::default()
+        };
+        let json = serde_json::to_string(&view).expect("PrefsView serializes");
+        assert!(
+            !json.contains("token_value"),
+            "prefs_read JSON must not carry the token_value key: {json}"
+        );
+        assert!(
+            !json.contains("SECRET-bearer-token-must-not-leak"),
+            "prefs_read JSON must not carry the bearer secret value: {json}"
+        );
+        // We skip ONLY the bearer secret — the non-secret record fields still
+        // serialize (so this is a confinement fix, not a blanket field removal).
+        assert!(
+            json.contains("ext-a"),
+            "non-secret extension_id should still serialize: {json}"
+        );
     }
 }

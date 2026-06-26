@@ -8,9 +8,10 @@
 // discipline). Seeded exactly once, on the create→unlock path only — never
 // re-created on later unlocks.
 //
-// i18n: English only. No i18n layer exists in the client yet (the B17
-// translation consumer is deferred); when it lands the copy moves into the
-// string catalog and is localized at create-time from the detected locale.
+// i18n: the copy is resolved at SEED TIME via the i18n runtime (NOT frozen at
+// module load), so the Welcome note is authored in whatever language is active
+// when the vault is created. The title/body/markdown are getter FUNCTIONS for
+// exactly this reason — a module-scope const would capture the boot language.
 //
 // Auto-open without touching Editor.tsx: the editor restores its pane/tab
 // layout from the `vault.workspace` (MYW1) descriptor on mount. We write a
@@ -19,42 +20,44 @@
 // auto-select special case.
 
 import { patchTitleField } from "../dialect";
+import i18n from "../i18n";
 import { noteCreate } from "./createNote";
 import { emptyWorkspace, openInFocusedTab } from "./workspaceState";
 import { serializeWorkspace, workspaceWrite } from "../lib/workspace-persist";
 
 /** The sidebar/tab title. Notes derive their title from the frontmatter
  *  `title:` field ONLY — never a body `# H1` (loadNoteBatch.ts) — so the
- *  Welcome note must carry it in frontmatter or it renders as "Untitled". */
-export const WELCOME_NOTE_TITLE = "Welcome to Myne";
+ *  Welcome note must carry it in frontmatter or it renders as "Untitled".
+ *  Resolved at call time (reactive to the active language). */
+export function welcomeNoteTitle(): string {
+  return i18n.t("notes.welcome.title");
+}
 
 /** The Welcome note body (Markdown). No leading `# H1`: the title chip
- *  already shows "Welcome to Myne", so a duplicate heading would just be
- *  noise. The myne.md link is a bare URL on purpose — only bare URLs and
- *  `<angle>` autolinks are click-to-open in the editor (`[text](url)` links
- *  render but aren't clickable, autolink.ts). A friendly welcome, not a
- *  feature tour. */
-const WELCOME_NOTE_BODY = `Welcome to Myne, your private space to think and write.
-
-Everything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.
-
-This is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.
-
-We're glad you're here. To learn more about Myne, visit https://myne.md
-`;
+ *  already shows the title, so a duplicate heading would just be noise. The
+ *  myne.md link is a bare URL on purpose — only bare URLs and `<angle>`
+ *  autolinks are click-to-open in the editor (`[text](url)` links render but
+ *  aren't clickable, autolink.ts). A friendly welcome, not a feature tour.
+ *  Resolved at call time (reactive to the active language). */
+export function welcomeNoteBody(): string {
+  return i18n.t("notes.welcome.body");
+}
 
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder();
 
 /**
  * Full note plaintext: a frontmatter `title:` block (so the sidebar/tab
- * shows "Welcome to Myne", not "Untitled") followed by the Markdown body.
- * Built via the canonical dialect helper so quoting/format match every
- * other Myne-written note.
+ * shows the title, not "Untitled") followed by the Markdown body. Built via
+ * the canonical dialect helper so quoting/format match every other
+ * Myne-written note. A FUNCTION (not a const) so the copy reflects the active
+ * language at seed time rather than the boot language.
  */
-export const WELCOME_NOTE_MARKDOWN = utf8Decoder.decode(
-  patchTitleField(utf8Encoder.encode(WELCOME_NOTE_BODY), WELCOME_NOTE_TITLE),
-);
+export function welcomeNoteMarkdown(): string {
+  return utf8Decoder.decode(
+    patchTitleField(utf8Encoder.encode(welcomeNoteBody()), welcomeNoteTitle()),
+  );
+}
 
 /**
  * Best-effort: create the Welcome note and pre-seed the workspace so the
@@ -64,7 +67,7 @@ export const WELCOME_NOTE_MARKDOWN = utf8Decoder.decode(
  */
 export async function seedWelcomeNote(): Promise<void> {
   try {
-    const noteId = await noteCreate(WELCOME_NOTE_MARKDOWN);
+    const noteId = await noteCreate(welcomeNoteMarkdown());
     // One pane, the Welcome note as its single active+focused tab — the
     // same shape the restore path produces, so it opens with no Editor.tsx
     // changes.

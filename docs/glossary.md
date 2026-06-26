@@ -168,6 +168,10 @@ The Tauri command that writes one [attachment](#attachment)'s **decrypted** byte
 
 The editor representation of a non-renderable (generic) [attachment](#attachment) — a `.docx`, `.zip`, `.txt`, etc. stored as `application/octet-stream`. Unlike an inline image/PDF, the file's content is **never** previewed; the form-C embed `![[att:<id>|filename]]` renders as a compact atomic card showing a file-type icon, the [`vault.attachments`](#vaultattachments) filename (the single source of truth — `Rename` edits it globally via `attachment_rename`, not the per-embed alias), a "type · size" line (the type label is derived from the filename extension TS-side, since the catalog stores only `octet-stream`), and a "⋯" overflow menu: Export (→ [attachment_export](#attachment_export)), Rename, Remove from note, Reveal in library. "Using" the file means exporting it. A missing id renders the shared [deleted-attachment tombstone](#deleted-attachment-tombstone). Inline preview of other types (docx/pptx/xlsx/text) is the separate follow-up MYND-268. (MYND-173; `decisions.md` 2026-06-14)
 
+### **attachment text extraction** &nbsp; 📋 *Protocol*
+
+The on-device extraction of searchable text from an [attachment](#attachment)'s plaintext — PDF text-layer, Word (`.docx`) OOXML text, and text-like files (`.txt`/`.md`/`.csv`) in v0.1 — so a note becomes findable by the contents of the files embedded in it. Extraction runs entirely in the Rust core (no network, no cloud OCR — `vision.md` zero-knowledge), is cached per attachment in an [`MYE1`](#mye1) blob keyed by [attachment-id](#attachment-id), and is folded into the [search index](#mys1) against each embedding note (the `MYS1` snapshot records the [extractor version](#extractor-version) it was built under — a change forces a rebuild; the codec's `index_format_version` byte is unchanged, the fold rides the engine-opaque inner snapshot). Image OCR + scanned (text-layer-less) PDFs are out of scope for v0.1, deferred to MYND-441, which reuses the same cache by bumping the [extractor version](#extractor-version). (`spec/protocol.md` §9.15; MYND-328)
+
 ### **auto-lock on idle** &nbsp; 📦 *Product*
 
 A security control that locks the vault after a period of device inactivity, bounding the exposure window of an unattended unlocked Myne (`threat-model.md` A6). A backend-authoritative, fail-closed idle timer fires at a configurable timeout; the lock has two legs — (1) unconditional in-memory key zeroize ("no further notes decryptable"), and (2) best-effort teardown of the decrypted open note (a synchronous OS-level window hide plus a WebView reload). **"Idle" means machine-level** device idle (no input to the whole machine, not merely the Myne window), read per-platform (`GetLastInputInfo` / `CGEventSourceSecondsSinceLastEventType` / `XScreenSaverQueryInfo`); on Wayland, where no portable OS-idle API exists, it falls back to window-level idle as a fail-secure (more-eager) degradation. The timeout preference lives in the encrypted `vault.prefs` blob (`auto_lock_seconds`); the protection itself is always on (see **AUTO_LOCK_CEILING**). Moves A6 from ❌ Out-of-scope to 🔒 Mitigated — deliberately not a 🛡️ Strong guarantee, since freed-page RAM, swap, and hibernation are not scrubbed (A7/A10).
@@ -206,6 +210,12 @@ Links between notes that are queryable from both endpoints — opening a note sh
 
 Used in: `vision.md` Phase 1 Scope
 
+### **bookmark note** &nbsp; 📦 *Product*
+
+A content-light `.myn` note created by the [browser clipper](#browser-clipper) holding a source URL (bare autolink) + title + `source:` / `clipped:` frontmatter; no page body. Participates in tags / backlinks / graph / saved views as an ordinary note. Re-clipping a URL creates an independent note (no dedup detection in v1).
+
+Used in: `browser-extension` epic, MYND-447
+
 ### **BIP-39** &nbsp; 🏗️ *Construction* (deep entry, *Myne-divergent*)
 
 *(Aliases: mnemonic phrase encoding. Myne-divergent: yes — encoding only.)*
@@ -240,6 +250,14 @@ A modern hash function and KDF with strong parallelism characteristics. **Not us
 Used in: `decisions.md` (Deferred #2 rationale)
 Reference: https://github.com/C2SP/C2SP/blob/main/BLAKE3.md
 
+### **browser clipper** &nbsp; 📦 *Product*
+
+*(Alias: clipper extension.)*
+
+Myne's **keyless** browser extension (`browser-extension` epic, MYND-442) that captures a web article / selection or a page URL, converts it to **markdown in the page**, and hands it to the desktop core over a [native-messaging host](#native-messaging-host) bridge to be encrypted into the vault. The desktop — not the extension — canonicalizes that markdown to exact [D1](#myne-markdown-dialect-d1) via the [clip serializer](#clip-serializer) (MYND-444: dialect-emit dependencies stay out of the hostile browser runtime, a TB10 boundary property). Holds no key; runs outside TB2; saves to the vault root with no capture-time folder/tag selection; never reads or decrypts the vault. Ships in the separate `myne-clipper` companion repo.
+
+Used in: `browser-extension` epic, MYND-442
+
 ### **bug bounty** &nbsp; 🛠️ *Tooling*
 
 A public-facing page listing known security reports and their resolution status, plus a mechanism to receive new reports. Cash payouts are not required at v0.1; acknowledgment-only is acceptable per the compensating-controls plan in `threat-model.md` §6.
@@ -264,6 +282,18 @@ Reference: RFC 8439.
 A single keyboard-shortcut combination, e.g. `Mod-Shift-g` (hotkeys epic, MYND-304). Myne's canonical chord string is CodeMirror-`KeyBinding.key`-compatible: a `-`-separated sequence of modifier tokens followed by one logical key, using the cross-platform `Mod` token (Cmd on macOS, Ctrl elsewhere) and the layout-respecting *logical* key (what the user sees on the key, not the physical `code`); single-character keys are lowercased. Stored NFC-normalized inside `vault.prefs` (the `keymap` field). See **keymap**, **key binding**.
 
 Used in: `spec/protocol.md` §9.5.2
+
+### **clip** &nbsp; 📦 *Product*
+
+A captured web article or selection written into the vault as an ordinary [`.myn`](#myn-file) note by the [browser clipper](#browser-clipper). Authored content emitted as canonical [D1](#myne-markdown-dialect-d1) by the [clip serializer](#clip-serializer); images imported as [`MYA1`](#mya1) attachments; saved to the vault root.
+
+### **clip serializer** &nbsp; 🛠️ *Tooling*
+
+*(Alias: D1 clip serializer.)*
+
+The desktop-side `@lezer/markdown`-tree → canonical-D1 emitter that normalizes a clip's Defuddle-produced markdown to Myne's exact dialect — the **first markdown serializer in the codebase** (the dialect layer was previously parse-and-project only). Faithful tables / code / math with safe-degrade (never emits broken markdown).
+
+Used in: MYND-444
 
 ### **code-signed releases** &nbsp; 🛠️ *Tooling*
 
@@ -515,6 +545,13 @@ Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 20
 A **self-host-only** operator flag (`MYNE_EXTENDED_RETENTION`) that disables the server's Layer-2 ciphertext reclamation, so deleted blobs are kept past the [tombstone horizon](#tombstone-horizon). A documented, deliberate **policy deviation**, never a default: it **weakens the user's "delete means gone" expectation** and the §6 operator obligation not to retain deleted ciphertext past the horizon. Hosted MUST NOT enable it. The structural guarantees (no plaintext, no required IP log) are unaffected — extended retention trades a retention-policy obligation, not a confidentiality guarantee. Phase 2.
 
 Used in: `self-host-policy.md` §4, `server-protocol.md` §6, `decisions.md` 2026-06-20 (MYND-438/440)
+### **extension pairing token** &nbsp; 🗝️ *Key/identifier*
+
+A scoped, revocable, **append-only** credential (create-clip + is-unlocked-status only — never a vault key) issued to the [browser clipper](#browser-clipper) after an in-app Accept/Reject + numeric-challenge handshake bound to the exact extension ID. Crossing [TB10](#native-messaging-host) requires it; a compromised token cannot read, modify, or delete notes. The short numeric code compared during this handshake is the **pairing challenge** (a.k.a. numeric challenge): a 6-digit nonce drawn from the core CSPRNG, shown identically in the in-app pairing dialog and the extension so the user confirms both endpoints share one pairing attempt — a human-comparison value, never a key. The registry of issued/revoked tokens persists encrypted at rest in the [vault.prefs](#vaultprefs) prefs-family blob (`decisions.md` 2026-06-20) so pairing survives a restart and revocation is durable.
+
+### **extractor version** &nbsp; 📋 *Protocol*
+
+The 1-byte generation tag (`extractor_version`) on an [`MYE1`](#mye1) extracted-text blob (`spec/protocol.md` §9.15.1), distinct from `protocol_version`: it identifies which [attachment text extraction](#attachment-text-extraction) generation produced the cached text. Because an [attachment-id](#attachment-id) is content-addressed (the bytes are immutable), cached text never needs re-extraction at a fixed `extractor_version`; a **bump** — a better extractor, or the future OCR layer (MYND-441) — invalidates older blobs and forces lazy re-extraction plus a search-index [rebuild](#fall-to-rebuild) (the index records the version it was built under, §9.6.4). Bound into the blob AAD as well as the header byte so a tampered header cannot be silently accepted. (MYND-328)
 
 ### **fall-to-rebuild** &nbsp; 📋 *Protocol*
 
@@ -762,6 +799,18 @@ is correctly spelled.
 
 Used in: `spec/protocol.md` §9.13; MYND-266.
 
+### **internationalization (i18n)** &nbsp; 🛠️ *Tooling*
+
+The desktop UI localization layer: `react-i18next` over bundled flat-per-namespace JSON **locale catalogs**, with **English** as the source language and per-key fallback. Catalogs ship inside the binary (no HTTP backend → no network egress for UI strings). Translated through self-hosted **Weblate**. Deliberately **excludes** load-bearing copy (`src/lib/load-bearing-copy.ts`) — those strings' exact wording is a privacy property and is E2E-pinned in English, so they render verbatim in every locale. Language is a device-local, pre-unlock preference (`localStorage` `myne.lang`), never `vault.prefs`.
+
+Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25; `src/i18n/`.
+
+### **locale catalog** &nbsp; 🛠️ *Tooling*
+
+A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; every other catalog is **Weblate**-managed and must not be hand-edited in the repo (that races Weblate). New keys are added by `pnpm i18n:extract` (`i18next-cli`).
+
+Used in: `docs/dev/i18n.md`; `locales/`.
+
 ### **KDF (Key Derivation Function)** &nbsp; 🏗️ *Construction*
 
 The generic class of functions that derive cryptographic keys from input keying material plus context. Myne uses two KDFs: Argon2id for password-stretching at vault unlock, HKDF-SHA-256 for fast subkey derivation post-unlock.
@@ -912,6 +961,10 @@ A non-repeating value used with a key in an encryption scheme. Myne nonces are 1
 
 Used in: `spec/protocol.md` §5.3
 
+### **native-messaging host** &nbsp; 📋 *Protocol*
+
+The small Rust stdio host in the Tauri core that receives a keyless clip handoff from the [browser clipper](#browser-clipper) and pipes it into the existing `note_create` / `attachment_import` pipeline. Allowlists the exact extension ID and treats every handed-off byte as hostile input (size caps, UTF-8 validation, no path traversal, re-sniffed MIME, rate limits). Defines trust boundary TB10.
+
 ### **note template** &nbsp; 📦 *Product*
 
 A reusable note skeleton the user picks at note-creation time. Stored as an ordinary AEAD-sealed [`.myn`](#myn-file) note carrying the value-strict Myne-managed `template:` flag (`spec/markdown-dialect.md` §3.6.1) — **not** a `vault.prefs` field, so it inherits the 16 MiB/note ceiling, per-note fault isolation, and a free [UUIDv7](#note_uuid) identity (rename-safe; the template's name is its `title:` field, its content is the note body). A note template is the inverse-visibility twin of [Trash](#trash): excluded from the sidebar file-tree, folder-tree, and search, surfaced **only** in the template picker and the management UI. Location-agnostic (no target-folder baked in) and minimal: no declared-variables field — the [template variable](#template-variable) engine infers `{{...}}` tokens from the body at fill time. Myne ships **none** — a fresh vault has zero templates (start-empty). See [markdown-dialect.md](spec/markdown-dialect.md) §3.6.1 (`template:` row), [decisions.md](decisions.md) 2026-06-07 (MYND-186).
@@ -953,6 +1006,10 @@ The 4-byte ASCII magic identifying a v0.1 [attachment](#attachment) blob (`spec/
 ### **MYC1** &nbsp; 📋 *Protocol*
 
 The 4-byte ASCII magic identifying the v0.1 [`vault.attachments`](#vaultattachments) catalog blob (`spec/protocol.md` §9.10), the authoritative per-attachment metadata store. A `MYP1`-style 34-byte envelope over canonical JSON; KEK `DeriveSubkey(root_key, "attachments-catalog-key")`. Registered in §10.3 with its v005-reserved sibling `MYC5`. The "C" is for *catalog* — chosen after the initial `MYI1` proposal collided with the already-reserved VaultIndices magic (`decisions.md` 2026-06-07).
+
+### **MYE1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying a v0.1 [extracted-attachment-text](#attachment-text-extraction) blob (`spec/protocol.md` §9.15), the per-attachment search-extraction cache at `attachments-text/<attachment-id-hex>`. A `MYS1`-style 34-byte envelope over a postcard payload; KEK `DeriveSubkey(root_key, "attachment-text-key")`, with the AAD additionally binding the [attachment-id](#attachment-id) and the [extractor version](#extractor-version). Like [`MYS1`](#mys1) it is a rebuildable cache — [fall to rebuild](#fall-to-rebuild) (here: re-extract from the source [`MYA1`](#mya1)) on any rejection rather than treating it as data loss. Registered in §10.3 with its v005-reserved sibling `MYE5`. The "E" is for *extracted*. Implementations MUST reject any candidate blob whose first four bytes are not `MYE1`. (MYND-328)
 
 ### **MYI1** &nbsp; 📋 *Protocol*
 
@@ -1535,9 +1592,9 @@ Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation sessio
 
 ### **vault head** &nbsp; 📋 *Protocol* (deep entry)
 
-The malicious-server hardening primitive for Phase 2 sync: a small, server-relayed, per-push record that commits the vault's current state under an HMAC-SHA-256 keyed by `DeriveSubkey(root_key, "vault-head-mac")` (§3.4). It commits a flat `SHA-256` of the canonical [vault-head manifest](#vault-head-manifest) (`uuid → content_nonce` of content blobs only — notes + attachments), a per-device [version vector](#version-vector-vv), and `prev_head_hash[]` parent links ([head_id](#head_id)s) forming a git-like hash-DAG, plus an auxiliary Lamport `seq`. Provides [fork-consistency](#fork-consistency): devices verify on pull that a new head **extends** their last-seen one (VV-dominance), and divergence surfaces on cross-read. The head is **wire-only** (no on-disk magic; the device-local last-seen baseline is the `MYH1` `vault.head-state` blob, `spec/protocol.md` §9.15). The server, lacking `root_key`, can only replay/withhold/reorder real heads, never forge one. **HMAC-not-signature**: single-user → all devices share `root_key` → a symmetric MAC suffices (no Ed25519, closed primitive set). Phase 2; full spec in `spec/sync-protocol.md`.
+The malicious-server hardening primitive for Phase 2 sync: a small, server-relayed, per-push record that commits the vault's current state under an HMAC-SHA-256 keyed by `DeriveSubkey(root_key, "vault-head-mac")` (§3.4). It commits a flat `SHA-256` of the canonical [vault-head manifest](#vault-head-manifest) (`uuid → content_nonce` of content blobs only — notes + attachments), a per-device [version vector](#version-vector-vv), and `prev_head_hash[]` parent links ([head_id](#head_id)s) forming a git-like hash-DAG, plus an auxiliary Lamport `seq`. Provides [fork-consistency](#fork-consistency): devices verify on pull that a new head **extends** their last-seen one (VV-dominance), and divergence surfaces on cross-read. The head is **wire-only** (no on-disk magic; the device-local last-seen baseline is the `MYH1` `vault.head-state` blob, `spec/protocol.md` §9.16). The server, lacking `root_key`, can only replay/withhold/reorder real heads, never forge one. **HMAC-not-signature**: single-user → all devices share `root_key` → a symmetric MAC suffices (no Ed25519, closed primitive set). Phase 2; full spec in `spec/sync-protocol.md`.
 
-Used in: `spec/sync-protocol.md`; `spec/protocol.md` §3.4, §9.15, §10.3; `threat-model.md` §7 (MYND-416)
+Used in: `spec/sync-protocol.md`; `spec/protocol.md` §3.4, §9.16, §10.3; `threat-model.md` §7 (MYND-416)
 
 ### **vault-head manifest** &nbsp; 📋 *Protocol*
 
@@ -1693,6 +1750,12 @@ Used in: `spec/markdown-dialect.md` §7; `dependency-policy.md`
 The `~x~` (subscript) and `^x^` (superscript) inline constructs, rendered with reduced-size, vertically-shifted typography (MYND-156, `.cm-sub` / `.cm-sup`). Use the pre-built `@lezer/markdown` Subscript/Superscript configs; single-run and space-free (Pandoc-style), disjoint from GFM strikethrough `~~…~~` and footnote `[^id]`. Recognize-and-render-only — never emitted; bytes preserved (§6 C1).
 
 Used in: `spec/markdown-dialect.md` §3.2
+
+### **Weblate** &nbsp; 🛠️ *Tooling*
+
+The self-hosted web translation platform at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only) that owns Myne's non-English **locale catalogs**. English source strings are authored in code and committed; Weblate reads the source, lets translators fill `tr`/`de`/`fr`, and flows translations back as commits to a dedicated push branch (merged via PR). File mask `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`.
+
+Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
 
 ### **wikilink** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 

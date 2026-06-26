@@ -9,6 +9,7 @@
 // budget threshold; falls back to dot/icon + tooltip).
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { formatRelativeTime, useTick } from "./relativeTime";
 import type { SaveStatus as SaveStatusValue } from "../useAutosave";
 
@@ -73,6 +74,7 @@ export type SaveStatusProps = {
 };
 
 export function SaveStatus({ status, onRetry }: SaveStatusProps) {
+  const { t } = useTranslation();
   // Subscribe to the shared 30s tick so "Saved · N min ago" auto-updates.
   useTick();
   // Ensure pulse keyframes are injected once into the document.
@@ -81,9 +83,14 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
   switch (status.status) {
     case "clean":
       return (
-        <span data-testid="editor.save-status" style={ROOT_STYLE} aria-label="Saved" title="Saved">
+        <span
+          data-testid="editor.save-status"
+          style={ROOT_STYLE}
+          aria-label={t("notes.saveStatus.saved")}
+          title={t("notes.saveStatus.saved")}
+        >
           <span style={DOT_BASE_STYLE} />
-          Saved
+          {t("notes.saveStatus.saved")}
         </span>
       );
 
@@ -92,19 +99,26 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
         <span
           data-testid="editor.save-status"
           style={ROOT_STYLE}
-          aria-label="Editing"
-          title="Editing — autosave is armed"
+          aria-label={t("notes.saveStatus.editing")}
+          title={t("notes.saveStatus.editingTitle")}
         >
           <span style={DOT_BASE_STYLE} />
-          Editing…
+          {t("notes.saveStatus.editingEllipsis")}
         </span>
       );
 
     case "saving":
       return (
-        <span data-testid="editor.save-status" style={ROOT_STYLE} aria-label="Saving" title="Saving…">
+        <span
+          data-testid="editor.save-status"
+          style={ROOT_STYLE}
+          aria-label={t("notes.saveStatus.saving")}
+          title={t("notes.saveStatus.savingEllipsis")}
+        >
           <span style={DOT_SAVING_STYLE} />
-          <span style={{ color: "var(--fg-1)" }}>Saving…</span>
+          <span style={{ color: "var(--fg-1)" }}>
+            {t("notes.saveStatus.savingEllipsis")}
+          </span>
         </span>
       );
 
@@ -114,12 +128,13 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
         <span
           data-testid="editor.save-status"
           style={ROOT_STYLE}
-          aria-label={`Saved ${rel}`}
-          title={`Saved ${rel}`}
+          aria-label={t("notes.saveStatus.savedRelative", { rel })}
+          title={t("notes.saveStatus.savedRelative", { rel })}
         >
           <span style={DOT_BASE_STYLE} />
-          Saved<span style={SEP_STYLE}>·</span>
-          {rel || "just now"}
+          {t("notes.saveStatus.saved")}
+          <span style={SEP_STYLE}>·</span>
+          {rel || t("notes.saveStatus.justNow")}
         </span>
       );
     }
@@ -129,16 +144,18 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
         <span
           data-testid="editor.save-status"
           style={{ ...ROOT_STYLE, color: "var(--warning)" }}
-          aria-label="Save failed"
-          title="Save failed — click Retry"
+          aria-label={t("notes.saveStatus.saveFailed")}
+          title={t("notes.saveStatus.saveFailedTitle")}
         >
           <span style={DOT_ERROR_STYLE} aria-hidden="true">
             ✕
           </span>
-          <span style={{ color: "var(--fg-1)" }}>Save failed</span>
+          <span style={{ color: "var(--fg-1)" }}>
+            {t("notes.saveStatus.saveFailed")}
+          </span>
           <span style={SEP_STYLE}>·</span>
           <button type="button" style={RETRY_BUTTON_STYLE} onClick={onRetry}>
-            Retry
+            {t("notes.saveStatus.retry")}
           </button>
         </span>
       );

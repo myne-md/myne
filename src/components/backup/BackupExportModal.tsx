@@ -11,6 +11,7 @@
 // counts. Cancel → `backup_cancel` (cooperative; partial output discarded).
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
@@ -70,6 +71,7 @@ export function BackupExportModal({
   onClose,
   onShowToast,
 }: BackupExportModalProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<ExportState>({
     step: "running",
     progress: null,
@@ -77,8 +79,8 @@ export function BackupExportModal({
   // The parent passes inline closures (unstable identities); routing them
   // through refs keeps the effect keyed on `open` alone — a parent
   // re-render mid-export must not tear down the progress subscription.
-  const callbacksRef = useRef({ onClose, onShowToast });
-  callbacksRef.current = { onClose, onShowToast };
+  const callbacksRef = useRef({ onClose, onShowToast, t });
+  callbacksRef.current = { onClose, onShowToast, t };
   // Once-per-open guard for the native save dialog: under StrictMode the
   // effect double-invokes on mount (cleanup between), and the ref —
   // surviving that remount — keeps a second dialog from opening.
@@ -118,7 +120,9 @@ export function BackupExportModal({
       }
       try {
         await exportBackup(destination);
-        callbacksRef.current.onShowToast("Backup verified and saved.");
+        callbacksRef.current.onShowToast(
+          callbacksRef.current.t("backup.export.successToast"),
+        );
         callbacksRef.current.onClose();
       } catch (raw) {
         setState({
@@ -137,7 +141,7 @@ export function BackupExportModal({
   return (
     <ModalShell
       open={open}
-      title="Back up vault"
+      title={t("backup.export.title")}
       labelId="backup-export-title"
       // Importer-anatomy inertness: while running, Esc/backdrop/× no-op —
       // cancel goes through the explicit Cancel button (cooperative).
@@ -150,10 +154,16 @@ export function BackupExportModal({
               <Spinner size={16} />
               <span>
                 {state.progress === null
-                  ? "Preparing…"
+                  ? t("backup.export.preparing")
                   : state.progress.phase === "verify"
-                    ? `Verifying ${state.progress.done} of ${state.progress.total}…`
-                    : `Copying ${state.progress.done} of ${state.progress.total}…`}
+                    ? t("backup.export.verifying", {
+                        done: state.progress.done,
+                        total: state.progress.total,
+                      })
+                    : t("backup.export.copying", {
+                        done: state.progress.done,
+                        total: state.progress.total,
+                      })}
               </span>
             </div>
           </div>
@@ -163,7 +173,7 @@ export function BackupExportModal({
               onClick={() => void backupCancel()}
               data-testid="backup-export.cancel"
             >
-              Cancel
+              {t("backup.export.cancel")}
             </Button>
           </div>
         </>
@@ -180,7 +190,7 @@ export function BackupExportModal({
           </div>
           <div style={FOOTER_STYLE}>
             <Button variant="secondary" onClick={onClose}>
-              Close
+              {t("backup.export.close")}
             </Button>
           </div>
         </>

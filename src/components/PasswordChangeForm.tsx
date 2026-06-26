@@ -14,6 +14,7 @@
 // canonical reject path.
 
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { DestructiveBanner } from "./DestructiveBanner";
 import { PasswordStrength } from "./PasswordStrength";
@@ -63,6 +64,7 @@ export function PasswordChangeForm({
   inFlight,
   error,
 }: PasswordChangeFormProps) {
+  const { t } = useTranslation();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -89,10 +91,10 @@ export function PasswordChangeForm({
     nextCaption = undefined;
     nextTone = "muted";
   } else if (tooShort) {
-    nextCaption = `Use at least ${MIN_PASSWORD_LEN} characters.`;
+    nextCaption = t("settings.changePassword.tooShort", { n: MIN_PASSWORD_LEN });
     nextTone = "danger";
   } else if (!zxcvbnReady || !result) {
-    nextCaption = "Checking strength…";
+    nextCaption = t("settings.changePassword.checkingStrength");
     nextTone = "pending";
   } else {
     showStrength = true;
@@ -131,7 +133,7 @@ export function PasswordChangeForm({
             letterSpacing: "var(--tracking-tight)",
           }}
         >
-          Change password
+          {t("settings.changePassword.title")}
         </h3>
         {onCancel && (
           <button
@@ -150,7 +152,7 @@ export function PasswordChangeForm({
               cursor: inFlight ? "default" : "pointer",
             }}
           >
-            Cancel
+            {t("settings.changePassword.cancel")}
           </button>
         )}
       </div>
@@ -165,7 +167,7 @@ export function PasswordChangeForm({
         }}
       >
         <PasswordInput
-          label="Current password"
+          label={t("settings.changePassword.currentLabel")}
           testId="change-password.current"
           value={current}
           onChange={setCurrent}
@@ -176,7 +178,7 @@ export function PasswordChangeForm({
         />
 
         <PasswordInput
-          label="New password"
+          label={t("settings.changePassword.newLabel")}
           testId="change-password.new"
           value={next}
           onChange={setNext}
@@ -197,14 +199,14 @@ export function PasswordChangeForm({
         )}
 
         <PasswordInput
-          label="Confirm new password"
+          label={t("settings.changePassword.confirmLabel")}
           testId="change-password.confirm"
           value={confirm}
           onChange={setConfirm}
           show={showConfirm}
           onToggleShow={() => setShowConfirm((s) => !s)}
           invalid={mismatch}
-          caption={mismatch ? "Passwords do not match." : undefined}
+          caption={mismatch ? t("settings.changePassword.mismatch") : undefined}
           captionTone="danger"
           disabled={inFlight}
         />
@@ -219,7 +221,7 @@ export function PasswordChangeForm({
           onClick={handleSubmit}
           disabled={!submitReady || inFlight}
         >
-          {inFlight ? "Changing password…" : "Change password"}
+          {inFlight ? t("settings.changePassword.submitting") : t("settings.changePassword.submit")}
         </Button>
       </div>
     </div>

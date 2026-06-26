@@ -15,6 +15,7 @@
 // No console.log of error contents anywhere in this module — `kind`
 // discriminator is logged at the call site (orchestrator) only.
 
+import i18n from "../i18n";
 import type { AppError, ProtocolError, IoErrorKind } from "../types/protocol-error";
 import type { ErrorState } from "../screens/vault-creation";
 
@@ -28,54 +29,54 @@ function mapProtocolError(error: ProtocolError): ErrorState {
       // Not reached during creation (no verification step before commit);
       // defensive entry kept so the exhaustive switch covers the variant.
       return {
-        title: "Invalid password",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.invalidPassword.title"),
+        body: i18n.t("vaultCreation.errors.invalidPassword.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "PasswordTooShort":
       // Client-side validation gates the submit before this can fire.
       return {
-        title: "Password too short",
-        body: "Use at least 12 characters.",
+        title: i18n.t("vaultCreation.errors.passwordTooShort.title"),
+        body: i18n.t("vaultCreation.errors.passwordTooShort.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "KdfFailure":
       return {
-        title: "Couldn't set up encryption",
-        body: "Try again. If this keeps happening, your system may be low on memory.",
+        title: i18n.t("vaultCreation.errors.kdfFailure.title"),
+        body: i18n.t("vaultCreation.errors.kdfFailure.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "AeadFailure":
       // Defensive — should not fire during creation, only during unlock.
       return {
-        title: "Encryption failed",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.aeadFailure.title"),
+        body: i18n.t("vaultCreation.errors.aeadFailure.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "InvalidVaultMeta":
       // Defensive — backend just built the meta we'd be parsing.
       return {
-        title: "Vault format error",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.invalidVaultMeta.title"),
+        body: i18n.t("vaultCreation.errors.invalidVaultMeta.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "AccountNumberInvalid":
       // Not reached during creation (account number is generated, not parsed).
       return {
-        title: "Account number invalid",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.accountNumberInvalid.title"),
+        body: i18n.t("vaultCreation.errors.accountNumberInvalid.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "Csprng":
       return {
-        title: "Couldn't generate secure random data",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.csprng.title"),
+        body: i18n.t("vaultCreation.errors.csprng.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -88,29 +89,29 @@ function mapIoError(error: IoErrorKind): ErrorState {
   switch (error.kind) {
     case "PermissionDenied":
       return {
-        title: "Couldn't write to vault folder",
-        body: "Make sure Myne has permission to write to your application data folder.",
+        title: i18n.t("vaultCreation.errors.permissionDenied.title"),
+        body: i18n.t("vaultCreation.errors.permissionDenied.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "NoSpace":
       return {
-        title: "Not enough disk space",
-        body: "Free up disk space and try again.",
+        title: i18n.t("vaultCreation.errors.noSpace.title"),
+        body: i18n.t("vaultCreation.errors.noSpace.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "NotFound":
       return {
-        title: "Vault folder missing",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.notFound.title"),
+        body: i18n.t("vaultCreation.errors.notFound.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "Other":
       return {
-        title: "Couldn't save the vault",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.ioOther.title"),
+        body: i18n.t("vaultCreation.errors.ioOther.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -137,29 +138,29 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
       return mapProtocolError(error.detail);
     case "SessionNotFound":
       return {
-        title: "Session not found",
-        body: "Start over from the beginning.",
+        title: i18n.t("vaultCreation.errors.sessionNotFound.title"),
+        body: i18n.t("vaultCreation.errors.sessionNotFound.body"),
         primaryAction: "restart",
         displayMode: "dedicated",
       };
     case "SessionExpired":
       return {
-        title: "Session expired",
-        body: "For your security, vault creation times out after 10 minutes. Start over.",
+        title: i18n.t("vaultCreation.errors.sessionExpired.title"),
+        body: i18n.t("vaultCreation.errors.sessionExpired.body"),
         primaryAction: "restart",
         displayMode: "dedicated",
       };
     case "TooManyConcurrentSessions":
       return {
-        title: "Too many vault creations at once",
-        body: "Close other Myne windows and try again.",
+        title: i18n.t("vaultCreation.errors.tooManyConcurrentSessions.title"),
+        body: i18n.t("vaultCreation.errors.tooManyConcurrentSessions.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "JoinFailure":
       return {
-        title: "Something went wrong",
-        body: "Try again.",
+        title: i18n.t("vaultCreation.errors.joinFailure.title"),
+        body: i18n.t("vaultCreation.errors.joinFailure.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -185,8 +186,8 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
       // (original) + MYND-105 PRD + grill Q7 (semantic broadening).
       // Renamed from VaultAlreadyExists on 2026-05-26.
       return {
-        title: "Vault already exists",
-        body: "A new vault cannot be created because vault data already exists on this device. Close the app and restart — the startup screen will route you to the unlock flow.",
+        title: i18n.t("vaultCreation.errors.vaultArtifactsPresent.title"),
+        body: i18n.t("vaultCreation.errors.vaultArtifactsPresent.body"),
         primaryAction: "restart",
         displayMode: "dedicated",
       };
@@ -197,8 +198,8 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
       // against a racing `vault_repair` sweep. A plain retry clears it —
       // the racing op finishes in milliseconds and releases the permit.
       return {
-        title: "Vault busy",
-        body: "Another vault operation is in progress. Try again in a moment.",
+        title: i18n.t("vaultCreation.errors.vaultBusyAuth.title"),
+        body: i18n.t("vaultCreation.errors.vaultBusyAuth.body"),
         primaryAction: "retry",
         displayMode: "inline",
       };

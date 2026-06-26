@@ -20,6 +20,7 @@ import {
 } from "@codemirror/view";
 import { isCursorLine } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
+import i18n from "../../i18n";
 
 // Inner SVG (24x24, stroke="currentColor") for the callout icons. Local to keep
 // the decoration self-contained (no edit to the shared ICON_PATHS).
@@ -43,34 +44,36 @@ const ICONS: Record<string, string> = {
 interface CalloutType {
   readonly color: "info" | "success" | "warning" | "danger" | "accent";
   readonly icon: string;
-  readonly label: string;
+  /** i18n key (under `editor.callout.label.*`) for the default title; resolved
+   *  at render time via `i18n.t()` so a language switch re-labels live. */
+  readonly labelKey: string;
 }
 
 // Obsidian-full set (case-insensitive) → semantic color token + icon + default title.
 const CALLOUT_TYPES: Record<string, CalloutType> = {
-  note: { color: "accent", icon: "pencil", label: "Note" },
-  info: { color: "info", icon: "info", label: "Info" },
-  todo: { color: "info", icon: "todo", label: "Todo" },
-  tip: { color: "success", icon: "lightbulb", label: "Tip" },
-  hint: { color: "success", icon: "lightbulb", label: "Hint" },
-  important: { color: "success", icon: "lightbulb", label: "Important" },
-  success: { color: "success", icon: "check", label: "Success" },
-  check: { color: "success", icon: "check", label: "Success" },
-  done: { color: "success", icon: "check", label: "Done" },
-  question: { color: "warning", icon: "help", label: "Question" },
-  faq: { color: "warning", icon: "help", label: "FAQ" },
-  warning: { color: "warning", icon: "warn", label: "Warning" },
-  caution: { color: "warning", icon: "warn", label: "Caution" },
-  attention: { color: "warning", icon: "warn", label: "Attention" },
-  failure: { color: "danger", icon: "x", label: "Failure" },
-  fail: { color: "danger", icon: "x", label: "Failure" },
-  missing: { color: "danger", icon: "x", label: "Missing" },
-  danger: { color: "danger", icon: "zap", label: "Danger" },
-  error: { color: "danger", icon: "zap", label: "Error" },
-  bug: { color: "danger", icon: "x", label: "Bug" },
-  example: { color: "accent", icon: "list", label: "Example" },
-  quote: { color: "accent", icon: "quote", label: "Quote" },
-  cite: { color: "accent", icon: "quote", label: "Quote" },
+  note: { color: "accent", icon: "pencil", labelKey: "editor.callout.label.note" },
+  info: { color: "info", icon: "info", labelKey: "editor.callout.label.info" },
+  todo: { color: "info", icon: "todo", labelKey: "editor.callout.label.todo" },
+  tip: { color: "success", icon: "lightbulb", labelKey: "editor.callout.label.tip" },
+  hint: { color: "success", icon: "lightbulb", labelKey: "editor.callout.label.hint" },
+  important: { color: "success", icon: "lightbulb", labelKey: "editor.callout.label.important" },
+  success: { color: "success", icon: "check", labelKey: "editor.callout.label.success" },
+  check: { color: "success", icon: "check", labelKey: "editor.callout.label.success" },
+  done: { color: "success", icon: "check", labelKey: "editor.callout.label.done" },
+  question: { color: "warning", icon: "help", labelKey: "editor.callout.label.question" },
+  faq: { color: "warning", icon: "help", labelKey: "editor.callout.label.faq" },
+  warning: { color: "warning", icon: "warn", labelKey: "editor.callout.label.warning" },
+  caution: { color: "warning", icon: "warn", labelKey: "editor.callout.label.caution" },
+  attention: { color: "warning", icon: "warn", labelKey: "editor.callout.label.attention" },
+  failure: { color: "danger", icon: "x", labelKey: "editor.callout.label.failure" },
+  fail: { color: "danger", icon: "x", labelKey: "editor.callout.label.failure" },
+  missing: { color: "danger", icon: "x", labelKey: "editor.callout.label.missing" },
+  danger: { color: "danger", icon: "zap", labelKey: "editor.callout.label.danger" },
+  error: { color: "danger", icon: "zap", labelKey: "editor.callout.label.error" },
+  bug: { color: "danger", icon: "x", labelKey: "editor.callout.label.bug" },
+  example: { color: "accent", icon: "list", labelKey: "editor.callout.label.example" },
+  quote: { color: "accent", icon: "quote", labelKey: "editor.callout.label.quote" },
+  cite: { color: "accent", icon: "quote", labelKey: "editor.callout.label.quote" },
 };
 
 /** Match the callout header on a blockquote's first content line (after the
@@ -85,7 +88,7 @@ class CalloutHeaderWidget extends WidgetType {
     super();
   }
   eq(other: CalloutHeaderWidget): boolean {
-    return other.title === this.title && other.type.label === this.type.label;
+    return other.title === this.title && other.type.labelKey === this.type.labelKey;
   }
   toDOM(): HTMLElement {
     const span = document.createElement("span");
@@ -139,7 +142,7 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
         // Header: off-cursor, replace `[!type]<fold> <title>` with [icon] Title.
         if (!isCursorLine(view, firstLine.from, firstLine.to)) {
           const markerStart = firstLine.from + m[1].length; // after `> `
-          const title = m[4].trim() !== "" ? m[4].trim() : type.label;
+          const title = m[4].trim() !== "" ? m[4].trim() : i18n.t(type.labelKey);
           decorations.push(
             Decoration.replace({
               widget: new CalloutHeaderWidget(type, title),

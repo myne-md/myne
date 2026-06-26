@@ -20,6 +20,7 @@
 // honors prefers-reduced-motion via no motion (parity with SettingsModal).
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { ModalShell } from "./primitives/ModalShell";
@@ -38,9 +39,6 @@ interface TemplatesManagerProps {
   /** Open a template in the normal note editor (selects it + closes the surface). */
   onOpenNote: (id: NoteId) => void;
 }
-
-/** Default name for a brand-new template (renamed later via the editor). */
-const NEW_TEMPLATE_NAME = "Untitled template";
 
 const TOOLBAR_STYLE: CSSProperties = {
   padding: "var(--space-3) var(--space-5)",
@@ -153,8 +151,8 @@ const LOADING_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
 };
 
-function displayName(rec: TitleRecord): string {
-  return rec.title?.trim() || NEW_TEMPLATE_NAME;
+function displayName(rec: TitleRecord, fallback: string): string {
+  return rec.title?.trim() || fallback;
 }
 
 export function TemplatesManager({
@@ -162,6 +160,9 @@ export function TemplatesManager({
   onClose,
   onOpenNote,
 }: TemplatesManagerProps) {
+  const { t } = useTranslation();
+  /** Default name for a brand-new template (renamed later via the editor). */
+  const newTemplateName = t("templates.manager.newTemplateName");
   // `null` = loading; `[]` = loaded-but-empty (first-run empty state).
   const [templates, setTemplates] = useState<TitleRecord[] | null>(null);
 
@@ -187,7 +188,7 @@ export function TemplatesManager({
   );
 
   const handleNew = useCallback(() => {
-    void createTemplate(NEW_TEMPLATE_NAME, "")
+    void createTemplate(newTemplateName, "")
       .then((id) => {
         onOpenNote(id as NoteId);
         onClose();
@@ -195,40 +196,37 @@ export function TemplatesManager({
       .catch(() => {
         // Surface stays open on failure; the list is unchanged.
       });
-  }, [onOpenNote, onClose]);
+  }, [onOpenNote, onClose, newTemplateName]);
 
   return (
     <ModalShell
       open={open}
-      title="Note templates"
+      title={t("templates.manager.title")}
       onClose={onClose}
       labelId="templates-modal-title"
       width={560}
       height={560}
-      closeLabel="Close templates"
+      closeLabel={t("templates.manager.closeLabel")}
     >
       <div style={TOOLBAR_STYLE}>
         <Button variant="primary" icon="file-plus" onClick={handleNew}>
-          New template
+          {t("templates.manager.newTemplate")}
         </Button>
       </div>
 
       {templates === null ? (
-        <div style={LOADING_STYLE}>Loading…</div>
+        <div style={LOADING_STYLE}>{t("templates.manager.loading")}</div>
       ) : templates.length === 0 ? (
         <div style={EMPTY_STYLE}>
           <Icon name="file-text" size={28} style={{ color: "var(--fg-3)" }} />
-          <p style={EMPTY_TITLE_STYLE}>No templates yet</p>
-          <p style={EMPTY_BODY_STYLE}>
-            Create a template to reuse a note skeleton — a meeting note, a daily
-            log, a reading note. Pick one when you make a new note.
-          </p>
+          <p style={EMPTY_TITLE_STYLE}>{t("templates.manager.emptyTitle")}</p>
+          <p style={EMPTY_BODY_STYLE}>{t("templates.manager.emptyBody")}</p>
         </div>
       ) : (
-        <div role="list" aria-label="Templates" style={LIST_STYLE}>
+        <div role="list" aria-label={t("templates.manager.listLabel")} style={LIST_STYLE}>
           {templates.map((rec) => {
             const id = rec.noteUuid as NoteId;
-            const name = displayName(rec);
+            const name = displayName(rec, newTemplateName);
             return (
               <div key={id} role="listitem" style={ROW_STYLE}>
                 <button
@@ -238,7 +236,7 @@ export function TemplatesManager({
                     onClose();
                   }}
                   style={ROW_OPEN_STYLE}
-                  aria-label={`Edit template ${name}`}
+                  aria-label={t("templates.manager.editTemplateLabel", { name })}
                 >
                   <Icon
                     name="file-text"
@@ -251,15 +249,15 @@ export function TemplatesManager({
                   type="button"
                   onClick={() => afterMutation(convertTemplateToNote(id))}
                   style={REMOVE_BUTTON_STYLE}
-                  aria-label={`Remove ${name} from templates (keeps the note)`}
+                  aria-label={t("templates.manager.removeRowLabel", { name })}
                 >
-                  Remove from templates
+                  {t("templates.manager.removeFromTemplates")}
                 </button>
                 <button
                   type="button"
                   onClick={() => afterMutation(deleteTemplate(id))}
                   style={DELETE_BUTTON_STYLE}
-                  aria-label={`Delete template ${name} (move to Trash)`}
+                  aria-label={t("templates.manager.deleteRowLabel", { name })}
                 >
                   <Icon name="trash-2" size={16} />
                 </button>

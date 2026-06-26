@@ -41,8 +41,10 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useReducer, useRef, type CSSProperties, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import i18n from "../i18n";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
@@ -80,6 +82,15 @@ interface UnlockProps {
    */
   vaultId?: VaultId;
   onUnlocked: () => void;
+  /**
+   * Back-to-picker affordance. Provided by App.tsx ONLY when the unlock was
+   * reached from the ≥2-vault picker (`Stage.unlock.fromPicker`). When present,
+   * a "Choose a different vault" link renders in idle mode and dispatches
+   * `unlock.back-to-picker` → `picker`, so a mis-picked vault is recoverable.
+   * `undefined` on every other entry path (no picker to return to) → the link
+   * is not rendered.
+   */
+  onBack?: () => void;
   /** Cold-start recovery entry. Dispatched by the "Recovery phrase ile
    *  aç" link in idle mode. App.tsx sends `unlock.start-recovery` →
    *  Stage transitions to `recover(phrase-entry)`. */
@@ -219,12 +230,12 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "VaultNotFound":
       return {
         kind: "banner",
-        text: "Vault file not found. Please restart the app.",
+        text: i18n.t("unlock.errors.vaultNotFound"),
       };
     case "VaultAlreadyUnlocked":
-      return { kind: "banner", text: "Vault is already unlocked." };
+      return { kind: "banner", text: i18n.t("unlock.errors.alreadyUnlocked") };
     case "UnlockInProgress":
-      return { kind: "banner", text: "Operation in progress." };
+      return { kind: "banner", text: i18n.t("unlock.errors.inProgress") };
     case "VaultRecoveryInProgress":
       // Slot is in Slot::Recovering — user must complete the
       // password-reset chained step (recovery-flow.md §4.1) before any
@@ -235,7 +246,7 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "JoinFailure":
       return {
         kind: "banner",
-        text: "Unexpected error. Please try again.",
+        text: i18n.t("unlock.errors.unexpected"),
       };
   }
 }
@@ -290,6 +301,25 @@ const DELETE_VAULT_LINK_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
+// Neutral ghost back link to the vault picker. Placed at the top of the
+// card, left-aligned with a leading chevron — a navigational affordance
+// distinct from the accent recovery link and the danger delete link below
+// the form, so it doesn't compete with the primary Unlock CTA.
+const BACK_LINK_STYLE: CSSProperties = {
+  background: "transparent",
+  border: 0,
+  padding: 0,
+  alignSelf: "flex-start",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--fg-2)",
+  cursor: "pointer",
+};
+
 const RECOVER_LINK_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
@@ -325,12 +355,14 @@ export function Unlock({
   initialStatus,
   vaultId,
   onUnlocked,
+  onBack,
   onStartRecovery,
   onResumeRecovery,
   onDeleteVaultSuccess,
   onRestoreBackup,
   suspicionReason,
 }: UnlockProps) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -459,16 +491,14 @@ export function Unlock({
   if (state.kind === "recovery-in-progress") {
     return (
       <CenteredCard>
-        <h1 style={CARD_TITLE_STYLE}>Recovery flow was interrupted.</h1>
-        <p style={CARD_BODY_STYLE}>
-          Set a new password first, then re-seal your vault.
-        </p>
+        <h1 style={CARD_TITLE_STYLE}>{t("unlock.recoveryInterruptedTitle")}</h1>
+        <p style={CARD_BODY_STYLE}>{t("unlock.recoveryInterruptedBody")}</p>
         <div
           role="alert"
           data-testid="unlock.recovery-in-progress-banner"
           style={INFO_BANNER_STYLE}
         >
-          Recovery flow was interrupted. Set a new password first.
+          {t("unlock.recoveryInterruptedBanner")}
         </div>
         <button
           type="button"
@@ -476,7 +506,7 @@ export function Unlock({
           style={ctaStyle(false)}
           data-testid="unlock.resume-cta"
         >
-          <span>Continue</span>
+          <span>{t("unlock.continue")}</span>
         </button>
       </CenteredCard>
     );
@@ -517,13 +547,28 @@ export function Unlock({
 
   return (
     <CenteredCard>
+      {/* Back to the ≥2-vault picker — only when the screen was reached by
+          picking a row (App passes `onBack` iff `Stage.unlock.fromPicker`).
+          Suppressed during `decrypting` so an in-flight unlock isn't
+          abandoned mid-IPC. */}
+      {onBack && !decrypting && (
+        <button
+          type="button"
+          onClick={onBack}
+          style={BACK_LINK_STYLE}
+          data-testid="unlock.back-to-picker"
+        >
+          <span aria-hidden="true">←</span>
+          <span>{t("unlock.backToPicker")}</span>
+        </button>
+      )}
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
-      <h1 style={CARD_TITLE_STYLE}>Unlock your vault.</h1>
-      <p style={CARD_BODY_STYLE}>Enter your password to continue.</p>
+      <h1 style={CARD_TITLE_STYLE}>{t("unlock.title")}</h1>
+      <p style={CARD_BODY_STYLE}>{t("unlock.subtitle")}</p>
       {/* Quick-unlock (PIN / Touch ID) affordance — rendered only when
           configured + usable this session; self-hides otherwise. The password
           form below stays the always-present escape hatch (MYND-329). */}
-      <QuickUnlockEntry onUnlocked={onUnlocked} />
+      <QuickUnlockEntry vaultId={vaultId} onUnlocked={onUnlocked} />
       {/* `data-vault-id` mirrors the picker-row idiom (SYNC-8): the
           vault-addressed unlock target threaded from the Stage payload,
           observable to the E2E suite (MYND-127 story 2). Absent when the
@@ -537,14 +582,14 @@ export function Unlock({
       >
         <input
           type="password"
-          placeholder="Password"
+          placeholder={t("unlock.passwordPlaceholder")}
           value={password}
           onChange={(e) => dispatch({ type: "set-password", value: e.currentTarget.value })}
           disabled={decrypting}
           autoFocus
           autoComplete="current-password"
           style={INPUT_STYLE}
-          aria-label="Password"
+          aria-label={t("unlock.passwordLabel")}
           aria-invalid={error != null ? true : undefined}
           data-testid="unlock.password-input"
         />
@@ -558,7 +603,7 @@ export function Unlock({
           data-testid="unlock.submit"
         >
           {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
-          <span>{decrypting ? "Decrypting…" : "Unlock"}</span>
+          <span>{decrypting ? t("unlock.decrypting") : t("unlock.submit")}</span>
         </button>
         {!decrypting && (
           <button
@@ -567,7 +612,7 @@ export function Unlock({
             style={RECOVER_LINK_STYLE}
             data-testid="unlock.recovery-link"
           >
-            Forgot your password? Unlock with recovery phrase
+            {t("unlock.recoveryLink")}
           </button>
         )}
         {!decrypting && (
@@ -577,7 +622,7 @@ export function Unlock({
             style={DELETE_VAULT_LINK_STYLE}
             data-testid="unlock.delete-link"
           >
-            Lost both password and recovery phrase? Delete vault and start over
+            {t("unlock.deleteLink")}
           </button>
         )}
       </form>

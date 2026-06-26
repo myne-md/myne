@@ -37,6 +37,7 @@
 
 import { useEffect, useReducer, useRef } from "react";
 import { appDataDir, join } from "@tauri-apps/api/path";
+import i18n from "../i18n";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
 import { closeApp } from "../lib/app-window";
@@ -109,7 +110,7 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
     case "VaultNotFound":
       return {
         kind: "banner-retry",
-        banner: "Vault file not found. Please restart the app.",
+        banner: i18n.t("recover.errors.vaultNotFound"),
       };
     case "VaultAlreadyUnlocked":
       // Stage-transition bug-canary: user shouldn't reach phrase-entry
@@ -123,19 +124,19 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
     case "RecoveryInProgress":
       return {
         kind: "banner-retry",
-        banner: "Operation in progress. Please wait.",
+        banner: i18n.t("recover.errors.operationInProgress"),
       };
     case "VaultRecoveryRequiresActiveSession":
       // Defensive — A8d cannot produce this variant in practice
       // (it's an A8f precondition). Treat as generic banner.
       return {
         kind: "banner-retry",
-        banner: "Unexpected error. Please try again.",
+        banner: i18n.t("recover.errors.unexpected"),
       };
     case "JoinFailure":
       return {
         kind: "banner-retry",
-        banner: "Unexpected error. Please try again.",
+        banner: i18n.t("recover.errors.unexpected"),
       };
     case "RecoveryAbortedByLock":
       // Defensive — an A8f-side variant (lock raced complete_recovery);
@@ -143,13 +144,13 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
       // change-password lock-race banner class.
       return {
         kind: "banner-retry",
-        banner: "Recovery cancelled: vault was locked.",
+        banner: i18n.t("recover.errors.cancelledVaultLocked"),
       };
     case "WeakNewPassword":
       // Defensive — A8f-side floor; A8d takes no password. Generic.
       return {
         kind: "banner-retry",
-        banner: "Unexpected error. Please try again.",
+        banner: i18n.t("recover.errors.unexpected"),
       };
   }
 }

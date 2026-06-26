@@ -77,6 +77,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_daily_template,
             commands::set_editor_text_size,
             commands::set_editor_line_numbers,
+            commands::set_archive_disabled,
             commands::set_editor_line_spacing,
             commands::set_editor_content_width,
             commands::set_editor_font_family,

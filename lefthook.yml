@@ -14,6 +14,15 @@ pre-commit:
       glob: "*.{ts,tsx}"
       run: pnpm exec tsc --noEmit
 
+    i18n-catalog:
+      # Guards the i18n migration (decisions.md 2026-06-25): fails if
+      # locales/en/common.json has any EMPTY English source value, or if a
+      # static t("…")/i18n.t("…") key used in src/ is missing from the catalog
+      # (plural-aware). Fix: `pnpm i18n:extract` then fill the English text.
+      # Load-bearing copy renders from constants and is intentionally out of scope.
+      glob: "*.{ts,tsx,json}"
+      run: node scripts/check-i18n.mjs
+
     whitespace:
       # Excludes vendored third-party dictionary data (wooorm/dictionaries
       # Hunspell .aff/.dic + upstream license text): those carry upstream

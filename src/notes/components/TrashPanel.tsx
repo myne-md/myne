@@ -12,10 +12,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import {
   trashedRecords,
   useSelectedNote,
@@ -67,9 +70,13 @@ export type TrashPanelProps = {
 };
 
 export function TrashPanel({ open, onClose }: TrashPanelProps) {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
 
   const records = useMemo(() => trashedRecords(ctx.cache), [ctx.cache]);
 
@@ -101,10 +108,10 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   const restore = useCallback(
     (id: NoteId) => {
       void ctx.restoreWithRollback(id).catch(() => {
-        setStatus("Couldn't restore that note. Try again.");
+        setStatus(t("notes.trash.restoreError"));
       });
     },
-    [ctx],
+    [ctx, t],
   );
 
   const confirmPurge = useCallback(async () => {
@@ -113,7 +120,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
       const id = confirm.id;
       setConfirm(null);
       await ctx.deleteWithRollback(id).catch(() => {
-        setStatus("Couldn't delete that note. Try again.");
+        setStatus(t("notes.trash.deleteError"));
       });
       return;
     }
@@ -127,10 +134,10 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
     const result = await ctx.emptyTrashWithSync(ids);
     if (result.failed.length > 0) {
       setStatus(
-        `${result.failed.length} note${result.failed.length === 1 ? "" : "s"} couldn't be deleted and remain in the trash.`,
+        t("notes.trash.emptyPartialFailure", { count: result.failed.length }),
       );
     }
-  }, [confirm, ctx]);
+  }, [confirm, ctx, t]);
 
   if (!open) return null;
 
@@ -139,6 +146,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   return (
     <div style={BACKDROP_STYLE} onClick={handleBackdrop} role="presentation">
       <div
+        ref={dialogRef}
         style={PANEL_STYLE}
         role="dialog"
         aria-modal="true"
@@ -147,22 +155,27 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
       >
         <div style={HEADER_STYLE}>
           <h2 id="trash-panel-title" style={HEADER_TITLE_STYLE}>
-            Trash
+            {t("notes.trash.title")}
           </h2>
           <span style={COUNT_STYLE}>
-            {count === 0 ? "Empty" : `${count} note${count === 1 ? "" : "s"}`}
+            {count === 0
+              ? t("notes.trash.countEmpty")
+              : t("notes.trash.count", { count })}
           </span>
         </div>
 
         {count === 0 ? (
-          <div style={EMPTY_STATE_STYLE}>Trash is empty.</div>
+          <div style={EMPTY_STATE_STYLE}>{t("notes.trash.emptyState")}</div>
         ) : (
           <div style={LIST_STYLE}>
             {records.map((r) => (
               <div key={r.noteUuid} style={ROW_STYLE}>
-                <span style={ROW_TITLE_STYLE} title={r.title ?? "Untitled"}>
+                <span
+                  style={ROW_TITLE_STYLE}
+                  title={r.title ?? t("notes.trash.untitled")}
+                >
                   {r.title === null || r.title.trim() === ""
-                    ? "Untitled"
+                    ? t("notes.trash.untitled")
                     : r.title}
                 </span>
                 <span style={AGE_STYLE}>
@@ -177,7 +190,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                   data-note-id={r.noteUuid}
                   onClick={() => restore(r.noteUuid)}
                 >
-                  Restore
+                  {t("notes.trash.restore")}
                 </button>
                 <button
                   type="button"
@@ -192,7 +205,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                     })
                   }
                 >
-                  Delete
+                  {t("notes.trash.delete")}
                 </button>
               </div>
             ))}
@@ -213,7 +226,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                 })
               }
             >
-              Empty trash
+              {t("notes.trash.empty")}
             </button>
           )}
           <button
@@ -222,7 +235,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
             data-testid="trash.close"
             onClick={onClose}
           >
-            Close
+            {t("notes.trash.close")}
           </button>
         </div>
       </div>
@@ -230,17 +243,19 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
       {confirm !== null && confirm.kind === "single" && (
         <DeleteConfirmModal
           noteTitle={confirm.title}
-          title="Delete permanently?"
-          confirmLabel="Delete permanently"
+          title={t("notes.trash.purgeConfirmTitle")}
+          confirmLabel={t("notes.trash.purgeConfirmCta")}
           onCancel={() => setConfirm(null)}
           onConfirm={() => void confirmPurge()}
         />
       )}
       {confirm !== null && confirm.kind === "empty" && (
         <DeleteConfirmModal
-          title="Empty trash?"
-          body={`${confirm.ids.length} note${confirm.ids.length === 1 ? "" : "s"} will be permanently deleted.`}
-          confirmLabel="Empty trash"
+          title={t("notes.trash.emptyConfirmTitle")}
+          body={t("notes.trash.emptyConfirmBody", {
+            count: confirm.ids.length,
+          })}
+          confirmLabel={t("notes.trash.emptyConfirmCta")}
           onCancel={() => setConfirm(null)}
           onConfirm={() => void confirmPurge()}
         />

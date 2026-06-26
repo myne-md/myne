@@ -24,6 +24,8 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { Icon } from "../../components/primitives/Icon";
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
@@ -132,6 +134,7 @@ export function TabStrip({
   insetLeft = 0,
   insetRight = 0,
 }: TabStripProps) {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   // Right-click tab context menu (tab-modes / MYND-320): { tab key, click pos }.
   const [tabMenu, setTabMenu] = useState<{ id: string; x: number; y: number } | null>(
@@ -181,7 +184,7 @@ export function TabStrip({
           "padding-left var(--duration-base) var(--ease-standard), padding-right var(--duration-base) var(--ease-standard)",
       }}
       role="tablist"
-      aria-label="Open notes"
+      aria-label={t("notes.tabStrip.openNotes")}
       data-editor-chrome
       data-testid="editor.tab-strip"
       data-pane-id={paneId}
@@ -194,6 +197,10 @@ export function TabStrip({
       onDrop={handleDrop}
     >
       <div
+        // Transparent to the a11y tree so the `role="tab"` children below are
+        // owned directly by the `role="tablist"` parent — without this the
+        // generic wrapper breaks axe's `aria-required-children` (MYND-93).
+        role="presentation"
         style={
           stacked
             ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative
@@ -226,7 +233,7 @@ export function TabStrip({
           />
         ))}
         {pendingNewTab && <NewTabChip onClose={onCloseNewTab} />}
-        <StripButton label="New tab" onClick={onNewTab}>
+        <StripButton label={t("notes.tabStrip.newTab")} onClick={onNewTab}>
           <Icon name="plus" size={14} />
         </StripButton>
       </div>
@@ -237,7 +244,7 @@ export function TabStrip({
 
       {tabs.length > 0 && (
         <StripButton
-          label="Open notes"
+          label={t("notes.tabStrip.openNotes")}
           onClick={() => setMenuOpen((v) => !v)}
           aria-expanded={menuOpen}
         >
@@ -282,7 +289,7 @@ function tabMenuItems(
   return [
     {
       id: pinned ? "tab.unpin" : "tab.pin",
-      label: pinned ? "Unpin" : "Pin",
+      label: pinned ? i18n.t("notes.tabStrip.unpin") : i18n.t("notes.tabStrip.pin"),
       onSelect: () => onTogglePin(id),
     },
   ];
@@ -290,7 +297,7 @@ function tabMenuItems(
 
 function tabLabel(title: string | null): { text: string; italic: boolean } {
   if (title === null || title.trim() === "") {
-    return { text: "Untitled", italic: true };
+    return { text: i18n.t("notes.tabStrip.untitled"), italic: true };
   }
   return { text: title, italic: false };
 }
@@ -328,6 +335,7 @@ function Tab({
   onClose,
   onContextMenu,
 }: TabProps) {
+  const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
   const { text, italic } = tabLabel(title);
   // A pinned tab is close-protected — its × is hidden (unpin to close).
@@ -474,8 +482,8 @@ function Tab({
         // Pinned: a static pin glyph stands in for the × — the tab is
         // close-protected (unpin via the right-click menu to close it).
         <span
-          aria-label="Pinned"
-          title="Pinned — unpin to close"
+          aria-label={t("notes.tabStrip.pinned")}
+          title={t("notes.tabStrip.pinnedTitle")}
           style={{
             display: "flex",
             alignItems: "center",
@@ -491,7 +499,7 @@ function Tab({
       ) : (
         <button
           type="button"
-          aria-label={`Close ${text}`}
+          aria-label={t("notes.tabStrip.closeTab", { title: text })}
           onClick={(e) => {
             e.stopPropagation();
             onClose(id);
@@ -522,11 +530,12 @@ function Tab({
 /** The transient empty "New tab" pseudo-tab (active while its chooser is
  *  open). Carries the same active-tab look as a real tab. */
 function NewTabChip({ onClose }: { onClose?: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       role="tab"
       aria-selected
-      title="New tab"
+      title={t("notes.tabStrip.newTab")}
       style={{
         display: "flex",
         alignItems: "center",
@@ -546,11 +555,13 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
       }}
     >
       <Icon name="file-text" size={13} />
-      <span style={{ fontStyle: "italic", color: "var(--fg-3)" }}>New tab</span>
+      <span style={{ fontStyle: "italic", color: "var(--fg-3)" }}>
+        {t("notes.tabStrip.newTab")}
+      </span>
       {onClose && (
         <button
           type="button"
-          aria-label="Close new tab"
+          aria-label={t("notes.tabStrip.closeNewTab")}
           onClick={onClose}
           style={{
             display: "flex",

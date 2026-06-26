@@ -17,6 +17,7 @@ import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
 import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
 import { DailyNotesSettings } from "./DailyNotesSettings";
+import { ArchiveSettings } from "./ArchiveSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 
 export function EditorPanel() {
@@ -44,6 +45,11 @@ export function EditorPanel() {
 
       {/* Daily-notes configuration (MYND-191) — folder / date-format / template. */}
       <DailyNotesSettings />
+
+      {/* Note-archive feature toggle (archive-disable, MYND-…) — on by default;
+          turning it off restores every archived note and hides the archive
+          controls. Last, as a feature-level (not per-edit) preference. */}
+      <ArchiveSettings />
     </div>
   );
 }

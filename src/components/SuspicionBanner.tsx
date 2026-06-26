@@ -20,6 +20,7 @@
 // is the "I see, I'm continuing" signal.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import type { SuspicionReason } from "../lib/stage";
 import { DestructiveBanner } from "./DestructiveBanner";
 
@@ -37,20 +38,26 @@ const GRAY_STYLE: CSSProperties = {
   color: "var(--fg-2)",
 };
 
-const COPY_FOR_REASON: Record<SuspicionReason, string> = {
-  "vault-meta-changed-externally":
-    "Vault was modified in another session — please unlock again.",
-  "vault-locked-during-change":
-    "Password change cancelled: vault was locked.",
+// i18n key suffix per reason — resolved at render time via t() (never frozen at
+// module scope) so a language switch re-renders the banner copy.
+const KEY_FOR_REASON: Record<SuspicionReason, string> = {
+  "vault-meta-changed-externally": "metaChangedExternally",
+  "vault-locked-during-change": "lockedDuringChange",
 };
 
 export function SuspicionBanner({ reason }: SuspicionBannerProps) {
-  const message = COPY_FOR_REASON[reason];
+  const { t } = useTranslation();
+  const message = t(`unlock.suspicion.${KEY_FOR_REASON[reason]}`);
   if (reason === "vault-meta-changed-externally") {
     return <DestructiveBanner testId="suspicion.banner">{message}</DestructiveBanner>;
   }
   return (
-    <div role="alert" data-testid="suspicion.banner" style={GRAY_STYLE}>
+    <div
+      role="alert"
+      aria-live="assertive"
+      data-testid="suspicion.banner"
+      style={GRAY_STYLE}
+    >
       {message}
     </div>
   );

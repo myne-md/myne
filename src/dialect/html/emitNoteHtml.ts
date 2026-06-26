@@ -34,6 +34,7 @@
 //     or raw-path resource (PRD story 7).
 
 import type { SyntaxNode } from "@lezer/common";
+import i18n from "../../i18n";
 import { parser } from "../lezer/parser";
 import { locateFrontmatter } from "../lezer/frontmatter";
 import { readTitleFromFmBody } from "../surgery";
@@ -518,7 +519,8 @@ function renderBlockquote(ctx: Ctx, node: SyntaxNode): string {
   if (header !== null) {
     const type = CALLOUT_HTML_TYPES[header[2]!.toLowerCase()];
     if (type !== undefined) {
-      const title = header[4]!.trim() !== "" ? header[4]!.trim() : type.label;
+      const title =
+        header[4]!.trim() !== "" ? header[4]!.trim() : i18n.t(type.labelKey);
       const body = renderBlockChildren(ctx, node, {
         clipFirstParagraphFrom: firstLineEnd + 1,
       });

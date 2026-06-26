@@ -16,6 +16,7 @@
 // Spec: protocol.md § 7.1.3 (phrase confirmation challenge).
 
 import { useMemo, type Dispatch } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
@@ -42,6 +43,7 @@ export function ConfirmStep({
   inputs,
   dispatch,
 }: ConfirmStepProps) {
+  const { t } = useTranslation();
   // NFKD normalization on every keystroke for all 4 targets adds up;
   // pre-normalize once per phrase/positions pair.
   const targets = useMemo(
@@ -58,11 +60,11 @@ export function ConfirmStep({
 
   return (
     <StepLayout>
-      <StepEyebrow icon="check">Step 3 of 4 — confirm phrase</StepEyebrow>
-      <StepHeading>Type back four words from your phrase.</StepHeading>
+      <StepEyebrow icon="check">{t("vaultCreation.confirm.eyebrow")}</StepEyebrow>
+      <StepHeading>{t("vaultCreation.confirm.heading")}</StepHeading>
 
       <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-2)" }}>
-        We'll ask for specific positions to verify you saved it.
+        {t("vaultCreation.confirm.intro")}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -76,7 +78,7 @@ export function ConfirmStep({
               style={{ display: "flex", flexDirection: "column", gap: 6 }}
             >
               <label htmlFor={inputId} style={labelStyle}>
-                Word at position {pos}
+                {t("vaultCreation.confirm.wordAtPosition", { pos })}
               </label>
               <Input
                 id={inputId}
@@ -103,7 +105,7 @@ export function ConfirmStep({
                   data-testid="create.confirm-error"
                   data-index={pos}
                 >
-                  Doesn't match word #{pos}.
+                  {t("vaultCreation.confirm.mismatch", { pos })}
                 </div>
               )}
             </div>
@@ -118,7 +120,7 @@ export function ConfirmStep({
           icon="arrow-left"
           data-testid="create.confirm-back"
         >
-          Back
+          {t("vaultCreation.confirm.back")}
         </Button>
         <div style={{ flex: 1 }} />
         <Button
@@ -127,7 +129,7 @@ export function ConfirmStep({
           disabled={!allMatch}
           data-testid="create.confirm-continue"
         >
-          Continue
+          {t("vaultCreation.confirm.continue")}
         </Button>
       </div>
     </StepLayout>

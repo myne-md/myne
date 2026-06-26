@@ -8,6 +8,7 @@
 // "3 days ago".
 
 import { useEffect, useState } from "react";
+import i18n from "../../i18n";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -18,23 +19,27 @@ const WEEK = 7 * DAY;
 export function formatRelativeTime(when: Date | null, now: Date = new Date()): string {
   if (when === null) return "";
   const delta = now.getTime() - when.getTime();
-  if (delta < 0) return "just now";
-  if (delta < MINUTE) return "just now";
+  if (delta < 0) return i18n.t("notes.relativeTime.justNow");
+  if (delta < MINUTE) return i18n.t("notes.relativeTime.justNow");
   if (delta < HOUR) {
     const m = Math.floor(delta / MINUTE);
-    return `${m} min ago`;
+    return i18n.t("notes.relativeTime.minutesAgo", { m });
   }
   if (delta < DAY) {
     const h = Math.floor(delta / HOUR);
-    return `${h} h ago`;
+    return i18n.t("notes.relativeTime.hoursAgo", { h });
   }
   if (delta < WEEK) {
     const d = Math.floor(delta / DAY);
-    return d === 1 ? "yesterday" : `${d} days ago`;
+    return d === 1
+      ? i18n.t("notes.relativeTime.yesterday")
+      : i18n.t("notes.relativeTime.daysAgo", { d });
   }
   if (delta < 4 * WEEK) {
     const w = Math.floor(delta / WEEK);
-    return w === 1 ? "1 week ago" : `${w} weeks ago`;
+    return w === 1
+      ? i18n.t("notes.relativeTime.oneWeekAgo")
+      : i18n.t("notes.relativeTime.weeksAgo", { w });
   }
   // For older entries fall back to absolute date (yyyy-mm-dd).
   const y = when.getFullYear();

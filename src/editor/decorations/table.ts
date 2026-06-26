@@ -45,6 +45,7 @@ import type { SyntaxNode } from "@lezer/common";
 import { revealActive, selectionTouchesLines } from "./cursor-aware";
 import { makeCursorAwareStateField } from "./plugin-factory";
 import { renderInlineCell } from "./table-inline";
+import i18n from "../../i18n";
 import {
   addColumn,
   addRow,
@@ -302,14 +303,14 @@ class TableWidget extends WidgetType {
     wrap.appendChild(table);
     wrap.appendChild(
       revealOnHover(
-        makeAffordanceButton("cm-table-add-col", "table.add-column", "Add column to the right", () =>
+        makeAffordanceButton("cm-table-add-col", "table.add-column", i18n.t("editor.table.addColumn"), () =>
           applyTableTransform(view, tableFrom, (g) => addColumn(g, g.align.length)),
         ),
       ),
     );
     wrap.appendChild(
       revealOnHover(
-        makeAffordanceButton("cm-table-add-row", "table.add-row", "Add row below", () =>
+        makeAffordanceButton("cm-table-add-row", "table.add-row", i18n.t("editor.table.addRow"), () =>
           applyTableTransform(view, tableFrom, (g) => addRow(g, g.rows.length)),
         ),
       ),
@@ -365,7 +366,7 @@ class TableWidget extends WidgetType {
     input.value = source;
     input.spellcheck = false;
     input.autocomplete = "off";
-    input.setAttribute("aria-label", "Table cell");
+    input.setAttribute("aria-label", i18n.t("editor.table.cellAriaLabel"));
     input.setAttribute("data-testid", "table.cell-input");
     // Replace the rendered text with the input (replaceChildren — NOT append — so a
     // plain-text node can't show through and collide with the input text), and pin
@@ -605,9 +606,9 @@ function appendCellAffordances(
   if (isHeader) {
     // Column gutter (above the column): reorder handle + delete-column, side by side.
     el.appendChild(
-      makeDragGrip("cm-table-handle cm-table-handle-col", "table.reorder-column", "Reorder column", "col", col, tableFrom),
+      makeDragGrip("cm-table-handle cm-table-handle-col", "table.reorder-column", i18n.t("editor.table.reorderColumn"), "col", col, tableFrom),
     );
-    const delCol = makeAffordanceButton("cm-table-del cm-table-del-col", "table.delete-column", "Delete column", () =>
+    const delCol = makeAffordanceButton("cm-table-del cm-table-del-col", "table.delete-column", i18n.t("editor.table.deleteColumn"), () =>
       applyTableTransform(view, tableFrom, (g) => deleteColumn(g, col)),
     );
     delCol.setAttribute("data-col", String(col));
@@ -618,9 +619,9 @@ function appendCellAffordances(
     // (incl. the header — `moveRow`/`deleteRow` now allow it; whatever lands at
     // row 0 becomes the header).
     el.appendChild(
-      makeDragGrip("cm-table-handle cm-table-handle-row", "table.reorder-row", "Reorder row", "row", row, tableFrom),
+      makeDragGrip("cm-table-handle cm-table-handle-row", "table.reorder-row", i18n.t("editor.table.reorderRow"), "row", row, tableFrom),
     );
-    const delRow = makeAffordanceButton("cm-table-del cm-table-del-row", "table.delete-row", "Delete row", () =>
+    const delRow = makeAffordanceButton("cm-table-del cm-table-del-row", "table.delete-row", i18n.t("editor.table.deleteRow"), () =>
       applyTableTransform(view, tableFrom, (g) => deleteRow(g, row)),
     );
     delRow.setAttribute("data-row", String(row));

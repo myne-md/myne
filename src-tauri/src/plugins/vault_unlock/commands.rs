@@ -364,6 +364,27 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     if let Some(active) = state.active_vault_id().await {
         state.set_cached_label(active, prefs.label).await;
     }
+
+    // MYND-443 (ext-foundation-handoff task 7): hydrate the browser-clipper
+    // pairing-token registry from the just-read prefs blob so a paired extension
+    // keeps working after a relaunch and a revoked one stays revoked. The
+    // registry rode inside the same `vault.prefs` blob (the `paired_extensions`
+    // field). A tampered/absent/replayed blob already collapsed to
+    // `PrefsView::default()` above (empty registry) → the extension must
+    // re-pair, never a partial/injected grant (`decisions.md` 2026-06-20). The
+    // `PairingState` singleton is managed by the `clipper-pairing` plugin; its
+    // absence (clipper plugin not installed) is a no-op. The token VALUES are
+    // never logged — only the live-pairing COUNT.
+    if let Some(pairing) = app.try_state::<crate::plugins::clipper_pairing::state::PairingState>() {
+        let registry =
+            crate::clipper::token::TokenRegistry::from_paired_extensions(&prefs.paired_extensions);
+        let live = registry.live_extension_ids().len();
+        pairing.replace_registry(registry);
+        tracing::debug!(
+            event = "clipper_pairing_registry_loaded",
+            live_pairings = live,
+        );
+    }
 }
 
 /// Closed-enum mapping for `PrefsReadError` variants emitted from the
@@ -1659,6 +1680,7 @@ mod tests {
                     item_order: Vec::new(),
                     keymap: Default::default(),
                     active_workspace: None,
+                    archive_disabled: None,
                     editor_layout: None,
                     editor_line_numbers: None,
                     editor_content_width: None,
@@ -1670,6 +1692,7 @@ mod tests {
                     editor_text_size: None,
                     label: None,
                     last_backup_at: None,
+                    paired_extensions: Vec::new(),
                     spell_enabled: None,
                     spell_languages: Vec::new(),
                     saved_views: Vec::new(),
@@ -1782,6 +1805,7 @@ mod tests {
                 item_order: Vec::new(),
                 keymap: Default::default(),
                 active_workspace: None,
+                archive_disabled: None,
                 editor_layout: None,
                 editor_line_numbers: None,
                 editor_content_width: None,
@@ -1793,6 +1817,7 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 saved_views: Vec::new(),

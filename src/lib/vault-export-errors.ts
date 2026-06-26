@@ -11,9 +11,10 @@
 // `tests/notes/vaultExportFlow.test.ts` pins non-empty, pairwise-distinct
 // copy per variant at runtime.
 
+import i18n from "../i18n";
 import type { VaultExportError } from "../types/vault-export-error";
 import {
-  EXPORT_DESTINATION_UNUSABLE_MESSAGE,
+  exportDestinationUnusableMessage,
   ioWriteErrorMessage,
 } from "./note-export-errors";
 
@@ -27,38 +28,41 @@ export function vaultExportErrorMessage(e: VaultExportError): string {
     case "VaultNotUnlocked":
       // Entry points are gated on an unlocked vault — surfacing this is
       // a router bug, but the copy stays honest if it ever fires.
-      return "The vault is locked. Unlock it, then try again.";
+      return i18n.t("export.vault.errors.vaultLocked");
     case "AuthOperationInProgress":
-      return "Another vault operation is in progress. Wait for it to finish, then try again.";
+      return i18n.t("export.vault.errors.authOperationInProgress");
     case "VaultNotFound":
-      return "No vault found to export.";
+      return i18n.t("export.vault.errors.vaultNotFound");
     case "InvalidDestination":
-      return EXPORT_DESTINATION_UNUSABLE_MESSAGE;
+      return exportDestinationUnusableMessage();
     case "DestinationNotAllowed":
       // PRD story 11: a plaintext tree inside Myne's own storage is
       // always refused.
-      return "That location is inside Myne's own storage. Choose a folder outside it.";
+      return i18n.t("export.vault.errors.destinationNotAllowed");
     case "DestinationAlreadyExists":
       // The engine never merges into or replaces an existing directory.
-      return "Something already exists at that location. Choose a fresh spot for the export.";
+      return i18n.t("export.vault.errors.destinationAlreadyExists");
     case "CannotDecrypt":
       // Non-distinguishing per protocol.md §6.4; all-or-nothing.
-      return "A note could not be read, so nothing was exported.";
+      return i18n.t("export.vault.errors.cannotDecrypt");
     case "InvalidPlaintextEncoding":
-      return "A note's content looks damaged, so nothing was exported. Restore it from a backup.";
+      return i18n.t("export.vault.errors.invalidPlaintextEncoding");
     case "InvalidVaultMeta":
-      return "The vault's metadata could not be read, so nothing was exported.";
+      return i18n.t("export.vault.errors.invalidVaultMeta");
     case "AttachmentMissing":
-      return "An attachment referenced by a note is missing, so nothing was exported.";
+      return i18n.t("export.vault.errors.attachmentMissing");
     case "AttachmentCorrupt":
-      return "An attachment referenced by a note could not be read, so nothing was exported.";
+      return i18n.t("export.vault.errors.attachmentCorrupt");
     case "Cancelled":
       // The modal returns to setup quietly on cancel; this line exists
       // for completeness (e.g. a future toast surface), not as a scold.
-      return "Export cancelled. Nothing was left at the destination.";
+      return i18n.t("export.vault.errors.cancelled");
     case "Io":
-      return ioWriteErrorMessage(e.detail.io_error_kind, "Could not write the export.");
+      return ioWriteErrorMessage(
+        e.detail.io_error_kind,
+        i18n.t("export.vault.errors.ioWriteDefault"),
+      );
     case "JoinFailure":
-      return "Export failed unexpectedly. Nothing was left at the destination.";
+      return i18n.t("export.vault.errors.joinFailure");
   }
 }

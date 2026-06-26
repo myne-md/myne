@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 type ZxcvbnScore = 0 | 1 | 2 | 3 | 4;
 
 interface PasswordStrengthProps {
@@ -6,12 +8,14 @@ interface PasswordStrengthProps {
   suggestion?: string;
 }
 
-const SCORE_LABEL: Record<ZxcvbnScore, string> = {
-  0: "Too weak",
-  1: "Too weak",
-  2: "Weak",
-  3: "Fair",
-  4: "Strong",
+// i18n key suffix per score — resolved at render time via t() (never frozen at
+// module scope) so a language switch re-renders the strength label.
+const SCORE_LABEL_KEY: Record<ZxcvbnScore, string> = {
+  0: "tooWeak",
+  1: "tooWeak",
+  2: "weak",
+  3: "fair",
+  4: "strong",
 };
 
 const SCORE_COLOR: Record<ZxcvbnScore, string> = {
@@ -37,9 +41,10 @@ export function PasswordStrength({
   warning,
   suggestion,
 }: PasswordStrengthProps) {
+  const { t } = useTranslation();
   const filled = SEGMENT_COUNT[score];
   const color = SCORE_COLOR[score];
-  const label = SCORE_LABEL[score];
+  const label = t(`password.strength.${SCORE_LABEL_KEY[score]}`);
   const feedback = warning || suggestion;
   const feedbackColor = warning ? "var(--danger)" : "var(--fg-3)";
 

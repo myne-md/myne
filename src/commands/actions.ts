@@ -14,11 +14,16 @@ import type { CommandAction } from "./registry";
 import { runWikilinkConvert } from "../editor/wikilink/convert-command";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { getActiveEditorView } from "../editor/active-view";
+import i18n from "../i18n";
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
-  label: "Lock vault",
-  category: "Vault",
+  get label() {
+    return i18n.t("commands.actions.lockVault.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: async (ctx) => {
     await ctx.onLock();
@@ -27,8 +32,12 @@ const lockVaultAction: CommandAction = {
 
 const openSettingsAction: CommandAction = {
   id: "app.open-settings",
-  label: "Open settings…",
-  category: "App",
+  get label() {
+    return i18n.t("commands.actions.openSettings.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
   kbd: "⌘,",
   defaultBinding: "Mod-,",
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
@@ -39,8 +48,12 @@ const openSettingsAction: CommandAction = {
 
 const backupVaultAction: CommandAction = {
   id: "vault.backup",
-  label: "Back up vault…",
-  category: "Vault",
+  get label() {
+    return i18n.t("commands.actions.backupVault.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
   // Editor-stage guarded like the importer entry: the flow's natural home
   // is the unlocked session (and the unlocked export records
   // `last_backup_at` — spec §9.5.2).
@@ -52,8 +65,12 @@ const backupVaultAction: CommandAction = {
 
 const exportVaultMarkdownAction: CommandAction = {
   id: "vault.export-markdown",
-  label: "Export vault as Markdown…",
-  category: "Vault",
+  get label() {
+    return i18n.t("commands.actions.exportVaultMarkdown.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
   // Editor-stage guarded, vault-level (no note selection needed): the
   // plaintext tree export requires an unlocked vault, and the editor is the
   // only stage that satisfies that. Opens the SAME three-phase modal as the
@@ -66,8 +83,12 @@ const exportVaultMarkdownAction: CommandAction = {
 
 const importObsidianAction: CommandAction = {
   id: "vault.import-obsidian",
-  label: "Import Obsidian vault…",
-  category: "Vault",
+  get label() {
+    return i18n.t("commands.actions.importObsidian.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
   // Enabled on the PR that lands the importer backend + UI (MYND-53), per the
   // established disabled-control discipline. Editor-stage guarded: import
   // requires an unlocked vault (note_create is Slot::Unlocked-gated), and the
@@ -80,8 +101,12 @@ const importObsidianAction: CommandAction = {
 
 const manageTemplatesAction: CommandAction = {
   id: "templates.manage",
-  label: "Manage templates…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.manageTemplates.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only, like Open settings — the management surface mounts inside the
   // Editor (modal carve-out). Free + local; no paywall, no hosted-sync gate.
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
@@ -92,8 +117,12 @@ const manageTemplatesAction: CommandAction = {
 
 const newNoteFromTemplateAction: CommandAction = {
   id: "templates.new-note",
-  label: "New note from template…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.newNoteFromTemplate.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only; opens the picker → prompt-first name → render+create flow. The
   // instant-blank path (bare Cmd+N + the five instant-create surfaces) is
   // untouched — this is the deliberate, opt-in template path (split-path).
@@ -105,8 +134,12 @@ const newNoteFromTemplateAction: CommandAction = {
 
 const openTodayNoteAction: CommandAction = {
   id: "daily.open-today",
-  label: "Open today's note",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.openTodayNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Idempotent open-or-create over ordinary notes (folder + date-title key).
   // Palette-only in v1 — no sidebar button, no built-in hotkey; past days are
   // reached via the ordinary Daily/ sidebar folder (no calendar, no date-picker).
@@ -118,8 +151,12 @@ const openTodayNoteAction: CommandAction = {
 
 const randomNoteAction: CommandAction = {
   id: "notes.random",
-  label: "Open random note",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.randomNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only like "Open today's note" (MYND-323): serendipitous review opens
   // a random live, non-template note. The empty-vault case shows a toast at run
   // time (never a modal), so visibility stays a simple stage guard.
@@ -131,8 +168,12 @@ const randomNoteAction: CommandAction = {
 
 const openAttachmentsAction: CommandAction = {
   id: "attachments.open",
-  label: "Open attachments…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.openAttachments.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only, like Open settings — the library is a full-pane center-pane
   // view inside the Editor (SYNC-9), not a Stage. Free + local.
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
@@ -143,8 +184,12 @@ const openAttachmentsAction: CommandAction = {
 
 const convertWikilinksAction: CommandAction = {
   id: "wikilinks.convert-in-this-note",
-  label: "Convert imported wikilinks in this note…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.convertWikilinks.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // R2 (MYND-84): per-note conversion of imported title-only wikilinks to the
   // canonical §3 path form, with a mandatory diff preview. Editor-only + per-note
   // (acts on the active buffer); the empty case shows a toast, never a modal.
@@ -157,8 +202,12 @@ const convertWikilinksAction: CommandAction = {
 
 const foldAllAction: CommandAction = {
   id: "editor.fold-all",
-  label: "Fold all",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.foldAll.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   kbd: "⌘⌥[",
   defaultBinding: "Mod-Alt-[",
   // Editor-only; reaches the focused pane's view directly via getActiveEditorView()
@@ -174,8 +223,12 @@ const foldAllAction: CommandAction = {
 
 const unfoldAllAction: CommandAction = {
   id: "editor.unfold-all",
-  label: "Unfold all",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.unfoldAll.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   kbd: "⌘⌥]",
   defaultBinding: "Mod-Alt-]",
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
@@ -187,8 +240,12 @@ const unfoldAllAction: CommandAction = {
 
 const openSnapshotsAction: CommandAction = {
   id: "snapshots.open",
-  label: "Snapshots…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.openSnapshots.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only and per-note: the panel is scoped to the selected note, so it is
   // hidden when nothing is selected (MYND-97).
   visibility: (ctx) =>
@@ -202,8 +259,12 @@ const openSnapshotsAction: CommandAction = {
 
 const exportNoteMarkdownAction: CommandAction = {
   id: "note.export-markdown",
-  label: "Export note as Markdown…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.exportNoteMarkdown.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only and per-note like Snapshots (MYND-97): the flow exports the
   // SELECTED note, so it is hidden when nothing is open. Runs the exact same
   // shared flow as the sidebar context-menu item (src/notes/exportFlow.ts) —
@@ -219,8 +280,12 @@ const exportNoteMarkdownAction: CommandAction = {
 
 const exportNotePdfAction: CommandAction = {
   id: "note.export-pdf",
-  label: "Export note as PDF…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.exportNotePdf.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Sibling of note.export-markdown with the SAME visibility rules
   // (MYND-255, SYNC-5): editor stage AND a selected note, else hidden.
   // Runs the exact same shared flow as the sidebar context-menu item
@@ -237,8 +302,12 @@ const exportNotePdfAction: CommandAction = {
 
 const exportNoteHtmlAction: CommandAction = {
   id: "note.export-html",
-  label: "Export note as HTML…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.exportNoteHtml.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Sibling of note.export-markdown / note.export-pdf with the SAME
   // visibility rules (MYND-340): editor stage AND a selected note, else
   // hidden. Runs the exact same shared flow as the sidebar context-menu
@@ -255,8 +324,12 @@ const exportNoteHtmlAction: CommandAction = {
 
 const exportNoteTxtAction: CommandAction = {
   id: "note.export-txt",
-  label: "Export note as Plain Text…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.exportNoteTxt.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Sibling of the other per-note export actions (MYND-340): editor stage
   // AND a selected note. Runs the shared
   // src/notes/exportFlow.ts::runNoteTxtExportFlow — deliberate plaintext
@@ -272,8 +345,12 @@ const exportNoteTxtAction: CommandAction = {
 
 const showGraphAction: CommandAction = {
   id: "graph.show",
-  label: "Show graph view…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.showGraph.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   kbd: "⌘⇧G",
   defaultBinding: "Mod-Shift-g",
   // Editor-only, like the other modal carve-outs. The whole-vault graph is a
@@ -287,8 +364,12 @@ const showGraphAction: CommandAction = {
 
 const showTagsAction: CommandAction = {
   id: "tags.show",
-  label: "Browse tags…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.showTags.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only, like the other modal carve-outs. A navigation surface reached
   // often, so it ALSO has a persistent BottomBar affordance (SYNC-7 refinement,
   // tag-system #2) — the palette action is one of two entry points.
@@ -300,8 +381,12 @@ const showTagsAction: CommandAction = {
 
 const importBaseViewAction: CommandAction = {
   id: "views.import-base",
-  label: "Import .base view…",
-  category: "Vault",
+  get label() {
+    return i18n.t("commands.actions.importBaseView.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
   // Live as of Saved Views #6 (MYND-276, task 6): the file-picker → parse → map →
   // persist → SYNC-12 import-summary tally dispatch now lands. Editor-stage only
   // (import needs an unlocked vault); hidden elsewhere, mirroring
@@ -314,8 +399,12 @@ const importBaseViewAction: CommandAction = {
 
 const showViewsAction: CommandAction = {
   id: "views.show",
-  label: "Browse views…",
-  category: "Editor",
+  get label() {
+    return i18n.t("commands.actions.showViews.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
   // Editor-only, like the other navigation entries. The Saved Views surface is
   // reached often, so it ALSO has a persistent BottomBar affordance (SYNC-7
   // dual-entry, Saved Views #4) — the palette action is one of two entry points.
@@ -327,8 +416,12 @@ const showViewsAction: CommandAction = {
 
 const toggleLeftSidebarAction: CommandAction = {
   id: "view.toggle-notes-sidebar",
-  label: "Toggle notes sidebar",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.toggleLeftSidebar.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onToggleLeftSidebar();
@@ -337,8 +430,12 @@ const toggleLeftSidebarAction: CommandAction = {
 
 const toggleRightSidebarAction: CommandAction = {
   id: "view.toggle-backlinks-sidebar",
-  label: "Toggle backlinks sidebar",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.toggleRightSidebar.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onToggleRightSidebar();
@@ -347,8 +444,12 @@ const toggleRightSidebarAction: CommandAction = {
 
 const toggleStackedTabsAction: CommandAction = {
   id: "view.toggle-stacked-tabs",
-  label: "Toggle stacked tabs",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.toggleStackedTabs.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   // tab-modes (MYND-319): per-leaf-pane layout flag on the FOCUSED pane — the
   // palette is the sole entry point (no pane-header chrome this slice). Editor-
   // only like the other view toggles; the pane state is always present there.
@@ -360,8 +461,12 @@ const toggleStackedTabsAction: CommandAction = {
 
 const toggleReadingAction: CommandAction = {
   id: "view.toggle-reading",
-  label: "Toggle reading view",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.toggleReading.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   kbd: "⇧⌘E",
   // reading-source-modes (MYND-299): Edit ⇄ Reading on the focused note tab. The
   // live chord fires through the WorkspaceHotkeys keybind entry + catalog default
@@ -375,8 +480,12 @@ const toggleReadingAction: CommandAction = {
 
 const toggleSourceAction: CommandAction = {
   id: "view.toggle-source",
-  label: "Toggle source mode",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.toggleSource.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   // Secondary live ⇄ source toggle on the focused note tab. No default chord
   // (grill D2) — palette + the bottom-bar switcher are its entry points.
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
@@ -387,8 +496,12 @@ const toggleSourceAction: CommandAction = {
 
 const toggleFocusAction: CommandAction = {
   id: "view.toggle-focus",
-  label: "Toggle focus mode",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.toggleFocus.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   kbd: "⇧⌘F",
   // focus-mode (MYND-348): distraction-free toggle. Live chord fires through the
   // WorkspaceHotkeys keybind entry + catalog default (Mod-Shift-f); this
@@ -406,8 +519,12 @@ const toggleFocusAction: CommandAction = {
 // twin entry point. Editor-only like the other view commands.
 const saveWorkspaceAsAction: CommandAction = {
   id: "workspace.save-as",
-  label: "Save workspace as…",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.saveWorkspaceAs.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onSaveWorkspaceAs();
@@ -416,8 +533,12 @@ const saveWorkspaceAsAction: CommandAction = {
 
 const switchWorkspaceAction: CommandAction = {
   id: "workspace.switch",
-  label: "Switch workspace…",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.switchWorkspace.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onSwitchWorkspace();
@@ -426,8 +547,12 @@ const switchWorkspaceAction: CommandAction = {
 
 const renameWorkspaceAction: CommandAction = {
   id: "workspace.rename",
-  label: "Rename workspace…",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.renameWorkspace.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onRenameWorkspace();
@@ -436,8 +561,12 @@ const renameWorkspaceAction: CommandAction = {
 
 const deleteWorkspaceAction: CommandAction = {
   id: "workspace.delete",
-  label: "Delete workspace…",
-  category: "View",
+  get label() {
+    return i18n.t("commands.actions.deleteWorkspace.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.view");
+  },
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onDeleteWorkspace();

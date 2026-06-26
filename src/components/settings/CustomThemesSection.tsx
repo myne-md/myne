@@ -13,6 +13,7 @@
 // the helper says "validated on this device", never "safe".
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Button } from "../primitives/Button";
@@ -28,6 +29,7 @@ import {
 } from "../../lib/themes";
 import { prefsRead, setCustomTheme } from "../../lib/prefs";
 import { applyCustomTheme, applyTheme } from "../../lib/theme";
+import i18n from "../../i18n";
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -143,20 +145,31 @@ function Chiplet({ preview }: { preview: NonNullable<ThemeInfo["preview"]> }) {
 
 /** Human-readable one-liner for a rich validation error. */
 function describeError(error: ThemeError | null): string {
-  if (!error) return "Invalid theme file.";
+  if (!error) return i18n.t("settings.customThemes.error.invalidFile");
   switch (error.kind) {
     case "MissingKey":
-      return `Missing required color ${error.key ?? ""}`.trim();
-    case "InvalidValue":
+      return i18n
+        .t("settings.customThemes.error.missingKey", { key: error.key ?? "" })
+        .trim();
+    case "InvalidValue": {
+      const key = error.key ?? i18n.t("settings.customThemes.error.aColorFallback");
       return error.line != null
-        ? `Invalid value for ${error.key ?? "a color"} (line ${error.line})`
-        : `Invalid value for ${error.key ?? "a color"}`;
+        ? i18n.t("settings.customThemes.error.invalidValueWithLine", {
+            key,
+            line: error.line,
+          })
+        : i18n.t("settings.customThemes.error.invalidValue", { key });
+    }
     case "ParseError":
-      return error.line != null ? `Not valid JSON (line ${error.line})` : "Not valid JSON";
+      return error.line != null
+        ? i18n.t("settings.customThemes.error.parseErrorWithLine", {
+            line: error.line,
+          })
+        : i18n.t("settings.customThemes.error.parseError");
     case "InvalidName":
-      return "Unsafe theme name";
+      return i18n.t("settings.customThemes.error.invalidName");
     default:
-      return "Invalid theme file.";
+      return i18n.t("settings.customThemes.error.invalidFile");
   }
 }
 
@@ -171,6 +184,10 @@ export function CustomThemesSection({
   activeCustom,
   onActiveCustomChange,
 }: CustomThemesSectionProps) {
+  // Aliased to `translate` because the theme-list `.map((t) => …)` below binds a
+  // loop variable named `t` (a `ThemeInfo`), which would otherwise shadow the
+  // translation function inside the row JSX.
+  const { t: translate } = useTranslation();
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
@@ -179,7 +196,7 @@ export function CustomThemesSection({
     try {
       setThemes(await listCustomThemes());
     } catch {
-      setError("Couldn't read your themes folder.");
+      setError(translate("settings.customThemes.readError"));
     }
   }
 
@@ -196,7 +213,7 @@ export function CustomThemesSection({
       applyCustomTheme(palette);
       onActiveCustomChange(name);
     } catch {
-      setError("Couldn't apply that theme. Please try again.");
+      setError(translate("settings.customThemes.applyError"));
     }
   }
 
@@ -219,7 +236,7 @@ export function CustomThemesSection({
       setConfirmingDelete(null);
       await refresh();
     } catch {
-      setError("Couldn't delete that theme. Please try again.");
+      setError(translate("settings.customThemes.deleteError"));
     }
   }
 
@@ -227,14 +244,16 @@ export function CustomThemesSection({
     setError(null);
     const picked = await openFileDialog({
       multiple: false,
-      filters: [{ name: "Myne theme", extensions: ["json"] }],
+      filters: [
+        { name: translate("settings.customThemes.fileFilterName"), extensions: ["json"] },
+      ],
     }).catch(() => null);
     if (typeof picked !== "string") return;
     try {
       await importCustomTheme(picked);
       await refresh();
     } catch {
-      setError("That file isn't a valid theme. Open the reference to see the format.");
+      setError(translate("settings.customThemes.importError"));
     }
   }
 
@@ -243,31 +262,27 @@ export function CustomThemesSection({
       const dir = await ensureThemesDir();
       await revealItemInDir(dir);
     } catch {
-      setError("Couldn't open the themes folder.");
+      setError(translate("settings.customThemes.openFolderError"));
     }
   }
 
   return (
     <div style={BLOCK_STYLE}>
-      <span style={LABEL_STYLE}>Custom themes</span>
-      <p style={HELPER_STYLE}>
-        Use your own color palette. Themes are validated on this device before
-        use — nothing is uploaded.
-      </p>
+      <span style={LABEL_STYLE}>{translate("settings.customThemes.label")}</span>
+      <p style={HELPER_STYLE}>{translate("settings.customThemes.helper")}</p>
 
       <div style={{ ...BUTTON_ROW_STYLE, marginTop: "var(--space-3)" }}>
         <Button variant="secondary" onClick={() => void importTheme()} data-testid="settings.custom-theme-import">
-          Import theme…
+          {translate("settings.customThemes.importButton")}
         </Button>
         <Button variant="ghost" onClick={() => void openFolder()} data-testid="settings.custom-theme-open-folder">
-          Open themes folder
+          {translate("settings.customThemes.openFolderButton")}
         </Button>
       </div>
 
       {themes.length === 0 ? (
         <p style={EMPTY_STYLE} data-testid="settings.custom-theme-empty">
-          No custom themes yet. Import one, or open the themes folder and add a
-          theme file.
+          {translate("settings.customThemes.empty")}
         </p>
       ) : (
         <div style={LIST_STYLE}>
@@ -299,7 +314,11 @@ export function CustomThemesSection({
                   <span style={NAME_INVALID_STYLE}>{t.display_name}</span>
                 )}
 
-                {t.valid && isActive && <span style={APPLIED_BADGE_STYLE}>Applied</span>}
+                {t.valid && isActive && (
+                  <span style={APPLIED_BADGE_STYLE}>
+                    {translate("settings.customThemes.appliedBadge")}
+                  </span>
+                )}
 
                 {!t.valid && (
                   <span style={ROW_ERROR_STYLE} role="alert">
@@ -314,7 +333,7 @@ export function CustomThemesSection({
                       onClick={() => void apply(t.name)}
                       data-testid="settings.custom-theme-apply"
                     >
-                      Apply
+                      {translate("settings.customThemes.apply")}
                     </Button>
                   )}
                   {confirmingDelete === t.name ? (
@@ -324,14 +343,14 @@ export function CustomThemesSection({
                         onClick={() => void confirmDelete(t.name)}
                         data-testid="settings.custom-theme-delete-confirm"
                       >
-                        Confirm
+                        {translate("settings.customThemes.confirm")}
                       </Button>
                       <Button
                         variant="ghost"
                         onClick={() => setConfirmingDelete(null)}
                         data-testid="settings.custom-theme-delete-cancel"
                       >
-                        Cancel
+                        {translate("settings.customThemes.cancel")}
                       </Button>
                     </>
                   ) : (
@@ -340,7 +359,7 @@ export function CustomThemesSection({
                       onClick={() => setConfirmingDelete(t.name)}
                       data-testid="settings.custom-theme-delete"
                     >
-                      Delete
+                      {translate("settings.customThemes.delete")}
                     </Button>
                   )}
                 </div>

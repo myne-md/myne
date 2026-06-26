@@ -31,6 +31,7 @@ permissions = [
   "allow-set-daily-template",
   "allow-set-editor-text-size",
   "allow-set-editor-line-numbers",
+  "allow-set-archive-disabled",
   "allow-set-editor-line-spacing",
   "allow-set-editor-content-width",
   "allow-set-editor-font-family",
@@ -176,6 +177,11 @@ commands.allow = ["set_editor_line_spacing"]
 identifier = "allow-set-editor-line-numbers"
 description = "Allow invoking prefs:set_editor_line_numbers (Slot::Unlocked-gated setter for the editor_line_numbers toggle — the optional editor line-number gutter; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time)."
 commands.allow = ["set_editor_line_numbers"]
+
+[[permission]]
+identifier = "allow-set-archive-disabled"
+description = "Allow invoking prefs:set_archive_disabled (Slot::Unlocked-gated setter for the archive_disabled toggle — disables the note-archive feature's UI entry points; atomic-writes vault.prefs with no native side-effect; the default-OFF policy (archiving enabled) is applied host-side at read time)."
+commands.allow = ["set_archive_disabled"]
 
 [[permission]]
 identifier = "allow-set-editor-content-width"

@@ -1,0 +1,2056 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Hủy",
+      "cleaning": "Đang dọn dẹp…",
+      "close": "Đóng",
+      "completeTitle": "Đã dọn dẹp xong",
+      "deleteCta": "Xóa {{count}} tệp không dùng",
+      "deleteCta_one": "Xóa {{count}} tệp không dùng",
+      "deleteCta_other": "Xóa {{count}} tệp không dùng",
+      "error": "Không thể dọn dẹp. Một số ghi chú có thể không đọc được — không có gì bị xóa.",
+      "intro_one": "Tệp đính kèm này không được dùng trong bất kỳ ghi chú nào. Việc xóa là vĩnh viễn và không thể hoàn tác.",
+      "intro_other": "{{count}} tệp đính kèm này không được dùng trong bất kỳ ghi chú nào. Việc xóa là vĩnh viễn và không thể hoàn tác.",
+      "summaryFreed": " · đã giải phóng {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "Đã xóa {{count}} tệp đính kèm",
+      "summaryRemoved_other": "Đã xóa {{count}} tệp đính kèm",
+      "summarySkipped": " · bỏ qua {{count}} (đang được dùng)",
+      "summarySkipped_one": " · bỏ qua {{count}} (đang được dùng)",
+      "summarySkipped_other": " · bỏ qua {{count}} (đang được dùng)",
+      "title": "Dọn các tệp đính kèm không dùng",
+      "willBeReclaimed": "Sẽ thu hồi {{size}}."
+    },
+    "coverPicker": {
+      "close": "Đóng",
+      "dropHint": "Thả một ảnh vào để dùng làm ảnh bìa.",
+      "empty": "Chưa có ảnh nào trong kho này. Tải lên một ảnh hoặc kéo ảnh vào đây.",
+      "loading": "Đang tải…",
+      "removeCover": "Bỏ ảnh bìa",
+      "title": "Chọn một ảnh bìa",
+      "upload": "Tải lên"
+    },
+    "deleteDialog": {
+      "cancel": "Hủy",
+      "confirmPrompt": "Xóa vĩnh viễn tệp đính kèm này? Không thể hoàn tác.",
+      "delete": "Xóa",
+      "deleting": "Đang xóa…",
+      "error": "Không thể xóa tệp đính kèm. Hãy thử lại.",
+      "notUsed": "Không được dùng trong ghi chú nào.",
+      "stillUsed_one": "Tệp vẫn được dùng trong {{count}} ghi chú. Xóa nó sẽ để lại một dấu vết ở nơi nó được nhúng:",
+      "stillUsed_other": "Tệp vẫn được dùng trong {{count}} ghi chú. Xóa nó sẽ để lại một dấu vết ở nơi nó được nhúng:",
+      "title": "Xóa tệp đính kèm",
+      "untitled": "Không có tiêu đề"
+    },
+    "library": {
+      "actionsAriaLabel": "Thao tác với tệp đính kèm",
+      "actionsTitle": "Thao tác",
+      "checking": "Đang kiểm tra…",
+      "checkUnusedFailedNotice": "Không thể kiểm tra tệp đính kèm không dùng. Hãy thử lại.",
+      "cleanUnused": "Dọn tệp không dùng",
+      "cleanUnusedTitle": "Xóa các tệp đính kèm không được dùng trong bất kỳ ghi chú nào",
+      "colCreated": "Ngày tạo",
+      "colName": "Tên",
+      "colSize": "Kích thước",
+      "colType": "Loại",
+      "colUsedIn": "Dùng trong",
+      "decrypting": "Đang giải mã tệp đính kèm…",
+      "emptyImportHint": "Nhập một tệp để giữ nó trong kho.",
+      "emptyLoadError": "Không thể đọc danh mục tệp đính kèm.",
+      "emptyNoAttachments": "Chưa có tệp đính kèm nào.",
+      "filterAriaLabel": "Lọc theo loại",
+      "gridView": "Xem dạng lưới",
+      "import": "Nhập",
+      "importDialogTitle": "Nhập tệp đính kèm",
+      "importFile": "Nhập một tệp",
+      "importing": "Đang nhập…",
+      "listView": "Xem dạng danh sách",
+      "menuDelete": "Xóa",
+      "menuExport": "Xuất",
+      "menuPreview": "Xem trước",
+      "menuRename": "Đổi tên",
+      "noMatch": "Không có tệp đính kèm nào khớp với tìm kiếm của bạn.",
+      "noUnusedNotice": "Không có tệp đính kèm không dùng nào để dọn.",
+      "preview": "Xem trước",
+      "previewAttachment": "Xem trước tệp đính kèm",
+      "searchAriaLabel": "Tìm tệp đính kèm theo tên tệp",
+      "searchPlaceholder": "Tìm theo tên tệp",
+      "sort": {
+        "createdAsc": "Cũ nhất trước",
+        "createdDesc": "Mới nhất trước",
+        "nameAsc": "Tên A–Z",
+        "nameDesc": "Tên Z–A"
+      },
+      "sortAriaLabel": "Sắp xếp tệp đính kèm",
+      "supportedFilesFilter": "Tệp được hỗ trợ",
+      "title": "Tệp đính kèm",
+      "typeFilter": {
+        "all": "Tất cả các loại",
+        "audio": "Âm thanh",
+        "image": "Hình ảnh",
+        "other": "Khác",
+        "pdf": "PDF"
+      },
+      "usedInCount_one": "Dùng trong {{count}} ghi chú",
+      "usedInCount_other": "Dùng trong {{count}} ghi chú",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Âm thanh: {{filename}}",
+      "file": "Tệp",
+      "pause": "Tạm dừng",
+      "pdfDocument": "Tài liệu PDF",
+      "pdfFirstPage": "Trang đầu PDF",
+      "play": "Phát"
+    },
+    "usedInNotesPopover": {
+      "empty": "Không được dùng trong ghi chú nào.",
+      "untitled": "Không có tiêu đề"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "Một thao tác kho khác đang diễn ra. Hãy chờ nó hoàn tất rồi thử lại.",
+        "cancelled": "Đã hủy sao lưu. Không có tệp nào được tạo ra.",
+        "invalidDestination": "Thư mục đích đó không dùng được.",
+        "ioGeneric": "Không thể ghi tệp sao lưu.",
+        "ioNoSpace": "Không đủ dung lượng ở thư mục đích.",
+        "ioPermissionDenied": "Không có quyền ghi tại thư mục đích.",
+        "joinFailure": "Sao lưu thất bại bất ngờ. Không có tệp nào được tạo ra.",
+        "memberTooLarge": "Một tệp trong kho này lớn hơn mức định dạng sao lưu cho phép.",
+        "vaultNotFound": "Không tìm thấy kho nào để sao lưu.",
+        "verifyFailed": "Bản sao lưu đã ghi không xác minh được nên đã bị loại bỏ. Hãy thử lại — dùng phương tiện khác nếu vẫn lặp lại."
+      },
+      "restore": {
+        "authOperationInProgress": "Một thao tác kho khác đang diễn ra. Hãy chờ nó hoàn tất rồi thử lại.",
+        "cancelled": "Đã hủy khôi phục. Không có gì thay đổi.",
+        "damagedBackup": "Tệp sao lưu đã bị hỏng.",
+        "futureVersionBackup": "Bản sao lưu này được tạo bởi một phiên bản Myne mới hơn. Hãy cập nhật Myne rồi khôi phục.",
+        "invalidVaultMeta": "Siêu dữ liệu kho của bản sao lưu này không đọc được, nên việc khôi phục không thể tạo ra một kho hoạt động.",
+        "ioGeneric": "Không thể đọc tệp sao lưu.",
+        "ioPermissionDenied": "Không có quyền đọc tệp sao lưu.",
+        "joinFailure": "Khôi phục thất bại bất ngờ. Không có gì thay đổi.",
+        "missingVaultMeta": "Bản sao lưu này thiếu siêu dữ liệu kho nên không thể khôi phục.",
+        "notABackupFile": "Tệp này không phải là bản sao lưu Myne.",
+        "vaultAlreadyExists": "Một kho từ bản sao lưu này đã tồn tại trên thiết bị này."
+      }
+    },
+    "export": {
+      "cancel": "Hủy",
+      "close": "Đóng",
+      "copying": "Đang sao chép {{done}} trên {{total}}…",
+      "preparing": "Đang chuẩn bị…",
+      "successToast": "Đã xác minh và lưu bản sao lưu.",
+      "title": "Sao lưu kho",
+      "verifying": "Đang xác minh {{done}} trên {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Chấp nhận",
+      "close": "Đóng",
+      "codeAriaLabel": "Mã ghép nối",
+      "intro": "Xác nhận mã này khớp với mã hiển thị trong tiện ích mở rộng, rồi nhấn Chấp nhận để ghép nối.",
+      "reject": "Từ chối",
+      "rejected": "Đã từ chối ghép nối.",
+      "title": "Một tiện ích trình duyệt muốn kết nối"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Lưu trữ",
+    "archivedBadgeTitle": "Đã lưu trữ",
+    "dialogLabel": "Bảng lệnh",
+    "matchedInBody": "↳ khớp trong nội dung",
+    "noMatches": "Không có kết quả",
+    "searchPlaceholder": "Tìm ghi chú hoặc chạy lệnh — Esc để đóng",
+    "sectionCommands": "Lệnh",
+    "sectionNotes": "Ghi chú",
+    "untitledNote": "Không có tiêu đề"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Sao lưu kho…"
+      },
+      "category": {
+        "app": "Ứng dụng",
+        "editor": "Trình soạn thảo",
+        "vault": "Kho",
+        "view": "Xem"
+      },
+      "convertWikilinks": {
+        "label": "Chuyển đổi liên kết wiki đã nhập trong ghi chú này…"
+      },
+      "deleteWorkspace": {
+        "label": "Xóa không gian làm việc…"
+      },
+      "exportNoteHtml": {
+        "label": "Xuất ghi chú dạng HTML…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Xuất ghi chú dạng Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "Xuất ghi chú dạng PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "Xuất ghi chú dạng văn bản thuần…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Xuất kho dạng Markdown…"
+      },
+      "foldAll": {
+        "label": "Thu gọn tất cả"
+      },
+      "importBaseView": {
+        "label": "Nhập chế độ xem .base…"
+      },
+      "importObsidian": {
+        "label": "Nhập kho Obsidian…"
+      },
+      "lockVault": {
+        "label": "Khóa kho"
+      },
+      "manageTemplates": {
+        "label": "Quản lý mẫu…"
+      },
+      "newNoteFromTemplate": {
+        "label": "Ghi chú mới từ mẫu…"
+      },
+      "openAttachments": {
+        "label": "Mở tệp đính kèm…"
+      },
+      "openSettings": {
+        "label": "Mở cài đặt…"
+      },
+      "openSnapshots": {
+        "label": "Ảnh chụp…"
+      },
+      "openTodayNote": {
+        "label": "Mở ghi chú hôm nay"
+      },
+      "randomNote": {
+        "label": "Mở ghi chú ngẫu nhiên"
+      },
+      "renameWorkspace": {
+        "label": "Đổi tên không gian làm việc…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Lưu không gian làm việc thành…"
+      },
+      "showGraph": {
+        "label": "Hiện chế độ xem đồ thị…"
+      },
+      "showTags": {
+        "label": "Duyệt thẻ…"
+      },
+      "showViews": {
+        "label": "Duyệt chế độ xem…"
+      },
+      "switchWorkspace": {
+        "label": "Chuyển không gian làm việc…"
+      },
+      "toggleFocus": {
+        "label": "Bật/tắt chế độ tập trung"
+      },
+      "toggleLeftSidebar": {
+        "label": "Bật/tắt thanh bên ghi chú"
+      },
+      "toggleReading": {
+        "label": "Bật/tắt chế độ đọc"
+      },
+      "toggleRightSidebar": {
+        "label": "Bật/tắt thanh bên liên kết ngược"
+      },
+      "toggleSource": {
+        "label": "Bật/tắt chế độ nguồn"
+      },
+      "toggleStackedTabs": {
+        "label": "Bật/tắt thẻ xếp chồng"
+      },
+      "unfoldAll": {
+        "label": "Mở rộng tất cả"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "In đậm",
+        "closeTab": "Đóng thẻ",
+        "cycleHeadingLevel": "Đổi vòng cấp tiêu đề",
+        "cycleTabs": "Chuyển vòng các thẻ",
+        "deleteWorkspace": "Xóa không gian làm việc",
+        "focusNextPane": "Chuyển sang khung tiếp theo",
+        "focusPrevPane": "Chuyển sang khung trước",
+        "foldAll": "Thu gọn tất cả",
+        "inlineCode": "Mã nội dòng",
+        "insertWikilink": "Chèn liên kết wiki",
+        "italic": "In nghiêng",
+        "navigateBack": "Quay lại",
+        "navigateForward": "Tiến tới",
+        "newNote": "Ghi chú mới",
+        "openSettings": "Mở cài đặt",
+        "paletteToggle": "Mở bảng lệnh",
+        "renameWorkspace": "Đổi tên không gian làm việc",
+        "saveWorkspaceAs": "Lưu không gian làm việc thành",
+        "selectAllScoped": "Chọn tất cả (trong phạm vi)",
+        "showGraphView": "Hiện chế độ xem đồ thị",
+        "splitPaneDown": "Chia khung (xuống dưới)",
+        "splitPaneRight": "Chia khung (sang phải)",
+        "switchWorkspace": "Chuyển không gian làm việc",
+        "toggleBulletList": "Bật/tắt danh sách dấu đầu dòng",
+        "toggleFocusMode": "Bật/tắt chế độ tập trung",
+        "toggleNumberedList": "Bật/tắt danh sách đánh số",
+        "toggleReadingView": "Bật/tắt chế độ đọc",
+        "toggleSourceMode": "Bật/tắt chế độ nguồn",
+        "toggleTaskList": "Bật/tắt danh sách công việc",
+        "unfoldAll": "Mở rộng tất cả"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Hãy thêm một phím bổ trợ (⌘, Ctrl hoặc Alt) — một phím đơn lẻ không thể làm phím tắt."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Hủy",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Đang tải"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "Đã xuất {{filename}}.",
+        "exportFailed": "Không thể xuất {{filename}}.",
+        "renamed": "Đã đổi tên thành {{name}}.",
+        "renameFailed": "Không thể đổi tên tệp đính kèm.",
+        "saveDialogFailed": "Không thể mở hộp thoại lưu."
+      },
+      "convert": {
+        "cancel": "Hủy",
+        "confirm": "Chuyển đổi",
+        "skipped": "đã bỏ qua — {{note}}",
+        "subtitle_one": "1 tham chiếu sẽ được viết lại. Hãy xem lại trước khi thực hiện.",
+        "subtitle_other": "{{count}} tham chiếu sẽ được viết lại. Hãy xem lại trước khi thực hiện.",
+        "subtitleEmpty": "Không có gì để chuyển đổi — không phân giải được tệp nguồn nào.",
+        "title": "Chuyển đổi tệp đính kèm đã nhập"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Nguồn tệp đính kèm"
+      },
+      "convertCore": {
+        "converted": "Đã chuyển đổi {{count}}",
+        "converted_one": "Đã chuyển đổi {{count}}",
+        "converted_other": "Đã chuyển đổi {{count}}",
+        "noneToConvert": "Không có tệp đính kèm đã nhập nào để chuyển đổi trong ghi chú này.",
+        "skipNote": {
+          "failed": "nhập thất bại",
+          "locked": "kho đã khóa",
+          "notFound": "không tìm thấy nguồn",
+          "tooLarge": "quá lớn (tối đa 64 MiB)",
+          "unsupported": "loại không được hỗ trợ"
+        },
+        "skippedSuffix": " · bỏ qua {{count}}",
+        "skippedSuffix_one": " · bỏ qua {{count}}",
+        "skippedSuffix_other": " · bỏ qua {{count}}"
+      },
+      "fileKind": {
+        "generic": "Tệp",
+        "label": {
+          "archive": "Tệp nén",
+          "audio": "Âm thanh",
+          "cHeader": "Tệp tiêu đề C",
+          "cppSource": "Mã nguồn C++",
+          "cSource": "Mã nguồn C",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Tài liệu",
+          "ebook": "Sách điện tử",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Hình ảnh",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Tài liệu Keynote",
+          "log": "Tệp nhật ký",
+          "markdown": "Markdown",
+          "numbers": "Bảng tính Numbers",
+          "pages": "Tài liệu Pages",
+          "pdf": "PDF",
+          "presentation": "Bản trình chiếu",
+          "python": "Python",
+          "richText": "Tài liệu văn bản định dạng",
+          "rust": "Rust",
+          "shell": "Tập lệnh shell",
+          "spreadsheet": "Bảng tính",
+          "svg": "Ảnh SVG",
+          "text": "Tài liệu văn bản",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Tài liệu Word",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "Tệp {{ext}}"
+      },
+      "lightbox": {
+        "close": "Đóng xem trước",
+        "export": "Xuất",
+        "exportAria": "Xuất tệp đính kèm",
+        "imagePreview": "Xem trước hình ảnh",
+        "pdfFallback": "PDF",
+        "pdfPreview": "Xem trước PDF"
+      },
+      "menu": {
+        "actionsAria": "Thao tác với tệp đính kèm"
+      },
+      "pdf": {
+        "loading": "Đang tải…"
+      },
+      "picker": {
+        "openFailed": "Không thể mở trình chọn tệp."
+      },
+      "progress": {
+        "encrypting": "Đang mã hóa…",
+        "importing": "Đang nhập…",
+        "loading": "Đang tải…"
+      },
+      "recording": {
+        "barAria": "Đang ghi âm ghi chú giọng nói",
+        "cancel": "Hủy",
+        "noAudio": "Không phát hiện âm thanh — hãy kiểm tra micrô.",
+        "saving": "Đang lưu…",
+        "stop": "Dừng"
+      },
+      "rename": {
+        "cancel": "Hủy",
+        "confirm": "Đổi tên",
+        "title": "Đổi tên tệp đính kèm"
+      },
+      "summary": {
+        "added": "Đã thêm {{count}}",
+        "added_one": "Đã thêm {{count}}",
+        "added_other": "Đã thêm {{count}}",
+        "reason": {
+          "failed": "thất bại",
+          "locked": "kho đã khóa",
+          "tooLarge": "quá lớn",
+          "unsupported": "loại không được hỗ trợ"
+        },
+        "skipped": "Bỏ qua {{count}}: {{noun}}",
+        "skipped_one": "Bỏ qua {{count}}: {{noun}}",
+        "skipped_other": "Bỏ qua {{count}}: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "Đang có một bản ghi âm tiến hành.",
+          "captureFailed": "Không thể bắt đầu ghi âm — hãy kiểm tra quyền truy cập micrô trong Cài đặt hệ thống.",
+          "generic": "Không thể bắt đầu ghi âm.",
+          "locked": "Hãy mở khóa kho để ghi âm ghi chú giọng nói.",
+          "noInputDevice": "Không tìm thấy micrô. Hãy kết nối một micrô rồi thử lại."
+        },
+        "stopError": {
+          "captureFailed": "Ghi âm thất bại — hãy kiểm tra micrô của bạn.",
+          "emptyRecording": "Không có gì được ghi âm.",
+          "generic": "Không thể lưu bản ghi âm.",
+          "silentRecording": "Bản ghi âm im lặng nên đã bị loại bỏ — hãy kiểm tra micrô của bạn."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Tạm dừng",
+          "play": "Phát",
+          "seek": "Tua"
+        },
+        "menu": {
+          "export": "Xuất",
+          "remove": "Gỡ bỏ",
+          "rename": "Đổi tên",
+          "reveal": "Hiện trong thư viện"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Tham chiếu tệp đính kèm bị hỏng: {{filename}}",
+          "brokenLabel": "bị hỏng",
+          "deletedAria": "Tệp đính kèm đã xóa: {{filename}}",
+          "deletedLabel": "đã xóa"
+        },
+        "urlImageFallback": "hình ảnh"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Lưu ý",
+        "bug": "Lỗi",
+        "caution": "Thận trọng",
+        "danger": "Nguy hiểm",
+        "done": "Hoàn tất",
+        "error": "Lỗi",
+        "example": "Ví dụ",
+        "failure": "Thất bại",
+        "faq": "Câu hỏi thường gặp",
+        "hint": "Gợi ý",
+        "important": "Quan trọng",
+        "info": "Thông tin",
+        "missing": "Còn thiếu",
+        "note": "Ghi chú",
+        "question": "Câu hỏi",
+        "quote": "Trích dẫn",
+        "success": "Thành công",
+        "tip": "Mẹo",
+        "todo": "Cần làm",
+        "warning": "Cảnh báo"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Đã lưu trữ",
+        "empty": "Chưa có liên kết ngược nào.",
+        "linkedFrom": "Được liên kết từ {{count}}",
+        "linkedFrom_one": "Được liên kết từ {{count}}",
+        "linkedFrom_other": "Được liên kết từ {{count}}",
+        "untitled": "Không có tiêu đề"
+      },
+      "barItems": {
+        "graph": "Đồ thị",
+        "lock": "Khóa",
+        "saveStatus": "Trạng thái lưu",
+        "settings": "Cài đặt",
+        "syncStatus": "Trạng thái đồng bộ",
+        "tags": "Thẻ",
+        "viewMode": "Chế độ xem",
+        "views": "Chế độ xem",
+        "wordCount": "Số từ",
+        "workspace": "Không gian làm việc"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · bỏ {{count}} bộ lọc",
+        "droppedFiltersSuffix_one": " · bỏ {{count}} bộ lọc",
+        "droppedFiltersSuffix_other": " · bỏ {{count}} bộ lọc",
+        "failed": "Nhập thất bại.",
+        "fileFilterName": "Obsidian Base",
+        "imported": "Đã nhập {{count}} chế độ xem",
+        "imported_one": "Đã nhập {{count}} chế độ xem",
+        "imported_other": "Đã nhập {{count}} chế độ xem",
+        "notValid": "Không phải tệp .base hợp lệ.",
+        "skippedSuffix": " · bỏ qua {{count}}",
+        "skippedSuffix_one": " · bỏ qua {{count}}",
+        "skippedSuffix_other": " · bỏ qua {{count}}",
+        "stoppedAfter": "Đã dừng nhập sau {{count}} chế độ xem.",
+        "stoppedAfter_one": "Đã dừng nhập sau {{count}} chế độ xem.",
+        "stoppedAfter_other": "Đã dừng nhập sau {{count}} chế độ xem."
+      },
+      "bottomBar": {
+        "browseTags": "Duyệt thẻ",
+        "browseViews": "Duyệt chế độ xem",
+        "cycleViewMode": "Chuyển vòng chế độ xem",
+        "docStats": {
+          "summary_one": "{{count}} từ · {{characters}} ký tự",
+          "summary_other": "{{count}} từ · {{characters}} ký tự",
+          "summarySelectionSuffix": " (đã chọn)",
+          "title_one": "{{characters}} ký tự · {{words}} từ · {{spaces}} dấu cách · {{count}} đoạn",
+          "title_other": "{{characters}} ký tự · {{words}} từ · {{spaces}} dấu cách · {{count}} đoạn",
+          "titleSelectionSuffix": " (vùng chọn)"
+        },
+        "graphTitle": "Đồ thị (⌘⇧G)",
+        "lock": "Khóa",
+        "lockVault": "Khóa kho",
+        "openSettings": "Mở cài đặt",
+        "settingsTitle": "Cài đặt (⌘,)",
+        "showGraph": "Hiện chế độ xem đồ thị",
+        "syncStatus": "Chỉ cục bộ · chưa đồng bộ",
+        "tagsTitle": "Thẻ",
+        "togglePreview": "Bật/tắt xem trước cạnh nhau",
+        "viewModeTitle": "Chế độ xem: {{mode}} (nhấn để chuyển vòng)",
+        "viewsTitle": "Chế độ xem"
+      },
+      "import": {
+        "imported_one": "Đã nhập {{count}} ghi chú{{skipped}}",
+        "imported_other": "Đã nhập {{count}} ghi chú{{skipped}}",
+        "skippedSuffix": " · bỏ qua {{count}}",
+        "skippedSuffix_one": " · bỏ qua {{count}}",
+        "skippedSuffix_other": " · bỏ qua {{count}}"
+      },
+      "nav": {
+        "goBack": "Quay lại",
+        "goForward": "Tiến tới"
+      },
+      "noNotesToOpen": "Không có ghi chú nào để mở.",
+      "resizeBacklinksSidebar": "Đổi cỡ thanh bên liên kết ngược",
+      "resizeNotesSidebar": "Đổi cỡ thanh bên ghi chú",
+      "sidebarToggle": {
+        "hideBacklinks": "Ẩn thanh bên liên kết ngược",
+        "hideNotes": "Ẩn thanh bên ghi chú",
+        "showBacklinks": "Hiện thanh bên liên kết ngược",
+        "showNotes": "Hiện thanh bên ghi chú"
+      },
+      "switchingOverlay": {
+        "saving": "Đang lưu…"
+      },
+      "viewMode": {
+        "live": "Trực tiếp",
+        "reading": "Đọc",
+        "source": "Nguồn"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Tên không gian làm việc",
+        "renameConfirm": "Đổi tên",
+        "renameTitle": "Đổi tên không gian làm việc",
+        "saveAsTitle": "Lưu không gian làm việc thành",
+        "saveConfirm": "Lưu"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Không gian làm việc",
+        "renameItemLabel": "Đổi tên không gian làm việc {{name}}",
+        "renameTitle": "Đổi tên không gian làm việc",
+        "saveCurrentAs": "Lưu không gian hiện tại thành…",
+        "switchLabel": "Chuyển không gian làm việc",
+        "toggleTitle": "Không gian làm việc: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Sao chép mã",
+      "defaultBadge": "mã"
+    },
+    "find": {
+      "close": "Đóng tìm kiếm",
+      "matchCase": "Phân biệt chữ hoa/thường",
+      "matchCount": "{{current}} trên {{total}}",
+      "nextMatch": "Kết quả kế tiếp",
+      "noMatches": "Không có kết quả",
+      "placeholder": "Tìm trong ghi chú",
+      "previousMatch": "Kết quả trước",
+      "replaceAll": "Thay thế tất cả",
+      "replaceAllCount": "Thay thế tất cả ({{total}})",
+      "replaceOne": "Thay thế",
+      "replacePlaceholder": "Thay bằng",
+      "toggleReplace": "Bật/tắt thay thế"
+    },
+    "folding": {
+      "clickToUnfold": "Nhấn để mở rộng",
+      "unfold": "Mở rộng"
+    },
+    "footnote": {
+      "heading": "Chú thích cuối trang",
+      "unreferenced": "không được tham chiếu"
+    },
+    "frontmatter": {
+      "addProperty": "+ Thêm thuộc tính",
+      "propertiesLabel": "Thuộc tính",
+      "titleAriaLabel": "Tiêu đề ghi chú",
+      "titlePlaceholder": "Không có tiêu đề"
+    },
+    "mermaid": {
+      "rendering": "Đang dựng sơ đồ…"
+    },
+    "slash": {
+      "attachFile": "Đính kèm tệp",
+      "bulletList": "Danh sách dấu đầu dòng",
+      "callout": "Khung chú thích",
+      "date": "Ngày",
+      "day": "Thứ trong tuần",
+      "divider": "Dấu phân cách",
+      "heading1": "Tiêu đề 1",
+      "heading2": "Tiêu đề 2",
+      "heading3": "Tiêu đề 3",
+      "heading4": "Tiêu đề 4",
+      "heading5": "Tiêu đề 5",
+      "heading6": "Tiêu đề 6",
+      "link": "Liên kết",
+      "now": "Bây giờ",
+      "numberedList": "Danh sách đánh số",
+      "quote": "Trích dẫn",
+      "table": "Bảng",
+      "time": "Giờ",
+      "todoList": "Danh sách việc cần làm",
+      "voiceNote": "Ghi chú giọng nói",
+      "wikiLink": "Liên kết wiki"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Thêm vào từ điển",
+        "ignoreInVault": "Bỏ qua trong kho này",
+        "ignoreThisSession": "Bỏ qua trong phiên này",
+        "noSuggestions": "Không có gợi ý"
+      }
+    },
+    "table": {
+      "addColumn": "Thêm cột bên phải",
+      "addRow": "Thêm hàng bên dưới",
+      "cellAriaLabel": "Ô bảng",
+      "deleteColumn": "Xóa cột",
+      "deleteRow": "Xóa hàng",
+      "reorderColumn": "Sắp xếp lại cột",
+      "reorderRow": "Sắp xếp lại hàng"
+    },
+    "toolbar": {
+      "apply": "Áp dụng",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Đoạn văn"
+      },
+      "highlight": {
+        "blue": "Xanh dương",
+        "green": "Xanh lá",
+        "pink": "Hồng",
+        "purple": "Tím",
+        "yellow": "Vàng"
+      },
+      "urlPlaceholder": "Dán URL liên kết"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Toàn bộ",
+        "narrow": "Hẹp",
+        "normal": "Bình thường",
+        "wide": "Rộng"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Bình thường",
+        "relaxed": "Thoáng",
+        "tight": "Sát"
+      },
+      "textSize": {
+        "lg": "Lớn",
+        "md": "Mặc định",
+        "sm": "Nhỏ",
+        "xl": "Rất lớn"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Nhúng: {{label}}"
+      },
+      "convert": {
+        "cancel": "Hủy",
+        "choiceClause_one": " · {{count}} cần một lựa chọn.",
+        "choiceClause_other": " · {{count}} cần một lựa chọn.",
+        "chooseTarget": "Chọn đích…",
+        "convert": "Chuyển đổi",
+        "convertedToast_one": "Đã chuyển đổi {{count}} liên kết wiki",
+        "convertedToast_other": "Đã chuyển đổi {{count}} liên kết wiki",
+        "noneToConvert": "Không có liên kết wiki đã nhập nào để chuyển đổi trong ghi chú này.",
+        "nothingToConvert": "Không có gì để chuyển đổi — không phân giải được liên kết wiki đã nhập nào.",
+        "rewriteCount_one": "{{count}} liên kết sẽ được viết lại",
+        "rewriteCount_other": "{{count}} liên kết sẽ được viết lại",
+        "skipped": "đã bỏ qua — {{reason}}",
+        "title": "Chuyển đổi liên kết wiki đã nhập trong ghi chú này"
+      },
+      "convertCore": {
+        "noMatch": "không khớp"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Ghi chú",
+      "errors": {
+        "attachmentCorrupt": "Không đọc được một tệp đính kèm mà ghi chú này tham chiếu, nên không có gì được xuất.",
+        "attachmentMissing": "Thiếu một tệp đính kèm mà ghi chú này tham chiếu, nên không có gì được xuất.",
+        "cannotDecrypt": "Không đọc được ghi chú này.",
+        "destinationUnusable": "Thư mục đích đó không dùng được.",
+        "fallback": "Xuất thất bại bất ngờ. Hãy thử lại.",
+        "invalidAttachmentCatalog": "Không đọc được danh mục tệp đính kèm của kho, nên không có gì được xuất.",
+        "invalidNoteFilename": "Tên tệp đó không dùng được, nên không có gì được xuất.",
+        "invalidNoteId": "Không thể nhận diện ghi chú này, nên không có gì được xuất.",
+        "invalidPlaintextEncoding": "Nội dung của ghi chú này có vẻ bị hỏng, nên không có gì được xuất. Hãy khôi phục nó từ một bản sao lưu.",
+        "ioNoSpace": "Không đủ dung lượng ở thư mục đích.",
+        "ioPermissionDenied": "Không có quyền ghi tại thư mục đích.",
+        "ioWriteDefault": "Không thể ghi tệp đã xuất.",
+        "noteNotFound": "Ghi chú này không còn tồn tại — có thể nó đã bị xóa.",
+        "pdfCaptureFailed": "Không thể tạo PDF, nên không có gì được xuất.",
+        "pdfExportInProgress": "Một thao tác xuất PDF đang chạy. Hãy chờ nó hoàn tất rồi thử lại.",
+        "pdfPayloadMissing": "Quá trình xuất bị gián đoạn — nếu kho đã khóa, hãy mở khóa rồi thử lại.",
+        "pdfRenderTimeout": "Ghi chú mất quá nhiều thời gian để dựng, nên không có gì được xuất.",
+        "pdfWindowCreateFailed": "Không thể mở cửa sổ xuất, nên không có gì được xuất.",
+        "targetExists": "Đã có một tệp trùng tên ở thư mục đích.",
+        "vaultLocked": "Kho đang bị khóa. Hãy mở khóa rồi thử lại."
+      },
+      "flow": {
+        "couldNotRead": "Không đọc được ghi chú này.",
+        "exportedTo": "Đã xuất ra {{filename}}",
+        "exportedToWithAttachments_one": "Đã xuất ra {{filename}} + {{count}} tệp đính kèm",
+        "exportedToWithAttachments_other": "Đã xuất ra {{filename}} + {{count}} tệp đính kèm",
+        "exportedToWithImages_one": "Đã xuất ra {{filename}} + {{count}} hình ảnh",
+        "exportedToWithImages_other": "Đã xuất ra {{filename}} + {{count}} hình ảnh",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Văn bản thuần",
+        "showInFolder": "Hiện trong thư mục"
+      },
+      "modal": {
+        "cancel": "Hủy",
+        "export": "Xuất…",
+        "includeAttachments_one": "Bao gồm {{count}} tệp đính kèm",
+        "includeAttachments_other": "Bao gồm {{count}} tệp đính kèm",
+        "title": "Xuất dạng Markdown"
+      }
+    },
+    "pdf": {
+      "cancel": "Hủy",
+      "continue": "Tiếp tục…",
+      "title": "Xuất dạng PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Chọn nơi đặt bản xuất",
+      "errors": {
+        "attachmentCorrupt": "Không đọc được một tệp đính kèm mà một ghi chú tham chiếu, nên không có gì được xuất.",
+        "attachmentMissing": "Thiếu một tệp đính kèm mà một ghi chú tham chiếu, nên không có gì được xuất.",
+        "authOperationInProgress": "Một thao tác kho khác đang diễn ra. Hãy chờ nó hoàn tất rồi thử lại.",
+        "cancelled": "Đã hủy xuất. Không còn gì lại ở thư mục đích.",
+        "cannotDecrypt": "Không đọc được một ghi chú, nên không có gì được xuất.",
+        "destinationAlreadyExists": "Đã có thứ gì đó tồn tại tại vị trí đó. Hãy chọn một chỗ trống cho bản xuất.",
+        "destinationNotAllowed": "Vị trí đó nằm trong vùng lưu trữ của riêng Myne. Hãy chọn một thư mục bên ngoài.",
+        "invalidPlaintextEncoding": "Nội dung của một ghi chú có vẻ bị hỏng, nên không có gì được xuất. Hãy khôi phục nó từ một bản sao lưu.",
+        "invalidVaultMeta": "Không đọc được siêu dữ liệu của kho, nên không có gì được xuất.",
+        "ioWriteDefault": "Không thể ghi bản xuất.",
+        "joinFailure": "Xuất thất bại bất ngờ. Không còn gì lại ở thư mục đích.",
+        "vaultLocked": "Kho đang bị khóa. Hãy mở khóa rồi thử lại.",
+        "vaultNotFound": "Không tìm thấy kho nào để xuất."
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} tệp đính kèm",
+        "countAttachments_other": "{{count}} tệp đính kèm",
+        "countFolders_one": "{{count}} thư mục",
+        "countFolders_other": "{{count}} thư mục",
+        "countNotes_one": "{{count}} ghi chú",
+        "countNotes_other": "{{count}} ghi chú",
+        "exclusionsHistory": "Không bao gồm lịch sử phiên bản.",
+        "exclusionsTrashed_one": "Không bao gồm {{count}} ghi chú trong thùng rác.",
+        "exclusionsTrashed_other": "Không bao gồm {{count}} ghi chú trong thùng rác.",
+        "exclusionsTrashedAndHistory_one": "Không bao gồm {{count}} ghi chú trong thùng rác và lịch sử phiên bản.",
+        "exclusionsTrashedAndHistory_other": "Không bao gồm {{count}} ghi chú trong thùng rác và lịch sử phiên bản.",
+        "phaseAttachments": "tệp đính kèm",
+        "phaseNotes": "ghi chú",
+        "preparing": "Đang chuẩn bị…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Hủy",
+        "cancelling": "Đang hủy…",
+        "title": "Đang xuất…"
+      },
+      "setup": {
+        "cancel": "Hủy",
+        "choose": "Chọn…",
+        "chooseFolder": "Chọn một thư mục…",
+        "destinationLabel": "Thư mục đích",
+        "export": "Xuất…",
+        "folderSelectAriaLabel": "Thư mục cần xuất",
+        "noFolderChosen": "Chưa chọn thư mục",
+        "noFoldersInVault": "Không có thư mục nào trong kho này",
+        "scopeFolder": "Một thư mục",
+        "scopeLabel": "Phạm vi",
+        "scopeWhole": "Toàn bộ kho",
+        "title": "Xuất kho dạng Markdown"
+      },
+      "summary": {
+        "done": "Xong",
+        "showInFolder": "Hiện trong thư mục",
+        "title": "Đã xuất xong"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "Nếu bạn có bản sao lưu, bạn có thể khôi phục nó — các tệp hiện tại của bạn không bị động đến; bản sao lưu được khôi phục thành một kho riêng biệt trước.",
+      "cta": "Đóng ứng dụng",
+      "title": "Tệp kho bị hỏng."
+    },
+    "invalidState": {
+      "body": "Hãy khởi động lại.",
+      "cta": "Khóa",
+      "title": "Trạng thái bất ngờ."
+    },
+    "ioError": {
+      "body": "Đây có thể là lỗi ổ đĩa hoặc hệ thống tệp.",
+      "cta": "Đóng ứng dụng",
+      "title": "Không thể đọc tệp kho."
+    },
+    "permissionDenied": {
+      "body": "Hãy kiểm tra quyền của tệp.",
+      "cta": "Đóng ứng dụng",
+      "title": "Không có quyền truy cập tệp kho."
+    },
+    "restoreFromBackup": "Khôi phục từ bản sao lưu…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Đóng",
+      "count_one": "{{count}} ghi chú",
+      "count_other": "{{count}} ghi chú",
+      "countEmpty": "Trống",
+      "delete": "Xóa",
+      "deleteError": "Không thể xóa ghi chú đó. Hãy thử lại.",
+      "emptyState": "Kho lưu trữ trống.",
+      "restore": "Khôi phục",
+      "restoreError": "Không thể khôi phục ghi chú đó. Hãy thử lại.",
+      "title": "Lưu trữ",
+      "untitled": "Không có tiêu đề"
+    },
+    "cardMenu": {
+      "copyLink": "Sao chép liên kết",
+      "open": "Mở",
+      "openInNewTab": "Mở trong thẻ mới",
+      "revealInFolder": "Hiện trong thư mục"
+    },
+    "colorLabels": {
+      "clay": "Đất nung",
+      "moss": "Rêu",
+      "ochre": "Hoàng thổ",
+      "plum": "Mận",
+      "slate": "Xám đá",
+      "stone": "Đá"
+    },
+    "decoration": {
+      "colorSection": "Màu sắc",
+      "default": "Mặc định",
+      "defaultFolderIcon": "Biểu tượng thư mục mặc định",
+      "iconSection": "Biểu tượng",
+      "menuLabel": "Nhãn màu",
+      "noColor": "Không màu",
+      "none": "Không có"
+    },
+    "deleteConfirm": {
+      "cancel": "Hủy",
+      "delete": "Xóa",
+      "title": "Xóa ghi chú này?",
+      "untitled": "Không có tiêu đề",
+      "warning": "Không thể hoàn tác."
+    },
+    "filterBuilder": {
+      "addCondition": "Thêm điều kiện",
+      "addFilterGroup": "Thêm nhóm bộ lọc",
+      "cancel": "Hủy",
+      "combinator": {
+        "all": "tất cả",
+        "any": "bất kỳ"
+      },
+      "match": "Khớp",
+      "negate": {
+        "is": "là",
+        "isNot": "không phải là"
+      },
+      "noConditions": "Chưa có điều kiện nào — chế độ xem này hiển thị tất cả các trang.",
+      "noteCount_one": "{{count}} ghi chú",
+      "noteCount_other": "{{count}} ghi chú",
+      "of": "của:",
+      "ofTheGroups": "của các nhóm:",
+      "removeCondition": "Xóa điều kiện",
+      "replaceFilter": "Thay thế bộ lọc",
+      "save": "Lưu",
+      "searchTextPlaceholder": "tìm văn bản",
+      "selectFolderPlaceholder": "chọn một thư mục…",
+      "selectTagPlaceholder": "chọn một thẻ…",
+      "type": {
+        "folder": "Thư mục",
+        "search": "Tìm kiếm",
+        "tag": "Thẻ"
+      },
+      "unrepresentable": "Bộ lọc này được tạo bằng trình chỉnh sửa nâng cao và không thể chỉnh sửa ở đây.",
+      "unresolved": "chưa phân giải"
+    },
+    "folderManagement": {
+      "illegalSegment": "Tên thư mục không được chứa / \\ | # ^ [ ] hoặc bắt đầu/kết thúc bằng dấu cách.",
+      "tooLong": "Đường dẫn thư mục đó quá dài."
+    },
+    "folderNote": {
+      "defaultTitle": "Mục lục"
+    },
+    "folderRow": {
+      "createFolderNote": "Tạo một ghi chú thư mục",
+      "empty": "trống",
+      "folderNote": "ghi chú thư mục",
+      "openFolderNote": "Mở ghi chú thư mục"
+    },
+    "graph": {
+      "allConnected": "Mọi thứ đều được kết nối — không có ghi chú nào tách biệt.",
+      "building": "Đang dựng đồ thị…",
+      "depthToggleTitle": "Bật/tắt độ sâu lân cận (1 ↔ 2 bước)",
+      "filterAll": "Tất cả",
+      "filterAroundNote": "Quanh ghi chú này",
+      "filterByTag": "Lọc theo thẻ",
+      "filterIsolated": "Tách biệt",
+      "hop": "{{depth}} bước",
+      "loading": "Đang tải đồ thị…",
+      "noNotes": "Chưa có ghi chú nào để vẽ đồ thị.",
+      "overCap": "Kho này lớn — đồ thị toàn kho bị giới hạn. Hãy lọc theo thẻ hoặc hiển thị các ghi chú tách biệt để khám phá.",
+      "refresh": "Làm mới",
+      "refreshTitle": "Kho đã thay đổi — dựng lại đồ thị",
+      "tagPlaceholder": "Thẻ…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Chế độ xem không có tiêu đề"
+      },
+      "modal": {
+        "cancel": "Hủy",
+        "cancelledNotImported": "Chưa nhập {{count}}",
+        "cancelledNotImported_one": "Chưa nhập {{count}}",
+        "cancelledNotImported_other": "Chưa nhập {{count}}",
+        "cancelling": "Đang hủy…",
+        "chooseFolder": "Chọn thư mục…",
+        "close": "Đóng",
+        "closeAriaLabel": "Đóng",
+        "copied": "Đã sao chép",
+        "copy": "Sao chép",
+        "done": "Xong",
+        "errorBody": "Không thể hoàn tất việc nhập. Mọi ghi chú đã nhập đều được giữ lại và an toàn để giữ hoặc xóa.",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
+        "flagKindFolder": "Thư mục",
+        "flagKindTitle": "Tiêu đề",
+        "folderPickerTitle": "Chọn thư mục kho Obsidian của bạn",
+        "hiddenIgnoredPrefix_one": "Đã bỏ qua {{count}} mục cấu hình / ẩn (ví dụ ",
+        "hiddenIgnoredPrefix_other": "Đã bỏ qua {{count}} mục cấu hình / ẩn (ví dụ ",
+        "hiddenIgnoredSuffix": ", tệp ẩn).",
+        "ifNoteExistsLabel": "Nếu một ghi chú đã tồn tại",
+        "import": "Nhập",
+        "importFailed": "Nhập thất bại.",
+        "importing": "Đang nhập kho của bạn…",
+        "markDone": "Đánh dấu hoàn tất",
+        "markedDone": "Đã đánh dấu hoàn tất",
+        "mediaImported": "Đã nhập {{count}}",
+        "mediaImported_one": "Đã nhập {{count}}",
+        "mediaImported_other": "Đã nhập {{count}}",
+        "mediaOmittedSuffix": " · bỏ {{count}}",
+        "mediaOmittedSuffix_one": " · bỏ {{count}}",
+        "mediaOmittedSuffix_other": " · bỏ {{count}}",
+        "needsAttention": "Cần chú ý",
+        "needsAttentionHelp": "Những ghi chú này được nhập nguyên trạng. Các gợi ý sửa chỉ là điểm khởi đầu — sao chép một gợi ý, rồi đổi tên ghi chú khi bạn mở nó.",
+        "noFolderChosen": "Chưa chọn thư mục",
+        "notesImported_one": "ghi chú đã nhập",
+        "notesImported_other": "ghi chú đã nhập",
+        "policyCopyHint": "Đưa nó vào cùng với ghi chú hiện có.",
+        "policyCopyLabel": "Nhập làm bản sao",
+        "policySkipHint": "Khuyến nghị — chạy lại việc nhập sẽ không bao giờ tạo bản sao hay ghi đè.",
+        "policySkipLabel": "Bỏ qua nó",
+        "preexistingDetail": "Ghi chú này vốn đã có thư mục riêng: “{{existing}}”, mà Myne giữ lại — thư mục của nó có thể khác với vị trí trên đĩa.",
+        "preparing": "Đang chuẩn bị…",
+        "progressNotes": " ghi chú",
+        "progressOf": " trên ",
+        "reasonIllegalChar": "chứa một ký tự mà Myne không thể dùng trong tên",
+        "reasonPathTooLong": "đường dẫn thư mục + tiêu đề quá dài",
+        "reasonSegmentTooLong": "tên dài hơn mức Myne cho phép",
+        "scanning": "Đang quét kho của bạn…",
+        "setupIntro": "Trỏ Myne tới thư mục kho Obsidian hiện có của bạn. Mọi ghi chú Markdown được nhập và mã hóa ngay tại chỗ — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn không bị động đến.",
+        "statCancelled": "Đã hủy",
+        "statCanvasSkipped": "tệp .canvas đã bỏ qua",
+        "statEmptyFoldersKept": "Thư mục trống được giữ lại",
+        "statMedia": "Tệp đa phương tiện",
+        "statOtherSkipped": "Tệp khác đã bỏ qua",
+        "statSkipped": "Đã bỏ qua (đã tồn tại)",
+        "suggestedNameAriaLabel": "Tên gợi ý",
+        "titleComplete": "Đã nhập xong",
+        "titleFailed": "Nhập thất bại",
+        "titleSetup": "Nhập kho Obsidian",
+        "vaultFolderLabel": "Thư mục kho",
+        "vaultRoot": "(thư mục gốc của kho)"
+      },
+      "offer": {
+        "body": "Đưa các ghi chú hiện có của bạn vào Myne. Từng ghi chú được mã hóa khi nhập — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn vẫn ở nguyên vị trí.",
+        "chooseFolder": "Chọn thư mục…",
+        "laterHint": "Bạn luôn có thể nhập sau từ Cài đặt → Lưu trữ.",
+        "notNow": "Không phải bây giờ",
+        "title": "Nhập kho Obsidian của bạn?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Thêm vào mục yêu thích",
+      "archive": "Lưu trữ",
+      "archiveBulkError": "Không thể lưu trữ các ghi chú.",
+      "archiveNote": "Lưu trữ",
+      "archiveSingleError": "Không thể lưu trữ ghi chú.",
+      "attachments": "Tệp đính kèm",
+      "bulkArchive": "Lưu trữ {{count}} ghi chú",
+      "bulkArchive_one": "Lưu trữ {{count}} ghi chú",
+      "bulkArchive_other": "Lưu trữ {{count}} ghi chú",
+      "bulkDelete": "Xóa {{count}} ghi chú",
+      "bulkDelete_one": "Xóa {{count}} ghi chú",
+      "bulkDelete_other": "Xóa {{count}} ghi chú",
+      "bulkMove": "Di chuyển {{count}} ghi chú đến…",
+      "bulkMove_one": "Di chuyển {{count}} ghi chú đến…",
+      "bulkMove_other": "Di chuyển {{count}} ghi chú đến…",
+      "caseMergeBody": "Đã có một thư mục tên “{{name}}”. Chúng sẽ được hợp nhất — đổi tên một thư mục để tách riêng?",
+      "color": "Màu sắc…",
+      "createFirstNote": "+ Tạo ghi chú đầu tiên của bạn",
+      "createFolderNote": "Tạo ghi chú thư mục",
+      "customize": "Tùy chỉnh…",
+      "delete": "Xóa",
+      "deleteFolderBody_one": "“{{name}}” và {{count}} ghi chú của nó",
+      "deleteFolderBody_other": "“{{name}}” và {{count}} ghi chú của nó",
+      "deleteFolderConfirm": "Xóa thư mục",
+      "deleteFolderTitle": "Xóa thư mục này?",
+      "deleteFolderWarning": "Các ghi chú sẽ được chuyển vào Thùng rác — bạn có thể khôi phục chúng sau.",
+      "duplicate": "Nhân bản",
+      "editFilterTitle": "Chỉnh sửa bộ lọc",
+      "emptyState": "Chưa có ghi chú nào.",
+      "exportHtml": "Xuất dạng HTML…",
+      "exportMarkdown": "Xuất dạng Markdown…",
+      "exportPdf": "Xuất dạng PDF…",
+      "exportTxt": "Xuất dạng văn bản thuần…",
+      "favoritesHeading": "Yêu thích",
+      "mergeAnyway": "Vẫn hợp nhất",
+      "newFolder": "Thư mục mới",
+      "newFolderInPlaceholder": "Thư mục mới trong {{path}}",
+      "newFolderPlaceholder": "Thư mục mới",
+      "newNote": "Ghi chú mới",
+      "newNoteFromTemplate": "Ghi chú mới từ mẫu…",
+      "newNoteHere": "Ghi chú mới tại đây",
+      "newNoteMenu": "Ghi chú mới",
+      "newNoteShortcut": "Ghi chú mới (⌘N)",
+      "newSubfolder": "Thư mục con mới",
+      "newViewTitle": "Chế độ xem mới",
+      "noteMovedToTrash": "Đã chuyển ghi chú vào Thùng rác",
+      "notesHeading": "Ghi chú",
+      "notesMovedToTrash_one": "Đã chuyển {{count}} ghi chú vào Thùng rác",
+      "notesMovedToTrash_other": "Đã chuyển {{count}} ghi chú vào Thùng rác",
+      "openArchive": "Mở kho lưu trữ",
+      "openAttachments": "Mở tệp đính kèm",
+      "openFolderNote": "Mở ghi chú thư mục",
+      "openInNewTab": "Mở trong thẻ mới",
+      "openToSide": "Mở sang một bên",
+      "openTrash": "Mở thùng rác",
+      "removeAsFolderNote": "Bỏ làm ghi chú thư mục",
+      "removeFromFavorites": "Bỏ khỏi mục yêu thích",
+      "rename": "Đổi tên",
+      "setAsFolderNote": "Đặt làm ghi chú thư mục",
+      "trash": "Thùng rác",
+      "trashBulkError": "Không thể chuyển các ghi chú vào Thùng rác.",
+      "trashSingleError": "Không thể chuyển ghi chú vào Thùng rác.",
+      "undo": "Hoàn tác",
+      "vaultRoot": "Thư mục gốc của kho",
+      "viewSettingsTitle": "Cài đặt chế độ xem"
+    },
+    "newFromTemplate": {
+      "back": "Quay lại",
+      "blankNote": "Ghi chú trống",
+      "createNote": "Tạo ghi chú",
+      "emptyState": "Bạn chưa tạo mẫu nào.",
+      "listLabel": "Mẫu",
+      "loading": "Đang tải…",
+      "nameLabel": "Tên cho ghi chú (từ “{{templateName}}”)",
+      "namePlaceholder": "Không có tiêu đề",
+      "nameStepTitle": "Đặt tên cho ghi chú này",
+      "pickStepTitle": "Ghi chú mới từ mẫu",
+      "untitledTemplate": "Mẫu không có tiêu đề"
+    },
+    "newTab": {
+      "createNote": "Tạo một ghi chú mới",
+      "noNotesMatch": "Không có ghi chú nào khớp.",
+      "noNotesYet": "Chưa có ghi chú nào.",
+      "searchAriaLabel": "Tìm ghi chú để mở",
+      "searchPlaceholder": "Tìm ghi chú…",
+      "untitled": "Không có tiêu đề"
+    },
+    "pane": {
+      "graphTab": "Đồ thị",
+      "loading": "Đang tải…",
+      "untitledView": "Chế độ xem không có tiêu đề"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} ngày trước",
+      "hoursAgo": "{{h}} giờ trước",
+      "justNow": "vừa xong",
+      "minutesAgo": "{{m}} phút trước",
+      "oneWeekAgo": "1 tuần trước",
+      "weeksAgo": "{{w}} tuần trước",
+      "yesterday": "hôm qua"
+    },
+    "row": {
+      "addToFavorites": "Thêm vào mục yêu thích",
+      "folderIndexBadgeLabel": "Ghi chú thư mục",
+      "folderIndexBadgeTitle": "Ghi chú thư mục — mục lục của thư mục này",
+      "folderIndexConflictLabel": "Thư mục đã có một ghi chú mục lục",
+      "folderIndexConflictTitle": "Thư mục này đã có một ghi chú mục lục",
+      "loadError": "Không thể tải ghi chú này",
+      "removeFromFavorites": "Bỏ khỏi mục yêu thích",
+      "renameAriaLabel": "Đổi tên ghi chú",
+      "untitled": "Không có tiêu đề"
+    },
+    "savedView": {
+      "defaultName": "Chế độ xem đã lọc"
+    },
+    "saveStatus": {
+      "editing": "Đang chỉnh sửa",
+      "editingEllipsis": "Đang chỉnh sửa…",
+      "editingTitle": "Đang chỉnh sửa — tự động lưu đã sẵn sàng",
+      "justNow": "vừa xong",
+      "retry": "Thử lại",
+      "saved": "Đã lưu",
+      "savedRelative": "Đã lưu {{rel}}",
+      "saveFailed": "Lưu thất bại",
+      "saveFailedTitle": "Lưu thất bại — nhấn Thử lại",
+      "saving": "Đang lưu",
+      "savingEllipsis": "Đang lưu…"
+    },
+    "snapshotFailed": {
+      "dismiss": "Bỏ qua",
+      "message": "Không thể lưu một ảnh chụp — ghi chú của bạn đã được lưu, nhưng lịch sử phiên bản của nó có thể không đầy đủ (ổ đĩa có thể đã đầy)."
+    },
+    "snapshots": {
+      "cancel": "Hủy",
+      "changeCount_one": "{{count}} thay đổi kể từ ảnh chụp này",
+      "changeCount_other": "{{count}} thay đổi kể từ ảnh chụp này",
+      "close": "Đóng",
+      "confirmBody": "Ghi chú hiện tại của bạn sẽ được lưu thành một ảnh chụp trước, nên bạn có thể hoàn tác việc này.",
+      "confirmTitle": "Khôi phục ảnh chụp này?",
+      "decrypting": "Đang giải mã…",
+      "emptyState": "Chưa có ảnh chụp nào. Ảnh chụp được lưu tự động khi bạn chỉnh sửa và được giữ khoảng 7 ngày. Chúng được mã hóa và biến mất khi ghi chú bị xóa vĩnh viễn.",
+      "encryptedSize": "Đã mã hóa · {{size}}",
+      "errorCannotDecrypt": "Không thể giải mã ảnh chụp này.",
+      "errorGeneric": "Đã xảy ra lỗi. Hãy thử lại.",
+      "errorIo": "Đã xảy ra lỗi ổ đĩa — ổ đĩa có thể đã đầy hoặc không ghi được.",
+      "errorNotFound": "Ảnh chụp đó không còn nữa.",
+      "errorStorageAccess": "Không thể truy cập vùng lưu trữ ảnh chụp của kho.",
+      "errorVaultLocked": "Kho đang bị khóa. Hãy mở khóa để xem ảnh chụp.",
+      "justNow": "vừa xong",
+      "listLabel": "Danh sách ảnh chụp",
+      "loading": "Đang tải…",
+      "restore": "Khôi phục",
+      "restoreCta": "Khôi phục ảnh chụp này",
+      "restoredStatus": "Đã khôi phục. Phiên bản bạn đang có được lưu thành một ảnh chụp.",
+      "selectPlaceholder": "Chọn một ảnh chụp để xem những gì đã thay đổi kể từ đó.",
+      "title": "Ảnh chụp",
+      "untitled": "Không có tiêu đề"
+    },
+    "tabStrip": {
+      "closeNewTab": "Đóng thẻ mới",
+      "closeTab": "Đóng {{title}}",
+      "newTab": "Thẻ mới",
+      "openNotes": "Mở ghi chú",
+      "pin": "Ghim",
+      "pinned": "Đã ghim",
+      "pinnedTitle": "Đã ghim — bỏ ghim để đóng",
+      "unpin": "Bỏ ghim",
+      "untitled": "Không có tiêu đề"
+    },
+    "tagBrowser": {
+      "cancel": "Hủy",
+      "clear": "Xóa",
+      "combineTagsWith": "Kết hợp thẻ bằng",
+      "filtering": "Đang lọc…",
+      "modeAll": "Tất cả",
+      "modeAny": "Bất kỳ",
+      "noNotesForFilter": "Không có ghi chú nào cho bộ lọc này.",
+      "noTagsMatch": "Không có thẻ nào khớp “{{query}}”.",
+      "noTagsYet": "Chưa có thẻ nào.",
+      "noteCount_one": "{{count}} ghi chú",
+      "noteCount_other": "{{count}} ghi chú",
+      "notes": "Ghi chú",
+      "pickTag": "Chọn một thẻ để lọc.",
+      "save": "Lưu",
+      "saveAsView": "Lưu thành chế độ xem",
+      "searchPlaceholder": "Tìm thẻ…",
+      "title": "Thẻ",
+      "untitled": "Không có tiêu đề",
+      "viewNamePlaceholder": "Tên chế độ xem"
+    },
+    "trash": {
+      "close": "Đóng",
+      "count_one": "{{count}} ghi chú",
+      "count_other": "{{count}} ghi chú",
+      "countEmpty": "Trống",
+      "delete": "Xóa",
+      "deleteError": "Không thể xóa ghi chú đó. Hãy thử lại.",
+      "empty": "Dọn sạch thùng rác",
+      "emptyConfirmBody_one": "{{count}} ghi chú sẽ bị xóa vĩnh viễn.",
+      "emptyConfirmBody_other": "{{count}} ghi chú sẽ bị xóa vĩnh viễn.",
+      "emptyConfirmCta": "Dọn sạch thùng rác",
+      "emptyConfirmTitle": "Dọn sạch thùng rác?",
+      "emptyPartialFailure_one": "Không thể xóa {{count}} ghi chú và chúng vẫn ở trong thùng rác.",
+      "emptyPartialFailure_other": "Không thể xóa {{count}} ghi chú và chúng vẫn ở trong thùng rác.",
+      "emptyState": "Thùng rác trống.",
+      "purgeConfirmCta": "Xóa vĩnh viễn",
+      "purgeConfirmTitle": "Xóa vĩnh viễn?",
+      "restore": "Khôi phục",
+      "restoreError": "Không thể khôi phục ghi chú đó. Hãy thử lại.",
+      "title": "Thùng rác",
+      "untitled": "Không có tiêu đề"
+    },
+    "unlinkedMentions": {
+      "empty": "Không có lượt nhắc chưa liên kết nào.",
+      "heading": "Lượt nhắc chưa liên kết",
+      "link": "Liên kết",
+      "linkTooltip": "Liên kết lượt nhắc này tới {{title}}",
+      "refresh": "Các lượt nhắc có thể đã thay đổi — làm mới",
+      "searching": "Đang tìm…",
+      "thisNote": "ghi chú này",
+      "untitled": "Không có tiêu đề"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Đổi ảnh bìa",
+        "changeCoverImage": "Đổi ảnh bìa",
+        "empty": "Không có ghi chú nào khớp với chế độ xem này",
+        "noValue": "Không có giá trị",
+        "setCover": "Đặt ảnh bìa",
+        "setCoverImage": "Đặt ảnh bìa",
+        "untitled": "Không có tiêu đề"
+      },
+      "collapseViews": "Thu gọn chế độ xem",
+      "empty": "Chưa có chế độ xem nào. Hãy lưu danh sách ghi chú hiện tại thành một chế độ xem.",
+      "expandViews": "Mở rộng chế độ xem",
+      "heading": "Chế độ xem",
+      "host": {
+        "unsupported": "Loại chế độ xem này sẽ có trong bản cập nhật sau."
+      },
+      "menu": {
+        "deleteView": "Xóa chế độ xem",
+        "editFilter": "Chỉnh sửa bộ lọc…",
+        "moveDown": "Di chuyển xuống",
+        "moveUp": "Di chuyển lên",
+        "rename": "Đổi tên",
+        "viewSettings": "Cài đặt chế độ xem…"
+      },
+      "newView": "Chế độ xem mới",
+      "untitledView": "Chế độ xem không có tiêu đề"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Mặc định (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (vuông)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (rộng)"
+      },
+      "cancel": "Hủy",
+      "cardSize": "Kích thước thẻ",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Thuộc tính frontmatter có giá trị là một hình ảnh — hiển thị làm ảnh bìa của mỗi thẻ. Để trống nếu không muốn ảnh bìa.",
+      "coverImagePlaceholder": "vd. cover",
+      "coverImageProperty": "Thuộc tính ảnh bìa",
+      "imageAspectRatio": "Tỉ lệ khung hình ảnh",
+      "reset": "Đặt lại",
+      "save": "Lưu"
+    },
+    "welcome": {
+      "body": "Chào mừng bạn đến với Myne, không gian riêng tư để bạn suy nghĩ và viết.\n\nMọi thứ bạn lưu ở đây đều được mã hóa và nằm trên thiết bị của bạn. **Mật khẩu** và **cụm từ khôi phục** là chìa khóa duy nhất để mở chúng, nên hãy giữ chúng ở nơi an toàn. Nếu mất cả hai, không ai có thể lấy lại ghi chú của bạn, kể cả chúng tôi.\n\nĐây chỉ là một ghi chú thông thường, nên hãy biến nó thành của riêng bạn. Chỉnh sửa, đổi tên hay xóa nó bất cứ khi nào bạn muốn, và thêm ghi chú mới khi ý tưởng của bạn lớn dần lên.\n\nChúng tôi rất vui vì bạn đã ở đây. Để tìm hiểu thêm về Myne, hãy truy cập https://myne.md\n",
+      "title": "Chào mừng đến với Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "Mặc định"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Đang kiểm tra độ mạnh…",
+      "confirmLabel": "Xác nhận mật khẩu chính",
+      "defaultEmptyCaption": "Được dùng làm đầu vào cho Argon2id (m=256 MiB, t=3, p=2). Hãy chọn mật khẩu bạn có thể nhớ; bạn không thể đặt lại nó.",
+      "mismatch": "Mật khẩu không khớp.",
+      "passwordLabel": "Mật khẩu chính",
+      "suggestPassword": "Gợi ý mật khẩu",
+      "tooShort": "Hãy dùng ít nhất {{n}} ký tự."
+    },
+    "input": {
+      "hide": "Ẩn mật khẩu",
+      "show": "Hiện mật khẩu"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "Không có kết quả.",
+      "placeholder": "Chọn…",
+      "searchPlaceholder": "Tìm kiếm…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Đã hủy khôi phục: kho đã bị khóa.",
+      "operationInProgress": "Một thao tác đang diễn ra. Vui lòng chờ.",
+      "unexpected": "Lỗi bất ngờ. Vui lòng thử lại.",
+      "vaultNotFound": "Không tìm thấy tệp kho. Vui lòng khởi động lại ứng dụng."
+    }
+  },
+  "restore": {
+    "backLabel": "Quay lại",
+    "cancelLabel": "Hủy",
+    "collision": {
+      "body": "Một kho từ bản sao lưu này đã tồn tại trên thiết bị này. Bạn có thể giữ cả hai — bản sao đã khôi phục sẽ hiện ra như một kho riêng biệt trong danh sách kho của bạn — hoặc khôi phục ngay rồi tự gỡ kho hiện có khỏi danh sách (việc gỡ yêu cầu bạn gõ DELETE, và chỉ nên làm sau khi bạn xác nhận kho đã khôi phục mở được).",
+      "keepBoth": "Giữ cả hai",
+      "replaceExisting": "Khôi phục, rồi thay thế kho hiện có…"
+    },
+    "damaged": {
+      "body": "Tệp sao lưu bị hỏng nên không có gì được khôi phục. Nếu đây là bản sao duy nhất bạn có, chức năng cứu dữ liệu có thể khôi phục các ghi chú còn nguyên vẹn và liệt kê chính xác những gì không đọc được — kết quả luôn được ghi là khôi phục một phần.",
+      "close": "Đóng",
+      "salvage": "Cứu các ghi chú nguyên vẹn…"
+    },
+    "error": {
+      "tryAnotherFile": "Thử tệp khác"
+    },
+    "pick": {
+      "body": "Chọn một tệp <code>.myne-backup</code>. Bản sao lưu được xác minh trước khi khôi phục bất cứ thứ gì; kho đã khôi phục được mở khóa bằng mật khẩu hoặc cụm từ khôi phục của kho đó — y hệt như khi mở khóa.",
+      "chooseFile": "Chọn tệp sao lưu…",
+      "corruptedSuffix": "Kho hiện tại của bạn không bị động đến: bản sao lưu được khôi phục thành một kho riêng biệt trước."
+    },
+    "summary": {
+      "attachments": "Tệp đính kèm: {{n}}",
+      "collidedNote": "Bản sao trước đó của kho này vẫn còn trong danh sách kho của bạn. Sau khi bạn xác nhận kho đã khôi phục mở được, bạn có thể gỡ bản cũ khỏi danh sách kho (nó sẽ yêu cầu bạn gõ DELETE).",
+      "notes": "Ghi chú: {{n}}",
+      "openVaultList": "Mở danh sách kho",
+      "partialHeader_one": "Đã khôi phục một phần — không đọc được {{count}} mục.",
+      "partialHeader_other": "Đã khôi phục một phần — không đọc được {{count}} mục.",
+      "restored": "Đã khôi phục kho.",
+      "versionHistory": "Mục lịch sử phiên bản: {{n}}"
+    },
+    "title": "Khôi phục từ bản sao lưu",
+    "working": {
+      "cancel": "Hủy",
+      "restoringProgress": "Đang khôi phục… {{done}} trên {{total}}",
+      "verifying": "Đang xác minh bản sao lưu…",
+      "verifyingProgress": "Đang xác minh bản sao lưu… {{done}} trên {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Bản phát triển",
+      "buildChannelLabel": "Kênh phát hành",
+      "buildChannelStable": "Ổn định",
+      "changelogButton": "Xem nhật ký thay đổi…",
+      "changelogHelper": "Ghi chú theo từng phiên bản. Sẽ xuất hiện khi MYND-119 hoàn thành.",
+      "changelogLabel": "Nhật ký thay đổi",
+      "licenseBody": "Tiền alpha · Tài liệu CC0 · Mã ứng dụng AGPL-3.0 khi phát hành Giai đoạn 1.",
+      "licenseLabel": "Giấy phép",
+      "tagline": "Tiền alpha · Trình khách máy tính Giai đoạn 1",
+      "threatModelHelper": "Mở tài liệu mô hình mối đe dọa công khai trong trình duyệt của bạn.",
+      "threatModelLabel": "Mô hình mối đe dọa"
+    },
+    "account": {
+      "argon2idHeading": "Tham số Argon2id",
+      "changePasswordButton": "Đổi mật khẩu",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Sai mật khẩu hiện tại hoặc tệp kho bị hỏng.",
+        "ioError": "Lỗi ổ đĩa, vui lòng thử lại.",
+        "joinFailure": "Đã xảy ra lỗi, vui lòng thử lại.",
+        "samePasswordRejected": "Mật khẩu mới trùng với mật khẩu hiện tại.",
+        "weakNewPassword": "Mật khẩu mới phải có ít nhất 12 ký tự."
+      },
+      "changePasswordHeading": "Đổi mật khẩu",
+      "changePasswordHelper": "Thay mật khẩu chính trong khi vẫn giữ nguyên kho. Cụm từ khôi phục không đổi.",
+      "dangerZoneHeading": "Vùng nguy hiểm",
+      "dangerZoneHelper": "Xóa vĩnh viễn kho này và mọi ghi chú. Không thể hoàn tác. Cụm từ khôi phục sẽ không khôi phục được kho.",
+      "deleteVaultButton": "Xóa kho…",
+      "memoryCost": "Chi phí bộ nhớ",
+      "parallelism": "Mức song song",
+      "timeCost": "Chi phí thời gian",
+      "vaultLabelEyebrow": "NHÃN KHO",
+      "vaultLabelHelper": "Tên cho kho này, hiển thị trong bộ chuyển kho của ứng dụng. Được lưu mã hóa bên trong kho; không bao giờ rời thiết bị của bạn dưới dạng văn bản thuần.",
+      "vaultLabelPlaceholder": "Thêm một nhãn…",
+      "vaultLabelSave": "Lưu"
+    },
+    "appearance": {
+      "showEditTimesAria": "Hiện thời gian chỉnh sửa trong thanh bên",
+      "showEditTimesHelper": "Hiển thị thời gian chỉnh sửa gần nhất của mỗi ghi chú dưới tiêu đề của nó trong thanh bên.",
+      "showEditTimesLabel": "Hiện thời gian chỉnh sửa",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Tối",
+        "light": "Sáng",
+        "system": "Hệ thống"
+      },
+      "themeHelper": "Chuyển đổi giữa giao diện sáng và tối, hoặc theo tùy chọn hệ thống.",
+      "themeLabel": "Giao diện",
+      "themeOptionAria": "Giao diện {{label}}",
+      "themeSaveError": "Không thể lưu giao diện. Vui lòng thử lại.",
+      "timestampsSaveError": "Không thể lưu tùy chọn. Vui lòng thử lại."
+    },
+    "archive": {
+      "helper": "Cho phép chuyển ghi chú vào Kho lưu trữ, giữ chúng ngoài danh sách chính. Tắt tùy chọn này sẽ khôi phục mọi ghi chú đã lưu trữ về thư mục của nó và ẩn các nút điều khiển lưu trữ.",
+      "label": "Lưu trữ",
+      "off": "Tắt",
+      "on": "Bật",
+      "saveError": "Không thể cập nhật cài đặt lưu trữ."
+    },
+    "autoBackup": {
+      "backupFolder": "Thư mục sao lưu",
+      "chooseFolder": "Chọn thư mục…",
+      "chooseFolderDialogTitle": "Chọn một thư mục để sao lưu tự động",
+      "frequency": "Tần suất",
+      "frequencyAriaLabel": "Tần suất sao lưu",
+      "helper": "Ghi một tệp .myne-backup đã mã hóa vào một thư mục theo lịch, trong khi ứng dụng đang mở và kho đã mở khóa. Các bản sao lưu được mã hóa đúng như kho của bạn; Myne giữ lại vài bản gần nhất và không bao giờ gửi bất cứ thứ gì ra khỏi thiết bị của bạn.",
+      "intervalDaily": "Hằng ngày",
+      "intervalEveryUnlock": "Mỗi lần mở khóa",
+      "intervalWeekly": "Hằng tuần",
+      "keepLast": "Giữ lại gần nhất",
+      "noFolderChosen": "Chưa chọn thư mục nào.",
+      "saveFailedToast": "Không thể lưu cài đặt sao lưu.",
+      "searchEmpty": "Không có kết quả.",
+      "searchPlaceholder": "Tìm kiếm…",
+      "statusFailed": "Sao lưu tự động thất bại — {{stamp}}",
+      "statusLastBackup": "Sao lưu gần nhất: {{stamp}}",
+      "statusNever": "Chưa có bản sao lưu tự động nào.",
+      "title": "Sao lưu tự động"
+    },
+    "changePassword": {
+      "cancel": "Hủy",
+      "checkingStrength": "Đang kiểm tra độ mạnh…",
+      "confirmLabel": "Xác nhận mật khẩu mới",
+      "currentLabel": "Mật khẩu hiện tại",
+      "mismatch": "Mật khẩu không khớp.",
+      "newLabel": "Mật khẩu mới",
+      "submit": "Đổi mật khẩu",
+      "submitting": "Đang đổi mật khẩu…",
+      "title": "Đổi mật khẩu",
+      "tooShort": "Hãy dùng ít nhất {{n}} ký tự."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Tiện ích trình duyệt"
+      },
+      "when": {
+        "bare": "Đã kết nối",
+        "daysAgo_one": "Đã kết nối {{count}} ngày trước",
+        "daysAgo_other": "Đã kết nối {{count}} ngày trước",
+        "hoursAgo": "Đã kết nối {{count}} giờ trước",
+        "hoursAgo_one": "Đã kết nối {{count}} giờ trước",
+        "hoursAgo_other": "Đã kết nối {{count}} giờ trước",
+        "justNow": "Vừa kết nối",
+        "minutesAgo": "Đã kết nối {{count}} phút trước",
+        "minutesAgo_one": "Đã kết nối {{count}} phút trước",
+        "minutesAgo_other": "Đã kết nối {{count}} phút trước",
+        "onDate": "Đã kết nối vào {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Đang áp dụng",
+      "apply": "Áp dụng",
+      "applyError": "Không thể áp dụng giao diện đó. Vui lòng thử lại.",
+      "cancel": "Hủy",
+      "confirm": "Xác nhận",
+      "delete": "Xóa",
+      "deleteError": "Không thể xóa giao diện đó. Vui lòng thử lại.",
+      "empty": "Chưa có giao diện tùy chỉnh nào. Hãy nhập một giao diện, hoặc mở thư mục giao diện và thêm một tệp giao diện.",
+      "error": {
+        "aColorFallback": "một màu",
+        "invalidFile": "Tệp giao diện không hợp lệ.",
+        "invalidName": "Tên giao diện không an toàn",
+        "invalidValue": "Giá trị không hợp lệ cho {{key}}",
+        "invalidValueWithLine": "Giá trị không hợp lệ cho {{key}} (dòng {{line}})",
+        "missingKey": "Thiếu màu bắt buộc {{key}}",
+        "parseError": "JSON không hợp lệ",
+        "parseErrorWithLine": "JSON không hợp lệ (dòng {{line}})"
+      },
+      "fileFilterName": "Giao diện Myne",
+      "helper": "Dùng bảng màu của riêng bạn. Giao diện được kiểm tra trên thiết bị này trước khi dùng — không có gì được tải lên.",
+      "importButton": "Nhập giao diện…",
+      "importError": "Tệp đó không phải là một giao diện hợp lệ. Mở tài liệu tham khảo để xem định dạng.",
+      "label": "Giao diện tùy chỉnh",
+      "openFolderButton": "Mở thư mục giao diện",
+      "openFolderError": "Không thể mở thư mục giao diện.",
+      "readError": "Không thể đọc thư mục giao diện của bạn."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Trống (không có mẫu)",
+      "dateFormatHelper": "Tiêu đề của mỗi ghi chú hằng ngày. Hỗ trợ YYYY, MM, DD. Mặc định là {{default}}.",
+      "dateFormatLabel": "Định dạng ngày của ghi chú hằng ngày",
+      "dateFormatSaveError": "Không thể lưu định dạng ngày. Vui lòng thử lại.",
+      "folderHelper": "Nơi lưu các ghi chú hằng ngày mới. Mặc định là {{default}} — thư mục được giữ lại ngay cả khi trống.",
+      "folderLabel": "Thư mục ghi chú hằng ngày",
+      "folderSaveError": "Không thể lưu thư mục hằng ngày. Vui lòng thử lại.",
+      "searchEmpty": "Không có mẫu nào khớp.",
+      "searchPlaceholder": "Tìm mẫu…",
+      "templateHelper": "Chọn một mẫu để khởi tạo mỗi ghi chú hằng ngày, hoặc để trống để có một ghi chú trống lấy ngày làm tiêu đề.",
+      "templateLabel": "Mẫu ghi chú hằng ngày",
+      "templateSaveError": "Không thể lưu mẫu hằng ngày. Vui lòng thử lại.",
+      "untitledTemplate": "Mẫu không có tiêu đề"
+    },
+    "deleteVault": {
+      "cancel": "Hủy",
+      "caseSensitiveHint": "Phân biệt chữ hoa/thường. Gõ chính xác từ này để bật chức năng xóa.",
+      "continue": "Tiếp tục",
+      "copyPrimary": "Thao tác này sẽ xóa vĩnh viễn kho này và mọi ghi chú bên trong nó. Không thể hoàn tác, và cụm từ khôi phục của bạn sẽ không khôi phục được dữ liệu.",
+      "copySecondary": "Các khóa của kho được xóa sạch khỏi bộ nhớ trước khi các tệp bị gỡ liên kết; bất kỳ văn bản mã hóa mồ côi nào còn lại trên đĩa vẫn là dữ liệu vô dụng được bọc bằng Argon2id, không thể khôi phục.",
+      "eyebrow": "KHÔNG THỂ ĐẢO NGƯỢC",
+      "heading": "Xóa kho",
+      "ioFailBody": "Không thể truy cập các tệp kho để xóa. Các khóa của kho đã được xóa sạch khỏi bộ nhớ; bất kỳ dữ liệu kho nào còn lại trên đĩa đều là dữ liệu vô dụng được bọc bằng Argon2id, không thể khôi phục.",
+      "ioFailTitle": "Lỗi ổ đĩa khi xóa",
+      "partialFailBody_one": "Không thể xóa {{count}} tệp khỏi đĩa. Các khóa của kho đã được xóa sạch khỏi bộ nhớ, nên bất kỳ văn bản mã hóa mồ côi nào còn lại đều là dữ liệu vô dụng được bọc bằng Argon2id, không thể khôi phục.",
+      "partialFailBody_other": "Không thể xóa {{count}} tệp khỏi đĩa. Các khóa của kho đã được xóa sạch khỏi bộ nhớ, nên bất kỳ văn bản mã hóa mồ côi nào còn lại đều là dữ liệu vô dụng được bọc bằng Argon2id, không thể khôi phục.",
+      "partialFailTitle": "Việc xóa kho thất bại một phần",
+      "submit": "Xóa kho",
+      "submitInFlight": "Đang xóa kho…",
+      "typeToConfirmLabel": "Gõ DELETE để xác nhận",
+      "vaultPath": "Đường dẫn kho: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Làm mờ các dòng không hoạt động",
+      "dimHelper": "Trong chế độ tập trung (⇧⌘F), làm mờ mọi dòng trừ dòng bạn đang chỉnh sửa.",
+      "dimLabel": "Chế độ tập trung · làm mờ các dòng không hoạt động",
+      "off": "Tắt",
+      "on": "Bật",
+      "saveError": "Không thể lưu cài đặt chế độ tập trung.",
+      "typewriterAria": "Cuộn kiểu máy đánh chữ",
+      "typewriterHelper": "Trong chế độ tập trung (⇧⌘F), giữ dòng đang hoạt động ở giữa theo chiều dọc khi bạn gõ.",
+      "typewriterLabel": "Chế độ tập trung · cuộn kiểu máy đánh chữ"
+    },
+    "hotkeys": {
+      "addBindingAria": "Thêm một phím tắt cho {{command}}",
+      "cancel": "Hủy",
+      "capturePrompt": "Nhấn một phím…",
+      "conflictIndicator": "⚠ xung đột",
+      "conflictTitle": "Cũng được dùng bởi {{commands}}",
+      "fixed": "cố định",
+      "group": {
+        "editorFormatting": "Định dạng trình soạn thảo",
+        "general": "Chung",
+        "navigation": "Điều hướng",
+        "notes": "Ghi chú",
+        "panesTabs": "Khung & Thẻ",
+        "view": "Xem"
+      },
+      "helper": "Xem và thay đổi phím tắt. Phím tắt định dạng trình soạn thảo và phím chuyển vòng thẻ là cố định.",
+      "notSet": "Chưa đặt",
+      "removeBindingAria": "Xóa {{chord}}",
+      "resetAll": "Đặt lại tất cả phím tắt…",
+      "resetAllConfirm": "Đặt lại mọi phím tắt tùy chỉnh về mặc định?",
+      "resetAllYes": "Đặt lại tất cả",
+      "restoreDefaultAria": "Khôi phục mặc định cho {{command}}",
+      "searchAriaLabel": "Tìm phím tắt",
+      "searchPlaceholder": "Tìm phím tắt…",
+      "warnAlreadyUsed": "Đã được dùng bởi {{commands}} — vẫn thêm."
+    },
+    "language": {
+      "helper": "Chọn ngôn ngữ hiển thị cho ứng dụng.",
+      "label": "Ngôn ngữ"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Không thể lưu cài đặt số dòng.",
+      "helper": "Hiển thị cột đánh số dòng trong trình soạn thảo. Mỗi dòng một số; mặc định là tắt.",
+      "label": "Số dòng",
+      "off": "Tắt",
+      "on": "Bật"
+    },
+    "prefs": {
+      "saveError": "Không thể lưu tùy chọn — hãy thử lại"
+    },
+    "privacy": {
+      "autoLockHelper": "Khóa kho sau khoảng thời gian không hoạt động này.",
+      "autoLockLabel": "Tự động khóa",
+      "autoLockSearchEmpty": "Không có khoảng thời gian nào khớp.",
+      "autoLockSearchPlaceholder": "Tìm khoảng thời gian…",
+      "screenCaptureHelperOff": "Bảo vệ luôn được áp dụng trước khi mở khóa. Sau khi mở khóa, theo tùy chọn này.",
+      "screenCaptureHelperOn": "Hoạt động trên macOS và Windows 10 (Bản cập nhật tháng 5 năm 2020 trở lên). Hỗ trợ Linux sẽ có trong bản phát hành tương lai.",
+      "screenCaptureLabel": "Chống chụp màn hình"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Đã hủy.",
+      "errorGeneric": "Không thể thiết lập mở khóa nhanh.",
+      "errorHardwareUnavailable": "Touch ID không khả dụng trên thiết bị này.",
+      "errorNotUnlocked": "Hãy mở khóa kho trước.",
+      "errorPinNotDigits": "Mã PIN chỉ được gồm chữ số.",
+      "errorPinTooShort": "Mã PIN phải có ít nhất {{count}} chữ số.",
+      "errorPinTooShort_one": "Mã PIN phải có ít nhất {{count}} chữ số.",
+      "errorPinTooShort_other": "Mã PIN phải có ít nhất {{count}} chữ số.",
+      "helperConfigured": "Đã thiết lập qua {{method}}. Khi nhập lại sau khi tự động khóa sẽ bỏ qua mật khẩu chính. Vẫn cần mật khẩu chính sau khi khởi động lại.",
+      "helperNotConfigured": "Nhập lại sau khi tự động khóa bằng mã PIN hoặc Touch ID thay vì mật khẩu chính đầy đủ. Đây là tiện ích bổ sung cho kho đã mã hóa — vẫn cần mật khẩu chính sau khi khởi động lại.",
+      "methodPin": "Mã PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "Mã PIN mở khóa nhanh",
+      "pinPlaceholder": "Mã PIN (ít nhất {{count}} chữ số)",
+      "pinPlaceholder_one": "Mã PIN (ít nhất {{count}} chữ số)",
+      "pinPlaceholder_other": "Mã PIN (ít nhất {{count}} chữ số)",
+      "setPin": "Đặt mã PIN",
+      "setupHelper": "Touch ID chỉ có trên macOS và hiện đang thử nghiệm (chờ xác minh phần cứng). Mã PIN hoạt động ở mọi nơi.",
+      "title": "Mở khóa nhanh",
+      "useTouchId": "Dùng Touch ID"
+    },
+    "shell": {
+      "closeLabel": "Đóng cài đặt",
+      "navLabel": "Bảng cài đặt",
+      "panels": {
+        "about": "Giới thiệu",
+        "account": "Tài khoản",
+        "appearance": "Giao diện",
+        "editor": "Trình soạn thảo",
+        "hotkeys": "Phím tắt",
+        "privacy": "Quyền riêng tư",
+        "storage": "Lưu trữ"
+      },
+      "passwordUpdatedToast": "Đã cập nhật mật khẩu",
+      "title": "Cài đặt"
+    },
+    "spell": {
+      "errorSaveLanguages": "Không thể lưu các ngôn ngữ kiểm tra chính tả.",
+      "errorSaveSetting": "Không thể lưu cài đặt kiểm tra chính tả.",
+      "helper": "Gạch chân các từ sai chính tả khi bạn gõ. Hoàn toàn ngoại tuyến — ghi chú của bạn không bao giờ rời khỏi thiết bị.",
+      "label": "Kiểm tra chính tả",
+      "languagesAriaLabel": "Ngôn ngữ kiểm tra chính tả",
+      "languagesHelper": "Một từ là đúng nếu nó hợp lệ trong bất kỳ ngôn ngữ nào được chọn — tiện lợi khi xen các thuật ngữ tiếng Anh vào ghi chú bằng ngôn ngữ khác.",
+      "languagesLabel": "Ngôn ngữ",
+      "languagesPlaceholder": "Chọn ngôn ngữ…",
+      "languagesSearchEmpty": "Không có ngôn ngữ nào khớp.",
+      "languagesSearchPlaceholder": "Tìm ngôn ngữ…",
+      "off": "Tắt",
+      "on": "Bật"
+    },
+    "storage": {
+      "backupHelper": "Các bản sao lưu được mã hóa đúng như kho của bạn, trong một tệp .myne-backup duy nhất đã được xác minh. Việc khôi phục dùng mật khẩu hoặc cụm từ khôi phục của kho đó — y hệt như khi mở khóa.",
+      "backupLabel": "Sao lưu",
+      "backUpVault": "Sao lưu kho…",
+      "exportAction": "Xuất…",
+      "exportBody": "Xuất kho dạng Markdown",
+      "exportHelper": "Cây Markdown thuần — không được mã hóa.",
+      "exportLabel": "Xuất",
+      "importHelper": "Đưa một kho Obsidian hiện có vào Myne. Mọi ghi chú Markdown được nhập và mã hóa ngay tại chỗ; các tệp gốc của bạn không bị động đến.",
+      "importLabel": "Nhập",
+      "importObsidian": "Nhập kho Obsidian…",
+      "locationHelper": "Mỗi kho là một thư mục chứa các tệp đã mã hóa nằm dưới đường dẫn này. Hãy ưu tiên nút Sao lưu bên dưới thay vì sao chép thủ công — nó xác minh tệp đã ghi.",
+      "locationLabel": "Vị trí kho",
+      "openInFiles": "Mở trong trình quản lý tệp",
+      "pathUnavailable": "Không có đường dẫn",
+      "restoreBackup": "Khôi phục từ bản sao lưu…"
+    },
+    "typography": {
+      "contentWidthHelper": "Chiều rộng tối đa của cột soạn thảo. Toàn bộ cho phép văn bản trải rộng khắp khung.",
+      "contentWidthLabel": "Chiều rộng nội dung",
+      "errorSave": "Không thể lưu tùy chọn. Vui lòng thử lại.",
+      "fontHelper": "Văn bản đơn cách (monospace) hoặc cân đối (sans-serif).",
+      "fontLabel": "Phông chữ",
+      "lineSpacingHelper": "Khoảng cách dọc giữa các dòng.",
+      "lineSpacingLabel": "Khoảng cách dòng",
+      "textSizeHelper": "Cỡ cơ bản của văn bản trình soạn thảo. Tiêu đề sẽ co giãn theo.",
+      "textSizeLabel": "Cỡ chữ"
+    },
+    "viewMode": {
+      "errorSave": "Không thể lưu chế độ xem mặc định.",
+      "helper": "Cách một ghi chú mở ra: Xem trước trực tiếp (mặc định), Đọc chỉ-xem, hoặc Nguồn thô. Bật/tắt cho một ghi chú bằng ⇧⌘E.",
+      "label": "Chế độ xem mặc định",
+      "optionLive": "Xem trước trực tiếp",
+      "optionReading": "Đọc",
+      "optionSource": "Nguồn"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Đóng trình quản lý mẫu",
+      "deleteRowLabel": "Xóa mẫu {{name}} (chuyển vào Thùng rác)",
+      "editTemplateLabel": "Chỉnh sửa mẫu {{name}}",
+      "emptyBody": "Tạo một mẫu để tái sử dụng khung ghi chú — ghi chú cuộc họp, nhật ký hằng ngày, ghi chú đọc sách. Chọn một mẫu khi bạn tạo ghi chú mới.",
+      "emptyTitle": "Chưa có mẫu nào",
+      "listLabel": "Mẫu",
+      "loading": "Đang tải…",
+      "newTemplate": "Mẫu mới",
+      "newTemplateName": "Mẫu không có tiêu đề",
+      "removeFromTemplates": "Bỏ khỏi danh sách mẫu",
+      "removeRowLabel": "Bỏ {{name}} khỏi danh sách mẫu (vẫn giữ ghi chú)",
+      "title": "Mẫu ghi chú"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Chọn một kho khác",
+    "continue": "Tiếp tục",
+    "decrypting": "Đang giải mã…",
+    "deleteLink": "Mất cả mật khẩu lẫn cụm từ khôi phục? Xóa kho và bắt đầu lại",
+    "errors": {
+      "alreadyUnlocked": "Kho đã được mở khóa.",
+      "inProgress": "Một thao tác đang diễn ra.",
+      "unexpected": "Lỗi bất ngờ. Vui lòng thử lại.",
+      "vaultNotFound": "Không tìm thấy tệp kho. Vui lòng khởi động lại ứng dụng."
+    },
+    "passwordLabel": "Mật khẩu",
+    "passwordPlaceholder": "Mật khẩu",
+    "quickUnlock": {
+      "failed": "Mở khóa nhanh thất bại. Hãy dùng mật khẩu của bạn.",
+      "pinAriaLabel": "Mã PIN mở khóa nhanh",
+      "pinPlaceholder": "Mã PIN",
+      "unlockWithPin": "Mở khóa bằng mã PIN",
+      "unlockWithTouchId": "Mở khóa bằng Touch ID",
+      "usePasswordBelow": "hoặc dùng mật khẩu của bạn bên dưới",
+      "wrongCredential": "Không chính xác. Còn {{remaining}} lần thử."
+    },
+    "recoveryInterruptedBanner": "Quá trình khôi phục đã bị gián đoạn. Hãy đặt mật khẩu mới trước.",
+    "recoveryInterruptedBody": "Hãy đặt mật khẩu mới trước, rồi niêm phong lại kho của bạn.",
+    "recoveryInterruptedTitle": "Quá trình khôi phục đã bị gián đoạn.",
+    "recoveryLink": "Quên mật khẩu? Mở khóa bằng cụm từ khôi phục",
+    "submit": "Mở khóa",
+    "subtitle": "Nhập mật khẩu của bạn để tiếp tục.",
+    "suspicion": {
+      "lockedDuringChange": "Đã hủy đổi mật khẩu: kho đã bị khóa.",
+      "metaChangedExternally": "Kho đã bị sửa đổi ở một phiên khác — vui lòng mở khóa lại."
+    },
+    "title": "Mở khóa kho của bạn."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Không thể đọc tệp kho.",
+      "notFound": "Không tìm thấy tệp kho. Vui lòng khởi động lại ứng dụng.",
+      "permissionDenied": "Không có quyền truy cập tệp kho. Hãy kiểm tra quyền của tệp."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "Tôi đã lưu số tài khoản của mình ở nơi có thể tìm lại sau này.",
+      "back": "Quay lại",
+      "commit": "Tạo kho",
+      "committing": "Đang lưu…",
+      "copied": "Đã sao chép",
+      "copy": "Sao chép",
+      "eyebrow": "Bước 4 trên 4 — số tài khoản",
+      "heading": "Lưu lại số tài khoản của bạn.",
+      "intro": "Đây là mã định danh bí mật của bạn — hãy coi nó như tiền mặt.",
+      "saveAsFile": "Lưu thành tệp",
+      "shownOnceBody": "Hãy lưu nó ngay — Myne không thể khôi phục nó cho bạn. Cần có nó để đăng ký đồng bộ sau này.",
+      "shownOnceEmphasis": "Số này chỉ được hiển thị một lần."
+    },
+    "briefing": {
+      "back": "Quay lại",
+      "continue": "Tiếp tục tạo kho",
+      "eyebrow": "Trước khi bạn tạo kho",
+      "heading": "Trước khi bạn tạo kho",
+      "intro": "Myne mã hóa ghi chú của bạn để chỉ mình bạn có thể mở chúng. Từ đó có ba điều hệ quả — hãy đọc rồi tiếp tục.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "Tôi hiểu rằng không có khôi phục qua email.",
+          "statement": "Không có khôi phục qua email. Sẽ không bao giờ có.",
+          "why": "Chúng tôi không bao giờ hỏi email của bạn, nên không có liên kết đặt lại và không có tài khoản nào để bộ phận hỗ trợ mở khóa. Đây không phải là một tính năng còn thiếu — đó là sự đảm bảo. Khôi phục qua email đồng nghĩa với việc chúng tôi có thể đọc ghi chú của bạn, và Myne được xây dựng để chúng tôi không thể làm điều đó."
+        },
+        "no-store": {
+          "ackLabel": "Tôi hiểu rằng Myne không thể khôi phục mật khẩu của tôi.",
+          "statement": "Mật khẩu của bạn mở khóa kho của bạn. Chúng tôi không lưu nó.",
+          "why": "Mật khẩu của bạn là đầu vào cho khóa giải mã ghi chú của bạn. Nó không bao giờ rời khỏi thiết bị này, và không gì trên máy chủ của chúng tôi có thể tái tạo nó. Đó là điều giữ cho ghi chú của bạn riêng tư — và là lý do chúng tôi không thể đặt lại nó cho bạn."
+        },
+        "phrase-backup": {
+          "ackLabel": "Tôi hiểu rằng cụm từ khôi phục là bản sao lưu duy nhất của tôi.",
+          "statement": "Cụm từ khôi phục là bản sao lưu duy nhất của bạn.",
+          "why": "Nếu bạn quên mật khẩu, cụm từ khôi phục 24 từ là cách duy nhất để truy cập lại. {{lostBothSecrets}} Hãy viết cụm từ ra giấy và giữ ở nơi an toàn."
+        }
+      },
+      "why": "Tại sao?"
+    },
+    "confirm": {
+      "back": "Quay lại",
+      "continue": "Tiếp tục",
+      "eyebrow": "Bước 3 trên 4 — xác nhận cụm từ",
+      "heading": "Gõ lại bốn từ trong cụm từ của bạn.",
+      "intro": "Chúng tôi sẽ hỏi các vị trí cụ thể để xác minh bạn đã lưu nó.",
+      "mismatch": "Không khớp với từ số {{pos}}.",
+      "wordAtPosition": "Từ ở vị trí {{pos}}"
+    },
+    "encrypting": {
+      "caption": "Việc này mất một chút thời gian.",
+      "footerHint": "Nếu việc này lâu hơn 30 giây, hãy đóng cửa sổ rồi thử lại.",
+      "heading": "Đang mã hóa kho của bạn"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Hãy thử lại.",
+        "title": "Số tài khoản không hợp lệ"
+      },
+      "aeadFailure": {
+        "body": "Hãy thử lại.",
+        "title": "Mã hóa thất bại"
+      },
+      "csprng": {
+        "body": "Hãy thử lại.",
+        "title": "Không thể tạo dữ liệu ngẫu nhiên an toàn"
+      },
+      "invalidPassword": {
+        "body": "Hãy thử lại.",
+        "title": "Mật khẩu không hợp lệ"
+      },
+      "invalidVaultMeta": {
+        "body": "Hãy thử lại.",
+        "title": "Lỗi định dạng kho"
+      },
+      "ioOther": {
+        "body": "Hãy thử lại.",
+        "title": "Không thể lưu kho"
+      },
+      "joinFailure": {
+        "body": "Hãy thử lại.",
+        "title": "Đã xảy ra lỗi"
+      },
+      "kdfFailure": {
+        "body": "Hãy thử lại. Nếu việc này cứ tiếp diễn, hệ thống của bạn có thể đang thiếu bộ nhớ.",
+        "title": "Không thể thiết lập mã hóa"
+      },
+      "noSpace": {
+        "body": "Hãy giải phóng dung lượng đĩa rồi thử lại.",
+        "title": "Không đủ dung lượng đĩa"
+      },
+      "notFound": {
+        "body": "Hãy thử lại.",
+        "title": "Thiếu thư mục kho"
+      },
+      "passwordTooShort": {
+        "body": "Hãy dùng ít nhất 12 ký tự.",
+        "title": "Mật khẩu quá ngắn"
+      },
+      "permissionDenied": {
+        "body": "Hãy đảm bảo Myne có quyền ghi vào thư mục dữ liệu ứng dụng của bạn.",
+        "title": "Không thể ghi vào thư mục kho"
+      },
+      "sessionExpired": {
+        "body": "Vì sự an toàn của bạn, việc tạo kho sẽ hết hạn sau 10 phút. Hãy bắt đầu lại.",
+        "title": "Phiên đã hết hạn"
+      },
+      "sessionNotFound": {
+        "body": "Hãy bắt đầu lại từ đầu.",
+        "title": "Không tìm thấy phiên"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Hãy đóng các cửa sổ Myne khác rồi thử lại.",
+        "title": "Quá nhiều phiên tạo kho cùng lúc"
+      },
+      "vaultArtifactsPresent": {
+        "body": "Không thể tạo kho mới vì dữ liệu kho đã tồn tại trên thiết bị này. Hãy đóng ứng dụng và khởi động lại — màn hình khởi động sẽ đưa bạn tới luồng mở khóa.",
+        "title": "Kho đã tồn tại"
+      },
+      "vaultBusyAuth": {
+        "body": "Một thao tác kho khác đang diễn ra. Hãy thử lại sau giây lát.",
+        "title": "Kho đang bận"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Hủy",
+        "message": "Đóng cửa sổ sẽ loại bỏ cụm từ khôi phục của bạn. Tiếp tục đóng?",
+        "okLabel": "Vẫn đóng",
+        "title": "Hủy việc tạo kho?"
+      },
+      "genericError": {
+        "body": "Hãy thử lại.",
+        "title": "Đã xảy ra lỗi"
+      }
+    },
+    "password": {
+      "back": "Quay lại",
+      "eyebrow": "Bước 1 trên 4 — mật khẩu chính",
+      "heading": "Tạo kho",
+      "helperLead": "Myne không lưu mật khẩu hay cụm từ khôi phục của bạn.",
+      "submit": "Tạo cụm từ khôi phục"
+    },
+    "phrase": {
+      "back": "Quay lại",
+      "continue": "Tôi đã lưu cụm từ này — xác nhận cụm từ",
+      "copy": "Sao chép",
+      "eyebrow": "Bước 2 trên 4 — cụm từ khôi phục",
+      "heading": "Hãy viết ra 24 từ này.",
+      "intro": "Cụm từ này, cùng với mật khẩu của bạn, là cách duy nhất để khôi phục kho của bạn. Hãy lưu nó ngoại tuyến — trên giấy, trình quản lý mật khẩu, ví phần cứng. Hãy coi nó như tiền mặt.",
+      "reveal": "Hiện cụm từ",
+      "saveAsFile": "Lưu thành tệp"
+    },
+    "ready": {
+      "backedUp": "Đã sao lưu ✓",
+      "backingUp": "Đang sao lưu…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Sao lưu chưa hoàn tất — không có tệp nào được tạo ra. Bạn có thể sao lưu bất cứ lúc nào từ Cài đặt → Lưu trữ.",
+      "backupFilterName": "Bản sao lưu Myne",
+      "backUpNow": "Sao lưu kho này ngay",
+      "body": "Myne đã ghi kho của bạn vào thư mục dữ liệu ứng dụng. Mật khẩu chính và cụm từ khôi phục là cách duy nhất để truy cập lại — hãy đảm bảo cả hai được lưu ở nơi an toàn.",
+      "decrypting": "Đang giải mã…",
+      "done": "Xong",
+      "heading": "Kho của bạn đã sẵn sàng.",
+      "showFolder": "Hiện thư mục kho"
+    },
+    "sessionLost": {
+      "startOver": "Bắt đầu lại"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Tạo một kho khác",
+    "heading": "Chọn một kho",
+    "loading": "Đang tải các kho của bạn…",
+    "noneLoaded": "Hiện không thể tải kho nào.",
+    "openedRelative": "đã mở {{rel}}",
+    "restoreFromBackup": "Khôi phục từ bản sao lưu",
+    "subline": "Bạn có nhiều hơn một kho trên thiết bị này. Chọn một kho để mở khóa.",
+    "vaultFallback": "Kho {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "Việc này mất một chút thời gian.",
+      "eyebrow": "KHÔI PHỤC · ĐANG GIẢI MÃ",
+      "footerHint": "Nếu việc này lâu hơn 30 giây, hãy đóng cửa sổ rồi thử lại.",
+      "heading": "Đang giải mã kho của bạn",
+      "subCaption": "Đang xử lý… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Đã hủy khôi phục: kho đã bị khóa.",
+        "operationInProgress": "Một thao tác đang diễn ra. Vui lòng chờ.",
+        "unexpected": "Lỗi bất ngờ. Vui lòng thử lại.",
+        "weakPassword": "Mật khẩu mới phải có ít nhất 12 ký tự."
+      },
+      "eyebrow": "Khôi phục · Mật khẩu mới",
+      "helperBody": "Đã mở bằng cụm từ khôi phục của bạn. Mật khẩu cũ của bạn không còn dùng được — hãy đặt mật khẩu chính mới ngay.",
+      "helperEmphasis": "Cụm từ khôi phục của bạn vẫn giữ nguyên.",
+      "submit": "Đặt mật khẩu mới",
+      "title": "Đặt mật khẩu chính mới"
+    },
+    "phrase": {
+      "back": "← Quay lại",
+      "body": "Nhập cụm từ khôi phục của bạn. 24 từ BIP-39.",
+      "cellLabel": "Từ {{index}}",
+      "deleteLink": "Xóa kho và bắt đầu lại",
+      "eyebrow": "Khôi phục",
+      "submit": "Mở khóa",
+      "title": "Khôi phục kho của bạn."
+    },
+    "select": {
+      "accountInvalid": "Số tài khoản không hợp lệ. Vui lòng kiểm tra và thử lại.",
+      "accountLabel": "Số tài khoản (tùy chọn)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (tùy chọn)",
+      "body": "Chọn kho bạn muốn khôi phục bằng cụm từ khôi phục 24 từ của bạn. Bạn cũng có thể gõ số tài khoản để chuyển thẳng tới nó.",
+      "cancel": "Hủy",
+      "checking": "Đang kiểm tra…",
+      "loadFailed": "Hiện không thể tải kho nào.",
+      "loading": "Đang tải các kho của bạn…",
+      "openedRelative": "đã mở {{rel}}",
+      "or": "hoặc",
+      "title": "Chọn một kho để khôi phục",
+      "useAccountNumber": "Dùng số tài khoản",
+      "vaultFallback": "Kho {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Kho",
+    "createAnother": "Tạo một kho khác",
+    "switching": "đang chuyển…",
+    "switchVaultLabel": "Chuyển kho",
+    "vaultFallback": "Kho {{n}}"
+  },
+  "welcome": {
+    "createCta": "Tạo kho mới",
+    "headlineLine1": "Ghi chú Markdown được mã hóa.",
+    "headlineLine2": "Không cần email khi đăng ký.",
+    "repairResidue": {
+      "cancel": "Hủy",
+      "cleaningUp": "Đang dọn dẹp…",
+      "cleanUp": "Dọn dẹp",
+      "confirmBody_one": "{{count}} tệp sẽ bị xóa. Chúng vốn đã không đọc được; không mất gì có thể khôi phục.",
+      "confirmBody_other": "{{count}} tệp sẽ bị xóa. Chúng vốn đã không đọc được; không mất gì có thể khôi phục.",
+      "confirmTitle": "Dọn dẹp các tệp còn sót lại?",
+      "doneBody_one": "Đã xóa {{count}} tệp còn sót lại. Bây giờ bạn có thể tạo một kho mới.",
+      "doneBody_other": "Đã xóa {{count}} tệp còn sót lại. Bây giờ bạn có thể tạo một kho mới.",
+      "doneTitle": "Đã dọn dẹp xong",
+      "errorBody": "Đã xảy ra lỗi. Hãy đóng ứng dụng rồi thử lại.",
+      "errorTitle": "Dọn dẹp thất bại",
+      "foundBody_one": "{{count}} tệp còn sót lại từ một lần xóa trước đó chưa hoàn tất. Chúng vốn đã không đọc được — bạn sẽ không mất gì có thể khôi phục.",
+      "foundBody_other": "{{count}} tệp còn sót lại từ một lần xóa trước đó chưa hoàn tất. Chúng vốn đã không đọc được — bạn sẽ không mất gì có thể khôi phục.",
+      "foundTitle": "Tệp còn sót lại từ một lần xóa chưa hoàn tất",
+      "partialBody_one": "{{count}} tệp có thể đang bị một ứng dụng khác khóa (phần mềm diệt virus, đồng bộ tệp, hoặc lập chỉ mục tìm kiếm). Hãy đóng ứng dụng và thử lại sau giây lát, hoặc gỡ thư mục kho thủ công.",
+      "partialBody_other": "{{count}} tệp có thể đang bị một ứng dụng khác khóa (phần mềm diệt virus, đồng bộ tệp, hoặc lập chỉ mục tìm kiếm). Hãy đóng ứng dụng và thử lại sau giây lát, hoặc gỡ thư mục kho thủ công.",
+      "partialTitle": "Không thể gỡ một số tệp"
+    },
+    "restoreCta": "Khôi phục từ bản sao lưu",
+    "subtitle": "Ghi chú của bạn được mã hóa trên thiết bị này trước khi rời khỏi nó. Máy chủ chỉ lưu văn bản mã hóa."
+  }
+}

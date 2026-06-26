@@ -221,7 +221,7 @@ describe("UrlImageChipWidget", () => {
 
 describe("AttachmentFileCardWidget", () => {
   it("renders the card: icon, filename, 'type · size' meta, and an overflow menu", () => {
-    const dom = new AttachmentFileCardWidget(ID, "report.docx", 2048, "Word document").toDOM(
+    const dom = new AttachmentFileCardWidget(ID, "report.docx", 2048).toDOM(
       fakeView,
     );
     expect(dom.getAttribute("data-testid")).toBe("attachment-card");

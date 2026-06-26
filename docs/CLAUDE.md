@@ -7,7 +7,7 @@
 ```
 docs/
 ├── vision.md              ← phased plan, anti-features (commitments)
-├── threat-model.md        ← A1–A13, AS1–AS17, TB1–TB9 — NORMATIVE
+├── threat-model.md        ← A1–A14, AS1–AS17, TB1–TB10 — NORMATIVE
 ├── glossary.md            ← canonical terminology (~115 entries)
 ├── decisions.md           ← append-only timeline
 ├── questions.md           ← open questions parking lot

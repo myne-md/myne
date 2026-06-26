@@ -23,6 +23,7 @@
 // form serves vs `PasswordChangeForm`.
 
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { PasswordStrength } from "./PasswordStrength";
 import {
@@ -90,9 +91,6 @@ interface PasswordCreateFormProps {
   testIdPrefix?: string;
 }
 
-const DEFAULT_EMPTY_CAPTION =
-  "Used as input to Argon2id (m=256 MiB, t=3, p=2). Choose something you can remember; you cannot reset it.";
-
 export function PasswordCreateForm({
   submitLabel,
   onSubmit,
@@ -100,10 +98,14 @@ export function PasswordCreateForm({
   errorBanner,
   helperCopy,
   secondaryAction,
-  emptyCaption = DEFAULT_EMPTY_CAPTION,
+  emptyCaption,
   autoFocus = true,
   testIdPrefix,
 }: PasswordCreateFormProps) {
+  const { t } = useTranslation();
+  // Resolve the default at render time (not module scope) so a language switch
+  // re-renders the caption.
+  const resolvedEmptyCaption = emptyCaption ?? t("password.createForm.defaultEmptyCaption");
   const tid = (suffix: string) => (testIdPrefix ? `${testIdPrefix}.${suffix}` : undefined);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -125,13 +127,13 @@ export function PasswordCreateForm({
   let showStrength = false;
 
   if (password.length === 0) {
-    passwordCaption = emptyCaption;
+    passwordCaption = resolvedEmptyCaption;
     passwordTone = "muted";
   } else if (tooShort) {
-    passwordCaption = `Use at least ${MIN_PASSWORD_LEN} characters.`;
+    passwordCaption = t("password.createForm.tooShort", { n: MIN_PASSWORD_LEN });
     passwordTone = "danger";
   } else if (!zxcvbnReady || !result) {
-    passwordCaption = "Checking strength…";
+    passwordCaption = t("password.createForm.checkingStrength");
     passwordTone = "pending";
   } else {
     showStrength = true;
@@ -157,7 +159,7 @@ export function PasswordCreateForm({
       {helperCopy}
 
       <PasswordInput
-        label="Master password"
+        label={t("password.createForm.passwordLabel")}
         value={password}
         onChange={setPassword}
         show={showPassword}
@@ -184,7 +186,7 @@ export function PasswordCreateForm({
               cursor: disabled ? "default" : "pointer",
             }}
           >
-            Suggest password
+            {t("password.createForm.suggestPassword")}
           </button>
         }
       />
@@ -198,13 +200,13 @@ export function PasswordCreateForm({
       )}
 
       <PasswordInput
-        label="Confirm master password"
+        label={t("password.createForm.confirmLabel")}
         value={confirm}
         onChange={setConfirm}
         show={showConfirm}
         onToggleShow={() => setShowConfirm((s) => !s)}
         invalid={mismatch}
-        caption={mismatch ? "Passwords do not match." : undefined}
+        caption={mismatch ? t("password.createForm.mismatch") : undefined}
         captionTone="danger"
         disabled={disabled}
         testId={tid("confirm-input")}

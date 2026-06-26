@@ -13,6 +13,7 @@ import {
   type ResolverNote,
 } from "../../notes/resolveWikilink";
 import { emitNoteWikilink } from "./emit";
+import i18n from "../../i18n";
 
 export type ConversionRow =
   | { kind: "rewrite"; byteRange: ByteRange; before: string; after: string }
@@ -57,7 +58,7 @@ export function planWikilinkConversion(
     if (ref.targetKind !== "title") continue; // already path-form → leave alone
     const res = resolveWikilink(ref, notes);
     if (res.status === "broken") {
-      rows.push({ kind: "skipped", byteRange: ref.byteRange, before: ref.raw, reason: "no match" });
+      rows.push({ kind: "skipped", byteRange: ref.byteRange, before: ref.raw, reason: i18n.t("editor.wikilink.convertCore.noMatch") });
       continue;
     }
     if (res.ambiguous) {

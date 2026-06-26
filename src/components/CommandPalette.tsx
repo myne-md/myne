@@ -1,7 +1,9 @@
 // Global command palette modal — MYND-86 + MYND-40.
 //
-// Keyboard-first entry point. `Cmd/Ctrl+K` or `Cmd/Ctrl+P` opens it (both toggle
-// the same palette). As you type, results appear in two fixed sections:
+// Keyboard-first entry point. The `palette.toggle` command opens it — default
+// `Cmd/Ctrl+K` or `Cmd/Ctrl+P` (both toggle the same palette), rebindable via
+// Settings → Hotkeys like any other window command. As you type, results appear
+// in two fixed sections:
 // COMMANDS (the typed action registry, frontend fuzzy — instant) and NOTES
 // (backend full-text `note_search`, BM25, debounced). Arrow keys navigate across
 // both sections, Enter runs the highlighted row (run a command / open a note),
@@ -23,8 +25,10 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS, fuzzyFilter } from "../commands";
 import { Icon } from "./primitives/Icon";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { formatChord } from "../commands/chord";
 import type {
   ActionVisibility,
@@ -203,12 +207,18 @@ export function CommandPalette({
   isTemplate,
   isArchived,
 }: CommandPaletteProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   // Backend full-text results for the NOTES section (MYND-40). Populated by the
   // search effect below; empty while the query is empty.
   const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Carve-out modal: trap focus directly (not via ModalShell, which would
+  // strip the input + arrow/Enter list navigation). Initial focus is the
+  // search input. MYND-93.
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
   // Monotonic dispatch counter for the note-search generation-guard (MYND-40):
   // each query dispatch claims the next value; only the latest-dispatched
   // response is applied (see `shouldApplyNoteSearchResult`).
@@ -328,7 +338,7 @@ export function CommandPalette({
               (h): Row => ({
                 kind: "note",
                 id: h.note_id,
-                title: h.title === "" ? "Untitled" : h.title,
+                title: h.title === "" ? t("commandPalette.untitledNote") : h.title,
                 matchedIn: h.matched_in,
                 // Archived notes STAY in search (archive ≠ soft-trash) — flagged
                 // for the badge, not filtered out (MYND-331).
@@ -340,7 +350,7 @@ export function CommandPalette({
     // sections in the flat list (commands always lead) — used for section
     // labels without re-scanning `rows`.
     return { rows: [...commandRows, ...noteRows], commandCount: commandRows.length };
-  }, [query, ctx, noteHits, isTrashed, isTemplate, isArchived]);
+  }, [query, ctx, noteHits, isTrashed, isTemplate, isArchived, t]);
 
   // Clamp selected index when row count changes.
   useEffect(() => {
@@ -425,7 +435,13 @@ export function CommandPalette({
 
   return (
     <div style={BACKDROP_STYLE} onClick={onBackdropClick} role="presentation">
-      <div style={MODAL_STYLE} role="dialog" aria-label="Command palette">
+      <div
+        ref={modalRef}
+        style={MODAL_STYLE}
+        role="dialog"
+        aria-label={t("commandPalette.dialogLabel")}
+        data-testid="palette.dialog"
+      >
         <input
           ref={inputRef}
           type="text"
@@ -435,7 +451,8 @@ export function CommandPalette({
             setSelectedIndex(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder="Search notes or run a command — Esc to dismiss"
+          placeholder={t("commandPalette.searchPlaceholder")}
+          aria-label={t("commandPalette.searchPlaceholder")}
           style={INPUT_STYLE}
           autoComplete="off"
           autoCorrect="off"
@@ -444,7 +461,7 @@ export function CommandPalette({
         />
         <div style={LIST_STYLE} role="listbox">
           {rows.length === 0 ? (
-            <div style={EMPTY_STYLE}>No matches</div>
+            <div style={EMPTY_STYLE}>{t("commandPalette.noMatches")}</div>
           ) : (
             rows.map((row, i) => {
               // Inject a section label before the first command row and before
@@ -452,9 +469,9 @@ export function CommandPalette({
               const label = !showSectionLabels
                 ? null
                 : i === 0
-                  ? "Commands"
+                  ? t("commandPalette.sectionCommands")
                   : i === commandCount
-                    ? "Notes"
+                    ? t("commandPalette.sectionNotes")
                     : null;
               const key =
                 row.kind === "action" ? row.action.id : `note:${row.id}`;
@@ -463,7 +480,7 @@ export function CommandPalette({
                   {label !== null && (
                     <div style={SECTION_LABEL_STYLE}>{label}</div>
                   )}
-                  {renderRow(row, i, i === selectedIndex, runRow)}
+                  {renderRow(row, i, i === selectedIndex, runRow, t)}
                 </Fragment>
               );
             })
@@ -479,6 +496,7 @@ function renderRow(
   index: number,
   selected: boolean,
   runRow: (row: Row) => void | Promise<void>,
+  t: (key: string) => string,
 ) {
   const isDisabled = row.kind === "action" && row.visibility === "disabled";
   const style = isDisabled
@@ -532,10 +550,10 @@ function renderRow(
             <span
               style={ARCHIVED_BADGE_STYLE}
               data-testid="palette.archived-badge"
-              title="Archived"
+              title={t("commandPalette.archivedBadgeTitle")}
             >
               <Icon name="archive" size={12} />
-              Arşiv
+              {t("commandPalette.archivedBadge")}
             </span>
           )}
           {/* Body-only match (MYND-40): the query matched in the note body but
@@ -545,7 +563,7 @@ function renderRow(
               term is in the visible title). Drives off the precise backend
               `matched_in`, so it is correct even for stemmed/Turkish-cased hits. */}
           {row.matchedIn.body && !row.matchedIn.title && (
-            <span style={HINT_STYLE}>↳ matched in body</span>
+            <span style={HINT_STYLE}>{t("commandPalette.matchedInBody")}</span>
           )}
         </>
       )}

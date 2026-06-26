@@ -11,6 +11,7 @@
 // widget shares one menu implementation rather than a second copy. All visible
 // text is set via `textContent` (never `innerHTML`) per TB2.
 
+import i18n from "../../i18n";
 import { ensureAttachmentInsertStyles } from "./styles";
 
 /** One row of the overflow menu. */
@@ -47,7 +48,7 @@ export function buildOverflowMenu(
   button.setAttribute("data-testid", opts.buttonTestId);
   button.setAttribute("aria-haspopup", "menu");
   button.setAttribute("aria-expanded", "false");
-  button.setAttribute("aria-label", "Attachment actions");
+  button.setAttribute("aria-label", i18n.t("editor.attachment.menu.actionsAria"));
   button.textContent = "⋯";
   wrap.appendChild(button);
 

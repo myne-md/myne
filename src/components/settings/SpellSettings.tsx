@@ -12,6 +12,7 @@
 // adding a bundled language surfaces here with no edit.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
@@ -88,6 +89,7 @@ const LANG_OPTIONS: readonly SelectOption<string>[] = [...BUNDLED_SPELL_LANGUAGE
   .sort((a, b) => a.label.localeCompare(b.label));
 
 export function SpellSettings() {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState(true);
   const [active, setActive] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +126,7 @@ export function SpellSettings() {
       setError(null);
     } catch {
       setEnabled(prev); // rollback
-      setError("Could not save the spell-check setting.");
+      setError(t("settings.spell.errorSaveSetting"));
     }
   }
 
@@ -140,33 +142,33 @@ export function SpellSettings() {
       setError(null);
     } catch {
       setActive(prev); // rollback
-      setError("Could not save the spell-check languages.");
+      setError(t("settings.spell.errorSaveLanguages"));
     }
   }
 
   return (
     <>
       <ControlBlock
-        label="Spell check"
-        helper="Underline misspelled words as you type. Fully offline — your notes never leave the device."
+        label={t("settings.spell.label")}
+        helper={t("settings.spell.helper")}
         control={
           <button
             type="button"
             role="switch"
             aria-checked={enabled}
-            aria-label="Spell check"
+            aria-label={t("settings.spell.label")}
             data-testid="settings.spell-check"
             onClick={() => void toggleEnabled(!enabled)}
             style={TOGGLE_STYLE}
           >
-            {enabled ? "On" : "Off"}
+            {enabled ? t("settings.spell.on") : t("settings.spell.off")}
           </button>
         }
       />
 
       <div style={BLOCK_STYLE}>
         <span style={LABEL_STYLE} id="spell-langs-label">
-          Languages
+          {t("settings.spell.languagesLabel")}
         </span>
         <SearchableSelect
           multiple
@@ -174,15 +176,14 @@ export function SpellSettings() {
           selected={active}
           onChange={(next) => void setLanguages(next)}
           disabled={!enabled}
-          aria-label="Spell-check languages"
+          aria-label={t("settings.spell.languagesAriaLabel")}
           testId="settings.spell-language-select"
-          placeholder="Select languages…"
-          searchPlaceholder="Search languages…"
-          emptyText="No languages match."
+          placeholder={t("settings.spell.languagesPlaceholder")}
+          searchPlaceholder={t("settings.spell.languagesSearchPlaceholder")}
+          emptyText={t("settings.spell.languagesSearchEmpty")}
         />
         <p style={HELPER_STYLE}>
-          A word is correct if it’s valid in any selected language — handy for
-          mixing English terms into other-language notes.
+          {t("settings.spell.languagesHelper")}
         </p>
       </div>
 

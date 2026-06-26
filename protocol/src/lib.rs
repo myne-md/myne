@@ -52,6 +52,7 @@ pub const MAX_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 pub mod account_number;
 pub mod aead;
 pub mod attachment_blob;
+pub mod attachment_text_blob;
 pub mod attachments_catalog;
 pub mod blob;
 pub(crate) mod canonical_json;
@@ -59,6 +60,7 @@ pub mod dictionary_blob;
 pub mod error;
 pub mod kdf;
 pub mod manifest;
+pub mod paired_extension;
 pub mod password_policy;
 pub mod phrase;
 pub mod prefs;
@@ -79,7 +81,7 @@ pub use account_number::{
     ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
+    aad_attachment_text_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
     aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
     aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob,
     aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
@@ -89,6 +91,12 @@ pub use attachment_blob::{
     encode_attachment_blob, encode_attachment_blob_raw, AttachmentBlobError, ATTACHMENT_BLOB_MAGIC,
     ATTACHMENT_BLOB_PROTOCOL_VERSION, ATTACHMENT_BLOB_RESERVED, ATTACHMENT_ID_LEN,
     MAX_ATTACHMENT_LEN,
+};
+pub use attachment_text_blob::{
+    decode_attachment_text_blob, encode_attachment_text_blob, encode_attachment_text_blob_raw,
+    AttachmentTextBlobError, ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN,
+    ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1, ATTACHMENT_TEXT_BLOB_HEADER_LEN, ATTACHMENT_TEXT_BLOB_MAGIC,
+    ATTACHMENT_TEXT_BLOB_PROTOCOL_VERSION, MAX_ATTACHMENT_TEXT_PLAINTEXT_LEN,
 };
 pub use attachments_catalog::{
     aad_attachments_catalog, decode_attachments_catalog, encode_attachments_catalog,
@@ -115,6 +123,10 @@ pub use manifest::{
     compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
     MANIFEST_DOMAIN_PREFIX, MANIFEST_FORMAT_V1, MANIFEST_HASH_LEN, MANIFEST_ID_LEN,
     MANIFEST_PROTOCOL_VERSION,
+};
+pub use paired_extension::{
+    canonical_encode_paired_extensions, parse_paired_extensions_array, PairedExtension,
+    PairedExtensionParseError,
 };
 pub use password_policy::{validate_min_length, MIN_PASSWORD_LEN};
 pub use phrase::{

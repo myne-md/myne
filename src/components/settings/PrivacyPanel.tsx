@@ -14,6 +14,7 @@
 // hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import { useSyncPrefs } from "../../hooks/useSyncPrefs";
 import { useLastActiveNotePref } from "../../hooks/useLastActiveNotePref";
@@ -44,11 +45,14 @@ const TOGGLE_ROW_STYLE: CSSProperties = {
 // support disclosure inherited from MYND-55/78's disabled placeholder
 // copy — modified to drop the "Per-vault toggle ... coming in a
 // future release" sentence since the toggle is now interactive.
-function screenCaptureHelperText(enabled: boolean): string {
+function screenCaptureHelperText(
+  enabled: boolean,
+  t: (key: string) => string,
+): string {
   if (enabled) {
-    return "Active on macOS and Windows 10 (May 2020 Update or later). Linux support coming in a future release.";
+    return t("settings.privacy.screenCaptureHelperOn");
   }
-  return "Protection always applies before unlock. After unlock, follows this preference.";
+  return t("settings.privacy.screenCaptureHelperOff");
 }
 
 interface ToggleRowProps {
@@ -137,11 +141,12 @@ interface AutoLockRowProps {
 }
 
 function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
+  const { t } = useTranslation();
   return (
     <div style={BLOCK_STYLE}>
       <div style={TOGGLE_ROW_STYLE}>
         <span style={LABEL_STYLE} id="auto-lock-label">
-          Auto-lock
+          {t("settings.privacy.autoLockLabel")}
         </span>
         <SearchableSelect
           options={AUTO_LOCK_SELECT_OPTIONS}
@@ -150,14 +155,14 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
             const secs = Number(next[0]);
             if (!Number.isNaN(secs)) onChange(secs);
           }}
-          aria-label="Auto-lock"
+          aria-label={t("settings.privacy.autoLockLabel")}
           testId="settings.auto-lock-select"
-          searchPlaceholder="Search durations…"
-          emptyText="No durations match."
+          searchPlaceholder={t("settings.privacy.autoLockSearchPlaceholder")}
+          emptyText={t("settings.privacy.autoLockSearchEmpty")}
         />
       </div>
       <p id="auto-lock-helper" style={HELPER_STYLE}>
-        Lock the vault after this much inactivity.
+        {t("settings.privacy.autoLockHelper")}
       </p>
     </div>
   );
@@ -186,6 +191,7 @@ function realtimeSyncHelperText(enabled: boolean): string {
 }
 
 export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
+  const { t } = useTranslation();
   const { prefs, toggleScreenCapture, setAutoLock } = usePrefs(onShowToast);
   const { realtimeSse, setRealtimeSse } = useSyncPrefs();
   const { enabled: lastActiveNote, setEnabled: setLastActiveNote } =
@@ -193,10 +199,10 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   return (
     <div style={PANEL_ROOT_STYLE}>
       <ToggleRow
-        label="Screen-capture protection"
-        ariaLabel="Screen-capture protection"
+        label={t("settings.privacy.screenCaptureLabel")}
+        ariaLabel={t("settings.privacy.screenCaptureLabel")}
         ariaDescribedBy="screen-capture-protection-helper"
-        helper={screenCaptureHelperText(prefs.screen_capture_protection)}
+        helper={screenCaptureHelperText(prefs.screen_capture_protection, t)}
         checked={prefs.screen_capture_protection}
         onToggle={(next) => {
           void toggleScreenCapture(next);

@@ -52,10 +52,21 @@ const ATTEMPT_FILE: &str = "vault.quickunlock.attempts";
 /// Whether quick-unlock is configured for a vault, and by which method.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct QuickUnlockStatus {
-    /// `true` when a `vault.quickunlock` blob exists and parses.
+    /// `true` when a `vault.quickunlock` blob exists and parses. Pure disk
+    /// truth — the Settings panel uses this to render "Configured via PIN".
     pub configured: bool,
     /// `"pin"` / `"biometric"` when configured, else `None`.
     pub method: Option<&'static str>,
+    /// `true` only when quick-unlock can actually be redeemed *right now* —
+    /// `configured` AND the spring-loaded session gate is open (a full
+    /// master-password unlock has happened this process session). `false` on a
+    /// cold start (app restart) so the Unlock screen hides the PIN field
+    /// instead of offering a credential that would immediately fail
+    /// `RequiresFullPassword`. Mirrors the `quick_unlock_with_dir` gate so the
+    /// status and the redeem path never disagree. The pure-disk
+    /// [`status_with_dir`] reports `false` (it has no session knowledge); the
+    /// [`quick_unlock_status`] command layers the gate on.
+    pub available: bool,
 }
 
 fn blob_path(dir: &Path) -> PathBuf {
@@ -161,6 +172,10 @@ pub(crate) async fn setup_with_dir<P: QuickUnlockProvider + Send + 'static>(
 }
 
 /// Report whether quick-unlock is configured for the vault at `dir`.
+///
+/// Pure disk truth — `available` is always `false` here because availability
+/// depends on the per-session spring-loaded gate, which this OS-free core
+/// cannot see. The [`quick_unlock_status`] command layers the gate on.
 pub(crate) fn status_with_dir(dir: &Path) -> QuickUnlockStatus {
     match std::fs::read(blob_path(dir))
         .ok()
@@ -169,12 +184,23 @@ pub(crate) fn status_with_dir(dir: &Path) -> QuickUnlockStatus {
         Some(header) => QuickUnlockStatus {
             configured: true,
             method: method_label(header.provider_kind),
+            available: false,
         },
         None => QuickUnlockStatus {
             configured: false,
             method: None,
+            available: false,
         },
     }
+}
+
+/// Whether quick-unlock can be redeemed right now: a credential exists AND the
+/// spring-loaded session gate is open. Mirrors the `quick_unlock_with_dir` gate
+/// (a cold start has no full unlock yet, so quick-unlock is suppressed) so the
+/// Unlock screen never offers a PIN that would immediately fail
+/// `RequiresFullPassword`.
+fn compute_available(configured: bool, full_unlock_this_session: bool) -> bool {
+    configured && full_unlock_this_session
 }
 
 /// Disable quick-unlock: remove the device-local files. (Biometric keychain
@@ -301,6 +327,31 @@ async fn active_dir<R: Runtime>(
         .map_err(|_| QuickUnlockError::InvalidVaultMeta)
 }
 
+/// Resolve the quick-unlock target dir for a command that may name an explicit
+/// `vault_id`.
+///
+/// The Unlock-screen commands (status / redeem) run while NO vault is
+/// `Unlocked`, so [`active_dir`]'s `active_vault_id()` is `None` and its
+/// sole-vault disk heuristic ([`crate::paths::current_vault_root_from_base`])
+/// resolves to the WRONG (legacy `vault/`) path the moment two or more vaults
+/// exist on disk — the credential blob then appears absent and the PIN field
+/// silently self-hides. The Unlock screen DOES know which locked vault it
+/// targets, so it threads that id here and we resolve `<app_data_dir>/vaults/<id>/`
+/// directly (non-creating). When no id is named (the Settings panel, where a
+/// vault IS unlocked) we keep the active-vault path.
+async fn target_dir<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &VaultRuntimeState,
+    vault_id: Option<&str>,
+) -> Result<PathBuf, QuickUnlockError> {
+    match VaultId::parse_optional(vault_id) {
+        Some(id) => {
+            crate::paths::vault_root_for_id(app, id).map_err(|_| QuickUnlockError::InvalidVaultMeta)
+        }
+        None => active_dir(app, state).await,
+    }
+}
+
 /// Configure PIN quick-unlock for the active (Unlocked) vault.
 #[tauri::command]
 pub async fn quick_unlock_setup_pin<R: Runtime>(
@@ -320,15 +371,16 @@ pub async fn quick_unlock_setup_pin<R: Runtime>(
 #[tauri::command]
 pub async fn quick_unlock_with_pin<R: Runtime>(
     pin: String,
+    vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
     let pin = Zeroizing::new(pin);
-    let dir = active_dir(&app, &state).await?;
+    let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
     let (_, meta) = read_meta(&dir)?;
-    let vault_id = crate::paths::vault_id_from_root(&dir);
+    let id = crate::paths::vault_id_from_root(&dir);
     let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
-    quick_unlock_with_dir(&dir, vault_id, &state, provider).await
+    quick_unlock_with_dir(&dir, id, &state, provider).await
 }
 
 /// Best-effort removal of the macOS biometric Keychain credential for the vault
@@ -374,20 +426,21 @@ pub async fn quick_unlock_setup_biometric<R: Runtime>(
 /// command's verification caveat.)
 #[tauri::command]
 pub async fn quick_unlock_with_biometric<R: Runtime>(
+    vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
     #[cfg(target_os = "macos")]
     {
-        let dir = active_dir(&app, &state).await?;
+        let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
         let (_, meta) = read_meta(&dir)?;
-        let vault_id = crate::paths::vault_id_from_root(&dir);
+        let id = crate::paths::vault_id_from_root(&dir);
         let provider = super::macos::MacosBiometricProvider::new(meta.account_number_hash);
-        quick_unlock_with_dir(&dir, vault_id, &state, provider).await
+        quick_unlock_with_dir(&dir, id, &state, provider).await
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (&app, &state);
+        let _ = (&app, &state, &vault_id);
         Err(QuickUnlockError::HardwareUnavailable)
     }
 }
@@ -395,11 +448,18 @@ pub async fn quick_unlock_with_biometric<R: Runtime>(
 /// Report quick-unlock status for the active vault.
 #[tauri::command]
 pub async fn quick_unlock_status<R: Runtime>(
+    vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<QuickUnlockStatus, QuickUnlockError> {
-    let dir = active_dir(&app, &state).await?;
-    Ok(status_with_dir(&dir))
+    let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
+    let mut status = status_with_dir(&dir);
+    // Layer the spring-loaded session gate on: a cold start (no full unlock yet)
+    // reports `available: false` so the Unlock screen hides the PIN field rather
+    // than offer a credential that `quick_unlock_with_dir` would immediately
+    // reject with `RequiresFullPassword`.
+    status.available = compute_available(status.configured, state.has_full_unlock_this_session());
+    Ok(status)
 }
 
 /// Disable quick-unlock for the active vault.
@@ -636,6 +696,20 @@ mod tests {
         disable_with_dir(dir).expect("disable");
         assert!(!status_with_dir(dir).configured);
         assert_eq!(disable_with_dir(dir), Err(QuickUnlockError::NotConfigured));
+    }
+
+    #[test]
+    fn status_available_requires_both_configured_and_open_gate() {
+        // Cold start: configured on disk but the session gate is closed → the
+        // Unlock screen must hide the PIN field (no `RequiresFullPassword` dead
+        // end). This is the bug fix: status now mirrors the redeem-path gate.
+        assert!(!compute_available(true, false));
+        // After a full master-password unlock this session, an auto-lock leaves
+        // the credential redeemable → the PIN field shows.
+        assert!(compute_available(true, true));
+        // Never available when nothing is configured.
+        assert!(!compute_available(false, true));
+        assert!(!compute_available(false, false));
     }
 
     #[test]
