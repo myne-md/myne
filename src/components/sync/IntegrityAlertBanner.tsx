@@ -6,6 +6,7 @@
 // directive; built against design tokens.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { SYNC_INTEGRITY_ALERT } from "../../lib/load-bearing-copy";
 
 const STYLE: CSSProperties = {
@@ -41,6 +42,7 @@ interface IntegrityAlertBannerProps {
 }
 
 export function IntegrityAlertBanner({ present, onDismiss }: IntegrityAlertBannerProps) {
+  const { t } = useTranslation();
   if (!present) return null;
   return (
     <div role="alert" data-testid="sync.integrity-alert" style={STYLE}>
@@ -48,7 +50,7 @@ export function IntegrityAlertBanner({ present, onDismiss }: IntegrityAlertBanne
       {onDismiss && (
         <button
           type="button"
-          aria-label="Dismiss"
+          aria-label={t("common.dismiss")}
           onClick={onDismiss}
           style={DISMISS_STYLE}
           data-testid="sync.integrity-alert-dismiss"

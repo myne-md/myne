@@ -7,6 +7,7 @@
 // block / label / helper rhythm.
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 import { EndpointConfig } from "../sync/EndpointConfig";
@@ -37,6 +38,7 @@ const SECTION_TITLE_STYLE: CSSProperties = {
 };
 
 export function SyncPanel() {
+  const { t } = useTranslation();
   const ctx = useSelectedNote();
   const groups = conflictRecordsByOriginal(ctx.cache);
 
@@ -114,46 +116,42 @@ export function SyncPanel() {
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
       <div style={BLOCK_STYLE}>
-        <span style={LABEL_STYLE}>Sync server</span>
+        <span style={LABEL_STYLE}>{t("sync.panel.server.label")}</span>
         <EndpointConfig />
         <p style={HELPER_STYLE}>
-          Enter the same server URL on every device. For a self-hosted server use
-          its <code>https://</code> address; verify the certificate fingerprint
-          matches across your devices.
+          <Trans i18nKey="sync.panel.server.helper">
+            Enter the same server URL on every device. For a self-hosted server
+            use its <code>https://</code> address; verify the certificate
+            fingerprint matches across your devices.
+          </Trans>
         </p>
       </div>
 
       <div style={BLOCK_STYLE}>
-        <span style={LABEL_STYLE}>Sync status</span>
+        <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
         <SyncStatusIndicator />
         <BuildingIndexState building={buildingIndex} />
-        <p style={HELPER_STYLE}>
-          Myne syncs your encrypted notes across your devices. The server stores
-          only ciphertext it cannot read.
-        </p>
+        <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
       </div>
 
       <div style={BLOCK_STYLE}>
-        <span style={SECTION_TITLE_STYLE}>Add a device</span>
-        <p style={HELPER_STYLE}>
-          Sign in on a new device with your account number and password or
-          recovery phrase. A device stays pending until an existing device
-          approves it.
-        </p>
+        <span style={SECTION_TITLE_STYLE}>
+          {t("sync.panel.addDevice.label")}
+        </span>
+        <p style={HELPER_STYLE}>{t("sync.panel.addDevice.helper")}</p>
         <EnrollDeviceForm />
       </div>
 
       <div style={BLOCK_STYLE}>
-        <span style={SECTION_TITLE_STYLE}>Devices</span>
+        <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
         <DeviceManagementPanel />
       </div>
 
       <div style={BLOCK_STYLE}>
-        <span style={SECTION_TITLE_STYLE}>Conflicts</span>
-        <p style={HELPER_STYLE}>
-          When the same note is edited on two devices at once, Myne keeps both
-          copies so nothing is lost. Resolve them here.
-        </p>
+        <span style={SECTION_TITLE_STYLE}>
+          {t("sync.panel.conflicts.label")}
+        </span>
+        <p style={HELPER_STYLE}>{t("sync.panel.conflicts.helper")}</p>
         <ConflictsView
           groups={groups}
           onKeepBoth={handleKeepBoth}

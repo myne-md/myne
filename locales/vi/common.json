@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Hủy",
       "confirmDefault": "OK"
@@ -1735,6 +1736,124 @@
       "optionLive": "Xem trước trực tiếp",
       "optionReading": "Đọc",
       "optionSource": "Nguồn"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {

@@ -45,8 +45,8 @@
     "library": {
       "actionsAriaLabel": "Ek işlemleri",
       "actionsTitle": "İşlemler",
-      "checkUnusedFailedNotice": "Kullanılmayan ekler denetlenemedi. Tekrar deneyin.",
       "checking": "Denetleniyor…",
+      "checkUnusedFailedNotice": "Kullanılmayan ekler denetlenemedi. Tekrar deneyin.",
       "cleanUnused": "Kullanılmayanları temizle",
       "cleanUnusedTitle": "Hiçbir notta kullanılmayan ekleri sil",
       "colCreated": "Oluşturulma",
@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "İptal",
       "confirmDefault": "Tamam"
@@ -323,19 +324,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "{{filename}} dışa aktarılamadı.",
         "exported": "{{filename}} dışa aktarıldı.",
-        "renameFailed": "Ek yeniden adlandırılamadı.",
+        "exportFailed": "{{filename}} dışa aktarılamadı.",
         "renamed": "{{name}} olarak yeniden adlandırıldı.",
+        "renameFailed": "Ek yeniden adlandırılamadı.",
         "saveDialogFailed": "Kaydetme penceresi açılamadı."
       },
       "convert": {
         "cancel": "İptal",
         "confirm": "Dönüştür",
         "skipped": "atlandı — {{note}}",
-        "subtitleEmpty": "Dönüştürülecek bir şey yok — hiçbir kaynak dosya çözümlenemedi.",
         "subtitle_one": "1 referans yeniden yazılacak. Uygulamadan önce gözden geçirin.",
         "subtitle_other": "{{count}} referans yeniden yazılacak. Uygulamadan önce gözden geçirin.",
+        "subtitleEmpty": "Dönüştürülecek bir şey yok — hiçbir kaynak dosya çözümlenemedi.",
         "title": "İçe aktarılmış ekleri dönüştür"
       },
       "convertCommand": {
@@ -363,8 +364,8 @@
           "archive": "Arşiv",
           "audio": "Ses",
           "cHeader": "C başlık dosyası",
-          "cSource": "C kaynağı",
           "cppSource": "C++ kaynağı",
+          "cSource": "C kaynağı",
           "css": "CSS",
           "csv": "CSV",
           "document": "Belge",
@@ -551,12 +552,12 @@
         "browseViews": "Görünümlere göz at",
         "cycleViewMode": "Görünüm modunu değiştir",
         "docStats": {
-          "summarySelectionSuffix": " (seçim)",
           "summary_one": "{{count}} sözcük · {{characters}} karakter",
           "summary_other": "{{count}} sözcük · {{characters}} karakter",
-          "titleSelectionSuffix": " (seçim)",
+          "summarySelectionSuffix": " (seçim)",
           "title_one": "{{characters}} karakter · {{words}} sözcük · {{spaces}} boşluk · {{count}} paragraf",
-          "title_other": "{{characters}} karakter · {{words}} sözcük · {{spaces}} boşluk · {{count}} paragraf"
+          "title_other": "{{characters}} karakter · {{words}} sözcük · {{spaces}} boşluk · {{count}} paragraf",
+          "titleSelectionSuffix": " (seçim)"
         },
         "graphTitle": "Grafik (⌘⇧G)",
         "lock": "Kilitle",
@@ -832,10 +833,10 @@
         "countNotes_one": "{{count}} not",
         "countNotes_other": "{{count}} not",
         "exclusionsHistory": "Sürüm geçmişi dahil edilmedi.",
-        "exclusionsTrashedAndHistory_one": "{{count}} çöpteki not ve sürüm geçmişi dahil edilmedi.",
-        "exclusionsTrashedAndHistory_other": "{{count}} çöpteki not ve sürüm geçmişi dahil edilmedi.",
         "exclusionsTrashed_one": "{{count}} çöpteki not dahil edilmedi.",
         "exclusionsTrashed_other": "{{count}} çöpteki not dahil edilmedi.",
+        "exclusionsTrashedAndHistory_one": "{{count}} çöpteki not ve sürüm geçmişi dahil edilmedi.",
+        "exclusionsTrashedAndHistory_other": "{{count}} çöpteki not ve sürüm geçmişi dahil edilmedi.",
         "phaseAttachments": "ek",
         "phaseNotes": "not",
         "preparing": "Hazırlanıyor…",
@@ -893,9 +894,9 @@
   "notes": {
     "archive": {
       "close": "Kapat",
-      "countEmpty": "Boş",
       "count_one": "{{count}} not",
       "count_other": "{{count}} not",
+      "countEmpty": "Boş",
       "delete": "Sil",
       "deleteError": "Bu not silinemedi. Tekrar deneyin.",
       "emptyState": "Arşiv boş.",
@@ -1183,21 +1184,21 @@
       "renameAriaLabel": "Notu yeniden adlandır",
       "untitled": "Başlıksız"
     },
+    "savedView": {
+      "defaultName": "Filtrelenmiş görünüm"
+    },
     "saveStatus": {
       "editing": "Düzenleniyor",
       "editingEllipsis": "Düzenleniyor…",
       "editingTitle": "Düzenleniyor — otomatik kaydetme etkin",
       "justNow": "az önce",
       "retry": "Yeniden dene",
-      "saveFailed": "Kayıt başarısız",
-      "saveFailedTitle": "Kayıt başarısız — Yeniden dene’ye tıklayın",
       "saved": "Kaydedildi",
       "savedRelative": "{{rel}} kaydedildi",
+      "saveFailed": "Kayıt başarısız",
+      "saveFailedTitle": "Kayıt başarısız — Yeniden dene’ye tıklayın",
       "saving": "Kaydediliyor",
       "savingEllipsis": "Kaydediliyor…"
-    },
-    "savedView": {
-      "defaultName": "Filtrelenmiş görünüm"
     },
     "snapshotFailed": {
       "dismiss": "Kapat",
@@ -1263,9 +1264,9 @@
     },
     "trash": {
       "close": "Kapat",
-      "countEmpty": "Boş",
       "count_one": "{{count}} not",
       "count_other": "{{count}} not",
+      "countEmpty": "Boş",
       "delete": "Sil",
       "deleteError": "Bu not silinemedi. Tekrar deneyin.",
       "empty": "Çöp Kutusu’nu boşalt",
@@ -1292,24 +1293,6 @@
       "searching": "Aranıyor…",
       "thisNote": "bu not",
       "untitled": "Başlıksız"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Varsayılan (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (kare)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (geniş)"
-      },
-      "cancel": "İptal",
-      "cardSize": "Kart boyutu",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Değeri bir görsel olan ön bilgi özelliği — her kartın kapağı olarak gösterilir. Kapak istemiyorsanız boş bırakın.",
-      "coverImagePlaceholder": "örneğin cover",
-      "coverImageProperty": "Kapak görseli özelliği",
-      "imageAspectRatio": "Görsel en boy oranı",
-      "reset": "Sıfırla",
-      "save": "Kaydet"
     },
     "views": {
       "cards": {
@@ -1338,6 +1321,24 @@
       },
       "newView": "Yeni görünüm",
       "untitledView": "Başlıksız görünüm"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Varsayılan (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kare)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (geniş)"
+      },
+      "cancel": "İptal",
+      "cardSize": "Kart boyutu",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Değeri bir görsel olan ön bilgi özelliği — her kartın kapağı olarak gösterilir. Kapak istemiyorsanız boş bırakın.",
+      "coverImagePlaceholder": "örneğin cover",
+      "coverImageProperty": "Kapak görseli özelliği",
+      "imageAspectRatio": "Görsel en boy oranı",
+      "reset": "Sıfırla",
+      "save": "Kaydet"
     },
     "welcome": {
       "body": "Myne’e hoş geldiniz; düşünmek ve yazmak için özel alanınız.\n\nBurada kaydettiğiniz her şey şifrelenir ve cihazınızda kalır. **Parolanız** ve **kurtarma ifadeniz** bunun tek anahtarıdır, bu yüzden onları güvenli bir yerde saklayın. İkisi de kaybolursa kimse notlarınızı geri getiremez, biz bile.\n\nBu sadece sıradan bir not, o yüzden onu kendinize göre düzenleyin. Dilediğiniz zaman düzenleyin, yeniden adlandırın veya silin; fikirleriniz büyüdükçe yeni notlar ekleyin.\n\nBurada olmanıza sevindik. Myne hakkında daha fazla bilgi için https://myne.md adresini ziyaret edin\n",
@@ -1701,9 +1702,9 @@
       "on": "Açık"
     },
     "storage": {
-      "backUpVault": "Kasayı yedekle…",
       "backupHelper": "Yedeklemeler, tek bir doğrulanmış .myne-backup dosyasında, kasanız kadar şifreli kalır. Geri yükleme, o kasanın parolası veya kurtarma ifadesiyle çalışır — tıpkı kilit açma gibi.",
       "backupLabel": "Yedekleme",
+      "backUpVault": "Kasayı yedekle…",
       "exportAction": "Dışa aktar…",
       "exportBody": "Kasayı Markdown olarak dışa aktar",
       "exportHelper": "Düz markdown ağacı — şifreli değil.",
@@ -1735,6 +1736,127 @@
       "optionLive": "Canlı önizleme",
       "optionReading": "Okuma",
       "optionSource": "Kaynak"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1948,12 +2070,12 @@
       "saveAsFile": "Dosya olarak kaydet"
     },
     "ready": {
-      "backUpNow": "Bu kasayı şimdi yedekle",
       "backedUp": "Yedeklendi ✓",
       "backingUp": "Yedekleniyor…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Yedekleme tamamlanamadı — geride hiçbir dosya bırakılmadı. İstediğiniz zaman Ayarlar → Depolama’dan yedekleyebilirsiniz.",
       "backupFilterName": "Myne yedeklemesi",
+      "backUpNow": "Bu kasayı şimdi yedekle",
       "body": "Myne kasanızı uygulama veri klasörünüze yazdı. Geri dönmenin tek yolu ana parolanız ve kurtarma ifadenizdir — ikisinin de güvenli bir yerde kayıtlı olduğundan emin olun.",
       "decrypting": "Şifre çözülüyor…",
       "done": "Tamam",
@@ -2023,8 +2145,8 @@
   "vaultSwitcher": {
     "chipFallback": "Kasa",
     "createAnother": "Başka bir kasa oluştur",
-    "switchVaultLabel": "Kasa değiştir",
     "switching": "değiştiriliyor…",
+    "switchVaultLabel": "Kasa değiştir",
     "vaultFallback": "Kasa {{n}}"
   },
   "welcome": {
@@ -2033,8 +2155,8 @@
     "headlineLine2": "Kayıtta e-posta yok.",
     "repairResidue": {
       "cancel": "İptal",
-      "cleanUp": "Temizle",
       "cleaningUp": "Temizleniyor…",
+      "cleanUp": "Temizle",
       "confirmBody_one": "{{count}} dosya kaldırılacak. Zaten okunamaz durumdalar; kurtarılabilir hiçbir şey kaybolmaz.",
       "confirmBody_other": "{{count}} dosya kaldırılacak. Zaten okunamaz durumdalar; kurtarılabilir hiçbir şey kaybolmaz.",
       "confirmTitle": "Artık dosyalar temizlensin mi?",

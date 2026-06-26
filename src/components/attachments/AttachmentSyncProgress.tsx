@@ -9,6 +9,8 @@
 // ready to mount (e.g. in a sidebar/status surface) once the engine + B5 editor land.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { formatBytes } from "./format";
 import {
   type AttachmentTransfer,
@@ -92,17 +94,18 @@ function directionLabel(d: AttachmentTransfer["direction"]): string {
 function statusText(t: AttachmentTransfer): string {
   switch (t.status) {
     case "done":
-      return "done";
+      return i18n.t("sync.attachments.status.done");
     case "error":
-      return "failed — will retry";
+      return i18n.t("sync.attachments.status.failedWillRetry");
     case "paused":
-      return "paused";
+      return i18n.t("sync.attachments.status.paused");
     default:
       return `${formatBytes(t.transferred)} / ${formatBytes(t.total)}`;
   }
 }
 
 function TransferRow({ t }: { t: AttachmentTransfer }) {
+  const { t: translate } = useTranslation();
   const pct = t.total > 0 ? Math.min(100, Math.round((t.transferred / t.total) * 100)) : 0;
   return (
     <div
@@ -124,7 +127,11 @@ function TransferRow({ t }: { t: AttachmentTransfer }) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
-        aria-label={`${t.direction === "upload" ? "Uploading" : "Downloading"} ${t.name}`}
+        aria-label={
+          t.direction === "upload"
+            ? translate("sync.attachments.aria.uploading", { name: t.name })
+            : translate("sync.attachments.aria.downloading", { name: t.name })
+        }
       >
         <div style={fillStyle(pct, t.status)} />
       </div>
@@ -142,6 +149,7 @@ export function AttachmentSyncProgress({
 }: {
   hideWhenEmpty?: boolean;
 }) {
+  const { t } = useTranslation();
   const transfers = useAttachmentTransfers();
 
   if (transfers.length === 0 && hideWhenEmpty) {
@@ -150,10 +158,10 @@ export function AttachmentSyncProgress({
 
   return (
     <section style={ROOT_STYLE} data-testid="attachments.sync-progress">
-      <p style={HEADING_STYLE}>Attachment sync</p>
+      <p style={HEADING_STYLE}>{t("sync.attachments.heading")}</p>
       {transfers.length === 0 ? (
         <p style={EMPTY_STYLE} data-testid="attachments.sync-progress-empty">
-          No transfers in progress.
+          {t("sync.attachments.empty")}
         </p>
       ) : (
         transfers.map((t) => <TransferRow key={t.id} t={t} />)

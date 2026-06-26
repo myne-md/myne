@@ -352,7 +352,13 @@ fn main() {
                     "sync_list_devices",
                     "sync_approve_device",
                     "sync_remove_device",
+                    "sync_pending_conflicts",
+                    "sync_take_conflict",
+                    "sync_resolve_conflict",
+                    "sync_mark_tombstone",
                     "sync_enroll",
+                    "sync_join_account",
+                    "sync_reset_local",
                 ]),
             )
             .plugin(

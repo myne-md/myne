@@ -45,8 +45,8 @@
     "library": {
       "actionsAriaLabel": "Bijlageacties",
       "actionsTitle": "Acties",
-      "checkUnusedFailedNotice": "Controleren op ongebruikte bijlagen is mislukt. Probeer het opnieuw.",
       "checking": "Controleren…",
+      "checkUnusedFailedNotice": "Controleren op ongebruikte bijlagen is mislukt. Probeer het opnieuw.",
       "cleanUnused": "Ongebruikte opruimen",
       "cleanUnusedTitle": "Bijlagen verwijderen die in geen enkele notitie worden gebruikt",
       "colCreated": "Aangemaakt",
@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Annuleren",
       "confirmDefault": "OK"
@@ -323,19 +324,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "{{filename}} kon niet worden geëxporteerd.",
         "exported": "{{filename}} geëxporteerd.",
-        "renameFailed": "De bijlage kon niet worden hernoemd.",
+        "exportFailed": "{{filename}} kon niet worden geëxporteerd.",
         "renamed": "Hernoemd naar {{name}}.",
+        "renameFailed": "De bijlage kon niet worden hernoemd.",
         "saveDialogFailed": "Het opslagvenster kon niet worden geopend."
       },
       "convert": {
         "cancel": "Annuleren",
         "confirm": "Omzetten",
         "skipped": "overgeslagen — {{note}}",
-        "subtitleEmpty": "Niets om om te zetten — geen bronbestanden gevonden.",
         "subtitle_one": "1 verwijzing wordt herschreven. Controleer voordat je doorgaat.",
         "subtitle_other": "{{count}} verwijzingen worden herschreven. Controleer voordat je doorgaat.",
+        "subtitleEmpty": "Niets om om te zetten — geen bronbestanden gevonden.",
         "title": "Geïmporteerde bijlagen omzetten"
       },
       "convertCommand": {
@@ -363,8 +364,8 @@
           "archive": "Archief",
           "audio": "Audio",
           "cHeader": "C-header",
-          "cSource": "C-broncode",
           "cppSource": "C++-broncode",
+          "cSource": "C-broncode",
           "css": "CSS",
           "csv": "CSV",
           "document": "Document",
@@ -551,12 +552,12 @@
         "browseViews": "Weergaven doorbladeren",
         "cycleViewMode": "Weergavemodus doorlopen",
         "docStats": {
-          "summarySelectionSuffix": " (sel.)",
           "summary_one": "{{count}} woord · {{characters}} tekens",
           "summary_other": "{{count}} woorden · {{characters}} tekens",
-          "titleSelectionSuffix": " (selectie)",
+          "summarySelectionSuffix": " (sel.)",
           "title_one": "{{characters}} tekens · {{words}} woorden · {{spaces}} spaties · {{count}} alinea",
-          "title_other": "{{characters}} tekens · {{words}} woorden · {{spaces}} spaties · {{count}} alinea's"
+          "title_other": "{{characters}} tekens · {{words}} woorden · {{spaces}} spaties · {{count}} alinea's",
+          "titleSelectionSuffix": " (selectie)"
         },
         "graphTitle": "Grafiek (⌘⇧G)",
         "lock": "Vergrendelen",
@@ -832,10 +833,10 @@
         "countNotes_one": "{{count}} notitie",
         "countNotes_other": "{{count}} notities",
         "exclusionsHistory": "Versiegeschiedenis niet opgenomen.",
-        "exclusionsTrashedAndHistory_one": "{{count}} verwijderde notitie en versiegeschiedenis niet opgenomen.",
-        "exclusionsTrashedAndHistory_other": "{{count}} verwijderde notities en versiegeschiedenis niet opgenomen.",
         "exclusionsTrashed_one": "{{count}} verwijderde notitie niet opgenomen.",
         "exclusionsTrashed_other": "{{count}} verwijderde notities niet opgenomen.",
+        "exclusionsTrashedAndHistory_one": "{{count}} verwijderde notitie en versiegeschiedenis niet opgenomen.",
+        "exclusionsTrashedAndHistory_other": "{{count}} verwijderde notities en versiegeschiedenis niet opgenomen.",
         "phaseAttachments": "bijlagen",
         "phaseNotes": "notities",
         "preparing": "Voorbereiden…",
@@ -893,9 +894,9 @@
   "notes": {
     "archive": {
       "close": "Sluiten",
-      "countEmpty": "Leeg",
       "count_one": "{{count}} notitie",
       "count_other": "{{count}} notities",
+      "countEmpty": "Leeg",
       "delete": "Verwijderen",
       "deleteError": "Die notitie kon niet worden verwijderd. Probeer het opnieuw.",
       "emptyState": "Het archief is leeg.",
@@ -1183,21 +1184,21 @@
       "renameAriaLabel": "Notitie hernoemen",
       "untitled": "Naamloos"
     },
+    "savedView": {
+      "defaultName": "Gefilterde weergave"
+    },
     "saveStatus": {
       "editing": "Bewerken",
       "editingEllipsis": "Bewerken…",
       "editingTitle": "Bewerken — automatisch opslaan staat klaar",
       "justNow": "zojuist",
       "retry": "Opnieuw proberen",
-      "saveFailed": "Opslaan mislukt",
-      "saveFailedTitle": "Opslaan mislukt — klik op Opnieuw proberen",
       "saved": "Opgeslagen",
       "savedRelative": "Opgeslagen {{rel}}",
+      "saveFailed": "Opslaan mislukt",
+      "saveFailedTitle": "Opslaan mislukt — klik op Opnieuw proberen",
       "saving": "Opslaan",
       "savingEllipsis": "Opslaan…"
-    },
-    "savedView": {
-      "defaultName": "Gefilterde weergave"
     },
     "snapshotFailed": {
       "dismiss": "Sluiten",
@@ -1263,9 +1264,9 @@
     },
     "trash": {
       "close": "Sluiten",
-      "countEmpty": "Leeg",
       "count_one": "{{count}} notitie",
       "count_other": "{{count}} notities",
+      "countEmpty": "Leeg",
       "delete": "Verwijderen",
       "deleteError": "Die notitie kon niet worden verwijderd. Probeer het opnieuw.",
       "empty": "Prullenbak legen",
@@ -1292,24 +1293,6 @@
       "searching": "Zoeken…",
       "thisNote": "deze notitie",
       "untitled": "Naamloos"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Standaard (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (vierkant)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (breed)"
-      },
-      "cancel": "Annuleren",
-      "cardSize": "Kaartgrootte",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "De frontmatter-eigenschap waarvan de waarde een afbeelding is — getoond als de omslag van elke kaart. Laat leeg voor geen omslag.",
-      "coverImagePlaceholder": "bijv. cover",
-      "coverImageProperty": "Eigenschap voor omslagafbeelding",
-      "imageAspectRatio": "Beeldverhouding",
-      "reset": "Resetten",
-      "save": "Opslaan"
     },
     "views": {
       "cards": {
@@ -1338,6 +1321,24 @@
       },
       "newView": "Nieuwe weergave",
       "untitledView": "Naamloze weergave"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Standaard (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (vierkant)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (breed)"
+      },
+      "cancel": "Annuleren",
+      "cardSize": "Kaartgrootte",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "De frontmatter-eigenschap waarvan de waarde een afbeelding is — getoond als de omslag van elke kaart. Laat leeg voor geen omslag.",
+      "coverImagePlaceholder": "bijv. cover",
+      "coverImageProperty": "Eigenschap voor omslagafbeelding",
+      "imageAspectRatio": "Beeldverhouding",
+      "reset": "Resetten",
+      "save": "Opslaan"
     },
     "welcome": {
       "body": "Welkom bij Myne, je privéruimte om te denken en te schrijven.\n\nAlles wat je hier opslaat is versleuteld en blijft op je apparaat. Je **wachtwoord** en **herstelzin** zijn de enige sleutels ertoe, dus bewaar ze op een veilige plek. Als je beide ooit verliest, kan niemand je notities meer terughalen, wij ook niet.\n\nDit is gewoon een normale notitie, dus maak hem helemaal van jezelf. Bewerk, hernoem of verwijder hem wanneer je maar wilt, en voeg nieuwe notities toe naarmate je ideeën groeien.\n\nFijn dat je er bent. Voor meer informatie over Myne, ga naar https://myne.md\n",
@@ -1701,9 +1702,9 @@
       "on": "Aan"
     },
     "storage": {
-      "backUpVault": "Back-up van kluis maken…",
       "backupHelper": "Back-ups blijven precies zo versleuteld als je kluis, in één geverifieerd .myne-backup-bestand. Herstellen werkt met het wachtwoord of de herstelzin van die kluis — net als bij ontgrendelen.",
       "backupLabel": "Back-up",
+      "backUpVault": "Back-up van kluis maken…",
       "exportAction": "Exporteren…",
       "exportBody": "Kluis exporteren als Markdown",
       "exportHelper": "Platte Markdown-structuur — niet versleuteld.",
@@ -1735,6 +1736,127 @@
       "optionLive": "Live-voorbeeld",
       "optionReading": "Lezen",
       "optionSource": "Bron"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1948,12 +2070,12 @@
       "saveAsFile": "Opslaan als bestand"
     },
     "ready": {
-      "backUpNow": "Maak nu een back-up van deze kluis",
       "backedUp": "Back-up gemaakt ✓",
       "backingUp": "Back-up maken…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "De back-up is niet voltooid — er is geen bestand achtergelaten. Je kunt op elk moment een back-up maken via Instellingen → Opslag.",
       "backupFilterName": "Myne-back-up",
+      "backUpNow": "Maak nu een back-up van deze kluis",
       "body": "Myne heeft je kluis naar je map met toepassingsgegevens geschreven. Je hoofdwachtwoord en herstelzin zijn de enige manier om weer binnen te komen — zorg dat beide veilig zijn opgeslagen.",
       "decrypting": "Ontsleutelen…",
       "done": "Klaar",
@@ -2023,8 +2145,8 @@
   "vaultSwitcher": {
     "chipFallback": "Kluis",
     "createAnother": "Nog een kluis aanmaken",
-    "switchVaultLabel": "Kluis wisselen",
     "switching": "wisselen…",
+    "switchVaultLabel": "Kluis wisselen",
     "vaultFallback": "Kluis {{n}}"
   },
   "welcome": {
@@ -2033,8 +2155,8 @@
     "headlineLine2": "Geen e-mail bij aanmelden.",
     "repairResidue": {
       "cancel": "Annuleren",
-      "cleanUp": "Opruimen",
       "cleaningUp": "Opruimen…",
+      "cleanUp": "Opruimen",
       "confirmBody_one": "{{count}} bestand wordt verwijderd. Ze zijn al onleesbaar; er gaat niets herstelbaars verloren.",
       "confirmBody_other": "{{count}} bestanden worden verwijderd. Ze zijn al onleesbaar; er gaat niets herstelbaars verloren.",
       "confirmTitle": "Achtergebleven bestanden opruimen?",

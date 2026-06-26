@@ -45,8 +45,8 @@
     "library": {
       "actionsAriaLabel": "Bilageåtgärder",
       "actionsTitle": "Åtgärder",
-      "checkUnusedFailedNotice": "Kunde inte kontrollera oanvända bilagor. Försök igen.",
       "checking": "Kontrollerar…",
+      "checkUnusedFailedNotice": "Kunde inte kontrollera oanvända bilagor. Försök igen.",
       "cleanUnused": "Rensa oanvända",
       "cleanUnusedTitle": "Ta bort bilagor som inte används i någon anteckning",
       "colCreated": "Skapad",
@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Avbryt",
       "confirmDefault": "OK"
@@ -323,19 +324,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Kunde inte exportera {{filename}}.",
         "exported": "Exporterade {{filename}}.",
-        "renameFailed": "Kunde inte byta namn på bilagan.",
+        "exportFailed": "Kunde inte exportera {{filename}}.",
         "renamed": "Bytte namn till {{name}}.",
+        "renameFailed": "Kunde inte byta namn på bilagan.",
         "saveDialogFailed": "Kunde inte öppna spardialogen."
       },
       "convert": {
         "cancel": "Avbryt",
         "confirm": "Konvertera",
         "skipped": "hoppades över — {{note}}",
-        "subtitleEmpty": "Inget att konvertera — inga källfiler kunde hittas.",
         "subtitle_one": "1 referens kommer att skrivas om. Granska innan du bekräftar.",
         "subtitle_other": "{{count}} referenser kommer att skrivas om. Granska innan du bekräftar.",
+        "subtitleEmpty": "Inget att konvertera — inga källfiler kunde hittas.",
         "title": "Konvertera importerade bilagor"
       },
       "convertCommand": {
@@ -363,8 +364,8 @@
           "archive": "Arkiv",
           "audio": "Ljud",
           "cHeader": "C-header",
-          "cSource": "C-källkod",
           "cppSource": "C++-källkod",
+          "cSource": "C-källkod",
           "css": "CSS",
           "csv": "CSV",
           "document": "Dokument",
@@ -546,12 +547,12 @@
         "browseViews": "Bläddra bland vyer",
         "cycleViewMode": "Växla visningsläge",
         "docStats": {
-          "summarySelectionSuffix": " (mark)",
           "summary_one": "{{count}} ord · {{characters}} tecken",
           "summary_other": "{{count}} ord · {{characters}} tecken",
-          "titleSelectionSuffix": " (markering)",
+          "summarySelectionSuffix": " (mark)",
           "title_one": "{{characters}} tecken · {{words}} ord · {{spaces}} mellanslag · {{count}} stycke",
-          "title_other": "{{characters}} tecken · {{words}} ord · {{spaces}} mellanslag · {{count}} stycken"
+          "title_other": "{{characters}} tecken · {{words}} ord · {{spaces}} mellanslag · {{count}} stycken",
+          "titleSelectionSuffix": " (markering)"
         },
         "graphTitle": "Graf (⌘⇧G)",
         "lock": "Lås",
@@ -826,10 +827,10 @@
         "countNotes_one": "{{count}} anteckning",
         "countNotes_other": "{{count}} anteckningar",
         "exclusionsHistory": "Versionshistorik ingår inte.",
-        "exclusionsTrashedAndHistory_one": "{{count}} anteckning i papperskorgen och versionshistorik ingår inte.",
-        "exclusionsTrashedAndHistory_other": "{{count}} anteckningar i papperskorgen och versionshistorik ingår inte.",
         "exclusionsTrashed_one": "{{count}} anteckning i papperskorgen ingår inte.",
         "exclusionsTrashed_other": "{{count}} anteckningar i papperskorgen ingår inte.",
+        "exclusionsTrashedAndHistory_one": "{{count}} anteckning i papperskorgen och versionshistorik ingår inte.",
+        "exclusionsTrashedAndHistory_other": "{{count}} anteckningar i papperskorgen och versionshistorik ingår inte.",
         "phaseAttachments": "bilagor",
         "phaseNotes": "anteckningar",
         "preparing": "Förbereder…",
@@ -887,9 +888,9 @@
   "notes": {
     "archive": {
       "close": "Stäng",
-      "countEmpty": "Tomt",
       "count_one": "{{count}} anteckning",
       "count_other": "{{count}} anteckningar",
+      "countEmpty": "Tomt",
       "delete": "Ta bort",
       "deleteError": "Kunde inte ta bort den anteckningen. Försök igen.",
       "emptyState": "Arkivet är tomt.",
@@ -1171,21 +1172,21 @@
       "renameAriaLabel": "Byt namn på anteckning",
       "untitled": "Namnlös"
     },
+    "savedView": {
+      "defaultName": "Filtrerad vy"
+    },
     "saveStatus": {
       "editing": "Redigerar",
       "editingEllipsis": "Redigerar…",
       "editingTitle": "Redigerar — autospar är aktiverat",
       "justNow": "just nu",
       "retry": "Försök igen",
-      "saveFailed": "Sparningen misslyckades",
-      "saveFailedTitle": "Sparningen misslyckades — klicka på Försök igen",
       "saved": "Sparad",
       "savedRelative": "Sparad {{rel}}",
+      "saveFailed": "Sparningen misslyckades",
+      "saveFailedTitle": "Sparningen misslyckades — klicka på Försök igen",
       "saving": "Sparar",
       "savingEllipsis": "Sparar…"
-    },
-    "savedView": {
-      "defaultName": "Filtrerad vy"
     },
     "snapshotFailed": {
       "dismiss": "Avfärda",
@@ -1251,9 +1252,9 @@
     },
     "trash": {
       "close": "Stäng",
-      "countEmpty": "Tomt",
       "count_one": "{{count}} anteckning",
       "count_other": "{{count}} anteckningar",
+      "countEmpty": "Tomt",
       "delete": "Ta bort",
       "deleteError": "Kunde inte ta bort den anteckningen. Försök igen.",
       "empty": "Töm papperskorgen",
@@ -1280,24 +1281,6 @@
       "searching": "Söker…",
       "thisNote": "den här anteckningen",
       "untitled": "Namnlös"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Standard (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (kvadrat)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (bred)"
-      },
-      "cancel": "Avbryt",
-      "cardSize": "Kortstorlek",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Den frontmatter-egenskap vars värde är en bild — visas som varje korts omslag. Lämna tomt för inget omslag.",
-      "coverImagePlaceholder": "t.ex. cover",
-      "coverImageProperty": "Omslagsbildsegenskap",
-      "imageAspectRatio": "Bildens bildförhållande",
-      "reset": "Återställ",
-      "save": "Spara"
     },
     "views": {
       "cards": {
@@ -1326,6 +1309,24 @@
       },
       "newView": "Ny vy",
       "untitledView": "Namnlös vy"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Standard (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kvadrat)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (bred)"
+      },
+      "cancel": "Avbryt",
+      "cardSize": "Kortstorlek",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Den frontmatter-egenskap vars värde är en bild — visas som varje korts omslag. Lämna tomt för inget omslag.",
+      "coverImagePlaceholder": "t.ex. cover",
+      "coverImageProperty": "Omslagsbildsegenskap",
+      "imageAspectRatio": "Bildens bildförhållande",
+      "reset": "Återställ",
+      "save": "Spara"
     },
     "welcome": {
       "body": "Välkommen till Myne, ditt privata utrymme för att tänka och skriva.\n\nAllt du sparar här är krypterat och stannar på din enhet. Ditt **lösenord** och din **återställningsfras** är de enda nycklarna till det, så förvara dem på ett säkert ställe. Om båda någonsin går förlorade kan ingen återskapa dina anteckningar, inte ens vi.\n\nDet här är bara en vanlig anteckning, så gör den till din egen. Redigera den, byt namn på den eller ta bort den när du vill, och lägg till nya anteckningar i takt med att dina idéer växer.\n\nVi är glada att du är här. För att lära dig mer om Myne, besök https://myne.md\n",
@@ -1685,9 +1686,9 @@
       "on": "På"
     },
     "storage": {
-      "backUpVault": "Säkerhetskopiera valv…",
       "backupHelper": "Säkerhetskopior förblir exakt lika krypterade som ditt valv, i en enda verifierad .myne-backup-fil. Återställning fungerar med det valvets lösenord eller återställningsfras — precis som vid upplåsning.",
       "backupLabel": "Säkerhetskopia",
+      "backUpVault": "Säkerhetskopiera valv…",
       "exportAction": "Exportera…",
       "exportBody": "Exportera valv som Markdown",
       "exportHelper": "Vanligt markdown-träd — inte krypterat.",
@@ -1719,6 +1720,127 @@
       "optionLive": "Direkt förhandsgranskning",
       "optionReading": "Läsning",
       "optionSource": "Källa"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1932,12 +2054,12 @@
       "saveAsFile": "Spara som fil"
     },
     "ready": {
-      "backUpNow": "Säkerhetskopiera det här valvet nu",
       "backedUp": "Säkerhetskopierad ✓",
       "backingUp": "Säkerhetskopierar…",
       "backupDefaultFilename": "Myne-säkerhetskopia.myne-backup",
       "backupError": "Säkerhetskopieringen slutfördes inte — ingen fil lämnades kvar. Du kan säkerhetskopiera när som helst från Inställningar → Lagring.",
       "backupFilterName": "Myne-säkerhetskopia",
+      "backUpNow": "Säkerhetskopiera det här valvet nu",
       "body": "Myne skrev ditt valv till din applikationsdatamapp. Ditt huvudlösenord och din återställningsfras är det enda sättet tillbaka in — se till att båda är sparade på ett säkert ställe.",
       "decrypting": "Dekrypterar…",
       "done": "Klart",
@@ -2007,8 +2129,8 @@
   "vaultSwitcher": {
     "chipFallback": "Valv",
     "createAnother": "Skapa ett till valv",
-    "switchVaultLabel": "Byt valv",
     "switching": "byter…",
+    "switchVaultLabel": "Byt valv",
     "vaultFallback": "Valv {{n}}"
   },
   "welcome": {
@@ -2017,8 +2139,8 @@
     "headlineLine2": "Ingen e-post vid registrering.",
     "repairResidue": {
       "cancel": "Avbryt",
-      "cleanUp": "Rensa upp",
       "cleaningUp": "Rensar upp…",
+      "cleanUp": "Rensa upp",
       "confirmBody_one": "{{count}} fil kommer att tas bort. De är redan oläsbara; ingenting återställbart går förlorat.",
       "confirmBody_other": "{{count}} filer kommer att tas bort. De är redan oläsbara; ingenting återställbart går förlorat.",
       "confirmTitle": "Rensa upp överblivna filer?",

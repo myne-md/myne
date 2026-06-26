@@ -8,6 +8,8 @@
 // protocol::head_fingerprint and is wired when the head_fingerprint command lands.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { useDevices, type DeviceEntry } from "../../hooks/useDevices";
 
 const ROOT: CSSProperties = {
@@ -57,10 +59,11 @@ const BADGE: CSSProperties = {
 
 /** A short, stable display name from the device_id (until editable names land). */
 function shortName(d: DeviceEntry): string {
-  return `Device ${d.device_id_hex.slice(0, 6)}`;
+  return i18n.t("sync.devices.shortName", { hex: d.device_id_hex.slice(0, 6) });
 }
 
 export function DeviceManagementPanel() {
+  const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
   // This device, if the roster came back marking it retired — it was removed from
@@ -75,15 +78,14 @@ export function DeviceManagementPanel() {
           data-testid="sync.device-not-enrolled"
           style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}
         >
-          This device isn’t connected yet. If you just added it, wait for approval from
-          another device; otherwise add it with the “Add a device” form above.
+          {t("sync.devices.notEnrolled")}
         </div>
       ) : error ? (
         <div
           data-testid="sync.device-error"
           style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--danger)", fontSize: "var(--text-sm)" }}
         >
-          <span>Couldn’t reach sync ({error}).</span>
+          <span>{t("sync.devices.unreachable", { error })}</span>
           {error === "Unauthenticated" ? (
             // A rejected credential (e.g. this device was removed elsewhere) — a local
             // reset is the actual remedy.
@@ -94,14 +96,13 @@ export function DeviceManagementPanel() {
               onClick={() => void resetLocal()}
               data-testid="sync.reset-local"
             >
-              Reset sync on this device
+              {t("sync.devices.resetSyncOnThisDevice")}
             </button>
           ) : (
             // A transport failure — NOT a reason to wipe the baseline. The likely cause
             // (server moved / certificate changed) is fixed by re-pinning the endpoint.
             <span style={{ color: "var(--fg-3)" }} data-testid="sync.transport-hint">
-              If the server moved or its certificate changed, re-enter the server URL
-              under “Sync server” above to re-trust it.
+              {t("sync.devices.transportHint")}
             </span>
           )}
         </div>
@@ -110,7 +111,7 @@ export function DeviceManagementPanel() {
           data-testid="sync.device-retired-self"
           style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--danger)", fontSize: "var(--text-sm)" }}
         >
-          <span>This device was removed from your account on another device.</span>
+          <span>{t("sync.devices.removedElsewhere")}</span>
           <button
             type="button"
             style={BTN}
@@ -118,7 +119,7 @@ export function DeviceManagementPanel() {
             onClick={() => void resetLocal()}
             data-testid="sync.reset-local"
           >
-            Reset and re-add this device
+            {t("sync.devices.resetAndReAdd")}
           </button>
         </div>
       ) : null}
@@ -126,9 +127,7 @@ export function DeviceManagementPanel() {
       {pending.length > 0 && (
         <div data-testid="sync.pending-devices">
           <div style={SECTION_LABEL}>
-            {pending.length === 1
-              ? "1 device awaiting approval"
-              : `${pending.length} devices awaiting approval`}
+            {t("sync.devices.awaitingApproval", { count: pending.length })}
           </div>
           {pending.map((d) => (
             <div key={d.device_id_hex} style={ROW} data-testid="sync.pending-row" data-device-id={d.device_id_hex}>
@@ -140,7 +139,7 @@ export function DeviceManagementPanel() {
                 onClick={() => void approve(d.device_id_hex)}
                 data-testid="sync.approve-device"
               >
-                Approve
+                {t("sync.devices.approve")}
               </button>
             </div>
           ))}
@@ -148,16 +147,16 @@ export function DeviceManagementPanel() {
       )}
 
       <div>
-        <div style={SECTION_LABEL}>Your devices</div>
+        <div style={SECTION_LABEL}>{t("sync.devices.yourDevices")}</div>
         {devices === null ? (
           // Only "Loading…" while genuinely loading. When the roster failed (e.g. this
           // device is not enrolled) `devices` stays null with an error set above — show
           // nothing here rather than spinning on "Loading…" forever.
           error ? null : (
-            <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>Loading…</div>
+            <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>{t("sync.devices.loading")}</div>
           )
         ) : approved.length === 0 ? (
-          <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>No devices synced yet.</div>
+          <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>{t("sync.devices.noDevices")}</div>
         ) : (
           approved.map((d) => (
             <div key={d.device_id_hex} style={ROW} data-testid="sync.device-row" data-device-id={d.device_id_hex} data-current={d.is_current ? "true" : "false"}>
@@ -165,13 +164,13 @@ export function DeviceManagementPanel() {
                 {shortName(d)}
                 {d.is_current && (
                   <span style={BADGE} data-testid="sync.this-device">
-                    This device
+                    {t("sync.devices.thisDevice")}
                   </span>
                 )}
               </span>
               {d.is_current ? (
                 <span style={{ color: "var(--fg-3)", fontSize: "var(--text-xs)" }}>
-                  Synced here
+                  {t("sync.devices.syncedHere")}
                 </span>
               ) : (
                 <button
@@ -181,7 +180,7 @@ export function DeviceManagementPanel() {
                   onClick={() => void remove(d.device_id_hex)}
                   data-testid="sync.remove-device"
                 >
-                  Remove
+                  {t("sync.devices.remove")}
                 </button>
               )}
             </div>
