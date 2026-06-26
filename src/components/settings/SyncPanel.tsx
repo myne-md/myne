@@ -1,0 +1,163 @@
+// Sync settings panel (MYND-424/425/426/427) — the in-app hub for the sync
+// engine: runtime status + manual sync, this-account device management (add +
+// approve + remove), the cold-start "building index" state, and the keep-both
+// Conflicts surface. Mounts inside the Editor's SidebarStateProvider, so it reads
+// the live note cache for conflict copies. Penpot skipped per the owner
+// directive; built against design tokens, mirroring the other Settings panels'
+// block / label / helper rhythm.
+
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
+import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
+import { EndpointConfig } from "../sync/EndpointConfig";
+import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
+import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
+import { BuildingIndexState } from "../sync/BuildingIndexState";
+import { ConflictsView } from "../../notes/components/ConflictsView";
+import {
+  useSelectedNote,
+  conflictRecordsByOriginal,
+} from "../../notes/sidebarState";
+import { noteRead } from "../../notes/readNote";
+import { noteUpdate } from "../../notes/updateNote";
+import { deleteNoteRouted } from "../../notes/deleteNote";
+import { clearConflictMarkers } from "../../notes/conflictCopy";
+import { noteList } from "../../notes";
+import {
+  PANEL_ROOT_STYLE,
+  BLOCK_STYLE,
+  LABEL_STYLE,
+  HELPER_STYLE,
+} from "./panel-styles";
+
+const SECTION_TITLE_STYLE: CSSProperties = {
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
+  color: "var(--fg-1)",
+};
+
+export function SyncPanel() {
+  const { t } = useTranslation();
+  const ctx = useSelectedNote();
+  const groups = conflictRecordsByOriginal(ctx.cache);
+
+  // Cold-start "building search index…" state. Producer: the MYND-426 engine
+  // re-derives vault.search/vault.indices after a full-reconcile or a fresh
+  // device enroll and emits `sync://index-building` around that window. Dormant
+  // until the loop lands (R3); no-op outside Tauri (browser dev shim).
+  const [buildingIndex, setBuildingIndex] = useState(false);
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen<{ building: boolean }>(
+          "sync://index-building",
+          (e) => {
+            if (!cancelled) setBuildingIndex(e.payload?.building ?? true);
+          },
+        );
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri → no index-building channel.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  const refreshSidebar = useCallback(async () => {
+    try {
+      const ids = await noteList();
+      await ctx.refreshAll(ids);
+    } catch {
+      // Sidebar stays as-is until the next refresh — non-fatal.
+    }
+  }, [ctx]);
+
+  // Keep-both: the conflict copy becomes an ordinary note (clear its
+  // `conflict:` / `conflict_of:` markers, write the new version), then refresh
+  // so it re-enters the live sidebar.
+  const handleKeepBoth = useCallback(
+    (copyId: string) => {
+      void (async () => {
+        try {
+          const content = await noteRead(copyId);
+          await noteUpdate(copyId, clearConflictMarkers(content));
+          await refreshSidebar();
+        } catch {
+          // Surfaced via the unchanged Conflicts list — the user can retry.
+        }
+      })();
+    },
+    [refreshSidebar],
+  );
+
+  // Discard: delete the conflict copy. Routed so that under sync it tombstones
+  // (propagates + no resurrection) instead of a bare unlink.
+  const handleDiscard = useCallback(
+    (copyId: string) => {
+      void (async () => {
+        try {
+          await deleteNoteRouted(copyId);
+          await refreshSidebar();
+        } catch {
+          // Non-fatal — the copy stays listed until the next refresh.
+        }
+      })();
+    },
+    [refreshSidebar],
+  );
+
+  return (
+    <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
+      <div style={BLOCK_STYLE}>
+        <span style={LABEL_STYLE}>{t("sync.panel.server.label")}</span>
+        <EndpointConfig />
+        <p style={HELPER_STYLE}>
+          <Trans i18nKey="sync.panel.server.helper">
+            Enter the same server URL on every device. For a self-hosted server
+            use its <code>https://</code> address; verify the certificate
+            fingerprint matches across your devices.
+          </Trans>
+        </p>
+      </div>
+
+      <div style={BLOCK_STYLE}>
+        <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
+        <SyncStatusIndicator />
+        <BuildingIndexState building={buildingIndex} />
+        <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
+      </div>
+
+      <div style={BLOCK_STYLE}>
+        <span style={SECTION_TITLE_STYLE}>
+          {t("sync.panel.addDevice.label")}
+        </span>
+        <p style={HELPER_STYLE}>{t("sync.panel.addDevice.helper")}</p>
+        <EnrollDeviceForm />
+      </div>
+
+      <div style={BLOCK_STYLE}>
+        <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
+        <DeviceManagementPanel />
+      </div>
+
+      <div style={BLOCK_STYLE}>
+        <span style={SECTION_TITLE_STYLE}>
+          {t("sync.panel.conflicts.label")}
+        </span>
+        <p style={HELPER_STYLE}>{t("sync.panel.conflicts.helper")}</p>
+        <ConflictsView
+          groups={groups}
+          onKeepBoth={handleKeepBoth}
+          onDiscard={handleDiscard}
+        />
+      </div>
+    </div>
+  );
+}

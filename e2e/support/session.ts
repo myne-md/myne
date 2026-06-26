@@ -69,6 +69,9 @@ export interface AppSession {
   dataHome: string;
   /** `<dataHome>/md.myne.desktop` — what `app_data_dir` resolves to. */
   appDataDir: string;
+  /** `<dataHome>/.config/md.myne.desktop` — what `app_config_dir`
+   *  resolves to (device-local sync endpoint config lives here, SYNC-14). */
+  appConfigDir: string;
   /** Stop the app session + driver, remove the temp dir. */
   teardown(): Promise<void>;
   /** Save a failure artifact (base64 PNG screenshot + page source). */
@@ -80,8 +83,18 @@ export interface LaunchOptions {
    *  app launches (lay down `vaults/<id>/` fixtures, legacy `vault/`
    *  layouts, corrupt bytes…). The dir exists when called. */
   seed?: (appDataDir: string) => void | Promise<void>;
+  /** Pre-seed callback for the app_config_dir (device-local plaintext:
+   *  the sync endpoint config, custom themes…). Runs before launch; the
+   *  dir exists when called. Used by the multi-device harness to point a
+   *  device at the ephemeral server via the real SYNC-14 surface. */
+  seedConfig?: (appConfigDir: string) => void | Promise<void>;
   /** Keep the temp data dir on teardown (debugging). */
   keepDataDir?: boolean;
+  /** Override the tauri-driver port (multi-device: one pair per instance,
+   *  off the `MYNE_E2E_DRIVER_PORT` base). Defaults to env/4444. */
+  driverPort?: number;
+  /** Override the native (WebView automation) port. Defaults to env/4445. */
+  nativePort?: number;
 }
 
 async function waitForDriver(baseUrl: string, proc: ChildProcess): Promise<void> {
@@ -115,13 +128,20 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   const support = harnessSupported();
   if (!support.ok) throw new Error(support.reason);
 
-  const driverPort = Number(process.env.MYNE_E2E_DRIVER_PORT ?? DEFAULT_DRIVER_PORT);
-  const nativePort = Number(process.env.MYNE_E2E_NATIVE_PORT ?? DEFAULT_NATIVE_PORT);
+  const driverPort =
+    opts.driverPort ?? Number(process.env.MYNE_E2E_DRIVER_PORT ?? DEFAULT_DRIVER_PORT);
+  const nativePort =
+    opts.nativePort ?? Number(process.env.MYNE_E2E_NATIVE_PORT ?? DEFAULT_NATIVE_PORT);
   const baseUrl = `http://${DRIVER_HOST}:${driverPort}`;
 
   const dataHome = mkdtempSync(join(tmpdir(), "myne-e2e-"));
   const appDataDir = join(dataHome, "md.myne.desktop");
   mkdirSync(appDataDir, { recursive: true });
+  // app_config_dir = XDG_CONFIG_HOME/md.myne.desktop (XDG_CONFIG_HOME is set
+  // to <dataHome>/.config below). Create it so seedConfig can lay down the
+  // device-local sync endpoint config before launch (SYNC-14).
+  const appConfigDir = join(dataHome, ".config", "md.myne.desktop");
+  mkdirSync(appConfigDir, { recursive: true });
   // XDG_RUNTIME_DIR demands 0700 ownership; create it explicitly so
   // WebKit scratch files land inside the scanned/cleaned tree too.
   const runtimeDir = join(dataHome, ".runtime");
@@ -130,6 +150,7 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   const tmpDir = join(dataHome, ".tmp");
   mkdirSync(tmpDir, { recursive: true });
   if (opts.seed) await opts.seed(appDataDir);
+  if (opts.seedConfig) await opts.seedConfig(appConfigDir);
 
   const proc = spawn(
     driverBinary(),
@@ -195,7 +216,7 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       writeFileSync(join(dir, `${stamp}.driver.log`), driverLog);
     };
 
-    return { session, dataHome, appDataDir, teardown, saveArtifacts };
+    return { session, dataHome, appDataDir, appConfigDir, teardown, saveArtifacts };
   } catch (e) {
     proc.kill("SIGKILL");
     if (!opts.keepDataDir) rmSync(dataHome, { recursive: true, force: true });

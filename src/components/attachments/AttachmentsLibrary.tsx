@@ -39,6 +39,7 @@ import {
   type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
+import { AttachmentSyncProgress } from "./AttachmentSyncProgress";
 import { referencingNotes } from "../../notes/attachmentRefs";
 import { useSelectedNote, type NoteId } from "../../notes/sidebarState";
 import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
@@ -556,6 +557,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           </Button>
         </div>
       </div>
+
+      {/* In-flight attachment transfers (MYND-423). Hidden entirely while idle
+          (the common case); the MYND-424 sync engine becomes the registry's
+          writer when it lands. */}
+      <AttachmentSyncProgress hideWhenEmpty />
 
       <div style={SCROLL_STYLE}>
         {isLoading ? (

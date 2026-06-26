@@ -225,6 +225,18 @@ Bitcoin Improvement Proposal 39, defining a mapping from random entropy to a seq
 Used in: `spec/protocol.md` §7
 Reference: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
+### **bootstrap-fingerprint** &nbsp; 📋 *Protocol*
+
+A short, eye-comparable code derived from a [vault head](#vault-head)'s [head_id](#head_id), compared **out-of-band** between two devices at the device-approval moment to harden the [TOFU bootstrap](#tofu-bootstrap) of a newly-enrolled device against a malicious server — the same role as Signal/Matrix safety numbers. A fresh device has no prior head to compare against, so its first adopted state would otherwise be taken on faith; the user eye-comparing the fingerprint on both screens turns "trust the server" into "verified against an existing trusted device". ~SAS-magnitude (tens of bits), not the full 32-byte MAC. v1 ships the substrate (the fingerprint is a deterministic function of `head_id`); the general always-available fork-audit fingerprint UI is v1.x. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head); `spec/protocol.md` §3.4 (MYND-416)
+
+### **blind blob store** &nbsp; 📦 *Product*
+
+The Phase 2 sync server's role: it stores **opaque ciphertext blobs and key-wrapping material only**, and performs **structural** operations on them — current-head pointer compare-and-swap, the per-note version-counter increment, quota accounting — but **never** decrypts, merges, or interprets content (A1; TB5). Plaintext, decryption keys, and the master password never leave the client. Conflict resolution is consequently client-side (`sync-protocol.md` §10). "Blind" = the server is structurally incapable of reading what it relays; self-hosted and hosted operators are identical in this respect (TB5). Phase 2.
+
+Used in: `spec/server-protocol.md` §1–§2
+
 ### **bottom bar** &nbsp; 📦 *Product*
 
 The 28px status bar pinned to the bottom of the editor (`BottomBar`, `src/screens/Editor.tsx`). Hosts the connection/sync status text, the [save-status](#optimistic-ui-rollback) badge, and the persistent affordances for the [tag browser](#tag-browser), Saved Views, the whole-vault graph, Settings, vault Lock, and the live document-statistics readout (characters / words / spaces / paragraphs — selection-scoped when a non-empty selection exists, the full breakdown in its hover title; MYND-339, reusing the `word-count` item id). **Bottom-bar customization** (2026-06-15) lets the user hide/show each item via a right-click context menu; the hidden set persists per-vault in the `vault.prefs` `hidden_bar_items` field (set semantics, omitted-when-empty — a fully-visible bar is byte-identical to a pre-feature vault). The bar root stays right-clickable even when fully emptied, which is the only restore path (no Settings-panel mirror). There is deliberately **no** separate top bar — the top controls float into the OS title-bar row (MYND-166).
@@ -319,11 +331,21 @@ Adversary class A2: subpoena, court order, national security letter, or other le
 
 Used in: `threat-model.md` §1 (A2)
 
+### **conflict copy** &nbsp; 📋 *Protocol*
+
+The artifact of [keep-both conflict resolution](#keep-both-conflict-resolution): when the sync engine detects a concurrent edit, it materializes the remote revision as a **new** `.myn` note carrying the Myne-managed `conflict: true` + `conflict_of: <original note_uuid>` frontmatter fields (`spec/markdown-dialect.md` §3.6.1) so both edits survive. A conflict copy is excluded from the live sidebar, folder-tree, full-text search, and the backlink resolver — surfaced only in the **Conflicts view**, reached via a count badge — until the user resolves it ("Keep as separate" clears the markers so it re-enters the live set; "Discard" deletes it). TS orchestrator (`src/notes/conflictCopy.ts`) over `note_create` + `patchFrontmatterField`; no backend command, no `.myn` envelope change (MYND-427). Phase 2.
+
 ### **content_type** &nbsp; 📋 *Protocol*
 
 A length-prefixed UTF-8 string carried in the AAD of content-encryption AEAD operations. In v0.1 it is always `"text/markdown"`; the field exists so v005 can introduce attachments (with content types like `"image/png"` or `"application/pdf"`) without breaking the AAD layout.
 
 Used in: `spec/protocol.md` §5.2
+
+### **contentless poke** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync change-notification signal: a **zero-payload** "vault changed, come pull" message carrying **no note-id, no version, no count, no cursor** — anything beyond mere arrival would leak which/what/how-much changed to the untrusted server or a network observer (A13). Polling is the **privacy-default baseline** (a device appears online only at poll time); the poke (over SSE) is an **opt-in low-latency** layer. Presence + timing of a poke is intrinsic A13 (a push already reveals it) and accepted; no payload is added on top. See [sync cursor](#sync-cursor). Phase 2.
+
+Used in: `spec/sync-protocol.md` §8
 
 ### **context string** &nbsp; 📋 *Protocol*
 
@@ -333,7 +355,7 @@ Used in: `spec/protocol.md` §3.2, §3.4
 
 ### **context string registry** &nbsp; 📋 *Protocol*
 
-The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth` and `backup-key` (both reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10). v005 strings will be registered under the `"myne.v005 "` prefix.
+The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth`, `backup-key`, and `vault-head-mac` (all reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10; `vault-head-mac` is the Phase 2 [vault head](#vault-head) MAC key, MYND-416). v005 strings will be registered under the `"myne.v005 "` prefix.
 
 Used in: `spec/protocol.md` §3.4
 
@@ -413,6 +435,10 @@ An ordinary `.myn` note representing one calendar day, identified by **folder + 
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07 (MYND-182 / MYND-191)
 
+### **deleted field** &nbsp; 📋 *Protocol*
+
+The Myne-managed canonical frontmatter field `deleted:` — a **value-strict** RFC 3339 UTC timestamp marking a note as a **sync deletion tombstone** (the exact twin of `trashed:`; any non-timestamp value leaves the note live). Under sync a delete is rerouted (`src/notes/deleteNote.ts::deleteNoteRouted` → `tombstoneNote` via `patchDeletedField`) to a `deleted: <now>` version the [vault head](#vault-head) commits, so the deletion **propagates** to other devices and cannot be silently resurrected by the blind server; a local-only delete stays the hard cryptographic-erase `unlink`. Excluded from sidebar / folder-tree / search like `trashed:`; GC'd at the [tombstone horizon](#tombstone-horizon). Rides the existing `.myn` AEAD envelope — no `protocol.md` magic-byte / AAD / version change (MYND-426). Phase 2. See [markdown-dialect.md](spec/markdown-dialect.md) §3.6.1.
+
 ### **deleted-attachment tombstone** &nbsp; 📦 *Product*
 
 The styleable placeholder an editor embed renders when its [attachment-id](#attachment-id) no longer resolves. Note bodies are **never** rewritten on deletion — the `![[att:<id>|filename]]` reference dangles intentionally and the resolver renders a tombstone, distinguishing a *deleted attachment* (id once existed, removed from the library) from a *broken reference* (id never existed). One shared component across the editor and the attachments library. Consistent with the no-auto-GC, explicit-delete-only attachment lifecycle. (MYND-164)
@@ -440,6 +466,18 @@ Used in: `spec/protocol.md` §3.2.1
 Reserved term for `appname-v005` multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.
 
 Used in: `spec/protocol.md` §11 (out of scope for v0.1)
+
+### **device_id (VV-actor)** &nbsp; 🗝️ *Key/identifier*
+
+The permanent, client-generated 16-byte random identifier of a device as it appears in a [vault head](#vault-head)'s [version vector](#version-vector-vv). Allocated once at enrollment, registered in the per-account device table (**AS16**), and **kept separate from** the device's secret per-device token/credential: the token is revocable/rotatable (an availability control), whereas `device_id` is permanent *history* — deriving the id from the token would let a revocation rewrite version-vector history and break [fork-consistency](#fork-consistency) continuity. Its legitimacy is **not** separately authenticated and need not be: single-user → all devices share `root_key` → the shared-key head MAC is the actor-set authority, and a malicious server (lacking `root_key`) cannot inject a phantom `device_id`. A reset/re-enrolled device generates a **new** `device_id` (the old one's VV component freezes — never pruned in v1). Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head, version vector)
+
+### **device registry** &nbsp; 📦 *Product*
+
+The Phase 2 server's per-account table of enrolled devices, the server-side record that makes **revocation** possible (AS16 — device count per account is server-visible by necessity). Keyed by the client-generated [device_id](#device_id-vv-actor) (the VV-actor), **distinct from** the secret per-device token. Revocation in v0.1 = token iptal (an **availability** control — it stops a device syncing; it is not forward-secret, which is a v005/MLS feature, `threat-model.md` §7). The device-approval gate that admits a new enrollment is a server authz concern (the ceremony is MYND-425). Phase 2.
+
+Used in: `spec/server-protocol.md` §4; `threat-model.md` AS16
 
 ### **device-local credential** &nbsp; 🗝️ *Key/identifier*
 
@@ -502,6 +540,11 @@ A one-shot, user-initiated operation that decrypts user content and writes it as
 
 Used in: `threat-model.md` §3/§5, `markdown-dialect.md` §6, `decisions.md` 2026-06-11 (export suite)
 
+### **extended retention** &nbsp; 📦 *Product*
+
+A **self-host-only** operator flag (`MYNE_EXTENDED_RETENTION`) that disables the server's Layer-2 ciphertext reclamation, so deleted blobs are kept past the [tombstone horizon](#tombstone-horizon). A documented, deliberate **policy deviation**, never a default: it **weakens the user's "delete means gone" expectation** and the §6 operator obligation not to retain deleted ciphertext past the horizon. Hosted MUST NOT enable it. The structural guarantees (no plaintext, no required IP log) are unaffected — extended retention trades a retention-policy obligation, not a confidentiality guarantee. Phase 2.
+
+Used in: `self-host-policy.md` §4, `server-protocol.md` §6, `decisions.md` 2026-06-20 (MYND-438/440)
 ### **extension pairing token** &nbsp; 🗝️ *Key/identifier*
 
 A scoped, revocable, **append-only** credential (create-clip + is-unlocked-status only — never a vault key) issued to the [browser clipper](#browser-clipper) after an in-app Accept/Reject + numeric-challenge handshake bound to the exact extension ID. Crossing [TB10](#native-messaging-host) requires it; a compromised token cannot read, modify, or delete notes. The short numeric code compared during this handshake is the **pairing challenge** (a.k.a. numeric challenge): a 6-digit nonce drawn from the core CSPRNG, shown identically in the in-app pairing dialog and the extension so the user confirms both endpoints share one pairing attempt — a human-comparison value, never a key. The registry of issued/revoked tokens persists encrypted at rest in the [vault.prefs](#vaultprefs) prefs-family blob (`decisions.md` 2026-06-20) so pairing survives a restart and revocation is durable.
@@ -515,6 +558,12 @@ The 1-byte generation tag (`extractor_version`) on an [`MYE1`](#mye1) extracted-
 The fallback path for loading the [search index](#search-index) when the cached `vault.search` blob (`spec/protocol.md` §9.6) cannot be trusted or used — blob absent, magic / version mismatch, AEAD-verification failure, or an unreadable staleness manifest. Instead of incrementally reconciling the cached index against the notes, the client **rebuilds it from scratch** by decrypting every `.myn`. Rebuild always recovers the correct index, so `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more. The complement of the **incremental reconcile** happy path (re-index only the notes whose `content_nonce` changed) — fall-to-rebuild is the always-correct safety net beneath it (`decisions.md` 2026-05-31).
 
 Used in: `spec/protocol.md` §9.6.4
+
+### **full-reconcile** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync recovery mode a device enters when incremental catch-up is impossible or untrusted — a [soft-retired](#soft-retire) device returning past the [tombstone horizon](#tombstone-horizon), or any device whose cursor is too stale to trust. Instead of replaying missed deltas, the device reconciles its entire local state against the server's authoritative manifest (the same decryption-free [content_nonce](#content_type) reconcile as [fall-to-rebuild](#fall-to-rebuild), §9.6.4): notes absent from the authoritative manifest are NOT resurrected, and local-only notes fall to a [keep-both conflict](#keep-both-conflict-resolution) copy rather than silently re-appearing. The structural defence against a server-driven resurrection past horizon-GC. Phase 2.
+
+Used in: `spec/sync-protocol.md` §11
 
 ### **favorites** &nbsp; 📦 *Product*
 
@@ -564,6 +613,12 @@ An inline `[^N]` marker in the Myne dialect (`spec/markdown-dialect.md` §3.4), 
 
 Used in: `spec/markdown-dialect.md` §3.4, §8; `decisions.md` 2026-05-31; `src/dialect/lezer/footnote.ts`, `src/editor/decorations/footnote.ts`
 
+### **fork-consistency** &nbsp; 🏗️ *Construction*
+
+The integrity property a [vault head](#vault-head) provides against a malicious sync server (**TB5**) that cannot read or forge content but can still **rollback** (serve an older authentic blob), **withhold** (hide an update), or **equivocate / fork** (show different devices divergent histories). Following SUNDR (OSDI 2004): every update is committed into an unforgeable, monotonic, hash-chained head, so the server cannot *heal* a fork — once it shows two devices divergent heads, their [version vectors](#version-vector-vv) never re-converge and the split surfaces on the next cross-read. Fork detection is therefore **delayed and in-band** (caught when devices observe each other's state) or immediate only via an [out-of-band fingerprint](#bootstrap-fingerprint); a lone client with no external comparison cannot detect equivocation (the SUNDR theorem). Withholding of a device's *own* work is caught in-band; withholding of *other* devices' work / global staleness is best-effort. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head); `threat-model.md` §7
+
 ### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 
 Myne's architectural commitment that each major protocol version (v0.1, v005, v006, …) is a closed, complete specification with distinct magic bytes, AAD prefix, and context-string prefix. Cross-major reads happen only via explicit user-initiated migration (`spec/protocol.md` §10.4); a v005 client refuses to silently parse a v0.1 blob, and vice versa. The choice contradicts the additive-extension model common in TLS 1.0–1.2 and OpenPGP; the reasoning is that those protocols' downgrade-attack history (POODLE, FREAK, Logjam, MEGA-2022) shows additive extension to be a structural risk. v005's anticipated changes (PQ hybrid wrap, MLS multi-device, OPAQUE auth, KT log) are too deep to be additive in any honest sense.
@@ -599,6 +654,12 @@ Used in: `vision.md` Phase 1 Scope
 Lockfiles checked into the repository that record the exact SHA hash of every direct and transitive dependency. Myne covers Cargo (Rust), npm (Phase 3 web UI), Go modules (server), and any WASM artifacts. Updates require explicit review.
 
 Used in: `threat-model.md` §6, §7
+
+### **head_id** &nbsp; 🗝️ *Key/identifier*
+
+The identity of a single [vault head](#vault-head): `head_id = SHA-256(serialized full head record INCLUDING its head_mac)`. Hashing over the MAC (not just the pre-MAC content) makes the hash-DAG bind **authentication**, not merely content. A head's parent links (`prev_head_hash[]`) are the `head_id`s of its parents — one parent = linear extension, two = a legitimate concurrent-push merge (byte-sorted lexicographically for encoding determinism). Domain-separated from the [vault-head manifest](#vault-head-manifest) hash and the §5.1 [CTX commitment](#ctx-commitment) by a distinct leading prefix, so no SHA-256 input is reinterpretable as another's. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head)
 
 ### **HKDF (HKDF-SHA-256)** &nbsp; 🔐 *Primitive*
 
@@ -660,6 +721,12 @@ Used in: `decisions.md` 2026-05-31
 TLS 1.3 with strict cipher configuration plus client-side certificate pinning. The transport layer in Myne's protocol is TLS-only — no plaintext fallback (`threat-model.md` §3 TB4). Distinct from at-rest encryption and from the AEAD that ciphertext bytes carry inside their TLS payload.
 
 Used in: `threat-model.md` §3 TB4
+
+### **IP-scrubbing proxy** &nbsp; 🏗️ *Construction*
+
+The self-host bundle's TLS edge (a vetted Caddy reverse proxy) configured to **delete every client-IP-bearing field** from its access log (`remote_ip`, `client_ip`, `X-Forwarded-For`, `X-Real-Ip`, `Forwarded`). Caddy's *default* access log emits the client IP, so the scrub is explicit and load-bearing: it enforces the no-persistent-IP-logging commitment (C4/AS14) at the **edge**, complementing the app's in-process `noIP` middleware (defense in depth). An operator who fronts the bundle with their own load balancer inherits the obligation to scrub the IP there. Phase 2.
+
+Used in: `self-host-policy.md` §3, `decisions.md` 2026-06-20 (MYND-438)
 
 ### **inline tag** &nbsp; 📦 *Product*
 
@@ -780,6 +847,12 @@ An AEAD that commits to its key, in the sense that no two distinct keys can decr
 
 Used in: `spec/protocol.md` §5.1
 Reference: Chan & Rogaway 2022.
+
+### **keep-both conflict resolution** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync resolution rule for **note bodies**: when two devices concurrently edit the same note (detected by the push compare-and-swap rejecting a stale base), **both versions are kept** — the loser is written as a conflict-marked duplicate note for the user to reconcile — rather than silently picking a last-writer-wins winner (which would destroy an edit the server can't even see, A1). The paranoid Standard-Notes posture: no silent data loss. Distinct from the **singleton** resolution (post-decrypt field/set merge per `protocol.md` §9.5.2) and the **`vault.meta`** bespoke merge (preserves the recovery-side wrapped `root_key`, §9.3). Pure LWW on bodies is forbidden. Phase 2.
+
+Used in: `spec/sync-protocol.md` §10
 
 ### **keymap** &nbsp; 📦 *Product*
 
@@ -1077,6 +1150,30 @@ Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `v
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
+### **per-account quota** &nbsp; 📦 *Product*
+
+The Phase 2 hosted-sync storage ceiling: per-account aggregate **deduplicated** ciphertext bytes (AS17 — one stored blob is counted once, not once per referencing note). Keyed on the account, never on identity beyond `account_number_hash`; a self-host operator sets their own ceiling (the protocol exposes the counter, the operator sets policy — TB5). Distinct from the [per-account rate-limit](#per-account-rate-limit) (bytes-at-rest vs request-frequency). Phase 2.
+
+Used in: `spec/server-protocol.md` §5
+
+### **per-account rate-limit** &nbsp; 📦 *Product*
+
+The Phase 2 abuse bound: a per-account **token-bucket keyed on `account_number_hash`**, **never on IP** (C4 / AS14 — the server keeps no persistent IP log; TLS sees the connection IP transiently and discards it). Abuse mitigation is therefore designed in around per-account counters from the start, not retrofitted as IP bans. Bounds the damage a Sybil/abusive account can do; primary Sybil resistance on hosted is the payment-gate (the payment system is MYND-430). Phase 2.
+
+Used in: `spec/server-protocol.md` §5
+
+### **per-blob sync-meta** &nbsp; 📋 *Protocol*
+
+The small, server-visible descriptor a Phase 2 [pull](#sync-cursor) returns for each changed content blob: `(uuid, version, content_nonce, size)`. The client uses it to decide what to fetch — `content_nonce` is the decryption-free staleness discriminator (§9.6.4), `version` the server's opaque per-note counter (AS6), `size` the AS17 quota unit. It exposes nothing the server doesn't already hold (the [vault head](#vault-head) commits the same `content_nonce`s); the client never trusts it for integrity — that is the head's job. Phase 2.
+
+Used in: `spec/sync-protocol.md` §8
+
+### **per-vault namespace** &nbsp; 📋 *Protocol*
+
+The Phase 2 server storage layout: each vault's ciphertext blobs live in a namespace scoped to that vault — there is **no global content-addressed bucket**. Because attachment-ids are vault-scoped keyed-HMAC (`protocol.md` §9.9), cross-vault deduplication is **structurally impossible** (and undesired — a global bucket would be a known-file confirmation oracle). Dedup is intra-vault only; quota (AS17) and the tombstone ledger are kept clean per vault. Phase 2.
+
+Used in: `spec/server-protocol.md` §2
+
 ### **property** &nbsp; 📦 *Product*
 
 A typed `key → value` pair derived from a note's YAML [frontmatter](#frontmatter) body by the Saved Views property-index (MYND-271). Every arbitrary frontmatter key is read and coerced to exactly one Myne type — `string` / `number` / `date` / `list` / `checkbox` — by the canonical value-typing ruleset (`spec/markdown-dialect.md` §3.6.4); the property-index is the **single type authority** for the Saved Views epic (sibling features consume its typing, never redefine it). Tags (`#tag` ∪ frontmatter `tags:`) and the `folder:` value are queryable alongside properties as pseudo-properties. The parse is read-only and non-mutating (the `.myn` file stays source of truth); the typed values live in the derived [vault.indices](#vaultindices) / `MYI1` cache. A [saved view](#saved-view) filters and sorts on properties.
@@ -1294,6 +1391,12 @@ An encrypted previous version of a note, captured automatically as the note is e
 
 Used in: `spec/protocol.md` §9.1; `threat-model.md` §7; `decisions.md` 2026-06-08
 
+### **soft-retire** &nbsp; 📋 *Protocol*
+
+The Phase 2 sync state a device enters when its cursor falls behind the [tombstone horizon](#tombstone-horizon) (it has been offline / silent too long to participate in the per-device-ack [tombstone](#tombstone-horizon) GC). A soft-retired device is dropped from the "must-ack" set so its absence can't pin tombstones forever; on return it cannot resume incrementally and must run a [full-reconcile](#full-reconcile). Reuses the AS16 device-retirement mechanism (also needed for revocation) rather than inventing new state. Distinct from a hard device revocation (per-device token iptal). Phase 2.
+
+Used in: `spec/sync-protocol.md` §11
+
 ### **Source mode** &nbsp; 📦 *Product*
 
 The raw-markdown [view mode](#view-mode) of a note tab (MYND-299): the [decoration layer](#decoration-layer) is emptied, so the editor shows the exact on-disk markdown with no rendering — headings keep their `#`s, links show their brackets, nothing is hidden. Because §6 C1 guarantees the editor buffer is byte-identical to the stored `.myn`, Source mode displays exactly the stored bytes. It is editable (unlike [Reading view](#reading-view)) — the writer's surface for inspecting or hand-editing raw syntax. Reached via the command palette or the bottom-bar [view-mode switcher](#view-mode), **not** a default chord (the secondary live ↔ source toggle is deliberately chord-free; `Mod-Shift-E` is reserved for Edit ⇄ Reading). Contrast live preview (cursor-aware reveal) and [Reading view](#reading-view) (rendered, read-only). See also [view mode](#view-mode), [Reading view](#reading-view).
@@ -1315,6 +1418,18 @@ An [`MYA1`](#mya1) blob present on disk at `attachments/<attachment-id-hex>` who
 Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships malicious code. Myne's mitigations are hash-pinned lockfiles, minimal direct-dependency surface, dependency-review at update time, and `cargo-vet`/`cargo-audit` in CI. Status: Best-effort — cannot fully defend against a determined attacker in the dependency graph, but the Tauri/Cargo dependency tree is materially smaller than Electron/npm would be.
 
 Used in: `threat-model.md` §1 (A8), §7
+
+### **sync cursor** &nbsp; 📋 *Protocol*
+
+The Phase 2 opaque, per-device **monotone position** marking how far a device has pulled. A pull sends the cursor and receives the [per-blob sync-meta](#per-blob-sync-meta) for everything changed since; the cursor then advances. It carries **no wall-clock** (clock/order authority is the [version vector](#version-vector-vv), §4.1 Pin 4) — it is a catch-up bookmark, not a security primitive. Persisted device-locally alongside (but separate from) the [vault head](#vault-head) baseline. Phase 2.
+
+Used in: `spec/sync-protocol.md` §8
+
+### **sync taxonomy** &nbsp; 📋 *Protocol*
+
+The Phase 2 four-class partition of a vault's artefacts by sync disposition: **authoritative-data** (notes, snapshots, `vault.prefs`, `vault.dictionary`, attachments + `vault.attachments` — SYNC), **identity** (`vault.meta` — SYNC, bespoke merge), **rebuildable-cache** (`vault.search`, `vault.indices` — re-derived locally via the §9.6.4 reconcile, NEVER synced), **device-local** (`vault.workspace`, `vault.quickunlock`, `vault.head-state` — NEVER synced). Governed by the invariant **sync members ⊆ backup members**: sync membership is the authoritative-vs-derivable cut of the `protocol.md` §9.11.3 backup allowlist, not a separate list. Phase 2.
+
+Used in: `spec/sync-protocol.md` §9
 
 ### **tag browser** &nbsp; 📦 *Product*
 
@@ -1384,6 +1499,18 @@ Used in: `myne-test-vectors/` (the companion repository carrying every landed `c
 The structured catalog of adversaries, assets, trust boundaries, and defensive posture that defines what Myne protects against and what it explicitly does not. The authoritative document is `threat-model.md`. Marketing copy must not exceed the guarantees there; that document is normative for what users may rely on.
 
 Used in: `threat-model.md`
+
+### **TOFU bootstrap** &nbsp; 📋 *Protocol*
+
+Trust-on-first-use: how a freshly enrolled or reset device adopts its first [vault head](#vault-head). [Fork-consistency](#fork-consistency) via version-vector dominance is a **continuity** guarantee — it only protects a device that already holds a persisted last-seen baseline. A device with no baseline has nothing to compare against, so it takes the server-served head on faith after verifying its MAC (the MAC proves "a `root_key` holder authored this", **not** "this is the latest, unforked head") — the same model as Signal/Matrix key TOFU. The "first device" is not cryptographically special; "has-a-baseline-or-not" is (a reset device is also a TOFU client). The only hardening is an out-of-band [bootstrap-fingerprint](#bootstrap-fingerprint) compared at the device-approval gate. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head); `threat-model.md` §7
+
+### **tombstone horizon** &nbsp; 📋 *Protocol*
+
+The Phase 2 bound on how long a deletion [tombstone](#deleted-attachment-tombstone) is retained before garbage collection. A deletion is a `deleted`-marked new encrypted version (carried in the [vault head](#vault-head) manifest until GC, §4.2), not a bare "absent on disk → drop". A tombstone is collected once **every horizon-active device's [sync cursor](#sync-cursor) has acked past** the delete-version; a device that falls behind the horizon is [soft-retired](#soft-retire) and must [full-reconcile](#full-reconcile) on return. The horizon is **month-scale (90–180 days)**, not days — cost is asymmetric (an over-long tombstone is a tiny meta record; too short forces a full-resync). Prevents the Cassandra-zombie resurrection a bare grace-drop would allow. Phase 2.
+
+Used in: `spec/sync-protocol.md` §11
 
 ### **traffic analysis** &nbsp; ⚠️ *Threat*
 
@@ -1462,6 +1589,18 @@ Used in: `spec/protocol.md` §9.11; `threat-model.md` §7; `decisions.md` 2026-0
 The backend-resident state held between the `begin` and `commit` IPC calls of the vault-creation flow. A `VaultCreationSession` (Rust struct in `src-tauri/src/plugins/vault_creation/state.rs`) carries the freshly generated `account_number`, `recovery_phrase`, `root_key`, two Argon2id salts, the cached password and recovery wrap keys, the chosen `KdfParams`, and a `created_at: Instant` timestamp. Lives in a `Mutex<HashMap<Uuid, VaultCreationSession>>` indexed by **session token**. Bounded by `MAX_CONCURRENT_SESSIONS = 4` and `SESSION_TTL_SECS = 600` (10 minutes); evicted by a background `tokio::time::interval(60s)` task whose evicted tokens land in a parallel **tombstone** map for up to `TOMBSTONE_RETENTION_SECS = 3600` (1 hour). `root_key` and the wrap keys never cross the IPC boundary — they live only in this session until `commit` consumes it.
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
+
+### **vault head** &nbsp; 📋 *Protocol* (deep entry)
+
+The malicious-server hardening primitive for Phase 2 sync: a small, server-relayed, per-push record that commits the vault's current state under an HMAC-SHA-256 keyed by `DeriveSubkey(root_key, "vault-head-mac")` (§3.4). It commits a flat `SHA-256` of the canonical [vault-head manifest](#vault-head-manifest) (`uuid → content_nonce` of content blobs only — notes + attachments), a per-device [version vector](#version-vector-vv), and `prev_head_hash[]` parent links ([head_id](#head_id)s) forming a git-like hash-DAG, plus an auxiliary Lamport `seq`. Provides [fork-consistency](#fork-consistency): devices verify on pull that a new head **extends** their last-seen one (VV-dominance), and divergence surfaces on cross-read. The head is **wire-only** (no on-disk magic; the device-local last-seen baseline is the `MYH1` `vault.head-state` blob, `spec/protocol.md` §9.16). The server, lacking `root_key`, can only replay/withhold/reorder real heads, never forge one. **HMAC-not-signature**: single-user → all devices share `root_key` → a symmetric MAC suffices (no Ed25519, closed primitive set). Phase 2; full spec in `spec/sync-protocol.md`.
+
+Used in: `spec/sync-protocol.md`; `spec/protocol.md` §3.4, §9.16, §10.3; `threat-model.md` §7 (MYND-416)
+
+### **vault-head manifest** &nbsp; 📋 *Protocol*
+
+The `uuid → content_nonce` map of a vault's **content blobs only** (notes + attachments; synced singletons like [vault.prefs](#vaultprefs) / [vault.meta](#vaultmeta) are excluded — their rollback is the already-accepted "local prefs replay" of `threat-model.md` §7). A [vault head](#vault-head) commits a flat `SHA-256` of this map's canonical encoding (uuid-sorted, fixed-width), not the map itself, keeping the head O(1). Binding [content_nonce](#content_type) (fresh-random per save, §6.3) rather than a bare counter gives **two-layer** rollback detection: a server serving an old version mismatches the manifest *before* decryption, and the AEAD nonce-binding makes a header/content splice fail *on* decrypt. The manifest object's own canonical encoding is the sync wire protocol's concern (MYND-414); the head only anchors its hash. Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head)
 
 ### **vault label** &nbsp; 📦 *Product*
 
@@ -1552,6 +1691,12 @@ Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/sl
 The in-RAM, plaintext-derived index of a vault's wikilink graph — forward links + reverse adjacency (backlinks) — and its tag index, plus the title→note resolution surface (MYND-31). The structural twin of `vault.search`: rebuilt on unlock, wiped on lock, never written to disk in plaintext; persisted encrypted-at-rest as the [vault.indices](#vaultindices) / `MYI1` blob (`spec/protocol.md` §9.8 — the MYND-31 design, persistence landed by MYND-271 alongside the typed [property](#property) index). Built **Build-B**: dialect extraction stays on the TS side (one dialect source of truth, `title_extract.rs` / MYND-82) while the struct, query surface (`backlinks` / `forward` / `by_tag` / `tag_tree` / `resolveTitle`), and persistence are Rust-side. Edges are title-keyed, not UUID-keyed (Model-2), and resolution runs through the single `resolveWikilink` resolver (`spec/wikilink.md` §5.3, "plain-B"). See `decisions.md` 2026-06-07.
 
 Used in: `decisions.md` 2026-06-07 (MYND-31)
+
+### **version vector (VV)** &nbsp; 🏗️ *Construction*
+
+A per-device monotonic counter map (`device_id → count`) embedded in and MAC'd by each [vault head](#vault-head), carrying the count of heads each [device](#device_id-vv-actor) has authored (at **push** granularity, not per keystroke). It is the single mechanism behind both concurrency and fork detection: componentwise comparison of a new head's VV to the last-seen one yields **extension** (≥ componentwise → accept), **rollback** (any decreased component → reject), or **incomparable** (concurrent → the device writes a merge head, componentwise-max + author+1). A VV that *never* re-converges across devices is a [fork](#fork-consistency); one that is merely incomparable is a legitimate concurrent edit. This is the same VV the sync conflict layer uses — fork-consistency adds no separate structure. Not pruned in v1 (a unilateral drop would let a server hide a fork; a v005 prune must ride an authenticated device-retirement event). Phase 2.
+
+Used in: `spec/sync-protocol.md` (vault head)
 
 ### **view mode** &nbsp; 📦 *Product*
 
@@ -1695,6 +1840,7 @@ Used in: `spec/protocol.md` §4.1
 | `item_key` (32 B random) | Encrypts one note's plaintext | Encrypted in `.myn` file | Note lifetime |
 | `server-auth` subkey | Reserved for Phase 2 sync auth | Derived only (not transmitted in v0.1) | Session |
 | `backup-key` | Reserved for a future sealed-backup variant — not used in v0.1 (demoted 2026-06-10) | Derived only (reserved) | — |
+| `head_mac_key` | Reserved for Phase 2 [vault head](#vault-head) fork-consistency MAC (`vault-head-mac`) | Derived only (not used in v0.1) | Session |
 | `account_number` (95-bit + Damm) | User identifier; bearer token in P2+ | User offline storage | Permanent |
 | `account_number_hash` (SHA-256[:16]) | Argon2id salt binding | `vault.meta` | Vault lifetime |
 

@@ -40,7 +40,7 @@ use protocol::{decode_note, encode_new_note, encode_update, DecryptError, Protoc
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use zeroize::Zeroizing;
 
 use super::error::{
@@ -129,6 +129,10 @@ pub async fn note_create<R: Runtime>(
         let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
         let body = fold_attachment_text_for_index(&app, state.inner(), &plaintext).await;
         search.upsert(id, &title, &body);
+        // MYND-424: mark the sync loop dirty so the new note pushes (soft dep).
+        if let Some(sig) = app.try_state::<crate::plugins::sync::loop_control::SyncLocalChange>() {
+            sig.bump();
+        }
     }
     result
 }
@@ -1818,6 +1822,13 @@ pub async fn note_update<R: Runtime>(
             let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
             let body = fold_attachment_text_for_index(&app, state.inner(), &plaintext).await;
             search.upsert(&note_id, &title, &body);
+            // MYND-424: mark the sync loop dirty so the coalesced push fires
+            // (soft dependency — a no-op when the sync plugin isn't registered).
+            if let Some(sig) =
+                app.try_state::<crate::plugins::sync::loop_control::SyncLocalChange>()
+            {
+                sig.bump();
+            }
             // SYNC-8: a best-effort snapshot failure is surfaced non-blockingly
             // (the note itself saved fine). The frontend shows it on the
             // save-status channel; the IPC return stays `Ok(())`.

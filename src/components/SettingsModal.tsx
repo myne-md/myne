@@ -35,6 +35,7 @@ import { EditorPanel } from "./settings/EditorPanel";
 import { HotkeysPanel } from "./settings/HotkeysPanel";
 import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
+import { SyncPanel } from "./settings/SyncPanel";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 
 /**
@@ -45,6 +46,7 @@ import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 type PanelId =
   | "account"
   | "privacy"
+  | "sync"
   | "editor"
   | "hotkeys"
   | "appearance"
@@ -61,6 +63,7 @@ interface PanelMeta {
 const PANELS: readonly PanelMeta[] = [
   { id: "account", labelKey: "settings.shell.panels.account" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy" },
+  { id: "sync", labelKey: "settings.shell.panels.sync" },
   { id: "editor", labelKey: "settings.shell.panels.editor" },
   { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys" },
   { id: "appearance", labelKey: "settings.shell.panels.appearance" },
@@ -240,6 +243,7 @@ export function SettingsModal({
   const itemRefs = useRef<Record<PanelId, HTMLButtonElement | null>>({
     account: null,
     privacy: null,
+    sync: null,
     editor: null,
     hotkeys: null,
     appearance: null,
@@ -309,6 +313,7 @@ export function SettingsModal({
       />
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
+    sync: <SyncPanel />,
     editor: <EditorPanel />,
     hotkeys: <HotkeysPanel />,
     appearance: <AppearancePanel />,

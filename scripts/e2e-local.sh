@@ -25,6 +25,26 @@ for arg in "$@"; do
   esac
 done
 
+# Cross-compile the LINUX myne-server binary the multi-device sync E2E spawns
+# (MYND-428 task 5). The container needs a Linux server binary; the host's
+# `myne-server/myne-server` is the dev OS's arch and won't exec in the container.
+# Go on the host produces a static CGO_ENABLED=0 binary matching the container arch
+# (same flags as the reproducible image, MYND-437). If Go is absent, the sync specs
+# self-skip with an actionable reason rather than failing.
+SERVER_BIN=""
+if command -v go >/dev/null 2>&1; then
+  case "$(docker info --format '{{.Architecture}}' 2>/dev/null)" in
+    x86_64|amd64) GOARCH=amd64 ;;
+    *) GOARCH=arm64 ;;
+  esac
+  SERVER_BIN="myne-server/myne-server-linux-$GOARCH"
+  echo "e2e-local: cross-compiling $SERVER_BIN (linux/$GOARCH) for the sync harness ..."
+  ( cd myne-server && CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" \
+      go build -trimpath -ldflags="-buildid= -s -w" -o "myne-server-linux-$GOARCH" ./cmd/myne-server )
+else
+  echo "e2e-local: Go not on host — multi-device sync specs self-skip (no Linux server binary)." >&2
+fi
+
 docker build -t "$IMAGE" -f e2e/Dockerfile e2e
 
 RUN_FLAGS=(
@@ -45,6 +65,11 @@ RUN_FLAGS=(
 # (clobbering the rust image's PATH) — export explicitly, same idiom as
 # .woodpecker.yml's cargo-test-tauri step.
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
+# Point the multi-device sync harness at the Linux server binary built above so it
+# spawns the REAL server in-container instead of the host-arch one (MYND-428 task 5).
+if [[ -n "$SERVER_BIN" ]]; then
+  E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/$SERVER_BIN"
+fi
 FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target /usr/local/cargo/registry'
 
 if [[ "$SHELL_MODE" == 1 ]]; then

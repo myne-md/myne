@@ -474,7 +474,10 @@ pub(super) fn start_print_to_pdf(
     let done = Arc::new(Mutex::new(Some(on_done)));
     let done_handler = Arc::clone(&done);
     let handler = PrintToPdfCompletedHandler::create(Box::new(move |error_code, is_successful| {
-        let ok = error_code.is_ok() && is_successful.as_bool();
+        // `is_successful` arrives as a Rust `bool` from the windows-crate
+        // binding (not a Win32 `BOOL`), so it is used directly — `.as_bool()`
+        // exists only on the `BOOL` newtype and does not compile here.
+        let ok = error_code.is_ok() && is_successful;
         if let Some(f) = done_handler
             .lock()
             .unwrap_or_else(|e| e.into_inner())

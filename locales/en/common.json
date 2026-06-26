@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "Dismiss",
     "prompt": {
       "cancel": "Cancel",
       "confirmDefault": "OK"
@@ -1681,7 +1682,8 @@
         "editor": "Editor",
         "hotkeys": "Hotkeys",
         "privacy": "Privacy",
-        "storage": "Storage"
+        "storage": "Storage",
+        "sync": "Sync"
       },
       "passwordUpdatedToast": "Password updated",
       "title": "Settings"
@@ -1735,6 +1737,127 @@
       "optionLive": "Live preview",
       "optionReading": "Reading",
       "optionSource": "Source"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "Downloading {{name}}",
+        "uploading": "Uploading {{name}}"
+      },
+      "empty": "No transfers in progress.",
+      "heading": "Attachment sync",
+      "status": {
+        "done": "done",
+        "failedWillRetry": "failed — will retry",
+        "paused": "paused"
+      }
+    },
+    "buildingIndex": {
+      "label": "Building search index…"
+    },
+    "conflicts": {
+      "discard": "Discard",
+      "empty": "No conflicts — your devices are in sync.",
+      "groupTitle_one": "{{count}} conflicting copy of {{original}}",
+      "groupTitle_other": "{{count}} conflicting copies of {{original}}",
+      "keepAsSeparate": "Keep as separate",
+      "untitled": "Untitled ({{hex}})"
+    },
+    "devices": {
+      "approve": "Approve",
+      "awaitingApproval_one": "{{count}} device awaiting approval",
+      "awaitingApproval_other": "{{count}} devices awaiting approval",
+      "loading": "Loading…",
+      "noDevices": "No devices synced yet.",
+      "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
+      "remove": "Remove",
+      "removedElsewhere": "This device was removed from your account on another device.",
+      "resetAndReAdd": "Reset and re-add this device",
+      "resetSyncOnThisDevice": "Reset sync on this device",
+      "shortName": "Device {{hex}}",
+      "syncedHere": "Synced here",
+      "thisDevice": "This device",
+      "transportHint": "If the server moved or its certificate changed, re-enter the server URL under “Sync server” above to re-trust it.",
+      "unreachable": "Couldn’t reach sync ({{error}}).",
+      "yourDevices": "Your devices"
+    },
+    "endpoint": {
+      "connect": "Connect",
+      "connectedLocal": "Connected (local, no TLS).",
+      "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
+      "connecting": "Connecting…",
+      "fingerprintLabel": "Server certificate fingerprint:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Couldn’t reach that server — check the URL and that it’s running."
+    },
+    "enroll": {
+      "accountNumberLabel": "Account number",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Connecting…",
+      "credentialTypeAria": "Credential type",
+      "error": {
+        "notConfigured": "Set a sync server in settings before adding this device.",
+        "transport": "Couldn’t reach the sync server. Check your connection and try again."
+      },
+      "mode": {
+        "password": "Password",
+        "recovery": "Recovery phrase"
+      },
+      "passwordLabel": "Password",
+      "recoveryPhraseHint": "Enter your 24-word recovery phrase.",
+      "recoveryPhraseLabel": "Recovery phrase",
+      "signInWith": "Sign in with",
+      "submit": "Add this device",
+      "wordAria": "Word {{number}}"
+    },
+    "join": {
+      "accountLabel": "Account number",
+      "cancel": "Cancel",
+      "error": "Couldn’t add this device. Check the server URL, account number, and password — and that the server is reachable.",
+      "help": "Sign in with your account number and password. This device will sync your notes once an existing device approves it. No recovery phrase needed.",
+      "passwordLabel": "Password",
+      "serverLabel": "Sync server",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Add device",
+      "submitting": "Adding…",
+      "title": "Add this device to an account"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "Sign in on a new device with your account number and password or recovery phrase. A device stays pending until an existing device approves it.",
+        "label": "Add a device"
+      },
+      "conflicts": {
+        "helper": "When the same note is edited on two devices at once, Myne keeps both copies so nothing is lost. Resolve them here.",
+        "label": "Conflicts"
+      },
+      "devices": {
+        "label": "Devices"
+      },
+      "server": {
+        "helper": "Enter the same server URL on every device. For a self-hosted server use its <1>https://</1> address; verify the certificate fingerprint matches across your devices.",
+        "label": "Sync server"
+      },
+      "status": {
+        "helper": "Myne syncs your encrypted notes across your devices. The server stores only ciphertext it cannot read.",
+        "label": "Sync status"
+      }
+    },
+    "reconcile": {
+      "message": "This device was offline for a while — catching up on sync. Your notes are safe."
+    },
+    "status": {
+      "awaitingApproval": "Awaiting approval",
+      "conflicts_one": "{{count}} conflict to review",
+      "conflicts_other": "{{count}} conflicts to review",
+      "error": "Sync error",
+      "loading": "Sync status…",
+      "notEnrolled": "Not enrolled",
+      "off": "Sync off",
+      "synced": "Synced",
+      "syncing": "Syncing…",
+      "syncNow": "Sync now"
     }
   },
   "templates": {

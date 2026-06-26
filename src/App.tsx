@@ -237,6 +237,12 @@ function App() {
           <Welcome
             onCreateVault={() => dispatch({ type: "create-vault.start" })}
             onRestoreBackup={() => dispatch({ type: "welcome.restore-backup" })}
+            onJoined={(vaultId) =>
+              dispatch({
+                type: "welcome.join-success",
+                vaultId: vaultId as VaultId,
+              })
+            }
           />
         );
       case "create-vault":

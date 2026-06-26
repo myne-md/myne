@@ -5,21 +5,25 @@
       "cleaning": "Czyszczenie…",
       "close": "Zamknij",
       "completeTitle": "Czyszczenie zakończone",
+      "deleteCta_one": "Usuń {{count}} nieużywany",
       "deleteCta_few": "Usuń {{count}} nieużywane",
       "deleteCta_many": "Usuń {{count}} nieużywanych",
-      "deleteCta_one": "Usuń {{count}} nieużywany",
+      "deleteCta_other": "",
       "error": "Nie udało się posprzątać. Niektóre notatki mogą być nieczytelne — nic nie zostało usunięte.",
+      "intro_one": "Ten załącznik nie jest używany w żadnej notatce. Usunięcie go jest trwałe i nie można go cofnąć.",
       "intro_few": "Te {{count}} załączniki nie są używane w żadnej notatce. Usunięcie ich jest trwałe i nie można go cofnąć.",
       "intro_many": "Tych {{count}} załączników nie używa żadna notatka. Usunięcie ich jest trwałe i nie można go cofnąć.",
-      "intro_one": "Ten załącznik nie jest używany w żadnej notatce. Usunięcie go jest trwałe i nie można go cofnąć.",
+      "intro_other": "",
       "summaryFreed": " · zwolniono {{size}}",
       "summaryPeriod": ".",
+      "summaryRemoved_one": "Usunięto {{count}} załącznik",
       "summaryRemoved_few": "Usunięto {{count}} załączniki",
       "summaryRemoved_many": "Usunięto {{count}} załączników",
-      "summaryRemoved_one": "Usunięto {{count}} załącznik",
+      "summaryRemoved_other": "",
+      "summarySkipped_one": " · {{count}} pominięty (obecnie w użyciu)",
       "summarySkipped_few": " · {{count}} pominięte (obecnie w użyciu)",
       "summarySkipped_many": " · {{count}} pominiętych (obecnie w użyciu)",
-      "summarySkipped_one": " · {{count}} pominięty (obecnie w użyciu)",
+      "summarySkipped_other": "",
       "title": "Usuń nieużywane załączniki",
       "willBeReclaimed": "Zostanie odzyskane {{size}}."
     },
@@ -39,17 +43,18 @@
       "deleting": "Usuwanie…",
       "error": "Nie udało się usunąć załącznika. Spróbuj ponownie.",
       "notUsed": "Nieużywany w żadnej notatce.",
+      "stillUsed_one": "Jest wciąż używany w {{count}} notatce. Usunięcie go pozostawia placeholder w miejscu, gdzie był osadzony:",
       "stillUsed_few": "Jest wciąż używany w {{count}} notatkach. Usunięcie go pozostawia placeholder w miejscu, gdzie był osadzony:",
       "stillUsed_many": "Jest wciąż używany w {{count}} notatkach. Usunięcie go pozostawia placeholder w miejscu, gdzie był osadzony:",
-      "stillUsed_one": "Jest wciąż używany w {{count}} notatce. Usunięcie go pozostawia placeholder w miejscu, gdzie był osadzony:",
+      "stillUsed_other": "",
       "title": "Usuń załącznik",
       "untitled": "Bez tytułu"
     },
     "library": {
       "actionsAriaLabel": "Działania na załączniku",
       "actionsTitle": "Działania",
-      "checkUnusedFailedNotice": "Nie udało się sprawdzić nieużywanych załączników. Spróbuj ponownie.",
       "checking": "Sprawdzanie…",
+      "checkUnusedFailedNotice": "Nie udało się sprawdzić nieużywanych załączników. Spróbuj ponownie.",
       "cleanUnused": "Usuń nieużywane",
       "cleanUnusedTitle": "Usuń załączniki nieużywane w żadnej notatce",
       "colCreated": "Utworzono",
@@ -94,9 +99,10 @@
         "other": "Inne",
         "pdf": "PDF"
       },
+      "usedInCount_one": "Użyto w {{count}} notatce",
       "usedInCount_few": "Użyto w {{count}} notatkach",
       "usedInCount_many": "Użyto w {{count}} notatkach",
-      "usedInCount_one": "Użyto w {{count}} notatce",
+      "usedInCount_other": "",
       "usedInLoading": "…"
     },
     "thumbnail": {
@@ -316,6 +322,7 @@
     }
   },
   "common": {
+    "dismiss": "Zamknij",
     "prompt": {
       "cancel": "Anuluj",
       "confirmDefault": "OK"
@@ -327,29 +334,31 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Nie udało się wyeksportować {{filename}}.",
         "exported": "Wyeksportowano {{filename}}.",
-        "renameFailed": "Nie udało się zmienić nazwy załącznika.",
+        "exportFailed": "Nie udało się wyeksportować {{filename}}.",
         "renamed": "Zmieniono nazwę na {{name}}.",
+        "renameFailed": "Nie udało się zmienić nazwy załącznika.",
         "saveDialogFailed": "Nie udało się otworzyć okna zapisu."
       },
       "convert": {
         "cancel": "Anuluj",
         "confirm": "Konwertuj",
         "skipped": "pominięto — {{note}}",
-        "subtitleEmpty": "Nie ma czego konwertować — nie znaleziono plików źródłowych.",
+        "subtitle_one": "1 odwołanie zostanie przepisane. Sprawdź przed zatwierdzeniem.",
         "subtitle_few": "{{count}} odwołania zostaną przepisane. Sprawdź przed zatwierdzeniem.",
         "subtitle_many": "{{count}} odwołań zostanie przepisanych. Sprawdź przed zatwierdzeniem.",
-        "subtitle_one": "1 odwołanie zostanie przepisane. Sprawdź przed zatwierdzeniem.",
+        "subtitle_other": "",
+        "subtitleEmpty": "Nie ma czego konwertować — nie znaleziono plików źródłowych.",
         "title": "Konwertuj zaimportowane załączniki"
       },
       "convertCommand": {
         "pickerSourceFilter": "Źródło załącznika"
       },
       "convertCore": {
+        "converted_one": "{{count}} przekonwertowany",
         "converted_few": "{{count}} przekonwertowane",
         "converted_many": "{{count}} przekonwertowanych",
-        "converted_one": "{{count}} przekonwertowany",
+        "converted_other": "",
         "noneToConvert": "Brak zaimportowanych załączników do konwersji w tej notatce.",
         "skipNote": {
           "failed": "import nie powiódł się",
@@ -358,9 +367,10 @@
           "tooLarge": "za duży (maks. 64 MiB)",
           "unsupported": "nieobsługiwany typ"
         },
+        "skippedSuffix_one": " · {{count}} pominięty",
         "skippedSuffix_few": " · {{count}} pominięte",
         "skippedSuffix_many": " · {{count}} pominiętych",
-        "skippedSuffix_one": " · {{count}} pominięty"
+        "skippedSuffix_other": ""
       },
       "fileKind": {
         "generic": "Plik",
@@ -368,8 +378,8 @@
           "archive": "Archiwum",
           "audio": "Audio",
           "cHeader": "Nagłówek C",
-          "cSource": "Źródło C",
           "cppSource": "Źródło C++",
+          "cSource": "Źródło C",
           "css": "CSS",
           "csv": "CSV",
           "document": "Dokument",
@@ -439,18 +449,20 @@
         "title": "Zmień nazwę załącznika"
       },
       "summary": {
+        "added_one": "{{count}} dodany",
         "added_few": "{{count}} dodane",
         "added_many": "{{count}} dodanych",
-        "added_one": "{{count}} dodany",
+        "added_other": "",
         "reason": {
           "failed": "niepowodzenie",
           "locked": "skarbiec zablokowany",
           "tooLarge": "za duży",
           "unsupported": "nieobsługiwany typ"
         },
+        "skipped_one": "{{count}} pominięty: {{noun}}",
         "skipped_few": "{{count}} pominięte: {{noun}}",
         "skipped_many": "{{count}} pominiętych: {{noun}}",
-        "skipped_one": "{{count}} pominięty: {{noun}}"
+        "skipped_other": ""
       },
       "voice": {
         "startError": {
@@ -516,9 +528,10 @@
       "backlinks": {
         "archivedBadge": "Zarchiwizowane",
         "empty": "Brak odnośników zwrotnych.",
+        "linkedFrom_one": "Powiązane z {{count}}",
         "linkedFrom_few": "Powiązane z {{count}}",
         "linkedFrom_many": "Powiązane z {{count}}",
-        "linkedFrom_one": "Powiązane z {{count}}",
+        "linkedFrom_other": "",
         "untitled": "Bez tytułu"
       },
       "barItems": {
@@ -533,35 +546,41 @@
         "workspace": "Obszar roboczy"
       },
       "baseImport": {
+        "droppedFiltersSuffix_one": " · {{count}} filtr pominięto",
         "droppedFiltersSuffix_few": " · {{count}} filtry pominięto",
         "droppedFiltersSuffix_many": " · {{count}} filtrów pominięto",
-        "droppedFiltersSuffix_one": " · {{count}} filtr pominięto",
+        "droppedFiltersSuffix_other": "",
         "failed": "Import nie powiódł się.",
         "fileFilterName": "Obsidian Base",
+        "imported_one": "Zaimportowano {{count}} widok",
         "imported_few": "Zaimportowano {{count}} widoki",
         "imported_many": "Zaimportowano {{count}} widoków",
-        "imported_one": "Zaimportowano {{count}} widok",
+        "imported_other": "",
         "notValid": "To nie jest prawidłowy plik .base.",
+        "skippedSuffix_one": " · {{count}} pominięty",
         "skippedSuffix_few": " · {{count}} pominięte",
         "skippedSuffix_many": " · {{count}} pominiętych",
-        "skippedSuffix_one": " · {{count}} pominięty",
+        "skippedSuffix_other": "",
+        "stoppedAfter_one": "Import zatrzymano po {{count}} widoku.",
         "stoppedAfter_few": "Import zatrzymano po {{count}} widokach.",
         "stoppedAfter_many": "Import zatrzymano po {{count}} widokach.",
-        "stoppedAfter_one": "Import zatrzymano po {{count}} widoku."
+        "stoppedAfter_other": ""
       },
       "bottomBar": {
         "browseTags": "Przeglądaj tagi",
         "browseViews": "Przeglądaj widoki",
         "cycleViewMode": "Przełączaj tryb widoku",
         "docStats": {
-          "summarySelectionSuffix": " (zazn.)",
+          "summary_one": "{{count}} słowo · {{characters}} znaków",
           "summary_few": "{{count}} słowa · {{characters}} znaków",
           "summary_many": "{{count}} słów · {{characters}} znaków",
-          "summary_one": "{{count}} słowo · {{characters}} znaków",
-          "titleSelectionSuffix": " (zaznaczenie)",
+          "summary_other": "",
+          "summarySelectionSuffix": " (zazn.)",
+          "title_one": "{{characters}} znaków · {{words}} słów · {{spaces}} spacji · {{count}} akapit",
           "title_few": "{{characters}} znaków · {{words}} słów · {{spaces}} spacji · {{count}} akapity",
           "title_many": "{{characters}} znaków · {{words}} słów · {{spaces}} spacji · {{count}} akapitów",
-          "title_one": "{{characters}} znaków · {{words}} słów · {{spaces}} spacji · {{count}} akapit"
+          "title_other": "",
+          "titleSelectionSuffix": " (zaznaczenie)"
         },
         "graphTitle": "Graf (⌘⇧G)",
         "lock": "Zablokuj",
@@ -576,12 +595,14 @@
         "viewsTitle": "Widoki"
       },
       "import": {
+        "imported_one": "Zaimportowano {{count}} notatkę{{skipped}}",
         "imported_few": "Zaimportowano {{count}} notatki{{skipped}}",
         "imported_many": "Zaimportowano {{count}} notatek{{skipped}}",
-        "imported_one": "Zaimportowano {{count}} notatkę{{skipped}}",
+        "imported_other": "",
+        "skippedSuffix_one": " · {{count}} pominięty",
         "skippedSuffix_few": " · {{count}} pominięte",
         "skippedSuffix_many": " · {{count}} pominiętych",
-        "skippedSuffix_one": " · {{count}} pominięty"
+        "skippedSuffix_other": ""
       },
       "nav": {
         "goBack": "Wstecz",
@@ -741,19 +762,22 @@
       },
       "convert": {
         "cancel": "Anuluj",
+        "choiceClause_one": " · {{count}} wymaga wyboru.",
         "choiceClause_few": " · {{count}} wymagają wyboru.",
         "choiceClause_many": " · {{count}} wymaga wyboru.",
-        "choiceClause_one": " · {{count}} wymaga wyboru.",
+        "choiceClause_other": "",
         "chooseTarget": "Wybierz cel…",
         "convert": "Konwertuj",
+        "convertedToast_one": "Przekonwertowano {{count}} wikilink",
         "convertedToast_few": "Przekonwertowano {{count}} wikilinki",
         "convertedToast_many": "Przekonwertowano {{count}} wikilinków",
-        "convertedToast_one": "Przekonwertowano {{count}} wikilink",
+        "convertedToast_other": "",
         "noneToConvert": "Brak zaimportowanych wikilinków do konwersji w tej notatce.",
         "nothingToConvert": "Nie ma czego konwertować — żaden zaimportowany wikilink się nie rozwiązuje.",
+        "rewriteCount_one": "{{count}} łącze zostanie przepisane",
         "rewriteCount_few": "{{count}} łącza zostaną przepisane",
         "rewriteCount_many": "{{count}} łączy zostanie przepisanych",
-        "rewriteCount_one": "{{count}} łącze zostanie przepisane",
+        "rewriteCount_other": "",
         "skipped": "pominięto — {{reason}}",
         "title": "Konwertuj zaimportowane wikilinki w tej notatce"
       },
@@ -790,12 +814,14 @@
       "flow": {
         "couldNotRead": "Nie udało się odczytać tej notatki.",
         "exportedTo": "Wyeksportowano do {{filename}}",
+        "exportedToWithAttachments_one": "Wyeksportowano do {{filename}} + {{count}} załącznik",
         "exportedToWithAttachments_few": "Wyeksportowano do {{filename}} + {{count}} załączniki",
         "exportedToWithAttachments_many": "Wyeksportowano do {{filename}} + {{count}} załączników",
-        "exportedToWithAttachments_one": "Wyeksportowano do {{filename}} + {{count}} załącznik",
+        "exportedToWithAttachments_other": "",
+        "exportedToWithImages_one": "Wyeksportowano do {{filename}} + {{count}} obraz",
         "exportedToWithImages_few": "Wyeksportowano do {{filename}} + {{count}} obrazy",
         "exportedToWithImages_many": "Wyeksportowano do {{filename}} + {{count}} obrazów",
-        "exportedToWithImages_one": "Wyeksportowano do {{filename}} + {{count}} obraz",
+        "exportedToWithImages_other": "",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
@@ -805,9 +831,10 @@
       "modal": {
         "cancel": "Anuluj",
         "export": "Eksportuj…",
+        "includeAttachments_one": "Dołącz {{count}} załącznik",
         "includeAttachments_few": "Dołącz {{count}} załączniki",
         "includeAttachments_many": "Dołącz {{count}} załączników",
-        "includeAttachments_one": "Dołącz {{count}} załącznik",
+        "includeAttachments_other": "",
         "title": "Eksportuj jako Markdown"
       }
     },
@@ -834,22 +861,27 @@
         "vaultNotFound": "Nie znaleziono skarbca do wyeksportowania."
       },
       "flow": {
+        "countAttachments_one": "{{count}} załącznik",
         "countAttachments_few": "{{count}} załączniki",
         "countAttachments_many": "{{count}} załączników",
-        "countAttachments_one": "{{count}} załącznik",
+        "countAttachments_other": "",
+        "countFolders_one": "{{count}} folder",
         "countFolders_few": "{{count}} foldery",
         "countFolders_many": "{{count}} folderów",
-        "countFolders_one": "{{count}} folder",
+        "countFolders_other": "",
+        "countNotes_one": "{{count}} notatka",
         "countNotes_few": "{{count}} notatki",
         "countNotes_many": "{{count}} notatek",
-        "countNotes_one": "{{count}} notatka",
+        "countNotes_other": "",
         "exclusionsHistory": "Historia wersji nie została uwzględniona.",
-        "exclusionsTrashedAndHistory_few": "{{count}} notatki w koszu oraz historia wersji nie zostały uwzględnione.",
-        "exclusionsTrashedAndHistory_many": "{{count}} notatek w koszu oraz historia wersji nie zostały uwzględnione.",
-        "exclusionsTrashedAndHistory_one": "{{count}} notatka w koszu oraz historia wersji nie zostały uwzględnione.",
+        "exclusionsTrashed_one": "{{count}} notatka w koszu nie została uwzględniona.",
         "exclusionsTrashed_few": "{{count}} notatki w koszu nie zostały uwzględnione.",
         "exclusionsTrashed_many": "{{count}} notatek w koszu nie zostało uwzględnionych.",
-        "exclusionsTrashed_one": "{{count}} notatka w koszu nie została uwzględniona.",
+        "exclusionsTrashed_other": "",
+        "exclusionsTrashedAndHistory_one": "{{count}} notatka w koszu oraz historia wersji nie zostały uwzględnione.",
+        "exclusionsTrashedAndHistory_few": "{{count}} notatki w koszu oraz historia wersji nie zostały uwzględnione.",
+        "exclusionsTrashedAndHistory_many": "{{count}} notatek w koszu oraz historia wersji nie zostały uwzględnione.",
+        "exclusionsTrashedAndHistory_other": "",
         "phaseAttachments": "załączniki",
         "phaseNotes": "notatki",
         "preparing": "Przygotowywanie…",
@@ -907,10 +939,11 @@
   "notes": {
     "archive": {
       "close": "Zamknij",
-      "countEmpty": "Pusty",
+      "count_one": "{{count}} notatka",
       "count_few": "{{count}} notatki",
       "count_many": "{{count}} notatek",
-      "count_one": "{{count}} notatka",
+      "count_other": "",
+      "countEmpty": "Pusty",
       "delete": "Usuń",
       "deleteError": "Nie udało się usunąć tej notatki. Spróbuj ponownie.",
       "emptyState": "Archiwum jest puste.",
@@ -963,9 +996,10 @@
         "isNot": "nie jest"
       },
       "noConditions": "Brak warunków — ten widok pokazuje wszystkie strony.",
+      "noteCount_one": "{{count}} notatka",
       "noteCount_few": "{{count}} notatki",
       "noteCount_many": "{{count}} notatek",
-      "noteCount_one": "{{count}} notatka",
+      "noteCount_other": "",
       "of": "z:",
       "ofTheGroups": "spośród grup:",
       "removeCondition": "Usuń warunek",
@@ -1017,9 +1051,10 @@
       },
       "modal": {
         "cancel": "Anuluj",
+        "cancelledNotImported_one": "{{count}} niezaimportowana",
         "cancelledNotImported_few": "{{count}} niezaimportowane",
         "cancelledNotImported_many": "{{count}} niezaimportowanych",
-        "cancelledNotImported_one": "{{count}} niezaimportowana",
+        "cancelledNotImported_other": "",
         "cancelling": "Anulowanie…",
         "chooseFolder": "Wybierz folder…",
         "close": "Zamknij",
@@ -1032,9 +1067,10 @@
         "flagKindFolder": "Folder",
         "flagKindTitle": "Tytuł",
         "folderPickerTitle": "Wybierz folder skarbca Obsidian",
+        "hiddenIgnoredPrefix_one": "Zignorowano {{count}} element konfiguracyjny / ukryty (np. ",
         "hiddenIgnoredPrefix_few": "Zignorowano {{count}} elementy konfiguracyjne / ukryte (np. ",
         "hiddenIgnoredPrefix_many": "Zignorowano {{count}} elementów konfiguracyjnych / ukrytych (np. ",
-        "hiddenIgnoredPrefix_one": "Zignorowano {{count}} element konfiguracyjny / ukryty (np. ",
+        "hiddenIgnoredPrefix_other": "",
         "hiddenIgnoredSuffix": ", pliki ukryte).",
         "ifNoteExistsLabel": "Jeśli notatka już istnieje",
         "import": "Importuj",
@@ -1042,18 +1078,21 @@
         "importing": "Importowanie skarbca…",
         "markDone": "Oznacz jako wykonane",
         "markedDone": "Oznaczono jako wykonane",
+        "mediaImported_one": "{{count}} zaimportowany",
         "mediaImported_few": "{{count}} zaimportowane",
         "mediaImported_many": "{{count}} zaimportowanych",
-        "mediaImported_one": "{{count}} zaimportowany",
+        "mediaImported_other": "",
+        "mediaOmittedSuffix_one": " · {{count}} pominięty",
         "mediaOmittedSuffix_few": " · {{count}} pominięte",
         "mediaOmittedSuffix_many": " · {{count}} pominiętych",
-        "mediaOmittedSuffix_one": " · {{count}} pominięty",
+        "mediaOmittedSuffix_other": "",
         "needsAttention": "Wymaga uwagi",
         "needsAttentionHelp": "Te notatki zostały zaimportowane bez zmian. Sugerowane poprawki to punkt wyjścia — skopiuj jedną, a następnie zmień nazwę notatki po jej otwarciu.",
         "noFolderChosen": "Nie wybrano folderu",
+        "notesImported_one": "notatka zaimportowana",
         "notesImported_few": "notatki zaimportowane",
         "notesImported_many": "notatek zaimportowanych",
-        "notesImported_one": "notatka zaimportowana",
+        "notesImported_other": "",
         "policyCopyHint": "Dodaj ją obok istniejącej notatki.",
         "policyCopyLabel": "Importuj jako kopię",
         "policySkipHint": "Zalecane — ponowne uruchomienie importu nigdy nie powiela ani nie nadpisuje.",
@@ -1095,24 +1134,28 @@
       "archiveNote": "Archiwizuj",
       "archiveSingleError": "Nie udało się zarchiwizować notatki.",
       "attachments": "Załączniki",
+      "bulkArchive_one": "Zarchiwizuj {{count}} notatkę",
       "bulkArchive_few": "Zarchiwizuj {{count}} notatki",
       "bulkArchive_many": "Zarchiwizuj {{count}} notatek",
-      "bulkArchive_one": "Zarchiwizuj {{count}} notatkę",
+      "bulkArchive_other": "",
+      "bulkDelete_one": "Usuń {{count}} notatkę",
       "bulkDelete_few": "Usuń {{count}} notatki",
       "bulkDelete_many": "Usuń {{count}} notatek",
-      "bulkDelete_one": "Usuń {{count}} notatkę",
+      "bulkDelete_other": "",
+      "bulkMove_one": "Przenieś {{count}} notatkę do…",
       "bulkMove_few": "Przenieś {{count}} notatki do…",
       "bulkMove_many": "Przenieś {{count}} notatek do…",
-      "bulkMove_one": "Przenieś {{count}} notatkę do…",
+      "bulkMove_other": "",
       "caseMergeBody": "Folder o nazwie „{{name}}” już istnieje. Zostaną one scalone — zmienić nazwę jednego, aby zachować je osobno?",
       "color": "Kolor…",
       "createFirstNote": "+ Utwórz swoją pierwszą notatkę",
       "createFolderNote": "Utwórz notatkę folderu",
       "customize": "Dostosuj…",
       "delete": "Usuń",
+      "deleteFolderBody_one": "„{{name}}” i jego {{count}} notatka",
       "deleteFolderBody_few": "„{{name}}” i jego {{count}} notatki",
       "deleteFolderBody_many": "„{{name}}” i jego {{count}} notatek",
-      "deleteFolderBody_one": "„{{name}}” i jego {{count}} notatka",
+      "deleteFolderBody_other": "",
       "deleteFolderConfirm": "Usuń folder",
       "deleteFolderTitle": "Usunąć ten folder?",
       "deleteFolderWarning": "Notatki zostaną przeniesione do Kosza — można je później przywrócić.",
@@ -1137,9 +1180,10 @@
       "newViewTitle": "Nowy widok",
       "noteMovedToTrash": "Notatka przeniesiona do Kosza",
       "notesHeading": "Notatki",
+      "notesMovedToTrash_one": "{{count}} notatka przeniesiona do Kosza",
       "notesMovedToTrash_few": "{{count}} notatki przeniesione do Kosza",
       "notesMovedToTrash_many": "{{count}} notatek przeniesionych do Kosza",
-      "notesMovedToTrash_one": "{{count}} notatka przeniesiona do Kosza",
+      "notesMovedToTrash_other": "",
       "openArchive": "Otwórz archiwum",
       "openAttachments": "Otwórz załączniki",
       "openFolderNote": "Otwórz notatkę folderu",
@@ -1203,21 +1247,21 @@
       "renameAriaLabel": "Zmień nazwę notatki",
       "untitled": "Bez tytułu"
     },
+    "savedView": {
+      "defaultName": "Widok filtrowany"
+    },
     "saveStatus": {
       "editing": "Edytowanie",
       "editingEllipsis": "Edytowanie…",
       "editingTitle": "Edytowanie — autozapis jest aktywny",
       "justNow": "przed chwilą",
       "retry": "Ponów",
-      "saveFailed": "Zapis nie powiódł się",
-      "saveFailedTitle": "Zapis nie powiódł się — kliknij Ponów",
       "saved": "Zapisano",
       "savedRelative": "Zapisano {{rel}}",
+      "saveFailed": "Zapis nie powiódł się",
+      "saveFailedTitle": "Zapis nie powiódł się — kliknij Ponów",
       "saving": "Zapisywanie",
       "savingEllipsis": "Zapisywanie…"
-    },
-    "savedView": {
-      "defaultName": "Widok filtrowany"
     },
     "snapshotFailed": {
       "dismiss": "Zamknij",
@@ -1225,9 +1269,10 @@
     },
     "snapshots": {
       "cancel": "Anuluj",
+      "changeCount_one": "{{count}} zmiana od tej migawki",
       "changeCount_few": "{{count}} zmiany od tej migawki",
       "changeCount_many": "{{count}} zmian od tej migawki",
-      "changeCount_one": "{{count}} zmiana od tej migawki",
+      "changeCount_other": "",
       "close": "Zamknij",
       "confirmBody": "Twoja obecna notatka zostanie najpierw zapisana jako migawka, więc możesz to cofnąć.",
       "confirmTitle": "Przywrócić tę migawkę?",
@@ -1271,9 +1316,10 @@
       "noNotesForFilter": "Brak notatek dla tego filtra.",
       "noTagsMatch": "Brak tagów pasujących do „{{query}}”.",
       "noTagsYet": "Brak tagów.",
+      "noteCount_one": "{{count}} notatka",
       "noteCount_few": "{{count}} notatki",
       "noteCount_many": "{{count}} notatek",
-      "noteCount_one": "{{count}} notatka",
+      "noteCount_other": "",
       "notes": "Notatki",
       "pickTag": "Wybierz tag do filtrowania.",
       "save": "Zapisz",
@@ -1285,21 +1331,24 @@
     },
     "trash": {
       "close": "Zamknij",
-      "countEmpty": "Pusty",
+      "count_one": "{{count}} notatka",
       "count_few": "{{count}} notatki",
       "count_many": "{{count}} notatek",
-      "count_one": "{{count}} notatka",
+      "count_other": "",
+      "countEmpty": "Pusty",
       "delete": "Usuń",
       "deleteError": "Nie udało się usunąć tej notatki. Spróbuj ponownie.",
       "empty": "Opróżnij kosz",
+      "emptyConfirmBody_one": "{{count}} notatka zostanie trwale usunięta.",
       "emptyConfirmBody_few": "{{count}} notatki zostaną trwale usunięte.",
       "emptyConfirmBody_many": "{{count}} notatek zostanie trwale usuniętych.",
-      "emptyConfirmBody_one": "{{count}} notatka zostanie trwale usunięta.",
+      "emptyConfirmBody_other": "",
       "emptyConfirmCta": "Opróżnij kosz",
       "emptyConfirmTitle": "Opróżnić kosz?",
+      "emptyPartialFailure_one": "{{count}} notatka nie mogła zostać usunięta i pozostaje w koszu.",
       "emptyPartialFailure_few": "{{count}} notatki nie mogły zostać usunięte i pozostają w koszu.",
       "emptyPartialFailure_many": "{{count}} notatek nie mogło zostać usuniętych i pozostają w koszu.",
-      "emptyPartialFailure_one": "{{count}} notatka nie mogła zostać usunięta i pozostaje w koszu.",
+      "emptyPartialFailure_other": "",
       "emptyState": "Kosz jest pusty.",
       "purgeConfirmCta": "Usuń trwale",
       "purgeConfirmTitle": "Usunąć trwale?",
@@ -1317,24 +1366,6 @@
       "searching": "Wyszukiwanie…",
       "thisNote": "ta notatka",
       "untitled": "Bez tytułu"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Domyślne (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (kwadrat)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (szeroki)"
-      },
-      "cancel": "Anuluj",
-      "cardSize": "Rozmiar karty",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Właściwość frontmatter, której wartością jest obraz — pokazywany jako okładka każdej karty. Pozostaw puste, aby nie wyświetlać okładki.",
-      "coverImagePlaceholder": "np. cover",
-      "coverImageProperty": "Właściwość obrazu okładki",
-      "imageAspectRatio": "Proporcje obrazu",
-      "reset": "Resetuj",
-      "save": "Zapisz"
     },
     "views": {
       "cards": {
@@ -1363,6 +1394,24 @@
       },
       "newView": "Nowy widok",
       "untitledView": "Widok bez tytułu"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Domyślne (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kwadrat)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (szeroki)"
+      },
+      "cancel": "Anuluj",
+      "cardSize": "Rozmiar karty",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Właściwość frontmatter, której wartością jest obraz — pokazywany jako okładka każdej karty. Pozostaw puste, aby nie wyświetlać okładki.",
+      "coverImagePlaceholder": "np. cover",
+      "coverImageProperty": "Właściwość obrazu okładki",
+      "imageAspectRatio": "Proporcje obrazu",
+      "reset": "Resetuj",
+      "save": "Zapisz"
     },
     "welcome": {
       "body": "Witamy w Myne, Twojej prywatnej przestrzeni do myślenia i pisania.\n\nWszystko, co tu zapiszesz, jest zaszyfrowane i pozostaje na Twoim urządzeniu. Twoje **hasło** i **fraza odzyskiwania** to jedyne klucze do niego, więc przechowuj je w bezpiecznym miejscu. Jeśli oba kiedykolwiek zaginą, nikt nie odzyska Twoich notatek — nawet my.\n\nTo zwykła notatka, więc uczyń ją swoją. Edytuj ją, zmień jej nazwę lub usuń, kiedy tylko chcesz, i dodawaj nowe notatki w miarę rozwijania pomysłów.\n\nCieszymy się, że tu jesteś. Aby dowiedzieć się więcej o Myne, odwiedź https://myne.md\n",
@@ -1428,9 +1477,10 @@
       "collidedNote": "Wcześniej istniejąca kopia tego skarbca nadal znajduje się na liście skarbców. Po potwierdzeniu, że przywrócony skarbiec się otwiera, możesz usunąć stary z listy (wymaga wpisania DELETE).",
       "notes": "Notatki: {{n}}",
       "openVaultList": "Otwórz listę skarbców",
+      "partialHeader_one": "Przywrócono częściowo — nie udało się odczytać {{count}} elementu.",
       "partialHeader_few": "Przywrócono częściowo — nie udało się odczytać {{count}} elementów.",
       "partialHeader_many": "Przywrócono częściowo — nie udało się odczytać {{count}} elementów.",
-      "partialHeader_one": "Przywrócono częściowo — nie udało się odczytać {{count}} elementu.",
+      "partialHeader_other": "",
       "restored": "Skarbiec przywrócony.",
       "versionHistory": "Wpisy historii wersji: {{n}}"
     },
@@ -1542,16 +1592,19 @@
       },
       "when": {
         "bare": "Połączono",
+        "daysAgo_one": "Połączono {{count}} dzień temu",
         "daysAgo_few": "Połączono {{count}} dni temu",
         "daysAgo_many": "Połączono {{count}} dni temu",
-        "daysAgo_one": "Połączono {{count}} dzień temu",
+        "daysAgo_other": "",
+        "hoursAgo_one": "Połączono {{count}} godz. temu",
         "hoursAgo_few": "Połączono {{count}} godz. temu",
         "hoursAgo_many": "Połączono {{count}} godz. temu",
-        "hoursAgo_one": "Połączono {{count}} godz. temu",
+        "hoursAgo_other": "",
         "justNow": "Połączono przed chwilą",
+        "minutesAgo_one": "Połączono {{count}} min temu",
         "minutesAgo_few": "Połączono {{count}} min temu",
         "minutesAgo_many": "Połączono {{count}} min temu",
-        "minutesAgo_one": "Połączono {{count}} min temu",
+        "minutesAgo_other": "",
         "onDate": "Połączono {{date}}"
       }
     },
@@ -1608,9 +1661,10 @@
       "heading": "Usuń skarbiec",
       "ioFailBody": "Nie udało się uzyskać dostępu do plików skarbca w celu usunięcia. Klucze skarbca są już wyzerowane w pamięci; wszelkie dane skarbca pozostające na dysku są nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
       "ioFailTitle": "Błąd dysku podczas usuwania",
+      "partialFailBody_one": "Nie udało się usunąć z dysku {{count}} pliku. Klucze skarbca są już wyzerowane w pamięci, więc wszelki osierocony szyfrogram, który pozostanie, jest nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
       "partialFailBody_few": "Nie udało się usunąć z dysku {{count}} plików. Klucze skarbca są już wyzerowane w pamięci, więc wszelki osierocony szyfrogram, który pozostanie, jest nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
       "partialFailBody_many": "Nie udało się usunąć z dysku {{count}} plików. Klucze skarbca są już wyzerowane w pamięci, więc wszelki osierocony szyfrogram, który pozostanie, jest nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
-      "partialFailBody_one": "Nie udało się usunąć z dysku {{count}} pliku. Klucze skarbca są już wyzerowane w pamięci, więc wszelki osierocony szyfrogram, który pozostanie, jest nieodzyskiwalnym śmieciem opakowanym przez Argon2id.",
+      "partialFailBody_other": "",
       "partialFailTitle": "Usuwanie skarbca częściowo się nie powiodło",
       "submit": "Usuń skarbiec",
       "submitInFlight": "Usuwanie skarbca…",
@@ -1683,17 +1737,19 @@
       "errorHardwareUnavailable": "Touch ID nie jest dostępny na tym urządzeniu.",
       "errorNotUnlocked": "Najpierw odblokuj skarbiec.",
       "errorPinNotDigits": "PIN może zawierać tylko cyfry.",
+      "errorPinTooShort_one": "PIN musi mieć co najmniej {{count}} cyfrę.",
       "errorPinTooShort_few": "PIN musi mieć co najmniej {{count}} cyfry.",
       "errorPinTooShort_many": "PIN musi mieć co najmniej {{count}} cyfr.",
-      "errorPinTooShort_one": "PIN musi mieć co najmniej {{count}} cyfrę.",
+      "errorPinTooShort_other": "",
       "helperConfigured": "Skonfigurowano przez {{method}}. Ponowne wprowadzenie po automatycznej blokadzie pomija hasło główne. Hasło główne jest nadal wymagane po ponownym uruchomieniu.",
       "helperNotConfigured": "Wprowadzaj ponownie po automatycznej blokadzie za pomocą PIN-u lub Touch ID zamiast pełnego hasła głównego. To udogodnienie wobec zaszyfrowanego skarbca — hasło główne pozostaje wymagane po ponownym uruchomieniu.",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "PIN szybkiego odblokowania",
+      "pinPlaceholder_one": "PIN (co najmniej {{count}} cyfra)",
       "pinPlaceholder_few": "PIN (co najmniej {{count}} cyfry)",
       "pinPlaceholder_many": "PIN (co najmniej {{count}} cyfr)",
-      "pinPlaceholder_one": "PIN (co najmniej {{count}} cyfra)",
+      "pinPlaceholder_other": "",
       "setPin": "Ustaw PIN",
       "setupHelper": "Touch ID jest dostępny tylko w macOS i obecnie eksperymentalny (oczekuje na weryfikację sprzętu). PIN działa wszędzie.",
       "title": "Szybkie odblokowanie",
@@ -1709,7 +1765,8 @@
         "editor": "Edytor",
         "hotkeys": "Skróty klawiszowe",
         "privacy": "Prywatność",
-        "storage": "Pamięć"
+        "storage": "Pamięć",
+        "sync": "Synchronizacja"
       },
       "passwordUpdatedToast": "Hasło zaktualizowane",
       "title": "Ustawienia"
@@ -1729,9 +1786,9 @@
       "on": "Wł."
     },
     "storage": {
-      "backUpVault": "Utwórz kopię zapasową skarbca…",
       "backupHelper": "Kopie zapasowe pozostają dokładnie tak samo zaszyfrowane jak Twój skarbiec, w jednym zweryfikowanym pliku .myne-backup. Przywracanie działa z hasłem lub frazą odzyskiwania tego skarbca — dokładnie tak jak przy odblokowywaniu.",
       "backupLabel": "Kopia zapasowa",
+      "backUpVault": "Utwórz kopię zapasową skarbca…",
       "exportAction": "Eksportuj…",
       "exportBody": "Eksportuj skarbiec jako Markdown",
       "exportHelper": "Zwykłe drzewo Markdown — niezaszyfrowane.",
@@ -1762,6 +1819,133 @@
       "label": "Domyślny tryb widoku",
       "optionReading": "Czytanie",
       "optionSource": "Źródło"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "Pobieranie {{name}}",
+        "uploading": "Wysyłanie {{name}}"
+      },
+      "empty": "Brak trwających transferów.",
+      "heading": "Synchronizacja załączników",
+      "status": {
+        "done": "gotowe",
+        "failedWillRetry": "niepowodzenie — ponowimy próbę",
+        "paused": "wstrzymano"
+      }
+    },
+    "buildingIndex": {
+      "label": "Budowanie indeksu wyszukiwania…"
+    },
+    "conflicts": {
+      "discard": "Odrzuć",
+      "empty": "Brak konfliktów — Twoje urządzenia są zsynchronizowane.",
+      "groupTitle_one": "{{count}} sprzeczna kopia: {{original}}",
+      "groupTitle_few": "{{count}} sprzeczne kopie: {{original}}",
+      "groupTitle_many": "{{count}} sprzecznych kopii: {{original}}",
+      "groupTitle_other": "",
+      "keepAsSeparate": "Zachowaj osobno",
+      "untitled": "Bez tytułu ({{hex}})"
+    },
+    "devices": {
+      "approve": "Zatwierdź",
+      "awaitingApproval_one": "{{count}} urządzenie oczekuje na zatwierdzenie",
+      "awaitingApproval_few": "{{count}} urządzenia oczekują na zatwierdzenie",
+      "awaitingApproval_many": "{{count}} urządzeń oczekuje na zatwierdzenie",
+      "awaitingApproval_other": "",
+      "loading": "Ładowanie…",
+      "noDevices": "Nie zsynchronizowano jeszcze żadnego urządzenia.",
+      "notEnrolled": "To urządzenie nie jest jeszcze połączone. Jeśli właśnie je dodałeś(-aś), poczekaj na zatwierdzenie z innego urządzenia; w przeciwnym razie dodaj je za pomocą formularza „Dodaj urządzenie” powyżej.",
+      "remove": "Usuń",
+      "removedElsewhere": "To urządzenie zostało usunięte z Twojego konta na innym urządzeniu.",
+      "resetAndReAdd": "Zresetuj i dodaj to urządzenie ponownie",
+      "resetSyncOnThisDevice": "Zresetuj synchronizację na tym urządzeniu",
+      "shortName": "Urządzenie {{hex}}",
+      "syncedHere": "Zsynchronizowano tutaj",
+      "thisDevice": "To urządzenie",
+      "transportHint": "Jeśli serwer został przeniesiony lub zmienił się jego certyfikat, wpisz ponownie adres serwera w sekcji „Serwer synchronizacji” powyżej, aby ponownie obdarzyć go zaufaniem.",
+      "unreachable": "Nie udało się połączyć z synchronizacją ({{error}}).",
+      "yourDevices": "Twoje urządzenia"
+    },
+    "endpoint": {
+      "connect": "Połącz",
+      "connectedLocal": "Połączono (lokalnie, bez TLS).",
+      "connectedTls": "Połączono. Sprawdź, czy ten odcisk palca zgadza się z tym na drugim urządzeniu.",
+      "connecting": "Łączenie…",
+      "fingerprintLabel": "Odcisk palca certyfikatu serwera:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Nie udało się połączyć z tym serwerem — sprawdź adres URL oraz to, czy serwer działa."
+    },
+    "enroll": {
+      "accountNumberLabel": "Numer konta",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Łączenie…",
+      "credentialTypeAria": "Typ poświadczenia",
+      "error": {
+        "notConfigured": "Ustaw serwer synchronizacji w ustawieniach, zanim dodasz to urządzenie.",
+        "transport": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź połączenie i spróbuj ponownie."
+      },
+      "mode": {
+        "password": "Hasło",
+        "recovery": "Fraza odzyskiwania"
+      },
+      "passwordLabel": "Hasło",
+      "recoveryPhraseHint": "Wpisz swoją 24-słowną frazę odzyskiwania.",
+      "recoveryPhraseLabel": "Fraza odzyskiwania",
+      "signInWith": "Zaloguj się przez",
+      "submit": "Dodaj to urządzenie",
+      "wordAria": "Słowo {{number}}"
+    },
+    "join": {
+      "accountLabel": "Numer konta",
+      "cancel": "Anuluj",
+      "error": "Nie udało się dodać tego urządzenia. Sprawdź adres serwera, numer konta i hasło — oraz to, czy serwer jest dostępny.",
+      "help": "Zaloguj się numerem konta i hasłem. To urządzenie zsynchronizuje Twoje notatki, gdy zatwierdzi je istniejące urządzenie. Fraza odzyskiwania nie jest potrzebna.",
+      "passwordLabel": "Hasło",
+      "serverLabel": "Serwer synchronizacji",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Dodaj urządzenie",
+      "submitting": "Dodawanie…",
+      "title": "Dodaj to urządzenie do konta"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "Zaloguj się na nowym urządzeniu numerem konta i hasłem lub frazą odzyskiwania. Urządzenie pozostaje oczekujące, dopóki nie zatwierdzi go istniejące urządzenie.",
+        "label": "Dodaj urządzenie"
+      },
+      "conflicts": {
+        "helper": "Gdy ta sama notatka jest edytowana jednocześnie na dwóch urządzeniach, Myne zachowuje obie kopie, aby nic nie przepadło. Rozwiąż je tutaj.",
+        "label": "Konflikty"
+      },
+      "devices": {
+        "label": "Urządzenia"
+      },
+      "server": {
+        "helper": "Wpisz ten sam adres serwera na każdym urządzeniu. W przypadku serwera własnego użyj jego adresu <1>https://</1>; sprawdź, czy odcisk palca certyfikatu zgadza się na wszystkich Twoich urządzeniach.",
+        "label": "Serwer synchronizacji"
+      },
+      "status": {
+        "helper": "Myne synchronizuje Twoje zaszyfrowane notatki między urządzeniami. Serwer przechowuje wyłącznie szyfrogram, którego nie potrafi odczytać.",
+        "label": "Stan synchronizacji"
+      }
+    },
+    "reconcile": {
+      "message": "To urządzenie było przez pewien czas offline — trwa nadrabianie synchronizacji. Twoje notatki są bezpieczne."
+    },
+    "status": {
+      "awaitingApproval": "Oczekuje na zatwierdzenie",
+      "conflicts_one": "{{count}} konflikt do przejrzenia",
+      "conflicts_few": "{{count}} konflikty do przejrzenia",
+      "conflicts_many": "{{count}} konfliktów do przejrzenia",
+      "conflicts_other": "",
+      "error": "Błąd synchronizacji",
+      "loading": "Stan synchronizacji…",
+      "notEnrolled": "Niezarejestrowane",
+      "off": "Synchronizacja wyłączona",
+      "synced": "Zsynchronizowano",
+      "syncing": "Synchronizowanie…",
+      "syncNow": "Synchronizuj teraz"
     }
   },
   "templates": {
@@ -1975,12 +2159,12 @@
       "saveAsFile": "Zapisz jako plik"
     },
     "ready": {
-      "backUpNow": "Utwórz teraz kopię zapasową tego skarbca",
       "backedUp": "Utworzono kopię zapasową ✓",
       "backingUp": "Tworzenie kopii zapasowej…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Tworzenie kopii zapasowej nie zostało ukończone — nie pozostawiono żadnego pliku. Możesz utworzyć kopię zapasową w dowolnej chwili w Ustawienia → Pamięć.",
       "backupFilterName": "Kopia zapasowa Myne",
+      "backUpNow": "Utwórz teraz kopię zapasową tego skarbca",
       "body": "Myne zapisało Twój skarbiec w folderze danych aplikacji. Twoje hasło główne i fraza odzyskiwania to jedyny sposób powrotu — upewnij się, że oba są zapisane w bezpiecznym miejscu.",
       "decrypting": "Odszyfrowywanie…",
       "done": "Gotowe",
@@ -2050,8 +2234,8 @@
   "vaultSwitcher": {
     "chipFallback": "Skarbiec",
     "createAnother": "Utwórz kolejny skarbiec",
-    "switchVaultLabel": "Przełącz skarbiec",
     "switching": "przełączanie…",
+    "switchVaultLabel": "Przełącz skarbiec",
     "vaultFallback": "Skarbiec {{n}}"
   },
   "welcome": {
@@ -2060,25 +2244,29 @@
     "headlineLine2": "Bez e-maila przy rejestracji.",
     "repairResidue": {
       "cancel": "Anuluj",
-      "cleanUp": "Posprzątaj",
       "cleaningUp": "Sprzątanie…",
+      "cleanUp": "Posprzątaj",
+      "confirmBody_one": "Zostanie usunięty {{count}} plik. Jest już nieczytelny; nic, co da się odzyskać, nie zostanie utracone.",
       "confirmBody_few": "Zostaną usunięte {{count}} pliki. Są już nieczytelne; nic, co da się odzyskać, nie zostanie utracone.",
       "confirmBody_many": "Zostanie usuniętych {{count}} plików. Są już nieczytelne; nic, co da się odzyskać, nie zostanie utracone.",
-      "confirmBody_one": "Zostanie usunięty {{count}} plik. Jest już nieczytelny; nic, co da się odzyskać, nie zostanie utracone.",
+      "confirmBody_other": "",
       "confirmTitle": "Posprzątać pozostałe pliki?",
+      "doneBody_one": "Usunięto {{count}} pozostały plik. Możesz teraz utworzyć nowy skarbiec.",
       "doneBody_few": "Usunięto {{count}} pozostałe pliki. Możesz teraz utworzyć nowy skarbiec.",
       "doneBody_many": "Usunięto {{count}} pozostałych plików. Możesz teraz utworzyć nowy skarbiec.",
-      "doneBody_one": "Usunięto {{count}} pozostały plik. Możesz teraz utworzyć nowy skarbiec.",
+      "doneBody_other": "",
       "doneTitle": "Posprzątano",
       "errorBody": "Coś poszło nie tak. Zamknij aplikację i spróbuj ponownie.",
       "errorTitle": "Sprzątanie nie powiodło się",
+      "foundBody_one": "{{count}} pozostały plik z poprzedniego usuwania, które się nie zakończyło. Jest już nieczytelny — nie stracisz niczego, co da się odzyskać.",
       "foundBody_few": "{{count}} pozostałe pliki z poprzedniego usuwania, które się nie zakończyło. Są już nieczytelne — nie stracisz niczego, co da się odzyskać.",
       "foundBody_many": "{{count}} pozostałych plików z poprzedniego usuwania, które się nie zakończyło. Są już nieczytelne — nie stracisz niczego, co da się odzyskać.",
-      "foundBody_one": "{{count}} pozostały plik z poprzedniego usuwania, które się nie zakończyło. Jest już nieczytelny — nie stracisz niczego, co da się odzyskać.",
+      "foundBody_other": "",
       "foundTitle": "Pozostałe pliki z niedokończonego usuwania",
+      "partialBody_one": "{{count}} plik może być zablokowany przez inną aplikację (program antywirusowy, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę albo usuń folder skarbca ręcznie.",
       "partialBody_few": "{{count}} pliki mogą być zablokowane przez inną aplikację (program antywirusowy, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę albo usuń folder skarbca ręcznie.",
       "partialBody_many": "{{count}} plików może być zablokowanych przez inną aplikację (program antywirusowy, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę albo usuń folder skarbca ręcznie.",
-      "partialBody_one": "{{count}} plik może być zablokowany przez inną aplikację (program antywirusowy, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę albo usuń folder skarbca ręcznie.",
+      "partialBody_other": "",
       "partialTitle": "Niektórych plików nie udało się usunąć"
     },
     "restoreCta": "Przywróć z kopii zapasowej",

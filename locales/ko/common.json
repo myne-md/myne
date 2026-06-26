@@ -6,12 +6,14 @@
       "close": "닫기",
       "completeTitle": "정리 완료",
       "deleteCta": "미사용 {{count}}개 삭제",
+      "deleteCta_other": "",
       "error": "정리하지 못했습니다. 일부 노트를 읽을 수 없을 수 있습니다 — 아무것도 삭제되지 않았습니다.",
       "intro_other": "이 첨부 파일 {{count}}개는 어떤 노트에서도 사용되지 않습니다. 삭제하면 영구적이며 되돌릴 수 없습니다.",
       "summaryFreed": " · {{size}} 확보됨",
       "summaryPeriod": ".",
       "summaryRemoved_other": "첨부 파일 {{count}}개 삭제됨",
       "summarySkipped": " · {{count}}개 건너뜀(지금 사용 중)",
+      "summarySkipped_other": "",
       "title": "미사용 첨부 파일 정리",
       "willBeReclaimed": "{{size}}가 확보됩니다."
     },
@@ -38,8 +40,8 @@
     "library": {
       "actionsAriaLabel": "첨부 파일 작업",
       "actionsTitle": "작업",
-      "checkUnusedFailedNotice": "미사용 첨부 파일을 확인하지 못했습니다. 다시 시도하세요.",
       "checking": "확인하는 중…",
+      "checkUnusedFailedNotice": "미사용 첨부 파일을 확인하지 못했습니다. 다시 시도하세요.",
       "cleanUnused": "미사용 정리",
       "cleanUnusedTitle": "어떤 노트에서도 사용되지 않는 첨부 파일 삭제",
       "colCreated": "생성일",
@@ -304,6 +306,7 @@
     }
   },
   "common": {
+    "dismiss": "닫기",
     "prompt": {
       "cancel": "취소",
       "confirmDefault": "확인"
@@ -315,18 +318,18 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "{{filename}}을(를) 내보내지 못했습니다.",
         "exported": "{{filename}}을(를) 내보냈습니다.",
-        "renameFailed": "첨부 파일의 이름을 바꾸지 못했습니다.",
+        "exportFailed": "{{filename}}을(를) 내보내지 못했습니다.",
         "renamed": "{{name}}(으)로 이름을 바꿨습니다.",
+        "renameFailed": "첨부 파일의 이름을 바꾸지 못했습니다.",
         "saveDialogFailed": "저장 대화 상자를 열지 못했습니다."
       },
       "convert": {
         "cancel": "취소",
         "confirm": "변환",
         "skipped": "건너뜀 — {{note}}",
-        "subtitleEmpty": "변환할 항목이 없습니다 — 확인된 원본 파일이 없습니다.",
         "subtitle_other": "참조 {{count}}개가 다시 작성됩니다. 적용하기 전에 확인하세요.",
+        "subtitleEmpty": "변환할 항목이 없습니다 — 확인된 원본 파일이 없습니다.",
         "title": "가져온 첨부 파일 변환"
       },
       "convertCommand": {
@@ -334,6 +337,7 @@
       },
       "convertCore": {
         "converted": "{{count}}개 변환됨",
+        "converted_other": "",
         "noneToConvert": "이 노트에 변환할 가져온 첨부 파일이 없습니다.",
         "skipNote": {
           "failed": "가져오기 실패",
@@ -342,7 +346,8 @@
           "tooLarge": "너무 큼(최대 64 MiB)",
           "unsupported": "지원되지 않는 유형"
         },
-        "skippedSuffix": " · {{count}}개 건너뜀"
+        "skippedSuffix": " · {{count}}개 건너뜀",
+        "skippedSuffix_other": ""
       },
       "fileKind": {
         "generic": "파일",
@@ -350,8 +355,8 @@
           "archive": "압축 파일",
           "audio": "오디오",
           "cHeader": "C 헤더",
-          "cSource": "C 소스",
           "cppSource": "C++ 소스",
+          "cSource": "C 소스",
           "css": "CSS",
           "csv": "CSV",
           "document": "문서",
@@ -422,13 +427,15 @@
       },
       "summary": {
         "added": "{{count}}개 추가됨",
+        "added_other": "",
         "reason": {
           "failed": "실패",
           "locked": "보관함 잠김",
           "tooLarge": "너무 큼",
           "unsupported": "지원되지 않는 유형"
         },
-        "skipped": "{{count}}개 건너뜀: {{noun}}"
+        "skipped": "{{count}}개 건너뜀: {{noun}}",
+        "skipped_other": ""
       },
       "voice": {
         "startError": {
@@ -496,6 +503,7 @@
         "archivedBadge": "보관됨",
         "empty": "아직 백링크가 없습니다.",
         "linkedFrom": "{{count}}개에서 연결됨",
+        "linkedFrom_other": "",
         "untitled": "제목 없음"
       },
       "barItems": {
@@ -512,22 +520,26 @@
       },
       "baseImport": {
         "droppedFiltersSuffix": " · 필터 {{count}}개 제외됨",
+        "droppedFiltersSuffix_other": "",
         "failed": "가져오기에 실패했습니다.",
         "fileFilterName": "Obsidian Base",
         "imported": "뷰 {{count}}개 가져옴",
+        "imported_other": "",
         "notValid": "올바른 .base 파일이 아닙니다.",
         "skippedSuffix": " · {{count}}개 건너뜀",
-        "stoppedAfter": "뷰 {{count}}개 후 가져오기가 중단되었습니다."
+        "skippedSuffix_other": "",
+        "stoppedAfter": "뷰 {{count}}개 후 가져오기가 중단되었습니다.",
+        "stoppedAfter_other": ""
       },
       "bottomBar": {
         "browseTags": "태그 탐색",
         "browseViews": "뷰 탐색",
         "cycleViewMode": "보기 모드 순환",
         "docStats": {
-          "summarySelectionSuffix": " (선택)",
           "summary_other": "{{count}}개 단어 · {{characters}}자",
-          "titleSelectionSuffix": " (선택 영역)",
-          "title_other": "{{characters}}자 · 단어 {{words}}개 · 공백 {{spaces}}개 · 단락 {{count}}개"
+          "summarySelectionSuffix": " (선택)",
+          "title_other": "{{characters}}자 · 단어 {{words}}개 · 공백 {{spaces}}개 · 단락 {{count}}개",
+          "titleSelectionSuffix": " (선택 영역)"
         },
         "graphTitle": "그래프 (⌘⇧G)",
         "lock": "잠그기",
@@ -543,7 +555,8 @@
       },
       "import": {
         "imported_other": "노트 {{count}}개 가져옴{{skipped}}",
-        "skippedSuffix": " · {{count}}개 건너뜀"
+        "skippedSuffix": " · {{count}}개 건너뜀",
+        "skippedSuffix_other": ""
       },
       "nav": {
         "goBack": "뒤로",
@@ -791,8 +804,8 @@
         "countFolders_other": "폴더 {{count}}개",
         "countNotes_other": "노트 {{count}}개",
         "exclusionsHistory": "버전 기록은 포함되지 않습니다.",
-        "exclusionsTrashedAndHistory_other": "휴지통의 노트 {{count}}개와 버전 기록은 포함되지 않습니다.",
         "exclusionsTrashed_other": "휴지통의 노트 {{count}}개는 포함되지 않습니다.",
+        "exclusionsTrashedAndHistory_other": "휴지통의 노트 {{count}}개와 버전 기록은 포함되지 않습니다.",
         "phaseAttachments": "첨부 파일",
         "phaseNotes": "노트",
         "preparing": "준비하는 중…",
@@ -850,8 +863,8 @@
   "notes": {
     "archive": {
       "close": "닫기",
-      "countEmpty": "비어 있음",
       "count_other": "노트 {{count}}개",
+      "countEmpty": "비어 있음",
       "delete": "삭제",
       "deleteError": "해당 노트를 삭제하지 못했습니다. 다시 시도하세요.",
       "emptyState": "보관함이 비어 있습니다.",
@@ -957,6 +970,7 @@
       "modal": {
         "cancel": "취소",
         "cancelledNotImported": "{{count}}개 가져오지 않음",
+        "cancelledNotImported_other": "",
         "cancelling": "취소하는 중…",
         "chooseFolder": "폴더 선택…",
         "close": "닫기",
@@ -978,7 +992,9 @@
         "markDone": "완료로 표시",
         "markedDone": "완료로 표시됨",
         "mediaImported": "{{count}}개 가져옴",
+        "mediaImported_other": "",
         "mediaOmittedSuffix": " · {{count}}개 생략됨",
+        "mediaOmittedSuffix_other": "",
         "needsAttention": "확인 필요",
         "needsAttentionHelp": "이 노트들은 변경 없이 가져왔습니다. 제안된 수정은 시작점일 뿐이니, 하나를 복사한 후 노트를 열어 이름을 바꾸세요.",
         "noFolderChosen": "선택한 폴더 없음",
@@ -1025,8 +1041,11 @@
       "archiveSingleError": "노트를 보관하지 못했습니다.",
       "attachments": "첨부 파일",
       "bulkArchive": "노트 {{count}}개 보관",
+      "bulkArchive_other": "",
       "bulkDelete": "노트 {{count}}개 삭제",
+      "bulkDelete_other": "",
       "bulkMove": "노트 {{count}}개 이동…",
+      "bulkMove_other": "",
       "caseMergeBody": "“{{name}}”(이)라는 폴더가 이미 있습니다. 병합됩니다 — 따로 유지하려면 하나의 이름을 바꿀까요?",
       "color": "색상…",
       "createFirstNote": "+ 첫 노트 만들기",
@@ -1122,21 +1141,21 @@
       "renameAriaLabel": "노트 이름 바꾸기",
       "untitled": "제목 없음"
     },
+    "savedView": {
+      "defaultName": "필터된 뷰"
+    },
     "saveStatus": {
       "editing": "편집 중",
       "editingEllipsis": "편집 중…",
       "editingTitle": "편집 중 — 자동 저장이 준비됨",
       "justNow": "방금",
       "retry": "다시 시도",
-      "saveFailed": "저장 실패",
-      "saveFailedTitle": "저장 실패 — [다시 시도]를 클릭하세요",
       "saved": "저장됨",
       "savedRelative": "{{rel}} 저장됨",
+      "saveFailed": "저장 실패",
+      "saveFailedTitle": "저장 실패 — [다시 시도]를 클릭하세요",
       "saving": "저장 중",
       "savingEllipsis": "저장하는 중…"
-    },
-    "savedView": {
-      "defaultName": "필터된 뷰"
     },
     "snapshotFailed": {
       "dismiss": "닫기",
@@ -1200,8 +1219,8 @@
     },
     "trash": {
       "close": "닫기",
-      "countEmpty": "비어 있음",
       "count_other": "노트 {{count}}개",
+      "countEmpty": "비어 있음",
       "delete": "삭제",
       "deleteError": "해당 노트를 삭제하지 못했습니다. 다시 시도하세요.",
       "empty": "휴지통 비우기",
@@ -1226,24 +1245,6 @@
       "searching": "검색하는 중…",
       "thisNote": "이 노트",
       "untitled": "제목 없음"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "기본 (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (정사각형)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (와이드)"
-      },
-      "cancel": "취소",
-      "cardSize": "카드 크기",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "값이 이미지인 frontmatter 속성으로, 각 카드의 표지로 표시됩니다. 표지를 사용하지 않으려면 비워 두세요.",
-      "coverImagePlaceholder": "예: cover",
-      "coverImageProperty": "표지 이미지 속성",
-      "imageAspectRatio": "이미지 가로세로 비율",
-      "reset": "재설정",
-      "save": "저장"
     },
     "views": {
       "cards": {
@@ -1272,6 +1273,24 @@
       },
       "newView": "새 뷰",
       "untitledView": "제목 없는 뷰"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "기본 (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (정사각형)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (와이드)"
+      },
+      "cancel": "취소",
+      "cardSize": "카드 크기",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "값이 이미지인 frontmatter 속성으로, 각 카드의 표지로 표시됩니다. 표지를 사용하지 않으려면 비워 두세요.",
+      "coverImagePlaceholder": "예: cover",
+      "coverImageProperty": "표지 이미지 속성",
+      "imageAspectRatio": "이미지 가로세로 비율",
+      "reset": "재설정",
+      "save": "저장"
     },
     "welcome": {
       "body": "생각하고 글을 쓰는 나만의 공간, Myne에 오신 것을 환영합니다.\n\n여기에 저장하는 모든 것은 암호화되어 기기에만 보관됩니다. **비밀번호**와 **복구 구문**만이 그 유일한 열쇠이니 안전한 곳에 보관하세요. 둘 다 잃어버리면 저희를 포함해 누구도 노트를 되찾을 수 없습니다.\n\n이것은 평범한 노트일 뿐이니 마음껏 사용하세요. 언제든지 편집하거나 이름을 바꾸거나 삭제할 수 있고, 생각이 늘어날 때마다 새 노트를 추가하세요.\n\n함께하게 되어 기쁩니다. Myne에 대해 더 알아보려면 https://myne.md를 방문하세요.\n",
@@ -1451,8 +1470,10 @@
         "bare": "연결됨",
         "daysAgo_other": "{{count}}일 전 연결됨",
         "hoursAgo": "{{count}}시간 전 연결됨",
+        "hoursAgo_other": "",
         "justNow": "방금 연결됨",
         "minutesAgo": "{{count}}분 전 연결됨",
+        "minutesAgo_other": "",
         "onDate": "{{date}}에 연결됨"
       }
     },
@@ -1583,12 +1604,14 @@
       "errorNotUnlocked": "먼저 보관함을 잠금 해제하세요.",
       "errorPinNotDigits": "PIN은 숫자만 입력할 수 있습니다.",
       "errorPinTooShort": "PIN은 최소 {{count}}자리여야 합니다.",
+      "errorPinTooShort_other": "",
       "helperConfigured": "{{method}}(으)로 설정됨. 자동 잠금 후 다시 들어올 때 마스터 비밀번호를 건너뜁니다. 재시작 후에는 여전히 마스터 비밀번호가 필요합니다.",
       "helperNotConfigured": "자동 잠금 후 전체 마스터 비밀번호 대신 PIN 또는 Touch ID로 다시 들어옵니다. 암호화된 보관함에 대한 편의 기능이며, 재시작 후에는 여전히 마스터 비밀번호가 필요합니다.",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "빠른 잠금 해제 PIN",
       "pinPlaceholder": "PIN({{count}}자리 이상)",
+      "pinPlaceholder_other": "",
       "setPin": "PIN 설정",
       "setupHelper": "Touch ID는 macOS 전용이며 현재 실험적 기능입니다(하드웨어 검증 대기 중). PIN은 어디에서나 작동합니다.",
       "title": "빠른 잠금 해제",
@@ -1604,7 +1627,8 @@
         "editor": "편집기",
         "hotkeys": "단축키",
         "privacy": "개인정보",
-        "storage": "저장소"
+        "storage": "저장소",
+        "sync": "동기화"
       },
       "passwordUpdatedToast": "비밀번호가 업데이트되었습니다",
       "title": "설정"
@@ -1624,9 +1648,9 @@
       "on": "켬"
     },
     "storage": {
-      "backUpVault": "보관함 백업…",
       "backupHelper": "백업은 보관함과 동일하게 암호화된 상태로 검증된 단일 .myne-backup 파일에 저장됩니다. 복원은 해당 보관함의 비밀번호나 복구 구문으로 진행됩니다 — 일반 잠금 해제와 동일합니다.",
       "backupLabel": "백업",
+      "backUpVault": "보관함 백업…",
       "exportAction": "내보내기…",
       "exportBody": "보관함을 Markdown으로 내보내기",
       "exportHelper": "평문 Markdown 트리 — 암호화되지 않습니다.",
@@ -1658,6 +1682,124 @@
       "optionLive": "실시간 미리보기",
       "optionReading": "읽기",
       "optionSource": "소스"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "{{name}} 다운로드 중",
+        "uploading": "{{name}} 업로드 중"
+      },
+      "empty": "진행 중인 전송이 없습니다.",
+      "heading": "첨부 파일 동기화",
+      "status": {
+        "done": "완료",
+        "failedWillRetry": "실패 — 다시 시도합니다",
+        "paused": "일시정지됨"
+      }
+    },
+    "buildingIndex": {
+      "label": "검색 색인을 만드는 중…"
+    },
+    "conflicts": {
+      "discard": "버리기",
+      "empty": "충돌 없음 — 기기 간 동기화가 완료되었습니다.",
+      "groupTitle_other": "“{{original}}”의 충돌 사본 {{count}}개",
+      "keepAsSeparate": "별도로 유지",
+      "untitled": "제목 없음 ({{hex}})"
+    },
+    "devices": {
+      "approve": "승인",
+      "awaitingApproval_other": "승인 대기 중인 기기 {{count}}개",
+      "loading": "불러오는 중…",
+      "noDevices": "아직 동기화된 기기가 없습니다.",
+      "notEnrolled": "이 기기는 아직 연결되지 않았습니다. 방금 추가했다면 다른 기기에서 승인할 때까지 기다리세요. 그렇지 않으면 위의 “기기 추가” 양식으로 추가하세요.",
+      "remove": "제거",
+      "removedElsewhere": "이 기기는 다른 기기에서 계정으로부터 제거되었습니다.",
+      "resetAndReAdd": "이 기기를 초기화하고 다시 추가",
+      "resetSyncOnThisDevice": "이 기기에서 동기화 초기화",
+      "shortName": "기기 {{hex}}",
+      "syncedHere": "여기에서 동기화됨",
+      "thisDevice": "이 기기",
+      "transportHint": "서버가 이전되었거나 인증서가 변경된 경우, 위의 “동기화 서버”에 서버 URL을 다시 입력하여 신뢰를 재설정하세요.",
+      "unreachable": "동기화에 연결하지 못했습니다 ({{error}}).",
+      "yourDevices": "내 기기"
+    },
+    "endpoint": {
+      "connect": "연결",
+      "connectedLocal": "연결됨(로컬, TLS 없음).",
+      "connectedTls": "연결되었습니다. 다른 기기에서 이 지문이 일치하는지 확인하세요.",
+      "connecting": "연결하는 중…",
+      "fingerprintLabel": "서버 인증서 지문:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "해당 서버에 연결하지 못했습니다 — URL과 서버 실행 여부를 확인하세요."
+    },
+    "enroll": {
+      "accountNumberLabel": "계정 번호",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "연결하는 중…",
+      "credentialTypeAria": "자격 증명 유형",
+      "error": {
+        "notConfigured": "이 기기를 추가하기 전에 설정에서 동기화 서버를 지정하세요.",
+        "transport": "동기화 서버에 연결하지 못했습니다. 연결 상태를 확인한 후 다시 시도하세요."
+      },
+      "mode": {
+        "password": "비밀번호",
+        "recovery": "복구 구문"
+      },
+      "passwordLabel": "비밀번호",
+      "recoveryPhraseHint": "24단어 복구 구문을 입력하세요.",
+      "recoveryPhraseLabel": "복구 구문",
+      "signInWith": "로그인 방법",
+      "submit": "이 기기 추가",
+      "wordAria": "{{number}}번째 단어"
+    },
+    "join": {
+      "accountLabel": "계정 번호",
+      "cancel": "취소",
+      "error": "이 기기를 추가하지 못했습니다. 서버 URL, 계정 번호, 비밀번호와 서버 연결 가능 여부를 확인하세요.",
+      "help": "계정 번호와 비밀번호로 로그인하세요. 기존 기기가 승인하면 이 기기에 노트가 동기화됩니다. 복구 구문은 필요하지 않습니다.",
+      "passwordLabel": "비밀번호",
+      "serverLabel": "동기화 서버",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "기기 추가",
+      "submitting": "추가하는 중…",
+      "title": "이 기기를 계정에 추가"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "새 기기에서 계정 번호와 비밀번호 또는 복구 구문으로 로그인하세요. 기존 기기가 승인할 때까지 기기는 대기 상태로 유지됩니다.",
+        "label": "기기 추가"
+      },
+      "conflicts": {
+        "helper": "같은 노트를 두 기기에서 동시에 편집하면 Myne가 양쪽 사본을 모두 보존하여 아무것도 잃지 않습니다. 여기에서 해결하세요.",
+        "label": "충돌"
+      },
+      "devices": {
+        "label": "기기"
+      },
+      "server": {
+        "helper": "모든 기기에 동일한 서버 URL을 입력하세요. 직접 호스팅하는 서버라면 <1>https://</1> 주소를 사용하고, 기기 간에 인증서 지문이 일치하는지 확인하세요.",
+        "label": "동기화 서버"
+      },
+      "status": {
+        "helper": "Myne는 암호화된 노트를 기기 간에 동기화합니다. 서버는 읽을 수 없는 암호문만 저장합니다.",
+        "label": "동기화 상태"
+      }
+    },
+    "reconcile": {
+      "message": "이 기기가 한동안 오프라인 상태였습니다 — 동기화를 따라잡는 중입니다. 노트는 안전합니다."
+    },
+    "status": {
+      "awaitingApproval": "승인 대기 중",
+      "conflicts_other": "검토할 충돌 {{count}}개",
+      "error": "동기화 오류",
+      "loading": "동기화 상태…",
+      "notEnrolled": "등록되지 않음",
+      "off": "동기화 꺼짐",
+      "synced": "동기화됨",
+      "syncing": "동기화하는 중…",
+      "syncNow": "지금 동기화"
     }
   },
   "templates": {
@@ -1871,12 +2013,12 @@
       "saveAsFile": "파일로 저장"
     },
     "ready": {
-      "backUpNow": "지금 이 보관함 백업",
       "backedUp": "백업됨 ✓",
       "backingUp": "백업하는 중…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "백업을 완료하지 못했습니다 — 남겨진 파일은 없습니다. 설정 → 저장소에서 언제든지 백업할 수 있습니다.",
       "backupFilterName": "Myne 백업",
+      "backUpNow": "지금 이 보관함 백업",
       "body": "Myne가 애플리케이션 데이터 폴더에 보관함을 작성했습니다. 마스터 비밀번호와 복구 구문이 다시 들어갈 유일한 방법이니, 둘 다 안전한 곳에 저장했는지 확인하세요.",
       "decrypting": "복호화하는 중…",
       "done": "완료",
@@ -1946,8 +2088,8 @@
   "vaultSwitcher": {
     "chipFallback": "보관함",
     "createAnother": "다른 보관함 만들기",
-    "switchVaultLabel": "보관함 전환",
     "switching": "전환하는 중…",
+    "switchVaultLabel": "보관함 전환",
     "vaultFallback": "보관함 {{n}}"
   },
   "welcome": {
@@ -1956,8 +2098,8 @@
     "headlineLine2": "가입 시 이메일 불필요.",
     "repairResidue": {
       "cancel": "취소",
-      "cleanUp": "정리",
       "cleaningUp": "정리하는 중…",
+      "cleanUp": "정리",
       "confirmBody_other": "파일 {{count}}개가 제거됩니다. 이미 읽을 수 없는 파일이므로 복구 가능한 것은 잃지 않습니다.",
       "confirmTitle": "남은 파일을 정리할까요?",
       "doneBody_other": "남은 파일 {{count}}개를 제거했습니다. 이제 새 보관함을 만들 수 있습니다.",
