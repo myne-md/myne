@@ -43,8 +43,8 @@
     "library": {
       "actionsAriaLabel": "Liitteen toiminnot",
       "actionsTitle": "Toiminnot",
-      "checkUnusedFailedNotice": "Käyttämättömien liitteiden tarkistus ei onnistunut. Yritä uudelleen.",
       "checking": "Tarkistetaan…",
+      "checkUnusedFailedNotice": "Käyttämättömien liitteiden tarkistus ei onnistunut. Yritä uudelleen.",
       "cleanUnused": "Siivoa käyttämättömät",
       "cleanUnusedTitle": "Poista liitteet, joita ei käytetä missään muistiinpanossa",
       "colCreated": "Luotu",
@@ -310,6 +310,7 @@
     }
   },
   "common": {
+    "dismiss": "Hylkää",
     "prompt": {
       "cancel": "Peruuta",
       "confirmDefault": "OK"
@@ -321,19 +322,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Tiedoston {{filename}} vienti ei onnistunut.",
         "exported": "Viety {{filename}}.",
-        "renameFailed": "Liitteen uudelleennimeäminen ei onnistunut.",
+        "exportFailed": "Tiedoston {{filename}} vienti ei onnistunut.",
         "renamed": "Nimetty uudelleen: {{name}}.",
+        "renameFailed": "Liitteen uudelleennimeäminen ei onnistunut.",
         "saveDialogFailed": "Tallennusikkunan avaaminen ei onnistunut."
       },
       "convert": {
         "cancel": "Peruuta",
         "confirm": "Muunna",
         "skipped": "ohitettiin — {{note}}",
-        "subtitleEmpty": "Ei mitään muunnettavaa — lähdetiedostoja ei löytynyt.",
         "subtitle_one": "1 viittaus kirjoitetaan uudelleen. Tarkista ennen vahvistamista.",
         "subtitle_other": "{{count}} viittausta kirjoitetaan uudelleen. Tarkista ennen vahvistamista.",
+        "subtitleEmpty": "Ei mitään muunnettavaa — lähdetiedostoja ei löytynyt.",
         "title": "Muunna tuodut liitteet"
       },
       "convertCommand": {
@@ -359,8 +360,8 @@
           "archive": "Arkisto",
           "audio": "Ääni",
           "cHeader": "C-otsaketiedosto",
-          "cSource": "C-lähdekoodi",
           "cppSource": "C++-lähdekoodi",
+          "cSource": "C-lähdekoodi",
           "css": "CSS",
           "csv": "CSV",
           "document": "Asiakirja",
@@ -540,12 +541,12 @@
         "browseViews": "Selaa näkymiä",
         "cycleViewMode": "Selaa näkymätiloja",
         "docStats": {
-          "summarySelectionSuffix": " (valinta)",
           "summary_one": "{{count}} sana · {{characters}} merkkiä",
           "summary_other": "{{count}} sanaa · {{characters}} merkkiä",
-          "titleSelectionSuffix": " (valinta)",
+          "summarySelectionSuffix": " (valinta)",
           "title_one": "{{characters}} merkkiä · {{words}} sanaa · {{spaces}} välilyöntiä · {{count}} kappale",
-          "title_other": "{{characters}} merkkiä · {{words}} sanaa · {{spaces}} välilyöntiä · {{count}} kappaletta"
+          "title_other": "{{characters}} merkkiä · {{words}} sanaa · {{spaces}} välilyöntiä · {{count}} kappaletta",
+          "titleSelectionSuffix": " (valinta)"
         },
         "graphTitle": "Kaavio (⌘⇧G)",
         "lock": "Lukitse",
@@ -820,10 +821,10 @@
         "countNotes_one": "{{count}} muistiinpano",
         "countNotes_other": "{{count}} muistiinpanoa",
         "exclusionsHistory": "Versiohistoriaa ei sisällytetty.",
-        "exclusionsTrashedAndHistory_one": "{{count}} roskakorissa olevaa muistiinpanoa ja versiohistoriaa ei sisällytetty.",
-        "exclusionsTrashedAndHistory_other": "{{count}} roskakorissa olevaa muistiinpanoa ja versiohistoriaa ei sisällytetty.",
         "exclusionsTrashed_one": "{{count}} roskakorissa olevaa muistiinpanoa ei sisällytetty.",
         "exclusionsTrashed_other": "{{count}} roskakorissa olevaa muistiinpanoa ei sisällytetty.",
+        "exclusionsTrashedAndHistory_one": "{{count}} roskakorissa olevaa muistiinpanoa ja versiohistoriaa ei sisällytetty.",
+        "exclusionsTrashedAndHistory_other": "{{count}} roskakorissa olevaa muistiinpanoa ja versiohistoriaa ei sisällytetty.",
         "phaseAttachments": "liitteet",
         "phaseNotes": "muistiinpanot",
         "preparing": "Valmistellaan…",
@@ -881,9 +882,9 @@
   "notes": {
     "archive": {
       "close": "Sulje",
-      "countEmpty": "Tyhjä",
       "count_one": "{{count}} muistiinpano",
       "count_other": "{{count}} muistiinpanoa",
+      "countEmpty": "Tyhjä",
       "delete": "Poista",
       "deleteError": "Muistiinpanon poistaminen ei onnistunut. Yritä uudelleen.",
       "emptyState": "Arkisto on tyhjä.",
@@ -1165,21 +1166,21 @@
       "renameAriaLabel": "Nimeä muistiinpano uudelleen",
       "untitled": "Nimetön"
     },
+    "savedView": {
+      "defaultName": "Suodatettu näkymä"
+    },
     "saveStatus": {
       "editing": "Muokataan",
       "editingEllipsis": "Muokataan…",
       "editingTitle": "Muokataan — automaattitallennus on valmiina",
       "justNow": "juuri nyt",
       "retry": "Yritä uudelleen",
-      "saveFailed": "Tallennus epäonnistui",
-      "saveFailedTitle": "Tallennus epäonnistui — napsauta Yritä uudelleen",
       "saved": "Tallennettu",
       "savedRelative": "Tallennettu {{rel}}",
+      "saveFailed": "Tallennus epäonnistui",
+      "saveFailedTitle": "Tallennus epäonnistui — napsauta Yritä uudelleen",
       "saving": "Tallennetaan",
       "savingEllipsis": "Tallennetaan…"
-    },
-    "savedView": {
-      "defaultName": "Suodatettu näkymä"
     },
     "snapshotFailed": {
       "dismiss": "Hylkää",
@@ -1245,9 +1246,9 @@
     },
     "trash": {
       "close": "Sulje",
-      "countEmpty": "Tyhjä",
       "count_one": "{{count}} muistiinpano",
       "count_other": "{{count}} muistiinpanoa",
+      "countEmpty": "Tyhjä",
       "delete": "Poista",
       "deleteError": "Muistiinpanon poistaminen ei onnistunut. Yritä uudelleen.",
       "empty": "Tyhjennä roskakori",
@@ -1274,24 +1275,6 @@
       "searching": "Etsitään…",
       "thisNote": "tämä muistiinpano",
       "untitled": "Nimetön"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Oletus (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (neliö)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (leveä)"
-      },
-      "cancel": "Peruuta",
-      "cardSize": "Kortin koko",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Esitietojen ominaisuus, jonka arvo on kuva — näytetään kunkin kortin kansikuvana. Jätä tyhjäksi, jos et halua kansikuvaa.",
-      "coverImagePlaceholder": "esim. cover",
-      "coverImageProperty": "Kansikuvan ominaisuus",
-      "imageAspectRatio": "Kuvan kuvasuhde",
-      "reset": "Palauta oletukset",
-      "save": "Tallenna"
     },
     "views": {
       "cards": {
@@ -1320,6 +1303,24 @@
       },
       "newView": "Uusi näkymä",
       "untitledView": "Nimetön näkymä"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Oletus (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (neliö)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (leveä)"
+      },
+      "cancel": "Peruuta",
+      "cardSize": "Kortin koko",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Esitietojen ominaisuus, jonka arvo on kuva — näytetään kunkin kortin kansikuvana. Jätä tyhjäksi, jos et halua kansikuvaa.",
+      "coverImagePlaceholder": "esim. cover",
+      "coverImageProperty": "Kansikuvan ominaisuus",
+      "imageAspectRatio": "Kuvan kuvasuhde",
+      "reset": "Palauta oletukset",
+      "save": "Tallenna"
     },
     "welcome": {
       "body": "Tervetuloa Myneen, yksityiseen tilaasi ajatella ja kirjoittaa.\n\nKaikki, minkä tähän tallennat, on salattu ja pysyy laitteessasi. **Salasanasi** ja **palautuslauseesi** ovat sen ainoat avaimet, joten säilytä ne turvallisessa paikassa. Jos molemmat katoavat, kukaan ei saa muistiinpanojasi takaisin — emme mekään.\n\nTämä on tavallinen muistiinpano, joten tee siitä omasi. Muokkaa sitä, nimeä se uudelleen tai poista se milloin haluat, ja lisää uusia muistiinpanoja ideoidesi karttuessa.\n\nOlemme iloisia, että olet täällä. Lisätietoja Mynestä saat osoitteesta https://myne.md\n",
@@ -1659,7 +1660,8 @@
         "editor": "Muokkain",
         "hotkeys": "Pikanäppäimet",
         "privacy": "Yksityisyys",
-        "storage": "Tallennus"
+        "storage": "Tallennus",
+        "sync": "Synkronointi"
       },
       "passwordUpdatedToast": "Salasana päivitetty",
       "title": "Asetukset"
@@ -1679,9 +1681,9 @@
       "on": "Päällä"
     },
     "storage": {
-      "backUpVault": "Varmuuskopioi holvi…",
       "backupHelper": "Varmuuskopiot pysyvät täsmälleen yhtä salattuina kuin holvisi, yhtenä tarkistettuna .myne-backup-tiedostona. Palauttaminen onnistuu kyseisen holvin salasanalla tai palautuslauseella — aivan kuten avattaessa.",
       "backupLabel": "Varmuuskopio",
+      "backUpVault": "Varmuuskopioi holvi…",
       "exportAction": "Vie…",
       "exportBody": "Vie holvi Markdown-muodossa",
       "exportHelper": "Pelkkä Markdown-puu — ei salattu.",
@@ -1713,6 +1715,127 @@
       "optionLive": "Reaaliaikainen esikatselu",
       "optionReading": "Lukeminen",
       "optionSource": "Lähde"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "Ladataan: {{name}}",
+        "uploading": "Lähetetään: {{name}}"
+      },
+      "empty": "Ei käynnissä olevia siirtoja.",
+      "heading": "Liitteiden synkronointi",
+      "status": {
+        "done": "valmis",
+        "failedWillRetry": "epäonnistui — yritetään uudelleen",
+        "paused": "keskeytetty"
+      }
+    },
+    "buildingIndex": {
+      "label": "Rakennetaan hakuindeksiä…"
+    },
+    "conflicts": {
+      "discard": "Hylkää",
+      "empty": "Ei ristiriitoja — laitteesi ovat synkronissa.",
+      "groupTitle_one": "{{count}} ristiriitainen kopio kohteesta {{original}}",
+      "groupTitle_other": "{{count}} ristiriitaista kopiota kohteesta {{original}}",
+      "keepAsSeparate": "Säilytä erillisinä",
+      "untitled": "Nimetön ({{hex}})"
+    },
+    "devices": {
+      "approve": "Hyväksy",
+      "awaitingApproval_one": "{{count}} laite odottaa hyväksyntää",
+      "awaitingApproval_other": "{{count}} laitetta odottaa hyväksyntää",
+      "loading": "Ladataan…",
+      "noDevices": "Ei vielä synkronoituja laitteita.",
+      "notEnrolled": "Tätä laitetta ei ole vielä yhdistetty. Jos lisäsit sen juuri, odota hyväksyntää toiselta laitteelta; muussa tapauksessa lisää se yllä olevalla ”Lisää laite” -lomakkeella.",
+      "remove": "Poista",
+      "removedElsewhere": "Tämä laite poistettiin tililtäsi toisella laitteella.",
+      "resetAndReAdd": "Nollaa ja lisää tämä laite uudelleen",
+      "resetSyncOnThisDevice": "Nollaa synkronointi tällä laitteella",
+      "shortName": "Laite {{hex}}",
+      "syncedHere": "Synkronoitu täällä",
+      "thisDevice": "Tämä laite",
+      "transportHint": "Jos palvelin vaihtoi sijaintia tai sen varmenne muuttui, syötä palvelimen osoite uudelleen yllä kohdassa ”Synkronointipalvelin” luottaaksesi siihen jälleen.",
+      "unreachable": "Synkronointiin ei saatu yhteyttä ({{error}}).",
+      "yourDevices": "Laitteesi"
+    },
+    "endpoint": {
+      "connect": "Yhdistä",
+      "connectedLocal": "Yhdistetty (paikallinen, ei TLS:ää).",
+      "connectedTls": "Yhdistetty. Varmista, että tämä sormenjälki täsmää toisella laitteellasi.",
+      "connecting": "Yhdistetään…",
+      "fingerprintLabel": "Palvelinvarmenteen sormenjälki:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Palvelimeen ei saatu yhteyttä — tarkista osoite ja että palvelin on käynnissä."
+    },
+    "enroll": {
+      "accountNumberLabel": "Tilinumero",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Yhdistetään…",
+      "credentialTypeAria": "Tunnistautumistapa",
+      "error": {
+        "notConfigured": "Aseta synkronointipalvelin asetuksiin ennen tämän laitteen lisäämistä.",
+        "transport": "Synkronointipalvelimeen ei saatu yhteyttä. Tarkista yhteytesi ja yritä uudelleen."
+      },
+      "mode": {
+        "password": "Salasana",
+        "recovery": "Palautuslause"
+      },
+      "passwordLabel": "Salasana",
+      "recoveryPhraseHint": "Syötä 24-sanainen palautuslauseesi.",
+      "recoveryPhraseLabel": "Palautuslause",
+      "signInWith": "Kirjaudu tavalla",
+      "submit": "Lisää tämä laite",
+      "wordAria": "Sana {{number}}"
+    },
+    "join": {
+      "accountLabel": "Tilinumero",
+      "cancel": "Peruuta",
+      "error": "Tämän laitteen lisääminen ei onnistunut. Tarkista palvelimen osoite, tilinumero ja salasana — ja että palvelimeen saa yhteyden.",
+      "help": "Kirjaudu tilinumerollasi ja salasanallasi. Tämä laite synkronoi muistiinpanosi, kun jokin olemassa oleva laite hyväksyy sen. Palautuslausetta ei tarvita.",
+      "passwordLabel": "Salasana",
+      "serverLabel": "Synkronointipalvelin",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Lisää laite",
+      "submitting": "Lisätään…",
+      "title": "Lisää tämä laite tiliin"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "Kirjaudu uudella laitteella tilinumerollasi ja salasanallasi tai palautuslauseellasi. Laite pysyy odottavana, kunnes jokin olemassa oleva laite hyväksyy sen.",
+        "label": "Lisää laite"
+      },
+      "conflicts": {
+        "helper": "Kun samaa muistiinpanoa muokataan kahdella laitteella yhtä aikaa, Myne säilyttää molemmat kopiot, jottei mitään katoa. Ratkaise ne täällä.",
+        "label": "Ristiriidat"
+      },
+      "devices": {
+        "label": "Laitteet"
+      },
+      "server": {
+        "helper": "Syötä sama palvelimen osoite jokaiselle laitteelle. Itse ylläpidetyllä palvelimella käytä sen <1>https://</1>-osoitetta; varmista, että varmenteen sormenjälki täsmää laitteidesi välillä.",
+        "label": "Synkronointipalvelin"
+      },
+      "status": {
+        "helper": "Myne synkronoi salatut muistiinpanosi laitteidesi välillä. Palvelin tallentaa vain salatekstiä, jota se ei voi lukea.",
+        "label": "Synkronoinnin tila"
+      }
+    },
+    "reconcile": {
+      "message": "Tämä laite oli jonkin aikaa offline-tilassa — synkronointi otetaan kiinni. Muistiinpanosi ovat turvassa."
+    },
+    "status": {
+      "awaitingApproval": "Odottaa hyväksyntää",
+      "conflicts_one": "{{count}} ristiriita tarkistettavana",
+      "conflicts_other": "{{count}} ristiriitaa tarkistettavana",
+      "error": "Synkronointivirhe",
+      "loading": "Synkronoinnin tila…",
+      "notEnrolled": "Ei rekisteröity",
+      "off": "Synkronointi pois käytöstä",
+      "synced": "Synkronoitu",
+      "syncing": "Synkronoidaan…",
+      "syncNow": "Synkronoi nyt"
     }
   },
   "templates": {
@@ -1926,12 +2049,12 @@
       "saveAsFile": "Tallenna tiedostona"
     },
     "ready": {
-      "backUpNow": "Varmuuskopioi tämä holvi nyt",
       "backedUp": "Varmuuskopioitu ✓",
       "backingUp": "Varmuuskopioidaan…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Varmuuskopiointi ei valmistunut — tiedostoa ei jäänyt jäljelle. Voit varmuuskopioida milloin tahansa kohdasta Asetukset → Tallennus.",
       "backupFilterName": "Myne-varmuuskopio",
+      "backUpNow": "Varmuuskopioi tämä holvi nyt",
       "body": "Myne kirjoitti holvisi sovelluksesi datakansioon. Pääsalasanasi ja palautuslauseesi ovat ainoa tie takaisin sisään — varmista, että molemmat on tallennettu turvalliseen paikkaan.",
       "decrypting": "Puretaan salausta…",
       "done": "Valmis",
@@ -2001,8 +2124,8 @@
   "vaultSwitcher": {
     "chipFallback": "Holvi",
     "createAnother": "Luo toinen holvi",
-    "switchVaultLabel": "Vaihda holvia",
     "switching": "vaihdetaan…",
+    "switchVaultLabel": "Vaihda holvia",
     "vaultFallback": "Holvi {{n}}"
   },
   "welcome": {
@@ -2011,8 +2134,8 @@
     "headlineLine2": "Ei sähköpostia rekisteröitäessä.",
     "repairResidue": {
       "cancel": "Peruuta",
-      "cleanUp": "Siivoa",
       "cleaningUp": "Siivotaan…",
+      "cleanUp": "Siivoa",
       "confirmBody_one": "{{count}} tiedosto poistetaan. Ne ovat jo lukukelvottomia; mitään palautettavaa ei menetetä.",
       "confirmBody_other": "{{count}} tiedostoa poistetaan. Ne ovat jo lukukelvottomia; mitään palautettavaa ei menetetä.",
       "confirmTitle": "Siivotaanko jäljelle jääneet tiedostot?",

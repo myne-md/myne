@@ -15,6 +15,14 @@ const TITLE_KEY_RE = /^([ \t]*title[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_KEY_RE = /^([ \t]*folder[ \t]*:[ \t]*)(.*)$/;
 const TRASHED_KEY_RE = /^([ \t]*trashed[ \t]*:[ \t]*)(.*)$/;
 const ARCHIVED_KEY_RE = /^([ \t]*archived[ \t]*:[ \t]*)(.*)$/;
+// MYND-426: the sync deletion tombstone marker. Value-strict RFC 3339 like
+// `trashed:`/`archived:` — only a parseable timestamp marks the note deleted.
+const DELETED_KEY_RE = /^([ \t]*deleted[ \t]*:[ \t]*)(.*)$/;
+// MYND-427: the conflict-copy markers. `conflict:` is value-strict canonical
+// `true` (like `template:`); `conflict_of:` carries the original note UUID.
+const CONFLICT_KEY_RE = /^([ \t]*conflict[ \t]*:[ \t]*)(.*)$/;
+const CONFLICT_OF_KEY_RE = /^([ \t]*conflict_of[ \t]*:[ \t]*)(.*)$/;
+const CONFLICT_FLAG_VALUE = "true";
 const TEMPLATE_KEY_RE = /^([ \t]*template[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_INDEX_KEY_RE = /^([ \t]*folder_index[ \t]*:[ \t]*)(.*)$/;
 
@@ -818,6 +826,40 @@ export function readArchivedFromFmBody(fmBody: string): string | null {
   return null;
 }
 
+/**
+ * Value-strict read of the `conflict:` marker (MYND-427): only the canonical
+ * unquoted `true` marks a note a conflict copy (a user's own `conflict: 1` reads
+ * as not-a-conflict — the same value-strictness as `template:`).
+ */
+export function readConflictFromFmBody(fmBody: string): boolean {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = CONFLICT_KEY_RE.exec(line);
+    if (m === null) continue;
+    const valuePortion = m[2] ?? "";
+    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+    const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
+    return raw.trim() === CONFLICT_FLAG_VALUE;
+  }
+  return false;
+}
+
+/**
+ * Read the `conflict_of:` original-note UUID (MYND-427) — the value the Conflicts
+ * view groups copies by. Returns the trimmed scalar (quotes/comment stripped) or
+ * null when absent.
+ */
+export function readConflictOfFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = CONFLICT_OF_KEY_RE.exec(line);
+    if (m === null) continue;
+    const value = extractTrashedScalar(m[2] ?? "");
+    return value !== null && value.length > 0 ? value : null;
+  }
+  return null;
+}
+
 // === patchArchivedField — note-archive write target for FM `archived:` ===
 //
 // Spec: docs/spec/markdown-dialect.md §3.6.1 (`archived:` is the 7th Myne-managed
@@ -963,6 +1005,130 @@ export function patchArchivedField(
   }
 
   return utf8Encoder.encode(applyStateBArchived(source, fm.bodyEnd, value));
+}
+
+// === patchDeletedField — sync deletion-tombstone write target for FM `deleted:` ===
+//
+// Spec: docs/spec/markdown-dialect.md §3.6.1 (`deleted:` — the sync tombstone
+// marker, MYND-426). Value-strict RFC 3339 like `trashed:`/`archived:`: only a
+// parseable timestamp marks the note a deletion tombstone. Write trigger = the
+// under-sync deletion reroute (`src/notes/deleteNote.ts`) — NEVER body autosave.
+// Structurally identical to `patchArchivedField` (A/B/C set + state-D delete),
+// so it composes with every other managed field without clobbering.
+
+function applyStateADeleted(source: string, value: string): string {
+  return (
+    FRONTMATTER_OPENER +
+    "deleted: " + formatYamlScalar(value) + NEWLINE +
+    FRONTMATTER_DELIMITER + NEWLINE +
+    NEWLINE +
+    source
+  );
+}
+
+function applyStateBDeleted(source: string, bodyEnd: number, value: string): string {
+  const insert = "deleted: " + formatYamlScalar(value) + NEWLINE;
+  return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
+}
+
+function applyStateCDeleted(
+  source: string,
+  bodyStart: number,
+  bodyEnd: number,
+  value: string,
+): string | null {
+  const fmBody = source.substring(bodyStart, bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = DELETED_KEY_RE.exec(lines[i] ?? "");
+    if (m === null) continue;
+    const prefix = m[1] ?? "";
+    const valuePortion = m[2] ?? "";
+    const trimmedValue = valuePortion.trim();
+
+    if (/^[|>]/.test(trimmedValue)) {
+      lines[i] = prefix + formatYamlScalar(value);
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
+      lines.splice(i + 1, j - (i + 1));
+      return lines.join(NEWLINE);
+    }
+
+    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
+    if (quotedM !== null) {
+      const quote = quotedM[1] ?? '"';
+      const trailing = quotedM[3] ?? "";
+      const escaped =
+        quote === '"'
+          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          : value.replace(/'/g, "''");
+      lines[i] = prefix + quote + escaped + quote + trailing;
+      return lines.join(NEWLINE);
+    }
+
+    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+    if (commentM !== null) {
+      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
+      return lines.join(NEWLINE);
+    }
+
+    lines[i] = prefix + formatYamlScalar(value);
+    return lines.join(NEWLINE);
+  }
+
+  return null;
+}
+
+function deleteDeletedField(source: string): string {
+  const fm = locateFrontmatter(source);
+  if (fm === null) return source;
+
+  const fmBody = source.substring(fm.bodyStart, fm.bodyEnd);
+  const lines = fmBody.split(NEWLINE);
+  const idx = lines.findIndex((l) => DELETED_KEY_RE.test(l));
+  if (idx === -1) return source;
+
+  const remaining = lines.slice(0, idx).concat(lines.slice(idx + 1));
+  const hasResidual = remaining.some((l) => l.trim() !== "");
+
+  if (!hasResidual) {
+    let removalEnd = fm.blockEnd;
+    if (source.charAt(removalEnd) === NEWLINE) removalEnd += NEWLINE.length;
+    return source.substring(removalEnd);
+  }
+
+  const newBody = remaining.join(NEWLINE);
+  return source.substring(0, fm.bodyStart) + newBody + source.substring(fm.bodyEnd);
+}
+
+/**
+ * Set, insert, or delete the Myne-managed `deleted:` tombstone field (MYND-426).
+ * `value` is an RFC 3339 timestamp (the deletion path); `null` deletes the field
+ * (rare — an undelete). Touches only the `deleted:` line, so it composes with
+ * every other managed field. Used by the under-sync deletion reroute so a delete
+ * propagates as a `deleted`-marked version, never a bare absence.
+ */
+export function patchDeletedField(bytes: Uint8Array, value: string | null): Uint8Array {
+  const source = utf8Decoder.decode(bytes);
+
+  if (value === null) {
+    return utf8Encoder.encode(deleteDeletedField(source));
+  }
+
+  const fm = locateFrontmatter(source);
+  if (fm === null) {
+    return utf8Encoder.encode(applyStateADeleted(source, value));
+  }
+
+  const stateCResult = applyStateCDeleted(source, fm.bodyStart, fm.bodyEnd, value);
+  if (stateCResult !== null) {
+    const before = source.substring(0, fm.bodyStart);
+    const after = source.substring(fm.bodyEnd);
+    return utf8Encoder.encode(before + stateCResult + after);
+  }
+
+  return utf8Encoder.encode(applyStateBDeleted(source, fm.bodyEnd, value));
 }
 
 // === patchTemplateField — note-template write target for FM `template:` ===

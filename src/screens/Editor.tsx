@@ -43,11 +43,14 @@ import { useTranslation } from "react-i18next";
 import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
 import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
+import { useConflictMaterializer } from "../hooks/useConflictMaterializer";
 import type { KeybindEntry } from "../commands/keybindEngine";
 import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
+import { SyncStatusIndicator } from "../components/sync/SyncStatusIndicator";
+import { SyncBanners } from "../components/sync/SyncBanners";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
@@ -471,6 +474,16 @@ function EditorChrome({
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  // Keep-both (MYND-427): drain the sync engine's staged concurrent-edit
+  // conflicts → materialize each remote revision as a `conflict_of:` copy →
+  // refresh the sidebar so it appears. Both edits survive; nothing is lost.
+  useConflictMaterializer(
+    useCallback(() => {
+      void noteList()
+        .then((ids) => ctx.refreshAll(ids))
+        .catch(() => {});
+    }, [ctx]),
+  );
   // Plain-message sink for the pre-existing string consumers (Settings,
   // backup export, importer); the export flow goes through the structured
   // `showExportToast` below so success can carry its reveal action.
@@ -787,6 +800,38 @@ function EditorChrome({
     return () => window.removeEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
   }, []);
 
+  // MYND-424: the background sync loop emits `sync://changed` after writing
+  // pulled notes to disk. Reload the sidebar + the open note so incoming edits
+  // from another device appear without a manual refresh. Subscribe ONCE (the
+  // ref keeps the handler on the latest selection context); no-op outside Tauri.
+  const syncCtxRef = useRef(ctx);
+  syncCtxRef.current = ctx;
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen("sync://changed", () => {
+          if (cancelled) return;
+          void noteList()
+            .then((ids) => syncCtxRef.current.refreshAll(ids))
+            .then(() => syncCtxRef.current.reloadOpenNote())
+            .catch(() => {
+              /* the next sync tick / manual refresh catches up */
+            });
+        });
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri (browser dev shim) → no sync events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, []);
+
   // MYND-166 selection bridges — two one-way syncs that never loop
   // (A only fires for a note open in NO pane; B only mirrors):
   //  A) a selection arriving via a non-pane path (a freshly-created note,
@@ -994,12 +1039,21 @@ function EditorChrome({
         const w = getCurrentWebviewWindow();
         unlisten = await w.onCloseRequested(async (event) => {
           if (cancelled) return;
-          // Stop the default close; we'll close manually after flush.
+          // Stop the default close; we terminate manually after the flush.
           event.preventDefault();
           await flushAll();
           await persistWorkspace();
           await persistVaultIndices();
-          await w.close();
+          // `destroy()`, NOT `close()`: the capability ACL grants
+          // `core:window:allow-destroy` but deliberately NOT `allow-close`
+          // (TB6 surface — see lib/app-window.ts). `close()` rejects under the
+          // permission system, so the window would never close. On Windows the
+          // title-bar X is the only quit affordance (no macOS Cmd+Q →
+          // RunEvent::ExitRequested path), so that left the app unclosable while
+          // unlocked. `destroy()` is non-cancellable and won't re-fire this
+          // handler; destroying the last window still raises ExitRequested, so
+          // the Rust-side search-index persist on exit still runs.
+          await w.destroy();
         });
       } catch {
         // Not running inside Tauri (e.g., `pnpm dev` browser shim) →
@@ -1163,6 +1217,10 @@ function EditorChrome({
           visible until then. No confirm-discard dialog — the flush is
           automatic. */}
       {switching && <SwitchingOverlay />}
+      {/* Sync banners (MYND-426 reconcile / MYND-427 integrity), above the
+          three-pane row. Non-blocking + dismissable; renders nothing while sync
+          is off (the common case). */}
+      <SyncBanners />
       {/* No separate top bar (MYND-166): the editor content fills from the top
           and each top pane's tab strip rises into the OS title-bar row,
           Obsidian-style. The sidebar toggles float in the top corners below
@@ -2669,11 +2727,7 @@ function BottomBar({
         padding: "0 12px",
       }}
     >
-      {!isHidden("sync-status") && (
-        <span style={STATUS_TEXT_STYLE}>
-          {t("editor.chrome.bottomBar.syncStatus")}
-        </span>
-      )}
+      {!isHidden("sync-status") && <SyncStatusIndicator />}
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {!hideSaveStatus && !isHidden("save-status") && (

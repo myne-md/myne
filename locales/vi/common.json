@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "Bỏ qua",
     "prompt": {
       "cancel": "Hủy",
       "confirmDefault": "OK"
@@ -1681,7 +1682,8 @@
         "editor": "Trình soạn thảo",
         "hotkeys": "Phím tắt",
         "privacy": "Quyền riêng tư",
-        "storage": "Lưu trữ"
+        "storage": "Lưu trữ",
+        "sync": "Đồng bộ"
       },
       "passwordUpdatedToast": "Đã cập nhật mật khẩu",
       "title": "Cài đặt"
@@ -1735,6 +1737,127 @@
       "optionLive": "Xem trước trực tiếp",
       "optionReading": "Đọc",
       "optionSource": "Nguồn"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "Đang tải xuống {{name}}",
+        "uploading": "Đang tải lên {{name}}"
+      },
+      "empty": "Không có truyền tải nào đang diễn ra.",
+      "heading": "Đồng bộ tệp đính kèm",
+      "status": {
+        "done": "xong",
+        "failedWillRetry": "thất bại — sẽ thử lại",
+        "paused": "tạm dừng"
+      }
+    },
+    "buildingIndex": {
+      "label": "Đang dựng chỉ mục tìm kiếm…"
+    },
+    "conflicts": {
+      "discard": "Loại bỏ",
+      "empty": "Không có xung đột — các thiết bị của bạn đã đồng bộ.",
+      "groupTitle_one": "{{count}} bản xung đột của {{original}}",
+      "groupTitle_other": "{{count}} bản xung đột của {{original}}",
+      "keepAsSeparate": "Giữ thành bản riêng",
+      "untitled": "Không có tiêu đề ({{hex}})"
+    },
+    "devices": {
+      "approve": "Phê duyệt",
+      "awaitingApproval_one": "{{count}} thiết bị đang chờ phê duyệt",
+      "awaitingApproval_other": "{{count}} thiết bị đang chờ phê duyệt",
+      "loading": "Đang tải…",
+      "noDevices": "Chưa có thiết bị nào được đồng bộ.",
+      "notEnrolled": "Thiết bị này chưa được kết nối. Nếu bạn vừa thêm nó, hãy chờ một thiết bị khác phê duyệt; nếu không, hãy thêm nó bằng biểu mẫu “Thêm một thiết bị” ở trên.",
+      "remove": "Gỡ bỏ",
+      "removedElsewhere": "Thiết bị này đã bị gỡ khỏi tài khoản của bạn trên một thiết bị khác.",
+      "resetAndReAdd": "Đặt lại và thêm lại thiết bị này",
+      "resetSyncOnThisDevice": "Đặt lại đồng bộ trên thiết bị này",
+      "shortName": "Thiết bị {{hex}}",
+      "syncedHere": "Đã đồng bộ tại đây",
+      "thisDevice": "Thiết bị này",
+      "transportHint": "Nếu máy chủ đã chuyển đi hoặc chứng chỉ của nó thay đổi, hãy nhập lại URL máy chủ trong mục “Máy chủ đồng bộ” ở trên để tin cậy lại.",
+      "unreachable": "Không thể kết nối tới đồng bộ ({{error}}).",
+      "yourDevices": "Thiết bị của bạn"
+    },
+    "endpoint": {
+      "connect": "Kết nối",
+      "connectedLocal": "Đã kết nối (cục bộ, không có TLS).",
+      "connectedTls": "Đã kết nối. Hãy kiểm tra dấu vân tay này khớp với dấu trên thiết bị kia của bạn.",
+      "connecting": "Đang kết nối…",
+      "fingerprintLabel": "Dấu vân tay chứng chỉ máy chủ:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Không thể kết nối tới máy chủ đó — hãy kiểm tra URL và xem nó có đang chạy không."
+    },
+    "enroll": {
+      "accountNumberLabel": "Số tài khoản",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Đang kết nối…",
+      "credentialTypeAria": "Loại thông tin đăng nhập",
+      "error": {
+        "notConfigured": "Hãy đặt một máy chủ đồng bộ trong cài đặt trước khi thêm thiết bị này.",
+        "transport": "Không thể kết nối tới máy chủ đồng bộ. Hãy kiểm tra kết nối của bạn rồi thử lại."
+      },
+      "mode": {
+        "password": "Mật khẩu",
+        "recovery": "Cụm từ khôi phục"
+      },
+      "passwordLabel": "Mật khẩu",
+      "recoveryPhraseHint": "Nhập cụm từ khôi phục 24 từ của bạn.",
+      "recoveryPhraseLabel": "Cụm từ khôi phục",
+      "signInWith": "Đăng nhập bằng",
+      "submit": "Thêm thiết bị này",
+      "wordAria": "Từ {{number}}"
+    },
+    "join": {
+      "accountLabel": "Số tài khoản",
+      "cancel": "Hủy",
+      "error": "Không thể thêm thiết bị này. Hãy kiểm tra URL máy chủ, số tài khoản và mật khẩu — và xem máy chủ có kết nối được không.",
+      "help": "Đăng nhập bằng số tài khoản và mật khẩu của bạn. Thiết bị này sẽ đồng bộ ghi chú của bạn sau khi một thiết bị hiện có phê duyệt nó. Không cần cụm từ khôi phục.",
+      "passwordLabel": "Mật khẩu",
+      "serverLabel": "Máy chủ đồng bộ",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Thêm thiết bị",
+      "submitting": "Đang thêm…",
+      "title": "Thêm thiết bị này vào một tài khoản"
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "Đăng nhập trên một thiết bị mới bằng số tài khoản và mật khẩu hoặc cụm từ khôi phục của bạn. Một thiết bị vẫn ở trạng thái chờ cho đến khi một thiết bị hiện có phê duyệt nó.",
+        "label": "Thêm một thiết bị"
+      },
+      "conflicts": {
+        "helper": "Khi cùng một ghi chú được sửa trên hai thiết bị cùng lúc, Myne giữ cả hai bản để không mất gì. Hãy giải quyết chúng tại đây.",
+        "label": "Xung đột"
+      },
+      "devices": {
+        "label": "Thiết bị"
+      },
+      "server": {
+        "helper": "Nhập cùng một URL máy chủ trên mọi thiết bị. Với máy chủ tự lưu trữ, hãy dùng địa chỉ <1>https://</1> của nó; hãy xác minh dấu vân tay chứng chỉ khớp nhau trên các thiết bị của bạn.",
+        "label": "Máy chủ đồng bộ"
+      },
+      "status": {
+        "helper": "Myne đồng bộ các ghi chú đã mã hóa của bạn giữa các thiết bị. Máy chủ chỉ lưu bản mã mà nó không thể đọc.",
+        "label": "Trạng thái đồng bộ"
+      }
+    },
+    "reconcile": {
+      "message": "Thiết bị này đã ngoại tuyến một lúc — đang bắt kịp đồng bộ. Ghi chú của bạn vẫn an toàn."
+    },
+    "status": {
+      "awaitingApproval": "Đang chờ phê duyệt",
+      "conflicts_one": "{{count}} xung đột cần xem lại",
+      "conflicts_other": "{{count}} xung đột cần xem lại",
+      "error": "Lỗi đồng bộ",
+      "loading": "Trạng thái đồng bộ…",
+      "notEnrolled": "Chưa đăng ký",
+      "off": "Đồng bộ đã tắt",
+      "synced": "Đã đồng bộ",
+      "syncing": "Đang đồng bộ…",
+      "syncNow": "Đồng bộ ngay"
     }
   },
   "templates": {

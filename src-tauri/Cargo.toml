@@ -82,6 +82,28 @@ postcard = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
 spellbook = "=0.4.2"
 
+# Phase 2 sync (MYND-424): decode the base64-encoded head record + blob
+# ciphertext the Go server emits on /sync/pull (record_b64 / ciphertext_b64)
+# and encode them on /sync/push. Transitive→direct promotion — `base64 0.22.1`
+# is already locked via the dependency tree, so this is zero Cargo.lock tree
+# expansion (the `windows-sys`/`objc2` precedent). Pure-Rust, no_std-capable,
+# MIT/Apache-2.0. Record in `docs/dependency-policy.md`.
+base64 = "0.22"
+
+# Phase 2 sync transport (MYND-424 task 2): the raw-rustls connection layer the
+# SCRAM auth + sync push/pull share — one TLS path with cert-pinning (A4) and
+# keying-material export (tls-exporter, the SCRAM channel binding, SYNC-3). This
+# is a NEW dependency tree (rustls + ring provider + rustls-pki-types), an
+# owner-approved security decision (CLAUDE.md "adding a dependency is a security
+# decision"; reproducible-build + TB9 audit-anchor relevant). The `ring` crypto
+# provider is chosen over the default `aws-lc-rs` for a more reproducible build
+# (no C/CMake toolchain). NOTE: the cert-pin verifier + tls-exporter wiring is
+# R3-gated — a primitive-level security review + live interop test are still owed
+# before production trust (see the MYND-424 spec-deltas). Record both crates in
+# `docs/dependency-policy.md`. Apache-2.0/ISC/MIT.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1"
+
 # PDF export per-page footer stamping (MYND-255 hotfix, owner-requested):
 # post-processes the captured PDF to draw the document title (bottom-left)
 # and an "X / Y" page counter (bottom-right) on every page. WebKit print
