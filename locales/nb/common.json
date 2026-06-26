@@ -1,0 +1,2056 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Avbryt",
+      "cleaning": "Rydder opp…",
+      "close": "Lukk",
+      "completeTitle": "Opprydding fullført",
+      "deleteCta": "Slett {{count}} ubrukte",
+      "deleteCta_one": "Slett {{count}} ubrukt",
+      "deleteCta_other": "Slett {{count}} ubrukte",
+      "error": "Kunne ikke rydde opp. Noen notater kan være uleselige — ingenting ble slettet.",
+      "intro_one": "Dette vedlegget brukes ikke i noe notat. Å slette det er permanent og kan ikke angres.",
+      "intro_other": "Disse {{count}} vedleggene brukes ikke i noe notat. Å slette dem er permanent og kan ikke angres.",
+      "summaryFreed": " · frigjorde {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "Fjernet {{count}} vedlegg",
+      "summaryRemoved_other": "Fjernet {{count}} vedlegg",
+      "summarySkipped": " · {{count}} hoppet over (nå i bruk)",
+      "summarySkipped_one": " · {{count}} hoppet over (nå i bruk)",
+      "summarySkipped_other": " · {{count}} hoppet over (nå i bruk)",
+      "title": "Rydd opp i ubrukte vedlegg",
+      "willBeReclaimed": "{{size}} blir frigjort."
+    },
+    "coverPicker": {
+      "close": "Lukk",
+      "dropHint": "Slipp et bilde for å bruke det som omslag.",
+      "empty": "Ingen bilder i dette hvelvet ennå. Last opp ett, eller dra et bilde hit.",
+      "loading": "Laster…",
+      "removeCover": "Fjern omslag",
+      "title": "Velg et omslagsbilde",
+      "upload": "Last opp"
+    },
+    "deleteDialog": {
+      "cancel": "Avbryt",
+      "confirmPrompt": "Slette dette vedlegget permanent? Dette kan ikke angres.",
+      "delete": "Slett",
+      "deleting": "Sletter…",
+      "error": "Kunne ikke slette vedlegget. Prøv igjen.",
+      "notUsed": "Ikke brukt i noe notat.",
+      "stillUsed_one": "Det brukes fortsatt i {{count}} notat. Sletting etterlater en plassholder der det var bygd inn:",
+      "stillUsed_other": "Det brukes fortsatt i {{count}} notater. Sletting etterlater en plassholder der det var bygd inn:",
+      "title": "Slett vedlegg",
+      "untitled": "Uten tittel"
+    },
+    "library": {
+      "actionsAriaLabel": "Vedleggshandlinger",
+      "actionsTitle": "Handlinger",
+      "checkUnusedFailedNotice": "Kunne ikke se etter ubrukte vedlegg. Prøv igjen.",
+      "checking": "Sjekker…",
+      "cleanUnused": "Rydd opp i ubrukte",
+      "cleanUnusedTitle": "Slett vedlegg som ikke brukes i noe notat",
+      "colCreated": "Opprettet",
+      "colName": "Navn",
+      "colSize": "Størrelse",
+      "colType": "Type",
+      "colUsedIn": "Brukt i",
+      "decrypting": "Dekrypterer vedlegg…",
+      "emptyImportHint": "Importer en fil for å beholde den i hvelvet.",
+      "emptyLoadError": "Kunne ikke lese vedleggskatalogen.",
+      "emptyNoAttachments": "Ingen vedlegg ennå.",
+      "filterAriaLabel": "Filtrer etter type",
+      "gridView": "Rutenettvisning",
+      "import": "Importer",
+      "importDialogTitle": "Importer vedlegg",
+      "importFile": "Importer en fil",
+      "importing": "Importerer…",
+      "listView": "Listevisning",
+      "menuDelete": "Slett",
+      "menuExport": "Eksporter",
+      "menuPreview": "Forhåndsvis",
+      "menuRename": "Endre navn",
+      "noMatch": "Ingen vedlegg samsvarer med søket.",
+      "noUnusedNotice": "Ingen ubrukte vedlegg å rydde opp i.",
+      "preview": "Forhåndsvis",
+      "previewAttachment": "Forhåndsvis vedlegg",
+      "searchAriaLabel": "Søk i vedlegg etter filnavn",
+      "searchPlaceholder": "Søk etter filnavn",
+      "sort": {
+        "createdAsc": "Eldste først",
+        "createdDesc": "Nyeste først",
+        "nameAsc": "Navn A–Å",
+        "nameDesc": "Navn Å–A"
+      },
+      "sortAriaLabel": "Sorter vedlegg",
+      "supportedFilesFilter": "Støttede filer",
+      "title": "Vedlegg",
+      "typeFilter": {
+        "all": "Alle typer",
+        "audio": "Lyd",
+        "image": "Bilder",
+        "other": "Annet",
+        "pdf": "PDF-er"
+      },
+      "usedInCount_one": "Brukt i {{count}} notat",
+      "usedInCount_other": "Brukt i {{count}} notater",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Lyd: {{filename}}",
+      "file": "Fil",
+      "pause": "Pause",
+      "pdfDocument": "PDF-dokument",
+      "pdfFirstPage": "Første side i PDF",
+      "play": "Spill av"
+    },
+    "usedInNotesPopover": {
+      "empty": "Ikke brukt i noe notat.",
+      "untitled": "Uten tittel"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv igjen.",
+        "cancelled": "Sikkerhetskopiering avbrutt. Ingen fil ble igjen.",
+        "invalidDestination": "Den målmappen kan ikke brukes.",
+        "ioGeneric": "Kunne ikke skrive sikkerhetskopifilen.",
+        "ioNoSpace": "Ikke nok plass på målet.",
+        "ioPermissionDenied": "Ingen tillatelse til å skrive til målet.",
+        "joinFailure": "Sikkerhetskopiering mislyktes uventet. Ingen fil ble igjen.",
+        "memberTooLarge": "En fil i dette hvelvet er større enn sikkerhetskopiformatet tillater.",
+        "vaultNotFound": "Fant ingen hvelv å sikkerhetskopiere.",
+        "verifyFailed": "Den skrevne sikkerhetskopien lot seg ikke verifisere og ble forkastet. Prøv igjen — på et annet medium hvis det gjentar seg."
+      },
+      "restore": {
+        "authOperationInProgress": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv igjen.",
+        "cancelled": "Gjenoppretting avbrutt. Ingenting ble endret.",
+        "damagedBackup": "Sikkerhetskopifilen er skadet.",
+        "futureVersionBackup": "Denne sikkerhetskopien ble laget av en nyere versjon av Myne. Oppdater Myne, og gjenopprett den deretter.",
+        "invalidVaultMeta": "Metadataene i denne sikkerhetskopien er uleselige, så gjenoppretting kunne ikke gi et fungerende hvelv.",
+        "ioGeneric": "Kunne ikke lese sikkerhetskopifilen.",
+        "ioPermissionDenied": "Ingen tillatelse til å lese sikkerhetskopifilen.",
+        "joinFailure": "Gjenoppretting mislyktes uventet. Ingenting ble endret.",
+        "missingVaultMeta": "Denne sikkerhetskopien mangler hvelvets metadata og kan ikke gjenopprettes.",
+        "notABackupFile": "Denne filen er ikke en Myne-sikkerhetskopi.",
+        "vaultAlreadyExists": "Et hvelv fra denne sikkerhetskopien finnes allerede på denne enheten."
+      }
+    },
+    "export": {
+      "cancel": "Avbryt",
+      "close": "Lukk",
+      "copying": "Kopierer {{done}} av {{total}}…",
+      "preparing": "Forbereder…",
+      "successToast": "Sikkerhetskopi verifisert og lagret.",
+      "title": "Sikkerhetskopier hvelv",
+      "verifying": "Verifiserer {{done}} av {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Godta",
+      "close": "Lukk",
+      "codeAriaLabel": "Paringskode",
+      "intro": "Bekreft at denne koden samsvarer med den som vises i utvidelsen, og velg deretter Godta for å pare.",
+      "reject": "Avvis",
+      "rejected": "Paring avvist.",
+      "title": "En nettleserutvidelse vil koble til"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Arkiv",
+    "archivedBadgeTitle": "Arkivert",
+    "dialogLabel": "Kommandopalett",
+    "matchedInBody": "↳ treff i brødteksten",
+    "noMatches": "Ingen treff",
+    "searchPlaceholder": "Søk i notater eller kjør en kommando — Esc for å lukke",
+    "sectionCommands": "Kommandoer",
+    "sectionNotes": "Notater",
+    "untitledNote": "Uten tittel"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Sikkerhetskopier hvelv…"
+      },
+      "category": {
+        "app": "App",
+        "editor": "Redigering",
+        "vault": "Hvelv",
+        "view": "Visning"
+      },
+      "convertWikilinks": {
+        "label": "Konverter importerte wikilenker i dette notatet…"
+      },
+      "deleteWorkspace": {
+        "label": "Slett arbeidsområde…"
+      },
+      "exportNoteHtml": {
+        "label": "Eksporter notat som HTML…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Eksporter notat som Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "Eksporter notat som PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "Eksporter notat som ren tekst…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Eksporter hvelv som Markdown…"
+      },
+      "foldAll": {
+        "label": "Fold sammen alle"
+      },
+      "importBaseView": {
+        "label": "Importer .base-visning…"
+      },
+      "importObsidian": {
+        "label": "Importer Obsidian-hvelv…"
+      },
+      "lockVault": {
+        "label": "Lås hvelv"
+      },
+      "manageTemplates": {
+        "label": "Administrer maler…"
+      },
+      "newNoteFromTemplate": {
+        "label": "Nytt notat fra mal…"
+      },
+      "openAttachments": {
+        "label": "Åpne vedlegg…"
+      },
+      "openSettings": {
+        "label": "Åpne innstillinger…"
+      },
+      "openSnapshots": {
+        "label": "Øyeblikksbilder…"
+      },
+      "openTodayNote": {
+        "label": "Åpne dagens notat"
+      },
+      "randomNote": {
+        "label": "Åpne et tilfeldig notat"
+      },
+      "renameWorkspace": {
+        "label": "Gi nytt navn til arbeidsområde…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Lagre arbeidsområde som…"
+      },
+      "showGraph": {
+        "label": "Vis grafvisning…"
+      },
+      "showTags": {
+        "label": "Bla gjennom etiketter…"
+      },
+      "showViews": {
+        "label": "Bla gjennom visninger…"
+      },
+      "switchWorkspace": {
+        "label": "Bytt arbeidsområde…"
+      },
+      "toggleFocus": {
+        "label": "Slå fokusmodus av/på"
+      },
+      "toggleLeftSidebar": {
+        "label": "Vis/skjul notatfelt"
+      },
+      "toggleReading": {
+        "label": "Slå lesevisning av/på"
+      },
+      "toggleRightSidebar": {
+        "label": "Vis/skjul tilbakekoblingsfelt"
+      },
+      "toggleSource": {
+        "label": "Slå kildemodus av/på"
+      },
+      "toggleStackedTabs": {
+        "label": "Slå stablede faner av/på"
+      },
+      "unfoldAll": {
+        "label": "Fold ut alle"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "Fet",
+        "closeTab": "Lukk fane",
+        "cycleHeadingLevel": "Bla gjennom overskriftsnivå",
+        "cycleTabs": "Bla gjennom faner",
+        "deleteWorkspace": "Slett arbeidsområde",
+        "focusNextPane": "Fokuser neste rute",
+        "focusPrevPane": "Fokuser forrige rute",
+        "foldAll": "Fold sammen alle",
+        "inlineCode": "Innebygd kode",
+        "insertWikilink": "Sett inn wikilenke",
+        "italic": "Kursiv",
+        "navigateBack": "Gå tilbake",
+        "navigateForward": "Gå fremover",
+        "newNote": "Nytt notat",
+        "openSettings": "Åpne innstillinger",
+        "paletteToggle": "Åpne kommandopalett",
+        "renameWorkspace": "Gi nytt navn til arbeidsområde",
+        "saveWorkspaceAs": "Lagre arbeidsområde som",
+        "selectAllScoped": "Merk alt (avgrenset)",
+        "showGraphView": "Vis grafvisning",
+        "splitPaneDown": "Del rute (ned)",
+        "splitPaneRight": "Del rute (høyre)",
+        "switchWorkspace": "Bytt arbeidsområde",
+        "toggleBulletList": "Slå punktliste av/på",
+        "toggleFocusMode": "Slå fokusmodus av/på",
+        "toggleNumberedList": "Slå nummerert liste av/på",
+        "toggleReadingView": "Slå lesevisning av/på",
+        "toggleSourceMode": "Slå kildemodus av/på",
+        "toggleTaskList": "Slå oppgaveliste av/på",
+        "unfoldAll": "Fold ut alle"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Legg til en modifikatortast (⌘, Ctrl eller Alt) — en tast alene kan ikke være en snarvei."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Avbryt",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Laster"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exportFailed": "Kunne ikke eksportere {{filename}}.",
+        "exported": "Eksporterte {{filename}}.",
+        "renameFailed": "Kunne ikke endre navn på vedlegget.",
+        "renamed": "Endret navn til {{name}}.",
+        "saveDialogFailed": "Kunne ikke åpne lagringsdialogen."
+      },
+      "convert": {
+        "cancel": "Avbryt",
+        "confirm": "Konverter",
+        "skipped": "hoppet over — {{note}}",
+        "subtitleEmpty": "Ingenting å konvertere — ingen kildefiler ble funnet.",
+        "subtitle_one": "1 referanse blir skrevet om. Se gjennom før du bekrefter.",
+        "subtitle_other": "{{count}} referanser blir skrevet om. Se gjennom før du bekrefter.",
+        "title": "Konverter importerte vedlegg"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Vedleggskilde"
+      },
+      "convertCore": {
+        "converted": "{{count}} konvertert",
+        "converted_one": "{{count}} konvertert",
+        "converted_other": "{{count}} konvertert",
+        "noneToConvert": "Ingen importerte vedlegg å konvertere i dette notatet.",
+        "skipNote": {
+          "failed": "import mislyktes",
+          "locked": "hvelvet er låst",
+          "notFound": "kilde ikke funnet",
+          "tooLarge": "for stor (maks 64 MiB)",
+          "unsupported": "ustøttet type"
+        },
+        "skippedSuffix": " · {{count}} hoppet over",
+        "skippedSuffix_one": " · {{count}} hoppet over",
+        "skippedSuffix_other": " · {{count}} hoppet over"
+      },
+      "fileKind": {
+        "generic": "Fil",
+        "label": {
+          "archive": "Arkiv",
+          "audio": "Lyd",
+          "cHeader": "C-header",
+          "cSource": "C-kildekode",
+          "cppSource": "C++-kildekode",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Dokument",
+          "ebook": "E-bok",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Bilde",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "Loggfil",
+          "markdown": "Markdown",
+          "numbers": "Numbers-regneark",
+          "pages": "Pages-dokument",
+          "pdf": "PDF",
+          "presentation": "Presentasjon",
+          "python": "Python",
+          "richText": "Rikt tekstdokument",
+          "rust": "Rust",
+          "shell": "Skallskript",
+          "spreadsheet": "Regneark",
+          "svg": "SVG-bilde",
+          "text": "Tekstdokument",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Word-dokument",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "{{ext}}-fil"
+      },
+      "lightbox": {
+        "close": "Lukk forhåndsvisning",
+        "export": "Eksporter",
+        "exportAria": "Eksporter vedlegg",
+        "imagePreview": "Forhåndsvisning av bilde",
+        "pdfFallback": "PDF",
+        "pdfPreview": "Forhåndsvisning av PDF"
+      },
+      "menu": {
+        "actionsAria": "Vedleggshandlinger"
+      },
+      "pdf": {
+        "loading": "Laster…"
+      },
+      "picker": {
+        "openFailed": "Kunne ikke åpne filvelgeren."
+      },
+      "progress": {
+        "encrypting": "Krypterer…",
+        "importing": "Importerer…",
+        "loading": "Laster…"
+      },
+      "recording": {
+        "barAria": "Tar opp talenotat",
+        "cancel": "Avbryt",
+        "noAudio": "Ingen lyd registrert — sjekk mikrofonen.",
+        "saving": "Lagrer…",
+        "stop": "Stopp"
+      },
+      "rename": {
+        "cancel": "Avbryt",
+        "confirm": "Endre navn",
+        "title": "Endre navn på vedlegg"
+      },
+      "summary": {
+        "added": "{{count}} lagt til",
+        "added_one": "{{count}} lagt til",
+        "added_other": "{{count}} lagt til",
+        "reason": {
+          "failed": "mislyktes",
+          "locked": "hvelvet er låst",
+          "tooLarge": "for stor",
+          "unsupported": "ustøttet type"
+        },
+        "skipped": "{{count}} hoppet over: {{noun}}",
+        "skipped_one": "{{count}} hoppet over: {{noun}}",
+        "skipped_other": "{{count}} hoppet over: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "Et opptak pågår allerede.",
+          "captureFailed": "Kunne ikke starte opptak — sjekk mikrofontilgang i Systeminnstillinger.",
+          "generic": "Kunne ikke starte opptak.",
+          "locked": "Lås opp hvelvet for å ta opp et talenotat.",
+          "noInputDevice": "Ingen mikrofon funnet. Koble til en og prøv igjen."
+        },
+        "stopError": {
+          "captureFailed": "Opptaket mislyktes — sjekk mikrofonen.",
+          "emptyRecording": "Ingenting ble tatt opp.",
+          "generic": "Kunne ikke lagre opptaket.",
+          "silentRecording": "Opptaket var stille og ble forkastet — sjekk mikrofonen."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Pause",
+          "play": "Spill av",
+          "seek": "Spol"
+        },
+        "menu": {
+          "export": "Eksporter",
+          "remove": "Fjern",
+          "rename": "Endre navn",
+          "reveal": "Vis i biblioteket"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Ødelagt vedleggsreferanse: {{filename}}",
+          "brokenLabel": "ødelagt",
+          "deletedAria": "Slettet vedlegg: {{filename}}",
+          "deletedLabel": "slettet"
+        },
+        "urlImageFallback": "bilde"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Merk",
+        "bug": "Feil",
+        "caution": "Forsiktig",
+        "danger": "Fare",
+        "done": "Fullført",
+        "error": "Feil",
+        "example": "Eksempel",
+        "failure": "Mislykket",
+        "faq": "Vanlige spørsmål",
+        "hint": "Hint",
+        "important": "Viktig",
+        "info": "Info",
+        "missing": "Mangler",
+        "note": "Notat",
+        "question": "Spørsmål",
+        "quote": "Sitat",
+        "success": "Vellykket",
+        "tip": "Tips",
+        "todo": "Gjøremål",
+        "warning": "Advarsel"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Arkivert",
+        "empty": "Ingen tilbakekoblinger ennå.",
+        "linkedFrom": "Koblet fra {{count}}",
+        "linkedFrom_one": "Koblet fra {{count}}",
+        "linkedFrom_other": "Koblet fra {{count}}",
+        "untitled": "Uten tittel"
+      },
+      "barItems": {
+        "graph": "Graf",
+        "lock": "Lås",
+        "saveStatus": "Lagringsstatus",
+        "settings": "Innstillinger",
+        "syncStatus": "Synkroniseringsstatus",
+        "tags": "Etiketter",
+        "viewMode": "Visningsmodus",
+        "views": "Visninger",
+        "wordCount": "Ordtelling",
+        "workspace": "Arbeidsområde"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} filtre forkastet",
+        "droppedFiltersSuffix_one": " · {{count}} filter forkastet",
+        "droppedFiltersSuffix_other": " · {{count}} filtre forkastet",
+        "failed": "Import mislyktes.",
+        "fileFilterName": "Obsidian Base",
+        "imported": "Importerte {{count}} visning(er)",
+        "imported_one": "Importerte {{count}} visning",
+        "imported_other": "Importerte {{count}} visninger",
+        "notValid": "Ikke en gyldig .base-fil.",
+        "skippedSuffix": " · {{count}} hoppet over",
+        "skippedSuffix_one": " · {{count}} hoppet over",
+        "skippedSuffix_other": " · {{count}} hoppet over",
+        "stoppedAfter": "Import stoppet etter {{count}} visning(er).",
+        "stoppedAfter_one": "Import stoppet etter {{count}} visning.",
+        "stoppedAfter_other": "Import stoppet etter {{count}} visninger."
+      },
+      "bottomBar": {
+        "browseTags": "Bla gjennom etiketter",
+        "browseViews": "Bla gjennom visninger",
+        "cycleViewMode": "Bla gjennom visningsmodus",
+        "docStats": {
+          "summarySelectionSuffix": " (utvalg)",
+          "summary_one": "{{count}} ord · {{characters}} tegn",
+          "summary_other": "{{count}} ord · {{characters}} tegn",
+          "titleSelectionSuffix": " (utvalg)",
+          "title_one": "{{characters}} tegn · {{words}} ord · {{spaces}} mellomrom · {{count}} avsnitt",
+          "title_other": "{{characters}} tegn · {{words}} ord · {{spaces}} mellomrom · {{count}} avsnitt"
+        },
+        "graphTitle": "Graf (⌘⇧G)",
+        "lock": "Lås",
+        "lockVault": "Lås hvelv",
+        "openSettings": "Åpne innstillinger",
+        "settingsTitle": "Innstillinger (⌘,)",
+        "showGraph": "Vis grafvisning",
+        "syncStatus": "Kun lokalt · ikke synkronisert",
+        "tagsTitle": "Etiketter",
+        "togglePreview": "Slå forhåndsvisning side om side av/på",
+        "viewModeTitle": "Visningsmodus: {{mode}} (klikk for å bla)",
+        "viewsTitle": "Visninger"
+      },
+      "import": {
+        "imported_one": "Importerte {{count}} notat{{skipped}}",
+        "imported_other": "Importerte {{count}} notater{{skipped}}",
+        "skippedSuffix": " · {{count}} hoppet over",
+        "skippedSuffix_one": " · {{count}} hoppet over",
+        "skippedSuffix_other": " · {{count}} hoppet over"
+      },
+      "nav": {
+        "goBack": "Gå tilbake",
+        "goForward": "Gå fremover"
+      },
+      "noNotesToOpen": "Ingen notater å åpne.",
+      "resizeBacklinksSidebar": "Endre størrelse på tilbakekoblingsfeltet",
+      "resizeNotesSidebar": "Endre størrelse på notatfeltet",
+      "sidebarToggle": {
+        "hideBacklinks": "Skjul tilbakekoblingsfelt",
+        "hideNotes": "Skjul notatfelt",
+        "showBacklinks": "Vis tilbakekoblingsfelt",
+        "showNotes": "Vis notatfelt"
+      },
+      "switchingOverlay": {
+        "saving": "Lagrer…"
+      },
+      "viewMode": {
+        "live": "Live",
+        "reading": "Lesing",
+        "source": "Kilde"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Navn på arbeidsområde",
+        "renameConfirm": "Endre navn",
+        "renameTitle": "Gi nytt navn til arbeidsområde",
+        "saveAsTitle": "Lagre arbeidsområde som",
+        "saveConfirm": "Lagre"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Arbeidsområde",
+        "renameItemLabel": "Gi nytt navn til arbeidsområde {{name}}",
+        "renameTitle": "Gi nytt navn til arbeidsområde",
+        "saveCurrentAs": "Lagre gjeldende som…",
+        "switchLabel": "Bytt arbeidsområde",
+        "toggleTitle": "Arbeidsområde: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Kopier kode",
+      "defaultBadge": "kode"
+    },
+    "find": {
+      "close": "Lukk søk",
+      "matchCase": "Skill mellom store og små bokstaver",
+      "matchCount": "{{current}} av {{total}}",
+      "nextMatch": "Neste treff",
+      "noMatches": "Ingen treff",
+      "placeholder": "Finn i notat",
+      "previousMatch": "Forrige treff",
+      "replaceAll": "Erstatt alle",
+      "replaceAllCount": "Erstatt alle ({{total}})",
+      "replaceOne": "Erstatt",
+      "replacePlaceholder": "Erstatt med",
+      "toggleReplace": "Slå erstatt av/på"
+    },
+    "folding": {
+      "clickToUnfold": "Klikk for å folde ut",
+      "unfold": "Fold ut"
+    },
+    "footnote": {
+      "heading": "Fotnoter",
+      "unreferenced": "uten referanse"
+    },
+    "frontmatter": {
+      "addProperty": "+ Legg til egenskap",
+      "propertiesLabel": "Egenskaper",
+      "titleAriaLabel": "Notattittel",
+      "titlePlaceholder": "Uten tittel"
+    },
+    "mermaid": {
+      "rendering": "Tegner diagram…"
+    },
+    "slash": {
+      "attachFile": "Legg ved fil",
+      "bulletList": "Punktliste",
+      "callout": "Callout",
+      "date": "Dato",
+      "day": "Dag",
+      "divider": "Skillelinje",
+      "heading1": "Overskrift 1",
+      "heading2": "Overskrift 2",
+      "heading3": "Overskrift 3",
+      "heading4": "Overskrift 4",
+      "heading5": "Overskrift 5",
+      "heading6": "Overskrift 6",
+      "link": "Lenke",
+      "now": "Nå",
+      "numberedList": "Nummerert liste",
+      "quote": "Sitat",
+      "table": "Tabell",
+      "time": "Klokkeslett",
+      "todoList": "Gjøremålsliste",
+      "voiceNote": "Talenotat",
+      "wikiLink": "Wikilenke"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Legg til i ordlisten",
+        "ignoreInVault": "Ignorer i dette hvelvet",
+        "ignoreThisSession": "Ignorer i denne økten",
+        "noSuggestions": "Ingen forslag"
+      }
+    },
+    "table": {
+      "addColumn": "Legg til kolonne til høyre",
+      "addRow": "Legg til rad under",
+      "cellAriaLabel": "Tabellcelle",
+      "deleteColumn": "Slett kolonne",
+      "deleteRow": "Slett rad",
+      "reorderColumn": "Endre rekkefølge på kolonne",
+      "reorderRow": "Endre rekkefølge på rad"
+    },
+    "toolbar": {
+      "apply": "Bruk",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Avsnitt"
+      },
+      "highlight": {
+        "blue": "Blå",
+        "green": "Grønn",
+        "pink": "Rosa",
+        "purple": "Lilla",
+        "yellow": "Gul"
+      },
+      "urlPlaceholder": "Lim inn lenke-URL"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Full",
+        "narrow": "Smal",
+        "normal": "Normal",
+        "wide": "Bred"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normal",
+        "relaxed": "Avslappet",
+        "tight": "Tett"
+      },
+      "textSize": {
+        "lg": "Stor",
+        "md": "Standard",
+        "sm": "Liten",
+        "xl": "Ekstra stor"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Bygg inn: {{label}}"
+      },
+      "convert": {
+        "cancel": "Avbryt",
+        "choiceClause_one": " · {{count}} trenger et valg.",
+        "choiceClause_other": " · {{count}} trenger et valg.",
+        "chooseTarget": "Velg mål…",
+        "convert": "Konverter",
+        "convertedToast_one": "{{count}} wikilenke konvertert",
+        "convertedToast_other": "{{count}} wikilenker konvertert",
+        "noneToConvert": "Ingen importerte wikilenker å konvertere i dette notatet.",
+        "nothingToConvert": "Ingenting å konvertere — ingen importerte wikilenker lar seg løse.",
+        "rewriteCount_one": "{{count}} lenke blir skrevet om",
+        "rewriteCount_other": "{{count}} lenker blir skrevet om",
+        "skipped": "hoppet over — {{reason}}",
+        "title": "Konverter importerte wikilenker i dette notatet"
+      },
+      "convertCore": {
+        "noMatch": "ingen treff"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Notat",
+      "errors": {
+        "attachmentCorrupt": "Et vedlegg det vises til i dette notatet kunne ikke leses, så ingenting ble eksportert.",
+        "attachmentMissing": "Et vedlegg det vises til i dette notatet mangler, så ingenting ble eksportert.",
+        "cannotDecrypt": "Dette notatet kunne ikke leses.",
+        "destinationUnusable": "Den målmappen kan ikke brukes.",
+        "fallback": "Eksport mislyktes uventet. Prøv igjen.",
+        "invalidAttachmentCatalog": "Hvelvets vedleggskatalog kunne ikke leses, så ingenting ble eksportert.",
+        "invalidNoteFilename": "Det filnavnet kan ikke brukes, så ingenting ble eksportert.",
+        "invalidNoteId": "Dette notatet kunne ikke identifiseres, så ingenting ble eksportert.",
+        "invalidPlaintextEncoding": "Innholdet i dette notatet ser skadet ut, så ingenting ble eksportert. Gjenopprett det fra en sikkerhetskopi.",
+        "ioNoSpace": "Ikke nok plass på målet.",
+        "ioPermissionDenied": "Ingen tillatelse til å skrive til målet.",
+        "ioWriteDefault": "Kunne ikke skrive den eksporterte filen.",
+        "noteNotFound": "Dette notatet finnes ikke lenger — det kan ha blitt slettet.",
+        "pdfCaptureFailed": "PDF-en kunne ikke genereres, så ingenting ble eksportert.",
+        "pdfExportInProgress": "En PDF-eksport pågår allerede. Vent til den er ferdig, og prøv igjen.",
+        "pdfPayloadMissing": "Eksporten ble avbrutt — hvis hvelvet ble låst, lås det opp og prøv igjen.",
+        "pdfRenderTimeout": "Notatet tok for lang tid å gjengi, så ingenting ble eksportert.",
+        "pdfWindowCreateFailed": "Eksportvinduet kunne ikke åpnes, så ingenting ble eksportert.",
+        "targetExists": "En fil med det navnet finnes allerede på målet.",
+        "vaultLocked": "Hvelvet er låst. Lås det opp, og prøv igjen."
+      },
+      "flow": {
+        "couldNotRead": "Dette notatet kunne ikke leses.",
+        "exportedTo": "Eksportert til {{filename}}",
+        "exportedToWithAttachments_one": "Eksportert til {{filename}} + {{count}} vedlegg",
+        "exportedToWithAttachments_other": "Eksportert til {{filename}} + {{count}} vedlegg",
+        "exportedToWithImages_one": "Eksportert til {{filename}} + {{count}} bilde",
+        "exportedToWithImages_other": "Eksportert til {{filename}} + {{count}} bilder",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Ren tekst",
+        "showInFolder": "Vis i mappe"
+      },
+      "modal": {
+        "cancel": "Avbryt",
+        "export": "Eksporter…",
+        "includeAttachments_one": "Inkluder {{count}} vedlegg",
+        "includeAttachments_other": "Inkluder {{count}} vedlegg",
+        "title": "Eksporter som Markdown"
+      }
+    },
+    "pdf": {
+      "cancel": "Avbryt",
+      "continue": "Fortsett…",
+      "title": "Eksporter som PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Velg hvor eksporten skal lagres",
+      "errors": {
+        "attachmentCorrupt": "Et vedlegg det vises til i et notat kunne ikke leses, så ingenting ble eksportert.",
+        "attachmentMissing": "Et vedlegg det vises til i et notat mangler, så ingenting ble eksportert.",
+        "authOperationInProgress": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv igjen.",
+        "cancelled": "Eksport avbrutt. Ingenting ble igjen på målet.",
+        "cannotDecrypt": "Et notat kunne ikke leses, så ingenting ble eksportert.",
+        "destinationAlreadyExists": "Noe finnes allerede på det stedet. Velg et nytt sted for eksporten.",
+        "destinationNotAllowed": "Det stedet ligger inne i Mynes egen lagring. Velg en mappe utenfor den.",
+        "invalidPlaintextEncoding": "Innholdet i et notat ser skadet ut, så ingenting ble eksportert. Gjenopprett det fra en sikkerhetskopi.",
+        "invalidVaultMeta": "Hvelvets metadata kunne ikke leses, så ingenting ble eksportert.",
+        "ioWriteDefault": "Kunne ikke skrive eksporten.",
+        "joinFailure": "Eksport mislyktes uventet. Ingenting ble igjen på målet.",
+        "vaultLocked": "Hvelvet er låst. Lås det opp, og prøv igjen.",
+        "vaultNotFound": "Fant ingen hvelv å eksportere."
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} vedlegg",
+        "countAttachments_other": "{{count}} vedlegg",
+        "countFolders_one": "{{count}} mappe",
+        "countFolders_other": "{{count}} mapper",
+        "countNotes_one": "{{count}} notat",
+        "countNotes_other": "{{count}} notater",
+        "exclusionsHistory": "Versjonshistorikk er ikke inkludert.",
+        "exclusionsTrashedAndHistory_one": "{{count}} slettet notat og versjonshistorikk er ikke inkludert.",
+        "exclusionsTrashedAndHistory_other": "{{count}} slettede notater og versjonshistorikk er ikke inkludert.",
+        "exclusionsTrashed_one": "{{count}} slettet notat er ikke inkludert.",
+        "exclusionsTrashed_other": "{{count}} slettede notater er ikke inkludert.",
+        "phaseAttachments": "vedlegg",
+        "phaseNotes": "notater",
+        "preparing": "Forbereder…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Avbryt",
+        "cancelling": "Avbryter…",
+        "title": "Eksporterer…"
+      },
+      "setup": {
+        "cancel": "Avbryt",
+        "choose": "Velg…",
+        "chooseFolder": "Velg en mappe…",
+        "destinationLabel": "Mål",
+        "export": "Eksporter…",
+        "folderSelectAriaLabel": "Mappe som skal eksporteres",
+        "noFolderChosen": "Ingen mappe valgt",
+        "noFoldersInVault": "Ingen mapper i dette hvelvet",
+        "scopeFolder": "Én mappe",
+        "scopeLabel": "Omfang",
+        "scopeWhole": "Hele hvelvet",
+        "title": "Eksporter hvelv som Markdown"
+      },
+      "summary": {
+        "done": "Fullført",
+        "showInFolder": "Vis i mappe",
+        "title": "Eksport fullført"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "Hvis du har en sikkerhetskopi, kan du gjenopprette den — de nåværende filene dine berøres ikke; sikkerhetskopien gjenopprettes som et separat hvelv først.",
+      "cta": "Lukk appen",
+      "title": "Hvelvfilen er ødelagt."
+    },
+    "invalidState": {
+      "body": "Start på nytt.",
+      "cta": "Lås",
+      "title": "Uventet tilstand."
+    },
+    "ioError": {
+      "body": "Dette kan være en disk- eller filsystemfeil.",
+      "cta": "Lukk appen",
+      "title": "Kan ikke lese hvelvfilen."
+    },
+    "permissionDenied": {
+      "body": "Sjekk filtillatelsene.",
+      "cta": "Lukk appen",
+      "title": "Ingen tillatelse til å åpne hvelvfilen."
+    },
+    "restoreFromBackup": "Gjenopprett fra sikkerhetskopi…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Lukk",
+      "countEmpty": "Tomt",
+      "count_one": "{{count}} notat",
+      "count_other": "{{count}} notater",
+      "delete": "Slett",
+      "deleteError": "Kunne ikke slette det notatet. Prøv igjen.",
+      "emptyState": "Arkivet er tomt.",
+      "restore": "Gjenopprett",
+      "restoreError": "Kunne ikke gjenopprette det notatet. Prøv igjen.",
+      "title": "Arkiv",
+      "untitled": "Uten tittel"
+    },
+    "cardMenu": {
+      "copyLink": "Kopier lenke",
+      "open": "Åpne",
+      "openInNewTab": "Åpne i ny fane",
+      "revealInFolder": "Vis i mappe"
+    },
+    "colorLabels": {
+      "clay": "Leire",
+      "moss": "Mose",
+      "ochre": "Oker",
+      "plum": "Plomme",
+      "slate": "Skifer",
+      "stone": "Stein"
+    },
+    "decoration": {
+      "colorSection": "Farge",
+      "default": "Standard",
+      "defaultFolderIcon": "Standard mappeikon",
+      "iconSection": "Ikon",
+      "menuLabel": "Fargemerke",
+      "noColor": "Ingen farge",
+      "none": "Ingen"
+    },
+    "deleteConfirm": {
+      "cancel": "Avbryt",
+      "delete": "Slett",
+      "title": "Slette dette notatet?",
+      "untitled": "Uten tittel",
+      "warning": "Dette kan ikke angres."
+    },
+    "filterBuilder": {
+      "addCondition": "Legg til betingelse",
+      "addFilterGroup": "Legg til filtergruppe",
+      "cancel": "Avbryt",
+      "combinator": {
+        "all": "alle",
+        "any": "én av"
+      },
+      "match": "Treff",
+      "negate": {
+        "is": "er",
+        "isNot": "er ikke"
+      },
+      "noConditions": "Ingen betingelser ennå — denne visningen viser alle sider.",
+      "noteCount_one": "{{count}} notat",
+      "noteCount_other": "{{count}} notater",
+      "of": "av:",
+      "ofTheGroups": "av gruppene:",
+      "removeCondition": "Fjern betingelse",
+      "replaceFilter": "Erstatt filter",
+      "save": "Lagre",
+      "searchTextPlaceholder": "søketekst",
+      "selectFolderPlaceholder": "velg en mappe…",
+      "selectTagPlaceholder": "velg en etikett…",
+      "type": {
+        "folder": "Mappe",
+        "search": "Søk",
+        "tag": "Etikett"
+      },
+      "unrepresentable": "Dette filteret ble laget med en avansert redigerer og kan ikke redigeres her.",
+      "unresolved": "uløst"
+    },
+    "folderManagement": {
+      "illegalSegment": "Et mappenavn kan ikke inneholde / \\ | # ^ [ ] eller starte/slutte med et mellomrom.",
+      "tooLong": "Den mappebanen er for lang."
+    },
+    "folderNote": {
+      "defaultTitle": "Indeks"
+    },
+    "folderRow": {
+      "createFolderNote": "Opprett et mappenotat",
+      "empty": "tom",
+      "folderNote": "mappenotat",
+      "openFolderNote": "Åpne mappenotat"
+    },
+    "graph": {
+      "allConnected": "Alt henger sammen — ingen isolerte notater.",
+      "building": "Bygger graf…",
+      "depthToggleTitle": "Bytt nabolagsdybde (1 ↔ 2 hopp)",
+      "filterAll": "Alle",
+      "filterAroundNote": "Rundt dette notatet",
+      "filterByTag": "Filtrer etter etikett",
+      "filterIsolated": "Isolerte",
+      "hop": "{{depth}} hopp",
+      "loading": "Laster graf…",
+      "noNotes": "Ingen notater å lage graf av ennå.",
+      "overCap": "Dette hvelvet er stort — grafen over hele hvelvet er begrenset. Filtrer på en etikett eller vis isolerte notater for å utforske.",
+      "refresh": "Oppdater",
+      "refreshTitle": "Hvelvet er endret — bygg grafen på nytt",
+      "tagPlaceholder": "Etikett…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Visning uten tittel"
+      },
+      "modal": {
+        "cancel": "Avbryt",
+        "cancelledNotImported": "{{count}} ikke importert",
+        "cancelledNotImported_one": "{{count}} ikke importert",
+        "cancelledNotImported_other": "{{count}} ikke importert",
+        "cancelling": "Avbryter…",
+        "chooseFolder": "Velg mappe…",
+        "close": "Lukk",
+        "closeAriaLabel": "Lukk",
+        "copied": "Kopiert",
+        "copy": "Kopier",
+        "done": "Fullført",
+        "errorBody": "Importen kunne ikke fullføres. Alle notater som allerede ble importert, er beholdt og er trygge å beholde eller slette.",
+        "flagDetail": "{{kind}} «{{segment}}» {{reason}}.",
+        "flagKindFolder": "Mappe",
+        "flagKindTitle": "Tittel",
+        "folderPickerTitle": "Velg din Obsidian-hvelvmappe",
+        "hiddenIgnoredPrefix_one": "{{count}} konfigurasjons-/skjult element ignorert (f.eks. ",
+        "hiddenIgnoredPrefix_other": "{{count}} konfigurasjons-/skjulte elementer ignorert (f.eks. ",
+        "hiddenIgnoredSuffix": ", punktfiler).",
+        "ifNoteExistsLabel": "Hvis et notat allerede finnes",
+        "import": "Importer",
+        "importFailed": "Import mislyktes.",
+        "importing": "Importerer hvelvet ditt…",
+        "markDone": "Marker som fullført",
+        "markedDone": "Markert som fullført",
+        "mediaImported": "{{count}} importert",
+        "mediaImported_one": "{{count}} importert",
+        "mediaImported_other": "{{count}} importert",
+        "mediaOmittedSuffix": " · {{count}} utelatt",
+        "mediaOmittedSuffix_one": " · {{count}} utelatt",
+        "mediaOmittedSuffix_other": " · {{count}} utelatt",
+        "needsAttention": "Trenger oppmerksomhet",
+        "needsAttentionHelp": "Disse notatene ble importert uendret. Foreslåtte rettelser er utgangspunkter — kopier ett, og gi notatet nytt navn når du åpner det.",
+        "noFolderChosen": "Ingen mappe valgt",
+        "notesImported_one": "notat importert",
+        "notesImported_other": "notater importert",
+        "policyCopyHint": "Hent det inn ved siden av det eksisterende notatet.",
+        "policyCopyLabel": "Importer som en kopi",
+        "policySkipHint": "Anbefalt — å kjøre en import på nytt dupliserer eller overskriver aldri.",
+        "policySkipLabel": "Hopp over det",
+        "preexistingDetail": "Dette notatet hadde allerede sin egen mappe: «{{existing}}», som Myne beholdt — mappen kan avvike fra der den lå på disken.",
+        "preparing": "Forbereder…",
+        "progressNotes": " notater",
+        "progressOf": " av ",
+        "reasonIllegalChar": "inneholder et tegn Myne ikke kan bruke i et navn",
+        "reasonPathTooLong": "banen for mappe + tittel er for lang",
+        "reasonSegmentTooLong": "navnet er lengre enn Myne tillater",
+        "scanning": "Skanner hvelvet ditt…",
+        "setupIntro": "Pek Myne mot din eksisterende Obsidian-hvelvmappe. Hvert Markdown-notat importeres og krypteres på stedet — ingenting forlater denne enheten, og originalfilene dine berøres ikke.",
+        "statCancelled": "Avbrutt",
+        "statCanvasSkipped": ".canvas-filer hoppet over",
+        "statEmptyFoldersKept": "Tomme mapper beholdt",
+        "statMedia": "Medier",
+        "statOtherSkipped": "Andre filer hoppet over",
+        "statSkipped": "Hoppet over (finnes allerede)",
+        "suggestedNameAriaLabel": "Foreslått navn",
+        "titleComplete": "Import fullført",
+        "titleFailed": "Import mislyktes",
+        "titleSetup": "Importer Obsidian-hvelv",
+        "vaultFolderLabel": "Hvelvmappe",
+        "vaultRoot": "(hvelvrot)"
+      },
+      "offer": {
+        "body": "Hent dine eksisterende notater inn i Myne. Hvert enkelt krypteres etter hvert som det importeres — ingenting forlater denne enheten, og originalfilene dine forblir nøyaktig der de er.",
+        "chooseFolder": "Velg mappe…",
+        "laterHint": "Du kan alltid importere senere fra Innstillinger → Lagring.",
+        "notNow": "Ikke nå",
+        "title": "Importere ditt Obsidian-hvelv?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Legg til i favoritter",
+      "archive": "Arkiver",
+      "archiveBulkError": "Kunne ikke arkivere notatene.",
+      "archiveNote": "Arkiver",
+      "archiveSingleError": "Kunne ikke arkivere notatet.",
+      "attachments": "Vedlegg",
+      "bulkArchive": "Arkiver {{count}} notater",
+      "bulkArchive_one": "Arkiver {{count}} notat",
+      "bulkArchive_other": "Arkiver {{count}} notater",
+      "bulkDelete": "Slett {{count}} notater",
+      "bulkDelete_one": "Slett {{count}} notat",
+      "bulkDelete_other": "Slett {{count}} notater",
+      "bulkMove": "Flytt {{count}} notater til…",
+      "bulkMove_one": "Flytt {{count}} notat til…",
+      "bulkMove_other": "Flytt {{count}} notater til…",
+      "caseMergeBody": "En mappe med navnet «{{name}}» finnes allerede. Disse vil bli slått sammen — gi den ene nytt navn for å holde dem adskilt?",
+      "color": "Farge…",
+      "createFirstNote": "+ Opprett ditt første notat",
+      "createFolderNote": "Opprett mappenotat",
+      "customize": "Tilpass…",
+      "delete": "Slett",
+      "deleteFolderBody_one": "«{{name}}» og dens {{count}} notat",
+      "deleteFolderBody_other": "«{{name}}» og dens {{count}} notater",
+      "deleteFolderConfirm": "Slett mappe",
+      "deleteFolderTitle": "Slette denne mappen?",
+      "deleteFolderWarning": "Notatene flyttes til papirkurven — du kan gjenopprette dem senere.",
+      "duplicate": "Dupliser",
+      "editFilterTitle": "Rediger filter",
+      "emptyState": "Ingen notater ennå.",
+      "exportHtml": "Eksporter som HTML…",
+      "exportMarkdown": "Eksporter som Markdown…",
+      "exportPdf": "Eksporter som PDF…",
+      "exportTxt": "Eksporter som ren tekst…",
+      "favoritesHeading": "Favoritter",
+      "mergeAnyway": "Slå sammen likevel",
+      "newFolder": "Ny mappe",
+      "newFolderInPlaceholder": "Ny mappe i {{path}}",
+      "newFolderPlaceholder": "Ny mappe",
+      "newNote": "Nytt notat",
+      "newNoteFromTemplate": "Nytt notat fra mal…",
+      "newNoteHere": "Nytt notat her",
+      "newNoteMenu": "Nytt notat",
+      "newNoteShortcut": "Nytt notat (⌘N)",
+      "newSubfolder": "Ny undermappe",
+      "newViewTitle": "Ny visning",
+      "noteMovedToTrash": "Notat flyttet til papirkurven",
+      "notesHeading": "Notater",
+      "notesMovedToTrash_one": "{{count}} notat flyttet til papirkurven",
+      "notesMovedToTrash_other": "{{count}} notater flyttet til papirkurven",
+      "openArchive": "Åpne arkivet",
+      "openAttachments": "Åpne vedlegg",
+      "openFolderNote": "Åpne mappenotat",
+      "openInNewTab": "Åpne i ny fane",
+      "openToSide": "Åpne ved siden av",
+      "openTrash": "Åpne papirkurven",
+      "removeAsFolderNote": "Fjern som mappenotat",
+      "removeFromFavorites": "Fjern fra favoritter",
+      "rename": "Endre navn",
+      "setAsFolderNote": "Angi som mappenotat",
+      "trash": "Papirkurv",
+      "trashBulkError": "Kunne ikke flytte notatene til papirkurven.",
+      "trashSingleError": "Kunne ikke flytte notatet til papirkurven.",
+      "undo": "Angre",
+      "vaultRoot": "Hvelvrot",
+      "viewSettingsTitle": "Visningsinnstillinger"
+    },
+    "newFromTemplate": {
+      "back": "Tilbake",
+      "blankNote": "Tomt notat",
+      "createNote": "Opprett notat",
+      "emptyState": "Du har ikke opprettet noen maler ennå.",
+      "listLabel": "Maler",
+      "loading": "Laster…",
+      "nameLabel": "Navn på notatet (fra «{{templateName}}»)",
+      "namePlaceholder": "Uten tittel",
+      "nameStepTitle": "Gi dette notatet et navn",
+      "pickStepTitle": "Nytt notat fra mal",
+      "untitledTemplate": "Mal uten tittel"
+    },
+    "newTab": {
+      "createNote": "Opprett et nytt notat",
+      "noNotesMatch": "Ingen notater samsvarer.",
+      "noNotesYet": "Ingen notater ennå.",
+      "searchAriaLabel": "Søk i notater for å åpne",
+      "searchPlaceholder": "Søk i notater…",
+      "untitled": "Uten tittel"
+    },
+    "pane": {
+      "graphTab": "Graf",
+      "loading": "Laster…",
+      "untitledView": "Visning uten tittel"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} dager siden",
+      "hoursAgo": "{{h}} t siden",
+      "justNow": "akkurat nå",
+      "minutesAgo": "{{m}} min siden",
+      "oneWeekAgo": "1 uke siden",
+      "weeksAgo": "{{w}} uker siden",
+      "yesterday": "i går"
+    },
+    "row": {
+      "addToFavorites": "Legg til i favoritter",
+      "folderIndexBadgeLabel": "Mappenotat",
+      "folderIndexBadgeTitle": "Mappenotat — denne mappens indeks",
+      "folderIndexConflictLabel": "Mappen har allerede et indeksnotat",
+      "folderIndexConflictTitle": "Denne mappen har allerede et indeksnotat",
+      "loadError": "Kunne ikke laste dette notatet",
+      "removeFromFavorites": "Fjern fra favoritter",
+      "renameAriaLabel": "Endre navn på notat",
+      "untitled": "Uten tittel"
+    },
+    "saveStatus": {
+      "editing": "Redigerer",
+      "editingEllipsis": "Redigerer…",
+      "editingTitle": "Redigerer — autolagring er klar",
+      "justNow": "akkurat nå",
+      "retry": "Prøv igjen",
+      "saveFailed": "Lagring mislyktes",
+      "saveFailedTitle": "Lagring mislyktes — klikk Prøv igjen",
+      "saved": "Lagret",
+      "savedRelative": "Lagret {{rel}}",
+      "saving": "Lagrer",
+      "savingEllipsis": "Lagrer…"
+    },
+    "savedView": {
+      "defaultName": "Filtrert visning"
+    },
+    "snapshotFailed": {
+      "dismiss": "Lukk",
+      "message": "Kunne ikke lagre et øyeblikksbilde — notatet ditt er lagret, men versjonshistorikken kan være ufullstendig (disken kan være full)."
+    },
+    "snapshots": {
+      "cancel": "Avbryt",
+      "changeCount_one": "{{count}} endring siden dette øyeblikksbildet",
+      "changeCount_other": "{{count}} endringer siden dette øyeblikksbildet",
+      "close": "Lukk",
+      "confirmBody": "Det nåværende notatet ditt lagres som et øyeblikksbilde først, så du kan angre dette.",
+      "confirmTitle": "Gjenopprette dette øyeblikksbildet?",
+      "decrypting": "Dekrypterer…",
+      "emptyState": "Ingen øyeblikksbilder ennå. Øyeblikksbilder lagres automatisk mens du redigerer, og beholdes i omtrent 7 dager. De er krypterte og forsvinner når notatet slettes permanent.",
+      "encryptedSize": "Kryptert · {{size}}",
+      "errorCannotDecrypt": "Dette øyeblikksbildet kunne ikke dekrypteres.",
+      "errorGeneric": "Noe gikk galt. Prøv igjen.",
+      "errorIo": "En diskfeil oppstod — disken kan være full eller skrivebeskyttet.",
+      "errorNotFound": "Det øyeblikksbildet er ikke lenger tilgjengelig.",
+      "errorStorageAccess": "Kunne ikke få tilgang til hvelvets øyeblikksbildelagring.",
+      "errorVaultLocked": "Hvelvet er låst. Lås det opp for å se øyeblikksbilder.",
+      "justNow": "akkurat nå",
+      "listLabel": "Liste over øyeblikksbilder",
+      "loading": "Laster…",
+      "restore": "Gjenopprett",
+      "restoreCta": "Gjenopprett dette øyeblikksbildet",
+      "restoredStatus": "Gjenopprettet. Versjonen du hadde, er lagret som et øyeblikksbilde.",
+      "selectPlaceholder": "Velg et øyeblikksbilde for å forhåndsvise hva som har endret seg siden da.",
+      "title": "Øyeblikksbilder",
+      "untitled": "Uten tittel"
+    },
+    "tabStrip": {
+      "closeNewTab": "Lukk ny fane",
+      "closeTab": "Lukk {{title}}",
+      "newTab": "Ny fane",
+      "openNotes": "Åpne notater",
+      "pin": "Fest",
+      "pinned": "Festet",
+      "pinnedTitle": "Festet — løsne for å lukke",
+      "unpin": "Løsne",
+      "untitled": "Uten tittel"
+    },
+    "tagBrowser": {
+      "cancel": "Avbryt",
+      "clear": "Tøm",
+      "combineTagsWith": "Kombiner etiketter med",
+      "filtering": "Filtrerer…",
+      "modeAll": "Alle",
+      "modeAny": "Én av",
+      "noNotesForFilter": "Ingen notater for dette filteret.",
+      "noTagsMatch": "Ingen etiketter samsvarer med «{{query}}».",
+      "noTagsYet": "Ingen etiketter ennå.",
+      "noteCount_one": "{{count}} notat",
+      "noteCount_other": "{{count}} notater",
+      "notes": "Notater",
+      "pickTag": "Velg en etikett å filtrere på.",
+      "save": "Lagre",
+      "saveAsView": "Lagre som visning",
+      "searchPlaceholder": "Søk i etiketter…",
+      "title": "Etiketter",
+      "untitled": "Uten tittel",
+      "viewNamePlaceholder": "Visningsnavn"
+    },
+    "trash": {
+      "close": "Lukk",
+      "countEmpty": "Tom",
+      "count_one": "{{count}} notat",
+      "count_other": "{{count}} notater",
+      "delete": "Slett",
+      "deleteError": "Kunne ikke slette det notatet. Prøv igjen.",
+      "empty": "Tøm papirkurven",
+      "emptyConfirmBody_one": "{{count}} notat blir slettet permanent.",
+      "emptyConfirmBody_other": "{{count}} notater blir slettet permanent.",
+      "emptyConfirmCta": "Tøm papirkurven",
+      "emptyConfirmTitle": "Tømme papirkurven?",
+      "emptyPartialFailure_one": "{{count}} notat kunne ikke slettes og blir liggende i papirkurven.",
+      "emptyPartialFailure_other": "{{count}} notater kunne ikke slettes og blir liggende i papirkurven.",
+      "emptyState": "Papirkurven er tom.",
+      "purgeConfirmCta": "Slett permanent",
+      "purgeConfirmTitle": "Slette permanent?",
+      "restore": "Gjenopprett",
+      "restoreError": "Kunne ikke gjenopprette det notatet. Prøv igjen.",
+      "title": "Papirkurv",
+      "untitled": "Uten tittel"
+    },
+    "unlinkedMentions": {
+      "empty": "Ingen ukoblede omtaler.",
+      "heading": "Ukoblede omtaler",
+      "link": "Koble",
+      "linkTooltip": "Koble denne omtalen til {{title}}",
+      "refresh": "Omtaler kan ha endret seg — oppdater",
+      "searching": "Søker…",
+      "thisNote": "dette notatet",
+      "untitled": "Uten tittel"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Standard (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kvadratisk)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (bredt)"
+      },
+      "cancel": "Avbryt",
+      "cardSize": "Kortstørrelse",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Frontmatter-egenskapen hvis verdi er et bilde — vises som omslaget for hvert kort. La stå tomt for å droppe omslag.",
+      "coverImagePlaceholder": "f.eks. cover",
+      "coverImageProperty": "Egenskap for omslagsbilde",
+      "imageAspectRatio": "Bildeforhold",
+      "reset": "Nullstill",
+      "save": "Lagre"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Endre omslag",
+        "changeCoverImage": "Endre omslagsbilde",
+        "empty": "Ingen notater samsvarer med denne visningen",
+        "noValue": "Ingen verdi",
+        "setCover": "Angi omslag",
+        "setCoverImage": "Angi omslagsbilde",
+        "untitled": "Uten tittel"
+      },
+      "collapseViews": "Slå sammen visninger",
+      "empty": "Ingen visninger ennå. Lagre den gjeldende notatlisten som en visning.",
+      "expandViews": "Utvid visninger",
+      "heading": "Visninger",
+      "host": {
+        "unsupported": "Denne visningstypen kommer i en senere oppdatering."
+      },
+      "menu": {
+        "deleteView": "Slett visning",
+        "editFilter": "Rediger filter…",
+        "moveDown": "Flytt ned",
+        "moveUp": "Flytt opp",
+        "rename": "Endre navn",
+        "viewSettings": "Visningsinnstillinger…"
+      },
+      "newView": "Ny visning",
+      "untitledView": "Visning uten tittel"
+    },
+    "welcome": {
+      "body": "Velkommen til Myne, ditt private rom for å tenke og skrive.\n\nAlt du lagrer her er kryptert og forblir på enheten din. **Passordet** og **gjenopprettingsfrasen** din er de eneste nøklene til det, så oppbevar dem et trygt sted. Hvis begge går tapt, kan ingen hente notatene dine tilbake, ikke engang vi.\n\nDette er bare et vanlig notat, så gjør det til ditt eget. Rediger det, gi det nytt navn eller slett det når du vil, og legg til nye notater etter hvert som ideene dine vokser.\n\nVi er glade for at du er her. For å lære mer om Myne, besøk https://myne.md\n",
+      "title": "Velkommen til Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "Standard"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Kontrollerer styrke…",
+      "confirmLabel": "Bekreft hovedpassord",
+      "defaultEmptyCaption": "Brukes som inndata til Argon2id (m=256 MiB, t=3, p=2). Velg noe du kan huske; du kan ikke nullstille det.",
+      "mismatch": "Passordene samsvarer ikke.",
+      "passwordLabel": "Hovedpassord",
+      "suggestPassword": "Foreslå passord",
+      "tooShort": "Bruk minst {{n}} tegn."
+    },
+    "input": {
+      "hide": "Skjul passord",
+      "show": "Vis passord"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "Ingen treff.",
+      "placeholder": "Velg…",
+      "searchPlaceholder": "Søk…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Gjenoppretting avbrutt: hvelvet ble låst.",
+      "operationInProgress": "En operasjon pågår. Vent litt.",
+      "unexpected": "Uventet feil. Prøv igjen.",
+      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt."
+    }
+  },
+  "restore": {
+    "backLabel": "Tilbake",
+    "cancelLabel": "Avbryt",
+    "collision": {
+      "body": "Et hvelv fra denne sikkerhetskopien finnes allerede på denne enheten. Du kan beholde begge — den gjenopprettede kopien vises som et separat hvelv i hvelvlisten din — eller gjenopprette nå og deretter fjerne det eksisterende hvelvet fra hvelvlisten selv (fjerning ber deg skrive DELETE, og gir bare mening etter at du har bekreftet at det gjenopprettede hvelvet åpner seg).",
+      "keepBoth": "Behold begge",
+      "replaceExisting": "Gjenopprett, og erstatt deretter eksisterende…"
+    },
+    "damaged": {
+      "body": "Sikkerhetskopifilen er skadet, så ingenting ble gjenopprettet. Hvis dette er den eneste kopien du har, kan berging gjenopprette de intakte notatene og liste opp nøyaktig hva som ikke kunne leses — resultatet merkes alltid som en delvis gjenoppretting.",
+      "close": "Lukk",
+      "salvage": "Berg intakte notater…"
+    },
+    "error": {
+      "tryAnotherFile": "Prøv en annen fil"
+    },
+    "pick": {
+      "body": "Velg en <code>.myne-backup</code>-fil. Sikkerhetskopien verifiseres før noe gjenopprettes; det gjenopprettede hvelvet låses opp med dette hvelvets passord eller gjenopprettingsfrase — akkurat som ved opplåsing.",
+      "chooseFile": "Velg sikkerhetskopifil…",
+      "corruptedSuffix": "Det nåværende hvelvet ditt berøres ikke: sikkerhetskopien gjenopprettes som et separat hvelv først."
+    },
+    "summary": {
+      "attachments": "Vedlegg: {{n}}",
+      "collidedNote": "Den tidligere kopien av dette hvelvet ligger fortsatt i hvelvlisten din. Når du har bekreftet at det gjenopprettede hvelvet åpner seg, kan du fjerne det gamle fra hvelvlisten (du blir bedt om å skrive DELETE).",
+      "notes": "Notater: {{n}}",
+      "openVaultList": "Åpne hvelvliste",
+      "partialHeader_one": "Delvis gjenopprettet — {{count}} element kunne ikke leses.",
+      "partialHeader_other": "Delvis gjenopprettet — {{count}} elementer kunne ikke leses.",
+      "restored": "Hvelv gjenopprettet.",
+      "versionHistory": "Oppføringer i versjonshistorikk: {{n}}"
+    },
+    "title": "Gjenopprett fra sikkerhetskopi",
+    "working": {
+      "cancel": "Avbryt",
+      "restoringProgress": "Gjenoppretter… {{done}} av {{total}}",
+      "verifying": "Verifiserer sikkerhetskopi…",
+      "verifyingProgress": "Verifiserer sikkerhetskopi… {{done}} av {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Utviklingsbygg",
+      "buildChannelLabel": "Byggkanal",
+      "buildChannelStable": "Stabil",
+      "changelogButton": "Vis endringslogg…",
+      "changelogHelper": "Notater per versjon. Vises når MYND-119 lander.",
+      "changelogLabel": "Endringslogg",
+      "licenseBody": "Pre-alfa · CC0-dokumentasjon · AGPL-3.0 applikasjonskode ved fase 1-utgivelse.",
+      "licenseLabel": "Lisens",
+      "tagline": "Pre-alfa · Fase 1 skrivebordsklient",
+      "threatModelHelper": "Åpne det offentlige trusselmodelldokumentet i nettleseren din.",
+      "threatModelLabel": "Trusselmodell"
+    },
+    "account": {
+      "argon2idHeading": "Argon2id-parametere",
+      "changePasswordButton": "Endre passord",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Feil nåværende passord, eller hvelvfilen er ødelagt.",
+        "ioError": "Diskfeil, prøv igjen.",
+        "joinFailure": "Noe gikk galt, prøv igjen.",
+        "samePasswordRejected": "Det nye passordet er likt det nåværende.",
+        "weakNewPassword": "Det nye passordet må være minst 12 tegn."
+      },
+      "changePasswordHeading": "Endre passord",
+      "changePasswordHelper": "Roter hovedpassordet ditt mens du beholder det samme hvelvet. Gjenopprettingsfrasen forblir den samme.",
+      "dangerZoneHeading": "Faresone",
+      "dangerZoneHelper": "Slett dette hvelvet og alle notater permanent. Kan ikke angres. Gjenopprettingsfrasen gjenoppretter ikke hvelvet.",
+      "deleteVaultButton": "Slett hvelv…",
+      "memoryCost": "Minnekostnad",
+      "parallelism": "Parallellisme",
+      "timeCost": "Tidskostnad",
+      "vaultLabelEyebrow": "HVELVETIKETT",
+      "vaultLabelHelper": "Et navn på dette hvelvet som vises i appens hvelvbytter. Lagres kryptert inne i hvelvet; forlater aldri enheten din i klartekst.",
+      "vaultLabelPlaceholder": "Legg til en etikett…",
+      "vaultLabelSave": "Lagre"
+    },
+    "appearance": {
+      "showEditTimesAria": "Vis redigeringstidspunkter i sidefeltet",
+      "showEditTimesHelper": "Vis hvert notats sist redigerte tidspunkt under tittelen i sidefeltet.",
+      "showEditTimesLabel": "Vis redigeringstidspunkter",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Mørkt",
+        "light": "Lyst",
+        "system": "System"
+      },
+      "themeHelper": "Bytt mellom lyst og mørkt tema, eller følg systeminnstillingen.",
+      "themeLabel": "Tema",
+      "themeOptionAria": "{{label}}-tema",
+      "themeSaveError": "Kunne ikke lagre tema. Prøv igjen.",
+      "timestampsSaveError": "Kunne ikke lagre innstillingen. Prøv igjen."
+    },
+    "archive": {
+      "helper": "La notater flyttes til et arkiv, holdt utenfor hovedlisten. Slår du dette av, gjenopprettes alle arkiverte notater til sine mapper, og arkivkontrollene skjules.",
+      "label": "Arkivering",
+      "off": "Av",
+      "on": "På",
+      "saveError": "Kunne ikke oppdatere arkiveringsinnstillingen."
+    },
+    "autoBackup": {
+      "backupFolder": "Sikkerhetskopimappe",
+      "chooseFolder": "Velg mappe…",
+      "chooseFolderDialogTitle": "Velg en mappe for automatiske sikkerhetskopier",
+      "frequency": "Hyppighet",
+      "frequencyAriaLabel": "Hyppighet for sikkerhetskopiering",
+      "helper": "Skriv en kryptert .myne-backup til en mappe etter en tidsplan, mens appen er åpen og hvelvet er låst opp. Sikkerhetskopiene forblir like krypterte som hvelvet ditt; Myne beholder de siste få og sender aldri noe vekk fra enheten din.",
+      "intervalDaily": "Daglig",
+      "intervalEveryUnlock": "Ved hver opplåsing",
+      "intervalWeekly": "Ukentlig",
+      "keepLast": "Behold de siste",
+      "noFolderChosen": "Ingen mappe valgt ennå.",
+      "saveFailedToast": "Kunne ikke lagre innstillinger for sikkerhetskopiering.",
+      "searchEmpty": "Ingen treff.",
+      "searchPlaceholder": "Søk…",
+      "statusFailed": "Automatisk sikkerhetskopiering mislyktes — {{stamp}}",
+      "statusLastBackup": "Siste sikkerhetskopi: {{stamp}}",
+      "statusNever": "Ingen automatisk sikkerhetskopi ennå.",
+      "title": "Automatiske sikkerhetskopier"
+    },
+    "changePassword": {
+      "cancel": "Avbryt",
+      "checkingStrength": "Kontrollerer styrke…",
+      "confirmLabel": "Bekreft nytt passord",
+      "currentLabel": "Nåværende passord",
+      "mismatch": "Passordene samsvarer ikke.",
+      "newLabel": "Nytt passord",
+      "submit": "Endre passord",
+      "submitting": "Endrer passord…",
+      "title": "Endre passord",
+      "tooShort": "Bruk minst {{n}} tegn."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Nettleserutvidelse"
+      },
+      "when": {
+        "bare": "Tilkoblet",
+        "daysAgo_one": "Tilkoblet for {{count}} dag siden",
+        "daysAgo_other": "Tilkoblet for {{count}} dager siden",
+        "hoursAgo": "Tilkoblet for {{count}} t siden",
+        "hoursAgo_one": "Tilkoblet for {{count}} t siden",
+        "hoursAgo_other": "Tilkoblet for {{count}} t siden",
+        "justNow": "Tilkoblet akkurat nå",
+        "minutesAgo": "Tilkoblet for {{count}} min siden",
+        "minutesAgo_one": "Tilkoblet for {{count}} min siden",
+        "minutesAgo_other": "Tilkoblet for {{count}} min siden",
+        "onDate": "Tilkoblet {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Brukt",
+      "apply": "Bruk",
+      "applyError": "Kunne ikke ta i bruk det temaet. Prøv igjen.",
+      "cancel": "Avbryt",
+      "confirm": "Bekreft",
+      "delete": "Slett",
+      "deleteError": "Kunne ikke slette det temaet. Prøv igjen.",
+      "empty": "Ingen egendefinerte temaer ennå. Importer ett, eller åpne temamappen og legg til en temafil.",
+      "error": {
+        "aColorFallback": "en farge",
+        "invalidFile": "Ugyldig temafil.",
+        "invalidName": "Utrygt temanavn",
+        "invalidValue": "Ugyldig verdi for {{key}}",
+        "invalidValueWithLine": "Ugyldig verdi for {{key}} (linje {{line}})",
+        "missingKey": "Mangler påkrevd farge {{key}}",
+        "parseError": "Ikke gyldig JSON",
+        "parseErrorWithLine": "Ikke gyldig JSON (linje {{line}})"
+      },
+      "fileFilterName": "Myne-tema",
+      "helper": "Bruk din egen fargepalett. Temaer valideres på denne enheten før bruk — ingenting lastes opp.",
+      "importButton": "Importer tema…",
+      "importError": "Den filen er ikke et gyldig tema. Åpne referansen for å se formatet.",
+      "label": "Egendefinerte temaer",
+      "openFolderButton": "Åpne temamappe",
+      "openFolderError": "Kunne ikke åpne temamappen.",
+      "readError": "Kunne ikke lese temamappen din."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Tomt (ingen mal)",
+      "dateFormatHelper": "Tittelen på hvert dagsnotat. Støtter YYYY, MM, DD. Standardverdi er {{default}}.",
+      "dateFormatLabel": "Datoformat for dagsnotat",
+      "dateFormatSaveError": "Kunne ikke lagre datoformatet. Prøv igjen.",
+      "folderHelper": "Hvor nye dagsnotater plasseres. Standardverdi er {{default}} — mappen beholdes selv når den er tom.",
+      "folderLabel": "Mappe for dagsnotat",
+      "folderSaveError": "Kunne ikke lagre dagsnotatmappen. Prøv igjen.",
+      "searchEmpty": "Ingen maler samsvarer.",
+      "searchPlaceholder": "Søk i maler…",
+      "templateHelper": "Velg en mal å starte hvert dagsnotat fra, eller la stå tom for et tomt notat med datoen som tittel.",
+      "templateLabel": "Mal for dagsnotat",
+      "templateSaveError": "Kunne ikke lagre dagsnotatmalen. Prøv igjen.",
+      "untitledTemplate": "Mal uten tittel"
+    },
+    "deleteVault": {
+      "cancel": "Avbryt",
+      "caseSensitiveHint": "Skiller mellom store og små bokstaver. Skriv ordet nøyaktig for å aktivere sletting.",
+      "continue": "Fortsett",
+      "copyPrimary": "Dette sletter permanent dette hvelvet og hvert notat i det. Handlingen kan ikke angres, og gjenopprettingsfrasen din gjenoppretter ikke dataene.",
+      "copySecondary": "Hvelvnøklene nullstilles fra minnet før filene fjernes; eventuell foreldreløs chiffertekst som blir igjen på disken, forblir ugjenopprettelig Argon2id-pakket søppel.",
+      "eyebrow": "KAN IKKE ANGRES",
+      "heading": "Slett hvelv",
+      "ioFailBody": "Kunne ikke få tilgang til hvelvfilene for sletting. Hvelvnøklene er allerede nullstilt fra minnet; eventuelle hvelvdata som blir igjen på disken, er ugjenopprettelig Argon2id-pakket søppel.",
+      "ioFailTitle": "Diskfeil under sletting",
+      "partialFailBody_one": "{{count}} fil kunne ikke slettes fra disken. Hvelvnøklene er allerede nullstilt fra minnet, så eventuell foreldreløs chiffertekst som blir igjen, er ugjenopprettelig Argon2id-pakket søppel.",
+      "partialFailBody_other": "{{count}} filer kunne ikke slettes fra disken. Hvelvnøklene er allerede nullstilt fra minnet, så eventuell foreldreløs chiffertekst som blir igjen, er ugjenopprettelig Argon2id-pakket søppel.",
+      "partialFailTitle": "Sletting av hvelv mislyktes delvis",
+      "submit": "Slett hvelv",
+      "submitInFlight": "Sletter hvelv…",
+      "typeToConfirmLabel": "Skriv DELETE for å bekrefte",
+      "vaultPath": "Hvelvbane: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Demp inaktive linjer",
+      "dimHelper": "I fokusmodus (⇧⌘F), demp alle linjer unntatt den du redigerer.",
+      "dimLabel": "Fokusmodus · demp inaktive linjer",
+      "off": "Av",
+      "on": "På",
+      "saveError": "Kunne ikke lagre fokusmodusinnstillingen.",
+      "typewriterAria": "Skrivemaskinrulling",
+      "typewriterHelper": "I fokusmodus (⇧⌘F), hold den aktive linjen vertikalt sentrert mens du skriver.",
+      "typewriterLabel": "Fokusmodus · skrivemaskinrulling"
+    },
+    "hotkeys": {
+      "addBindingAria": "Legg til en snarvei for {{command}}",
+      "cancel": "Avbryt",
+      "capturePrompt": "Trykk på en tast…",
+      "conflictIndicator": "⚠ konflikt",
+      "conflictTitle": "Brukes også av {{commands}}",
+      "fixed": "fast",
+      "group": {
+        "editorFormatting": "Redigeringsformatering",
+        "general": "Generelt",
+        "navigation": "Navigasjon",
+        "notes": "Notater",
+        "panesTabs": "Ruter og faner",
+        "view": "Visning"
+      },
+      "helper": "Vis og endre tastatursnarveier. Redigeringsformatering og fanesyklus-snarveien er faste.",
+      "notSet": "Ikke angitt",
+      "removeBindingAria": "Fjern {{chord}}",
+      "resetAll": "Tilbakestill alle hurtigtaster…",
+      "resetAllConfirm": "Tilbakestille hver egendefinert snarvei til standard?",
+      "resetAllYes": "Tilbakestill alle",
+      "restoreDefaultAria": "Gjenopprett standard for {{command}}",
+      "searchAriaLabel": "Søk i snarveier",
+      "searchPlaceholder": "Søk i snarveier…",
+      "warnAlreadyUsed": "Allerede brukt av {{commands}} — lagt til likevel."
+    },
+    "language": {
+      "helper": "Velg visningsspråk for appen.",
+      "label": "Språk"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Kunne ikke lagre linjenummerinnstillingen.",
+      "helper": "Vis en linjenummermarg i redigereren. Ett nummer per linje; av som standard.",
+      "label": "Linjenummer",
+      "off": "Av",
+      "on": "På"
+    },
+    "prefs": {
+      "saveError": "Kunne ikke lagre innstillingen — prøv igjen"
+    },
+    "privacy": {
+      "autoLockHelper": "Lås hvelvet etter så lang tids inaktivitet.",
+      "autoLockLabel": "Autolås",
+      "autoLockSearchEmpty": "Ingen varigheter samsvarer.",
+      "autoLockSearchPlaceholder": "Søk i varigheter…",
+      "screenCaptureHelperOff": "Beskyttelse gjelder alltid før opplåsing. Etter opplåsing følger den denne innstillingen.",
+      "screenCaptureHelperOn": "Aktiv på macOS og Windows 10 (May 2020 Update eller nyere). Linux-støtte kommer i en fremtidig utgivelse.",
+      "screenCaptureLabel": "Beskyttelse mot skjermopptak"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Avbrutt.",
+      "errorGeneric": "Kunne ikke konfigurere rask opplåsing.",
+      "errorHardwareUnavailable": "Touch ID er ikke tilgjengelig på denne enheten.",
+      "errorNotUnlocked": "Lås opp hvelvet først.",
+      "errorPinNotDigits": "PIN-koden kan bare bestå av siffer.",
+      "errorPinTooShort": "PIN-koden må være minst {{count}} sifre.",
+      "errorPinTooShort_one": "PIN-koden må være minst {{count}} siffer.",
+      "errorPinTooShort_other": "PIN-koden må være minst {{count}} sifre.",
+      "helperConfigured": "Konfigurert via {{method}}. Ny opplåsing etter autolås hopper over hovedpassordet. Hovedpassordet kreves fortsatt etter omstart.",
+      "helperNotConfigured": "Lås opp igjen etter autolås med en PIN-kode eller Touch ID i stedet for hele hovedpassordet. En bekvemmelighet over det krypterte hvelvet — hovedpassordet kreves fortsatt etter omstart.",
+      "methodPin": "PIN-kode",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN-kode for rask opplåsing",
+      "pinPlaceholder": "PIN-kode (minst {{count}} sifre)",
+      "pinPlaceholder_one": "PIN-kode (minst {{count}} siffer)",
+      "pinPlaceholder_other": "PIN-kode (minst {{count}} sifre)",
+      "setPin": "Angi PIN-kode",
+      "setupHelper": "Touch ID er kun for macOS og foreløpig eksperimentell (avventer maskinvareverifisering). PIN-kode fungerer overalt.",
+      "title": "Rask opplåsing",
+      "useTouchId": "Bruk Touch ID"
+    },
+    "shell": {
+      "closeLabel": "Lukk innstillinger",
+      "navLabel": "Innstillingspaneler",
+      "panels": {
+        "about": "Om",
+        "account": "Konto",
+        "appearance": "Utseende",
+        "editor": "Redigering",
+        "hotkeys": "Hurtigtaster",
+        "privacy": "Personvern",
+        "storage": "Lagring"
+      },
+      "passwordUpdatedToast": "Passord oppdatert",
+      "title": "Innstillinger"
+    },
+    "spell": {
+      "errorSaveLanguages": "Kunne ikke lagre stavekontrollspråkene.",
+      "errorSaveSetting": "Kunne ikke lagre stavekontrollinnstillingen.",
+      "helper": "Understrek feilstavede ord mens du skriver. Helt frakoblet — notatene dine forlater aldri enheten.",
+      "label": "Stavekontroll",
+      "languagesAriaLabel": "Stavekontrollspråk",
+      "languagesHelper": "Et ord er riktig hvis det er gyldig i ett av de valgte språkene — praktisk for å blande engelske termer inn i notater på andre språk.",
+      "languagesLabel": "Språk",
+      "languagesPlaceholder": "Velg språk…",
+      "languagesSearchEmpty": "Ingen språk samsvarer.",
+      "languagesSearchPlaceholder": "Søk i språk…",
+      "off": "Av",
+      "on": "På"
+    },
+    "storage": {
+      "backUpVault": "Sikkerhetskopier hvelv…",
+      "backupHelper": "Sikkerhetskopier forblir nøyaktig like krypterte som hvelvet ditt, i én enkelt verifisert .myne-backup-fil. Gjenoppretting fungerer med dette hvelvets passord eller gjenopprettingsfrase — akkurat som ved opplåsing.",
+      "backupLabel": "Sikkerhetskopi",
+      "exportAction": "Eksporter…",
+      "exportBody": "Eksporter hvelv som Markdown",
+      "exportHelper": "Ren markdown-mappestruktur — ikke kryptert.",
+      "exportLabel": "Eksporter",
+      "importHelper": "Hent et eksisterende Obsidian-hvelv inn i Myne. Hvert Markdown-notat importeres og krypteres på stedet; originalfilene dine berøres ikke.",
+      "importLabel": "Importer",
+      "importObsidian": "Importer Obsidian-hvelv…",
+      "locationHelper": "Hvert hvelv er en mappe med krypterte filer under denne banen. Foretrekk Sikkerhetskopi-knappen nedenfor fremfor manuelle kopier — den verifiserer den skrevne filen.",
+      "locationLabel": "Hvelvplassering",
+      "openInFiles": "Åpne i Filer",
+      "pathUnavailable": "Bane utilgjengelig",
+      "restoreBackup": "Gjenopprett fra sikkerhetskopi…"
+    },
+    "typography": {
+      "contentWidthHelper": "Maksimal bredde på redigeringskolonnen. Full lar teksten spenne over hele ruten.",
+      "contentWidthLabel": "Innholdsbredde",
+      "errorSave": "Kunne ikke lagre innstillingen. Prøv igjen.",
+      "fontHelper": "Monospasiert eller proporsjonal (sans-serif) tekst.",
+      "fontLabel": "Skrift",
+      "lineSpacingHelper": "Vertikal avstand mellom linjer.",
+      "lineSpacingLabel": "Linjeavstand",
+      "textSizeHelper": "Grunnstørrelse på redigeringsteksten. Overskrifter skaleres med den.",
+      "textSizeLabel": "Tekststørrelse"
+    },
+    "viewMode": {
+      "errorSave": "Kunne ikke lagre standard visningsmodus.",
+      "helper": "Hvordan et notat åpnes: Live forhåndsvisning (standard), skrivebeskyttet Lesing eller rå Kilde. Bytt for et notat med ⇧⌘E.",
+      "label": "Standard visningsmodus",
+      "optionLive": "Live forhåndsvisning",
+      "optionReading": "Lesing",
+      "optionSource": "Kilde"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Lukk maler",
+      "deleteRowLabel": "Slett mal {{name}} (flytt til papirkurv)",
+      "editTemplateLabel": "Rediger mal {{name}}",
+      "emptyBody": "Opprett en mal for å gjenbruke et notatskjelett — et møtenotat, en daglig logg, et lesenotat. Velg en når du lager et nytt notat.",
+      "emptyTitle": "Ingen maler ennå",
+      "listLabel": "Maler",
+      "loading": "Laster…",
+      "newTemplate": "Ny mal",
+      "newTemplateName": "Mal uten tittel",
+      "removeFromTemplates": "Fjern fra maler",
+      "removeRowLabel": "Fjern {{name}} fra maler (beholder notatet)",
+      "title": "Notatmaler"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Velg et annet hvelv",
+    "continue": "Fortsett",
+    "decrypting": "Dekrypterer…",
+    "deleteLink": "Mistet både passord og gjenopprettingsfrase? Slett hvelvet og start på nytt",
+    "errors": {
+      "alreadyUnlocked": "Hvelvet er allerede låst opp.",
+      "inProgress": "En operasjon pågår.",
+      "unexpected": "Uventet feil. Prøv igjen.",
+      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt."
+    },
+    "passwordLabel": "Passord",
+    "passwordPlaceholder": "Passord",
+    "quickUnlock": {
+      "failed": "Rask opplåsing mislyktes. Bruk passordet ditt.",
+      "pinAriaLabel": "PIN-kode for rask opplåsing",
+      "pinPlaceholder": "PIN-kode",
+      "unlockWithPin": "Lås opp med PIN-kode",
+      "unlockWithTouchId": "Lås opp med Touch ID",
+      "usePasswordBelow": "eller bruk passordet ditt nedenfor",
+      "wrongCredential": "Feil. {{remaining}} forsøk igjen."
+    },
+    "recoveryInterruptedBanner": "Gjenopprettingsflyten ble avbrutt. Angi et nytt passord først.",
+    "recoveryInterruptedBody": "Angi et nytt passord først, og forsegl deretter hvelvet på nytt.",
+    "recoveryInterruptedTitle": "Gjenopprettingsflyten ble avbrutt.",
+    "recoveryLink": "Glemt passordet ditt? Lås opp med gjenopprettingsfrase",
+    "submit": "Lås opp",
+    "subtitle": "Skriv inn passordet ditt for å fortsette.",
+    "suspicion": {
+      "lockedDuringChange": "Passordendring avbrutt: hvelvet ble låst.",
+      "metaChangedExternally": "Hvelvet ble endret i en annen økt — lås opp igjen."
+    },
+    "title": "Lås opp hvelvet ditt."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Kan ikke lese hvelvfilen.",
+      "notFound": "Fant ikke hvelvfilen. Start appen på nytt.",
+      "permissionDenied": "Ingen tillatelse til å åpne hvelvfilen. Sjekk filtillatelsene."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "Jeg har lagret kontonummeret mitt et sted jeg finner det igjen senere.",
+      "back": "Tilbake",
+      "commit": "Opprett hvelv",
+      "committing": "Lagrer…",
+      "copied": "Kopiert",
+      "copy": "Kopier",
+      "eyebrow": "Steg 4 av 4 — kontonummer",
+      "heading": "Lagre kontonummeret ditt.",
+      "intro": "Dette er ihendehaver-tokenet ditt — behandle det som kontanter.",
+      "saveAsFile": "Lagre som fil",
+      "shownOnceBody": "Lagre det nå — Myne kan ikke gjenopprette det for deg. Kreves for å registrere deg for synkronisering senere.",
+      "shownOnceEmphasis": "Dette vises bare én gang."
+    },
+    "briefing": {
+      "back": "Tilbake",
+      "continue": "Fortsett til opprettelse av hvelv",
+      "eyebrow": "Før du oppretter hvelvet ditt",
+      "heading": "Før du oppretter hvelvet ditt",
+      "intro": "Myne krypterer notatene dine slik at bare du kan åpne dem. Tre ting følger av det — les dem, og fortsett deretter.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "Jeg forstår at det ikke finnes e-postgjenoppretting.",
+          "statement": "Det finnes ingen e-postgjenoppretting. Det vil det aldri gjøre.",
+          "why": "Vi ber aldri om e-postadressen din, så det finnes ingen tilbakestillingslenke og ingen konto for kundestøtte å låse opp. Dette er ikke en manglende funksjon — det er garantien. E-postgjenoppretting ville bety at vi kunne lese notatene dine, og Myne er bygget slik at vi ikke kan."
+        },
+        "no-store": {
+          "ackLabel": "Jeg forstår at Myne ikke kan gjenopprette passordet mitt.",
+          "statement": "Passordet ditt låser opp hvelvet ditt. Vi lagrer det ikke.",
+          "why": "Passordet ditt er inndata til nøkkelen som dekrypterer notatene dine. Det forlater aldri denne enheten, og ingenting på serverne våre kan gjenskape det. Det er det som holder notatene dine private — og derfor kan vi ikke tilbakestille det for deg."
+        },
+        "phrase-backup": {
+          "ackLabel": "Jeg forstår at gjenopprettingsfrasen min er den eneste sikkerhetskopien.",
+          "statement": "Gjenopprettingsfrasen din er din eneste sikkerhetskopi.",
+          "why": "Hvis du glemmer passordet ditt, er den 24-ord lange gjenopprettingsfrasen den eneste veien tilbake. {{lostBothSecrets}} Skriv ned frasen, og oppbevar den et trygt sted."
+        }
+      },
+      "why": "Hvorfor?"
+    },
+    "confirm": {
+      "back": "Tilbake",
+      "continue": "Fortsett",
+      "eyebrow": "Steg 3 av 4 — bekreft frase",
+      "heading": "Skriv inn igjen fire ord fra frasen din.",
+      "intro": "Vi spør om bestemte posisjoner for å bekrefte at du har lagret den.",
+      "mismatch": "Samsvarer ikke med ord nr. {{pos}}.",
+      "wordAtPosition": "Ord på posisjon {{pos}}"
+    },
+    "encrypting": {
+      "caption": "Dette tar et øyeblikk.",
+      "footerHint": "Hvis dette tar mer enn 30 sekunder, lukk vinduet og prøv igjen.",
+      "heading": "Krypterer hvelvet ditt"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Prøv igjen.",
+        "title": "Ugyldig kontonummer"
+      },
+      "aeadFailure": {
+        "body": "Prøv igjen.",
+        "title": "Kryptering mislyktes"
+      },
+      "csprng": {
+        "body": "Prøv igjen.",
+        "title": "Kunne ikke generere sikre tilfeldige data"
+      },
+      "invalidPassword": {
+        "body": "Prøv igjen.",
+        "title": "Ugyldig passord"
+      },
+      "invalidVaultMeta": {
+        "body": "Prøv igjen.",
+        "title": "Feil i hvelvformatet"
+      },
+      "ioOther": {
+        "body": "Prøv igjen.",
+        "title": "Kunne ikke lagre hvelvet"
+      },
+      "joinFailure": {
+        "body": "Prøv igjen.",
+        "title": "Noe gikk galt"
+      },
+      "kdfFailure": {
+        "body": "Prøv igjen. Hvis dette fortsetter å skje, kan systemet ditt ha lite minne.",
+        "title": "Kunne ikke sette opp kryptering"
+      },
+      "noSpace": {
+        "body": "Frigjør diskplass og prøv igjen.",
+        "title": "Ikke nok diskplass"
+      },
+      "notFound": {
+        "body": "Prøv igjen.",
+        "title": "Hvelvmappe mangler"
+      },
+      "passwordTooShort": {
+        "body": "Bruk minst 12 tegn.",
+        "title": "Passordet er for kort"
+      },
+      "permissionDenied": {
+        "body": "Sørg for at Myne har tillatelse til å skrive til appdatamappen din.",
+        "title": "Kunne ikke skrive til hvelvmappen"
+      },
+      "sessionExpired": {
+        "body": "Av sikkerhetsgrunner får oppretting av hvelv en tidsavbrudd etter 10 minutter. Start på nytt.",
+        "title": "Økten er utløpt"
+      },
+      "sessionNotFound": {
+        "body": "Start på nytt fra begynnelsen.",
+        "title": "Fant ikke økten"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Lukk andre Myne-vinduer og prøv igjen.",
+        "title": "For mange hvelvopprettinger samtidig"
+      },
+      "vaultArtifactsPresent": {
+        "body": "Et nytt hvelv kan ikke opprettes fordi det allerede finnes hvelvdata på denne enheten. Lukk appen og start på nytt — oppstartsskjermen leder deg til opplåsingsflyten.",
+        "title": "Hvelvet finnes allerede"
+      },
+      "vaultBusyAuth": {
+        "body": "En annen hvelvoperasjon pågår. Prøv igjen om et øyeblikk.",
+        "title": "Hvelvet er opptatt"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Avbryt",
+        "message": "Lukking forkaster gjenopprettingsfrasen din. Fortsette å lukke?",
+        "okLabel": "Lukk likevel",
+        "title": "Forkaste oppretting av hvelv?"
+      },
+      "genericError": {
+        "body": "Prøv igjen.",
+        "title": "Noe gikk galt"
+      }
+    },
+    "password": {
+      "back": "Tilbake",
+      "eyebrow": "Steg 1 av 4 — hovedpassord",
+      "heading": "Opprett hvelv",
+      "helperLead": "Myne lagrer ikke passordet eller gjenopprettingsfrasen din.",
+      "submit": "Generer gjenopprettingsfrase"
+    },
+    "phrase": {
+      "back": "Tilbake",
+      "continue": "Jeg har lagret dette — bekreft frase",
+      "copy": "Kopier",
+      "eyebrow": "Steg 2 av 4 — gjenopprettingsfrase",
+      "heading": "Skriv ned disse 24 ordene.",
+      "intro": "Denne frasen, sammen med passordet ditt, er den eneste måten å gjenopprette hvelvet ditt på. Oppbevar den frakoblet — papir, passordbehandler, maskinvarelommebok. Behandle den som kontanter.",
+      "reveal": "Vis frase",
+      "saveAsFile": "Lagre som fil"
+    },
+    "ready": {
+      "backUpNow": "Sikkerhetskopier dette hvelvet nå",
+      "backedUp": "Sikkerhetskopiert ✓",
+      "backingUp": "Sikkerhetskopierer…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Sikkerhetskopieringen ble ikke fullført — ingen fil ble igjen. Du kan sikkerhetskopiere når som helst fra Innstillinger → Lagring.",
+      "backupFilterName": "Myne-sikkerhetskopi",
+      "body": "Myne skrev hvelvet ditt til appdatamappen din. Hovedpassordet og gjenopprettingsfrasen din er den eneste veien tilbake — sørg for at begge er lagret et trygt sted.",
+      "decrypting": "Dekrypterer…",
+      "done": "Fullført",
+      "heading": "Hvelvet ditt er klart.",
+      "showFolder": "Vis hvelvmappe"
+    },
+    "sessionLost": {
+      "startOver": "Start på nytt"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Opprett et nytt hvelv",
+    "heading": "Velg et hvelv",
+    "loading": "Laster hvelvene dine…",
+    "noneLoaded": "Ingen hvelv kunne lastes akkurat nå.",
+    "openedRelative": "åpnet {{rel}}",
+    "restoreFromBackup": "Gjenopprett fra sikkerhetskopi",
+    "subline": "Du har mer enn ett hvelv på denne enheten. Velg ett for å låse opp.",
+    "vaultFallback": "Hvelv {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "Dette tar et øyeblikk.",
+      "eyebrow": "GJENOPPRETTING · DEKRYPTERER",
+      "footerHint": "Hvis dette tar mer enn 30 sekunder, lukk vinduet og prøv igjen.",
+      "heading": "Dekrypterer hvelvet ditt",
+      "subCaption": "Arbeider… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Gjenoppretting avbrutt: hvelvet ble låst.",
+        "operationInProgress": "En operasjon pågår. Vent litt.",
+        "unexpected": "Uventet feil. Prøv igjen.",
+        "weakPassword": "Det nye passordet må være minst 12 tegn."
+      },
+      "eyebrow": "Gjenoppretting · Nytt passord",
+      "helperBody": "Åpnet med gjenopprettingsfrasen din. Det gamle passordet ditt fungerer ikke lenger — angi et nytt hovedpassord nå.",
+      "helperEmphasis": "Gjenopprettingsfrasen din forblir den samme.",
+      "submit": "Angi nytt passord",
+      "title": "Angi et nytt hovedpassord"
+    },
+    "phrase": {
+      "back": "← Tilbake",
+      "body": "Skriv inn gjenopprettingsfrasen din. 24 BIP-39-ord.",
+      "cellLabel": "Ord {{index}}",
+      "deleteLink": "Slett hvelvet og start på nytt",
+      "eyebrow": "Gjenoppretting",
+      "submit": "Lås opp",
+      "title": "Gjenopprett hvelvet ditt."
+    },
+    "select": {
+      "accountInvalid": "Ugyldig kontonummer. Sjekk det og prøv igjen.",
+      "accountLabel": "Kontonummer (valgfritt)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (valgfritt)",
+      "body": "Velg hvelvet du vil gjenopprette med den 24-ord lange gjenopprettingsfrasen din. Du kan også skrive inn kontonummeret ditt for å gå rett til det.",
+      "cancel": "Avbryt",
+      "checking": "Sjekker…",
+      "loadFailed": "Ingen hvelv kunne lastes akkurat nå.",
+      "loading": "Laster hvelvene dine…",
+      "openedRelative": "åpnet {{rel}}",
+      "or": "eller",
+      "title": "Velg et hvelv å gjenopprette",
+      "useAccountNumber": "Bruk kontonummer",
+      "vaultFallback": "Hvelv {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Hvelv",
+    "createAnother": "Opprett et nytt hvelv",
+    "switchVaultLabel": "Bytt hvelv",
+    "switching": "bytter…",
+    "vaultFallback": "Hvelv {{n}}"
+  },
+  "welcome": {
+    "createCta": "Opprett nytt hvelv",
+    "headlineLine1": "Krypterte markdown-notater.",
+    "headlineLine2": "Ingen e-post ved registrering.",
+    "repairResidue": {
+      "cancel": "Avbryt",
+      "cleanUp": "Rydd opp",
+      "cleaningUp": "Rydder opp…",
+      "confirmBody_one": "{{count}} fil blir fjernet. De er allerede uleselige; ingenting gjenopprettbart går tapt.",
+      "confirmBody_other": "{{count}} filer blir fjernet. De er allerede uleselige; ingenting gjenopprettbart går tapt.",
+      "confirmTitle": "Rydde opp i restfiler?",
+      "doneBody_one": "Fjernet {{count}} restfil. Du kan opprette et nytt hvelv nå.",
+      "doneBody_other": "Fjernet {{count}} restfiler. Du kan opprette et nytt hvelv nå.",
+      "doneTitle": "Ryddet opp",
+      "errorBody": "Noe gikk galt. Lukk appen og prøv igjen.",
+      "errorTitle": "Opprydding mislyktes",
+      "foundBody_one": "{{count}} restfil fra en tidligere sletting som ikke ble fullført. De er allerede uleselige — du mister ingenting gjenopprettbart.",
+      "foundBody_other": "{{count}} restfiler fra en tidligere sletting som ikke ble fullført. De er allerede uleselige — du mister ingenting gjenopprettbart.",
+      "foundTitle": "Restfiler fra en ufullstendig sletting",
+      "partialBody_one": "{{count}} fil kan være låst av en annen app (antivirus, filsynkronisering eller søkeindeksering). Lukk appen og prøv igjen om et øyeblikk, eller fjern hvelvmappen manuelt.",
+      "partialBody_other": "{{count}} filer kan være låst av en annen app (antivirus, filsynkronisering eller søkeindeksering). Lukk appen og prøv igjen om et øyeblikk, eller fjern hvelvmappen manuelt.",
+      "partialTitle": "Noen filer kunne ikke fjernes"
+    },
+    "restoreCta": "Gjenopprett fra sikkerhetskopi",
+    "subtitle": "Notatene dine krypteres på denne enheten før de forlater den. Serveren lagrer bare chiffertekst."
+  }
+}

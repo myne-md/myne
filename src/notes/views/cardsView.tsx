@@ -21,6 +21,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type { SavedView } from "../../lib/prefs";
 import type { StoredProperty, ViewResult, ViewRow } from "../queryEngine";
 import {
@@ -33,8 +34,10 @@ import { PropertyValue, hasDisplayableValue } from "./propertyFormat";
 import { VirtualList } from "../components/VirtualList";
 import { Icon } from "../../components/primitives/Icon";
 
-/** Exact empty-state copy from the design canon ("Cards view — render" frame).
- *  The single literal so an E2E full-text assertion has one source. */
+/** Exact empty-state copy from the design canon ("Cards view — render" frame),
+ *  in the source language. The rendered text goes through i18n
+ *  (`notes.views.cards.empty`); this literal is kept as the test/E2E full-text
+ *  assertion anchor and matches the English catalog value. */
 export const CARDS_EMPTY_COPY = "No notes match this view";
 
 /**
@@ -62,9 +65,6 @@ export function resolveCoverAttachmentId(
   if (fromTarget !== null) return fromTarget;
   return isAttachmentId(raw) ? raw : null;
 }
-
-/** Calm fallback label for the implicit no-value group (group key ""). */
-const NO_VALUE_LABEL = "No value";
 
 /** Default card column width (px) when the view sets no `card_size`. */
 export const DEFAULT_CARD_WIDTH = 220;
@@ -176,9 +176,6 @@ export function resolveAspectRatio(ratio: string | undefined): string {
   const n = Number.parseFloat(ratio.trim());
   return Number.isFinite(n) && n > 0 ? ratio.trim() : DEFAULT_ASPECT_RATIO;
 }
-
-/** Untitled-note fallback (matches the sidebar's "Untitled" placeholder). */
-const UNTITLED_LABEL = "Untitled";
 
 /**
  * Within-group dedupe by note id (task 3, query-engine fan-out constraint).
@@ -350,6 +347,7 @@ function CardArticle({
   onContextMenu?: (e: ReactMouseEvent) => void;
   onSetCover?: SetCoverHandler;
 }) {
+  const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
   const showCoverButton = onSetCover !== undefined && hovering;
   const baseStyle = interactive ? CARD_INTERACTIVE_STYLE : CARD_STYLE;
@@ -372,14 +370,20 @@ function CardArticle({
           type="button"
           data-testid="view.card-set-cover"
           style={COVER_BUTTON_STYLE}
-          title={coverId !== null ? "Change cover image" : "Set cover image"}
+          title={
+            coverId !== null
+              ? t("notes.views.cards.changeCoverImage")
+              : t("notes.views.cards.setCoverImage")
+          }
           onClick={(e) => {
             e.stopPropagation();
             onSetCover?.(row.noteId);
           }}
         >
           <Icon name="image" size={12} />
-          {coverId !== null ? "Change cover" : "Set cover"}
+          {coverId !== null
+            ? t("notes.views.cards.changeCover")
+            : t("notes.views.cards.setCover")}
         </button>
       )}
       {coverId !== null && (
@@ -390,7 +394,7 @@ function CardArticle({
           style={imageStyle}
         />
       )}
-      <div style={CARD_TITLE_STYLE}>{row.title ?? UNTITLED_LABEL}</div>
+      <div style={CARD_TITLE_STYLE}>{row.title ?? t("notes.views.cards.untitled")}</div>
       {columns.map((col) => {
         const prop = row.values[col];
         if (!hasDisplayableValue(prop)) return null; // skip empty
@@ -417,6 +421,7 @@ export function CardsView({
   onCardContextMenu?: CardContextMenuHandler;
   onSetCover?: SetCoverHandler;
 }) {
+  const { t } = useTranslation();
   // Card navigation (task 7) — mirrors the NoteRow click matrix exactly. The
   // render stays read-only (no edit affordance); these only OPEN the note.
   const handleCardClick = (noteId: string) => (e: ReactMouseEvent) => {
@@ -488,10 +493,10 @@ export function CardsView({
     () =>
       result.groups.map((group) => ({
         key: group.key,
-        label: group.key === "" ? NO_VALUE_LABEL : group.key,
+        label: group.key === "" ? t("notes.views.cards.noValue") : group.key,
         rows: dedupeRowsByNote(group.rows),
       })),
-    [result.groups],
+    [result.groups, t],
   );
   // Flatten groups → linear heading/shelf stream the row-virtualizer windows:
   // only the visible shelves (+ buffer) mount, so a large result set never
@@ -505,7 +510,7 @@ export function CardsView({
   if (totalRows === 0) {
     return (
       <div data-testid="view.empty" style={EMPTY_STYLE}>
-        {CARDS_EMPTY_COPY}
+        {t("notes.views.cards.empty")}
       </div>
     );
   }

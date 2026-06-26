@@ -18,6 +18,8 @@
 // the wire). SINGLE CTA per render — fail-closed contract.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
@@ -49,31 +51,31 @@ interface ReasonCopy {
   cta: string;
 }
 
-function copyForReason(reason: FailClosedReason): ReasonCopy {
+function copyForReason(reason: FailClosedReason, t: TFunction): ReasonCopy {
   switch (reason.kind) {
     case "corrupted-vault":
       return {
-        title: "Vault file is corrupted.",
-        body: "If you have a backup, you can restore it — your current files are not touched; the backup is restored as a separate vault first.",
-        cta: "Close app",
+        title: t("failClosed.corrupted.title"),
+        body: t("failClosed.corrupted.body"),
+        cta: t("failClosed.corrupted.cta"),
       };
     case "io-error":
       return reason.ioKind === "PermissionDenied"
         ? {
-            title: "No permission to access the vault file.",
-            body: "Check file permissions.",
-            cta: "Close app",
+            title: t("failClosed.permissionDenied.title"),
+            body: t("failClosed.permissionDenied.body"),
+            cta: t("failClosed.permissionDenied.cta"),
           }
         : {
-            title: "Cannot read the vault file.",
-            body: "This might be a disk or filesystem error.",
-            cta: "Close app",
+            title: t("failClosed.ioError.title"),
+            body: t("failClosed.ioError.body"),
+            cta: t("failClosed.ioError.cta"),
           };
     case "invalid-state":
       return {
-        title: "Unexpected state.",
-        body: "Please restart.",
-        cta: "Lock",
+        title: t("failClosed.invalidState.title"),
+        body: t("failClosed.invalidState.body"),
+        cta: t("failClosed.invalidState.cta"),
       };
   }
 }
@@ -104,7 +106,8 @@ export function FailClosedError({
   onCtaClick,
   onRestoreBackup,
 }: FailClosedErrorProps) {
-  const copy = copyForReason(reason);
+  const { t } = useTranslation();
+  const copy = copyForReason(reason, t);
   const restoreDoor =
     reason.kind === "corrupted-vault" ? onRestoreBackup : undefined;
   return (
@@ -127,7 +130,7 @@ export function FailClosedError({
             style={CTA_STYLE}
             data-testid="fail-closed.restore-cta"
           >
-            Restore from backup…
+            {t("failClosed.restoreFromBackup")}
           </button>
         )}
         <button

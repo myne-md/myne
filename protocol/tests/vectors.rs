@@ -635,6 +635,7 @@ fn hkdf_sha256_vectors() {
             "session-state-key" => SubkeyRole::SessionStateKey,
             "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
             "vault-indices-key" => SubkeyRole::VaultIndicesKey,
+            "attachment-text-key" => SubkeyRole::AttachmentTextKey,
             other => panic!(
                 "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
             ),
@@ -685,6 +686,7 @@ fn hkdf_sha256_vectors() {
         "session-state-key",
         "personal-dictionary-key",
         "vault-indices-key",
+        "attachment-text-key",
     ] {
         assert!(
             seen_roles.contains(required),
@@ -1938,9 +1940,9 @@ fn bip39_recovery_vectors() {
 #[test]
 fn aad_construction_vectors() {
     use protocol::{
-        aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
-        aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
-        aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
+        aad_attachment_text_blob, aad_note_content_encrypt, aad_note_item_key_wrap,
+        aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
+        aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
         aad_workspace_blob,
     };
 
@@ -2014,6 +2016,19 @@ fn aad_construction_vectors() {
                 .as_u64()
                 .unwrap_or_else(|| panic!("[{id}] missing input_provider_kind")) as u8
         };
+        let attachment_id = || -> [u8; 32] {
+            hex_decode_array(
+                case["input_attachment_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_attachment_id_hex")),
+            )
+        };
+        let extractor_version = || -> u8 {
+            case["input_extractor_version"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("[{id}] missing input_extractor_version"))
+                as u8
+        };
 
         let actual = match builder_name {
             "aad_password_wrap" => aad_password_wrap(&kdf_params()),
@@ -2031,6 +2046,9 @@ fn aad_construction_vectors() {
                 aad_quick_unlock_blob(&account_number_hash(), provider_kind())
             }
             "aad_note_content_encrypt" => aad_note_content_encrypt(&items_key_id(), &note_uuid()),
+            "aad_attachment_text_blob" => {
+                aad_attachment_text_blob(&account_number_hash(), &attachment_id(), extractor_version())
+            }
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — schema enforces enum; update this match arm in lockstep with the schema"
             ),
@@ -2084,7 +2102,7 @@ fn aad_construction_vectors() {
 
     // Structural guarantee: every pub aad_* builder must have a decomposition
     // case — drift in either the schema enum or the cases.json surfaces here.
-    let required: [&str; 11] = [
+    let required: [&str; 12] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -2096,6 +2114,7 @@ fn aad_construction_vectors() {
         "aad_personal_dictionary_blob",
         "aad_quick_unlock_blob",
         "aad_note_content_encrypt",
+        "aad_attachment_text_blob",
     ];
     for builder in required {
         assert!(
@@ -3062,6 +3081,262 @@ fn vault_dictionary_vectors() {
         assert!(
             seen_parse_errors.contains(err),
             "vault-dictionary missing parse_fail coverage for DictionaryBlobError '{err}' — every structural reject must be pinned"
+        );
+    }
+}
+
+#[test]
+fn attachment_text_vectors() {
+    use protocol::{
+        decode_attachment_text_blob, derive_subkey, encode_attachment_text_blob_raw,
+        AttachmentTextBlobError, SubkeyRole,
+    };
+
+    let path = companion_vectors_root()
+        .join("attachment-text")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] attachment-text: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "attachment-text");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 12,
+        "attachment-text must carry at least 12 vectors (3 encrypt + 1 decrypt_ok + 2 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("attachment-text", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let attachment_id: [u8; 32] = hex_decode_array(
+                    case["input_attachment_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_attachment_id_hex")),
+                );
+                let plaintext = hex_decode(
+                    case["input_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_plaintext_hex")),
+                );
+                let nonce: [u8; 24] = hex_decode_array(
+                    case["input_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_nonce_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_attachment_text_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{id}] missing expected_attachment_text_blob_hex")
+                        }),
+                );
+
+                let key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+
+                // The HKDF role "attachment-text-key" is DISTINCT from the AAD
+                // role "attachment-text-blob".
+                if let Some(info_hex) = case
+                    .get("informational_attachment_text_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_attachment_text_key_hex disagrees with derive_subkey(root_key, AttachmentTextKey)",
+                    );
+                }
+
+                let actual = encode_attachment_text_blob_raw(
+                    &key,
+                    &account_hash,
+                    &attachment_id,
+                    &plaintext,
+                    &nonce,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] attachment-text encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let attachment_id: [u8; 32] = hex_decode_array(
+                    case["input_attachment_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_attachment_id_hex")),
+                );
+                let expected_plaintext = hex_decode(
+                    case["expected_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_plaintext_hex")),
+                );
+
+                let key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+                let decoded =
+                    decode_attachment_text_blob(&key, &account_hash, &attachment_id, &blob)
+                        .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] attachment-text decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let attachment_id: [u8; 32] = hex_decode_array(
+                    case["input_attachment_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_attachment_id_hex")),
+                );
+
+                let key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
+                match decode_attachment_text_blob(&key, &account_hash, &attachment_id, &blob) {
+                    Err(AttachmentTextBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected AttachmentTextBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode_attachment_text_blob returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => AttachmentTextBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => {
+                        AttachmentTextBlobError::ProtocolVersionMismatch
+                    }
+                    "extractor_version_unsupported" => {
+                        AttachmentTextBlobError::ExtractorVersionUnsupported
+                    }
+                    "header_too_short" => AttachmentTextBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => AttachmentTextBlobError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => AttachmentTextBlobError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with AttachmentTextBlobError"
+                    ),
+                };
+
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                let dummy_id = [0u8; 32];
+                match decode_attachment_text_blob(&dummy_key, &dummy_hash, &dummy_id, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_attachment_text_blob returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "attachment-text missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "extractor_version_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "attachment-text missing parse_fail coverage for AttachmentTextBlobError '{err}' — every structural reject must be pinned"
         );
     }
 }
@@ -4520,6 +4795,180 @@ fn scram_auth_vectors() {
             hex_encode(&out.server_signature),
             expect("expected_server_signature_hex"),
             "[{id}] server_signature"
+        );
+    }
+}
+
+#[test]
+fn saved_view_vectors() {
+    use protocol::{canonical_encode_saved_views, parse_saved_views_array, SavedViewParseError};
+
+    let path = companion_vectors_root()
+        .join("saved-view")
+        .join("v0.1")
+        .join("cases.json");
+    if !path.exists() {
+        eprintln!(
+            "[skip] saved-view: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    assert_eq!(doc["schema"], "saved-view");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty(), "saved-view must have at least one case");
+    assert_unique_vector_ids("saved-view", cases);
+
+    // Mirror of `saved_view::tests::vector_error_str`. `SavedViewParseError` is
+    // `#[non_exhaustive]`, so across the crate boundary this match needs a
+    // catch-all — a new variant lands a vector string here and in the generator.
+    fn err_str(e: &SavedViewParseError) -> &'static str {
+        match e {
+            SavedViewParseError::Malformed => "malformed",
+            SavedViewParseError::MissingField => "missing_field",
+            SavedViewParseError::WrongType => "wrong_type",
+            SavedViewParseError::Unrepresentable => "unrepresentable",
+            other => panic!("unmapped SavedViewParseError variant {other:?} — extend err_str"),
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        let input = hex_decode(field(case, id, "input_bytes_utf8_hex"));
+        match kind {
+            "parse_ok" => {
+                seen.insert("parse_ok");
+                let (views, consumed) = parse_saved_views_array(&input)
+                    .unwrap_or_else(|e| panic!("[{id}] parse_ok input did not parse: {e:?}"));
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+                assert_eq!(
+                    hex_encode(&canonical_encode_saved_views(&views)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch"
+                );
+            }
+            "parse_fail" => {
+                seen.insert("parse_fail");
+                let got = parse_saved_views_array(&input)
+                    .expect_err(&format!("[{id}] parse_fail input parsed Ok"));
+                assert_eq!(
+                    err_str(&got),
+                    field(case, id, "expected_error"),
+                    "[{id}] error variant mismatch"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+    for kind in ["parse_ok", "parse_fail"] {
+        assert!(
+            seen.contains(kind),
+            "saved-view missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+}
+
+#[test]
+fn paired_extension_vectors() {
+    use protocol::{
+        canonical_encode_paired_extensions, parse_paired_extensions_array,
+        PairedExtensionParseError,
+    };
+
+    let path = companion_vectors_root()
+        .join("paired-extension")
+        .join("v0.1")
+        .join("cases.json");
+    if !path.exists() {
+        eprintln!(
+            "[skip] paired-extension: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    assert_eq!(doc["schema"], "paired-extension");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "paired-extension must have at least one case"
+    );
+    assert_unique_vector_ids("paired-extension", cases);
+
+    fn err_str(e: &PairedExtensionParseError) -> &'static str {
+        match e {
+            PairedExtensionParseError::Malformed => "malformed",
+            PairedExtensionParseError::MissingField => "missing_field",
+            PairedExtensionParseError::WrongType => "wrong_type",
+            other => {
+                panic!("unmapped PairedExtensionParseError variant {other:?} — extend err_str")
+            }
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        let input = hex_decode(field(case, id, "input_bytes_utf8_hex"));
+        match kind {
+            "parse_ok" => {
+                seen.insert("parse_ok");
+                let (records, consumed) = parse_paired_extensions_array(&input)
+                    .unwrap_or_else(|e| panic!("[{id}] parse_ok input did not parse: {e:?}"));
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+                assert_eq!(
+                    hex_encode(&canonical_encode_paired_extensions(&records)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch"
+                );
+            }
+            "parse_fail" => {
+                seen.insert("parse_fail");
+                let got = parse_paired_extensions_array(&input)
+                    .expect_err(&format!("[{id}] parse_fail input parsed Ok"));
+                assert_eq!(
+                    err_str(&got),
+                    field(case, id, "expected_error"),
+                    "[{id}] error variant mismatch"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+    for kind in ["parse_ok", "parse_fail"] {
+        assert!(
+            seen.contains(kind),
+            "paired-extension missing every case of case_kind '{kind}' — coverage regression"
         );
     }
 }

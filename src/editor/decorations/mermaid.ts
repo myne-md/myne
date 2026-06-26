@@ -31,6 +31,7 @@ import {
   linesRevealed,
 } from "./cursor-aware";
 import { loadMermaidRenderer, type MermaidRenderer } from "../mermaid/render-mermaid";
+import i18n from "../../i18n";
 
 export const setMermaidRenderer = StateEffect.define<MermaidRenderer>();
 export const mermaidRendererField = StateField.define<MermaidRenderer | null>({
@@ -91,7 +92,7 @@ class MermaidWidget extends WidgetType {
     root.className = "cm-mermaid";
     const card = document.createElement("div");
     card.className = "cm-mermaid-card";
-    card.textContent = "Rendering diagram…";
+    card.textContent = i18n.t("editor.mermaid.rendering");
     root.appendChild(card);
 
     // Click-to-edit: atomic block widget, so place the cursor at the fence source

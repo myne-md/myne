@@ -13,82 +13,90 @@
 // a single generic "file" glyph for every type; a per-type glyph (Word /
 // spreadsheet / archive …) is a follow-up that rides the inline-preview work
 // (MYND-268), at which point this map would grow a category column.
+//
+// i18n: the per-extension labels are i18n KEYS (resolved through the `common`
+// catalog under `editor.attachment.fileKind.label.*`), not English literals.
+// `fileTypeLabel` resolves them via `i18n.t` at CALL time, so the consumer
+// must call it at render time (never freeze the result at module load) to stay
+// reactive to a language switch.
 
-/** Per-extension human type label. Keys are lowercase, no leading dot. */
-const EXTENSION_LABELS: Readonly<Record<string, string>> = {
+import i18n from "../../i18n";
+
+/** Per-extension type-label i18n key. Keys are lowercase, no leading dot. */
+const EXTENSION_LABEL_KEYS: Readonly<Record<string, string>> = {
   // Documents
-  doc: "Word document",
-  docx: "Word document",
-  odt: "Document",
-  pages: "Pages document",
-  rtf: "Rich text document",
+  doc: "editor.attachment.fileKind.label.word",
+  docx: "editor.attachment.fileKind.label.word",
+  odt: "editor.attachment.fileKind.label.document",
+  pages: "editor.attachment.fileKind.label.pages",
+  rtf: "editor.attachment.fileKind.label.richText",
   // Spreadsheets
-  xls: "Spreadsheet",
-  xlsx: "Spreadsheet",
-  ods: "Spreadsheet",
-  numbers: "Numbers spreadsheet",
-  csv: "CSV",
-  tsv: "TSV",
+  xls: "editor.attachment.fileKind.label.spreadsheet",
+  xlsx: "editor.attachment.fileKind.label.spreadsheet",
+  ods: "editor.attachment.fileKind.label.spreadsheet",
+  numbers: "editor.attachment.fileKind.label.numbers",
+  csv: "editor.attachment.fileKind.label.csv",
+  tsv: "editor.attachment.fileKind.label.tsv",
   // Presentations
-  ppt: "Presentation",
-  pptx: "Presentation",
-  odp: "Presentation",
-  key: "Keynote",
+  ppt: "editor.attachment.fileKind.label.presentation",
+  pptx: "editor.attachment.fileKind.label.presentation",
+  odp: "editor.attachment.fileKind.label.presentation",
+  key: "editor.attachment.fileKind.label.keynote",
   // PDF (normally renders inline; here for completeness / fallback)
-  pdf: "PDF",
+  pdf: "editor.attachment.fileKind.label.pdf",
   // Archives
-  zip: "Archive",
-  rar: "Archive",
-  "7z": "Archive",
-  tar: "Archive",
-  gz: "Archive",
-  tgz: "Archive",
-  bz2: "Archive",
+  zip: "editor.attachment.fileKind.label.archive",
+  rar: "editor.attachment.fileKind.label.archive",
+  "7z": "editor.attachment.fileKind.label.archive",
+  tar: "editor.attachment.fileKind.label.archive",
+  gz: "editor.attachment.fileKind.label.archive",
+  tgz: "editor.attachment.fileKind.label.archive",
+  bz2: "editor.attachment.fileKind.label.archive",
   // Plain text
-  txt: "Text document",
-  md: "Markdown",
-  markdown: "Markdown",
-  log: "Log file",
-  epub: "Ebook",
+  txt: "editor.attachment.fileKind.label.text",
+  md: "editor.attachment.fileKind.label.markdown",
+  markdown: "editor.attachment.fileKind.label.markdown",
+  log: "editor.attachment.fileKind.label.log",
+  epub: "editor.attachment.fileKind.label.ebook",
   // Code / structured text
-  json: "JSON",
-  xml: "XML",
-  yml: "YAML",
-  yaml: "YAML",
-  toml: "TOML",
-  html: "HTML",
-  css: "CSS",
-  js: "JavaScript",
-  ts: "TypeScript",
-  tsx: "TypeScript",
-  jsx: "JavaScript",
-  py: "Python",
-  rs: "Rust",
-  go: "Go",
-  java: "Java",
-  c: "C source",
-  cpp: "C++ source",
-  h: "C header",
-  sh: "Shell script",
+  json: "editor.attachment.fileKind.label.json",
+  xml: "editor.attachment.fileKind.label.xml",
+  yml: "editor.attachment.fileKind.label.yaml",
+  yaml: "editor.attachment.fileKind.label.yaml",
+  toml: "editor.attachment.fileKind.label.toml",
+  html: "editor.attachment.fileKind.label.html",
+  css: "editor.attachment.fileKind.label.css",
+  js: "editor.attachment.fileKind.label.javascript",
+  ts: "editor.attachment.fileKind.label.typescript",
+  tsx: "editor.attachment.fileKind.label.typescript",
+  jsx: "editor.attachment.fileKind.label.javascript",
+  py: "editor.attachment.fileKind.label.python",
+  rs: "editor.attachment.fileKind.label.rust",
+  go: "editor.attachment.fileKind.label.go",
+  java: "editor.attachment.fileKind.label.java",
+  c: "editor.attachment.fileKind.label.cSource",
+  cpp: "editor.attachment.fileKind.label.cppSource",
+  h: "editor.attachment.fileKind.label.cHeader",
+  sh: "editor.attachment.fileKind.label.shell",
   // Audio
-  mp3: "Audio",
-  wav: "Audio",
-  flac: "Audio",
-  ogg: "Audio",
-  m4a: "Audio",
+  mp3: "editor.attachment.fileKind.label.audio",
+  wav: "editor.attachment.fileKind.label.audio",
+  flac: "editor.attachment.fileKind.label.audio",
+  ogg: "editor.attachment.fileKind.label.audio",
+  m4a: "editor.attachment.fileKind.label.audio",
   // Video
-  mp4: "Video",
-  mov: "Video",
-  avi: "Video",
-  mkv: "Video",
-  webm: "Video",
+  mp4: "editor.attachment.fileKind.label.video",
+  mov: "editor.attachment.fileKind.label.video",
+  avi: "editor.attachment.fileKind.label.video",
+  mkv: "editor.attachment.fileKind.label.video",
+  webm: "editor.attachment.fileKind.label.video",
   // Images (normally render inline; here for completeness / fallback)
-  png: "Image",
-  jpg: "Image",
-  jpeg: "Image",
-  gif: "Image",
-  webp: "Image",
-  svg: "SVG image",
+  png: "editor.attachment.fileKind.label.image",
+  jpg: "editor.attachment.fileKind.label.image",
+  jpeg: "editor.attachment.fileKind.label.image",
+  gif: "editor.attachment.fileKind.label.image",
+  webp: "editor.attachment.fileKind.label.image",
+  svg: "editor.attachment.fileKind.label.svg",
 };
 
 /**
@@ -114,11 +122,20 @@ export function extensionOf(filename: string): string | null {
  * a friendly label; an unknown extension becomes `"<EXT> file"` (e.g. `"XYZ
  * file"`); a name with no extension is the generic `"File"`. Always total —
  * never throws.
+ *
+ * Resolved through i18n at CALL time — call this at render so it tracks a
+ * language switch; do not cache the returned string at module load.
  */
 export function fileTypeLabel(filename: string): string {
   const ext = extensionOf(filename);
   if (ext === null) {
-    return "File";
+    return i18n.t("editor.attachment.fileKind.generic");
   }
-  return EXTENSION_LABELS[ext] ?? `${ext.toUpperCase()} file`;
+  const key = EXTENSION_LABEL_KEYS[ext];
+  if (key !== undefined) {
+    return i18n.t(key);
+  }
+  return i18n.t("editor.attachment.fileKind.unknown", {
+    ext: ext.toUpperCase(),
+  });
 }

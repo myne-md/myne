@@ -15,6 +15,7 @@ import {
   formatLocalTime,
   formatLocalWeekday,
 } from "../../notes/localDateTime";
+import i18n from "../../i18n";
 
 export type SlashCommand = {
   id: string;
@@ -98,44 +99,44 @@ export function slashCommands(): readonly SlashCommand[] {
   return [
     {
       id: "h1",
-      label: "Heading 1",
+      label: i18n.t("editor.slash.heading1"),
       icon: "H1",
       kbd: "⌘⇧H",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "# "),
     },
     {
       id: "h2",
-      label: "Heading 2",
+      label: i18n.t("editor.slash.heading2"),
       icon: "H2",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "## "),
     },
     {
       id: "h3",
-      label: "Heading 3",
+      label: i18n.t("editor.slash.heading3"),
       icon: "H3",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "### "),
     },
     {
       id: "h4",
-      label: "Heading 4",
+      label: i18n.t("editor.slash.heading4"),
       icon: "H4",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "#### "),
     },
     {
       id: "h5",
-      label: "Heading 5",
+      label: i18n.t("editor.slash.heading5"),
       icon: "H5",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "##### "),
     },
     {
       id: "h6",
-      label: "Heading 6",
+      label: i18n.t("editor.slash.heading6"),
       icon: "H6",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "###### "),
     },
     {
       id: "quote",
-      label: "Quote",
+      label: i18n.t("editor.slash.quote"),
       icon: "”",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "> "),
     },
@@ -144,13 +145,13 @@ export function slashCommands(): readonly SlashCommand[] {
       // change the type. (A type-picker sub-palette is a flagged refinement.)
       // First blockquote-family construct the editor EMITS — §5 callout row.
       id: "callout",
-      label: "Callout",
+      label: i18n.t("editor.slash.callout"),
       icon: "!",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "> [!note] "),
     },
     {
       id: "divider",
-      label: "Divider",
+      label: i18n.t("editor.slash.divider"),
       icon: "—",
       apply: (v, f, t) => insertAtTrigger(v, f, t, "---\n"),
     },
@@ -160,25 +161,25 @@ export function slashCommands(): readonly SlashCommand[] {
       // reuse the shared `localDateTime` helpers — the same source of truth as the
       // `{{date}}` template render context (local time, no UTC, no config).
       id: "date",
-      label: "Date",
+      label: i18n.t("editor.slash.date"),
       icon: "D",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalDate(new Date())),
     },
     {
       id: "day",
-      label: "Day",
+      label: i18n.t("editor.slash.day"),
       icon: "W",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalWeekday(new Date())),
     },
     {
       id: "time",
-      label: "Time",
+      label: i18n.t("editor.slash.time"),
       icon: "T",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalTime(new Date())),
     },
     {
       id: "now",
-      label: "Now",
+      label: i18n.t("editor.slash.now"),
       icon: "N",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalDateTime(new Date())),
     },
@@ -187,32 +188,32 @@ export function slashCommands(): readonly SlashCommand[] {
       // delimiter + one body row) and land the cursor in the first cell, where
       // the editable grid takes over.
       id: "table",
-      label: "Table",
+      label: i18n.t("editor.slash.table"),
       icon: "▦",
       apply: (v, f, t) => insertTable(v, f, t),
     },
     {
       id: "link",
-      label: "Link",
+      label: i18n.t("editor.slash.link"),
       icon: "↗",
       kbd: "⌘K",
       apply: (v, f, t) => insertAtTrigger(v, f, t, "[]()", 1),
     },
     {
       id: "bullet",
-      label: "Bullet list",
+      label: i18n.t("editor.slash.bulletList"),
       icon: "•",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "- "),
     },
     {
       id: "numbered",
-      label: "Numbered list",
+      label: i18n.t("editor.slash.numberedList"),
       icon: "1.",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "1. "),
     },
     {
       id: "todo",
-      label: "To-do list",
+      label: i18n.t("editor.slash.todoList"),
       icon: "☐",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "- [ ] "),
     },
@@ -222,7 +223,7 @@ export function slashCommands(): readonly SlashCommand[] {
       // form-C embed(s) at the trigger position. The trigger text (`/attach…`)
       // is removed first so the embed lands cleanly.
       id: "attach",
-      label: "Attach file",
+      label: i18n.t("editor.slash.attachFile"),
       icon: "▣",
       apply: (v, f, t) => {
         v.dispatch({
@@ -238,7 +239,7 @@ export function slashCommands(): readonly SlashCommand[] {
       // then arms native mic capture — the floating recording bar handles
       // Stop (insert the form-C embed at the cursor) / Cancel (discard).
       id: "record",
-      label: "Voice note",
+      label: i18n.t("editor.slash.voiceNote"),
       icon: "◉",
       apply: (v, f, t) => {
         v.dispatch({
@@ -254,7 +255,7 @@ export function slashCommands(): readonly SlashCommand[] {
       // opens on (same path as typing `[[`). No closeBrackets auto-close on a
       // programmatic dispatch, so the in-progress filter stays chip-free.
       id: "wiki",
-      label: "Wiki link",
+      label: i18n.t("editor.slash.wikiLink"),
       icon: "[[",
       apply: (v, f, t) => {
         v.dispatch({

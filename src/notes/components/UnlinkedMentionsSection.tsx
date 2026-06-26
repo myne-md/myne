@@ -11,6 +11,7 @@
 // is owned here; the reducer just decides which effect to run.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { SECTION_HEADING_STYLE, SIDEBAR_CARD_STYLE } from "./sharedStyles";
 import { Icon } from "../../components/primitives/Icon";
@@ -180,6 +181,7 @@ export function UnlinkedMentionsSection({
   onNavigate,
   onLinkMention,
 }: Props) {
+  const { t } = useTranslation();
   const {
     expanded,
     refreshAvailable,
@@ -243,7 +245,9 @@ export function UnlinkedMentionsSection({
           size={14}
           style={{ color: "var(--fg-3)" }}
         />
-        <span style={SECTION_HEADING_STYLE}>Unlinked mentions</span>
+        <span style={SECTION_HEADING_STYLE}>
+          {t("notes.unlinkedMentions.heading")}
+        </span>
         {expanded && mentions.length > 0 && (
           <span style={{ fontSize: 12, color: "var(--fg-3)" }}>
             {mentions.length}
@@ -268,15 +272,17 @@ export function UnlinkedMentionsSection({
                 color: "var(--accent, var(--fg-2))",
               }}
             >
-              Mentions may have changed — refresh
+              {t("notes.unlinkedMentions.refresh")}
             </button>
           )}
 
           {busy ? (
-            <div style={{ fontSize: 13, color: "var(--fg-3)" }}>Searching…</div>
+            <div style={{ fontSize: 13, color: "var(--fg-3)" }}>
+              {t("notes.unlinkedMentions.searching")}
+            </div>
           ) : mentions.length === 0 ? (
             <div style={{ fontSize: 13, color: "var(--fg-3)" }}>
-              No unlinked mentions.
+              {t("notes.unlinkedMentions.empty")}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -312,12 +318,15 @@ export function UnlinkedMentionsSection({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {mention.title || "Untitled"}
+                    {mention.title || t("notes.unlinkedMentions.untitled")}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleLink(mention)}
-                    title={`Link this mention to ${openTitle ?? "this note"}`}
+                    title={t("notes.unlinkedMentions.linkTooltip", {
+                      title:
+                        openTitle ?? t("notes.unlinkedMentions.thisNote"),
+                    })}
                     style={{
                       flexShrink: 0,
                       background: "transparent",
@@ -330,7 +339,7 @@ export function UnlinkedMentionsSection({
                       color: "var(--fg-2)",
                     }}
                   >
-                    Link
+                    {t("notes.unlinkedMentions.link")}
                   </button>
                 </div>
               ))}

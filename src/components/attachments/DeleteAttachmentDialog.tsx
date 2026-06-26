@@ -10,6 +10,7 @@
 // `--warning`).
 
 import { useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ModalShell } from "../primitives/ModalShell";
 import { Button } from "../primitives/Button";
 import type { CatalogEntry } from "../../lib/attachments";
@@ -74,6 +75,7 @@ export function DeleteAttachmentDialog({
   onConfirm,
   onClose,
 }: DeleteAttachmentDialogProps) {
+  const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const n = referencingNoteIds.length;
@@ -85,42 +87,41 @@ export function DeleteAttachmentDialog({
       .then(() => onClose())
       .catch(() => {
         setDeleting(false);
-        setError("Couldn't delete the attachment. Try again.");
+        setError(t("attachments.deleteDialog.error"));
       });
   };
 
   return (
     <ModalShell
       open
-      title="Delete attachment"
+      title={t("attachments.deleteDialog.title")}
       onClose={deleting ? () => {} : onClose}
       labelId="delete-attachment-title"
       width={460}
-      closeLabel="Cancel"
+      closeLabel={t("attachments.deleteDialog.cancel")}
     >
       <div style={BODY_STYLE}>
-        <div>
-          Permanently delete this attachment? This can't be undone.
-        </div>
+        <div>{t("attachments.deleteDialog.confirmPrompt")}</div>
         <div style={NAME_STYLE}>{attachment.filename}</div>
         {n > 0 ? (
           <>
             <div>
-              It's still used in {n} {n === 1 ? "note" : "notes"}. Deleting it
-              leaves a tombstone where it was embedded:
+              {t("attachments.deleteDialog.stillUsed", { count: n })}
             </div>
             <ul style={NOTE_LIST_STYLE}>
               {referencingNoteIds.map((id) => {
                 const title = cache.get(id as NoteId)?.title ?? null;
                 const label =
-                  title === null || title.trim() === "" ? "Untitled" : title;
+                  title === null || title.trim() === ""
+                    ? t("attachments.deleteDialog.untitled")
+                    : title;
                 return <li key={id}>{label}</li>;
               })}
             </ul>
           </>
         ) : (
           <div style={{ color: "var(--fg-3)", fontSize: 13 }}>
-            Not used in any note.
+            {t("attachments.deleteDialog.notUsed")}
           </div>
         )}
         {error !== null && <div style={ERROR_STYLE}>{error}</div>}
@@ -132,7 +133,7 @@ export function DeleteAttachmentDialog({
           disabled={deleting}
           data-testid="delete-attachment.cancel"
         >
-          Cancel
+          {t("attachments.deleteDialog.cancel")}
         </Button>
         <Button
           variant="danger"
@@ -140,7 +141,7 @@ export function DeleteAttachmentDialog({
           disabled={deleting}
           data-testid="delete-attachment.confirm"
         >
-          {deleting ? "Deleting…" : "Delete"}
+          {deleting ? t("attachments.deleteDialog.deleting") : t("attachments.deleteDialog.delete")}
         </Button>
       </div>
     </ModalShell>

@@ -10,6 +10,7 @@
 // switches to a one-line summary (removed N · freed X) before closing.
 
 import { useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { ModalShell } from "../primitives/ModalShell";
 import { Button } from "../primitives/Button";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
@@ -95,6 +96,7 @@ export function CleanUnusedAttachmentsDialog({
   onConfirm,
   onClose,
 }: CleanUnusedAttachmentsDialogProps) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CleanResult | null>(null);
@@ -112,9 +114,7 @@ export function CleanUnusedAttachmentsDialog({
       })
       .catch(() => {
         setBusy(false);
-        setError(
-          "Couldn't clean up. Some notes may be unreadable — nothing was deleted.",
-        );
+        setError(t("attachments.cleanUnused.error"));
       });
   };
 
@@ -123,23 +123,24 @@ export function CleanUnusedAttachmentsDialog({
     return (
       <ModalShell
         open
-        title="Cleanup complete"
+        title={t("attachments.cleanUnused.completeTitle")}
         onClose={onClose}
         labelId="clean-unused-title"
         width={460}
-        closeLabel="Close"
+        closeLabel={t("attachments.cleanUnused.close")}
       >
         <div style={BODY_STYLE} data-testid="clean-unused.summary">
           <div>
-            Removed {result.deleted}{" "}
-            {result.deleted === 1 ? "attachment" : "attachments"}
+            {t("attachments.cleanUnused.summaryRemoved", { count: result.deleted })}
             {result.bytes_reclaimed > 0
-              ? ` · freed ${formatBytes(result.bytes_reclaimed)}`
+              ? t("attachments.cleanUnused.summaryFreed", {
+                  size: formatBytes(result.bytes_reclaimed),
+                })
               : ""}
             {result.skipped > 0
-              ? ` · ${result.skipped} skipped (now in use)`
+              ? t("attachments.cleanUnused.summarySkipped", { count: result.skipped })
               : ""}
-            .
+            {t("attachments.cleanUnused.summaryPeriod")}
           </div>
         </div>
         <div style={FOOTER_STYLE}>
@@ -148,7 +149,7 @@ export function CleanUnusedAttachmentsDialog({
             onClick={onClose}
             data-testid="clean-unused.close"
           >
-            Close
+            {t("attachments.cleanUnused.close")}
           </Button>
         </div>
       </ModalShell>
@@ -159,18 +160,14 @@ export function CleanUnusedAttachmentsDialog({
   return (
     <ModalShell
       open
-      title="Clean unused attachments"
+      title={t("attachments.cleanUnused.title")}
       onClose={busy ? () => {} : onClose}
       labelId="clean-unused-title"
       width={460}
-      closeLabel="Cancel"
+      closeLabel={t("attachments.cleanUnused.cancel")}
     >
       <div style={BODY_STYLE}>
-        <div>
-          These {n === 1 ? "attachment is" : `${n} attachments are`} not used in
-          any note. Deleting {n === 1 ? "it" : "them"} is permanent and can't be
-          undone.
-        </div>
+        <div>{t("attachments.cleanUnused.intro", { count: n })}</div>
         <ul style={LIST_STYLE}>
           {attachments.map((a) => (
             <li key={a.id} style={ROW_STYLE} data-testid="clean-unused.row">
@@ -188,7 +185,9 @@ export function CleanUnusedAttachmentsDialog({
           ))}
         </ul>
         <div style={{ color: "var(--fg-3)", fontSize: 13 }}>
-          {formatBytes(totalBytes)} will be reclaimed.
+          {t("attachments.cleanUnused.willBeReclaimed", {
+            size: formatBytes(totalBytes),
+          })}
         </div>
         {error !== null && <div style={ERROR_STYLE}>{error}</div>}
       </div>
@@ -199,7 +198,7 @@ export function CleanUnusedAttachmentsDialog({
           disabled={busy}
           data-testid="clean-unused.cancel"
         >
-          Cancel
+          {t("attachments.cleanUnused.cancel")}
         </Button>
         <Button
           variant="danger"
@@ -207,7 +206,9 @@ export function CleanUnusedAttachmentsDialog({
           disabled={busy}
           data-testid="clean-unused.confirm"
         >
-          {busy ? "Cleaning…" : `Delete ${n} unused`}
+          {busy
+            ? t("attachments.cleanUnused.cleaning")
+            : t("attachments.cleanUnused.deleteCta", { count: n })}
         </Button>
       </div>
     </ModalShell>

@@ -41,6 +41,7 @@ import { chipKeySets, isChipBroken, resolveChipParts } from "./resolve-chip";
 import { pickerActiveFromField } from "./picker";
 import { hasAnchor, type WikilinkAnchor } from "./anchor";
 import { isCursorLine, readingModeFacet } from "../decorations/cursor-aware";
+import i18n from "../../i18n";
 
 /**
  * Whether a wikilink chip spanning `[from, to]` should LIFT to its raw, editable
@@ -137,10 +138,10 @@ function isAttachmentEmbed(parts: WikilinkParts): boolean {
 
 export function chipDisplayText(parts: WikilinkParts): string {
   if (parts.alias !== null && parts.alias !== "") {
-    return parts.isEmbed ? `Embed: ${parts.alias}` : parts.alias;
+    return parts.isEmbed ? i18n.t("editor.wikilink.chip.embed", { label: parts.alias }) : parts.alias;
   }
   if (parts.isEmbed) {
-    return `Embed: ${parts.target ?? ""}`;
+    return i18n.t("editor.wikilink.chip.embed", { label: parts.target ?? "" });
   }
   if (parts.heading !== null && parts.heading !== "") {
     return `${parts.target ?? ""} › ${parts.heading}`;

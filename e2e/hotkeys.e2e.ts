@@ -215,3 +215,38 @@ describeE2E("hk4 a migrated window chord still fires through the engine (MYND-36
     );
   });
 });
+
+describeE2E("hk5 the command palette is a rebindable command + opens via the engine", () => {
+  // Precondition: exactly 1 vault (weak KDF). Zero-regression proof for the
+  // palette migration: `palette.toggle` moved off its hardcoded window listener
+  // onto the keybind engine, so it now (a) renders as a rebindable Hotkeys row
+  // and (b) opens the palette through the engine-dispatched Ctrl+K default —
+  // the same chord every `runPaletteAction` caller relies on.
+  it("lists the palette.toggle row with its default chord and opens via Ctrl+K", async () => {
+    let password = "";
+    await scenario(
+      "hk5-palette-rebindable",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // (a) The migrated command surfaces as a rebindable panel row carrying
+        // its default Ctrl+K glyph (formatChord → "Ctrl+K" on the Linux harness).
+        await openSettings(s, "hotkeys");
+        await (await s.byTestId("hotkeys.search")).sendKeys("palette");
+        const row = await s.waitForElement(rowSel("palette.toggle"));
+        const rowText = await row.textContent();
+        if (!rowText.includes("Open command palette") || !rowText.includes("Ctrl+K")) {
+          throw new Error("palette.toggle row missing its label or default Ctrl+K binding");
+        }
+        await closeSettings(s);
+
+        // (b) Ctrl+K → palette.toggle default → engine opens the palette.
+        await sendCtrlChord(s, "k");
+        await s.byTestId("palette.input");
+      },
+    );
+  });
+});

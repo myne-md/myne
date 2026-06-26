@@ -22,6 +22,7 @@
 //
 // No console.log of password contents anywhere in this file.
 
+import { useTranslation } from "react-i18next";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { PasswordCreateForm } from "../../components/PasswordCreateForm";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
@@ -35,16 +36,21 @@ interface PasswordStepProps {
 }
 
 export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
+  const { t } = useTranslation();
   return (
     <StepLayout>
-      <StepEyebrow icon="lock">Step 1 of 4 — master password</StepEyebrow>
-      <StepHeading>Create vault</StepHeading>
+      <StepEyebrow icon="lock">{t("vaultCreation.password.eyebrow")}</StepEyebrow>
+      <StepHeading>{t("vaultCreation.password.heading")}</StepHeading>
 
       <PasswordCreateForm
-        submitLabel="Generate recovery phrase"
+        submitLabel={t("vaultCreation.password.submit")}
         onSubmit={onSubmit}
         testIdPrefix="create"
-        secondaryAction={{ label: "Back", onClick: onBack, icon: "arrow-left" }}
+        secondaryAction={{
+          label: t("vaultCreation.password.back"),
+          onClick: onBack,
+          icon: "arrow-left",
+        }}
         errorBanner={
           error && error.displayMode === "inline" ? (
             <ErrorBanner error={error} />
@@ -62,7 +68,7 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
               color: "var(--fg-2)",
             }}
           >
-            Myne does not store your password or recovery phrase.{" "}
+            {t("vaultCreation.password.helperLead")}{" "}
             <strong style={{ color: "var(--fg-1)" }}>
               {LOST_BOTH_SECRETS_SENTENCE}
             </strong>

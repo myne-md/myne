@@ -164,6 +164,42 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
     );
   });
 
+  it("2 vaults: picker → unlock → back returns to the picker, re-selectable", async () => {
+    // Vault-count precondition: 2. The picker → unlock hop was one-way; a
+    // mis-picked vault stranded the user on its unlock screen. The back
+    // affordance (rendered only on a picker-reached unlock) must return to
+    // the picker, and the picker must stay functional afterwards.
+    let a!: SeededVault;
+    let b!: SeededVault;
+    await scenario(
+      "sm-picker-back-to-picker",
+      {
+        seed: (appDataDir) => {
+          a = seedVault(appDataDir, { password: PASSWORD_A });
+          b = seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+
+        // Pick B → unlock addressed at B, with the back affordance present.
+        await selectPickerRow(app.session, b.vaultId);
+        const formB = await app.session.byTestId("unlock.form");
+        expect(await formB.attribute("data-vault-id")).toBe(b.vaultId);
+        await (await app.session.byTestId("unlock.back-to-picker")).click();
+
+        // Back lands on the picker again, both rows still present…
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        expect(await app.session.byTestIdAll("picker.vault-row")).toHaveLength(2);
+
+        // …and re-selecting (now A) opens A's unlock, proving it stays usable.
+        await selectPickerRow(app.session, a.vaultId);
+        const formA = await app.session.byTestId("unlock.form");
+        expect(await formA.attribute("data-vault-id")).toBe(a.vaultId);
+      },
+    );
+  });
+
   it("2 vaults: picker's Create-another enters the creation flow", async () => {
     // Vault-count precondition: 2.
     await scenario(

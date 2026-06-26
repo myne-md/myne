@@ -72,7 +72,7 @@ export async function switchToVault(session: Session, vaultId: string): Promise<
 }
 
 /** Open the command palette via its Ctrl+K hotkey (the Linux-container
- *  modifier — `CommandPaletteHotkey` listens for metaKey||ctrlKey + k/p) and
+ *  modifier — the `palette.toggle` keybind defaults to Mod-k / Mod-p) and
  *  wait for the palette input. Pure-key chord through the W3C Actions API:
  *  Control DOWN → k DOWN → k UP → Control UP. Then optionally filter by
  *  typing `query` and run the matching action row by its `data-action-id`. */

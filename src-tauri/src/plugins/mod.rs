@@ -9,6 +9,7 @@
 
 pub mod attachments;
 pub mod backup;
+pub mod clipper_pairing;
 pub mod export;
 pub mod importer;
 pub mod notes;

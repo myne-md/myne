@@ -13,7 +13,9 @@
 // SearchableSelect, Button, Input) and design tokens — no new visual language.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import i18n from "../../i18n";
 import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
 import { SearchableSelect } from "../primitives/SearchableSelect";
@@ -29,10 +31,16 @@ import {
 import { resolveActiveVaultId } from "../../lib/vault-list";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 
-const INTERVAL_OPTIONS: readonly SelectOption<BackupInterval>[] = [
-  { value: "every-unlock", label: "Every unlock" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
+// Interval option values paired with their i18n label keys. Labels are
+// resolved at render time (`t(...)`) — storing resolved strings at module
+// scope would freeze the boot language.
+const INTERVAL_OPTION_KEYS: readonly {
+  value: BackupInterval;
+  labelKey: string;
+}[] = [
+  { value: "every-unlock", labelKey: "settings.autoBackup.intervalEveryUnlock" },
+  { value: "daily", labelKey: "settings.autoBackup.intervalDaily" },
+  { value: "weekly", labelKey: "settings.autoBackup.intervalWeekly" },
 ];
 
 const ROW_STYLE: CSSProperties = {
@@ -87,17 +95,24 @@ function statusText(config: ScheduleConfig): { text: string; tone: string } {
   switch (config.lastBackupStatus) {
     case "success":
       return {
-        text: `Last backup: ${formatStamp(config.lastScheduledSuccessAt)}`,
+        text: i18n.t("settings.autoBackup.statusLastBackup", {
+          stamp: formatStamp(config.lastScheduledSuccessAt),
+        }),
         tone: "var(--fg-2)",
       };
     case "failed":
       return {
-        text: `Automatic backup failed — ${formatStamp(config.lastBackupAttemptAt)}`,
+        text: i18n.t("settings.autoBackup.statusFailed", {
+          stamp: formatStamp(config.lastBackupAttemptAt),
+        }),
         tone: "var(--warning, var(--danger))",
       };
     case "never":
     default:
-      return { text: "No automatic backup yet.", tone: "var(--fg-3)" };
+      return {
+        text: i18n.t("settings.autoBackup.statusNever"),
+        tone: "var(--fg-3)",
+      };
   }
 }
 
@@ -107,8 +122,13 @@ interface AutomaticBackupBlockProps {
 }
 
 export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps = {}) {
+  const { t } = useTranslation();
   const [vaultId, setVaultId] = useState<string | null>(null);
   const [config, setConfig] = useState<ScheduleConfig | null>(null);
+
+  // Resolve interval labels at render time so a language switch re-labels them.
+  const intervalOptions: SelectOption<BackupInterval>[] =
+    INTERVAL_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) }));
 
   // Resolve the active vault + load its schedule config once on mount.
   useEffect(() => {
@@ -144,7 +164,7 @@ export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps 
       retentionN: next.retentionN,
     };
     void scheduleWrite(vaultId, settings).catch(async () => {
-      onShowToast?.("Could not save backup settings.");
+      onShowToast?.(t("settings.autoBackup.saveFailedToast"));
       // Reload the on-disk truth so the UI never lies about what persisted.
       try {
         setConfig(await scheduleRead(vaultId));
@@ -159,7 +179,7 @@ export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps 
     const picked = await openDialog({
       directory: true,
       multiple: false,
-      title: "Choose a folder for automatic backups",
+      title: t("settings.autoBackup.chooseFolderDialogTitle"),
     }).catch(() => null);
     if (typeof picked !== "string") return; // cancelled
     commit({ ...config, targetFolder: picked });
@@ -174,41 +194,41 @@ export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps 
     <div style={BLOCK_STYLE} data-testid="settings.auto-backup">
       <div style={ROW_STYLE}>
         <span style={LABEL_STYLE} id="auto-backup-label">
-          Automatic backups
+          {t("settings.autoBackup.title")}
         </span>
         <Switch
           checked={config.enabled}
           onChange={(enabled) => commit({ ...config, enabled })}
-          ariaLabel="Automatic backups"
+          ariaLabel={t("settings.autoBackup.title")}
           ariaDescribedBy="auto-backup-helper"
           testId="settings.auto-backup-toggle"
         />
       </div>
 
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>Frequency</span>
+        <span style={LABEL_STYLE}>{t("settings.autoBackup.frequency")}</span>
         <SearchableSelect
-          options={INTERVAL_OPTIONS}
+          options={intervalOptions}
           selected={[config.interval]}
           onChange={(next) => {
             const interval = next[0] as BackupInterval;
             commit({ ...config, interval });
           }}
-          aria-label="Backup frequency"
+          aria-label={t("settings.autoBackup.frequencyAriaLabel")}
           testId="settings.auto-backup-interval"
-          searchPlaceholder="Search…"
-          emptyText="No match."
+          searchPlaceholder={t("settings.autoBackup.searchPlaceholder")}
+          emptyText={t("settings.autoBackup.searchEmpty")}
         />
       </div>
 
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>Backup folder</span>
+        <span style={LABEL_STYLE}>{t("settings.autoBackup.backupFolder")}</span>
         <Button
           variant="secondary"
           onClick={() => void chooseFolder()}
           data-testid="settings.auto-backup-folder"
         >
-          Choose folder…
+          {t("settings.autoBackup.chooseFolder")}
         </Button>
       </div>
       {config.targetFolder ? (
@@ -216,11 +236,13 @@ export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps 
           {config.targetFolder}
         </code>
       ) : (
-        <span style={FOLDER_PLACEHOLDER_STYLE}>No folder chosen yet.</span>
+        <span style={FOLDER_PLACEHOLDER_STYLE}>
+          {t("settings.autoBackup.noFolderChosen")}
+        </span>
       )}
 
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>Keep last</span>
+        <span style={LABEL_STYLE}>{t("settings.autoBackup.keepLast")}</span>
         <Input
           type="number"
           min={1}
@@ -241,10 +263,7 @@ export function AutomaticBackupBlock({ onShowToast }: AutomaticBackupBlockProps 
       </p>
 
       <p id="auto-backup-helper" style={HELPER_STYLE}>
-        Write an encrypted .myne-backup to a folder on a schedule, while the app
-        is open and the vault is unlocked. Backups stay as encrypted as your
-        vault; Myne keeps the most recent few and never sends anything off your
-        device.
+        {t("settings.autoBackup.helper")}
       </p>
     </div>
   );

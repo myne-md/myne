@@ -57,6 +57,26 @@ use super::title_extract::{extract_title_slices, resolve_note_title};
 /// on success — the UI never produces a `NoteId`, only consumes one
 /// returned by this command (see `decisions.md` 2026-05-07
 /// "Note UUIDv7 backend-gen; UI never names the destination").
+/// MYND-328: resolve this vault's dir and delegate to the canonical note-body
+/// fold (`search_sync::fold_note_body_for_index`) so a note saved in-session is
+/// findable by its attachment content. The refs-first guard here skips even the
+/// `vault_dir` resolution for the common no-attachment save; the shared helper
+/// is the single home for the fold contract (also used by `snapshot_restore`).
+/// Best-effort: any failure returns the body unchanged.
+async fn fold_attachment_text_for_index<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &VaultRuntimeState,
+    note_body: &str,
+) -> String {
+    if crate::plugins::attachments::reconcile::extract_att_ids(note_body).is_empty() {
+        return note_body.to_string();
+    }
+    let Ok(vault_dir) = paths::vault_dir_for_id(app, state.active_vault_id().await) else {
+        return note_body.to_string();
+    };
+    crate::plugins::notes::search_sync::fold_note_body_for_index(state, &vault_dir, note_body).await
+}
+
 #[tauri::command]
 pub async fn note_create<R: Runtime>(
     app: AppHandle<R>,
@@ -107,7 +127,8 @@ pub async fn note_create<R: Runtime>(
     let result = note_create_with_dir(notes_dir, state.inner(), (*plaintext).clone()).await;
     if let Ok(id) = &result {
         let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-        search.upsert(id, &title, &plaintext);
+        let body = fold_attachment_text_for_index(&app, state.inner(), &plaintext).await;
+        search.upsert(id, &title, &body);
         // MYND-424: mark the sync loop dirty so the new note pushes (soft dep).
         if let Some(sig) = app.try_state::<crate::plugins::sync::loop_control::SyncLocalChange>() {
             sig.bump();
@@ -1797,8 +1818,10 @@ pub async fn note_update<R: Runtime>(
     match result {
         Ok(outcome) => {
             // MYND-29: re-index the edited note after a successful write.
+            // MYND-328: fold in cached attachment text for in-session parity.
             let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-            search.upsert(&note_id, &title, &plaintext);
+            let body = fold_attachment_text_for_index(&app, state.inner(), &plaintext).await;
+            search.upsert(&note_id, &title, &body);
             // MYND-424: mark the sync loop dirty so the coalesced push fires
             // (soft dependency — a no-op when the sync plugin isn't registered).
             if let Some(sig) =
@@ -2310,7 +2333,8 @@ pub async fn note_write_batch_transactional<R: Runtime>(
     // follow-up (it bumps the index nonce once this resolves).
     for (note_id, plaintext) in &items {
         let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-        search.upsert(note_id, &title, plaintext);
+        let body = fold_attachment_text_for_index(&app, state.inner(), plaintext).await;
+        search.upsert(note_id, &title, &body);
     }
     tracing::debug!(
         stage = "success",

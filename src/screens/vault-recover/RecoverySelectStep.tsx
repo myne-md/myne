@@ -33,6 +33,8 @@ import {
   type CSSProperties,
   type FormEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { Input } from "../../components/primitives/Input";
@@ -76,18 +78,14 @@ function listReducer(state: ListState, action: ListAction): ListState {
 /** Display name for a row — real label when cached this session (SYNC-3),
  *  else the neutral "Vault N" fallback (N = 1-based last-unlock position). */
 function rowLabel(vault: VaultSummary, index: number): string {
-  return vault.label ?? `Vault ${index + 1}`;
+  return vault.label ?? i18n.t("vaultRecover.select.vaultFallback", { index: index + 1 });
 }
 
 function lastUnlockText(lastUnlock: number | null): string {
   if (lastUnlock == null) return "";
   const rel = formatRelativeTime(new Date(lastUnlock));
-  return rel === "" ? "" : `opened ${rel}`;
+  return rel === "" ? "" : i18n.t("vaultRecover.select.openedRelative", { rel });
 }
-
-// Single generic message for EVERY account-number failure — malformed input
-// and valid-but-no-match are indistinguishable (`account-number.md` §5).
-const ACCOUNT_NUMBER_INVALID = "Invalid account number. Please check and retry.";
 
 const LIST_STYLE: CSSProperties = {
   display: "flex",
@@ -203,6 +201,7 @@ export function RecoverySelectStep({
   onVaultSelected,
   onCancel,
 }: RecoverySelectStepProps) {
+  const { t } = useTranslation();
   const [list, dispatchList] = useReducer(listReducer, { kind: "loading" });
   const [accountNumber, setAccountNumber] = useState("");
   const [accountError, setAccountError] = useState<string | null>(null);
@@ -238,14 +237,14 @@ export function RecoverySelectStep({
         const vaultId = await resolveVaultByAccountNumber(trimmed);
         if (vaultId == null) {
           // Non-distinguishing: malformed OR no-match → one generic message.
-          setAccountError(ACCOUNT_NUMBER_INVALID);
+          setAccountError(t("vaultRecover.select.accountInvalid"));
           return;
         }
         onVaultSelected(vaultId);
       } catch {
         // An unexpected IPC failure is also surfaced as the same generic
         // message — never leak which failure mode occurred.
-        setAccountError(ACCOUNT_NUMBER_INVALID);
+        setAccountError(t("vaultRecover.select.accountInvalid"));
       } finally {
         setResolving(false);
       }
@@ -254,8 +253,8 @@ export function RecoverySelectStep({
 
   return (
     <StepShell
-      title="Choose a vault to recover"
-      body="Pick the vault you want to recover with your 24-word recovery phrase. You can also type your account number to jump straight to it."
+      title={t("vaultRecover.select.title")}
+      body={t("vaultRecover.select.body")}
     >
       {list.kind === "loading" && (
         <div
@@ -267,7 +266,7 @@ export function RecoverySelectStep({
           }}
         >
           <Spinner size={14} style={{ borderWidth: 2 }} />
-          <span>Loading your vaults…</span>
+          <span>{t("vaultRecover.select.loading")}</span>
         </div>
       )}
 
@@ -287,13 +286,13 @@ export function RecoverySelectStep({
 
       {list.kind === "failed" && (
         <p style={{ color: "var(--fg-3)", fontSize: "var(--text-base)" }}>
-          No vaults could be loaded right now.
+          {t("vaultRecover.select.loadFailed")}
         </p>
       )}
 
       <div style={DIVIDER_ROW_STYLE}>
         <hr style={HR_STYLE} />
-        <span>or</span>
+        <span>{t("vaultRecover.select.or")}</span>
         <hr style={HR_STYLE} />
       </div>
 
@@ -305,8 +304,8 @@ export function RecoverySelectStep({
             setAccountNumber(e.target.value);
             if (accountError) setAccountError(null);
           }}
-          placeholder="MY-XXXX-XXXX-XXXX-XXXX-X (optional)"
-          aria-label="Account number (optional)"
+          placeholder={t("vaultRecover.select.accountPlaceholder")}
+          aria-label={t("vaultRecover.select.accountLabel")}
           autoComplete="off"
           spellCheck={false}
           autoCapitalize="off"
@@ -324,7 +323,9 @@ export function RecoverySelectStep({
           disabled={resolving || accountNumber.trim() === ""}
           data-testid="recover.select-account-submit"
         >
-          {resolving ? "Checking…" : "Use account number"}
+          {resolving
+            ? t("vaultRecover.select.checking")
+            : t("vaultRecover.select.useAccountNumber")}
         </Button>
       </form>
 
@@ -334,7 +335,7 @@ export function RecoverySelectStep({
         onClick={onCancel}
         data-testid="recover.select-cancel"
       >
-        Cancel
+        {t("vaultRecover.select.cancel")}
       </Button>
     </StepShell>
   );

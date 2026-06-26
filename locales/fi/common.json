@@ -1,0 +1,2034 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Peruuta",
+      "cleaning": "Siivotaan…",
+      "close": "Sulje",
+      "completeTitle": "Siivous valmis",
+      "deleteCta_one": "Poista {{count}} käyttämätön",
+      "deleteCta_other": "Poista {{count}} käyttämätöntä",
+      "error": "Siivous ei onnistunut. Jotkin muistiinpanot saattavat olla lukukelvottomia — mitään ei poistettu.",
+      "intro_one": "Tätä liitettä ei käytetä missään muistiinpanossa. Sen poistaminen on pysyvää eikä sitä voi perua.",
+      "intro_other": "Näitä {{count}} liitettä ei käytetä missään muistiinpanossa. Niiden poistaminen on pysyvää eikä sitä voi perua.",
+      "summaryFreed": " · vapautui {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "Poistettiin {{count}} liite",
+      "summaryRemoved_other": "Poistettiin {{count}} liitettä",
+      "summarySkipped_one": " · {{count}} ohitettiin (nyt käytössä)",
+      "summarySkipped_other": " · {{count}} ohitettiin (nyt käytössä)",
+      "title": "Siivoa käyttämättömät liitteet",
+      "willBeReclaimed": "{{size}} vapautuu."
+    },
+    "coverPicker": {
+      "close": "Sulje",
+      "dropHint": "Pudota kuva käyttääksesi sitä kansikuvana.",
+      "empty": "Tässä holvissa ei ole vielä kuvia. Lähetä kuva tai vedä se tähän.",
+      "loading": "Ladataan…",
+      "removeCover": "Poista kansikuva",
+      "title": "Valitse kansikuva",
+      "upload": "Lähetä"
+    },
+    "deleteDialog": {
+      "cancel": "Peruuta",
+      "confirmPrompt": "Poistetaanko tämä liite pysyvästi? Tätä ei voi perua.",
+      "delete": "Poista",
+      "deleting": "Poistetaan…",
+      "error": "Liitteen poistaminen ei onnistunut. Yritä uudelleen.",
+      "notUsed": "Ei käytössä missään muistiinpanossa.",
+      "stillUsed_one": "Sitä käytetään edelleen {{count}} muistiinpanossa. Poistaminen jättää tilalle hautakiven kohtaan, johon se oli upotettu:",
+      "stillUsed_other": "Sitä käytetään edelleen {{count}} muistiinpanossa. Poistaminen jättää tilalle hautakiven kohtaan, johon se oli upotettu:",
+      "title": "Poista liite",
+      "untitled": "Nimetön"
+    },
+    "library": {
+      "actionsAriaLabel": "Liitteen toiminnot",
+      "actionsTitle": "Toiminnot",
+      "checkUnusedFailedNotice": "Käyttämättömien liitteiden tarkistus ei onnistunut. Yritä uudelleen.",
+      "checking": "Tarkistetaan…",
+      "cleanUnused": "Siivoa käyttämättömät",
+      "cleanUnusedTitle": "Poista liitteet, joita ei käytetä missään muistiinpanossa",
+      "colCreated": "Luotu",
+      "colName": "Nimi",
+      "colSize": "Koko",
+      "colType": "Tyyppi",
+      "colUsedIn": "Käytössä",
+      "decrypting": "Puretaan liitteitä…",
+      "emptyImportHint": "Tuo tiedosto säilyttääksesi sen holvissasi.",
+      "emptyLoadError": "Liiteluetteloa ei voitu lukea.",
+      "emptyNoAttachments": "Ei vielä liitteitä.",
+      "filterAriaLabel": "Suodata tyypin mukaan",
+      "gridView": "Ruudukkonäkymä",
+      "import": "Tuo",
+      "importDialogTitle": "Tuo liite",
+      "importFile": "Tuo tiedosto",
+      "importing": "Tuodaan…",
+      "listView": "Luettelonäkymä",
+      "menuDelete": "Poista",
+      "menuExport": "Vie",
+      "menuPreview": "Esikatsele",
+      "menuRename": "Nimeä uudelleen",
+      "noMatch": "Yksikään liite ei vastaa hakuasi.",
+      "noUnusedNotice": "Ei käyttämättömiä liitteitä siivottavaksi.",
+      "preview": "Esikatsele",
+      "previewAttachment": "Esikatsele liitettä",
+      "searchAriaLabel": "Etsi liitteitä tiedostonimen mukaan",
+      "searchPlaceholder": "Etsi tiedostonimellä",
+      "sort": {
+        "createdAsc": "Vanhin ensin",
+        "createdDesc": "Uusin ensin",
+        "nameAsc": "Nimi A–Ö",
+        "nameDesc": "Nimi Ö–A"
+      },
+      "sortAriaLabel": "Järjestä liitteet",
+      "supportedFilesFilter": "Tuetut tiedostot",
+      "title": "Liitteet",
+      "typeFilter": {
+        "all": "Kaikki tyypit",
+        "audio": "Ääni",
+        "image": "Kuvat",
+        "other": "Muut",
+        "pdf": "PDF-tiedostot"
+      },
+      "usedInCount_one": "Käytössä {{count}} muistiinpanossa",
+      "usedInCount_other": "Käytössä {{count}} muistiinpanossa",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Ääni: {{filename}}",
+      "file": "Tiedosto",
+      "pause": "Keskeytä",
+      "pdfDocument": "PDF-asiakirja",
+      "pdfFirstPage": "PDF:n ensimmäinen sivu",
+      "play": "Toista"
+    },
+    "usedInNotesPopover": {
+      "empty": "Ei käytössä missään muistiinpanossa.",
+      "untitled": "Nimetön"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "Toinen holvitoiminto on käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
+        "cancelled": "Varmuuskopiointi peruutettu. Tiedostoa ei jäänyt jäljelle.",
+        "invalidDestination": "Kohdekansiota ei voi käyttää.",
+        "ioGeneric": "Varmuuskopiotiedostoa ei voitu kirjoittaa.",
+        "ioNoSpace": "Kohteessa ei ole tarpeeksi tilaa.",
+        "ioPermissionDenied": "Ei oikeutta kirjoittaa kohteeseen.",
+        "joinFailure": "Varmuuskopiointi epäonnistui odottamatta. Tiedostoa ei jäänyt jäljelle.",
+        "memberTooLarge": "Tässä holvissa oleva tiedosto on suurempi kuin varmuuskopiomuoto sallii.",
+        "vaultNotFound": "Varmuuskopioitavaa holvia ei löytynyt.",
+        "verifyFailed": "Kirjoitettu varmuuskopio ei läpäissyt tarkistusta, joten se hylättiin. Yritä uudelleen — eri tallennusvälineelle, jos ongelma toistuu."
+      },
+      "restore": {
+        "authOperationInProgress": "Toinen holvitoiminto on käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
+        "cancelled": "Palautus peruutettu. Mitään ei muutettu.",
+        "damagedBackup": "Varmuuskopiotiedosto on vaurioitunut.",
+        "futureVersionBackup": "Tämä varmuuskopio on tehty uudemmalla Mynen versiolla. Päivitä Myne ja palauta se sitten.",
+        "invalidVaultMeta": "Tämän varmuuskopion holvin metatietoja ei voi lukea, joten palauttaminen ei tuottaisi toimivaa holvia.",
+        "ioGeneric": "Varmuuskopiotiedostoa ei voitu lukea.",
+        "ioPermissionDenied": "Ei oikeutta lukea varmuuskopiotiedostoa.",
+        "joinFailure": "Palautus epäonnistui odottamatta. Mitään ei muutettu.",
+        "missingVaultMeta": "Tästä varmuuskopiosta puuttuvat holvin metatiedot, eikä sitä voi palauttaa.",
+        "notABackupFile": "Tämä tiedosto ei ole Mynen varmuuskopio.",
+        "vaultAlreadyExists": "Tämän varmuuskopion holvi on jo olemassa tällä laitteella."
+      }
+    },
+    "export": {
+      "cancel": "Peruuta",
+      "close": "Sulje",
+      "copying": "Kopioidaan {{done}} / {{total}}…",
+      "preparing": "Valmistellaan…",
+      "successToast": "Varmuuskopio tarkistettu ja tallennettu.",
+      "title": "Varmuuskopioi holvi",
+      "verifying": "Tarkistetaan {{done}} / {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Hyväksy",
+      "close": "Sulje",
+      "codeAriaLabel": "Pariliitoskoodi",
+      "intro": "Varmista, että tämä koodi vastaa laajennuksessa näkyvää koodia, ja muodosta sitten pariliitos napsauttamalla Hyväksy.",
+      "reject": "Hylkää",
+      "rejected": "Pariliitos hylätty.",
+      "title": "Selainlaajennus haluaa muodostaa yhteyden"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Arkisto",
+    "archivedBadgeTitle": "Arkistoitu",
+    "dialogLabel": "Komentopaletti",
+    "matchedInBody": "↳ osuma sisällössä",
+    "noMatches": "Ei osumia",
+    "searchPlaceholder": "Etsi muistiinpanoja tai suorita komento — sulje Esc-näppäimellä",
+    "sectionCommands": "Komennot",
+    "sectionNotes": "Muistiinpanot",
+    "untitledNote": "Nimetön"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Varmuuskopioi holvi…"
+      },
+      "category": {
+        "app": "Sovellus",
+        "editor": "Muokkain",
+        "vault": "Holvi",
+        "view": "Näkymä"
+      },
+      "convertWikilinks": {
+        "label": "Muunna tuodut wikilinkit tässä muistiinpanossa…"
+      },
+      "deleteWorkspace": {
+        "label": "Poista työtila…"
+      },
+      "exportNoteHtml": {
+        "label": "Vie muistiinpano HTML-muodossa…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Vie muistiinpano Markdown-muodossa…"
+      },
+      "exportNotePdf": {
+        "label": "Vie muistiinpano PDF-muodossa…"
+      },
+      "exportNoteTxt": {
+        "label": "Vie muistiinpano pelkkänä tekstinä…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Vie holvi Markdown-muodossa…"
+      },
+      "foldAll": {
+        "label": "Tiivistä kaikki"
+      },
+      "importBaseView": {
+        "label": "Tuo .base-näkymä…"
+      },
+      "importObsidian": {
+        "label": "Tuo Obsidian-holvi…"
+      },
+      "lockVault": {
+        "label": "Lukitse holvi"
+      },
+      "manageTemplates": {
+        "label": "Hallitse malleja…"
+      },
+      "newNoteFromTemplate": {
+        "label": "Uusi muistiinpano mallista…"
+      },
+      "openAttachments": {
+        "label": "Avaa liitteet…"
+      },
+      "openSettings": {
+        "label": "Avaa asetukset…"
+      },
+      "openSnapshots": {
+        "label": "Tilannekuvat…"
+      },
+      "openTodayNote": {
+        "label": "Avaa tämän päivän muistiinpano"
+      },
+      "randomNote": {
+        "label": "Avaa satunnainen muistiinpano"
+      },
+      "renameWorkspace": {
+        "label": "Nimeä työtila uudelleen…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Tallenna työtila nimellä…"
+      },
+      "showGraph": {
+        "label": "Näytä kaavionäkymä…"
+      },
+      "showTags": {
+        "label": "Selaa tunnisteita…"
+      },
+      "showViews": {
+        "label": "Selaa näkymiä…"
+      },
+      "switchWorkspace": {
+        "label": "Vaihda työtilaa…"
+      },
+      "toggleFocus": {
+        "label": "Vaihda tarkennustila"
+      },
+      "toggleLeftSidebar": {
+        "label": "Näytä tai piilota muistiinpanojen sivupalkki"
+      },
+      "toggleReading": {
+        "label": "Vaihda lukunäkymä"
+      },
+      "toggleRightSidebar": {
+        "label": "Näytä tai piilota paluuviittausten sivupalkki"
+      },
+      "toggleSource": {
+        "label": "Vaihda lähdetila"
+      },
+      "toggleStackedTabs": {
+        "label": "Vaihda pinotut välilehdet"
+      },
+      "unfoldAll": {
+        "label": "Laajenna kaikki"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "Lihavointi",
+        "closeTab": "Sulje välilehti",
+        "cycleHeadingLevel": "Vaihda otsikkotasoa",
+        "cycleTabs": "Selaa välilehtiä",
+        "deleteWorkspace": "Poista työtila",
+        "focusNextPane": "Siirrä kohdistus seuraavaan ruutuun",
+        "focusPrevPane": "Siirrä kohdistus edelliseen ruutuun",
+        "foldAll": "Tiivistä kaikki",
+        "inlineCode": "Tekstinsisäinen koodi",
+        "insertWikilink": "Lisää wikilinkki",
+        "italic": "Kursivointi",
+        "navigateBack": "Siirry takaisin",
+        "navigateForward": "Siirry eteenpäin",
+        "newNote": "Uusi muistiinpano",
+        "openSettings": "Avaa asetukset",
+        "paletteToggle": "Avaa komentopaletti",
+        "renameWorkspace": "Nimeä työtila uudelleen",
+        "saveWorkspaceAs": "Tallenna työtila nimellä",
+        "selectAllScoped": "Valitse kaikki (rajattu)",
+        "showGraphView": "Näytä kaavionäkymä",
+        "splitPaneDown": "Jaa ruutu (alas)",
+        "splitPaneRight": "Jaa ruutu (oikealle)",
+        "switchWorkspace": "Vaihda työtilaa",
+        "toggleBulletList": "Vaihda luettelomerkit",
+        "toggleFocusMode": "Vaihda tarkennustila",
+        "toggleNumberedList": "Vaihda numeroitu luettelo",
+        "toggleReadingView": "Vaihda lukunäkymä",
+        "toggleSourceMode": "Vaihda lähdetila",
+        "toggleTaskList": "Vaihda tehtäväluettelo",
+        "unfoldAll": "Laajenna kaikki"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Lisää muunnosnäppäin (⌘, Ctrl tai Alt) — pelkkä näppäin ei voi olla pikanäppäin."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Peruuta",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Ladataan"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exportFailed": "Tiedoston {{filename}} vienti ei onnistunut.",
+        "exported": "Viety {{filename}}.",
+        "renameFailed": "Liitteen uudelleennimeäminen ei onnistunut.",
+        "renamed": "Nimetty uudelleen: {{name}}.",
+        "saveDialogFailed": "Tallennusikkunan avaaminen ei onnistunut."
+      },
+      "convert": {
+        "cancel": "Peruuta",
+        "confirm": "Muunna",
+        "skipped": "ohitettiin — {{note}}",
+        "subtitleEmpty": "Ei mitään muunnettavaa — lähdetiedostoja ei löytynyt.",
+        "subtitle_one": "1 viittaus kirjoitetaan uudelleen. Tarkista ennen vahvistamista.",
+        "subtitle_other": "{{count}} viittausta kirjoitetaan uudelleen. Tarkista ennen vahvistamista.",
+        "title": "Muunna tuodut liitteet"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Liitteen lähde"
+      },
+      "convertCore": {
+        "converted_one": "{{count}} muunnettu",
+        "converted_other": "{{count}} muunnettu",
+        "noneToConvert": "Tässä muistiinpanossa ei ole muunnettavia tuotuja liitteitä.",
+        "skipNote": {
+          "failed": "tuonti epäonnistui",
+          "locked": "holvi lukittu",
+          "notFound": "lähdettä ei löytynyt",
+          "tooLarge": "liian suuri (enintään 64 MiB)",
+          "unsupported": "ei-tuettu tyyppi"
+        },
+        "skippedSuffix_one": " · {{count}} ohitettu",
+        "skippedSuffix_other": " · {{count}} ohitettu"
+      },
+      "fileKind": {
+        "generic": "Tiedosto",
+        "label": {
+          "archive": "Arkisto",
+          "audio": "Ääni",
+          "cHeader": "C-otsaketiedosto",
+          "cSource": "C-lähdekoodi",
+          "cppSource": "C++-lähdekoodi",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Asiakirja",
+          "ebook": "E-kirja",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Kuva",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "Lokitiedosto",
+          "markdown": "Markdown",
+          "numbers": "Numbers-taulukko",
+          "pages": "Pages-asiakirja",
+          "pdf": "PDF",
+          "presentation": "Esitys",
+          "python": "Python",
+          "richText": "Muotoiltu tekstiasiakirja",
+          "rust": "Rust",
+          "shell": "Shell-komentosarja",
+          "spreadsheet": "Taulukko",
+          "svg": "SVG-kuva",
+          "text": "Tekstiasiakirja",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Word-asiakirja",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "{{ext}}-tiedosto"
+      },
+      "lightbox": {
+        "close": "Sulje esikatselu",
+        "export": "Vie",
+        "exportAria": "Vie liite",
+        "imagePreview": "Kuvan esikatselu",
+        "pdfFallback": "PDF",
+        "pdfPreview": "PDF-esikatselu"
+      },
+      "menu": {
+        "actionsAria": "Liitteen toiminnot"
+      },
+      "pdf": {
+        "loading": "Ladataan…"
+      },
+      "picker": {
+        "openFailed": "Tiedostonvalitsimen avaaminen ei onnistunut."
+      },
+      "progress": {
+        "encrypting": "Salataan…",
+        "importing": "Tuodaan…",
+        "loading": "Ladataan…"
+      },
+      "recording": {
+        "barAria": "Ääniviestin tallennus",
+        "cancel": "Peruuta",
+        "noAudio": "Ääntä ei havaittu — tarkista mikrofonisi.",
+        "saving": "Tallennetaan…",
+        "stop": "Pysäytä"
+      },
+      "rename": {
+        "cancel": "Peruuta",
+        "confirm": "Nimeä uudelleen",
+        "title": "Nimeä liite uudelleen"
+      },
+      "summary": {
+        "added_one": "{{count}} lisätty",
+        "added_other": "{{count}} lisätty",
+        "reason": {
+          "failed": "epäonnistui",
+          "locked": "holvi lukittu",
+          "tooLarge": "liian suuri",
+          "unsupported": "ei-tuettu tyyppi"
+        },
+        "skipped_one": "{{count}} ohitettu: {{noun}}",
+        "skipped_other": "{{count}} ohitettu: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "Tallennus on jo käynnissä.",
+          "captureFailed": "Tallennusta ei voitu aloittaa — tarkista mikrofonin käyttöoikeus järjestelmäasetuksista.",
+          "generic": "Tallennusta ei voitu aloittaa.",
+          "locked": "Avaa holvi tallentaaksesi ääniviestin.",
+          "noInputDevice": "Mikrofonia ei löytynyt. Liitä mikrofoni ja yritä uudelleen."
+        },
+        "stopError": {
+          "captureFailed": "Tallennus epäonnistui — tarkista mikrofonisi.",
+          "emptyRecording": "Mitään ei tallennettu.",
+          "generic": "Tallennusta ei voitu tallentaa.",
+          "silentRecording": "Tallennus oli äänetön ja hylättiin — tarkista mikrofonisi."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Keskeytä",
+          "play": "Toista",
+          "seek": "Kelaa"
+        },
+        "menu": {
+          "export": "Vie",
+          "remove": "Poista",
+          "rename": "Nimeä uudelleen",
+          "reveal": "Näytä kirjastossa"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Rikkinäinen liiteviittaus: {{filename}}",
+          "brokenLabel": "rikkinäinen",
+          "deletedAria": "Poistettu liite: {{filename}}",
+          "deletedLabel": "poistettu"
+        },
+        "urlImageFallback": "kuva"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Huomio",
+        "bug": "Vika",
+        "caution": "Varoitus",
+        "danger": "Vaara",
+        "done": "Valmis",
+        "error": "Virhe",
+        "example": "Esimerkki",
+        "failure": "Epäonnistuminen",
+        "faq": "UKK",
+        "hint": "Vihje",
+        "important": "Tärkeää",
+        "info": "Tietoa",
+        "missing": "Puuttuu",
+        "note": "Huomautus",
+        "question": "Kysymys",
+        "quote": "Lainaus",
+        "success": "Onnistui",
+        "tip": "Vinkki",
+        "todo": "Tehtävä",
+        "warning": "Varoitus"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Arkistoitu",
+        "empty": "Ei vielä paluuviittauksia.",
+        "linkedFrom_one": "Linkitetty {{count}} muistiinpanosta",
+        "linkedFrom_other": "Linkitetty {{count}} muistiinpanosta",
+        "untitled": "Nimetön"
+      },
+      "barItems": {
+        "graph": "Kaavio",
+        "lock": "Lukitse",
+        "saveStatus": "Tallennustila",
+        "settings": "Asetukset",
+        "syncStatus": "Synkronoinnin tila",
+        "tags": "Tunnisteet",
+        "viewMode": "Näkymätila",
+        "views": "Näkymät",
+        "wordCount": "Sanamäärä",
+        "workspace": "Työtila"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix_one": " · {{count}} suodatin pudotettiin",
+        "droppedFiltersSuffix_other": " · {{count}} suodatinta pudotettiin",
+        "failed": "Tuonti epäonnistui.",
+        "fileFilterName": "Obsidian Base",
+        "imported_one": "Tuotiin {{count}} näkymä",
+        "imported_other": "Tuotiin {{count}} näkymää",
+        "notValid": "Ei kelvollinen .base-tiedosto.",
+        "skippedSuffix_one": " · {{count}} ohitettu",
+        "skippedSuffix_other": " · {{count}} ohitettu",
+        "stoppedAfter_one": "Tuonti pysäytettiin {{count}} näkymän jälkeen.",
+        "stoppedAfter_other": "Tuonti pysäytettiin {{count}} näkymän jälkeen."
+      },
+      "bottomBar": {
+        "browseTags": "Selaa tunnisteita",
+        "browseViews": "Selaa näkymiä",
+        "cycleViewMode": "Selaa näkymätiloja",
+        "docStats": {
+          "summarySelectionSuffix": " (valinta)",
+          "summary_one": "{{count}} sana · {{characters}} merkkiä",
+          "summary_other": "{{count}} sanaa · {{characters}} merkkiä",
+          "titleSelectionSuffix": " (valinta)",
+          "title_one": "{{characters}} merkkiä · {{words}} sanaa · {{spaces}} välilyöntiä · {{count}} kappale",
+          "title_other": "{{characters}} merkkiä · {{words}} sanaa · {{spaces}} välilyöntiä · {{count}} kappaletta"
+        },
+        "graphTitle": "Kaavio (⌘⇧G)",
+        "lock": "Lukitse",
+        "lockVault": "Lukitse holvi",
+        "openSettings": "Avaa asetukset",
+        "settingsTitle": "Asetukset (⌘,)",
+        "showGraph": "Näytä kaavionäkymä",
+        "syncStatus": "Vain paikallinen · ei synkronoitu",
+        "tagsTitle": "Tunnisteet",
+        "togglePreview": "Vaihda rinnakkaisesikatselu",
+        "viewModeTitle": "Näkymätila: {{mode}} (vaihda napsauttamalla)",
+        "viewsTitle": "Näkymät"
+      },
+      "import": {
+        "imported_one": "Tuotiin {{count}} muistiinpano{{skipped}}",
+        "imported_other": "Tuotiin {{count}} muistiinpanoa{{skipped}}",
+        "skippedSuffix_one": " · {{count}} ohitettu",
+        "skippedSuffix_other": " · {{count}} ohitettu"
+      },
+      "nav": {
+        "goBack": "Siirry takaisin",
+        "goForward": "Siirry eteenpäin"
+      },
+      "noNotesToOpen": "Ei avattavia muistiinpanoja.",
+      "resizeBacklinksSidebar": "Muuta paluuviittausten sivupalkin kokoa",
+      "resizeNotesSidebar": "Muuta muistiinpanojen sivupalkin kokoa",
+      "sidebarToggle": {
+        "hideBacklinks": "Piilota paluuviittausten sivupalkki",
+        "hideNotes": "Piilota muistiinpanojen sivupalkki",
+        "showBacklinks": "Näytä paluuviittausten sivupalkki",
+        "showNotes": "Näytä muistiinpanojen sivupalkki"
+      },
+      "switchingOverlay": {
+        "saving": "Tallennetaan…"
+      },
+      "viewMode": {
+        "live": "Reaaliaikainen",
+        "reading": "Lukeminen",
+        "source": "Lähde"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Työtilan nimi",
+        "renameConfirm": "Nimeä uudelleen",
+        "renameTitle": "Nimeä työtila uudelleen",
+        "saveAsTitle": "Tallenna työtila nimellä",
+        "saveConfirm": "Tallenna"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Työtila",
+        "renameItemLabel": "Nimeä työtila {{name}} uudelleen",
+        "renameTitle": "Nimeä työtila uudelleen",
+        "saveCurrentAs": "Tallenna nykyinen nimellä…",
+        "switchLabel": "Vaihda työtilaa",
+        "toggleTitle": "Työtila: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Kopioi koodi",
+      "defaultBadge": "koodi"
+    },
+    "find": {
+      "close": "Sulje haku",
+      "matchCase": "Sama kirjainkoko",
+      "matchCount": "{{current}} / {{total}}",
+      "nextMatch": "Seuraava osuma",
+      "noMatches": "Ei osumia",
+      "placeholder": "Etsi muistiinpanosta",
+      "previousMatch": "Edellinen osuma",
+      "replaceAll": "Korvaa kaikki",
+      "replaceAllCount": "Korvaa kaikki ({{total}})",
+      "replaceOne": "Korvaa",
+      "replacePlaceholder": "Korvaa tällä",
+      "toggleReplace": "Vaihda korvaus"
+    },
+    "folding": {
+      "clickToUnfold": "Laajenna napsauttamalla",
+      "unfold": "Laajenna"
+    },
+    "footnote": {
+      "heading": "Alaviitteet",
+      "unreferenced": "ei viittausta"
+    },
+    "frontmatter": {
+      "addProperty": "+ Lisää ominaisuus",
+      "propertiesLabel": "Ominaisuudet",
+      "titleAriaLabel": "Muistiinpanon otsikko",
+      "titlePlaceholder": "Nimetön"
+    },
+    "mermaid": {
+      "rendering": "Piirretään kaaviota…"
+    },
+    "slash": {
+      "attachFile": "Liitä tiedosto",
+      "bulletList": "Luettelo",
+      "callout": "Tietolaatikko",
+      "date": "Päivämäärä",
+      "day": "Päivä",
+      "divider": "Erotin",
+      "heading1": "Otsikko 1",
+      "heading2": "Otsikko 2",
+      "heading3": "Otsikko 3",
+      "heading4": "Otsikko 4",
+      "heading5": "Otsikko 5",
+      "heading6": "Otsikko 6",
+      "link": "Linkki",
+      "now": "Nyt",
+      "numberedList": "Numeroitu luettelo",
+      "quote": "Lainaus",
+      "table": "Taulukko",
+      "time": "Aika",
+      "todoList": "Tehtäväluettelo",
+      "voiceNote": "Ääniviesti",
+      "wikiLink": "Wikilinkki"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Lisää sanakirjaan",
+        "ignoreInVault": "Ohita tässä holvissa",
+        "ignoreThisSession": "Ohita tässä istunnossa",
+        "noSuggestions": "Ei ehdotuksia"
+      }
+    },
+    "table": {
+      "addColumn": "Lisää sarake oikealle",
+      "addRow": "Lisää rivi alle",
+      "cellAriaLabel": "Taulukon solu",
+      "deleteColumn": "Poista sarake",
+      "deleteRow": "Poista rivi",
+      "reorderColumn": "Järjestä sarake uudelleen",
+      "reorderRow": "Järjestä rivi uudelleen"
+    },
+    "toolbar": {
+      "apply": "Käytä",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Kappale"
+      },
+      "highlight": {
+        "blue": "Sininen",
+        "green": "Vihreä",
+        "pink": "Pinkki",
+        "purple": "Violetti",
+        "yellow": "Keltainen"
+      },
+      "urlPlaceholder": "Liitä linkin osoite"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Täysi",
+        "narrow": "Kapea",
+        "normal": "Normaali",
+        "wide": "Leveä"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normaali",
+        "relaxed": "Väljä",
+        "tight": "Tiivis"
+      },
+      "textSize": {
+        "lg": "Suuri",
+        "md": "Oletus",
+        "sm": "Pieni",
+        "xl": "Erittäin suuri"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Upotus: {{label}}"
+      },
+      "convert": {
+        "cancel": "Peruuta",
+        "choiceClause_one": " · {{count}} vaatii valinnan.",
+        "choiceClause_other": " · {{count}} vaatii valinnan.",
+        "chooseTarget": "Valitse kohde…",
+        "convert": "Muunna",
+        "convertedToast_one": "{{count}} wikilinkki muunnettu",
+        "convertedToast_other": "{{count}} wikilinkkiä muunnettu",
+        "noneToConvert": "Tässä muistiinpanossa ei ole muunnettavia tuotuja wikilinkkejä.",
+        "nothingToConvert": "Ei mitään muunnettavaa — yksikään tuotu wikilinkki ei ratkennut.",
+        "rewriteCount_one": "{{count}} linkki kirjoitetaan uudelleen",
+        "rewriteCount_other": "{{count}} linkkiä kirjoitetaan uudelleen",
+        "skipped": "ohitettiin — {{reason}}",
+        "title": "Muunna tuodut wikilinkit tässä muistiinpanossa"
+      },
+      "convertCore": {
+        "noMatch": "ei osumaa"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Muistiinpano",
+      "errors": {
+        "attachmentCorrupt": "Tämän muistiinpanon viittaamaa liitettä ei voitu lukea, joten mitään ei viety.",
+        "attachmentMissing": "Tämän muistiinpanon viittaama liite puuttuu, joten mitään ei viety.",
+        "cannotDecrypt": "Tätä muistiinpanoa ei voitu lukea.",
+        "destinationUnusable": "Kohdekansiota ei voi käyttää.",
+        "fallback": "Vienti epäonnistui odottamatta. Yritä uudelleen.",
+        "invalidAttachmentCatalog": "Holvin liiteluetteloa ei voitu lukea, joten mitään ei viety.",
+        "invalidNoteFilename": "Tiedostonimeä ei voi käyttää, joten mitään ei viety.",
+        "invalidNoteId": "Tätä muistiinpanoa ei voitu tunnistaa, joten mitään ei viety.",
+        "invalidPlaintextEncoding": "Tämän muistiinpanon sisältö näyttää vaurioituneelta, joten mitään ei viety. Palauta se varmuuskopiosta.",
+        "ioNoSpace": "Kohteessa ei ole tarpeeksi tilaa.",
+        "ioPermissionDenied": "Ei oikeutta kirjoittaa kohteeseen.",
+        "ioWriteDefault": "Vietyä tiedostoa ei voitu kirjoittaa.",
+        "noteNotFound": "Tätä muistiinpanoa ei ole enää — se on saatettu poistaa.",
+        "pdfCaptureFailed": "PDF:ää ei voitu luoda, joten mitään ei viety.",
+        "pdfExportInProgress": "PDF-vienti on jo käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
+        "pdfPayloadMissing": "Vienti keskeytyi — jos holvi lukittui, avaa se ja yritä uudelleen.",
+        "pdfRenderTimeout": "Muistiinpanon piirtäminen kesti liian kauan, joten mitään ei viety.",
+        "pdfWindowCreateFailed": "Vienti-ikkunaa ei voitu avata, joten mitään ei viety.",
+        "targetExists": "Samanniminen tiedosto on jo kohteessa.",
+        "vaultLocked": "Holvi on lukittu. Avaa se ja yritä sitten uudelleen."
+      },
+      "flow": {
+        "couldNotRead": "Tätä muistiinpanoa ei voitu lukea.",
+        "exportedTo": "Viety: {{filename}}",
+        "exportedToWithAttachments_one": "Viety: {{filename}} + {{count}} liite",
+        "exportedToWithAttachments_other": "Viety: {{filename}} + {{count}} liitettä",
+        "exportedToWithImages_one": "Viety: {{filename}} + {{count}} kuva",
+        "exportedToWithImages_other": "Viety: {{filename}} + {{count}} kuvaa",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Pelkkä teksti",
+        "showInFolder": "Näytä kansiossa"
+      },
+      "modal": {
+        "cancel": "Peruuta",
+        "export": "Vie…",
+        "includeAttachments_one": "Sisällytä {{count}} liite",
+        "includeAttachments_other": "Sisällytä {{count}} liitettä",
+        "title": "Vie Markdown-muodossa"
+      }
+    },
+    "pdf": {
+      "cancel": "Peruuta",
+      "continue": "Jatka…",
+      "title": "Vie PDF-muodossa"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Valitse viennin sijainti",
+      "errors": {
+        "attachmentCorrupt": "Muistiinpanon viittaamaa liitettä ei voitu lukea, joten mitään ei viety.",
+        "attachmentMissing": "Muistiinpanon viittaama liite puuttuu, joten mitään ei viety.",
+        "authOperationInProgress": "Toinen holvitoiminto on käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
+        "cancelled": "Vienti peruutettu. Kohteeseen ei jäänyt mitään.",
+        "cannotDecrypt": "Muistiinpanoa ei voitu lukea, joten mitään ei viety.",
+        "destinationAlreadyExists": "Kohteessa on jo jotain. Valitse vientiä varten tyhjä paikka.",
+        "destinationNotAllowed": "Sijainti on Mynen oman tallennustilan sisällä. Valitse sen ulkopuolinen kansio.",
+        "invalidPlaintextEncoding": "Muistiinpanon sisältö näyttää vaurioituneelta, joten mitään ei viety. Palauta se varmuuskopiosta.",
+        "invalidVaultMeta": "Holvin metatietoja ei voitu lukea, joten mitään ei viety.",
+        "ioWriteDefault": "Vientiä ei voitu kirjoittaa.",
+        "joinFailure": "Vienti epäonnistui odottamatta. Kohteeseen ei jäänyt mitään.",
+        "vaultLocked": "Holvi on lukittu. Avaa se ja yritä sitten uudelleen.",
+        "vaultNotFound": "Vietävää holvia ei löytynyt."
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} liite",
+        "countAttachments_other": "{{count}} liitettä",
+        "countFolders_one": "{{count}} kansio",
+        "countFolders_other": "{{count}} kansiota",
+        "countNotes_one": "{{count}} muistiinpano",
+        "countNotes_other": "{{count}} muistiinpanoa",
+        "exclusionsHistory": "Versiohistoriaa ei sisällytetty.",
+        "exclusionsTrashedAndHistory_one": "{{count}} roskakorissa olevaa muistiinpanoa ja versiohistoriaa ei sisällytetty.",
+        "exclusionsTrashedAndHistory_other": "{{count}} roskakorissa olevaa muistiinpanoa ja versiohistoriaa ei sisällytetty.",
+        "exclusionsTrashed_one": "{{count}} roskakorissa olevaa muistiinpanoa ei sisällytetty.",
+        "exclusionsTrashed_other": "{{count}} roskakorissa olevaa muistiinpanoa ei sisällytetty.",
+        "phaseAttachments": "liitteet",
+        "phaseNotes": "muistiinpanot",
+        "preparing": "Valmistellaan…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Peruuta",
+        "cancelling": "Peruutetaan…",
+        "title": "Viedään…"
+      },
+      "setup": {
+        "cancel": "Peruuta",
+        "choose": "Valitse…",
+        "chooseFolder": "Valitse kansio…",
+        "destinationLabel": "Kohde",
+        "export": "Vie…",
+        "folderSelectAriaLabel": "Vietävä kansio",
+        "noFolderChosen": "Kansiota ei valittu",
+        "noFoldersInVault": "Tässä holvissa ei ole kansioita",
+        "scopeFolder": "Yksi kansio",
+        "scopeLabel": "Laajuus",
+        "scopeWhole": "Koko holvi",
+        "title": "Vie holvi Markdown-muodossa"
+      },
+      "summary": {
+        "done": "Valmis",
+        "showInFolder": "Näytä kansiossa",
+        "title": "Vienti valmis"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "Jos sinulla on varmuuskopio, voit palauttaa sen — nykyisiin tiedostoihisi ei kosketa; varmuuskopio palautetaan ensin erilliseksi holviksi.",
+      "cta": "Sulje sovellus",
+      "title": "Holvitiedosto on vioittunut."
+    },
+    "invalidState": {
+      "body": "Käynnistä uudelleen.",
+      "cta": "Lukitse",
+      "title": "Odottamaton tila."
+    },
+    "ioError": {
+      "body": "Tämä voi olla levy- tai tiedostojärjestelmävirhe.",
+      "cta": "Sulje sovellus",
+      "title": "Holvitiedostoa ei voi lukea."
+    },
+    "permissionDenied": {
+      "body": "Tarkista tiedoston käyttöoikeudet.",
+      "cta": "Sulje sovellus",
+      "title": "Ei oikeutta käyttää holvitiedostoa."
+    },
+    "restoreFromBackup": "Palauta varmuuskopiosta…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Sulje",
+      "countEmpty": "Tyhjä",
+      "count_one": "{{count}} muistiinpano",
+      "count_other": "{{count}} muistiinpanoa",
+      "delete": "Poista",
+      "deleteError": "Muistiinpanon poistaminen ei onnistunut. Yritä uudelleen.",
+      "emptyState": "Arkisto on tyhjä.",
+      "restore": "Palauta",
+      "restoreError": "Muistiinpanon palauttaminen ei onnistunut. Yritä uudelleen.",
+      "title": "Arkisto",
+      "untitled": "Nimetön"
+    },
+    "cardMenu": {
+      "copyLink": "Kopioi linkki",
+      "open": "Avaa",
+      "openInNewTab": "Avaa uudessa välilehdessä",
+      "revealInFolder": "Näytä kansiossa"
+    },
+    "colorLabels": {
+      "clay": "Savi",
+      "moss": "Sammal",
+      "ochre": "Okra",
+      "plum": "Luumu",
+      "slate": "Liuske",
+      "stone": "Kivi"
+    },
+    "decoration": {
+      "colorSection": "Väri",
+      "default": "Oletus",
+      "defaultFolderIcon": "Oletuskansion kuvake",
+      "iconSection": "Kuvake",
+      "menuLabel": "Värimerkintä",
+      "noColor": "Ei väriä",
+      "none": "Ei mitään"
+    },
+    "deleteConfirm": {
+      "cancel": "Peruuta",
+      "delete": "Poista",
+      "title": "Poistetaanko tämä muistiinpano?",
+      "untitled": "Nimetön",
+      "warning": "Tätä ei voi perua."
+    },
+    "filterBuilder": {
+      "addCondition": "Lisää ehto",
+      "addFilterGroup": "Lisää suodatinryhmä",
+      "cancel": "Peruuta",
+      "combinator": {
+        "all": "kaikki",
+        "any": "mikä tahansa"
+      },
+      "match": "Vastaa",
+      "negate": {
+        "is": "on",
+        "isNot": "ei ole"
+      },
+      "noConditions": "Ei vielä ehtoja — tämä näkymä näyttää kaikki sivut.",
+      "noteCount_one": "{{count}} muistiinpano",
+      "noteCount_other": "{{count}} muistiinpanoa",
+      "of": "joista:",
+      "ofTheGroups": "ryhmistä:",
+      "removeCondition": "Poista ehto",
+      "replaceFilter": "Korvaa suodatin",
+      "save": "Tallenna",
+      "searchTextPlaceholder": "hakuteksti",
+      "selectFolderPlaceholder": "valitse kansio…",
+      "selectTagPlaceholder": "valitse tunniste…",
+      "type": {
+        "folder": "Kansio",
+        "search": "Haku",
+        "tag": "Tunniste"
+      },
+      "unrepresentable": "Tämä suodatin on tehty kehittyneellä muokkaimella, eikä sitä voi muokata täällä.",
+      "unresolved": "ratkaisematon"
+    },
+    "folderManagement": {
+      "illegalSegment": "Kansion nimi ei voi sisältää merkkejä / \\ | # ^ [ ] eikä alkaa tai päättyä välilyöntiin.",
+      "tooLong": "Tuo kansiopolku on liian pitkä."
+    },
+    "folderNote": {
+      "defaultTitle": "Hakemisto"
+    },
+    "folderRow": {
+      "createFolderNote": "Luo kansiomuistiinpano",
+      "empty": "tyhjä",
+      "folderNote": "kansiomuistiinpano",
+      "openFolderNote": "Avaa kansiomuistiinpano"
+    },
+    "graph": {
+      "allConnected": "Kaikki on yhteydessä — ei erillisiä muistiinpanoja.",
+      "building": "Rakennetaan kaaviota…",
+      "depthToggleTitle": "Vaihda naapuruston syvyyttä (1 ↔ 2 hyppyä)",
+      "filterAll": "Kaikki",
+      "filterAroundNote": "Tämän muistiinpanon ympärillä",
+      "filterByTag": "Suodata tunnisteella",
+      "filterIsolated": "Erilliset",
+      "hop": "{{depth}} hyppy",
+      "loading": "Ladataan kaaviota…",
+      "noNotes": "Ei vielä muistiinpanoja kaavioon.",
+      "overCap": "Tämä holvi on suuri — koko holvin kaavio on rajattu. Suodata tunnisteen mukaan tai näytä erilliset muistiinpanot tutkiaksesi.",
+      "refresh": "Päivitä",
+      "refreshTitle": "Holvi muuttui — rakenna kaavio uudelleen",
+      "tagPlaceholder": "Tunniste…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Nimetön näkymä"
+      },
+      "modal": {
+        "cancel": "Peruuta",
+        "cancelledNotImported_one": "{{count}} ei tuotu",
+        "cancelledNotImported_other": "{{count}} ei tuotu",
+        "cancelling": "Peruutetaan…",
+        "chooseFolder": "Valitse kansio…",
+        "close": "Sulje",
+        "closeAriaLabel": "Sulje",
+        "copied": "Kopioitu",
+        "copy": "Kopioi",
+        "done": "Valmis",
+        "errorBody": "Tuontia ei voitu viedä loppuun. Kaikki jo tuodut muistiinpanot säilytettiin, ja ne voi turvallisesti pitää tai poistaa.",
+        "flagDetail": "{{kind}} ”{{segment}}” {{reason}}.",
+        "flagKindFolder": "Kansio",
+        "flagKindTitle": "Otsikko",
+        "folderPickerTitle": "Valitse Obsidian-holvin kansio",
+        "hiddenIgnoredPrefix_one": "{{count}} asetus-/piilotiedosto ohitettiin (esim. ",
+        "hiddenIgnoredPrefix_other": "{{count}} asetus-/piilotiedostoa ohitettiin (esim. ",
+        "hiddenIgnoredSuffix": ", pistetiedostot).",
+        "ifNoteExistsLabel": "Jos muistiinpano on jo olemassa",
+        "import": "Tuo",
+        "importFailed": "Tuonti epäonnistui.",
+        "importing": "Tuodaan holviasi…",
+        "markDone": "Merkitse valmiiksi",
+        "markedDone": "Merkitty valmiiksi",
+        "mediaImported_one": "{{count}} tuotu",
+        "mediaImported_other": "{{count}} tuotu",
+        "mediaOmittedSuffix_one": " · {{count}} jätetty pois",
+        "mediaOmittedSuffix_other": " · {{count}} jätetty pois",
+        "needsAttention": "Vaatii huomiota",
+        "needsAttentionHelp": "Nämä muistiinpanot tuotiin sellaisinaan. Ehdotetut korjaukset ovat vain lähtökohtia — kopioi yksi ja nimeä muistiinpano sitten uudelleen avatessasi sen.",
+        "noFolderChosen": "Kansiota ei valittu",
+        "notesImported_one": "muistiinpano tuotu",
+        "notesImported_other": "muistiinpanoa tuotu",
+        "policyCopyHint": "Tuo se olemassa olevan muistiinpanon rinnalle.",
+        "policyCopyLabel": "Tuo kopiona",
+        "policySkipHint": "Suositeltu — tuonnin uudelleenajo ei koskaan kahdenna tai korvaa.",
+        "policySkipLabel": "Ohita se",
+        "preexistingDetail": "Tällä muistiinpanolla oli jo oma kansionsa: ”{{existing}}”, jonka Myne säilytti — se voi poiketa siitä, missä se sijaitsi levyllä.",
+        "preparing": "Valmistellaan…",
+        "progressNotes": " muistiinpanoa",
+        "progressOf": " / ",
+        "reasonIllegalChar": "sisältää merkin, jota Myne ei voi käyttää nimessä",
+        "reasonPathTooLong": "kansion ja otsikon polku on liian pitkä",
+        "reasonSegmentTooLong": "nimi on pidempi kuin Myne sallii",
+        "scanning": "Tutkitaan holviasi…",
+        "setupIntro": "Osoita Myne olemassa olevaan Obsidian-holvin kansioosi. Jokainen Markdown-muistiinpano tuodaan ja salataan saman tien — mikään ei poistu tältä laitteelta, ja alkuperäiset tiedostosi jätetään koskemattomiksi.",
+        "statCancelled": "Peruutettu",
+        "statCanvasSkipped": ".canvas-tiedostot ohitettu",
+        "statEmptyFoldersKept": "Tyhjät kansiot säilytetty",
+        "statMedia": "Media",
+        "statOtherSkipped": "Muut tiedostot ohitettu",
+        "statSkipped": "Ohitettu (jo olemassa)",
+        "suggestedNameAriaLabel": "Ehdotettu nimi",
+        "titleComplete": "Tuonti valmis",
+        "titleFailed": "Tuonti epäonnistui",
+        "titleSetup": "Tuo Obsidian-holvi",
+        "vaultFolderLabel": "Holvin kansio",
+        "vaultRoot": "(holvin juuri)"
+      },
+      "offer": {
+        "body": "Tuo olemassa olevat muistiinpanosi Myneen. Jokainen salataan tuonnin yhteydessä — mikään ei poistu tältä laitteelta, ja alkuperäiset tiedostosi pysyvät täsmälleen paikoillaan.",
+        "chooseFolder": "Valitse kansio…",
+        "laterHint": "Voit aina tuoda myöhemmin kohdasta Asetukset → Tallennus.",
+        "notNow": "Ei nyt",
+        "title": "Tuodaanko Obsidian-holvisi?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Lisää suosikkeihin",
+      "archive": "Arkistoi",
+      "archiveBulkError": "Muistiinpanojen arkistointi ei onnistunut.",
+      "archiveNote": "Arkistoi",
+      "archiveSingleError": "Muistiinpanon arkistointi ei onnistunut.",
+      "attachments": "Liitteet",
+      "bulkArchive_one": "Arkistoi {{count}} muistiinpano",
+      "bulkArchive_other": "Arkistoi {{count}} muistiinpanoa",
+      "bulkDelete_one": "Poista {{count}} muistiinpano",
+      "bulkDelete_other": "Poista {{count}} muistiinpanoa",
+      "bulkMove_one": "Siirrä {{count}} muistiinpano kohteeseen…",
+      "bulkMove_other": "Siirrä {{count}} muistiinpanoa kohteeseen…",
+      "caseMergeBody": "Kansio nimeltä ”{{name}}” on jo olemassa. Nämä yhdistyvät — nimetäänkö toinen uudelleen niiden pitämiseksi erillään?",
+      "color": "Väri…",
+      "createFirstNote": "+ Luo ensimmäinen muistiinpanosi",
+      "createFolderNote": "Luo kansiomuistiinpano",
+      "customize": "Mukauta…",
+      "delete": "Poista",
+      "deleteFolderBody_one": "”{{name}}” ja sen {{count}} muistiinpano",
+      "deleteFolderBody_other": "”{{name}}” ja sen {{count}} muistiinpanoa",
+      "deleteFolderConfirm": "Poista kansio",
+      "deleteFolderTitle": "Poistetaanko tämä kansio?",
+      "deleteFolderWarning": "Muistiinpanot siirtyvät roskakoriin — voit palauttaa ne myöhemmin.",
+      "duplicate": "Kahdenna",
+      "editFilterTitle": "Muokkaa suodatinta",
+      "emptyState": "Ei vielä muistiinpanoja.",
+      "exportHtml": "Vie HTML-muodossa…",
+      "exportMarkdown": "Vie Markdown-muodossa…",
+      "exportPdf": "Vie PDF-muodossa…",
+      "exportTxt": "Vie pelkkänä tekstinä…",
+      "favoritesHeading": "Suosikit",
+      "mergeAnyway": "Yhdistä silti",
+      "newFolder": "Uusi kansio",
+      "newFolderInPlaceholder": "Uusi kansio kohteessa {{path}}",
+      "newFolderPlaceholder": "Uusi kansio",
+      "newNote": "Uusi muistiinpano",
+      "newNoteFromTemplate": "Uusi muistiinpano mallista…",
+      "newNoteHere": "Uusi muistiinpano tähän",
+      "newNoteMenu": "Uusi muistiinpano",
+      "newNoteShortcut": "Uusi muistiinpano (⌘N)",
+      "newSubfolder": "Uusi alikansio",
+      "newViewTitle": "Uusi näkymä",
+      "noteMovedToTrash": "Muistiinpano siirretty roskakoriin",
+      "notesHeading": "Muistiinpanot",
+      "notesMovedToTrash_one": "{{count}} muistiinpano siirretty roskakoriin",
+      "notesMovedToTrash_other": "{{count}} muistiinpanoa siirretty roskakoriin",
+      "openArchive": "Avaa arkisto",
+      "openAttachments": "Avaa liitteet",
+      "openFolderNote": "Avaa kansiomuistiinpano",
+      "openInNewTab": "Avaa uudessa välilehdessä",
+      "openToSide": "Avaa viereen",
+      "openTrash": "Avaa roskakori",
+      "removeAsFolderNote": "Poista kansiomuistiinpanon asetus",
+      "removeFromFavorites": "Poista suosikeista",
+      "rename": "Nimeä uudelleen",
+      "setAsFolderNote": "Aseta kansiomuistiinpanoksi",
+      "trash": "Roskakori",
+      "trashBulkError": "Muistiinpanojen siirtäminen roskakoriin ei onnistunut.",
+      "trashSingleError": "Muistiinpanon siirtäminen roskakoriin ei onnistunut.",
+      "undo": "Kumoa",
+      "vaultRoot": "Holvin juuri",
+      "viewSettingsTitle": "Näkymäasetukset"
+    },
+    "newFromTemplate": {
+      "back": "Takaisin",
+      "blankNote": "Tyhjä muistiinpano",
+      "createNote": "Luo muistiinpano",
+      "emptyState": "Et ole vielä luonut yhtään mallia.",
+      "listLabel": "Mallit",
+      "loading": "Ladataan…",
+      "nameLabel": "Muistiinpanon nimi (mallista ”{{templateName}}”)",
+      "namePlaceholder": "Nimetön",
+      "nameStepTitle": "Nimeä tämä muistiinpano",
+      "pickStepTitle": "Uusi muistiinpano mallista",
+      "untitledTemplate": "Nimetön malli"
+    },
+    "newTab": {
+      "createNote": "Luo uusi muistiinpano",
+      "noNotesMatch": "Yksikään muistiinpano ei vastaa hakua.",
+      "noNotesYet": "Ei vielä muistiinpanoja.",
+      "searchAriaLabel": "Etsi avattavia muistiinpanoja",
+      "searchPlaceholder": "Etsi muistiinpanoja…",
+      "untitled": "Nimetön"
+    },
+    "pane": {
+      "graphTab": "Kaavio",
+      "loading": "Ladataan…",
+      "untitledView": "Nimetön näkymä"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} päivää sitten",
+      "hoursAgo": "{{h}} t sitten",
+      "justNow": "juuri nyt",
+      "minutesAgo": "{{m}} min sitten",
+      "oneWeekAgo": "1 viikko sitten",
+      "weeksAgo": "{{w}} viikkoa sitten",
+      "yesterday": "eilen"
+    },
+    "row": {
+      "addToFavorites": "Lisää suosikkeihin",
+      "folderIndexBadgeLabel": "Kansiomuistiinpano",
+      "folderIndexBadgeTitle": "Kansiomuistiinpano — tämän kansion hakemisto",
+      "folderIndexConflictLabel": "Kansiolla on jo hakemistomuistiinpano",
+      "folderIndexConflictTitle": "Tällä kansiolla on jo hakemistomuistiinpano",
+      "loadError": "Tätä muistiinpanoa ei voitu ladata",
+      "removeFromFavorites": "Poista suosikeista",
+      "renameAriaLabel": "Nimeä muistiinpano uudelleen",
+      "untitled": "Nimetön"
+    },
+    "saveStatus": {
+      "editing": "Muokataan",
+      "editingEllipsis": "Muokataan…",
+      "editingTitle": "Muokataan — automaattitallennus on valmiina",
+      "justNow": "juuri nyt",
+      "retry": "Yritä uudelleen",
+      "saveFailed": "Tallennus epäonnistui",
+      "saveFailedTitle": "Tallennus epäonnistui — napsauta Yritä uudelleen",
+      "saved": "Tallennettu",
+      "savedRelative": "Tallennettu {{rel}}",
+      "saving": "Tallennetaan",
+      "savingEllipsis": "Tallennetaan…"
+    },
+    "savedView": {
+      "defaultName": "Suodatettu näkymä"
+    },
+    "snapshotFailed": {
+      "dismiss": "Hylkää",
+      "message": "Tilannekuvaa ei voitu tallentaa — muistiinpanosi on tallennettu, mutta sen versiohistoria voi olla puutteellinen (levy voi olla täynnä)."
+    },
+    "snapshots": {
+      "cancel": "Peruuta",
+      "changeCount_one": "{{count}} muutos tämän tilannekuvan jälkeen",
+      "changeCount_other": "{{count}} muutosta tämän tilannekuvan jälkeen",
+      "close": "Sulje",
+      "confirmBody": "Nykyinen muistiinpanosi tallennetaan ensin tilannekuvaksi, joten voit kumota tämän.",
+      "confirmTitle": "Palautetaanko tämä tilannekuva?",
+      "decrypting": "Puretaan salausta…",
+      "emptyState": "Ei vielä tilannekuvia. Tilannekuvat tallennetaan automaattisesti muokatessasi ja säilytetään noin 7 päivän ajan. Ne ovat salattuja ja katoavat, kun muistiinpano poistetaan pysyvästi.",
+      "encryptedSize": "Salattu · {{size}}",
+      "errorCannotDecrypt": "Tämän tilannekuvan salausta ei voitu purkaa.",
+      "errorGeneric": "Jokin meni pieleen. Yritä uudelleen.",
+      "errorIo": "Tapahtui levyvirhe — levy voi olla täynnä tai kirjoitussuojattu.",
+      "errorNotFound": "Tuo tilannekuva ei ole enää saatavilla.",
+      "errorStorageAccess": "Holvin tilannekuvavarastoon ei saatu yhteyttä.",
+      "errorVaultLocked": "Holvi on lukittu. Avaa se nähdäksesi tilannekuvat.",
+      "justNow": "juuri nyt",
+      "listLabel": "Tilannekuvaluettelo",
+      "loading": "Ladataan…",
+      "restore": "Palauta",
+      "restoreCta": "Palauta tämä tilannekuva",
+      "restoredStatus": "Palautettu. Sinulla ollut versio on tallennettu tilannekuvaksi.",
+      "selectPlaceholder": "Valitse tilannekuva esikatsellaksesi, mikä on muuttunut siitä lähtien.",
+      "title": "Tilannekuvat",
+      "untitled": "Nimetön"
+    },
+    "tabStrip": {
+      "closeNewTab": "Sulje uusi välilehti",
+      "closeTab": "Sulje {{title}}",
+      "newTab": "Uusi välilehti",
+      "openNotes": "Avoimet muistiinpanot",
+      "pin": "Kiinnitä",
+      "pinned": "Kiinnitetty",
+      "pinnedTitle": "Kiinnitetty — irrota kiinnitys sulkeaksesi",
+      "unpin": "Irrota kiinnitys",
+      "untitled": "Nimetön"
+    },
+    "tagBrowser": {
+      "cancel": "Peruuta",
+      "clear": "Tyhjennä",
+      "combineTagsWith": "Yhdistä tunnisteet operaattorilla",
+      "filtering": "Suodatetaan…",
+      "modeAll": "Kaikki",
+      "modeAny": "Mikä tahansa",
+      "noNotesForFilter": "Ei muistiinpanoja tälle suodattimelle.",
+      "noTagsMatch": "Yksikään tunniste ei vastaa hakua ”{{query}}”.",
+      "noTagsYet": "Ei vielä tunnisteita.",
+      "noteCount_one": "{{count}} muistiinpano",
+      "noteCount_other": "{{count}} muistiinpanoa",
+      "notes": "Muistiinpanot",
+      "pickTag": "Valitse tunniste suodattaaksesi.",
+      "save": "Tallenna",
+      "saveAsView": "Tallenna näkymänä",
+      "searchPlaceholder": "Etsi tunnisteita…",
+      "title": "Tunnisteet",
+      "untitled": "Nimetön",
+      "viewNamePlaceholder": "Näkymän nimi"
+    },
+    "trash": {
+      "close": "Sulje",
+      "countEmpty": "Tyhjä",
+      "count_one": "{{count}} muistiinpano",
+      "count_other": "{{count}} muistiinpanoa",
+      "delete": "Poista",
+      "deleteError": "Muistiinpanon poistaminen ei onnistunut. Yritä uudelleen.",
+      "empty": "Tyhjennä roskakori",
+      "emptyConfirmBody_one": "{{count}} muistiinpano poistetaan pysyvästi.",
+      "emptyConfirmBody_other": "{{count}} muistiinpanoa poistetaan pysyvästi.",
+      "emptyConfirmCta": "Tyhjennä roskakori",
+      "emptyConfirmTitle": "Tyhjennetäänkö roskakori?",
+      "emptyPartialFailure_one": "{{count}} muistiinpanoa ei voitu poistaa, ja se jää roskakoriin.",
+      "emptyPartialFailure_other": "{{count}} muistiinpanoa ei voitu poistaa, ja ne jäävät roskakoriin.",
+      "emptyState": "Roskakori on tyhjä.",
+      "purgeConfirmCta": "Poista pysyvästi",
+      "purgeConfirmTitle": "Poistetaanko pysyvästi?",
+      "restore": "Palauta",
+      "restoreError": "Muistiinpanon palauttaminen ei onnistunut. Yritä uudelleen.",
+      "title": "Roskakori",
+      "untitled": "Nimetön"
+    },
+    "unlinkedMentions": {
+      "empty": "Ei linkittämättömiä mainintoja.",
+      "heading": "Linkittämättömät maininnat",
+      "link": "Linkitä",
+      "linkTooltip": "Linkitä tämä maininta kohteeseen {{title}}",
+      "refresh": "Maininnat ovat saattaneet muuttua — päivitä",
+      "searching": "Etsitään…",
+      "thisNote": "tämä muistiinpano",
+      "untitled": "Nimetön"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Oletus (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (neliö)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (leveä)"
+      },
+      "cancel": "Peruuta",
+      "cardSize": "Kortin koko",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Esitietojen ominaisuus, jonka arvo on kuva — näytetään kunkin kortin kansikuvana. Jätä tyhjäksi, jos et halua kansikuvaa.",
+      "coverImagePlaceholder": "esim. cover",
+      "coverImageProperty": "Kansikuvan ominaisuus",
+      "imageAspectRatio": "Kuvan kuvasuhde",
+      "reset": "Palauta oletukset",
+      "save": "Tallenna"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Vaihda kansikuva",
+        "changeCoverImage": "Vaihda kansikuva",
+        "empty": "Yksikään muistiinpano ei vastaa tätä näkymää",
+        "noValue": "Ei arvoa",
+        "setCover": "Aseta kansikuva",
+        "setCoverImage": "Aseta kansikuva",
+        "untitled": "Nimetön"
+      },
+      "collapseViews": "Tiivistä näkymät",
+      "empty": "Ei vielä näkymiä. Tallenna nykyinen muistiinpanoluettelo näkymänä.",
+      "expandViews": "Laajenna näkymät",
+      "heading": "Näkymät",
+      "host": {
+        "unsupported": "Tämä näkymätyyppi tulee myöhemmässä päivityksessä."
+      },
+      "menu": {
+        "deleteView": "Poista näkymä",
+        "editFilter": "Muokkaa suodatinta…",
+        "moveDown": "Siirrä alas",
+        "moveUp": "Siirrä ylös",
+        "rename": "Nimeä uudelleen",
+        "viewSettings": "Näkymäasetukset…"
+      },
+      "newView": "Uusi näkymä",
+      "untitledView": "Nimetön näkymä"
+    },
+    "welcome": {
+      "body": "Tervetuloa Myneen, yksityiseen tilaasi ajatella ja kirjoittaa.\n\nKaikki, minkä tähän tallennat, on salattu ja pysyy laitteessasi. **Salasanasi** ja **palautuslauseesi** ovat sen ainoat avaimet, joten säilytä ne turvallisessa paikassa. Jos molemmat katoavat, kukaan ei saa muistiinpanojasi takaisin — emme mekään.\n\nTämä on tavallinen muistiinpano, joten tee siitä omasi. Muokkaa sitä, nimeä se uudelleen tai poista se milloin haluat, ja lisää uusia muistiinpanoja ideoidesi karttuessa.\n\nOlemme iloisia, että olet täällä. Lisätietoja Mynestä saat osoitteesta https://myne.md\n",
+      "title": "Tervetuloa Myneen"
+    },
+    "workspace": {
+      "defaultSlotName": "Oletus"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Tarkistetaan vahvuutta…",
+      "confirmLabel": "Vahvista pääsalasana",
+      "defaultEmptyCaption": "Käytetään syötteenä Argon2id-funktiolle (m=256 MiB, t=3, p=2). Valitse jotain, jonka muistat; sitä ei voi nollata.",
+      "mismatch": "Salasanat eivät täsmää.",
+      "passwordLabel": "Pääsalasana",
+      "suggestPassword": "Ehdota salasanaa",
+      "tooShort": "Käytä vähintään {{n}} merkkiä."
+    },
+    "input": {
+      "hide": "Piilota salasana",
+      "show": "Näytä salasana"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "Ei osumia.",
+      "placeholder": "Valitse…",
+      "searchPlaceholder": "Etsi…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Palautus peruutettu: holvi oli lukittu.",
+      "operationInProgress": "Toiminto on käynnissä. Odota.",
+      "unexpected": "Odottamaton virhe. Yritä uudelleen.",
+      "vaultNotFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen."
+    }
+  },
+  "restore": {
+    "backLabel": "Takaisin",
+    "cancelLabel": "Peruuta",
+    "collision": {
+      "body": "Tämän varmuuskopion holvi on jo olemassa tällä laitteella. Voit säilyttää molemmat — palautettu kopio näkyy erillisenä holvina holviluettelossasi — tai palauttaa nyt ja poistaa sitten olemassa olevan holvin itse holviluettelosta (poistaminen pyytää kirjoittamaan DELETE, ja siinä on järkeä vasta kun olet varmistanut, että palautettu holvi avautuu).",
+      "keepBoth": "Säilytä molemmat",
+      "replaceExisting": "Palauta ja korvaa sitten olemassa oleva…"
+    },
+    "damaged": {
+      "body": "Varmuuskopiotiedosto on vaurioitunut, joten mitään ei palautettu. Jos tämä on ainoa kopiosi, pelastus voi palauttaa ehjät muistiinpanot ja luetella tarkalleen, mitä ei voitu lukea — tulos on aina merkitty osittaiseksi palautukseksi.",
+      "close": "Sulje",
+      "salvage": "Pelasta ehjät muistiinpanot…"
+    },
+    "error": {
+      "tryAnotherFile": "Kokeile toista tiedostoa"
+    },
+    "pick": {
+      "body": "Valitse <code>.myne-backup</code>-tiedosto. Varmuuskopio tarkistetaan ennen kuin mitään palautetaan; palautettu holvi avataan kyseisen holvin salasanalla tai palautuslauseella — aivan kuten avattaessa.",
+      "chooseFile": "Valitse varmuuskopiotiedosto…",
+      "corruptedSuffix": "Nykyiseen holviisi ei kosketa: varmuuskopio palautetaan ensin erilliseksi holviksi."
+    },
+    "summary": {
+      "attachments": "Liitteet: {{n}}",
+      "collidedNote": "Tämän holvin aiempi kopio on yhä holviluettelossasi. Kun olet varmistanut, että palautettu holvi avautuu, voit poistaa vanhan holviluettelosta (se pyytää kirjoittamaan DELETE).",
+      "notes": "Muistiinpanot: {{n}}",
+      "openVaultList": "Avaa holviluettelo",
+      "partialHeader_one": "Palautettu osittain — {{count}} kohdetta ei voitu lukea.",
+      "partialHeader_other": "Palautettu osittain — {{count}} kohdetta ei voitu lukea.",
+      "restored": "Holvi palautettu.",
+      "versionHistory": "Versiohistorian merkinnät: {{n}}"
+    },
+    "title": "Palauta varmuuskopiosta",
+    "working": {
+      "cancel": "Peruuta",
+      "restoringProgress": "Palautetaan… {{done}} / {{total}}",
+      "verifying": "Tarkistetaan varmuuskopiota…",
+      "verifyingProgress": "Tarkistetaan varmuuskopiota… {{done}} / {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Kehitysversio",
+      "buildChannelLabel": "Koostekanava",
+      "buildChannelStable": "Vakaa",
+      "changelogButton": "Näytä muutosloki…",
+      "changelogHelper": "Versiokohtaiset muistiinpanot. Tulevat näkyviin, kun MYND-119 valmistuu.",
+      "changelogLabel": "Muutosloki",
+      "licenseBody": "Esialfa · CC0-asiakirjat · AGPL-3.0-sovelluskoodi vaiheen 1 julkaisussa.",
+      "licenseLabel": "Lisenssi",
+      "tagline": "Esialfa · Vaiheen 1 työpöytäsovellus",
+      "threatModelHelper": "Avaa julkinen uhkamalliasiakirja selaimessasi.",
+      "threatModelLabel": "Uhkamalli"
+    },
+    "account": {
+      "argon2idHeading": "Argon2id-parametrit",
+      "changePasswordButton": "Vaihda salasana",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Väärä nykyinen salasana tai holvitiedosto on vioittunut.",
+        "ioError": "Levyvirhe, yritä uudelleen.",
+        "joinFailure": "Jokin meni pieleen, yritä uudelleen.",
+        "samePasswordRejected": "Uusi salasana on sama kuin nykyinen.",
+        "weakNewPassword": "Uuden salasanan on oltava vähintään 12 merkkiä."
+      },
+      "changePasswordHeading": "Vaihda salasana",
+      "changePasswordHelper": "Vaihda pääsalasanasi säilyttäen saman holvin. Palautuslause pysyy samana.",
+      "dangerZoneHeading": "Vaaravyöhyke",
+      "dangerZoneHelper": "Poista tämä holvi ja kaikki muistiinpanot pysyvästi. Tätä ei voi perua. Palautuslause ei palauta holvia.",
+      "deleteVaultButton": "Poista holvi…",
+      "memoryCost": "Muistikustannus",
+      "parallelism": "Rinnakkaisuus",
+      "timeCost": "Aikakustannus",
+      "vaultLabelEyebrow": "HOLVIN NIMI",
+      "vaultLabelHelper": "Tämän holvin nimi, joka näkyy sovelluksen sisäisessä vaihtimessa. Tallennetaan salattuna holvin sisälle; ei koskaan poistu laitteeltasi selkokielisenä.",
+      "vaultLabelPlaceholder": "Lisää nimi…",
+      "vaultLabelSave": "Tallenna"
+    },
+    "appearance": {
+      "showEditTimesAria": "Näytä muokkausajat sivupalkissa",
+      "showEditTimesHelper": "Näytä kunkin muistiinpanon viimeisin muokkausaika sen otsikon alla sivupalkissa.",
+      "showEditTimesLabel": "Näytä muokkausajat",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Tumma",
+        "light": "Vaalea",
+        "system": "Järjestelmä"
+      },
+      "themeHelper": "Vaihda vaalean ja tumman teeman välillä tai noudata järjestelmän asetusta.",
+      "themeLabel": "Teema",
+      "themeOptionAria": "{{label}}-teema",
+      "themeSaveError": "Teeman tallentaminen ei onnistunut. Yritä uudelleen.",
+      "timestampsSaveError": "Asetuksen tallentaminen ei onnistunut. Yritä uudelleen."
+    },
+    "archive": {
+      "helper": "Salli muistiinpanojen siirtäminen arkistoon, pois päälistalta. Tämän poistaminen käytöstä palauttaa jokaisen arkistoidun muistiinpanon kansioonsa ja piilottaa arkistointitoiminnot.",
+      "label": "Arkistointi",
+      "off": "Pois",
+      "on": "Päällä",
+      "saveError": "Arkistointiasetusta ei voitu päivittää."
+    },
+    "autoBackup": {
+      "backupFolder": "Varmuuskopiokansio",
+      "chooseFolder": "Valitse kansio…",
+      "chooseFolderDialogTitle": "Valitse kansio automaattisille varmuuskopioille",
+      "frequency": "Tiheys",
+      "frequencyAriaLabel": "Varmuuskopioinnin tiheys",
+      "helper": "Kirjoita salattu .myne-backup-tiedosto kansioon ajastetusti, kun sovellus on auki ja holvi lukitsematon. Varmuuskopiot pysyvät yhtä salattuina kuin holvisi; Myne säilyttää muutaman viimeisimmän eikä koskaan lähetä mitään laitteeltasi.",
+      "intervalDaily": "Päivittäin",
+      "intervalEveryUnlock": "Joka avauksella",
+      "intervalWeekly": "Viikoittain",
+      "keepLast": "Säilytä viimeisimmät",
+      "noFolderChosen": "Kansiota ei ole vielä valittu.",
+      "saveFailedToast": "Varmuuskopiointiasetuksia ei voitu tallentaa.",
+      "searchEmpty": "Ei osumia.",
+      "searchPlaceholder": "Etsi…",
+      "statusFailed": "Automaattinen varmuuskopiointi epäonnistui — {{stamp}}",
+      "statusLastBackup": "Viimeisin varmuuskopio: {{stamp}}",
+      "statusNever": "Ei vielä automaattista varmuuskopiota.",
+      "title": "Automaattiset varmuuskopiot"
+    },
+    "changePassword": {
+      "cancel": "Peruuta",
+      "checkingStrength": "Tarkistetaan vahvuutta…",
+      "confirmLabel": "Vahvista uusi salasana",
+      "currentLabel": "Nykyinen salasana",
+      "mismatch": "Salasanat eivät täsmää.",
+      "newLabel": "Uusi salasana",
+      "submit": "Vaihda salasana",
+      "submitting": "Vaihdetaan salasanaa…",
+      "title": "Vaihda salasana",
+      "tooShort": "Käytä vähintään {{n}} merkkiä."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Selainlaajennus"
+      },
+      "when": {
+        "bare": "Yhdistetty",
+        "daysAgo_one": "Yhdistetty {{count}} päivä sitten",
+        "daysAgo_other": "Yhdistetty {{count}} päivää sitten",
+        "hoursAgo_one": "Yhdistetty {{count}} t sitten",
+        "hoursAgo_other": "Yhdistetty {{count}} t sitten",
+        "justNow": "Yhdistetty juuri nyt",
+        "minutesAgo_one": "Yhdistetty {{count}} min sitten",
+        "minutesAgo_other": "Yhdistetty {{count}} min sitten",
+        "onDate": "Yhdistetty {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Käytössä",
+      "apply": "Käytä",
+      "applyError": "Tuota teemaa ei voitu ottaa käyttöön. Yritä uudelleen.",
+      "cancel": "Peruuta",
+      "confirm": "Vahvista",
+      "delete": "Poista",
+      "deleteError": "Tuota teemaa ei voitu poistaa. Yritä uudelleen.",
+      "empty": "Ei vielä omia teemoja. Tuo teema tai avaa teemakansio ja lisää teematiedosto.",
+      "error": {
+        "aColorFallback": "väri",
+        "invalidFile": "Virheellinen teematiedosto.",
+        "invalidName": "Turvaton teeman nimi",
+        "invalidValue": "Virheellinen arvo kohteelle {{key}}",
+        "invalidValueWithLine": "Virheellinen arvo kohteelle {{key}} (rivi {{line}})",
+        "missingKey": "Puuttuva vaadittu väri {{key}}",
+        "parseError": "Ei kelvollista JSONia",
+        "parseErrorWithLine": "Ei kelvollista JSONia (rivi {{line}})"
+      },
+      "fileFilterName": "Myne-teema",
+      "helper": "Käytä omaa väripalettiasi. Teemat tarkistetaan tällä laitteella ennen käyttöä — mitään ei lähetetä verkkoon.",
+      "importButton": "Tuo teema…",
+      "importError": "Tuo tiedosto ei ole kelvollinen teema. Avaa viite nähdäksesi muodon.",
+      "label": "Omat teemat",
+      "openFolderButton": "Avaa teemakansio",
+      "openFolderError": "Teemakansion avaaminen ei onnistunut.",
+      "readError": "Teemakansiotasi ei voitu lukea."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Tyhjä (ei mallia)",
+      "dateFormatHelper": "Kunkin päivämuistiinpanon otsikko. Tukee muotoja YYYY, MM, DD. Oletus on {{default}}.",
+      "dateFormatLabel": "Päivämuistiinpanon päivämäärämuoto",
+      "dateFormatSaveError": "Päivämäärämuotoa ei voitu tallentaa. Yritä uudelleen.",
+      "folderHelper": "Mihin uudet päivämuistiinpanot tallennetaan. Oletus on {{default}} — kansio säilytetään silloinkin, kun se on tyhjä.",
+      "folderLabel": "Päivämuistiinpanojen kansio",
+      "folderSaveError": "Päivämuistiinpanojen kansiota ei voitu tallentaa. Yritä uudelleen.",
+      "searchEmpty": "Yksikään malli ei vastaa hakua.",
+      "searchPlaceholder": "Etsi malleja…",
+      "templateHelper": "Valitse malli, josta kukin päivämuistiinpano aloitetaan, tai jätä tyhjäksi, jolloin saat tyhjän muistiinpanon, jonka otsikkona on päivämäärä.",
+      "templateLabel": "Päivämuistiinpanon malli",
+      "templateSaveError": "Päivämuistiinpanon mallia ei voitu tallentaa. Yritä uudelleen.",
+      "untitledTemplate": "Nimetön malli"
+    },
+    "deleteVault": {
+      "cancel": "Peruuta",
+      "caseSensitiveHint": "Kirjainkokoriippuvainen. Kirjoita sana täsmälleen oikein ottaaksesi poiston käyttöön.",
+      "continue": "Jatka",
+      "copyPrimary": "Tämä poistaa pysyvästi tämän holvin ja kaikki sen sisältämät muistiinpanot. Toimintoa ei voi perua, eikä palautuslauseesi palauta tietoja.",
+      "copySecondary": "Holvin avaimet nollataan muistista ennen tiedostojen poistamista; mahdollinen levylle jäävä irrallinen salateksti pysyy palautuskelvottomana Argon2id-käärittynä roskana.",
+      "eyebrow": "PERUUTTAMATON",
+      "heading": "Poista holvi",
+      "ioFailBody": "Holvitiedostoja ei voitu käyttää poistamista varten. Holvin avaimet on jo nollattu muistista; mahdollinen levylle jäävä holvidata on palautuskelvotonta Argon2id-kääritty roskaa.",
+      "ioFailTitle": "Levyvirhe poiston aikana",
+      "partialFailBody_one": "{{count}} tiedostoa ei voitu poistaa levyltä. Holvin avaimet on jo nollattu muistista, joten mahdollinen jäljelle jäävä irrallinen salateksti on palautuskelvotonta Argon2id-kääritty roskaa.",
+      "partialFailBody_other": "{{count}} tiedostoa ei voitu poistaa levyltä. Holvin avaimet on jo nollattu muistista, joten mahdollinen jäljelle jäävä irrallinen salateksti on palautuskelvotonta Argon2id-kääritty roskaa.",
+      "partialFailTitle": "Holvin poisto epäonnistui osittain",
+      "submit": "Poista holvi",
+      "submitInFlight": "Poistetaan holvia…",
+      "typeToConfirmLabel": "Vahvista kirjoittamalla DELETE",
+      "vaultPath": "Holvin polku: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Himmennä ei-aktiiviset rivit",
+      "dimHelper": "Tarkennustilassa (⇧⌘F) himmennä kaikki rivit paitsi se, jota muokkaat.",
+      "dimLabel": "Tarkennustila · himmennä ei-aktiiviset rivit",
+      "off": "Pois",
+      "on": "Päällä",
+      "saveError": "Tarkennustilan asetusta ei voitu tallentaa.",
+      "typewriterAria": "Kirjoituskonevieritys",
+      "typewriterHelper": "Tarkennustilassa (⇧⌘F) pidä aktiivinen rivi pystysuunnassa keskellä kirjoittaessasi.",
+      "typewriterLabel": "Tarkennustila · kirjoituskonevieritys"
+    },
+    "hotkeys": {
+      "addBindingAria": "Lisää pikanäppäin komennolle {{command}}",
+      "cancel": "Peruuta",
+      "capturePrompt": "Paina näppäintä…",
+      "conflictIndicator": "⚠ ristiriita",
+      "conflictTitle": "Käytössä myös: {{commands}}",
+      "fixed": "kiinteä",
+      "group": {
+        "editorFormatting": "Muokkaimen muotoilu",
+        "general": "Yleiset",
+        "navigation": "Navigointi",
+        "notes": "Muistiinpanot",
+        "panesTabs": "Ruudut ja välilehdet",
+        "view": "Näkymä"
+      },
+      "helper": "Näytä ja muuta näppäimistön pikanäppäimiä. Muokkaimen muotoilu ja välilehtien selauspikanäppäin ovat kiinteät.",
+      "notSet": "Ei asetettu",
+      "removeBindingAria": "Poista {{chord}}",
+      "resetAll": "Palauta kaikki pikanäppäimet…",
+      "resetAllConfirm": "Palautetaanko jokainen mukautettu pikanäppäin oletukseensa?",
+      "resetAllYes": "Palauta kaikki",
+      "restoreDefaultAria": "Palauta oletus komennolle {{command}}",
+      "searchAriaLabel": "Etsi pikanäppäimiä",
+      "searchPlaceholder": "Etsi pikanäppäimiä…",
+      "warnAlreadyUsed": "Käytössä jo komennolla {{commands}} — lisättiin silti."
+    },
+    "language": {
+      "helper": "Valitse sovelluksen näyttökieli.",
+      "label": "Kieli"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Rivinumeroasetusta ei voitu tallentaa.",
+      "helper": "Näytä rivinumeropalsta muokkaimessa. Yksi numero riviä kohti; oletuksena pois päältä.",
+      "label": "Rivinumerot",
+      "off": "Pois",
+      "on": "Päällä"
+    },
+    "prefs": {
+      "saveError": "Asetusta ei voitu tallentaa — yritä uudelleen"
+    },
+    "privacy": {
+      "autoLockHelper": "Lukitse holvi tämän verran kestäneen käyttämättömyyden jälkeen.",
+      "autoLockLabel": "Automaattinen lukitus",
+      "autoLockSearchEmpty": "Yksikään kesto ei vastaa hakua.",
+      "autoLockSearchPlaceholder": "Etsi kestoja…",
+      "screenCaptureHelperOff": "Suojaus on aina käytössä ennen avaamista. Avaamisen jälkeen noudatetaan tätä asetusta.",
+      "screenCaptureHelperOn": "Käytössä macOS:ssä ja Windows 10:ssä (toukokuun 2020 päivitys tai uudempi). Linux-tuki tulee tulevassa julkaisussa.",
+      "screenCaptureLabel": "Näytönkaappaussuojaus"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Peruutettu.",
+      "errorGeneric": "Pika-avausta ei voitu määrittää.",
+      "errorHardwareUnavailable": "Touch ID ei ole käytettävissä tällä laitteella.",
+      "errorNotUnlocked": "Avaa holvi ensin.",
+      "errorPinNotDigits": "PIN-koodin on sisällettävä vain numeroita.",
+      "errorPinTooShort_one": "PIN-koodissa on oltava vähintään {{count}} numero.",
+      "errorPinTooShort_other": "PIN-koodissa on oltava vähintään {{count}} numeroa.",
+      "helperConfigured": "Määritetty menetelmällä {{method}}. Uudelleenavaus automaattilukituksen jälkeen ohittaa pääsalasanan. Pääsalasana vaaditaan edelleen uudelleenkäynnistyksen jälkeen.",
+      "helperNotConfigured": "Avaa uudelleen automaattilukituksen jälkeen PIN-koodilla tai Touch ID:llä koko pääsalasanan sijaan. Tämä on mukavuusominaisuus salatun holvin päällä — pääsalasana vaaditaan edelleen uudelleenkäynnistyksen jälkeen.",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "Pika-avauksen PIN-koodi",
+      "pinPlaceholder_one": "PIN (vähintään {{count}} numero)",
+      "pinPlaceholder_other": "PIN (vähintään {{count}} numeroa)",
+      "setPin": "Aseta PIN",
+      "setupHelper": "Touch ID on vain macOS:lle ja tällä hetkellä kokeellinen (odottaa laitteistovahvistusta). PIN toimii kaikkialla.",
+      "title": "Pika-avaus",
+      "useTouchId": "Käytä Touch ID:tä"
+    },
+    "shell": {
+      "closeLabel": "Sulje asetukset",
+      "navLabel": "Asetuspaneelit",
+      "panels": {
+        "about": "Tietoja",
+        "account": "Tili",
+        "appearance": "Ulkoasu",
+        "editor": "Muokkain",
+        "hotkeys": "Pikanäppäimet",
+        "privacy": "Yksityisyys",
+        "storage": "Tallennus"
+      },
+      "passwordUpdatedToast": "Salasana päivitetty",
+      "title": "Asetukset"
+    },
+    "spell": {
+      "errorSaveLanguages": "Oikolukukieliä ei voitu tallentaa.",
+      "errorSaveSetting": "Oikolukuasetusta ei voitu tallentaa.",
+      "helper": "Alleviivaa väärin kirjoitetut sanat kirjoittaessasi. Täysin paikallinen — muistiinpanosi eivät koskaan poistu laitteelta.",
+      "label": "Oikoluku",
+      "languagesAriaLabel": "Oikolukukielet",
+      "languagesHelper": "Sana on oikein, jos se on kelvollinen jollakin valitulla kielellä — kätevää sekoitettaessa englanninkielisiä termejä muunkielisiin muistiinpanoihin.",
+      "languagesLabel": "Kielet",
+      "languagesPlaceholder": "Valitse kielet…",
+      "languagesSearchEmpty": "Yksikään kieli ei vastaa hakua.",
+      "languagesSearchPlaceholder": "Etsi kieliä…",
+      "off": "Pois",
+      "on": "Päällä"
+    },
+    "storage": {
+      "backUpVault": "Varmuuskopioi holvi…",
+      "backupHelper": "Varmuuskopiot pysyvät täsmälleen yhtä salattuina kuin holvisi, yhtenä tarkistettuna .myne-backup-tiedostona. Palauttaminen onnistuu kyseisen holvin salasanalla tai palautuslauseella — aivan kuten avattaessa.",
+      "backupLabel": "Varmuuskopio",
+      "exportAction": "Vie…",
+      "exportBody": "Vie holvi Markdown-muodossa",
+      "exportHelper": "Pelkkä Markdown-puu — ei salattu.",
+      "exportLabel": "Vie",
+      "importHelper": "Tuo olemassa oleva Obsidian-holvi Myneen. Jokainen Markdown-muistiinpano tuodaan ja salataan saman tien; alkuperäiset tiedostosi jätetään koskemattomiksi.",
+      "importLabel": "Tuo",
+      "importObsidian": "Tuo Obsidian-holvi…",
+      "locationHelper": "Jokainen holvi on kansio salattuja tiedostoja tämän polun alla. Suosi alla olevaa Varmuuskopioi-painiketta manuaalisten kopioiden sijaan — se tarkistaa kirjoitetun tiedoston.",
+      "locationLabel": "Holvin sijainti",
+      "openInFiles": "Avaa Finderissa",
+      "pathUnavailable": "Polku ei käytettävissä",
+      "restoreBackup": "Palauta varmuuskopiosta…"
+    },
+    "typography": {
+      "contentWidthHelper": "Muokkauspalstan enimmäisleveys. Täysi antaa tekstin levitä koko ruudun leveydelle.",
+      "contentWidthLabel": "Sisällön leveys",
+      "errorSave": "Asetuksen tallentaminen ei onnistunut. Yritä uudelleen.",
+      "fontHelper": "Tasalevyinen tai suhteellinen (pääteviivaton) teksti.",
+      "fontLabel": "Kirjasin",
+      "lineSpacingHelper": "Pystysuuntainen tila rivien välillä.",
+      "lineSpacingLabel": "Riviväli",
+      "textSizeHelper": "Muokkaimen tekstin peruskoko. Otsikot skaalautuvat sen mukaan.",
+      "textSizeLabel": "Tekstin koko"
+    },
+    "viewMode": {
+      "errorSave": "Oletusnäkymätilaa ei voitu tallentaa.",
+      "helper": "Miten muistiinpano avautuu: reaaliaikainen esikatselu (oletus), vain luku -lukunäkymä tai raaka lähde. Vaihda muistiinpanon tilaa näppäimillä ⇧⌘E.",
+      "label": "Oletusnäkymätila",
+      "optionLive": "Reaaliaikainen esikatselu",
+      "optionReading": "Lukeminen",
+      "optionSource": "Lähde"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Sulje mallit",
+      "deleteRowLabel": "Poista malli {{name}} (siirrä roskakoriin)",
+      "editTemplateLabel": "Muokkaa mallia {{name}}",
+      "emptyBody": "Luo malli, jotta voit käyttää muistiinpanon runkoa uudelleen — kokousmuistiinpano, päiväkirja, lukumuistiinpano. Valitse yksi luodessasi uuden muistiinpanon.",
+      "emptyTitle": "Ei vielä malleja",
+      "listLabel": "Mallit",
+      "loading": "Ladataan…",
+      "newTemplate": "Uusi malli",
+      "newTemplateName": "Nimetön malli",
+      "removeFromTemplates": "Poista malleista",
+      "removeRowLabel": "Poista {{name}} malleista (säilyttää muistiinpanon)",
+      "title": "Muistiinpanomallit"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Valitse toinen holvi",
+    "continue": "Jatka",
+    "decrypting": "Puretaan salausta…",
+    "deleteLink": "Hävisikö sekä salasana että palautuslause? Poista holvi ja aloita alusta",
+    "errors": {
+      "alreadyUnlocked": "Holvi on jo avattu.",
+      "inProgress": "Toiminto on käynnissä.",
+      "unexpected": "Odottamaton virhe. Yritä uudelleen.",
+      "vaultNotFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen."
+    },
+    "passwordLabel": "Salasana",
+    "passwordPlaceholder": "Salasana",
+    "quickUnlock": {
+      "failed": "Pika-avaus epäonnistui. Käytä salasanaasi.",
+      "pinAriaLabel": "Pika-avauksen PIN-koodi",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "Avaa PIN-koodilla",
+      "unlockWithTouchId": "Avaa Touch ID:llä",
+      "usePasswordBelow": "tai käytä alla olevaa salasanaa",
+      "wrongCredential": "Väärin. {{remaining}} yritystä jäljellä."
+    },
+    "recoveryInterruptedBanner": "Palautusprosessi keskeytyi. Aseta ensin uusi salasana.",
+    "recoveryInterruptedBody": "Aseta ensin uusi salasana ja sinetöi sitten holvisi uudelleen.",
+    "recoveryInterruptedTitle": "Palautusprosessi keskeytyi.",
+    "recoveryLink": "Unohditko salasanasi? Avaa palautuslauseella",
+    "submit": "Avaa",
+    "subtitle": "Anna salasanasi jatkaaksesi.",
+    "suspicion": {
+      "lockedDuringChange": "Salasanan vaihto peruutettu: holvi oli lukittu.",
+      "metaChangedExternally": "Holvia muokattiin toisessa istunnossa — avaa uudelleen."
+    },
+    "title": "Avaa holvisi."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Holvitiedostoa ei voi lukea.",
+      "notFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen.",
+      "permissionDenied": "Ei oikeutta käyttää holvitiedostoa. Tarkista tiedoston käyttöoikeudet."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "Olen tallentanut tilinumeroni paikkaan, josta löydän sen myöhemmin.",
+      "back": "Takaisin",
+      "commit": "Luo holvi",
+      "committing": "Tallennetaan…",
+      "copied": "Kopioitu",
+      "copy": "Kopioi",
+      "eyebrow": "Vaihe 4/4 — tilinumero",
+      "heading": "Tallenna tilinumerosi.",
+      "intro": "Tämä on haltijatunnuksesi — kohtele sitä kuin käteistä.",
+      "saveAsFile": "Tallenna tiedostona",
+      "shownOnceBody": "Tallenna se nyt — Myne ei voi palauttaa sitä puolestasi. Vaaditaan myöhempää synkronoinnin rekisteröintiä varten.",
+      "shownOnceEmphasis": "Tämä näytetään vain kerran."
+    },
+    "briefing": {
+      "back": "Takaisin",
+      "continue": "Jatka holvin luomiseen",
+      "eyebrow": "Ennen holvin luomista",
+      "heading": "Ennen holvin luomista",
+      "intro": "Myne salaa muistiinpanosi niin, että vain sinä voit avata ne. Kolme asiaa seuraa tästä — lue ne ja jatka sitten.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "Ymmärrän, ettei sähköpostipalautusta ole.",
+          "statement": "Sähköpostipalautusta ei ole. Sitä ei koskaan tule.",
+          "why": "Emme koskaan kysy sähköpostiasi, joten ei ole nollauslinkkiä eikä tiliä, jonka tuki voisi avata. Tämä ei ole puuttuva ominaisuus — se on takuu. Sähköpostipalautus tarkoittaisi, että voisimme lukea muistiinpanosi, ja Myne on rakennettu niin, ettemme voi."
+        },
+        "no-store": {
+          "ackLabel": "Ymmärrän, ettei Myne voi palauttaa salasanaani.",
+          "statement": "Salasanasi avaa holvisi. Emme tallenna sitä.",
+          "why": "Salasanasi on syöte avaimelle, joka purkaa muistiinpanojesi salauksen. Se ei koskaan poistu tältä laitteelta, eikä mikään palvelimillamme voi tuottaa sitä uudelleen. Juuri tämä pitää muistiinpanosi yksityisinä — ja siksi emme voi nollata sitä puolestasi."
+        },
+        "phrase-backup": {
+          "ackLabel": "Ymmärrän, että palautuslauseeni on ainoa varmuuskopio.",
+          "statement": "Palautuslauseesi on ainoa varmuuskopiosi.",
+          "why": "Jos unohdat salasanasi, 24-sanainen palautuslause on ainoa tie takaisin sisään. {{lostBothSecrets}} Kirjoita lause ylös ja säilytä se turvallisessa paikassa."
+        }
+      },
+      "why": "Miksi?"
+    },
+    "confirm": {
+      "back": "Takaisin",
+      "continue": "Jatka",
+      "eyebrow": "Vaihe 3/4 — vahvista lause",
+      "heading": "Kirjoita neljä sanaa lauseestasi takaisin.",
+      "intro": "Kysymme tiettyjä kohtia varmistaaksemme, että tallensit sen.",
+      "mismatch": "Ei vastaa sanaa numero {{pos}}.",
+      "wordAtPosition": "Sana kohdassa {{pos}}"
+    },
+    "encrypting": {
+      "caption": "Tämä vie hetken.",
+      "footerHint": "Jos tämä kestää yli 30 sekuntia, sulje ikkuna ja yritä uudelleen.",
+      "heading": "Salataan holviasi"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Yritä uudelleen.",
+        "title": "Virheellinen tilinumero"
+      },
+      "aeadFailure": {
+        "body": "Yritä uudelleen.",
+        "title": "Salaus epäonnistui"
+      },
+      "csprng": {
+        "body": "Yritä uudelleen.",
+        "title": "Turvallista satunnaisdataa ei voitu luoda"
+      },
+      "invalidPassword": {
+        "body": "Yritä uudelleen.",
+        "title": "Virheellinen salasana"
+      },
+      "invalidVaultMeta": {
+        "body": "Yritä uudelleen.",
+        "title": "Holvin muotovirhe"
+      },
+      "ioOther": {
+        "body": "Yritä uudelleen.",
+        "title": "Holvia ei voitu tallentaa"
+      },
+      "joinFailure": {
+        "body": "Yritä uudelleen.",
+        "title": "Jokin meni pieleen"
+      },
+      "kdfFailure": {
+        "body": "Yritä uudelleen. Jos tämä toistuu, järjestelmäsi muisti voi olla vähissä.",
+        "title": "Salausta ei voitu määrittää"
+      },
+      "noSpace": {
+        "body": "Vapauta levytilaa ja yritä uudelleen.",
+        "title": "Levytilaa ei ole riittävästi"
+      },
+      "notFound": {
+        "body": "Yritä uudelleen.",
+        "title": "Holvin kansio puuttuu"
+      },
+      "passwordTooShort": {
+        "body": "Käytä vähintään 12 merkkiä.",
+        "title": "Salasana liian lyhyt"
+      },
+      "permissionDenied": {
+        "body": "Varmista, että Mynellä on oikeus kirjoittaa sovelluksesi datakansioon.",
+        "title": "Holvin kansioon ei voitu kirjoittaa"
+      },
+      "sessionExpired": {
+        "body": "Turvallisuutesi vuoksi holvin luonti aikakatkaistaan 10 minuutin jälkeen. Aloita alusta.",
+        "title": "Istunto vanhentui"
+      },
+      "sessionNotFound": {
+        "body": "Aloita alusta.",
+        "title": "Istuntoa ei löytynyt"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Sulje muut Myne-ikkunat ja yritä uudelleen.",
+        "title": "Liian monta holvin luontia kerralla"
+      },
+      "vaultArtifactsPresent": {
+        "body": "Uutta holvia ei voi luoda, koska tällä laitteella on jo holvidataa. Sulje sovellus ja käynnistä uudelleen — aloitusnäyttö ohjaa sinut avausnäkymään.",
+        "title": "Holvi on jo olemassa"
+      },
+      "vaultBusyAuth": {
+        "body": "Toinen holvitoiminto on käynnissä. Yritä hetken kuluttua uudelleen.",
+        "title": "Holvi varattu"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Peruuta",
+        "message": "Sulkeminen hylkää palautuslauseesi. Jatketaanko sulkemista?",
+        "okLabel": "Sulje silti",
+        "title": "Hylätäänkö holvin luonti?"
+      },
+      "genericError": {
+        "body": "Yritä uudelleen.",
+        "title": "Jokin meni pieleen"
+      }
+    },
+    "password": {
+      "back": "Takaisin",
+      "eyebrow": "Vaihe 1/4 — pääsalasana",
+      "heading": "Luo holvi",
+      "helperLead": "Myne ei tallenna salasanaasi eikä palautuslausettasi.",
+      "submit": "Luo palautuslause"
+    },
+    "phrase": {
+      "back": "Takaisin",
+      "continue": "Olen tallentanut tämän — vahvista lause",
+      "copy": "Kopioi",
+      "eyebrow": "Vaihe 2/4 — palautuslause",
+      "heading": "Kirjoita nämä 24 sanaa ylös.",
+      "intro": "Tämä lause yhdessä salasanasi kanssa on ainoa tapa palauttaa holvisi. Säilytä se offline — paperilla, salasananhallinnassa, laitelompakossa. Kohtele sitä kuin käteistä.",
+      "reveal": "Näytä lause",
+      "saveAsFile": "Tallenna tiedostona"
+    },
+    "ready": {
+      "backUpNow": "Varmuuskopioi tämä holvi nyt",
+      "backedUp": "Varmuuskopioitu ✓",
+      "backingUp": "Varmuuskopioidaan…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Varmuuskopiointi ei valmistunut — tiedostoa ei jäänyt jäljelle. Voit varmuuskopioida milloin tahansa kohdasta Asetukset → Tallennus.",
+      "backupFilterName": "Myne-varmuuskopio",
+      "body": "Myne kirjoitti holvisi sovelluksesi datakansioon. Pääsalasanasi ja palautuslauseesi ovat ainoa tie takaisin sisään — varmista, että molemmat on tallennettu turvalliseen paikkaan.",
+      "decrypting": "Puretaan salausta…",
+      "done": "Valmis",
+      "heading": "Holvisi on valmis.",
+      "showFolder": "Näytä holvin kansio"
+    },
+    "sessionLost": {
+      "startOver": "Aloita alusta"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Luo toinen holvi",
+    "heading": "Valitse holvi",
+    "loading": "Ladataan holvejasi…",
+    "noneLoaded": "Holveja ei voitu ladata juuri nyt.",
+    "openedRelative": "avattu {{rel}}",
+    "restoreFromBackup": "Palauta varmuuskopiosta",
+    "subline": "Tällä laitteella on useampi kuin yksi holvi. Valitse avattava holvi.",
+    "vaultFallback": "Holvi {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "Tämä vie hetken.",
+      "eyebrow": "PALAUTUS · PURETAAN SALAUSTA",
+      "footerHint": "Jos tämä kestää yli 30 sekuntia, sulje ikkuna ja yritä uudelleen.",
+      "heading": "Puretaan holvisi salausta",
+      "subCaption": "Käsitellään… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Palautus peruutettu: holvi oli lukittu.",
+        "operationInProgress": "Toiminto on käynnissä. Odota.",
+        "unexpected": "Odottamaton virhe. Yritä uudelleen.",
+        "weakPassword": "Uuden salasanan on oltava vähintään 12 merkkiä."
+      },
+      "eyebrow": "Palautus · Uusi salasana",
+      "helperBody": "Avattu palautuslauseellasi. Vanha salasanasi ei enää toimi — aseta nyt uusi pääsalasana.",
+      "helperEmphasis": "Palautuslauseesi pysyy samana.",
+      "submit": "Aseta uusi salasana",
+      "title": "Aseta uusi pääsalasana"
+    },
+    "phrase": {
+      "back": "← Takaisin",
+      "body": "Anna palautuslauseesi. 24 BIP-39-sanaa.",
+      "cellLabel": "Sana {{index}}",
+      "deleteLink": "Poista holvi ja aloita alusta",
+      "eyebrow": "Palautus",
+      "submit": "Avaa",
+      "title": "Palauta holvisi."
+    },
+    "select": {
+      "accountInvalid": "Virheellinen tilinumero. Tarkista ja yritä uudelleen.",
+      "accountLabel": "Tilinumero (valinnainen)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (valinnainen)",
+      "body": "Valitse holvi, jonka haluat palauttaa 24-sanaisella palautuslauseellasi. Voit myös kirjoittaa tilinumerosi siirtyäksesi suoraan siihen.",
+      "cancel": "Peruuta",
+      "checking": "Tarkistetaan…",
+      "loadFailed": "Holveja ei voitu ladata juuri nyt.",
+      "loading": "Ladataan holvejasi…",
+      "openedRelative": "avattu {{rel}}",
+      "or": "tai",
+      "title": "Valitse palautettava holvi",
+      "useAccountNumber": "Käytä tilinumeroa",
+      "vaultFallback": "Holvi {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Holvi",
+    "createAnother": "Luo toinen holvi",
+    "switchVaultLabel": "Vaihda holvia",
+    "switching": "vaihdetaan…",
+    "vaultFallback": "Holvi {{n}}"
+  },
+  "welcome": {
+    "createCta": "Luo uusi holvi",
+    "headlineLine1": "Salattuja Markdown-muistiinpanoja.",
+    "headlineLine2": "Ei sähköpostia rekisteröitäessä.",
+    "repairResidue": {
+      "cancel": "Peruuta",
+      "cleanUp": "Siivoa",
+      "cleaningUp": "Siivotaan…",
+      "confirmBody_one": "{{count}} tiedosto poistetaan. Ne ovat jo lukukelvottomia; mitään palautettavaa ei menetetä.",
+      "confirmBody_other": "{{count}} tiedostoa poistetaan. Ne ovat jo lukukelvottomia; mitään palautettavaa ei menetetä.",
+      "confirmTitle": "Siivotaanko jäljelle jääneet tiedostot?",
+      "doneBody_one": "Poistettiin {{count}} jäännöstiedosto. Voit nyt luoda uuden holvin.",
+      "doneBody_other": "Poistettiin {{count}} jäännöstiedostoa. Voit nyt luoda uuden holvin.",
+      "doneTitle": "Siivottu",
+      "errorBody": "Jokin meni pieleen. Sulje sovellus ja yritä uudelleen.",
+      "errorTitle": "Siivous epäonnistui",
+      "foundBody_one": "{{count}} jäännöstiedosto aiemmasta poistosta, joka ei valmistunut. Ne ovat jo lukukelvottomia — et menetä mitään palautettavaa.",
+      "foundBody_other": "{{count}} jäännöstiedostoa aiemmasta poistosta, joka ei valmistunut. Ne ovat jo lukukelvottomia — et menetä mitään palautettavaa.",
+      "foundTitle": "Jäännöstiedostoja keskeneräisestä poistosta",
+      "partialBody_one": "{{count}} tiedosto voi olla toisen sovelluksen lukitsemana (virustorjunta, tiedostosynkronointi tai hakuindeksointi). Sulje sovellus ja yritä hetken kuluttua uudelleen, tai poista holvin kansio manuaalisesti.",
+      "partialBody_other": "{{count}} tiedostoa voi olla toisen sovelluksen lukitsemana (virustorjunta, tiedostosynkronointi tai hakuindeksointi). Sulje sovellus ja yritä hetken kuluttua uudelleen, tai poista holvin kansio manuaalisesti.",
+      "partialTitle": "Joitakin tiedostoja ei voitu poistaa"
+    },
+    "restoreCta": "Palauta varmuuskopiosta",
+    "subtitle": "Muistiinpanosi salataan tällä laitteella ennen kuin ne poistuvat siltä. Palvelin tallentaa vain salatekstiä."
+  }
+}

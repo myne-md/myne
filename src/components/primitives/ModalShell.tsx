@@ -1,7 +1,8 @@
 // `ModalShell` — the shared chrome for the desktop modal carve-out
 // (`decisions.md` 2026-05-08): backdrop, Esc-dismiss, backdrop-click-dismiss,
-// the `role="dialog"` wrapper, and the header (title + close button). Callers
-// supply the body as children.
+// the `role="dialog"` wrapper, focus trap + focus restore (via `useFocusTrap`,
+// MYND-93 — so `aria-modal="true"` is truthful), and the header (title + close
+// button). Callers supply the body as children.
 //
 // Used by the note-templates modals (`TemplatesManager`,
 // `NewNoteFromTemplateModal`). NOT retrofitted onto `SettingsModal` /
@@ -14,11 +15,13 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   type CSSProperties,
   type MouseEvent,
   type ReactNode,
 } from "react";
 import { Icon } from "./Icon";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 interface ModalShellProps {
   open: boolean;
@@ -114,6 +117,10 @@ export function ModalShell({
     [onClose],
   );
 
+  // Trap + restore focus while open so `aria-modal="true"` is truthful (MYND-93).
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, { enabled: open });
+
   if (!open) return null;
 
   const modalStyle: CSSProperties = {
@@ -140,7 +147,11 @@ export function ModalShell({
       style={BACKDROP_STYLE}
       onClick={handleBackdropClick}
     >
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={modalRef}
+        style={modalStyle}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={HEADER_STYLE}>
           <h2 id={labelId} style={TITLE_STYLE}>
             {title}

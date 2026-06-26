@@ -12,6 +12,7 @@
 // hairline is pure CSS (theme.ts `.cm-attachment-progress-bar`); this module
 // only composes the DOM.
 
+import i18n from "../../i18n";
 import { ensureAttachmentInsertStyles } from "./styles";
 
 /** The three in-flight states the chip can name. */
@@ -21,11 +22,11 @@ export type ProgressKind = "importing" | "encrypting" | "loading";
 export function progressLabel(kind: ProgressKind): string {
   switch (kind) {
     case "importing":
-      return "Importing…";
+      return i18n.t("editor.attachment.progress.importing");
     case "encrypting":
-      return "Encrypting…";
+      return i18n.t("editor.attachment.progress.encrypting");
     case "loading":
-      return "Loading…";
+      return i18n.t("editor.attachment.progress.loading");
   }
 }
 

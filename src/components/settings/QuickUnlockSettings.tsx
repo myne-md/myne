@@ -11,6 +11,8 @@
 // copy says so; do not present it as a trusted gate until verified.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import {
   quickUnlockDisable,
   quickUnlockSetupBiometric,
@@ -48,28 +50,33 @@ const ACTIONS_STYLE = {
   gap: "var(--space-2)",
 };
 
-/** Map a rejected IPC error to one line of user-facing copy. */
+/** Map a rejected IPC error to one line of user-facing copy. Resolves the
+ *  message at call time (runtime) so a language switch is reflected, rather
+ *  than freezing a module-scope map at the boot language. */
 function errorMessage(e: unknown): string {
   if (isQuickUnlockError(e)) {
     switch (e.kind) {
       case "PinTooShort":
-        return `PIN must be at least ${MIN_PIN_LEN} digits.`;
+        return i18n.t("settings.quickUnlock.errorPinTooShort", {
+          count: MIN_PIN_LEN,
+        });
       case "PinNotDigits":
-        return "PIN must be digits only.";
+        return i18n.t("settings.quickUnlock.errorPinNotDigits");
       case "HardwareUnavailable":
-        return "Touch ID is not available on this device.";
+        return i18n.t("settings.quickUnlock.errorHardwareUnavailable");
       case "Cancelled":
-        return "Cancelled.";
+        return i18n.t("settings.quickUnlock.errorCancelled");
       case "NotUnlocked":
-        return "Unlock the vault first.";
+        return i18n.t("settings.quickUnlock.errorNotUnlocked");
       default:
-        return "Could not configure quick unlock.";
+        return i18n.t("settings.quickUnlock.errorGeneric");
     }
   }
-  return "Could not configure quick unlock.";
+  return i18n.t("settings.quickUnlock.errorGeneric");
 }
 
 export function QuickUnlockSettings() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<QuickUnlockStatus | null>(null);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [pin, setPin] = useState("");
@@ -85,7 +92,7 @@ export function QuickUnlockSettings() {
         if (alive) setStatus(s);
       })
       .catch(() => {
-        if (alive) setStatus({ configured: false, method: null });
+        if (alive) setStatus({ configured: false, method: null, available: false });
       });
     return () => {
       alive = false;
@@ -98,7 +105,7 @@ export function QuickUnlockSettings() {
     try {
       setStatus(await quickUnlockStatus());
     } catch {
-      setStatus({ configured: false, method: null });
+      setStatus({ configured: false, method: null, available: false });
     }
   }
 
@@ -149,7 +156,7 @@ export function QuickUnlockSettings() {
   return (
     <div style={BLOCK_STYLE} data-testid="settings.quick-unlock">
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>Quick unlock</span>
+        <span style={LABEL_STYLE}>{t("settings.quickUnlock.title")}</span>
         <Switch
           checked={configured || showPinSetup}
           onChange={(next) => {
@@ -161,15 +168,20 @@ export function QuickUnlockSettings() {
               if (configured) void onDisable();
             }
           }}
-          ariaLabel="Quick unlock"
+          ariaLabel={t("settings.quickUnlock.title")}
           ariaDescribedBy="quick-unlock-helper"
           testId="settings.quick-unlock-toggle"
         />
       </div>
       <p id="quick-unlock-helper" style={HELPER_STYLE} data-testid="settings.quick-unlock-status">
         {configured
-          ? `Configured via ${status?.method === "biometric" ? "Touch ID" : "PIN"}. Re-entry after auto-lock skips the master password. The master password is still required after restart.`
-          : "Re-enter after auto-lock with a PIN or Touch ID instead of the full master password. A convenience over the encrypted vault — the master password stays required after restart."}
+          ? t("settings.quickUnlock.helperConfigured", {
+              method:
+                status?.method === "biometric"
+                  ? t("settings.quickUnlock.methodTouchId")
+                  : t("settings.quickUnlock.methodPin"),
+            })
+          : t("settings.quickUnlock.helperNotConfigured")}
       </p>
 
       {!configured && showPinSetup && (
@@ -179,8 +191,10 @@ export function QuickUnlockSettings() {
             inputMode="numeric"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            placeholder={`PIN (at least ${MIN_PIN_LEN} digits)`}
-            aria-label="Quick-unlock PIN"
+            placeholder={t("settings.quickUnlock.pinPlaceholder", {
+              count: MIN_PIN_LEN,
+            })}
+            aria-label={t("settings.quickUnlock.pinAriaLabel")}
             data-testid="settings.quick-unlock-pin-input"
           />
           <div style={ACTIONS_STYLE}>
@@ -190,7 +204,7 @@ export function QuickUnlockSettings() {
               onClick={() => void onSetupPin()}
               data-testid="settings.quick-unlock-setup-pin"
             >
-              Set PIN
+              {t("settings.quickUnlock.setPin")}
             </Button>
             <Button
               variant="secondary"
@@ -198,26 +212,12 @@ export function QuickUnlockSettings() {
               onClick={() => void onSetupBiometric()}
               data-testid="settings.quick-unlock-setup-biometric"
             >
-              Use Touch ID
+              {t("settings.quickUnlock.useTouchId")}
             </Button>
           </div>
           <p style={HELPER_STYLE}>
-            Touch ID is macOS-only and currently experimental (pending hardware
-            verification). PIN works everywhere.
+            {t("settings.quickUnlock.setupHelper")}
           </p>
-        </div>
-      )}
-
-      {configured && (
-        <div style={ACTIONS_STYLE}>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void onDisable()}
-            data-testid="settings.quick-unlock-disable"
-          >
-            Turn off
-          </Button>
         </div>
       )}
 

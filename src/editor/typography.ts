@@ -18,15 +18,18 @@
 import type { CSSProperties } from "react";
 import type { PrefsView } from "../lib/prefs";
 
-/** A selectable preset: the wire value + its human label for the Settings UI. */
+/** A selectable preset: the wire value + the i18n KEY of its Settings-UI label.
+ *  `label` is a translation key (not display text) — the consumer resolves it
+ *  via `t(label)` at render so a language switch re-labels the segments. */
 export interface TypographyOption {
   value: string;
   label: string;
 }
 
 // Each map's FIRST key is the canonical default — `null`/unknown resolves to it.
-// The label strings are the Settings-UI segment captions (load-bearing for E2E
-// by `data-value`, not by label).
+// The `label` strings are i18n KEYS for the Settings-UI segment captions
+// (resolved with `t(...)` by the consumer; load-bearing for E2E by `data-value`,
+// not by the resolved caption).
 
 const TEXT_SIZE: Record<string, string> = {
   sm: "13px",
@@ -36,10 +39,10 @@ const TEXT_SIZE: Record<string, string> = {
 };
 const TEXT_SIZE_DEFAULT = "md";
 export const TEXT_SIZE_OPTIONS: readonly TypographyOption[] = [
-  { value: "sm", label: "Small" },
-  { value: "md", label: "Default" },
-  { value: "lg", label: "Large" },
-  { value: "xl", label: "Extra large" },
+  { value: "sm", label: "editor.typography.textSize.sm" },
+  { value: "md", label: "editor.typography.textSize.md" },
+  { value: "lg", label: "editor.typography.textSize.lg" },
+  { value: "xl", label: "editor.typography.textSize.xl" },
 ];
 
 const LINE_SPACING: Record<string, string> = {
@@ -49,9 +52,9 @@ const LINE_SPACING: Record<string, string> = {
 };
 const LINE_SPACING_DEFAULT = "normal";
 export const LINE_SPACING_OPTIONS: readonly TypographyOption[] = [
-  { value: "tight", label: "Tight" },
-  { value: "normal", label: "Normal" },
-  { value: "relaxed", label: "Relaxed" },
+  { value: "tight", label: "editor.typography.lineSpacing.tight" },
+  { value: "normal", label: "editor.typography.lineSpacing.normal" },
+  { value: "relaxed", label: "editor.typography.lineSpacing.relaxed" },
 ];
 
 // `full` ≡ no max-width (text spans the pane minus its padding).
@@ -63,10 +66,10 @@ const CONTENT_WIDTH: Record<string, string> = {
 };
 const CONTENT_WIDTH_DEFAULT = "normal";
 export const CONTENT_WIDTH_OPTIONS: readonly TypographyOption[] = [
-  { value: "narrow", label: "Narrow" },
-  { value: "normal", label: "Normal" },
-  { value: "wide", label: "Wide" },
-  { value: "full", label: "Full" },
+  { value: "narrow", label: "editor.typography.contentWidth.narrow" },
+  { value: "normal", label: "editor.typography.contentWidth.normal" },
+  { value: "wide", label: "editor.typography.contentWidth.wide" },
+  { value: "full", label: "editor.typography.contentWidth.full" },
 ];
 
 const FONT_FAMILY: Record<string, string> = {
@@ -75,8 +78,8 @@ const FONT_FAMILY: Record<string, string> = {
 };
 const FONT_FAMILY_DEFAULT = "mono";
 export const FONT_FAMILY_OPTIONS: readonly TypographyOption[] = [
-  { value: "mono", label: "Mono" },
-  { value: "sans", label: "Sans" },
+  { value: "mono", label: "editor.typography.font.mono" },
+  { value: "sans", label: "editor.typography.font.sans" },
 ];
 
 /** Canonical default preset per field — selecting it clears the stored value

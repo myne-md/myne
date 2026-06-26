@@ -10,5 +10,17 @@
   <dict>
     <key>NSMicrophoneUsageDescription</key>
     <string>Myne uses the microphone only when you record a voice note. Audio is encrypted on your device and never leaves it.</string>
+    <!--
+      Opt out of macOS App Nap. The browser-clipper assembles each clip in the
+      Myne WebView (the WebView holds note_create / the importer pipeline); a clip
+      arrives while Myne is BACKGROUNDED (the user clicks in their browser). Under
+      App Nap, a backgrounded app's run loop is suspended, so the `clipper://dispatch`
+      event isn't processed and the relay times out (clip_dispatch_timeout) — clips
+      silently fail. Disabling App Nap keeps the WebView responsive so clips assemble
+      regardless of focus. (The clip relay is a background-service responsibility of
+      the running app; this is the canonical opt-out for such work.)
+    -->
+    <key>LSAppNapIsDisabled</key>
+    <true/>
   </dict>
 </plist>

@@ -274,6 +274,16 @@ export interface PrefsView {
    */
   editor_line_numbers: boolean | null;
   /**
+   * Archive-feature disable toggle (archive-disable, MYND-…). `null` ≡ unset →
+   * the host applies the default-OFF policy (archiving enabled — the pre-feature
+   * behaviour). `true` hides the archive entry points (sidebar button, context
+   * menu actions); `false` keeps them. Serialized from Rust `Option<bool>`;
+   * omitted from the encrypted blob when `null` (byte-identical to a pre-feature
+   * vault). Non-load-bearing — the underlying `archived:` frontmatter surgery is
+   * untouched; this flag only gates the UI surfaces.
+   */
+  archive_disabled: boolean | null;
+  /**
    * User theme preference (MYND-110). `null` ≡ **system** (follow the OS
    * `prefers-color-scheme`) — the canonical encoding of "no explicit choice",
    * omitted from the encrypted blob. `"light"` / `"dark"` are explicit
@@ -634,6 +644,22 @@ export async function setEditorFontFamily(value: string | null): Promise<void> {
  */
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_line_numbers", { enabled: value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Disable (or re-enable) the note-archive feature (archive-disable, MYND-…).
+ * `true` hides the archive entry points; `false` (the default) keeps them.
+ * Disk-first, no native side-effect; a rejected promise means the write failed
+ * and the caller's optimistic UI must revert. Bumps the prefs nonce on success
+ * so the open editor + sidebar (each reading prefs through their OWN `usePrefs`)
+ * re-read disk truth and re-render their archive surfaces live — same chokepoint
+ * discipline as {@link setEditorLineNumbers}. The auto-unarchive of existing
+ * archived notes when disabling is orchestrated by the caller BEFORE this write.
+ * Non-load-bearing.
+ */
+export async function setArchiveDisabled(value: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_archive_disabled", { enabled: value });
   bumpPrefsNonce();
 }
 

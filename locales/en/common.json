@@ -1,0 +1,2056 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Cancel",
+      "cleaning": "Cleaning…",
+      "close": "Close",
+      "completeTitle": "Cleanup complete",
+      "deleteCta": "Delete {{count}} unused",
+      "deleteCta_one": "Delete {{count}} unused",
+      "deleteCta_other": "Delete {{count}} unused",
+      "error": "Couldn't clean up. Some notes may be unreadable — nothing was deleted.",
+      "intro_one": "These attachment is not used in any note. Deleting it is permanent and can't be undone.",
+      "intro_other": "These {{count}} attachments are not used in any note. Deleting them is permanent and can't be undone.",
+      "summaryFreed": " · freed {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_one": "Removed {{count}} attachment",
+      "summaryRemoved_other": "Removed {{count}} attachments",
+      "summarySkipped": " · {{count}} skipped (now in use)",
+      "summarySkipped_one": " · {{count}} skipped (now in use)",
+      "summarySkipped_other": " · {{count}} skipped (now in use)",
+      "title": "Clean unused attachments",
+      "willBeReclaimed": "{{size}} will be reclaimed."
+    },
+    "coverPicker": {
+      "close": "Close",
+      "dropHint": "Drop an image to use it as the cover.",
+      "empty": "No images in this vault yet. Upload one or drag an image here.",
+      "loading": "Loading…",
+      "removeCover": "Remove cover",
+      "title": "Choose a cover image",
+      "upload": "Upload"
+    },
+    "deleteDialog": {
+      "cancel": "Cancel",
+      "confirmPrompt": "Permanently delete this attachment? This can't be undone.",
+      "delete": "Delete",
+      "deleting": "Deleting…",
+      "error": "Couldn't delete the attachment. Try again.",
+      "notUsed": "Not used in any note.",
+      "stillUsed_one": "It's still used in {{count}} note. Deleting it leaves a tombstone where it was embedded:",
+      "stillUsed_other": "It's still used in {{count}} notes. Deleting it leaves a tombstone where it was embedded:",
+      "title": "Delete attachment",
+      "untitled": "Untitled"
+    },
+    "library": {
+      "actionsAriaLabel": "Attachment actions",
+      "actionsTitle": "Actions",
+      "checking": "Checking…",
+      "checkUnusedFailedNotice": "Couldn't check for unused attachments. Try again.",
+      "cleanUnused": "Clean unused",
+      "cleanUnusedTitle": "Delete attachments not used in any note",
+      "colCreated": "Created",
+      "colName": "Name",
+      "colSize": "Size",
+      "colType": "Type",
+      "colUsedIn": "Used in",
+      "decrypting": "Decrypting attachments…",
+      "emptyImportHint": "Import a file to keep it in your vault.",
+      "emptyLoadError": "Couldn't read the attachments catalog.",
+      "emptyNoAttachments": "No attachments yet.",
+      "filterAriaLabel": "Filter by type",
+      "gridView": "Grid view",
+      "import": "Import",
+      "importDialogTitle": "Import attachment",
+      "importFile": "Import a file",
+      "importing": "Importing…",
+      "listView": "List view",
+      "menuDelete": "Delete",
+      "menuExport": "Export",
+      "menuPreview": "Preview",
+      "menuRename": "Rename",
+      "noMatch": "No attachments match your search.",
+      "noUnusedNotice": "No unused attachments to clean.",
+      "preview": "Preview",
+      "previewAttachment": "Preview attachment",
+      "searchAriaLabel": "Search attachments by filename",
+      "searchPlaceholder": "Search by filename",
+      "sort": {
+        "createdAsc": "Oldest first",
+        "createdDesc": "Newest first",
+        "nameAsc": "Name A–Z",
+        "nameDesc": "Name Z–A"
+      },
+      "sortAriaLabel": "Sort attachments",
+      "supportedFilesFilter": "Supported files",
+      "title": "Attachments",
+      "typeFilter": {
+        "all": "All types",
+        "audio": "Audio",
+        "image": "Images",
+        "other": "Other",
+        "pdf": "PDFs"
+      },
+      "usedInCount_one": "Used in {{count}} note",
+      "usedInCount_other": "Used in {{count}} notes",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Audio: {{filename}}",
+      "file": "File",
+      "pause": "Pause",
+      "pdfDocument": "PDF document",
+      "pdfFirstPage": "PDF first page",
+      "play": "Play"
+    },
+    "usedInNotesPopover": {
+      "empty": "Not used in any note.",
+      "untitled": "Untitled"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "Another vault operation is in progress. Wait for it to finish, then try again.",
+        "cancelled": "Backup cancelled. No file was left behind.",
+        "invalidDestination": "That destination folder is not usable.",
+        "ioGeneric": "Could not write the backup file.",
+        "ioNoSpace": "Not enough space at the destination.",
+        "ioPermissionDenied": "No permission to write at the destination.",
+        "joinFailure": "Backup failed unexpectedly. No file was left behind.",
+        "memberTooLarge": "A file in this vault is larger than the backup format allows.",
+        "vaultNotFound": "No vault found to back up.",
+        "verifyFailed": "The written backup did not verify, so it was discarded. Try again — on different media if it repeats."
+      },
+      "restore": {
+        "authOperationInProgress": "Another vault operation is in progress. Wait for it to finish, then try again.",
+        "cancelled": "Restore cancelled. Nothing was changed.",
+        "damagedBackup": "The backup file is damaged.",
+        "futureVersionBackup": "This backup was made by a newer version of Myne. Update Myne, then restore it.",
+        "invalidVaultMeta": "This backup's vault metadata is unreadable, so restoring it could not produce a working vault.",
+        "ioGeneric": "Could not read the backup file.",
+        "ioPermissionDenied": "No permission to read the backup file.",
+        "joinFailure": "Restore failed unexpectedly. Nothing was changed.",
+        "missingVaultMeta": "This backup is missing its vault metadata and cannot be restored.",
+        "notABackupFile": "This file is not a Myne backup.",
+        "vaultAlreadyExists": "A vault from this backup already exists on this device."
+      }
+    },
+    "export": {
+      "cancel": "Cancel",
+      "close": "Close",
+      "copying": "Copying {{done}} of {{total}}…",
+      "preparing": "Preparing…",
+      "successToast": "Backup verified and saved.",
+      "title": "Back up vault",
+      "verifying": "Verifying {{done}} of {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Accept",
+      "close": "Close",
+      "codeAriaLabel": "Pairing code",
+      "intro": "Confirm this code matches the one shown in the extension, then Accept to pair.",
+      "reject": "Reject",
+      "rejected": "Pairing rejected.",
+      "title": "A browser extension wants to connect"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Archive",
+    "archivedBadgeTitle": "Archived",
+    "dialogLabel": "Command palette",
+    "matchedInBody": "↳ matched in body",
+    "noMatches": "No matches",
+    "searchPlaceholder": "Search notes or run a command — Esc to dismiss",
+    "sectionCommands": "Commands",
+    "sectionNotes": "Notes",
+    "untitledNote": "Untitled"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Back up vault…"
+      },
+      "category": {
+        "app": "App",
+        "editor": "Editor",
+        "vault": "Vault",
+        "view": "View"
+      },
+      "convertWikilinks": {
+        "label": "Convert imported wikilinks in this note…"
+      },
+      "deleteWorkspace": {
+        "label": "Delete workspace…"
+      },
+      "exportNoteHtml": {
+        "label": "Export note as HTML…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Export note as Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "Export note as PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "Export note as Plain Text…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Export vault as Markdown…"
+      },
+      "foldAll": {
+        "label": "Fold all"
+      },
+      "importBaseView": {
+        "label": "Import .base view…"
+      },
+      "importObsidian": {
+        "label": "Import Obsidian vault…"
+      },
+      "lockVault": {
+        "label": "Lock vault"
+      },
+      "manageTemplates": {
+        "label": "Manage templates…"
+      },
+      "newNoteFromTemplate": {
+        "label": "New note from template…"
+      },
+      "openAttachments": {
+        "label": "Open attachments…"
+      },
+      "openSettings": {
+        "label": "Open settings…"
+      },
+      "openSnapshots": {
+        "label": "Snapshots…"
+      },
+      "openTodayNote": {
+        "label": "Open today's note"
+      },
+      "randomNote": {
+        "label": "Open random note"
+      },
+      "renameWorkspace": {
+        "label": "Rename workspace…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Save workspace as…"
+      },
+      "showGraph": {
+        "label": "Show graph view…"
+      },
+      "showTags": {
+        "label": "Browse tags…"
+      },
+      "showViews": {
+        "label": "Browse views…"
+      },
+      "switchWorkspace": {
+        "label": "Switch workspace…"
+      },
+      "toggleFocus": {
+        "label": "Toggle focus mode"
+      },
+      "toggleLeftSidebar": {
+        "label": "Toggle notes sidebar"
+      },
+      "toggleReading": {
+        "label": "Toggle reading view"
+      },
+      "toggleRightSidebar": {
+        "label": "Toggle backlinks sidebar"
+      },
+      "toggleSource": {
+        "label": "Toggle source mode"
+      },
+      "toggleStackedTabs": {
+        "label": "Toggle stacked tabs"
+      },
+      "unfoldAll": {
+        "label": "Unfold all"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "Bold",
+        "closeTab": "Close tab",
+        "cycleHeadingLevel": "Cycle heading level",
+        "cycleTabs": "Cycle tabs",
+        "deleteWorkspace": "Delete workspace",
+        "focusNextPane": "Focus next pane",
+        "focusPrevPane": "Focus previous pane",
+        "foldAll": "Fold all",
+        "inlineCode": "Inline code",
+        "insertWikilink": "Insert wikilink",
+        "italic": "Italic",
+        "navigateBack": "Navigate back",
+        "navigateForward": "Navigate forward",
+        "newNote": "New note",
+        "openSettings": "Open settings",
+        "paletteToggle": "Open command palette",
+        "renameWorkspace": "Rename workspace",
+        "saveWorkspaceAs": "Save workspace as",
+        "selectAllScoped": "Select all (scoped)",
+        "showGraphView": "Show graph view",
+        "splitPaneDown": "Split pane (down)",
+        "splitPaneRight": "Split pane (right)",
+        "switchWorkspace": "Switch workspace",
+        "toggleBulletList": "Toggle bullet list",
+        "toggleFocusMode": "Toggle focus mode",
+        "toggleNumberedList": "Toggle numbered list",
+        "toggleReadingView": "Toggle reading view",
+        "toggleSourceMode": "Toggle source mode",
+        "toggleTaskList": "Toggle task list",
+        "unfoldAll": "Unfold all"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Add a modifier (⌘, Ctrl, or Alt) — a key on its own can't be a shortcut."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Cancel",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Loading"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "Exported {{filename}}.",
+        "exportFailed": "Couldn't export {{filename}}.",
+        "renamed": "Renamed to {{name}}.",
+        "renameFailed": "Couldn't rename the attachment.",
+        "saveDialogFailed": "Couldn't open the save dialog."
+      },
+      "convert": {
+        "cancel": "Cancel",
+        "confirm": "Convert",
+        "skipped": "skipped — {{note}}",
+        "subtitle_one": "1 reference will be rewritten. Review before committing.",
+        "subtitle_other": "{{count}} references will be rewritten. Review before committing.",
+        "subtitleEmpty": "Nothing to convert — no source files resolved.",
+        "title": "Convert imported attachments"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Attachment source"
+      },
+      "convertCore": {
+        "converted": "{{count}} converted",
+        "converted_one": "{{count}} converted",
+        "converted_other": "{{count}} converted",
+        "noneToConvert": "No imported attachments to convert in this note.",
+        "skipNote": {
+          "failed": "import failed",
+          "locked": "vault locked",
+          "notFound": "source not found",
+          "tooLarge": "too large (max 64 MiB)",
+          "unsupported": "unsupported type"
+        },
+        "skippedSuffix": " · {{count}} skipped",
+        "skippedSuffix_one": " · {{count}} skipped",
+        "skippedSuffix_other": " · {{count}} skipped"
+      },
+      "fileKind": {
+        "generic": "File",
+        "label": {
+          "archive": "Archive",
+          "audio": "Audio",
+          "cHeader": "C header",
+          "cppSource": "C++ source",
+          "cSource": "C source",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Document",
+          "ebook": "Ebook",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Image",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "Log file",
+          "markdown": "Markdown",
+          "numbers": "Numbers spreadsheet",
+          "pages": "Pages document",
+          "pdf": "PDF",
+          "presentation": "Presentation",
+          "python": "Python",
+          "richText": "Rich text document",
+          "rust": "Rust",
+          "shell": "Shell script",
+          "spreadsheet": "Spreadsheet",
+          "svg": "SVG image",
+          "text": "Text document",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Word document",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "{{ext}} file"
+      },
+      "lightbox": {
+        "close": "Close preview",
+        "export": "Export",
+        "exportAria": "Export attachment",
+        "imagePreview": "Image preview",
+        "pdfFallback": "PDF",
+        "pdfPreview": "PDF preview"
+      },
+      "menu": {
+        "actionsAria": "Attachment actions"
+      },
+      "pdf": {
+        "loading": "Loading…"
+      },
+      "picker": {
+        "openFailed": "Couldn't open the file picker."
+      },
+      "progress": {
+        "encrypting": "Encrypting…",
+        "importing": "Importing…",
+        "loading": "Loading…"
+      },
+      "recording": {
+        "barAria": "Recording voice note",
+        "cancel": "Cancel",
+        "noAudio": "No audio detected — check your microphone.",
+        "saving": "Saving…",
+        "stop": "Stop"
+      },
+      "rename": {
+        "cancel": "Cancel",
+        "confirm": "Rename",
+        "title": "Rename attachment"
+      },
+      "summary": {
+        "added": "{{count}} added",
+        "added_one": "{{count}} added",
+        "added_other": "{{count}} added",
+        "reason": {
+          "failed": "failed",
+          "locked": "vault locked",
+          "tooLarge": "too large",
+          "unsupported": "unsupported type"
+        },
+        "skipped": "{{count}} skipped: {{noun}}",
+        "skipped_one": "{{count}} skipped: {{noun}}",
+        "skipped_other": "{{count}} skipped: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "A recording is already in progress.",
+          "captureFailed": "Couldn't start recording — check microphone access in System Settings.",
+          "generic": "Couldn't start recording.",
+          "locked": "Unlock your vault to record a voice note.",
+          "noInputDevice": "No microphone found. Connect one and try again."
+        },
+        "stopError": {
+          "captureFailed": "Recording failed — check your microphone.",
+          "emptyRecording": "Nothing was recorded.",
+          "generic": "Couldn't save the recording.",
+          "silentRecording": "Recording was silent and discarded — check your microphone."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Pause",
+          "play": "Play",
+          "seek": "Seek"
+        },
+        "menu": {
+          "export": "Export",
+          "remove": "Remove",
+          "rename": "Rename",
+          "reveal": "Reveal in library"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Broken attachment reference: {{filename}}",
+          "brokenLabel": "broken",
+          "deletedAria": "Deleted attachment: {{filename}}",
+          "deletedLabel": "deleted"
+        },
+        "urlImageFallback": "image"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Attention",
+        "bug": "Bug",
+        "caution": "Caution",
+        "danger": "Danger",
+        "done": "Done",
+        "error": "Error",
+        "example": "Example",
+        "failure": "Failure",
+        "faq": "FAQ",
+        "hint": "Hint",
+        "important": "Important",
+        "info": "Info",
+        "missing": "Missing",
+        "note": "Note",
+        "question": "Question",
+        "quote": "Quote",
+        "success": "Success",
+        "tip": "Tip",
+        "todo": "Todo",
+        "warning": "Warning"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Archived",
+        "empty": "No backlinks yet.",
+        "linkedFrom": "Linked from {{count}}",
+        "linkedFrom_one": "Linked from {{count}}",
+        "linkedFrom_other": "Linked from {{count}}",
+        "untitled": "Untitled"
+      },
+      "barItems": {
+        "graph": "Graph",
+        "lock": "Lock",
+        "saveStatus": "Save status",
+        "settings": "Settings",
+        "syncStatus": "Sync status",
+        "tags": "Tags",
+        "viewMode": "View mode",
+        "views": "Views",
+        "wordCount": "Word count",
+        "workspace": "Workspace"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} filters dropped",
+        "droppedFiltersSuffix_one": " · {{count}} filters dropped",
+        "droppedFiltersSuffix_other": " · {{count}} filters dropped",
+        "failed": "Import failed.",
+        "fileFilterName": "Obsidian Base",
+        "imported": "Imported {{count}} view(s)",
+        "imported_one": "Imported {{count}} view(s)",
+        "imported_other": "Imported {{count}} view(s)",
+        "notValid": "Not a valid .base file.",
+        "skippedSuffix": " · {{count}} skipped",
+        "skippedSuffix_one": " · {{count}} skipped",
+        "skippedSuffix_other": " · {{count}} skipped",
+        "stoppedAfter": "Import stopped after {{count}} view(s).",
+        "stoppedAfter_one": "Import stopped after {{count}} view(s).",
+        "stoppedAfter_other": "Import stopped after {{count}} view(s)."
+      },
+      "bottomBar": {
+        "browseTags": "Browse tags",
+        "browseViews": "Browse views",
+        "cycleViewMode": "Cycle view mode",
+        "docStats": {
+          "summary_one": "{{count}} word · {{characters}} chars",
+          "summary_other": "{{count}} words · {{characters}} chars",
+          "summarySelectionSuffix": " (sel)",
+          "title_one": "{{characters}} characters · {{words}} words · {{spaces}} spaces · {{count}} paragraph",
+          "title_other": "{{characters}} characters · {{words}} words · {{spaces}} spaces · {{count}} paragraphs",
+          "titleSelectionSuffix": " (selection)"
+        },
+        "graphTitle": "Graph (⌘⇧G)",
+        "lock": "Lock",
+        "lockVault": "Lock vault",
+        "openSettings": "Open settings",
+        "settingsTitle": "Settings (⌘,)",
+        "showGraph": "Show graph view",
+        "syncStatus": "Local-only · not synced",
+        "tagsTitle": "Tags",
+        "togglePreview": "Toggle side-by-side preview",
+        "viewModeTitle": "View mode: {{mode}} (click to cycle)",
+        "viewsTitle": "Views"
+      },
+      "import": {
+        "imported_one": "Imported {{count}} note{{skipped}}",
+        "imported_other": "Imported {{count}} notes{{skipped}}",
+        "skippedSuffix": " · {{count}} skipped",
+        "skippedSuffix_one": " · {{count}} skipped",
+        "skippedSuffix_other": " · {{count}} skipped"
+      },
+      "nav": {
+        "goBack": "Go back",
+        "goForward": "Go forward"
+      },
+      "noNotesToOpen": "No notes to open.",
+      "resizeBacklinksSidebar": "Resize backlinks sidebar",
+      "resizeNotesSidebar": "Resize notes sidebar",
+      "sidebarToggle": {
+        "hideBacklinks": "Hide backlinks sidebar",
+        "hideNotes": "Hide notes sidebar",
+        "showBacklinks": "Show backlinks sidebar",
+        "showNotes": "Show notes sidebar"
+      },
+      "switchingOverlay": {
+        "saving": "Saving…"
+      },
+      "viewMode": {
+        "live": "Live",
+        "reading": "Reading",
+        "source": "Source"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Workspace name",
+        "renameConfirm": "Rename",
+        "renameTitle": "Rename workspace",
+        "saveAsTitle": "Save workspace as",
+        "saveConfirm": "Save"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Workspace",
+        "renameItemLabel": "Rename workspace {{name}}",
+        "renameTitle": "Rename workspace",
+        "saveCurrentAs": "Save current as…",
+        "switchLabel": "Switch workspace",
+        "toggleTitle": "Workspace: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Copy code",
+      "defaultBadge": "code"
+    },
+    "find": {
+      "close": "Close find",
+      "matchCase": "Match case",
+      "matchCount": "{{current}} of {{total}}",
+      "nextMatch": "Next match",
+      "noMatches": "No matches",
+      "placeholder": "Find in note",
+      "previousMatch": "Previous match",
+      "replaceAll": "Replace all",
+      "replaceAllCount": "Replace all ({{total}})",
+      "replaceOne": "Replace",
+      "replacePlaceholder": "Replace with",
+      "toggleReplace": "Toggle replace"
+    },
+    "folding": {
+      "clickToUnfold": "Click to unfold",
+      "unfold": "Unfold"
+    },
+    "footnote": {
+      "heading": "Footnotes",
+      "unreferenced": "unreferenced"
+    },
+    "frontmatter": {
+      "addProperty": "+ Add property",
+      "propertiesLabel": "Properties",
+      "titleAriaLabel": "Note title",
+      "titlePlaceholder": "Untitled"
+    },
+    "mermaid": {
+      "rendering": "Rendering diagram…"
+    },
+    "slash": {
+      "attachFile": "Attach file",
+      "bulletList": "Bullet list",
+      "callout": "Callout",
+      "date": "Date",
+      "day": "Day",
+      "divider": "Divider",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "heading4": "Heading 4",
+      "heading5": "Heading 5",
+      "heading6": "Heading 6",
+      "link": "Link",
+      "now": "Now",
+      "numberedList": "Numbered list",
+      "quote": "Quote",
+      "table": "Table",
+      "time": "Time",
+      "todoList": "To-do list",
+      "voiceNote": "Voice note",
+      "wikiLink": "Wiki link"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Add to dictionary",
+        "ignoreInVault": "Ignore in this vault",
+        "ignoreThisSession": "Ignore this session",
+        "noSuggestions": "No suggestions"
+      }
+    },
+    "table": {
+      "addColumn": "Add column to the right",
+      "addRow": "Add row below",
+      "cellAriaLabel": "Table cell",
+      "deleteColumn": "Delete column",
+      "deleteRow": "Delete row",
+      "reorderColumn": "Reorder column",
+      "reorderRow": "Reorder row"
+    },
+    "toolbar": {
+      "apply": "Apply",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Paragraph"
+      },
+      "highlight": {
+        "blue": "Blue",
+        "green": "Green",
+        "pink": "Pink",
+        "purple": "Purple",
+        "yellow": "Yellow"
+      },
+      "urlPlaceholder": "Paste link URL"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Full",
+        "narrow": "Narrow",
+        "normal": "Normal",
+        "wide": "Wide"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normal",
+        "relaxed": "Relaxed",
+        "tight": "Tight"
+      },
+      "textSize": {
+        "lg": "Large",
+        "md": "Default",
+        "sm": "Small",
+        "xl": "Extra large"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Embed: {{label}}"
+      },
+      "convert": {
+        "cancel": "Cancel",
+        "choiceClause_one": " · {{count}} needs a choice.",
+        "choiceClause_other": " · {{count}} need a choice.",
+        "chooseTarget": "Choose target…",
+        "convert": "Convert",
+        "convertedToast_one": "{{count}} wikilink converted",
+        "convertedToast_other": "{{count}} wikilinks converted",
+        "noneToConvert": "No imported wikilinks to convert in this note.",
+        "nothingToConvert": "Nothing to convert — no imported wikilinks resolve.",
+        "rewriteCount_one": "{{count}} link will be rewritten",
+        "rewriteCount_other": "{{count}} links will be rewritten",
+        "skipped": "skipped — {{reason}}",
+        "title": "Convert imported wikilinks in this note"
+      },
+      "convertCore": {
+        "noMatch": "no match"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Note",
+      "errors": {
+        "attachmentCorrupt": "An attachment referenced by this note could not be read, so nothing was exported.",
+        "attachmentMissing": "An attachment referenced by this note is missing, so nothing was exported.",
+        "cannotDecrypt": "This note could not be read.",
+        "destinationUnusable": "That destination folder is not usable.",
+        "fallback": "Export failed unexpectedly. Try again.",
+        "invalidAttachmentCatalog": "The vault's attachment catalog could not be read, so nothing was exported.",
+        "invalidNoteFilename": "That file name is not usable, so nothing was exported.",
+        "invalidNoteId": "This note could not be identified, so nothing was exported.",
+        "invalidPlaintextEncoding": "This note's content looks damaged, so nothing was exported. Restore it from a backup.",
+        "ioNoSpace": "Not enough space at the destination.",
+        "ioPermissionDenied": "No permission to write at the destination.",
+        "ioWriteDefault": "Could not write the exported file.",
+        "noteNotFound": "This note no longer exists — it may have been deleted.",
+        "pdfCaptureFailed": "The PDF could not be generated, so nothing was exported.",
+        "pdfExportInProgress": "A PDF export is already running. Wait for it to finish, then try again.",
+        "pdfPayloadMissing": "The export was interrupted — if the vault locked, unlock it and try again.",
+        "pdfRenderTimeout": "The note took too long to render, so nothing was exported.",
+        "pdfWindowCreateFailed": "The export window could not be opened, so nothing was exported.",
+        "targetExists": "A file with that name already exists at the destination.",
+        "vaultLocked": "The vault is locked. Unlock it, then try again."
+      },
+      "flow": {
+        "couldNotRead": "This note could not be read.",
+        "exportedTo": "Exported to {{filename}}",
+        "exportedToWithAttachments_one": "Exported to {{filename}} + {{count}} attachment",
+        "exportedToWithAttachments_other": "Exported to {{filename}} + {{count}} attachments",
+        "exportedToWithImages_one": "Exported to {{filename}} + {{count}} image",
+        "exportedToWithImages_other": "Exported to {{filename}} + {{count}} images",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Plain text",
+        "showInFolder": "Show in folder"
+      },
+      "modal": {
+        "cancel": "Cancel",
+        "export": "Export…",
+        "includeAttachments_one": "Include {{count}} attachment",
+        "includeAttachments_other": "Include {{count}} attachments",
+        "title": "Export as Markdown"
+      }
+    },
+    "pdf": {
+      "cancel": "Cancel",
+      "continue": "Continue…",
+      "title": "Export as PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Choose where to put the export",
+      "errors": {
+        "attachmentCorrupt": "An attachment referenced by a note could not be read, so nothing was exported.",
+        "attachmentMissing": "An attachment referenced by a note is missing, so nothing was exported.",
+        "authOperationInProgress": "Another vault operation is in progress. Wait for it to finish, then try again.",
+        "cancelled": "Export cancelled. Nothing was left at the destination.",
+        "cannotDecrypt": "A note could not be read, so nothing was exported.",
+        "destinationAlreadyExists": "Something already exists at that location. Choose a fresh spot for the export.",
+        "destinationNotAllowed": "That location is inside Myne's own storage. Choose a folder outside it.",
+        "invalidPlaintextEncoding": "A note's content looks damaged, so nothing was exported. Restore it from a backup.",
+        "invalidVaultMeta": "The vault's metadata could not be read, so nothing was exported.",
+        "ioWriteDefault": "Could not write the export.",
+        "joinFailure": "Export failed unexpectedly. Nothing was left at the destination.",
+        "vaultLocked": "The vault is locked. Unlock it, then try again.",
+        "vaultNotFound": "No vault found to export."
+      },
+      "flow": {
+        "countAttachments_one": "{{count}} attachment",
+        "countAttachments_other": "{{count}} attachments",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_other": "{{count}} folders",
+        "countNotes_one": "{{count}} note",
+        "countNotes_other": "{{count}} notes",
+        "exclusionsHistory": "Version history not included.",
+        "exclusionsTrashed_one": "{{count}} trashed note not included.",
+        "exclusionsTrashed_other": "{{count}} trashed notes not included.",
+        "exclusionsTrashedAndHistory_one": "{{count}} trashed note and version history not included.",
+        "exclusionsTrashedAndHistory_other": "{{count}} trashed notes and version history not included.",
+        "phaseAttachments": "attachments",
+        "phaseNotes": "notes",
+        "preparing": "Preparing…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Cancel",
+        "cancelling": "Cancelling…",
+        "title": "Exporting…"
+      },
+      "setup": {
+        "cancel": "Cancel",
+        "choose": "Choose…",
+        "chooseFolder": "Choose a folder…",
+        "destinationLabel": "Destination",
+        "export": "Export…",
+        "folderSelectAriaLabel": "Folder to export",
+        "noFolderChosen": "No folder chosen",
+        "noFoldersInVault": "No folders in this vault",
+        "scopeFolder": "One folder",
+        "scopeLabel": "Scope",
+        "scopeWhole": "Whole vault",
+        "title": "Export vault as Markdown"
+      },
+      "summary": {
+        "done": "Done",
+        "showInFolder": "Show in folder",
+        "title": "Export complete"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "If you have a backup, you can restore it — your current files are not touched; the backup is restored as a separate vault first.",
+      "cta": "Close app",
+      "title": "Vault file is corrupted."
+    },
+    "invalidState": {
+      "body": "Please restart.",
+      "cta": "Lock",
+      "title": "Unexpected state."
+    },
+    "ioError": {
+      "body": "This might be a disk or filesystem error.",
+      "cta": "Close app",
+      "title": "Cannot read the vault file."
+    },
+    "permissionDenied": {
+      "body": "Check file permissions.",
+      "cta": "Close app",
+      "title": "No permission to access the vault file."
+    },
+    "restoreFromBackup": "Restore from backup…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Close",
+      "count_one": "{{count}} note",
+      "count_other": "{{count}} notes",
+      "countEmpty": "Empty",
+      "delete": "Delete",
+      "deleteError": "Couldn't delete that note. Try again.",
+      "emptyState": "Archive is empty.",
+      "restore": "Restore",
+      "restoreError": "Couldn't restore that note. Try again.",
+      "title": "Archive",
+      "untitled": "Untitled"
+    },
+    "cardMenu": {
+      "copyLink": "Copy link",
+      "open": "Open",
+      "openInNewTab": "Open in new tab",
+      "revealInFolder": "Reveal in folder"
+    },
+    "colorLabels": {
+      "clay": "Clay",
+      "moss": "Moss",
+      "ochre": "Ochre",
+      "plum": "Plum",
+      "slate": "Slate",
+      "stone": "Stone"
+    },
+    "decoration": {
+      "colorSection": "Color",
+      "default": "Default",
+      "defaultFolderIcon": "Default folder icon",
+      "iconSection": "Icon",
+      "menuLabel": "Color label",
+      "noColor": "No color",
+      "none": "None"
+    },
+    "deleteConfirm": {
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "title": "Delete this note?",
+      "untitled": "Untitled",
+      "warning": "This cannot be undone."
+    },
+    "filterBuilder": {
+      "addCondition": "Add condition",
+      "addFilterGroup": "Add filter group",
+      "cancel": "Cancel",
+      "combinator": {
+        "all": "all",
+        "any": "any"
+      },
+      "match": "Match",
+      "negate": {
+        "is": "is",
+        "isNot": "is not"
+      },
+      "noConditions": "No conditions yet — this view shows all pages.",
+      "noteCount_one": "{{count}} note",
+      "noteCount_other": "{{count}} notes",
+      "of": "of:",
+      "ofTheGroups": "of the groups:",
+      "removeCondition": "Remove condition",
+      "replaceFilter": "Replace filter",
+      "save": "Save",
+      "searchTextPlaceholder": "search text",
+      "selectFolderPlaceholder": "select a folder…",
+      "selectTagPlaceholder": "select a tag…",
+      "type": {
+        "folder": "Folder",
+        "search": "Search",
+        "tag": "Tag"
+      },
+      "unrepresentable": "This filter was made with an advanced editor and can't be edited here.",
+      "unresolved": "unresolved"
+    },
+    "folderManagement": {
+      "illegalSegment": "A folder name can't contain / \\ | # ^ [ ] or start/end with a space.",
+      "tooLong": "That folder path is too long."
+    },
+    "folderNote": {
+      "defaultTitle": "Index"
+    },
+    "folderRow": {
+      "createFolderNote": "Create a folder note",
+      "empty": "empty",
+      "folderNote": "folder note",
+      "openFolderNote": "Open folder note"
+    },
+    "graph": {
+      "allConnected": "Everything is connected — no isolated notes.",
+      "building": "Building graph…",
+      "depthToggleTitle": "Toggle neighborhood depth (1 ↔ 2 hops)",
+      "filterAll": "All",
+      "filterAroundNote": "Around this note",
+      "filterByTag": "Filter by tag",
+      "filterIsolated": "Isolated",
+      "hop": "{{depth}} hop",
+      "loading": "Loading graph…",
+      "noNotes": "No notes to graph yet.",
+      "overCap": "This vault is large — the whole-vault graph is capped. Filter to a tag or show isolated notes to explore.",
+      "refresh": "Refresh",
+      "refreshTitle": "The vault changed — rebuild the graph",
+      "tagPlaceholder": "Tag…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Untitled view"
+      },
+      "modal": {
+        "cancel": "Cancel",
+        "cancelledNotImported": "{{count}} not imported",
+        "cancelledNotImported_one": "{{count}} not imported",
+        "cancelledNotImported_other": "{{count}} not imported",
+        "cancelling": "Cancelling…",
+        "chooseFolder": "Choose folder…",
+        "close": "Close",
+        "closeAriaLabel": "Close",
+        "copied": "Copied",
+        "copy": "Copy",
+        "done": "Done",
+        "errorBody": "The import couldn’t complete. Any notes already imported were kept and are safe to keep or delete.",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
+        "flagKindFolder": "Folder",
+        "flagKindTitle": "Title",
+        "folderPickerTitle": "Choose your Obsidian vault folder",
+        "hiddenIgnoredPrefix_one": "{{count}} config / hidden item ignored (e.g. ",
+        "hiddenIgnoredPrefix_other": "{{count}} config / hidden items ignored (e.g. ",
+        "hiddenIgnoredSuffix": ", dotfiles).",
+        "ifNoteExistsLabel": "If a note already exists",
+        "import": "Import",
+        "importFailed": "Import failed.",
+        "importing": "Importing your vault…",
+        "markDone": "Mark done",
+        "markedDone": "Marked done",
+        "mediaImported": "{{count}} imported",
+        "mediaImported_one": "{{count}} imported",
+        "mediaImported_other": "{{count}} imported",
+        "mediaOmittedSuffix": " · {{count}} omitted",
+        "mediaOmittedSuffix_one": " · {{count}} omitted",
+        "mediaOmittedSuffix_other": " · {{count}} omitted",
+        "needsAttention": "Needs attention",
+        "needsAttentionHelp": "These notes were imported unchanged. Suggested fixes are starting points — copy one, then rename the note when you open it.",
+        "noFolderChosen": "No folder chosen",
+        "notesImported_one": "note imported",
+        "notesImported_other": "notes imported",
+        "policyCopyHint": "Bring it in alongside the existing note.",
+        "policyCopyLabel": "Import as a copy",
+        "policySkipHint": "Recommended — re-running an import never duplicates or overwrites.",
+        "policySkipLabel": "Skip it",
+        "preexistingDetail": "This note already had its own folder: “{{existing}}”, which Myne kept — its folder may differ from where it sat on disk.",
+        "preparing": "Preparing…",
+        "progressNotes": " notes",
+        "progressOf": " of ",
+        "reasonIllegalChar": "contains a character Myne can’t use in a name",
+        "reasonPathTooLong": "the folder + title path is too long",
+        "reasonSegmentTooLong": "name is longer than Myne allows",
+        "scanning": "Scanning your vault…",
+        "setupIntro": "Point Myne at your existing Obsidian vault folder. Every Markdown note is imported and encrypted on the spot — nothing leaves this device, and your original files are left untouched.",
+        "statCancelled": "Cancelled",
+        "statCanvasSkipped": ".canvas files skipped",
+        "statEmptyFoldersKept": "Empty folders kept",
+        "statMedia": "Media",
+        "statOtherSkipped": "Other files skipped",
+        "statSkipped": "Skipped (already exist)",
+        "suggestedNameAriaLabel": "Suggested name",
+        "titleComplete": "Import complete",
+        "titleFailed": "Import failed",
+        "titleSetup": "Import Obsidian vault",
+        "vaultFolderLabel": "Vault folder",
+        "vaultRoot": "(vault root)"
+      },
+      "offer": {
+        "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported — nothing leaves this device, and your original files stay exactly where they are.",
+        "chooseFolder": "Choose folder…",
+        "laterHint": "You can always import later from Settings → Storage.",
+        "notNow": "Not now",
+        "title": "Import your Obsidian vault?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Add to favorites",
+      "archive": "Archive",
+      "archiveBulkError": "Couldn't archive the notes.",
+      "archiveNote": "Archive",
+      "archiveSingleError": "Couldn't archive the note.",
+      "attachments": "Attachments",
+      "bulkArchive": "Archive {{count}} notes",
+      "bulkArchive_one": "Archive {{count}} note",
+      "bulkArchive_other": "Archive {{count}} notes",
+      "bulkDelete": "Delete {{count}} notes",
+      "bulkDelete_one": "Delete {{count}} note",
+      "bulkDelete_other": "Delete {{count}} notes",
+      "bulkMove": "Move {{count}} notes to…",
+      "bulkMove_one": "Move {{count}} note to…",
+      "bulkMove_other": "Move {{count}} notes to…",
+      "caseMergeBody": "A folder named “{{name}}” already exists. These will merge — rename one to keep them separate?",
+      "color": "Color…",
+      "createFirstNote": "+ Create your first note",
+      "createFolderNote": "Create folder note",
+      "customize": "Customize…",
+      "delete": "Delete",
+      "deleteFolderBody_one": "“{{name}}” and its {{count}} note",
+      "deleteFolderBody_other": "“{{name}}” and its {{count}} notes",
+      "deleteFolderConfirm": "Delete folder",
+      "deleteFolderTitle": "Delete this folder?",
+      "deleteFolderWarning": "The notes move to Trash — you can restore them later.",
+      "duplicate": "Duplicate",
+      "editFilterTitle": "Edit filter",
+      "emptyState": "No notes yet.",
+      "exportHtml": "Export as HTML…",
+      "exportMarkdown": "Export as Markdown…",
+      "exportPdf": "Export as PDF…",
+      "exportTxt": "Export as Plain Text…",
+      "favoritesHeading": "Favorites",
+      "mergeAnyway": "Merge anyway",
+      "newFolder": "New folder",
+      "newFolderInPlaceholder": "New folder in {{path}}",
+      "newFolderPlaceholder": "New folder",
+      "newNote": "New note",
+      "newNoteFromTemplate": "New note from template…",
+      "newNoteHere": "New note here",
+      "newNoteMenu": "New note",
+      "newNoteShortcut": "New note (⌘N)",
+      "newSubfolder": "New subfolder",
+      "newViewTitle": "New view",
+      "noteMovedToTrash": "Note moved to Trash",
+      "notesHeading": "Notes",
+      "notesMovedToTrash_one": "{{count}} note moved to Trash",
+      "notesMovedToTrash_other": "{{count}} notes moved to Trash",
+      "openArchive": "Open the archive",
+      "openAttachments": "Open attachments",
+      "openFolderNote": "Open folder note",
+      "openInNewTab": "Open in new tab",
+      "openToSide": "Open to the side",
+      "openTrash": "Open the trash",
+      "removeAsFolderNote": "Remove as folder note",
+      "removeFromFavorites": "Remove from favorites",
+      "rename": "Rename",
+      "setAsFolderNote": "Set as folder note",
+      "trash": "Trash",
+      "trashBulkError": "Couldn't move the notes to Trash.",
+      "trashSingleError": "Couldn't move the note to Trash.",
+      "undo": "Undo",
+      "vaultRoot": "Vault root",
+      "viewSettingsTitle": "View settings"
+    },
+    "newFromTemplate": {
+      "back": "Back",
+      "blankNote": "Blank note",
+      "createNote": "Create note",
+      "emptyState": "You haven’t created any templates yet.",
+      "listLabel": "Templates",
+      "loading": "Loading…",
+      "nameLabel": "Name for the note (from “{{templateName}}”)",
+      "namePlaceholder": "Untitled",
+      "nameStepTitle": "Name this note",
+      "pickStepTitle": "New note from template",
+      "untitledTemplate": "Untitled template"
+    },
+    "newTab": {
+      "createNote": "Create a new note",
+      "noNotesMatch": "No notes match.",
+      "noNotesYet": "No notes yet.",
+      "searchAriaLabel": "Search notes to open",
+      "searchPlaceholder": "Search notes…",
+      "untitled": "Untitled"
+    },
+    "pane": {
+      "graphTab": "Graph",
+      "loading": "Loading…",
+      "untitledView": "Untitled view"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} days ago",
+      "hoursAgo": "{{h}} h ago",
+      "justNow": "just now",
+      "minutesAgo": "{{m}} min ago",
+      "oneWeekAgo": "1 week ago",
+      "weeksAgo": "{{w}} weeks ago",
+      "yesterday": "yesterday"
+    },
+    "row": {
+      "addToFavorites": "Add to favorites",
+      "folderIndexBadgeLabel": "Folder note",
+      "folderIndexBadgeTitle": "Folder note — this folder's index",
+      "folderIndexConflictLabel": "Folder already has an index note",
+      "folderIndexConflictTitle": "This folder already has an index note",
+      "loadError": "Couldn't load this note",
+      "removeFromFavorites": "Remove from favorites",
+      "renameAriaLabel": "Rename note",
+      "untitled": "Untitled"
+    },
+    "savedView": {
+      "defaultName": "Filtered view"
+    },
+    "saveStatus": {
+      "editing": "Editing",
+      "editingEllipsis": "Editing…",
+      "editingTitle": "Editing — autosave is armed",
+      "justNow": "just now",
+      "retry": "Retry",
+      "saved": "Saved",
+      "savedRelative": "Saved {{rel}}",
+      "saveFailed": "Save failed",
+      "saveFailedTitle": "Save failed — click Retry",
+      "saving": "Saving",
+      "savingEllipsis": "Saving…"
+    },
+    "snapshotFailed": {
+      "dismiss": "Dismiss",
+      "message": "Couldn’t save a snapshot — your note is saved, but its version history may be incomplete (the disk may be full)."
+    },
+    "snapshots": {
+      "cancel": "Cancel",
+      "changeCount_one": "{{count}} change since this snapshot",
+      "changeCount_other": "{{count}} changes since this snapshot",
+      "close": "Close",
+      "confirmBody": "Your current note will be saved as a snapshot first, so you can undo this.",
+      "confirmTitle": "Restore this snapshot?",
+      "decrypting": "Decrypting…",
+      "emptyState": "No snapshots yet. Snapshots are saved automatically as you edit and kept for about 7 days. They’re encrypted, and disappear when the note is permanently deleted.",
+      "encryptedSize": "Encrypted · {{size}}",
+      "errorCannotDecrypt": "This snapshot couldn't be decrypted.",
+      "errorGeneric": "Something went wrong. Try again.",
+      "errorIo": "A disk error occurred — the disk may be full or unwritable.",
+      "errorNotFound": "That snapshot is no longer available.",
+      "errorStorageAccess": "Couldn't access the vault's snapshot storage.",
+      "errorVaultLocked": "The vault is locked. Unlock it to view snapshots.",
+      "justNow": "just now",
+      "listLabel": "Snapshot list",
+      "loading": "Loading…",
+      "restore": "Restore",
+      "restoreCta": "Restore this snapshot",
+      "restoredStatus": "Restored. The version you had is saved as a snapshot.",
+      "selectPlaceholder": "Select a snapshot to preview what changed since then.",
+      "title": "Snapshots",
+      "untitled": "Untitled"
+    },
+    "tabStrip": {
+      "closeNewTab": "Close new tab",
+      "closeTab": "Close {{title}}",
+      "newTab": "New tab",
+      "openNotes": "Open notes",
+      "pin": "Pin",
+      "pinned": "Pinned",
+      "pinnedTitle": "Pinned — unpin to close",
+      "unpin": "Unpin",
+      "untitled": "Untitled"
+    },
+    "tagBrowser": {
+      "cancel": "Cancel",
+      "clear": "Clear",
+      "combineTagsWith": "Combine tags with",
+      "filtering": "Filtering…",
+      "modeAll": "All",
+      "modeAny": "Any",
+      "noNotesForFilter": "No notes for this filter.",
+      "noTagsMatch": "No tags match “{{query}}”.",
+      "noTagsYet": "No tags yet.",
+      "noteCount_one": "{{count}} note",
+      "noteCount_other": "{{count}} notes",
+      "notes": "Notes",
+      "pickTag": "Pick a tag to filter.",
+      "save": "Save",
+      "saveAsView": "Save as view",
+      "searchPlaceholder": "Search tags…",
+      "title": "Tags",
+      "untitled": "Untitled",
+      "viewNamePlaceholder": "View name"
+    },
+    "trash": {
+      "close": "Close",
+      "count_one": "{{count}} note",
+      "count_other": "{{count}} notes",
+      "countEmpty": "Empty",
+      "delete": "Delete",
+      "deleteError": "Couldn't delete that note. Try again.",
+      "empty": "Empty trash",
+      "emptyConfirmBody_one": "{{count}} note will be permanently deleted.",
+      "emptyConfirmBody_other": "{{count}} notes will be permanently deleted.",
+      "emptyConfirmCta": "Empty trash",
+      "emptyConfirmTitle": "Empty trash?",
+      "emptyPartialFailure_one": "{{count}} note couldn't be deleted and remain in the trash.",
+      "emptyPartialFailure_other": "{{count}} notes couldn't be deleted and remain in the trash.",
+      "emptyState": "Trash is empty.",
+      "purgeConfirmCta": "Delete permanently",
+      "purgeConfirmTitle": "Delete permanently?",
+      "restore": "Restore",
+      "restoreError": "Couldn't restore that note. Try again.",
+      "title": "Trash",
+      "untitled": "Untitled"
+    },
+    "unlinkedMentions": {
+      "empty": "No unlinked mentions.",
+      "heading": "Unlinked mentions",
+      "link": "Link",
+      "linkTooltip": "Link this mention to {{title}}",
+      "refresh": "Mentions may have changed — refresh",
+      "searching": "Searching…",
+      "thisNote": "this note",
+      "untitled": "Untitled"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Change cover",
+        "changeCoverImage": "Change cover image",
+        "empty": "No notes match this view",
+        "noValue": "No value",
+        "setCover": "Set cover",
+        "setCoverImage": "Set cover image",
+        "untitled": "Untitled"
+      },
+      "collapseViews": "Collapse views",
+      "empty": "No views yet. Save the current note list as a view.",
+      "expandViews": "Expand views",
+      "heading": "Views",
+      "host": {
+        "unsupported": "This view type arrives in a later update."
+      },
+      "menu": {
+        "deleteView": "Delete view",
+        "editFilter": "Edit filter…",
+        "moveDown": "Move down",
+        "moveUp": "Move up",
+        "rename": "Rename",
+        "viewSettings": "View settings…"
+      },
+      "newView": "New view",
+      "untitledView": "Untitled view"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Default (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (square)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (wide)"
+      },
+      "cancel": "Cancel",
+      "cardSize": "Card size",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "The frontmatter property whose value is an image — shown as each card's cover. Leave empty for no cover.",
+      "coverImagePlaceholder": "e.g. cover",
+      "coverImageProperty": "Cover image property",
+      "imageAspectRatio": "Image aspect ratio",
+      "reset": "Reset",
+      "save": "Save"
+    },
+    "welcome": {
+      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nWe're glad you're here. To learn more about Myne, visit https://myne.md\n",
+      "title": "Welcome to Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "Default"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Checking strength…",
+      "confirmLabel": "Confirm master password",
+      "defaultEmptyCaption": "Used as input to Argon2id (m=256 MiB, t=3, p=2). Choose something you can remember; you cannot reset it.",
+      "mismatch": "Passwords do not match.",
+      "passwordLabel": "Master password",
+      "suggestPassword": "Suggest password",
+      "tooShort": "Use at least {{n}} characters."
+    },
+    "input": {
+      "hide": "Hide password",
+      "show": "Show password"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "No matches.",
+      "placeholder": "Select…",
+      "searchPlaceholder": "Search…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Recovery cancelled: vault was locked.",
+      "operationInProgress": "Operation in progress. Please wait.",
+      "unexpected": "Unexpected error. Please try again.",
+      "vaultNotFound": "Vault file not found. Please restart the app."
+    }
+  },
+  "restore": {
+    "backLabel": "Back",
+    "cancelLabel": "Cancel",
+    "collision": {
+      "body": "A vault from this backup already exists on this device. You can keep both — the restored copy appears as a separate vault in your vault list — or restore now and then remove the existing vault from the vault list yourself (removal asks you to type DELETE, and only makes sense after you confirm the restored vault opens).",
+      "keepBoth": "Keep both",
+      "replaceExisting": "Restore, then replace existing…"
+    },
+    "damaged": {
+      "body": "The backup file is damaged, so nothing was restored. If this is the only copy you have, salvage can restore the intact notes and list exactly what could not be read — the result is always labeled as a partial restore.",
+      "close": "Close",
+      "salvage": "Salvage intact notes…"
+    },
+    "error": {
+      "tryAnotherFile": "Try another file"
+    },
+    "pick": {
+      "body": "Pick a <code>.myne-backup</code> file. The backup is verified before anything is restored; the restored vault unlocks with that vault's password or recovery phrase — exactly like unlock.",
+      "chooseFile": "Choose backup file…",
+      "corruptedSuffix": "Your current vault is not touched: the backup is restored as a separate vault first."
+    },
+    "summary": {
+      "attachments": "Attachments: {{n}}",
+      "collidedNote": "The previously existing copy of this vault is still in your vault list. Once you confirm the restored vault opens, you can remove the old one from the vault list (it will ask you to type DELETE).",
+      "notes": "Notes: {{n}}",
+      "openVaultList": "Open vault list",
+      "partialHeader_one": "Restored partially — {{count}} item could not be read.",
+      "partialHeader_other": "Restored partially — {{count}} items could not be read.",
+      "restored": "Vault restored.",
+      "versionHistory": "Version history entries: {{n}}"
+    },
+    "title": "Restore from backup",
+    "working": {
+      "cancel": "Cancel",
+      "restoringProgress": "Restoring… {{done}} of {{total}}",
+      "verifying": "Verifying backup…",
+      "verifyingProgress": "Verifying backup… {{done}} of {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Development build",
+      "buildChannelLabel": "Build channel",
+      "buildChannelStable": "Stable",
+      "changelogButton": "View changelog…",
+      "changelogHelper": "Per-version notes. Will appear when MYND-119 lands.",
+      "changelogLabel": "Changelog",
+      "licenseBody": "Pre-alpha · CC0 docs · AGPL-3.0 application code on Phase 1 release.",
+      "licenseLabel": "License",
+      "tagline": "Pre-alpha · Phase 1 desktop client",
+      "threatModelHelper": "Open the public threat-model document in your browser.",
+      "threatModelLabel": "Threat model"
+    },
+    "account": {
+      "argon2idHeading": "Argon2id parameters",
+      "changePasswordButton": "Change password",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Wrong current password or vault file is corrupted.",
+        "ioError": "Disk error, please try again.",
+        "joinFailure": "Something went wrong, please try again.",
+        "samePasswordRejected": "New password matches the current one.",
+        "weakNewPassword": "New password must be at least 12 characters."
+      },
+      "changePasswordHeading": "Change password",
+      "changePasswordHelper": "Rotate your master password while keeping the same vault. Recovery phrase stays the same.",
+      "dangerZoneHeading": "Danger zone",
+      "dangerZoneHelper": "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
+      "deleteVaultButton": "Delete vault…",
+      "memoryCost": "Memory cost",
+      "parallelism": "Parallelism",
+      "timeCost": "Time cost",
+      "vaultLabelEyebrow": "VAULT LABEL",
+      "vaultLabelHelper": "A name for this vault shown in the in-app switcher. Stored encrypted inside the vault; never leaves your device in plaintext.",
+      "vaultLabelPlaceholder": "Add a label…",
+      "vaultLabelSave": "Save"
+    },
+    "appearance": {
+      "showEditTimesAria": "Show edit times in sidebar",
+      "showEditTimesHelper": "Display each note's last-edited time beneath its title in the sidebar.",
+      "showEditTimesLabel": "Show edit times",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Dark",
+        "light": "Light",
+        "system": "System"
+      },
+      "themeHelper": "Switch between light and dark themes, or follow the system preference.",
+      "themeLabel": "Theme",
+      "themeOptionAria": "{{label}} theme",
+      "themeSaveError": "Couldn't save theme. Please try again.",
+      "timestampsSaveError": "Couldn't save preference. Please try again."
+    },
+    "archive": {
+      "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder and hides the archive controls.",
+      "label": "Archiving",
+      "off": "Off",
+      "on": "On",
+      "saveError": "Could not update the archiving setting."
+    },
+    "autoBackup": {
+      "backupFolder": "Backup folder",
+      "chooseFolder": "Choose folder…",
+      "chooseFolderDialogTitle": "Choose a folder for automatic backups",
+      "frequency": "Frequency",
+      "frequencyAriaLabel": "Backup frequency",
+      "helper": "Write an encrypted .myne-backup to a folder on a schedule, while the app is open and the vault is unlocked. Backups stay as encrypted as your vault; Myne keeps the most recent few and never sends anything off your device.",
+      "intervalDaily": "Daily",
+      "intervalEveryUnlock": "Every unlock",
+      "intervalWeekly": "Weekly",
+      "keepLast": "Keep last",
+      "noFolderChosen": "No folder chosen yet.",
+      "saveFailedToast": "Could not save backup settings.",
+      "searchEmpty": "No match.",
+      "searchPlaceholder": "Search…",
+      "statusFailed": "Automatic backup failed — {{stamp}}",
+      "statusLastBackup": "Last backup: {{stamp}}",
+      "statusNever": "No automatic backup yet.",
+      "title": "Automatic backups"
+    },
+    "changePassword": {
+      "cancel": "Cancel",
+      "checkingStrength": "Checking strength…",
+      "confirmLabel": "Confirm new password",
+      "currentLabel": "Current password",
+      "mismatch": "Passwords do not match.",
+      "newLabel": "New password",
+      "submit": "Change password",
+      "submitting": "Changing password…",
+      "title": "Change password",
+      "tooShort": "Use at least {{n}} characters."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Browser extension"
+      },
+      "when": {
+        "bare": "Connected",
+        "daysAgo_one": "Connected {{count}} day ago",
+        "daysAgo_other": "Connected {{count}} days ago",
+        "hoursAgo": "Connected {{count}} h ago",
+        "hoursAgo_one": "Connected {{count}} h ago",
+        "hoursAgo_other": "Connected {{count}} h ago",
+        "justNow": "Connected just now",
+        "minutesAgo": "Connected {{count}} min ago",
+        "minutesAgo_one": "Connected {{count}} min ago",
+        "minutesAgo_other": "Connected {{count}} min ago",
+        "onDate": "Connected {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Applied",
+      "apply": "Apply",
+      "applyError": "Couldn't apply that theme. Please try again.",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "delete": "Delete",
+      "deleteError": "Couldn't delete that theme. Please try again.",
+      "empty": "No custom themes yet. Import one, or open the themes folder and add a theme file.",
+      "error": {
+        "aColorFallback": "a color",
+        "invalidFile": "Invalid theme file.",
+        "invalidName": "Unsafe theme name",
+        "invalidValue": "Invalid value for {{key}}",
+        "invalidValueWithLine": "Invalid value for {{key}} (line {{line}})",
+        "missingKey": "Missing required color {{key}}",
+        "parseError": "Not valid JSON",
+        "parseErrorWithLine": "Not valid JSON (line {{line}})"
+      },
+      "fileFilterName": "Myne theme",
+      "helper": "Use your own color palette. Themes are validated on this device before use — nothing is uploaded.",
+      "importButton": "Import theme…",
+      "importError": "That file isn't a valid theme. Open the reference to see the format.",
+      "label": "Custom themes",
+      "openFolderButton": "Open themes folder",
+      "openFolderError": "Couldn't open the themes folder.",
+      "readError": "Couldn't read your themes folder."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Blank (no template)",
+      "dateFormatHelper": "The title of each daily note. Supports YYYY, MM, DD. Defaults to {{default}}.",
+      "dateFormatLabel": "Daily note date format",
+      "dateFormatSaveError": "Couldn't save the date format. Please try again.",
+      "folderHelper": "Where new daily notes are filed. Defaults to {{default}} — the folder is kept even when empty.",
+      "folderLabel": "Daily note folder",
+      "folderSaveError": "Couldn't save the daily folder. Please try again.",
+      "searchEmpty": "No templates match.",
+      "searchPlaceholder": "Search templates…",
+      "templateHelper": "Pick a template to start each daily note from, or leave blank for an empty note titled with the date.",
+      "templateLabel": "Daily note template",
+      "templateSaveError": "Couldn't save the daily template. Please try again.",
+      "untitledTemplate": "Untitled template"
+    },
+    "deleteVault": {
+      "cancel": "Cancel",
+      "caseSensitiveHint": "Case-sensitive. Type the word exactly to enable deletion.",
+      "continue": "Continue",
+      "copyPrimary": "This permanently deletes this vault and every note inside it. The action cannot be undone, and your recovery phrase will not restore the data.",
+      "copySecondary": "Vault keys are zeroized from memory before the files are unlinked; any orphan ciphertext that remains on disk stays unrecoverable Argon2id-wrapped junk.",
+      "eyebrow": "IRREVERSIBLE",
+      "heading": "Delete vault",
+      "ioFailBody": "Could not access vault files for deletion. Vault keys are already zeroized from memory; any vault data that remains on disk is unrecoverable Argon2id-wrapped junk.",
+      "ioFailTitle": "Disk error during delete",
+      "partialFailBody_one": "{{count}} file could not be deleted from disk. Vault keys are already zeroized from memory, so any orphan ciphertext that remains is unrecoverable Argon2id-wrapped junk.",
+      "partialFailBody_other": "{{count}} files could not be deleted from disk. Vault keys are already zeroized from memory, so any orphan ciphertext that remains is unrecoverable Argon2id-wrapped junk.",
+      "partialFailTitle": "Vault deletion partially failed",
+      "submit": "Delete vault",
+      "submitInFlight": "Deleting vault…",
+      "typeToConfirmLabel": "Type DELETE to confirm",
+      "vaultPath": "Vault path: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Dim inactive lines",
+      "dimHelper": "In focus mode (⇧⌘F), dim every line except the one you're editing.",
+      "dimLabel": "Focus mode · dim inactive lines",
+      "off": "Off",
+      "on": "On",
+      "saveError": "Could not save the focus-mode setting.",
+      "typewriterAria": "Typewriter scroll",
+      "typewriterHelper": "In focus mode (⇧⌘F), keep the active line vertically centered as you type.",
+      "typewriterLabel": "Focus mode · typewriter scroll"
+    },
+    "hotkeys": {
+      "addBindingAria": "Add a shortcut for {{command}}",
+      "cancel": "Cancel",
+      "capturePrompt": "Press a key…",
+      "conflictIndicator": "⚠ conflict",
+      "conflictTitle": "Also used by {{commands}}",
+      "fixed": "fixed",
+      "group": {
+        "editorFormatting": "Editor formatting",
+        "general": "General",
+        "navigation": "Navigation",
+        "notes": "Notes",
+        "panesTabs": "Panes & Tabs",
+        "view": "View"
+      },
+      "helper": "View and change keyboard shortcuts. Editor formatting and the tab-cycle shortcut are fixed.",
+      "notSet": "Not set",
+      "removeBindingAria": "Remove {{chord}}",
+      "resetAll": "Reset all hotkeys…",
+      "resetAllConfirm": "Reset every custom shortcut to its default?",
+      "resetAllYes": "Reset all",
+      "restoreDefaultAria": "Restore default for {{command}}",
+      "searchAriaLabel": "Search shortcuts",
+      "searchPlaceholder": "Search shortcuts…",
+      "warnAlreadyUsed": "Already used by {{commands}} — added anyway."
+    },
+    "language": {
+      "helper": "Choose the display language for the app.",
+      "label": "Language"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Could not save the line-number setting.",
+      "helper": "Show a line-number gutter in the editor. One number per line; off by default.",
+      "label": "Line numbers",
+      "off": "Off",
+      "on": "On"
+    },
+    "prefs": {
+      "saveError": "Couldn't save preference — try again"
+    },
+    "privacy": {
+      "autoLockHelper": "Lock the vault after this much inactivity.",
+      "autoLockLabel": "Auto-lock",
+      "autoLockSearchEmpty": "No durations match.",
+      "autoLockSearchPlaceholder": "Search durations…",
+      "screenCaptureHelperOff": "Protection always applies before unlock. After unlock, follows this preference.",
+      "screenCaptureHelperOn": "Active on macOS and Windows 10 (May 2020 Update or later). Linux support coming in a future release.",
+      "screenCaptureLabel": "Screen-capture protection"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Cancelled.",
+      "errorGeneric": "Could not configure quick unlock.",
+      "errorHardwareUnavailable": "Touch ID is not available on this device.",
+      "errorNotUnlocked": "Unlock the vault first.",
+      "errorPinNotDigits": "PIN must be digits only.",
+      "errorPinTooShort": "PIN must be at least {{count}} digits.",
+      "errorPinTooShort_one": "PIN must be at least {{count}} digit.",
+      "errorPinTooShort_other": "PIN must be at least {{count}} digits.",
+      "helperConfigured": "Configured via {{method}}. Re-entry after auto-lock skips the master password. The master password is still required after restart.",
+      "helperNotConfigured": "Re-enter after auto-lock with a PIN or Touch ID instead of the full master password. A convenience over the encrypted vault — the master password stays required after restart.",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "Quick-unlock PIN",
+      "pinPlaceholder": "PIN (at least {{count}} digits)",
+      "pinPlaceholder_one": "PIN (at least {{count}} digit)",
+      "pinPlaceholder_other": "PIN (at least {{count}} digits)",
+      "setPin": "Set PIN",
+      "setupHelper": "Touch ID is macOS-only and currently experimental (pending hardware verification). PIN works everywhere.",
+      "title": "Quick unlock",
+      "useTouchId": "Use Touch ID"
+    },
+    "shell": {
+      "closeLabel": "Close settings",
+      "navLabel": "Settings panels",
+      "panels": {
+        "about": "About",
+        "account": "Account",
+        "appearance": "Appearance",
+        "editor": "Editor",
+        "hotkeys": "Hotkeys",
+        "privacy": "Privacy",
+        "storage": "Storage"
+      },
+      "passwordUpdatedToast": "Password updated",
+      "title": "Settings"
+    },
+    "spell": {
+      "errorSaveLanguages": "Could not save the spell-check languages.",
+      "errorSaveSetting": "Could not save the spell-check setting.",
+      "helper": "Underline misspelled words as you type. Fully offline — your notes never leave the device.",
+      "label": "Spell check",
+      "languagesAriaLabel": "Spell-check languages",
+      "languagesHelper": "A word is correct if it’s valid in any selected language — handy for mixing English terms into other-language notes.",
+      "languagesLabel": "Languages",
+      "languagesPlaceholder": "Select languages…",
+      "languagesSearchEmpty": "No languages match.",
+      "languagesSearchPlaceholder": "Search languages…",
+      "off": "Off",
+      "on": "On"
+    },
+    "storage": {
+      "backupHelper": "Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password or recovery phrase — exactly like unlock.",
+      "backupLabel": "Backup",
+      "backUpVault": "Back up vault…",
+      "exportAction": "Export…",
+      "exportBody": "Export vault as Markdown",
+      "exportHelper": "Plain markdown tree — not encrypted.",
+      "exportLabel": "Export",
+      "importHelper": "Bring an existing Obsidian vault into Myne. Every Markdown note is imported and encrypted on the spot; your original files are left untouched.",
+      "importLabel": "Import",
+      "importObsidian": "Import Obsidian vault…",
+      "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file.",
+      "locationLabel": "Vault location",
+      "openInFiles": "Open in Files",
+      "pathUnavailable": "Path unavailable",
+      "restoreBackup": "Restore from backup…"
+    },
+    "typography": {
+      "contentWidthHelper": "Maximum width of the editing column. Full lets text span the pane.",
+      "contentWidthLabel": "Content width",
+      "errorSave": "Couldn't save preference. Please try again.",
+      "fontHelper": "Monospace or proportional (sans-serif) text.",
+      "fontLabel": "Font",
+      "lineSpacingHelper": "Vertical space between lines.",
+      "lineSpacingLabel": "Line spacing",
+      "textSizeHelper": "Base size of the editor text. Headings scale with it.",
+      "textSizeLabel": "Text size"
+    },
+    "viewMode": {
+      "errorSave": "Could not save the default view mode.",
+      "helper": "How a note opens: Live preview (default), read-only Reading, or raw Source. Toggle a note with ⇧⌘E.",
+      "label": "Default view mode",
+      "optionLive": "Live preview",
+      "optionReading": "Reading",
+      "optionSource": "Source"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Close templates",
+      "deleteRowLabel": "Delete template {{name}} (move to Trash)",
+      "editTemplateLabel": "Edit template {{name}}",
+      "emptyBody": "Create a template to reuse a note skeleton — a meeting note, a daily log, a reading note. Pick one when you make a new note.",
+      "emptyTitle": "No templates yet",
+      "listLabel": "Templates",
+      "loading": "Loading…",
+      "newTemplate": "New template",
+      "newTemplateName": "Untitled template",
+      "removeFromTemplates": "Remove from templates",
+      "removeRowLabel": "Remove {{name}} from templates (keeps the note)",
+      "title": "Note templates"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Choose a different vault",
+    "continue": "Continue",
+    "decrypting": "Decrypting…",
+    "deleteLink": "Lost both password and recovery phrase? Delete vault and start over",
+    "errors": {
+      "alreadyUnlocked": "Vault is already unlocked.",
+      "inProgress": "Operation in progress.",
+      "unexpected": "Unexpected error. Please try again.",
+      "vaultNotFound": "Vault file not found. Please restart the app."
+    },
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Password",
+    "quickUnlock": {
+      "failed": "Quick unlock failed. Use your password.",
+      "pinAriaLabel": "Quick-unlock PIN",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "Unlock with PIN",
+      "unlockWithTouchId": "Unlock with Touch ID",
+      "usePasswordBelow": "or use your password below",
+      "wrongCredential": "Incorrect. {{remaining}} attempt(s) left."
+    },
+    "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
+    "recoveryInterruptedBody": "Set a new password first, then re-seal your vault.",
+    "recoveryInterruptedTitle": "Recovery flow was interrupted.",
+    "recoveryLink": "Forgot your password? Unlock with recovery phrase",
+    "submit": "Unlock",
+    "subtitle": "Enter your password to continue.",
+    "suspicion": {
+      "lockedDuringChange": "Password change cancelled: vault was locked.",
+      "metaChangedExternally": "Vault was modified in another session — please unlock again."
+    },
+    "title": "Unlock your vault."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Cannot read the vault file.",
+      "notFound": "Vault file not found. Please restart the app.",
+      "permissionDenied": "No permission to access the vault file. Check file permissions."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "I have saved my account number where I can find it later.",
+      "back": "Back",
+      "commit": "Create vault",
+      "committing": "Saving…",
+      "copied": "Copied",
+      "copy": "Copy",
+      "eyebrow": "Step 4 of 4 — account number",
+      "heading": "Save your account number.",
+      "intro": "This is your bearer token — treat it like cash.",
+      "saveAsFile": "Save as file",
+      "shownOnceBody": "Save it now — Myne cannot recover it for you. Required to register for sync later.",
+      "shownOnceEmphasis": "This is shown only once."
+    },
+    "briefing": {
+      "back": "Back",
+      "continue": "Continue to vault creation",
+      "eyebrow": "Before you create your vault",
+      "heading": "Before you create your vault",
+      "intro": "Myne encrypts your notes so that only you can open them. Three things follow from that — read them, then continue.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "I understand there is no email recovery.",
+          "statement": "There is no email recovery. There never will be.",
+          "why": "We never ask for your email, so there's no reset link and no account for support to unlock. This isn't a missing feature — it's the guarantee. Email recovery would mean we could read your notes, and Myne is built so we can't."
+        },
+        "no-store": {
+          "ackLabel": "I understand Myne can't recover my password.",
+          "statement": "Your password unlocks your vault. We don't store it.",
+          "why": "Your password is the input to the key that decrypts your notes. It never leaves this device, and nothing on our servers can reproduce it. That's what keeps your notes private — and why we can't reset it for you."
+        },
+        "phrase-backup": {
+          "ackLabel": "I understand my recovery phrase is the only backup.",
+          "statement": "Your recovery phrase is your only backup.",
+          "why": "If you forget your password, the 24-word recovery phrase is the one way back in. {{lostBothSecrets}} Write the phrase down and keep it somewhere safe."
+        }
+      },
+      "why": "Why?"
+    },
+    "confirm": {
+      "back": "Back",
+      "continue": "Continue",
+      "eyebrow": "Step 3 of 4 — confirm phrase",
+      "heading": "Type back four words from your phrase.",
+      "intro": "We'll ask for specific positions to verify you saved it.",
+      "mismatch": "Doesn't match word #{{pos}}.",
+      "wordAtPosition": "Word at position {{pos}}"
+    },
+    "encrypting": {
+      "caption": "This takes a moment.",
+      "footerHint": "If this takes longer than 30 seconds, close the window and try again.",
+      "heading": "Encrypting your vault"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Try again.",
+        "title": "Account number invalid"
+      },
+      "aeadFailure": {
+        "body": "Try again.",
+        "title": "Encryption failed"
+      },
+      "csprng": {
+        "body": "Try again.",
+        "title": "Couldn't generate secure random data"
+      },
+      "invalidPassword": {
+        "body": "Try again.",
+        "title": "Invalid password"
+      },
+      "invalidVaultMeta": {
+        "body": "Try again.",
+        "title": "Vault format error"
+      },
+      "ioOther": {
+        "body": "Try again.",
+        "title": "Couldn't save the vault"
+      },
+      "joinFailure": {
+        "body": "Try again.",
+        "title": "Something went wrong"
+      },
+      "kdfFailure": {
+        "body": "Try again. If this keeps happening, your system may be low on memory.",
+        "title": "Couldn't set up encryption"
+      },
+      "noSpace": {
+        "body": "Free up disk space and try again.",
+        "title": "Not enough disk space"
+      },
+      "notFound": {
+        "body": "Try again.",
+        "title": "Vault folder missing"
+      },
+      "passwordTooShort": {
+        "body": "Use at least 12 characters.",
+        "title": "Password too short"
+      },
+      "permissionDenied": {
+        "body": "Make sure Myne has permission to write to your application data folder.",
+        "title": "Couldn't write to vault folder"
+      },
+      "sessionExpired": {
+        "body": "For your security, vault creation times out after 10 minutes. Start over.",
+        "title": "Session expired"
+      },
+      "sessionNotFound": {
+        "body": "Start over from the beginning.",
+        "title": "Session not found"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Close other Myne windows and try again.",
+        "title": "Too many vault creations at once"
+      },
+      "vaultArtifactsPresent": {
+        "body": "A new vault cannot be created because vault data already exists on this device. Close the app and restart — the startup screen will route you to the unlock flow.",
+        "title": "Vault already exists"
+      },
+      "vaultBusyAuth": {
+        "body": "Another vault operation is in progress. Try again in a moment.",
+        "title": "Vault busy"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Cancel",
+        "message": "Closing will discard your recovery phrase. Continue closing?",
+        "okLabel": "Close anyway",
+        "title": "Discard vault creation?"
+      },
+      "genericError": {
+        "body": "Try again.",
+        "title": "Something went wrong"
+      }
+    },
+    "password": {
+      "back": "Back",
+      "eyebrow": "Step 1 of 4 — master password",
+      "heading": "Create vault",
+      "helperLead": "Myne does not store your password or recovery phrase.",
+      "submit": "Generate recovery phrase"
+    },
+    "phrase": {
+      "back": "Back",
+      "continue": "I've saved this — confirm phrase",
+      "copy": "Copy",
+      "eyebrow": "Step 2 of 4 — recovery phrase",
+      "heading": "Write down these 24 words.",
+      "intro": "This phrase, together with your password, is the only way to recover your vault. Store it offline — paper, password manager, hardware wallet. Treat it like cash.",
+      "reveal": "Reveal phrase",
+      "saveAsFile": "Save as file"
+    },
+    "ready": {
+      "backedUp": "Backed up ✓",
+      "backingUp": "Backing up…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Backup didn't complete — no file was left behind. You can back up any time from Settings → Storage.",
+      "backupFilterName": "Myne backup",
+      "backUpNow": "Back up this vault now",
+      "body": "Myne wrote your vault to your application data folder. Your master password and recovery phrase are the only way back in — make sure both are saved somewhere safe.",
+      "decrypting": "Decrypting…",
+      "done": "Done",
+      "heading": "Your vault is ready.",
+      "showFolder": "Show vault folder"
+    },
+    "sessionLost": {
+      "startOver": "Start over"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Create another vault",
+    "heading": "Choose a vault",
+    "loading": "Loading your vaults…",
+    "noneLoaded": "No vaults could be loaded right now.",
+    "openedRelative": "opened {{rel}}",
+    "restoreFromBackup": "Restore from backup",
+    "subline": "You have more than one vault on this device. Pick one to unlock.",
+    "vaultFallback": "Vault {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "This takes a moment.",
+      "eyebrow": "RECOVERY · DECRYPTING",
+      "footerHint": "If this takes longer than 30 seconds, close the window and try again.",
+      "heading": "Decrypting your vault",
+      "subCaption": "Working… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Recovery cancelled: vault was locked.",
+        "operationInProgress": "Operation in progress. Please wait.",
+        "unexpected": "Unexpected error. Please try again.",
+        "weakPassword": "New password must be at least 12 characters."
+      },
+      "eyebrow": "Recovery · New password",
+      "helperBody": "Opened with your recovery phrase. Your old password no longer works — set a new master password now.",
+      "helperEmphasis": "Your recovery phrase stays the same.",
+      "submit": "Set new password",
+      "title": "Set a new master password"
+    },
+    "phrase": {
+      "back": "← Back",
+      "body": "Enter your recovery phrase. 24 BIP-39 words.",
+      "cellLabel": "Word {{index}}",
+      "deleteLink": "Delete vault and start over",
+      "eyebrow": "Recovery",
+      "submit": "Unlock",
+      "title": "Recover your vault."
+    },
+    "select": {
+      "accountInvalid": "Invalid account number. Please check and retry.",
+      "accountLabel": "Account number (optional)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (optional)",
+      "body": "Pick the vault you want to recover with your 24-word recovery phrase. You can also type your account number to jump straight to it.",
+      "cancel": "Cancel",
+      "checking": "Checking…",
+      "loadFailed": "No vaults could be loaded right now.",
+      "loading": "Loading your vaults…",
+      "openedRelative": "opened {{rel}}",
+      "or": "or",
+      "title": "Choose a vault to recover",
+      "useAccountNumber": "Use account number",
+      "vaultFallback": "Vault {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Vault",
+    "createAnother": "Create another vault",
+    "switching": "switching…",
+    "switchVaultLabel": "Switch vault",
+    "vaultFallback": "Vault {{n}}"
+  },
+  "welcome": {
+    "createCta": "Create new vault",
+    "headlineLine1": "Encrypted markdown notes.",
+    "headlineLine2": "No email at signup.",
+    "repairResidue": {
+      "cancel": "Cancel",
+      "cleaningUp": "Cleaning up…",
+      "cleanUp": "Clean up",
+      "confirmBody_one": "{{count}} file will be removed. They're already unreadable; nothing recoverable is lost.",
+      "confirmBody_other": "{{count}} files will be removed. They're already unreadable; nothing recoverable is lost.",
+      "confirmTitle": "Clean up leftover files?",
+      "doneBody_one": "Removed {{count}} leftover file. You can create a new vault now.",
+      "doneBody_other": "Removed {{count}} leftover files. You can create a new vault now.",
+      "doneTitle": "Cleaned up",
+      "errorBody": "Something went wrong. Close the app and try again.",
+      "errorTitle": "Cleanup failed",
+      "foundBody_one": "{{count}} leftover file from a previous deletion that didn't finish. They're already unreadable — you won't lose anything recoverable.",
+      "foundBody_other": "{{count}} leftover files from a previous deletion that didn't finish. They're already unreadable — you won't lose anything recoverable.",
+      "foundTitle": "Leftover files from an incomplete deletion",
+      "partialBody_one": "{{count}} file may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
+      "partialBody_other": "{{count}} files may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
+      "partialTitle": "Some files couldn't be removed"
+    },
+    "restoreCta": "Restore from backup",
+    "subtitle": "Your notes are encrypted on this device before they leave it. The server only stores ciphertext."
+  }
+}

@@ -42,6 +42,10 @@ coverage/
 /myne-website/
 /operations/
 /agent-tooling/
+/myne-clipper/
+
+# Vite dep-optimization cache (regenerated each build).
+.vite/
 
 /.claude/
 

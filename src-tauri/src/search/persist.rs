@@ -46,10 +46,17 @@ pub const MYN_HEADER_PREFIX_FOR_NONCE: usize = MYN_CONTENT_NONCE_OFFSET + MYN_CO
 pub type NonceManifest = BTreeMap<String, [u8; MYN_CONTENT_NONCE_LEN]>;
 
 /// Borrowed snapshot for the encode side (avoids cloning the index).
+///
+/// `extractor_version` (MYND-328) is the attachment-text extractor generation
+/// whose output is folded into the indexed note bodies (§ 9.6.4). It rides LAST
+/// so a pre-MYND-328 snapshot (no field) fails postcard decode → full rebuild,
+/// which backfills attachment text into every note. A later bump (e.g. the OCR
+/// layer, MYND-441) likewise forces a rebuild.
 #[derive(Serialize)]
 struct SnapshotRef<'a> {
     manifest: &'a NonceManifest,
     index: &'a InvertedIndex,
+    extractor_version: u8,
 }
 
 /// Owned snapshot for the decode side.
@@ -57,6 +64,7 @@ struct SnapshotRef<'a> {
 struct SnapshotOwned {
     manifest: NonceManifest,
     index: InvertedIndex,
+    extractor_version: u8,
 }
 
 /// Read a `.myn` file's `content_nonce` from its header bytes WITHOUT
@@ -83,7 +91,12 @@ pub fn encode_snapshot(
     manifest: &NonceManifest,
     index: &InvertedIndex,
 ) -> Result<Vec<u8>, SearchBlobError> {
-    let plaintext = postcard::to_allocvec(&SnapshotRef { manifest, index }).unwrap_or_default();
+    let plaintext = postcard::to_allocvec(&SnapshotRef {
+        manifest,
+        index,
+        extractor_version: protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1,
+    })
+    .unwrap_or_default();
     encode_search_index_blob(search_index_key, account_number_hash, &plaintext)
 }
 
@@ -97,6 +110,13 @@ pub fn decode_snapshot(
 ) -> Option<(NonceManifest, InvertedIndex)> {
     let plaintext = decode_search_index_blob(search_index_key, account_number_hash, blob).ok()?;
     let snap: SnapshotOwned = postcard::from_bytes(&plaintext).ok()?;
+    // A snapshot built under a different attachment-text extractor generation is
+    // stale (§ 9.6.4): reject → caller rebuilds so the current extractor's text
+    // is re-folded. A pre-MYND-328 snapshot lacks the field and already fails the
+    // `from_bytes` above (postcard is non-self-describing) → same rebuild.
+    if snap.extractor_version != protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1 {
+        return None;
+    }
     Some((snap.manifest, snap.index))
 }
 
@@ -220,6 +240,32 @@ mod tests {
         let wrong = [0x43; AEAD_KEY_LEN];
         assert!(decode_snapshot(&wrong, &ACCOUNT_HASH, &blob).is_none());
         assert!(decode_snapshot(&KEY, &ACCOUNT_HASH, b"not a blob").is_none());
+    }
+
+    #[test]
+    fn pre_mynd328_snapshot_without_extractor_version_forces_rebuild() {
+        // MYND-328: a snapshot serialized before the `extractor_version` field
+        // existed ({manifest, index}) must fail decode → caller rebuilds, which
+        // backfills attachment text into every note. postcard is
+        // non-self-describing, so the missing trailing field is a decode error.
+        #[derive(serde::Serialize)]
+        struct OldSnap<'a> {
+            manifest: &'a NonceManifest,
+            index: &'a InvertedIndex,
+        }
+        let mut manifest = NonceManifest::new();
+        manifest.insert("a".into(), nonce(1));
+        let index = InvertedIndex::default();
+        let plaintext = postcard::to_allocvec(&OldSnap {
+            manifest: &manifest,
+            index: &index,
+        })
+        .expect("encode old snapshot");
+        let blob = encode_search_index_blob(&KEY, &ACCOUNT_HASH, &plaintext).expect("seal");
+        assert!(
+            decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_none(),
+            "old snapshot must force a rebuild"
+        );
     }
 
     // ---- reconcile == rebuild ----------------------------------------

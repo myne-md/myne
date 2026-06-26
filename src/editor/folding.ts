@@ -24,6 +24,7 @@ import { EditorView } from "@codemirror/view";
 import { codeFolding, foldGutter } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 import { listFoldService } from "./list-fold";
+import i18n from "../i18n";
 
 // E2E observability (SYNC-8). `<screen>.<element>` naming.
 const GUTTER_MARKER_TESTID = "editor.fold-gutter-marker";
@@ -49,8 +50,8 @@ function foldPlaceholder(_view: EditorView, onclick: (event: Event) => void): HT
   el.className = "cm-foldPlaceholder";
   el.setAttribute("data-testid", PLACEHOLDER_TESTID);
   el.setAttribute("role", "button");
-  el.setAttribute("aria-label", "Unfold");
-  el.title = "Click to unfold";
+  el.setAttribute("aria-label", i18n.t("editor.folding.unfold"));
+  el.title = i18n.t("editor.folding.clickToUnfold");
   el.textContent = "⋯";
   el.addEventListener("click", onclick);
   return el;

@@ -1,0 +1,1975 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Batal",
+      "cleaning": "Membersihkan…",
+      "close": "Tutup",
+      "completeTitle": "Pembersihan selesai",
+      "deleteCta": "Hapus {{count}} yang tidak terpakai",
+      "error": "Tidak dapat membersihkan. Beberapa catatan mungkin tidak terbaca — tidak ada yang dihapus.",
+      "intro_other": "{{count}} lampiran ini tidak digunakan di catatan mana pun. Menghapusnya bersifat permanen dan tidak dapat dibatalkan.",
+      "summaryFreed": " · membebaskan {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_other": "Menghapus {{count}} lampiran",
+      "summarySkipped": " · {{count}} dilewati (kini sedang digunakan)",
+      "title": "Bersihkan lampiran yang tidak terpakai",
+      "willBeReclaimed": "{{size}} akan dikembalikan."
+    },
+    "coverPicker": {
+      "close": "Tutup",
+      "dropHint": "Letakkan gambar untuk menjadikannya sampul.",
+      "empty": "Belum ada gambar di brankas ini. Unggah satu atau seret gambar ke sini.",
+      "loading": "Memuat…",
+      "removeCover": "Hapus sampul",
+      "title": "Pilih gambar sampul",
+      "upload": "Unggah"
+    },
+    "deleteDialog": {
+      "cancel": "Batal",
+      "confirmPrompt": "Hapus lampiran ini secara permanen? Tindakan ini tidak dapat dibatalkan.",
+      "delete": "Hapus",
+      "deleting": "Menghapus…",
+      "error": "Tidak dapat menghapus lampiran. Coba lagi.",
+      "notUsed": "Tidak digunakan di catatan mana pun.",
+      "stillUsed_other": "Lampiran ini masih digunakan di {{count}} catatan. Menghapusnya akan meninggalkan penanda di tempat lampiran disematkan:",
+      "title": "Hapus lampiran",
+      "untitled": "Tanpa judul"
+    },
+    "library": {
+      "actionsAriaLabel": "Tindakan lampiran",
+      "actionsTitle": "Tindakan",
+      "checkUnusedFailedNotice": "Tidak dapat memeriksa lampiran yang tidak terpakai. Coba lagi.",
+      "checking": "Memeriksa…",
+      "cleanUnused": "Bersihkan yang tidak terpakai",
+      "cleanUnusedTitle": "Hapus lampiran yang tidak digunakan di catatan mana pun",
+      "colCreated": "Dibuat",
+      "colName": "Nama",
+      "colSize": "Ukuran",
+      "colType": "Tipe",
+      "colUsedIn": "Digunakan di",
+      "decrypting": "Mendekripsi lampiran…",
+      "emptyImportHint": "Impor berkas untuk menyimpannya di brankas Anda.",
+      "emptyLoadError": "Tidak dapat membaca katalog lampiran.",
+      "emptyNoAttachments": "Belum ada lampiran.",
+      "filterAriaLabel": "Saring berdasarkan tipe",
+      "gridView": "Tampilan kisi",
+      "import": "Impor",
+      "importDialogTitle": "Impor lampiran",
+      "importFile": "Impor berkas",
+      "importing": "Mengimpor…",
+      "listView": "Tampilan daftar",
+      "menuDelete": "Hapus",
+      "menuExport": "Ekspor",
+      "menuPreview": "Pratinjau",
+      "menuRename": "Ganti nama",
+      "noMatch": "Tidak ada lampiran yang cocok dengan pencarian Anda.",
+      "noUnusedNotice": "Tidak ada lampiran tak terpakai untuk dibersihkan.",
+      "preview": "Pratinjau",
+      "previewAttachment": "Pratinjau lampiran",
+      "searchAriaLabel": "Cari lampiran berdasarkan nama berkas",
+      "searchPlaceholder": "Cari berdasarkan nama berkas",
+      "sort": {
+        "createdAsc": "Terlama dulu",
+        "createdDesc": "Terbaru dulu",
+        "nameAsc": "Nama A–Z",
+        "nameDesc": "Nama Z–A"
+      },
+      "sortAriaLabel": "Urutkan lampiran",
+      "supportedFilesFilter": "Berkas yang didukung",
+      "title": "Lampiran",
+      "typeFilter": {
+        "all": "Semua tipe",
+        "audio": "Audio",
+        "image": "Gambar",
+        "other": "Lainnya",
+        "pdf": "PDF"
+      },
+      "usedInCount_other": "Digunakan di {{count}} catatan",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Audio: {{filename}}",
+      "file": "Berkas",
+      "pause": "Jeda",
+      "pdfDocument": "Dokumen PDF",
+      "pdfFirstPage": "Halaman pertama PDF",
+      "play": "Putar"
+    },
+    "usedInNotesPopover": {
+      "empty": "Tidak digunakan di catatan mana pun.",
+      "untitled": "Tanpa judul"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "Operasi brankas lain sedang berlangsung. Tunggu hingga selesai, lalu coba lagi.",
+        "cancelled": "Pencadangan dibatalkan. Tidak ada berkas yang tertinggal.",
+        "invalidDestination": "Folder tujuan tidak dapat digunakan.",
+        "ioGeneric": "Tidak dapat menulis berkas cadangan.",
+        "ioNoSpace": "Ruang di lokasi tujuan tidak cukup.",
+        "ioPermissionDenied": "Tidak ada izin untuk menulis di lokasi tujuan.",
+        "joinFailure": "Pencadangan gagal tak terduga. Tidak ada berkas yang tertinggal.",
+        "memberTooLarge": "Sebuah berkas di brankas ini lebih besar dari yang diizinkan format cadangan.",
+        "vaultNotFound": "Tidak ada brankas yang ditemukan untuk dicadangkan.",
+        "verifyFailed": "Cadangan yang ditulis gagal terverifikasi, sehingga dibuang. Coba lagi — gunakan media berbeda jika terulang."
+      },
+      "restore": {
+        "authOperationInProgress": "Operasi brankas lain sedang berlangsung. Tunggu hingga selesai, lalu coba lagi.",
+        "cancelled": "Pemulihan dibatalkan. Tidak ada yang diubah.",
+        "damagedBackup": "Berkas cadangan rusak.",
+        "futureVersionBackup": "Cadangan ini dibuat oleh versi Myne yang lebih baru. Perbarui Myne, lalu pulihkan.",
+        "invalidVaultMeta": "Metadata brankas pada cadangan ini tidak terbaca, sehingga pemulihannya tidak dapat menghasilkan brankas yang berfungsi.",
+        "ioGeneric": "Tidak dapat membaca berkas cadangan.",
+        "ioPermissionDenied": "Tidak ada izin untuk membaca berkas cadangan.",
+        "joinFailure": "Pemulihan gagal tak terduga. Tidak ada yang diubah.",
+        "missingVaultMeta": "Cadangan ini tidak memiliki metadata brankasnya dan tidak dapat dipulihkan.",
+        "notABackupFile": "Berkas ini bukan cadangan Myne.",
+        "vaultAlreadyExists": "Brankas dari cadangan ini sudah ada di perangkat ini."
+      }
+    },
+    "export": {
+      "cancel": "Batal",
+      "close": "Tutup",
+      "copying": "Menyalin {{done}} dari {{total}}…",
+      "preparing": "Menyiapkan…",
+      "successToast": "Cadangan terverifikasi dan tersimpan.",
+      "title": "Cadangkan brankas",
+      "verifying": "Memverifikasi {{done}} dari {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Terima",
+      "close": "Tutup",
+      "codeAriaLabel": "Kode pemasangan",
+      "intro": "Pastikan kode ini cocok dengan yang ditampilkan di ekstensi, lalu pilih Terima untuk memasangkan.",
+      "reject": "Tolak",
+      "rejected": "Pemasangan ditolak.",
+      "title": "Sebuah ekstensi peramban ingin terhubung"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Arsip",
+    "archivedBadgeTitle": "Diarsipkan",
+    "dialogLabel": "Palet perintah",
+    "matchedInBody": "↳ cocok di isi",
+    "noMatches": "Tidak ada yang cocok",
+    "searchPlaceholder": "Cari catatan atau jalankan perintah — Esc untuk menutup",
+    "sectionCommands": "Perintah",
+    "sectionNotes": "Catatan",
+    "untitledNote": "Tanpa judul"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Cadangkan brankas…"
+      },
+      "category": {
+        "app": "Aplikasi",
+        "editor": "Penyunting",
+        "vault": "Brankas",
+        "view": "Tampilan"
+      },
+      "convertWikilinks": {
+        "label": "Konversi wikilink yang diimpor di catatan ini…"
+      },
+      "deleteWorkspace": {
+        "label": "Hapus ruang kerja…"
+      },
+      "exportNoteHtml": {
+        "label": "Ekspor catatan sebagai HTML…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Ekspor catatan sebagai Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "Ekspor catatan sebagai PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "Ekspor catatan sebagai Teks Biasa…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Ekspor brankas sebagai Markdown…"
+      },
+      "foldAll": {
+        "label": "Lipat semua"
+      },
+      "importBaseView": {
+        "label": "Impor tampilan .base…"
+      },
+      "importObsidian": {
+        "label": "Impor brankas Obsidian…"
+      },
+      "lockVault": {
+        "label": "Kunci brankas"
+      },
+      "manageTemplates": {
+        "label": "Kelola templat…"
+      },
+      "newNoteFromTemplate": {
+        "label": "Catatan baru dari templat…"
+      },
+      "openAttachments": {
+        "label": "Buka lampiran…"
+      },
+      "openSettings": {
+        "label": "Buka pengaturan…"
+      },
+      "openSnapshots": {
+        "label": "Snapshot…"
+      },
+      "openTodayNote": {
+        "label": "Buka catatan hari ini"
+      },
+      "randomNote": {
+        "label": "Buka catatan acak"
+      },
+      "renameWorkspace": {
+        "label": "Ganti nama ruang kerja…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Simpan ruang kerja sebagai…"
+      },
+      "showGraph": {
+        "label": "Tampilkan tampilan grafik…"
+      },
+      "showTags": {
+        "label": "Jelajahi tag…"
+      },
+      "showViews": {
+        "label": "Jelajahi tampilan…"
+      },
+      "switchWorkspace": {
+        "label": "Ganti ruang kerja…"
+      },
+      "toggleFocus": {
+        "label": "Alihkan mode fokus"
+      },
+      "toggleLeftSidebar": {
+        "label": "Alihkan bilah sisi catatan"
+      },
+      "toggleReading": {
+        "label": "Alihkan tampilan baca"
+      },
+      "toggleRightSidebar": {
+        "label": "Alihkan bilah sisi backlink"
+      },
+      "toggleSource": {
+        "label": "Alihkan mode sumber"
+      },
+      "toggleStackedTabs": {
+        "label": "Alihkan tab bertumpuk"
+      },
+      "unfoldAll": {
+        "label": "Buka semua lipatan"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "Tebal",
+        "closeTab": "Tutup tab",
+        "cycleHeadingLevel": "Putar tingkat heading",
+        "cycleTabs": "Putar tab",
+        "deleteWorkspace": "Hapus ruang kerja",
+        "focusNextPane": "Fokus ke panel berikutnya",
+        "focusPrevPane": "Fokus ke panel sebelumnya",
+        "foldAll": "Lipat semua",
+        "inlineCode": "Kode sebaris",
+        "insertWikilink": "Sisipkan wikilink",
+        "italic": "Miring",
+        "navigateBack": "Navigasi mundur",
+        "navigateForward": "Navigasi maju",
+        "newNote": "Catatan baru",
+        "openSettings": "Buka pengaturan",
+        "paletteToggle": "Buka palet perintah",
+        "renameWorkspace": "Ganti nama ruang kerja",
+        "saveWorkspaceAs": "Simpan ruang kerja sebagai",
+        "selectAllScoped": "Pilih semua (terbatas)",
+        "showGraphView": "Tampilkan tampilan grafik",
+        "splitPaneDown": "Pisahkan panel (ke bawah)",
+        "splitPaneRight": "Pisahkan panel (ke kanan)",
+        "switchWorkspace": "Ganti ruang kerja",
+        "toggleBulletList": "Alihkan daftar berbutir",
+        "toggleFocusMode": "Alihkan mode fokus",
+        "toggleNumberedList": "Alihkan daftar bernomor",
+        "toggleReadingView": "Alihkan tampilan baca",
+        "toggleSourceMode": "Alihkan mode sumber",
+        "toggleTaskList": "Alihkan daftar tugas",
+        "unfoldAll": "Buka semua lipatan"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Tambahkan pemodifikasi (⌘, Ctrl, atau Alt) — satu tombol saja tidak bisa menjadi pintasan."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Batal",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Memuat"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exportFailed": "Tidak dapat mengekspor {{filename}}.",
+        "exported": "{{filename}} diekspor.",
+        "renameFailed": "Tidak dapat mengganti nama lampiran.",
+        "renamed": "Diganti namanya menjadi {{name}}.",
+        "saveDialogFailed": "Tidak dapat membuka dialog simpan."
+      },
+      "convert": {
+        "cancel": "Batal",
+        "confirm": "Konversi",
+        "skipped": "dilewati — {{note}}",
+        "subtitleEmpty": "Tidak ada yang perlu dikonversi — tidak ada berkas sumber yang ditemukan.",
+        "subtitle_other": "{{count}} referensi akan ditulis ulang. Tinjau sebelum menerapkan.",
+        "title": "Konversi lampiran yang diimpor"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Sumber lampiran"
+      },
+      "convertCore": {
+        "converted": "{{count}} dikonversi",
+        "noneToConvert": "Tidak ada lampiran impor yang perlu dikonversi di catatan ini.",
+        "skipNote": {
+          "failed": "impor gagal",
+          "locked": "brankas terkunci",
+          "notFound": "sumber tidak ditemukan",
+          "tooLarge": "terlalu besar (maks 64 MiB)",
+          "unsupported": "tipe tidak didukung"
+        },
+        "skippedSuffix": " · {{count}} dilewati"
+      },
+      "fileKind": {
+        "generic": "Berkas",
+        "label": {
+          "archive": "Arsip",
+          "audio": "Audio",
+          "cHeader": "Header C",
+          "cSource": "Sumber C",
+          "cppSource": "Sumber C++",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Dokumen",
+          "ebook": "E-book",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Gambar",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "Berkas log",
+          "markdown": "Markdown",
+          "numbers": "Lembar kerja Numbers",
+          "pages": "Dokumen Pages",
+          "pdf": "PDF",
+          "presentation": "Presentasi",
+          "python": "Python",
+          "richText": "Dokumen teks kaya",
+          "rust": "Rust",
+          "shell": "Skrip shell",
+          "spreadsheet": "Lembar kerja",
+          "svg": "Gambar SVG",
+          "text": "Dokumen teks",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Dokumen Word",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "Berkas {{ext}}"
+      },
+      "lightbox": {
+        "close": "Tutup pratinjau",
+        "export": "Ekspor",
+        "exportAria": "Ekspor lampiran",
+        "imagePreview": "Pratinjau gambar",
+        "pdfFallback": "PDF",
+        "pdfPreview": "Pratinjau PDF"
+      },
+      "menu": {
+        "actionsAria": "Tindakan lampiran"
+      },
+      "pdf": {
+        "loading": "Memuat…"
+      },
+      "picker": {
+        "openFailed": "Tidak dapat membuka pemilih berkas."
+      },
+      "progress": {
+        "encrypting": "Mengenkripsi…",
+        "importing": "Mengimpor…",
+        "loading": "Memuat…"
+      },
+      "recording": {
+        "barAria": "Merekam catatan suara",
+        "cancel": "Batal",
+        "noAudio": "Tidak ada audio terdeteksi — periksa mikrofon Anda.",
+        "saving": "Menyimpan…",
+        "stop": "Berhenti"
+      },
+      "rename": {
+        "cancel": "Batal",
+        "confirm": "Ganti nama",
+        "title": "Ganti nama lampiran"
+      },
+      "summary": {
+        "added": "{{count}} ditambahkan",
+        "reason": {
+          "failed": "gagal",
+          "locked": "brankas terkunci",
+          "tooLarge": "terlalu besar",
+          "unsupported": "tipe tidak didukung"
+        },
+        "skipped": "{{count}} dilewati: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "Rekaman sedang berlangsung.",
+          "captureFailed": "Tidak dapat memulai rekaman — periksa akses mikrofon di Pengaturan Sistem.",
+          "generic": "Tidak dapat memulai rekaman.",
+          "locked": "Buka kunci brankas Anda untuk merekam catatan suara.",
+          "noInputDevice": "Tidak ada mikrofon ditemukan. Hubungkan satu lalu coba lagi."
+        },
+        "stopError": {
+          "captureFailed": "Rekaman gagal — periksa mikrofon Anda.",
+          "emptyRecording": "Tidak ada yang terekam.",
+          "generic": "Tidak dapat menyimpan rekaman.",
+          "silentRecording": "Rekaman senyap dan dibuang — periksa mikrofon Anda."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Jeda",
+          "play": "Putar",
+          "seek": "Cari posisi"
+        },
+        "menu": {
+          "export": "Ekspor",
+          "remove": "Hapus",
+          "rename": "Ganti nama",
+          "reveal": "Tampilkan di pustaka"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Referensi lampiran rusak: {{filename}}",
+          "brokenLabel": "rusak",
+          "deletedAria": "Lampiran dihapus: {{filename}}",
+          "deletedLabel": "dihapus"
+        },
+        "urlImageFallback": "gambar"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Perhatian",
+        "bug": "Bug",
+        "caution": "Hati-hati",
+        "danger": "Bahaya",
+        "done": "Selesai",
+        "error": "Galat",
+        "example": "Contoh",
+        "failure": "Kegagalan",
+        "faq": "FAQ",
+        "hint": "Petunjuk",
+        "important": "Penting",
+        "info": "Info",
+        "missing": "Hilang",
+        "note": "Catatan",
+        "question": "Pertanyaan",
+        "quote": "Kutipan",
+        "success": "Berhasil",
+        "tip": "Tip",
+        "todo": "Tugas",
+        "warning": "Peringatan"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Diarsipkan",
+        "empty": "Belum ada backlink.",
+        "linkedFrom": "Ditautkan dari {{count}}",
+        "untitled": "Tanpa judul"
+      },
+      "barItems": {
+        "graph": "Grafik",
+        "lock": "Kunci",
+        "saveStatus": "Status simpan",
+        "settings": "Pengaturan",
+        "syncStatus": "Status sinkronisasi",
+        "tags": "Tag",
+        "viewMode": "Mode tampilan",
+        "views": "Tampilan",
+        "wordCount": "Jumlah kata",
+        "workspace": "Ruang kerja"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} filter dibuang",
+        "failed": "Impor gagal.",
+        "fileFilterName": "Base Obsidian",
+        "imported": "Mengimpor {{count}} tampilan",
+        "notValid": "Bukan berkas .base yang valid.",
+        "skippedSuffix": " · {{count}} dilewati",
+        "stoppedAfter": "Impor dihentikan setelah {{count}} tampilan."
+      },
+      "bottomBar": {
+        "browseTags": "Jelajahi tag",
+        "browseViews": "Jelajahi tampilan",
+        "cycleViewMode": "Putar mode tampilan",
+        "docStats": {
+          "summarySelectionSuffix": " (terpilih)",
+          "summary_other": "{{count}} kata · {{characters}} karakter",
+          "titleSelectionSuffix": " (seleksi)",
+          "title_other": "{{characters}} karakter · {{words}} kata · {{spaces}} spasi · {{count}} paragraf"
+        },
+        "graphTitle": "Grafik (⌘⇧G)",
+        "lock": "Kunci",
+        "lockVault": "Kunci brankas",
+        "openSettings": "Buka pengaturan",
+        "settingsTitle": "Pengaturan (⌘,)",
+        "showGraph": "Tampilkan tampilan grafik",
+        "syncStatus": "Hanya lokal · tidak disinkronkan",
+        "tagsTitle": "Tag",
+        "togglePreview": "Alihkan pratinjau berdampingan",
+        "viewModeTitle": "Mode tampilan: {{mode}} (klik untuk berputar)",
+        "viewsTitle": "Tampilan"
+      },
+      "import": {
+        "imported_other": "Mengimpor {{count}} catatan{{skipped}}",
+        "skippedSuffix": " · {{count}} dilewati"
+      },
+      "nav": {
+        "goBack": "Kembali",
+        "goForward": "Maju"
+      },
+      "noNotesToOpen": "Tidak ada catatan untuk dibuka.",
+      "resizeBacklinksSidebar": "Ubah ukuran bilah sisi backlink",
+      "resizeNotesSidebar": "Ubah ukuran bilah sisi catatan",
+      "sidebarToggle": {
+        "hideBacklinks": "Sembunyikan bilah sisi backlink",
+        "hideNotes": "Sembunyikan bilah sisi catatan",
+        "showBacklinks": "Tampilkan bilah sisi backlink",
+        "showNotes": "Tampilkan bilah sisi catatan"
+      },
+      "switchingOverlay": {
+        "saving": "Menyimpan…"
+      },
+      "viewMode": {
+        "live": "Langsung",
+        "reading": "Baca",
+        "source": "Sumber"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Nama ruang kerja",
+        "renameConfirm": "Ganti nama",
+        "renameTitle": "Ganti nama ruang kerja",
+        "saveAsTitle": "Simpan ruang kerja sebagai",
+        "saveConfirm": "Simpan"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Ruang kerja",
+        "renameItemLabel": "Ganti nama ruang kerja {{name}}",
+        "renameTitle": "Ganti nama ruang kerja",
+        "saveCurrentAs": "Simpan yang ini sebagai…",
+        "switchLabel": "Ganti ruang kerja",
+        "toggleTitle": "Ruang kerja: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Salin kode",
+      "defaultBadge": "kode"
+    },
+    "find": {
+      "close": "Tutup pencarian",
+      "matchCase": "Cocokkan huruf besar/kecil",
+      "matchCount": "{{current}} dari {{total}}",
+      "nextMatch": "Hasil berikutnya",
+      "noMatches": "Tidak ada yang cocok",
+      "placeholder": "Cari di catatan",
+      "previousMatch": "Hasil sebelumnya",
+      "replaceAll": "Ganti semua",
+      "replaceAllCount": "Ganti semua ({{total}})",
+      "replaceOne": "Ganti",
+      "replacePlaceholder": "Ganti dengan",
+      "toggleReplace": "Alihkan ganti"
+    },
+    "folding": {
+      "clickToUnfold": "Klik untuk membuka lipatan",
+      "unfold": "Buka lipatan"
+    },
+    "footnote": {
+      "heading": "Catatan kaki",
+      "unreferenced": "tak terujuk"
+    },
+    "frontmatter": {
+      "addProperty": "+ Tambah properti",
+      "propertiesLabel": "Properti",
+      "titleAriaLabel": "Judul catatan",
+      "titlePlaceholder": "Tanpa judul"
+    },
+    "mermaid": {
+      "rendering": "Merender diagram…"
+    },
+    "slash": {
+      "attachFile": "Lampirkan berkas",
+      "bulletList": "Daftar berbutir",
+      "callout": "Callout",
+      "date": "Tanggal",
+      "day": "Hari",
+      "divider": "Pembatas",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "heading4": "Heading 4",
+      "heading5": "Heading 5",
+      "heading6": "Heading 6",
+      "link": "Tautan",
+      "now": "Sekarang",
+      "numberedList": "Daftar bernomor",
+      "quote": "Kutipan",
+      "table": "Tabel",
+      "time": "Waktu",
+      "todoList": "Daftar tugas",
+      "voiceNote": "Catatan suara",
+      "wikiLink": "Wikilink"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Tambahkan ke kamus",
+        "ignoreInVault": "Abaikan di brankas ini",
+        "ignoreThisSession": "Abaikan sesi ini",
+        "noSuggestions": "Tidak ada saran"
+      }
+    },
+    "table": {
+      "addColumn": "Tambah kolom di kanan",
+      "addRow": "Tambah baris di bawah",
+      "cellAriaLabel": "Sel tabel",
+      "deleteColumn": "Hapus kolom",
+      "deleteRow": "Hapus baris",
+      "reorderColumn": "Susun ulang kolom",
+      "reorderRow": "Susun ulang baris"
+    },
+    "toolbar": {
+      "apply": "Terapkan",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Paragraf"
+      },
+      "highlight": {
+        "blue": "Biru",
+        "green": "Hijau",
+        "pink": "Merah muda",
+        "purple": "Ungu",
+        "yellow": "Kuning"
+      },
+      "urlPlaceholder": "Tempel URL tautan"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Penuh",
+        "narrow": "Sempit",
+        "normal": "Normal",
+        "wide": "Lebar"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normal",
+        "relaxed": "Renggang",
+        "tight": "Rapat"
+      },
+      "textSize": {
+        "lg": "Besar",
+        "md": "Default",
+        "sm": "Kecil",
+        "xl": "Sangat besar"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Sematkan: {{label}}"
+      },
+      "convert": {
+        "cancel": "Batal",
+        "choiceClause_other": " · {{count}} perlu pilihan.",
+        "chooseTarget": "Pilih target…",
+        "convert": "Konversi",
+        "convertedToast_other": "{{count}} wikilink dikonversi",
+        "noneToConvert": "Tidak ada wikilink impor yang perlu dikonversi di catatan ini.",
+        "nothingToConvert": "Tidak ada yang perlu dikonversi — tidak ada wikilink impor yang dapat ditemukan.",
+        "rewriteCount_other": "{{count}} tautan akan ditulis ulang",
+        "skipped": "dilewati — {{reason}}",
+        "title": "Konversi wikilink yang diimpor di catatan ini"
+      },
+      "convertCore": {
+        "noMatch": "tidak ada yang cocok"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Catatan",
+      "errors": {
+        "attachmentCorrupt": "Sebuah lampiran yang dirujuk oleh catatan ini tidak terbaca, sehingga tidak ada yang diekspor.",
+        "attachmentMissing": "Sebuah lampiran yang dirujuk oleh catatan ini hilang, sehingga tidak ada yang diekspor.",
+        "cannotDecrypt": "Catatan ini tidak terbaca.",
+        "destinationUnusable": "Folder tujuan tidak dapat digunakan.",
+        "fallback": "Ekspor gagal tak terduga. Coba lagi.",
+        "invalidAttachmentCatalog": "Katalog lampiran brankas tidak terbaca, sehingga tidak ada yang diekspor.",
+        "invalidNoteFilename": "Nama berkas itu tidak dapat digunakan, sehingga tidak ada yang diekspor.",
+        "invalidNoteId": "Catatan ini tidak dapat dikenali, sehingga tidak ada yang diekspor.",
+        "invalidPlaintextEncoding": "Isi catatan ini tampak rusak, sehingga tidak ada yang diekspor. Pulihkan dari cadangan.",
+        "ioNoSpace": "Ruang di lokasi tujuan tidak cukup.",
+        "ioPermissionDenied": "Tidak ada izin untuk menulis di lokasi tujuan.",
+        "ioWriteDefault": "Tidak dapat menulis berkas yang diekspor.",
+        "noteNotFound": "Catatan ini tidak ada lagi — mungkin telah dihapus.",
+        "pdfCaptureFailed": "PDF tidak dapat dibuat, sehingga tidak ada yang diekspor.",
+        "pdfExportInProgress": "Ekspor PDF sudah berjalan. Tunggu hingga selesai, lalu coba lagi.",
+        "pdfPayloadMissing": "Ekspor terputus — jika brankas terkunci, buka kuncinya lalu coba lagi.",
+        "pdfRenderTimeout": "Catatan terlalu lama dirender, sehingga tidak ada yang diekspor.",
+        "pdfWindowCreateFailed": "Jendela ekspor tidak dapat dibuka, sehingga tidak ada yang diekspor.",
+        "targetExists": "Berkas dengan nama itu sudah ada di lokasi tujuan.",
+        "vaultLocked": "Brankas terkunci. Buka kuncinya, lalu coba lagi."
+      },
+      "flow": {
+        "couldNotRead": "Catatan ini tidak terbaca.",
+        "exportedTo": "Diekspor ke {{filename}}",
+        "exportedToWithAttachments_other": "Diekspor ke {{filename}} + {{count}} lampiran",
+        "exportedToWithImages_other": "Diekspor ke {{filename}} + {{count}} gambar",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Teks biasa",
+        "showInFolder": "Tampilkan di folder"
+      },
+      "modal": {
+        "cancel": "Batal",
+        "export": "Ekspor…",
+        "includeAttachments_other": "Sertakan {{count}} lampiran",
+        "title": "Ekspor sebagai Markdown"
+      }
+    },
+    "pdf": {
+      "cancel": "Batal",
+      "continue": "Lanjutkan…",
+      "title": "Ekspor sebagai PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Pilih lokasi untuk menempatkan ekspor",
+      "errors": {
+        "attachmentCorrupt": "Sebuah lampiran yang dirujuk oleh catatan tidak terbaca, sehingga tidak ada yang diekspor.",
+        "attachmentMissing": "Sebuah lampiran yang dirujuk oleh catatan hilang, sehingga tidak ada yang diekspor.",
+        "authOperationInProgress": "Operasi brankas lain sedang berlangsung. Tunggu hingga selesai, lalu coba lagi.",
+        "cancelled": "Ekspor dibatalkan. Tidak ada yang tertinggal di lokasi tujuan.",
+        "cannotDecrypt": "Sebuah catatan tidak terbaca, sehingga tidak ada yang diekspor.",
+        "destinationAlreadyExists": "Sesuatu sudah ada di lokasi itu. Pilih tempat baru untuk ekspor.",
+        "destinationNotAllowed": "Lokasi itu berada di dalam penyimpanan Myne sendiri. Pilih folder di luarnya.",
+        "invalidPlaintextEncoding": "Isi sebuah catatan tampak rusak, sehingga tidak ada yang diekspor. Pulihkan dari cadangan.",
+        "invalidVaultMeta": "Metadata brankas tidak terbaca, sehingga tidak ada yang diekspor.",
+        "ioWriteDefault": "Tidak dapat menulis ekspor.",
+        "joinFailure": "Ekspor gagal tak terduga. Tidak ada yang tertinggal di lokasi tujuan.",
+        "vaultLocked": "Brankas terkunci. Buka kuncinya, lalu coba lagi.",
+        "vaultNotFound": "Tidak ada brankas yang ditemukan untuk diekspor."
+      },
+      "flow": {
+        "countAttachments_other": "{{count}} lampiran",
+        "countFolders_other": "{{count}} folder",
+        "countNotes_other": "{{count}} catatan",
+        "exclusionsHistory": "Riwayat versi tidak disertakan.",
+        "exclusionsTrashedAndHistory_other": "{{count}} catatan di tempat sampah dan riwayat versi tidak disertakan.",
+        "exclusionsTrashed_other": "{{count}} catatan di tempat sampah tidak disertakan.",
+        "phaseAttachments": "lampiran",
+        "phaseNotes": "catatan",
+        "preparing": "Menyiapkan…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Batal",
+        "cancelling": "Membatalkan…",
+        "title": "Mengekspor…"
+      },
+      "setup": {
+        "cancel": "Batal",
+        "choose": "Pilih…",
+        "chooseFolder": "Pilih folder…",
+        "destinationLabel": "Tujuan",
+        "export": "Ekspor…",
+        "folderSelectAriaLabel": "Folder untuk diekspor",
+        "noFolderChosen": "Belum ada folder dipilih",
+        "noFoldersInVault": "Tidak ada folder di brankas ini",
+        "scopeFolder": "Satu folder",
+        "scopeLabel": "Cakupan",
+        "scopeWhole": "Seluruh brankas",
+        "title": "Ekspor brankas sebagai Markdown"
+      },
+      "summary": {
+        "done": "Selesai",
+        "showInFolder": "Tampilkan di folder",
+        "title": "Ekspor selesai"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "Jika Anda punya cadangan, Anda dapat memulihkannya — berkas Anda saat ini tidak tersentuh; cadangan dipulihkan sebagai brankas terpisah terlebih dahulu.",
+      "cta": "Tutup aplikasi",
+      "title": "Berkas brankas rusak."
+    },
+    "invalidState": {
+      "body": "Silakan mulai ulang.",
+      "cta": "Kunci",
+      "title": "Keadaan tak terduga."
+    },
+    "ioError": {
+      "body": "Ini mungkin galat disk atau sistem berkas.",
+      "cta": "Tutup aplikasi",
+      "title": "Tidak dapat membaca berkas brankas."
+    },
+    "permissionDenied": {
+      "body": "Periksa izin berkas.",
+      "cta": "Tutup aplikasi",
+      "title": "Tidak ada izin untuk mengakses berkas brankas."
+    },
+    "restoreFromBackup": "Pulihkan dari cadangan…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Tutup",
+      "countEmpty": "Kosong",
+      "count_other": "{{count}} catatan",
+      "delete": "Hapus",
+      "deleteError": "Tidak dapat menghapus catatan itu. Coba lagi.",
+      "emptyState": "Arsip kosong.",
+      "restore": "Pulihkan",
+      "restoreError": "Tidak dapat memulihkan catatan itu. Coba lagi.",
+      "title": "Arsip",
+      "untitled": "Tanpa judul"
+    },
+    "cardMenu": {
+      "copyLink": "Salin tautan",
+      "open": "Buka",
+      "openInNewTab": "Buka di tab baru",
+      "revealInFolder": "Tampilkan di folder"
+    },
+    "colorLabels": {
+      "clay": "Tanah liat",
+      "moss": "Lumut",
+      "ochre": "Oker",
+      "plum": "Prem",
+      "slate": "Batu tulis",
+      "stone": "Batu"
+    },
+    "decoration": {
+      "colorSection": "Warna",
+      "default": "Default",
+      "defaultFolderIcon": "Ikon folder default",
+      "iconSection": "Ikon",
+      "menuLabel": "Label warna",
+      "noColor": "Tanpa warna",
+      "none": "Tidak ada"
+    },
+    "deleteConfirm": {
+      "cancel": "Batal",
+      "delete": "Hapus",
+      "title": "Hapus catatan ini?",
+      "untitled": "Tanpa judul",
+      "warning": "Tindakan ini tidak dapat dibatalkan."
+    },
+    "filterBuilder": {
+      "addCondition": "Tambah kondisi",
+      "addFilterGroup": "Tambah grup filter",
+      "cancel": "Batal",
+      "combinator": {
+        "all": "semua",
+        "any": "salah satu"
+      },
+      "match": "Cocokkan",
+      "negate": {
+        "is": "adalah",
+        "isNot": "bukan"
+      },
+      "noConditions": "Belum ada kondisi — tampilan ini menampilkan semua halaman.",
+      "noteCount_other": "{{count}} catatan",
+      "of": "dari:",
+      "ofTheGroups": "dari grup:",
+      "removeCondition": "Hapus kondisi",
+      "replaceFilter": "Ganti filter",
+      "save": "Simpan",
+      "searchTextPlaceholder": "teks pencarian",
+      "selectFolderPlaceholder": "pilih folder…",
+      "selectTagPlaceholder": "pilih tag…",
+      "type": {
+        "folder": "Folder",
+        "search": "Cari",
+        "tag": "Tag"
+      },
+      "unrepresentable": "Filter ini dibuat dengan penyunting lanjutan dan tidak dapat disunting di sini.",
+      "unresolved": "belum terselesaikan"
+    },
+    "folderManagement": {
+      "illegalSegment": "Nama folder tidak boleh memuat / \\ | # ^ [ ] atau diawali/diakhiri dengan spasi.",
+      "tooLong": "Jalur folder itu terlalu panjang."
+    },
+    "folderNote": {
+      "defaultTitle": "Indeks"
+    },
+    "folderRow": {
+      "createFolderNote": "Buat catatan folder",
+      "empty": "kosong",
+      "folderNote": "catatan folder",
+      "openFolderNote": "Buka catatan folder"
+    },
+    "graph": {
+      "allConnected": "Semuanya terhubung — tidak ada catatan yang terisolasi.",
+      "building": "Membangun grafik…",
+      "depthToggleTitle": "Alihkan kedalaman sekitar (1 ↔ 2 lompatan)",
+      "filterAll": "Semua",
+      "filterAroundNote": "Di sekitar catatan ini",
+      "filterByTag": "Saring berdasarkan tag",
+      "filterIsolated": "Terisolasi",
+      "hop": "{{depth}} lompatan",
+      "loading": "Memuat grafik…",
+      "noNotes": "Belum ada catatan untuk digrafikkan.",
+      "overCap": "Brankas ini besar — grafik seluruh brankas dibatasi. Saring berdasarkan tag atau tampilkan catatan terisolasi untuk menjelajah.",
+      "refresh": "Segarkan",
+      "refreshTitle": "Brankas berubah — bangun ulang grafik",
+      "tagPlaceholder": "Tag…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Tampilan tanpa judul"
+      },
+      "modal": {
+        "cancel": "Batal",
+        "cancelledNotImported": "{{count}} tidak diimpor",
+        "cancelling": "Membatalkan…",
+        "chooseFolder": "Pilih folder…",
+        "close": "Tutup",
+        "closeAriaLabel": "Tutup",
+        "copied": "Disalin",
+        "copy": "Salin",
+        "done": "Selesai",
+        "errorBody": "Impor tidak dapat diselesaikan. Catatan apa pun yang sudah diimpor tetap tersimpan dan aman untuk disimpan atau dihapus.",
+        "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
+        "flagKindFolder": "Folder",
+        "flagKindTitle": "Judul",
+        "folderPickerTitle": "Pilih folder brankas Obsidian Anda",
+        "hiddenIgnoredPrefix_other": "{{count}} item konfigurasi / tersembunyi diabaikan (mis. ",
+        "hiddenIgnoredSuffix": ", berkas titik).",
+        "ifNoteExistsLabel": "Jika sebuah catatan sudah ada",
+        "import": "Impor",
+        "importFailed": "Impor gagal.",
+        "importing": "Mengimpor brankas Anda…",
+        "markDone": "Tandai selesai",
+        "markedDone": "Ditandai selesai",
+        "mediaImported": "{{count}} diimpor",
+        "mediaOmittedSuffix": " · {{count}} diabaikan",
+        "needsAttention": "Perlu perhatian",
+        "needsAttentionHelp": "Catatan-catatan ini diimpor tanpa perubahan. Perbaikan yang disarankan hanya titik awal — salin salah satu, lalu ganti nama catatan saat Anda membukanya.",
+        "noFolderChosen": "Belum ada folder dipilih",
+        "notesImported_other": "catatan diimpor",
+        "policyCopyHint": "Bawa masuk berdampingan dengan catatan yang ada.",
+        "policyCopyLabel": "Impor sebagai salinan",
+        "policySkipHint": "Disarankan — menjalankan ulang impor tidak pernah menggandakan atau menimpa.",
+        "policySkipLabel": "Lewati",
+        "preexistingDetail": "Catatan ini sudah memiliki foldernya sendiri: “{{existing}}”, yang dipertahankan Myne — foldernya mungkin berbeda dari lokasinya di disk.",
+        "preparing": "Menyiapkan…",
+        "progressNotes": " catatan",
+        "progressOf": " dari ",
+        "reasonIllegalChar": "memuat karakter yang tidak dapat digunakan Myne dalam nama",
+        "reasonPathTooLong": "jalur folder + judul terlalu panjang",
+        "reasonSegmentTooLong": "nama lebih panjang dari yang diizinkan Myne",
+        "scanning": "Memindai brankas Anda…",
+        "setupIntro": "Arahkan Myne ke folder brankas Obsidian Anda yang sudah ada. Setiap catatan Markdown diimpor dan dienkripsi di tempat — tidak ada yang meninggalkan perangkat ini, dan berkas asli Anda dibiarkan tak tersentuh.",
+        "statCancelled": "Dibatalkan",
+        "statCanvasSkipped": "Berkas .canvas dilewati",
+        "statEmptyFoldersKept": "Folder kosong dipertahankan",
+        "statMedia": "Media",
+        "statOtherSkipped": "Berkas lain dilewati",
+        "statSkipped": "Dilewati (sudah ada)",
+        "suggestedNameAriaLabel": "Nama yang disarankan",
+        "titleComplete": "Impor selesai",
+        "titleFailed": "Impor gagal",
+        "titleSetup": "Impor brankas Obsidian",
+        "vaultFolderLabel": "Folder brankas",
+        "vaultRoot": "(akar brankas)"
+      },
+      "offer": {
+        "body": "Bawa catatan Anda yang sudah ada ke Myne. Masing-masing dienkripsi saat diimpor — tidak ada yang meninggalkan perangkat ini, dan berkas asli Anda tetap persis di tempatnya.",
+        "chooseFolder": "Pilih folder…",
+        "laterHint": "Anda selalu dapat mengimpor nanti dari Pengaturan → Penyimpanan.",
+        "notNow": "Tidak sekarang",
+        "title": "Impor brankas Obsidian Anda?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Tambahkan ke favorit",
+      "archive": "Arsipkan",
+      "archiveBulkError": "Tidak dapat mengarsipkan catatan.",
+      "archiveNote": "Arsipkan",
+      "archiveSingleError": "Tidak dapat mengarsipkan catatan.",
+      "attachments": "Lampiran",
+      "bulkArchive": "Arsipkan {{count}} catatan",
+      "bulkDelete": "Hapus {{count}} catatan",
+      "bulkMove": "Pindahkan {{count}} catatan ke…",
+      "caseMergeBody": "Folder bernama “{{name}}” sudah ada. Keduanya akan digabung — ganti nama salah satunya agar tetap terpisah?",
+      "color": "Warna…",
+      "createFirstNote": "+ Buat catatan pertama Anda",
+      "createFolderNote": "Buat catatan folder",
+      "customize": "Sesuaikan…",
+      "delete": "Hapus",
+      "deleteFolderBody_other": "“{{name}}” dan {{count}} catatannya",
+      "deleteFolderConfirm": "Hapus folder",
+      "deleteFolderTitle": "Hapus folder ini?",
+      "deleteFolderWarning": "Catatan dipindahkan ke Tempat Sampah — Anda dapat memulihkannya nanti.",
+      "duplicate": "Duplikat",
+      "editFilterTitle": "Sunting filter",
+      "emptyState": "Belum ada catatan.",
+      "exportHtml": "Ekspor sebagai HTML…",
+      "exportMarkdown": "Ekspor sebagai Markdown…",
+      "exportPdf": "Ekspor sebagai PDF…",
+      "exportTxt": "Ekspor sebagai Teks Biasa…",
+      "favoritesHeading": "Favorit",
+      "mergeAnyway": "Tetap gabung",
+      "newFolder": "Folder baru",
+      "newFolderInPlaceholder": "Folder baru di {{path}}",
+      "newFolderPlaceholder": "Folder baru",
+      "newNote": "Catatan baru",
+      "newNoteFromTemplate": "Catatan baru dari templat…",
+      "newNoteHere": "Catatan baru di sini",
+      "newNoteMenu": "Catatan baru",
+      "newNoteShortcut": "Catatan baru (⌘N)",
+      "newSubfolder": "Subfolder baru",
+      "newViewTitle": "Tampilan baru",
+      "noteMovedToTrash": "Catatan dipindahkan ke Tempat Sampah",
+      "notesHeading": "Catatan",
+      "notesMovedToTrash_other": "{{count}} catatan dipindahkan ke Tempat Sampah",
+      "openArchive": "Buka arsip",
+      "openAttachments": "Buka lampiran",
+      "openFolderNote": "Buka catatan folder",
+      "openInNewTab": "Buka di tab baru",
+      "openToSide": "Buka di samping",
+      "openTrash": "Buka tempat sampah",
+      "removeAsFolderNote": "Hapus sebagai catatan folder",
+      "removeFromFavorites": "Hapus dari favorit",
+      "rename": "Ganti nama",
+      "setAsFolderNote": "Jadikan catatan folder",
+      "trash": "Buang ke sampah",
+      "trashBulkError": "Tidak dapat memindahkan catatan ke Tempat Sampah.",
+      "trashSingleError": "Tidak dapat memindahkan catatan ke Tempat Sampah.",
+      "undo": "Urungkan",
+      "vaultRoot": "Akar brankas",
+      "viewSettingsTitle": "Pengaturan tampilan"
+    },
+    "newFromTemplate": {
+      "back": "Kembali",
+      "blankNote": "Catatan kosong",
+      "createNote": "Buat catatan",
+      "emptyState": "Anda belum membuat templat apa pun.",
+      "listLabel": "Templat",
+      "loading": "Memuat…",
+      "nameLabel": "Nama untuk catatan (dari “{{templateName}}”)",
+      "namePlaceholder": "Tanpa judul",
+      "nameStepTitle": "Beri nama catatan ini",
+      "pickStepTitle": "Catatan baru dari templat",
+      "untitledTemplate": "Templat tanpa judul"
+    },
+    "newTab": {
+      "createNote": "Buat catatan baru",
+      "noNotesMatch": "Tidak ada catatan yang cocok.",
+      "noNotesYet": "Belum ada catatan.",
+      "searchAriaLabel": "Cari catatan untuk dibuka",
+      "searchPlaceholder": "Cari catatan…",
+      "untitled": "Tanpa judul"
+    },
+    "pane": {
+      "graphTab": "Grafik",
+      "loading": "Memuat…",
+      "untitledView": "Tampilan tanpa judul"
+    },
+    "relativeTime": {
+      "daysAgo": "{{d}} hari lalu",
+      "hoursAgo": "{{h}} jam lalu",
+      "justNow": "baru saja",
+      "minutesAgo": "{{m}} mnt lalu",
+      "oneWeekAgo": "1 minggu lalu",
+      "weeksAgo": "{{w}} minggu lalu",
+      "yesterday": "kemarin"
+    },
+    "row": {
+      "addToFavorites": "Tambahkan ke favorit",
+      "folderIndexBadgeLabel": "Catatan folder",
+      "folderIndexBadgeTitle": "Catatan folder — indeks folder ini",
+      "folderIndexConflictLabel": "Folder sudah punya catatan indeks",
+      "folderIndexConflictTitle": "Folder ini sudah memiliki catatan indeks",
+      "loadError": "Tidak dapat memuat catatan ini",
+      "removeFromFavorites": "Hapus dari favorit",
+      "renameAriaLabel": "Ganti nama catatan",
+      "untitled": "Tanpa judul"
+    },
+    "saveStatus": {
+      "editing": "Menyunting",
+      "editingEllipsis": "Menyunting…",
+      "editingTitle": "Menyunting — simpan otomatis siap",
+      "justNow": "baru saja",
+      "retry": "Coba lagi",
+      "saveFailed": "Gagal menyimpan",
+      "saveFailedTitle": "Gagal menyimpan — klik Coba lagi",
+      "saved": "Tersimpan",
+      "savedRelative": "Tersimpan {{rel}}",
+      "saving": "Menyimpan",
+      "savingEllipsis": "Menyimpan…"
+    },
+    "savedView": {
+      "defaultName": "Tampilan tersaring"
+    },
+    "snapshotFailed": {
+      "dismiss": "Tutup",
+      "message": "Tidak dapat menyimpan snapshot — catatan Anda tersimpan, tetapi riwayat versinya mungkin tidak lengkap (disk mungkin penuh)."
+    },
+    "snapshots": {
+      "cancel": "Batal",
+      "changeCount_other": "{{count}} perubahan sejak snapshot ini",
+      "close": "Tutup",
+      "confirmBody": "Catatan Anda saat ini akan disimpan sebagai snapshot terlebih dahulu, sehingga Anda dapat mengurungkannya.",
+      "confirmTitle": "Pulihkan snapshot ini?",
+      "decrypting": "Mendekripsi…",
+      "emptyState": "Belum ada snapshot. Snapshot disimpan otomatis saat Anda menyunting dan disimpan selama sekitar 7 hari. Snapshot dienkripsi, dan hilang saat catatan dihapus permanen.",
+      "encryptedSize": "Dienkripsi · {{size}}",
+      "errorCannotDecrypt": "Snapshot ini tidak dapat didekripsi.",
+      "errorGeneric": "Terjadi kesalahan. Coba lagi.",
+      "errorIo": "Terjadi galat disk — disk mungkin penuh atau tidak dapat ditulis.",
+      "errorNotFound": "Snapshot itu tidak lagi tersedia.",
+      "errorStorageAccess": "Tidak dapat mengakses penyimpanan snapshot brankas.",
+      "errorVaultLocked": "Brankas terkunci. Buka kuncinya untuk melihat snapshot.",
+      "justNow": "baru saja",
+      "listLabel": "Daftar snapshot",
+      "loading": "Memuat…",
+      "restore": "Pulihkan",
+      "restoreCta": "Pulihkan snapshot ini",
+      "restoredStatus": "Dipulihkan. Versi yang Anda miliki tersimpan sebagai snapshot.",
+      "selectPlaceholder": "Pilih snapshot untuk melihat pratinjau perubahan sejak saat itu.",
+      "title": "Snapshot",
+      "untitled": "Tanpa judul"
+    },
+    "tabStrip": {
+      "closeNewTab": "Tutup tab baru",
+      "closeTab": "Tutup {{title}}",
+      "newTab": "Tab baru",
+      "openNotes": "Buka catatan",
+      "pin": "Sematkan",
+      "pinned": "Disematkan",
+      "pinnedTitle": "Disematkan — lepas sematan untuk menutup",
+      "unpin": "Lepas sematan",
+      "untitled": "Tanpa judul"
+    },
+    "tagBrowser": {
+      "cancel": "Batal",
+      "clear": "Bersihkan",
+      "combineTagsWith": "Gabungkan tag dengan",
+      "filtering": "Menyaring…",
+      "modeAll": "Semua",
+      "modeAny": "Salah satu",
+      "noNotesForFilter": "Tidak ada catatan untuk filter ini.",
+      "noTagsMatch": "Tidak ada tag yang cocok dengan “{{query}}”.",
+      "noTagsYet": "Belum ada tag.",
+      "noteCount_other": "{{count}} catatan",
+      "notes": "Catatan",
+      "pickTag": "Pilih tag untuk menyaring.",
+      "save": "Simpan",
+      "saveAsView": "Simpan sebagai tampilan",
+      "searchPlaceholder": "Cari tag…",
+      "title": "Tag",
+      "untitled": "Tanpa judul",
+      "viewNamePlaceholder": "Nama tampilan"
+    },
+    "trash": {
+      "close": "Tutup",
+      "countEmpty": "Kosong",
+      "count_other": "{{count}} catatan",
+      "delete": "Hapus",
+      "deleteError": "Tidak dapat menghapus catatan itu. Coba lagi.",
+      "empty": "Kosongkan tempat sampah",
+      "emptyConfirmBody_other": "{{count}} catatan akan dihapus permanen.",
+      "emptyConfirmCta": "Kosongkan tempat sampah",
+      "emptyConfirmTitle": "Kosongkan tempat sampah?",
+      "emptyPartialFailure_other": "{{count}} catatan tidak dapat dihapus dan tetap berada di tempat sampah.",
+      "emptyState": "Tempat sampah kosong.",
+      "purgeConfirmCta": "Hapus permanen",
+      "purgeConfirmTitle": "Hapus permanen?",
+      "restore": "Pulihkan",
+      "restoreError": "Tidak dapat memulihkan catatan itu. Coba lagi.",
+      "title": "Tempat Sampah",
+      "untitled": "Tanpa judul"
+    },
+    "unlinkedMentions": {
+      "empty": "Tidak ada penyebutan tak tertaut.",
+      "heading": "Penyebutan tak tertaut",
+      "link": "Tautkan",
+      "linkTooltip": "Tautkan penyebutan ini ke {{title}}",
+      "refresh": "Penyebutan mungkin telah berubah — segarkan",
+      "searching": "Mencari…",
+      "thisNote": "catatan ini",
+      "untitled": "Tanpa judul"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Default (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (persegi)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (lebar)"
+      },
+      "cancel": "Batal",
+      "cardSize": "Ukuran kartu",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Properti frontmatter yang nilainya berupa gambar — ditampilkan sebagai sampul tiap kartu. Biarkan kosong untuk tanpa sampul.",
+      "coverImagePlaceholder": "mis. cover",
+      "coverImageProperty": "Properti gambar sampul",
+      "imageAspectRatio": "Rasio aspek gambar",
+      "reset": "Atur ulang",
+      "save": "Simpan"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Ubah sampul",
+        "changeCoverImage": "Ubah gambar sampul",
+        "empty": "Tidak ada catatan yang cocok dengan tampilan ini",
+        "noValue": "Tidak ada nilai",
+        "setCover": "Atur sampul",
+        "setCoverImage": "Atur gambar sampul",
+        "untitled": "Tanpa judul"
+      },
+      "collapseViews": "Ciutkan tampilan",
+      "empty": "Belum ada tampilan. Simpan daftar catatan saat ini sebagai tampilan.",
+      "expandViews": "Bentangkan tampilan",
+      "heading": "Tampilan",
+      "host": {
+        "unsupported": "Tipe tampilan ini akan hadir di pembaruan mendatang."
+      },
+      "menu": {
+        "deleteView": "Hapus tampilan",
+        "editFilter": "Sunting filter…",
+        "moveDown": "Pindah ke bawah",
+        "moveUp": "Pindah ke atas",
+        "rename": "Ganti nama",
+        "viewSettings": "Pengaturan tampilan…"
+      },
+      "newView": "Tampilan baru",
+      "untitledView": "Tampilan tanpa judul"
+    },
+    "welcome": {
+      "body": "Selamat datang di Myne, ruang pribadi Anda untuk berpikir dan menulis.\n\nSemua yang Anda simpan di sini dienkripsi dan tetap berada di perangkat Anda. **Kata sandi** dan **frasa pemulihan** Anda adalah satu-satunya kunci untuk membukanya, jadi simpanlah di tempat yang aman. Jika keduanya hilang, tidak seorang pun dapat mengembalikan catatan Anda, bahkan kami.\n\nIni hanyalah catatan biasa, jadi jadikan milik Anda. Sunting, ganti nama, atau hapus kapan pun Anda suka, dan tambahkan catatan baru seiring berkembangnya ide Anda.\n\nKami senang Anda di sini. Untuk mempelajari lebih lanjut tentang Myne, kunjungi https://myne.md\n",
+      "title": "Selamat datang di Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "Default"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Memeriksa kekuatan…",
+      "confirmLabel": "Konfirmasi kata sandi master",
+      "defaultEmptyCaption": "Digunakan sebagai masukan ke Argon2id (m=256 MiB, t=3, p=2). Pilih sesuatu yang dapat Anda ingat; Anda tidak dapat menyetel ulangnya.",
+      "mismatch": "Kata sandi tidak cocok.",
+      "passwordLabel": "Kata sandi master",
+      "suggestPassword": "Sarankan kata sandi",
+      "tooShort": "Gunakan setidaknya {{n}} karakter."
+    },
+    "input": {
+      "hide": "Sembunyikan kata sandi",
+      "show": "Tampilkan kata sandi"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "Tidak ada yang cocok.",
+      "placeholder": "Pilih…",
+      "searchPlaceholder": "Cari…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Pemulihan dibatalkan: brankas terkunci.",
+      "operationInProgress": "Operasi sedang berlangsung. Mohon tunggu.",
+      "unexpected": "Kesalahan tak terduga. Silakan coba lagi.",
+      "vaultNotFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi."
+    }
+  },
+  "restore": {
+    "backLabel": "Kembali",
+    "cancelLabel": "Batal",
+    "collision": {
+      "body": "Brankas dari cadangan ini sudah ada di perangkat ini. Anda dapat menyimpan keduanya — salinan yang dipulihkan muncul sebagai brankas terpisah dalam daftar brankas Anda — atau pulihkan sekarang lalu hapus sendiri brankas yang ada dari daftar brankas (penghapusan meminta Anda mengetik DELETE, dan hanya masuk akal setelah Anda memastikan brankas yang dipulihkan dapat dibuka).",
+      "keepBoth": "Simpan keduanya",
+      "replaceExisting": "Pulihkan, lalu ganti yang ada…"
+    },
+    "damaged": {
+      "body": "Berkas cadangan rusak, sehingga tidak ada yang dipulihkan. Jika ini satu-satunya salinan yang Anda miliki, penyelamatan dapat memulihkan catatan yang utuh dan mendaftar persis apa yang tidak terbaca — hasilnya selalu ditandai sebagai pemulihan parsial.",
+      "close": "Tutup",
+      "salvage": "Selamatkan catatan yang utuh…"
+    },
+    "error": {
+      "tryAnotherFile": "Coba berkas lain"
+    },
+    "pick": {
+      "body": "Pilih berkas <code>.myne-backup</code>. Cadangan diverifikasi sebelum apa pun dipulihkan; brankas yang dipulihkan dibuka dengan kata sandi atau frasa pemulihan brankas itu — persis seperti membuka kunci.",
+      "chooseFile": "Pilih berkas cadangan…",
+      "corruptedSuffix": "Brankas Anda saat ini tidak tersentuh: cadangan dipulihkan sebagai brankas terpisah terlebih dahulu."
+    },
+    "summary": {
+      "attachments": "Lampiran: {{n}}",
+      "collidedNote": "Salinan brankas ini yang sebelumnya ada masih berada di daftar brankas Anda. Setelah Anda memastikan brankas yang dipulihkan dapat dibuka, Anda dapat menghapus yang lama dari daftar brankas (akan meminta Anda mengetik DELETE).",
+      "notes": "Catatan: {{n}}",
+      "openVaultList": "Buka daftar brankas",
+      "partialHeader_other": "Dipulihkan sebagian — {{count}} item tidak terbaca.",
+      "restored": "Brankas dipulihkan.",
+      "versionHistory": "Entri riwayat versi: {{n}}"
+    },
+    "title": "Pulihkan dari cadangan",
+    "working": {
+      "cancel": "Batal",
+      "restoringProgress": "Memulihkan… {{done}} dari {{total}}",
+      "verifying": "Memverifikasi cadangan…",
+      "verifyingProgress": "Memverifikasi cadangan… {{done}} dari {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Build pengembangan",
+      "buildChannelLabel": "Kanal build",
+      "buildChannelStable": "Stabil",
+      "changelogButton": "Lihat changelog…",
+      "changelogHelper": "Catatan per versi. Akan muncul saat MYND-119 dirilis.",
+      "changelogLabel": "Changelog",
+      "licenseBody": "Pra-alfa · Dokumen CC0 · Kode aplikasi AGPL-3.0 pada rilis Fase 1.",
+      "licenseLabel": "Lisensi",
+      "tagline": "Pra-alfa · Klien desktop Fase 1",
+      "threatModelHelper": "Buka dokumen model ancaman publik di peramban Anda.",
+      "threatModelLabel": "Model ancaman"
+    },
+    "account": {
+      "argon2idHeading": "Parameter Argon2id",
+      "changePasswordButton": "Ubah kata sandi",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Kata sandi saat ini salah atau berkas brankas rusak.",
+        "ioError": "Galat disk, silakan coba lagi.",
+        "joinFailure": "Terjadi kesalahan, silakan coba lagi.",
+        "samePasswordRejected": "Kata sandi baru sama dengan yang sekarang.",
+        "weakNewPassword": "Kata sandi baru harus minimal 12 karakter."
+      },
+      "changePasswordHeading": "Ubah kata sandi",
+      "changePasswordHelper": "Ganti kata sandi master Anda sambil tetap memakai brankas yang sama. Frasa pemulihan tetap sama.",
+      "dangerZoneHeading": "Zona bahaya",
+      "dangerZoneHelper": "Hapus permanen brankas ini beserta semua catatan. Tidak dapat dibatalkan. Frasa pemulihan tidak akan mengembalikan brankas.",
+      "deleteVaultButton": "Hapus brankas…",
+      "memoryCost": "Biaya memori",
+      "parallelism": "Paralelisme",
+      "timeCost": "Biaya waktu",
+      "vaultLabelEyebrow": "LABEL BRANKAS",
+      "vaultLabelHelper": "Nama untuk brankas ini yang ditampilkan di pengalih dalam aplikasi. Disimpan terenkripsi di dalam brankas; tidak pernah meninggalkan perangkat Anda dalam bentuk teks biasa.",
+      "vaultLabelPlaceholder": "Tambahkan label…",
+      "vaultLabelSave": "Simpan"
+    },
+    "appearance": {
+      "showEditTimesAria": "Tampilkan waktu sunting di bilah sisi",
+      "showEditTimesHelper": "Tampilkan waktu sunting terakhir tiap catatan di bawah judulnya pada bilah sisi.",
+      "showEditTimesLabel": "Tampilkan waktu sunting",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Gelap",
+        "light": "Terang",
+        "system": "Sistem"
+      },
+      "themeHelper": "Beralih antara tema terang dan gelap, atau ikuti preferensi sistem.",
+      "themeLabel": "Tema",
+      "themeOptionAria": "Tema {{label}}",
+      "themeSaveError": "Tidak dapat menyimpan tema. Silakan coba lagi.",
+      "timestampsSaveError": "Tidak dapat menyimpan preferensi. Silakan coba lagi."
+    },
+    "archive": {
+      "helper": "Izinkan catatan dipindahkan ke Arsip, terpisah dari daftar utama. Mematikan ini akan mengembalikan setiap catatan yang diarsipkan ke foldernya dan menyembunyikan kontrol arsip.",
+      "label": "Pengarsipan",
+      "off": "Mati",
+      "on": "Hidup",
+      "saveError": "Tidak dapat memperbarui pengaturan pengarsipan."
+    },
+    "autoBackup": {
+      "backupFolder": "Folder cadangan",
+      "chooseFolder": "Pilih folder…",
+      "chooseFolderDialogTitle": "Pilih folder untuk cadangan otomatis",
+      "frequency": "Frekuensi",
+      "frequencyAriaLabel": "Frekuensi cadangan",
+      "helper": "Menulis berkas .myne-backup terenkripsi ke sebuah folder secara terjadwal, selama aplikasi terbuka dan brankas tidak terkunci. Cadangan tetap terenkripsi sama seperti brankas Anda; Myne menyimpan beberapa yang terbaru dan tidak pernah mengirim apa pun keluar dari perangkat Anda.",
+      "intervalDaily": "Harian",
+      "intervalEveryUnlock": "Setiap buka kunci",
+      "intervalWeekly": "Mingguan",
+      "keepLast": "Simpan terakhir",
+      "noFolderChosen": "Belum ada folder dipilih.",
+      "saveFailedToast": "Tidak dapat menyimpan pengaturan cadangan.",
+      "searchEmpty": "Tidak ada yang cocok.",
+      "searchPlaceholder": "Cari…",
+      "statusFailed": "Cadangan otomatis gagal — {{stamp}}",
+      "statusLastBackup": "Cadangan terakhir: {{stamp}}",
+      "statusNever": "Belum ada cadangan otomatis.",
+      "title": "Cadangan otomatis"
+    },
+    "changePassword": {
+      "cancel": "Batal",
+      "checkingStrength": "Memeriksa kekuatan…",
+      "confirmLabel": "Konfirmasi kata sandi baru",
+      "currentLabel": "Kata sandi saat ini",
+      "mismatch": "Kata sandi tidak cocok.",
+      "newLabel": "Kata sandi baru",
+      "submit": "Ubah kata sandi",
+      "submitting": "Mengubah kata sandi…",
+      "title": "Ubah kata sandi",
+      "tooShort": "Gunakan setidaknya {{n}} karakter."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Ekstensi peramban"
+      },
+      "when": {
+        "bare": "Terhubung",
+        "daysAgo_other": "Terhubung {{count}} hari lalu",
+        "hoursAgo": "Terhubung {{count}} jam lalu",
+        "justNow": "Terhubung baru saja",
+        "minutesAgo": "Terhubung {{count}} mnt lalu",
+        "onDate": "Terhubung {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Diterapkan",
+      "apply": "Terapkan",
+      "applyError": "Tidak dapat menerapkan tema itu. Silakan coba lagi.",
+      "cancel": "Batal",
+      "confirm": "Konfirmasi",
+      "delete": "Hapus",
+      "deleteError": "Tidak dapat menghapus tema itu. Silakan coba lagi.",
+      "empty": "Belum ada tema kustom. Impor satu, atau buka folder tema dan tambahkan berkas tema.",
+      "error": {
+        "aColorFallback": "sebuah warna",
+        "invalidFile": "Berkas tema tidak valid.",
+        "invalidName": "Nama tema tidak aman",
+        "invalidValue": "Nilai tidak valid untuk {{key}}",
+        "invalidValueWithLine": "Nilai tidak valid untuk {{key}} (baris {{line}})",
+        "missingKey": "Warna wajib {{key}} tidak ada",
+        "parseError": "JSON tidak valid",
+        "parseErrorWithLine": "JSON tidak valid (baris {{line}})"
+      },
+      "fileFilterName": "Tema Myne",
+      "helper": "Gunakan palet warna Anda sendiri. Tema divalidasi di perangkat ini sebelum digunakan — tidak ada yang diunggah.",
+      "importButton": "Impor tema…",
+      "importError": "Berkas itu bukan tema yang valid. Buka referensi untuk melihat formatnya.",
+      "label": "Tema kustom",
+      "openFolderButton": "Buka folder tema",
+      "openFolderError": "Tidak dapat membuka folder tema.",
+      "readError": "Tidak dapat membaca folder tema Anda."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Kosong (tanpa templat)",
+      "dateFormatHelper": "Judul setiap catatan harian. Mendukung YYYY, MM, DD. Default ke {{default}}.",
+      "dateFormatLabel": "Format tanggal catatan harian",
+      "dateFormatSaveError": "Tidak dapat menyimpan format tanggal. Silakan coba lagi.",
+      "folderHelper": "Tempat catatan harian baru disimpan. Default ke {{default}} — folder tetap dipertahankan meski kosong.",
+      "folderLabel": "Folder catatan harian",
+      "folderSaveError": "Tidak dapat menyimpan folder harian. Silakan coba lagi.",
+      "searchEmpty": "Tidak ada templat yang cocok.",
+      "searchPlaceholder": "Cari templat…",
+      "templateHelper": "Pilih templat sebagai awalan setiap catatan harian, atau biarkan kosong untuk catatan kosong berjudul tanggal.",
+      "templateLabel": "Templat catatan harian",
+      "templateSaveError": "Tidak dapat menyimpan templat harian. Silakan coba lagi.",
+      "untitledTemplate": "Templat tanpa judul"
+    },
+    "deleteVault": {
+      "cancel": "Batal",
+      "caseSensitiveHint": "Peka huruf besar/kecil. Ketik kata persis sama untuk mengaktifkan penghapusan.",
+      "continue": "Lanjutkan",
+      "copyPrimary": "Ini menghapus permanen brankas ini beserta setiap catatan di dalamnya. Tindakan tidak dapat dibatalkan, dan frasa pemulihan Anda tidak akan mengembalikan datanya.",
+      "copySecondary": "Kunci brankas dinolkan dari memori sebelum berkas dihapus; ciphertext yatim yang tersisa di disk tetap menjadi sampah terbungkus Argon2id yang tidak dapat dipulihkan.",
+      "eyebrow": "TIDAK DAPAT DIBATALKAN",
+      "heading": "Hapus brankas",
+      "ioFailBody": "Tidak dapat mengakses berkas brankas untuk dihapus. Kunci brankas sudah dinolkan dari memori; data brankas yang tersisa di disk adalah sampah terbungkus Argon2id yang tidak dapat dipulihkan.",
+      "ioFailTitle": "Galat disk saat menghapus",
+      "partialFailBody_other": "{{count}} berkas tidak dapat dihapus dari disk. Kunci brankas sudah dinolkan dari memori, sehingga ciphertext yatim yang tersisa adalah sampah terbungkus Argon2id yang tidak dapat dipulihkan.",
+      "partialFailTitle": "Penghapusan brankas gagal sebagian",
+      "submit": "Hapus brankas",
+      "submitInFlight": "Menghapus brankas…",
+      "typeToConfirmLabel": "Ketik DELETE untuk mengonfirmasi",
+      "vaultPath": "Jalur brankas: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Redupkan baris tidak aktif",
+      "dimHelper": "Dalam mode fokus (⇧⌘F), redupkan setiap baris kecuali baris yang sedang Anda sunting.",
+      "dimLabel": "Mode fokus · redupkan baris tidak aktif",
+      "off": "Mati",
+      "on": "Hidup",
+      "saveError": "Tidak dapat menyimpan pengaturan mode fokus.",
+      "typewriterAria": "Gulir mesin tik",
+      "typewriterHelper": "Dalam mode fokus (⇧⌘F), jaga baris aktif tetap di tengah secara vertikal saat Anda mengetik.",
+      "typewriterLabel": "Mode fokus · gulir mesin tik"
+    },
+    "hotkeys": {
+      "addBindingAria": "Tambah pintasan untuk {{command}}",
+      "cancel": "Batal",
+      "capturePrompt": "Tekan sebuah tombol…",
+      "conflictIndicator": "⚠ konflik",
+      "conflictTitle": "Juga digunakan oleh {{commands}}",
+      "fixed": "tetap",
+      "group": {
+        "editorFormatting": "Pemformatan penyunting",
+        "general": "Umum",
+        "navigation": "Navigasi",
+        "notes": "Catatan",
+        "panesTabs": "Panel & Tab",
+        "view": "Tampilan"
+      },
+      "helper": "Lihat dan ubah pintasan papan ketik. Pemformatan penyunting dan pintasan putar tab bersifat tetap.",
+      "notSet": "Tidak diatur",
+      "removeBindingAria": "Hapus {{chord}}",
+      "resetAll": "Atur ulang semua pintasan…",
+      "resetAllConfirm": "Atur ulang setiap pintasan kustom ke default-nya?",
+      "resetAllYes": "Atur ulang semua",
+      "restoreDefaultAria": "Kembalikan default untuk {{command}}",
+      "searchAriaLabel": "Cari pintasan",
+      "searchPlaceholder": "Cari pintasan…",
+      "warnAlreadyUsed": "Sudah digunakan oleh {{commands}} — tetap ditambahkan."
+    },
+    "language": {
+      "helper": "Pilih bahasa tampilan untuk aplikasi.",
+      "label": "Bahasa"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Tidak dapat menyimpan pengaturan nomor baris.",
+      "helper": "Tampilkan kolom nomor baris di penyunting. Satu nomor per baris; mati secara default.",
+      "label": "Nomor baris",
+      "off": "Mati",
+      "on": "Hidup"
+    },
+    "prefs": {
+      "saveError": "Tidak dapat menyimpan preferensi — coba lagi"
+    },
+    "privacy": {
+      "autoLockHelper": "Kunci brankas setelah tidak aktif selama durasi ini.",
+      "autoLockLabel": "Kunci otomatis",
+      "autoLockSearchEmpty": "Tidak ada durasi yang cocok.",
+      "autoLockSearchPlaceholder": "Cari durasi…",
+      "screenCaptureHelperOff": "Perlindungan selalu berlaku sebelum buka kunci. Setelah buka kunci, mengikuti preferensi ini.",
+      "screenCaptureHelperOn": "Aktif di macOS dan Windows 10 (Pembaruan Mei 2020 atau lebih baru). Dukungan Linux akan hadir di rilis mendatang.",
+      "screenCaptureLabel": "Perlindungan tangkapan layar"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Dibatalkan.",
+      "errorGeneric": "Tidak dapat mengonfigurasi buka kunci cepat.",
+      "errorHardwareUnavailable": "Touch ID tidak tersedia di perangkat ini.",
+      "errorNotUnlocked": "Buka kunci brankas terlebih dahulu.",
+      "errorPinNotDigits": "PIN harus berupa angka saja.",
+      "errorPinTooShort": "PIN harus minimal {{count}} angka.",
+      "helperConfigured": "Dikonfigurasi melalui {{method}}. Masuk kembali setelah kunci otomatis melewati kata sandi master. Kata sandi master tetap diperlukan setelah mulai ulang.",
+      "helperNotConfigured": "Masuk kembali setelah kunci otomatis dengan PIN atau Touch ID alih-alih kata sandi master lengkap. Sebuah kemudahan di atas brankas terenkripsi — kata sandi master tetap diperlukan setelah mulai ulang.",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN buka kunci cepat",
+      "pinPlaceholder": "PIN (minimal {{count}} angka)",
+      "setPin": "Atur PIN",
+      "setupHelper": "Touch ID hanya untuk macOS dan saat ini bersifat eksperimental (menunggu verifikasi perangkat keras). PIN berfungsi di mana saja.",
+      "title": "Buka kunci cepat",
+      "useTouchId": "Gunakan Touch ID"
+    },
+    "shell": {
+      "closeLabel": "Tutup pengaturan",
+      "navLabel": "Panel pengaturan",
+      "panels": {
+        "about": "Tentang",
+        "account": "Akun",
+        "appearance": "Tampilan",
+        "editor": "Penyunting",
+        "hotkeys": "Pintasan",
+        "privacy": "Privasi",
+        "storage": "Penyimpanan"
+      },
+      "passwordUpdatedToast": "Kata sandi diperbarui",
+      "title": "Pengaturan"
+    },
+    "spell": {
+      "errorSaveLanguages": "Tidak dapat menyimpan bahasa pemeriksa ejaan.",
+      "errorSaveSetting": "Tidak dapat menyimpan pengaturan pemeriksa ejaan.",
+      "helper": "Garis bawahi kata yang salah eja saat Anda mengetik. Sepenuhnya luring — catatan Anda tidak pernah meninggalkan perangkat.",
+      "label": "Pemeriksa ejaan",
+      "languagesAriaLabel": "Bahasa pemeriksa ejaan",
+      "languagesHelper": "Sebuah kata dianggap benar jika valid dalam salah satu bahasa yang dipilih — berguna untuk mencampur istilah bahasa Inggris ke dalam catatan berbahasa lain.",
+      "languagesLabel": "Bahasa",
+      "languagesPlaceholder": "Pilih bahasa…",
+      "languagesSearchEmpty": "Tidak ada bahasa yang cocok.",
+      "languagesSearchPlaceholder": "Cari bahasa…",
+      "off": "Mati",
+      "on": "Hidup"
+    },
+    "storage": {
+      "backUpVault": "Cadangkan brankas…",
+      "backupHelper": "Cadangan tetap terenkripsi sama seperti brankas Anda, dalam satu berkas .myne-backup yang terverifikasi. Pemulihan bekerja dengan kata sandi atau frasa pemulihan brankas itu — persis seperti membuka kunci.",
+      "backupLabel": "Cadangan",
+      "exportAction": "Ekspor…",
+      "exportBody": "Ekspor brankas sebagai Markdown",
+      "exportHelper": "Pohon markdown biasa — tidak dienkripsi.",
+      "exportLabel": "Ekspor",
+      "importHelper": "Bawa brankas Obsidian yang sudah ada ke Myne. Setiap catatan Markdown diimpor dan dienkripsi di tempat; berkas asli Anda dibiarkan tak tersentuh.",
+      "importLabel": "Impor",
+      "importObsidian": "Impor brankas Obsidian…",
+      "locationHelper": "Setiap brankas adalah folder berisi berkas terenkripsi di bawah jalur ini. Lebih baik gunakan tombol Cadangan di bawah daripada menyalin manual — tombol itu memverifikasi berkas yang ditulis.",
+      "locationLabel": "Lokasi brankas",
+      "openInFiles": "Buka di Files",
+      "pathUnavailable": "Jalur tidak tersedia",
+      "restoreBackup": "Pulihkan dari cadangan…"
+    },
+    "typography": {
+      "contentWidthHelper": "Lebar maksimum kolom penyuntingan. Penuh membuat teks memenuhi panel.",
+      "contentWidthLabel": "Lebar konten",
+      "errorSave": "Tidak dapat menyimpan preferensi. Silakan coba lagi.",
+      "fontHelper": "Teks monospasi atau proporsional (sans-serif).",
+      "fontLabel": "Font",
+      "lineSpacingHelper": "Ruang vertikal antarbaris.",
+      "lineSpacingLabel": "Jarak baris",
+      "textSizeHelper": "Ukuran dasar teks penyunting. Heading menyesuaikan dengannya.",
+      "textSizeLabel": "Ukuran teks"
+    },
+    "viewMode": {
+      "errorSave": "Tidak dapat menyimpan mode tampilan default.",
+      "helper": "Cara catatan terbuka: pratinjau Langsung (default), Baca yang hanya-baca, atau Sumber mentah. Alihkan catatan dengan ⇧⌘E.",
+      "label": "Mode tampilan default",
+      "optionLive": "Pratinjau langsung",
+      "optionReading": "Baca",
+      "optionSource": "Sumber"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Tutup templat",
+      "deleteRowLabel": "Hapus templat {{name}} (pindahkan ke Tempat Sampah)",
+      "editTemplateLabel": "Sunting templat {{name}}",
+      "emptyBody": "Buat templat untuk memakai ulang kerangka catatan — catatan rapat, log harian, catatan bacaan. Pilih salah satu saat Anda membuat catatan baru.",
+      "emptyTitle": "Belum ada templat",
+      "listLabel": "Templat",
+      "loading": "Memuat…",
+      "newTemplate": "Templat baru",
+      "newTemplateName": "Templat tanpa judul",
+      "removeFromTemplates": "Hapus dari templat",
+      "removeRowLabel": "Hapus {{name}} dari templat (catatan tetap disimpan)",
+      "title": "Templat catatan"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Pilih brankas lain",
+    "continue": "Lanjutkan",
+    "decrypting": "Mendekripsi…",
+    "deleteLink": "Lupa kata sandi dan frasa pemulihan? Hapus brankas dan mulai dari awal",
+    "errors": {
+      "alreadyUnlocked": "Brankas sudah terbuka.",
+      "inProgress": "Operasi sedang berlangsung.",
+      "unexpected": "Kesalahan tak terduga. Silakan coba lagi.",
+      "vaultNotFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi."
+    },
+    "passwordLabel": "Kata sandi",
+    "passwordPlaceholder": "Kata sandi",
+    "quickUnlock": {
+      "failed": "Buka kunci cepat gagal. Gunakan kata sandi Anda.",
+      "pinAriaLabel": "PIN buka kunci cepat",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "Buka kunci dengan PIN",
+      "unlockWithTouchId": "Buka kunci dengan Touch ID",
+      "usePasswordBelow": "atau gunakan kata sandi Anda di bawah",
+      "wrongCredential": "Salah. Sisa {{remaining}} percobaan."
+    },
+    "recoveryInterruptedBanner": "Alur pemulihan terputus. Atur kata sandi baru terlebih dahulu.",
+    "recoveryInterruptedBody": "Atur kata sandi baru terlebih dahulu, lalu segel kembali brankas Anda.",
+    "recoveryInterruptedTitle": "Alur pemulihan terputus.",
+    "recoveryLink": "Lupa kata sandi Anda? Buka kunci dengan frasa pemulihan",
+    "submit": "Buka kunci",
+    "subtitle": "Masukkan kata sandi Anda untuk melanjutkan.",
+    "suspicion": {
+      "lockedDuringChange": "Perubahan kata sandi dibatalkan: brankas terkunci.",
+      "metaChangedExternally": "Brankas diubah di sesi lain — silakan buka kunci lagi."
+    },
+    "title": "Buka kunci brankas Anda."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Tidak dapat membaca berkas brankas.",
+      "notFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi.",
+      "permissionDenied": "Tidak ada izin untuk mengakses berkas brankas. Periksa izin berkas."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "Saya telah menyimpan nomor akun saya di tempat yang dapat saya temukan kembali nanti.",
+      "back": "Kembali",
+      "commit": "Buat brankas",
+      "committing": "Menyimpan…",
+      "copied": "Disalin",
+      "copy": "Salin",
+      "eyebrow": "Langkah 4 dari 4 — nomor akun",
+      "heading": "Simpan nomor akun Anda.",
+      "intro": "Ini adalah token pembawa Anda — perlakukan seperti uang tunai.",
+      "saveAsFile": "Simpan sebagai berkas",
+      "shownOnceBody": "Simpan sekarang — Myne tidak dapat memulihkannya untuk Anda. Diperlukan untuk mendaftar sinkronisasi nanti.",
+      "shownOnceEmphasis": "Ini hanya ditampilkan sekali."
+    },
+    "briefing": {
+      "back": "Kembali",
+      "continue": "Lanjutkan ke pembuatan brankas",
+      "eyebrow": "Sebelum Anda membuat brankas",
+      "heading": "Sebelum Anda membuat brankas",
+      "intro": "Myne mengenkripsi catatan Anda sehingga hanya Anda yang dapat membukanya. Tiga hal mengikuti dari itu — bacalah, lalu lanjutkan.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "Saya paham tidak ada pemulihan lewat email.",
+          "statement": "Tidak ada pemulihan lewat email. Tidak akan pernah ada.",
+          "why": "Kami tidak pernah meminta email Anda, jadi tidak ada tautan setel ulang dan tidak ada akun yang bisa dibuka oleh dukungan. Ini bukan fitur yang hilang — inilah jaminannya. Pemulihan lewat email berarti kami bisa membaca catatan Anda, dan Myne dibangun agar kami tidak bisa."
+        },
+        "no-store": {
+          "ackLabel": "Saya paham Myne tidak dapat memulihkan kata sandi saya.",
+          "statement": "Kata sandi Anda membuka brankas Anda. Kami tidak menyimpannya.",
+          "why": "Kata sandi Anda adalah masukan ke kunci yang mendekripsi catatan Anda. Kata sandi itu tidak pernah meninggalkan perangkat ini, dan tidak ada di server kami yang dapat menghasilkannya kembali. Itulah yang menjaga catatan Anda tetap pribadi — dan mengapa kami tidak dapat menyetelnya ulang untuk Anda."
+        },
+        "phrase-backup": {
+          "ackLabel": "Saya paham frasa pemulihan saya adalah satu-satunya cadangan.",
+          "statement": "Frasa pemulihan Anda adalah satu-satunya cadangan Anda.",
+          "why": "Jika Anda lupa kata sandi, frasa pemulihan 24 kata adalah satu-satunya cara untuk masuk kembali. {{lostBothSecrets}} Tuliskan frasa itu dan simpan di tempat yang aman."
+        }
+      },
+      "why": "Mengapa?"
+    },
+    "confirm": {
+      "back": "Kembali",
+      "continue": "Lanjutkan",
+      "eyebrow": "Langkah 3 dari 4 — konfirmasi frasa",
+      "heading": "Ketikkan kembali empat kata dari frasa Anda.",
+      "intro": "Kami akan meminta posisi tertentu untuk memverifikasi bahwa Anda telah menyimpannya.",
+      "mismatch": "Tidak cocok dengan kata #{{pos}}.",
+      "wordAtPosition": "Kata pada posisi {{pos}}"
+    },
+    "encrypting": {
+      "caption": "Ini memerlukan waktu sejenak.",
+      "footerHint": "Jika ini memakan waktu lebih dari 30 detik, tutup jendela dan coba lagi.",
+      "heading": "Mengenkripsi brankas Anda"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Coba lagi.",
+        "title": "Nomor akun tidak valid"
+      },
+      "aeadFailure": {
+        "body": "Coba lagi.",
+        "title": "Enkripsi gagal"
+      },
+      "csprng": {
+        "body": "Coba lagi.",
+        "title": "Tidak dapat membuat data acak yang aman"
+      },
+      "invalidPassword": {
+        "body": "Coba lagi.",
+        "title": "Kata sandi tidak valid"
+      },
+      "invalidVaultMeta": {
+        "body": "Coba lagi.",
+        "title": "Galat format brankas"
+      },
+      "ioOther": {
+        "body": "Coba lagi.",
+        "title": "Tidak dapat menyimpan brankas"
+      },
+      "joinFailure": {
+        "body": "Coba lagi.",
+        "title": "Terjadi kesalahan"
+      },
+      "kdfFailure": {
+        "body": "Coba lagi. Jika ini terus terjadi, sistem Anda mungkin kekurangan memori.",
+        "title": "Tidak dapat menyiapkan enkripsi"
+      },
+      "noSpace": {
+        "body": "Bebaskan ruang disk lalu coba lagi.",
+        "title": "Ruang disk tidak cukup"
+      },
+      "notFound": {
+        "body": "Coba lagi.",
+        "title": "Folder brankas hilang"
+      },
+      "passwordTooShort": {
+        "body": "Gunakan setidaknya 12 karakter.",
+        "title": "Kata sandi terlalu pendek"
+      },
+      "permissionDenied": {
+        "body": "Pastikan Myne memiliki izin untuk menulis ke folder data aplikasi Anda.",
+        "title": "Tidak dapat menulis ke folder brankas"
+      },
+      "sessionExpired": {
+        "body": "Demi keamanan Anda, pembuatan brankas kedaluwarsa setelah 10 menit. Mulai dari awal.",
+        "title": "Sesi kedaluwarsa"
+      },
+      "sessionNotFound": {
+        "body": "Mulai lagi dari awal.",
+        "title": "Sesi tidak ditemukan"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Tutup jendela Myne lain dan coba lagi.",
+        "title": "Terlalu banyak pembuatan brankas sekaligus"
+      },
+      "vaultArtifactsPresent": {
+        "body": "Brankas baru tidak dapat dibuat karena data brankas sudah ada di perangkat ini. Tutup aplikasi dan mulai ulang — layar awal akan mengarahkan Anda ke alur buka kunci.",
+        "title": "Brankas sudah ada"
+      },
+      "vaultBusyAuth": {
+        "body": "Operasi brankas lain sedang berlangsung. Coba lagi sebentar.",
+        "title": "Brankas sedang sibuk"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Batal",
+        "message": "Menutup akan membuang frasa pemulihan Anda. Tetap tutup?",
+        "okLabel": "Tetap tutup",
+        "title": "Buang pembuatan brankas?"
+      },
+      "genericError": {
+        "body": "Coba lagi.",
+        "title": "Terjadi kesalahan"
+      }
+    },
+    "password": {
+      "back": "Kembali",
+      "eyebrow": "Langkah 1 dari 4 — kata sandi master",
+      "heading": "Buat brankas",
+      "helperLead": "Myne tidak menyimpan kata sandi atau frasa pemulihan Anda.",
+      "submit": "Hasilkan frasa pemulihan"
+    },
+    "phrase": {
+      "back": "Kembali",
+      "continue": "Saya sudah menyimpan ini — konfirmasi frasa",
+      "copy": "Salin",
+      "eyebrow": "Langkah 2 dari 4 — frasa pemulihan",
+      "heading": "Tuliskan 24 kata ini.",
+      "intro": "Frasa ini, bersama kata sandi Anda, adalah satu-satunya cara untuk memulihkan brankas Anda. Simpan secara luring — kertas, pengelola kata sandi, dompet perangkat keras. Perlakukan seperti uang tunai.",
+      "reveal": "Tampilkan frasa",
+      "saveAsFile": "Simpan sebagai berkas"
+    },
+    "ready": {
+      "backUpNow": "Cadangkan brankas ini sekarang",
+      "backedUp": "Tercadangkan ✓",
+      "backingUp": "Mencadangkan…",
+      "backupDefaultFilename": "Cadangan Myne.myne-backup",
+      "backupError": "Pencadangan tidak selesai — tidak ada berkas yang tertinggal. Anda dapat mencadangkan kapan saja dari Pengaturan → Penyimpanan.",
+      "backupFilterName": "Cadangan Myne",
+      "body": "Myne telah menulis brankas Anda ke folder data aplikasi Anda. Kata sandi master dan frasa pemulihan Anda adalah satu-satunya jalan untuk masuk kembali — pastikan keduanya tersimpan di tempat yang aman.",
+      "decrypting": "Mendekripsi…",
+      "done": "Selesai",
+      "heading": "Brankas Anda siap.",
+      "showFolder": "Tampilkan folder brankas"
+    },
+    "sessionLost": {
+      "startOver": "Mulai dari awal"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Buat brankas lain",
+    "heading": "Pilih brankas",
+    "loading": "Memuat brankas Anda…",
+    "noneLoaded": "Tidak ada brankas yang dapat dimuat saat ini.",
+    "openedRelative": "dibuka {{rel}}",
+    "restoreFromBackup": "Pulihkan dari cadangan",
+    "subline": "Anda memiliki lebih dari satu brankas di perangkat ini. Pilih salah satu untuk membuka kunci.",
+    "vaultFallback": "Brankas {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "Ini memerlukan waktu sejenak.",
+      "eyebrow": "PEMULIHAN · MENDEKRIPSI",
+      "footerHint": "Jika ini memakan waktu lebih dari 30 detik, tutup jendela dan coba lagi.",
+      "heading": "Mendekripsi brankas Anda",
+      "subCaption": "Memproses… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Pemulihan dibatalkan: brankas terkunci.",
+        "operationInProgress": "Operasi sedang berlangsung. Mohon tunggu.",
+        "unexpected": "Kesalahan tak terduga. Silakan coba lagi.",
+        "weakPassword": "Kata sandi baru harus minimal 12 karakter."
+      },
+      "eyebrow": "Pemulihan · Kata sandi baru",
+      "helperBody": "Dibuka dengan frasa pemulihan Anda. Kata sandi lama Anda tidak lagi berfungsi — atur kata sandi master baru sekarang.",
+      "helperEmphasis": "Frasa pemulihan Anda tetap sama.",
+      "submit": "Atur kata sandi baru",
+      "title": "Atur kata sandi master baru"
+    },
+    "phrase": {
+      "back": "← Kembali",
+      "body": "Masukkan frasa pemulihan Anda. 24 kata BIP-39.",
+      "cellLabel": "Kata {{index}}",
+      "deleteLink": "Hapus brankas dan mulai dari awal",
+      "eyebrow": "Pemulihan",
+      "submit": "Buka kunci",
+      "title": "Pulihkan brankas Anda."
+    },
+    "select": {
+      "accountInvalid": "Nomor akun tidak valid. Silakan periksa dan coba lagi.",
+      "accountLabel": "Nomor akun (opsional)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (opsional)",
+      "body": "Pilih brankas yang ingin Anda pulihkan dengan frasa pemulihan 24 kata Anda. Anda juga dapat mengetik nomor akun untuk langsung menuju ke sana.",
+      "cancel": "Batal",
+      "checking": "Memeriksa…",
+      "loadFailed": "Tidak ada brankas yang dapat dimuat saat ini.",
+      "loading": "Memuat brankas Anda…",
+      "openedRelative": "dibuka {{rel}}",
+      "or": "atau",
+      "title": "Pilih brankas untuk dipulihkan",
+      "useAccountNumber": "Gunakan nomor akun",
+      "vaultFallback": "Brankas {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Brankas",
+    "createAnother": "Buat brankas lain",
+    "switchVaultLabel": "Ganti brankas",
+    "switching": "mengganti…",
+    "vaultFallback": "Brankas {{n}}"
+  },
+  "welcome": {
+    "createCta": "Buat brankas baru",
+    "headlineLine1": "Catatan markdown terenkripsi.",
+    "headlineLine2": "Tanpa email saat mendaftar.",
+    "repairResidue": {
+      "cancel": "Batal",
+      "cleanUp": "Bersihkan",
+      "cleaningUp": "Membersihkan…",
+      "confirmBody_other": "{{count}} berkas akan dihapus. Berkas itu sudah tidak terbaca; tidak ada yang dapat dipulihkan yang hilang.",
+      "confirmTitle": "Bersihkan berkas sisa?",
+      "doneBody_other": "Menghapus {{count}} berkas sisa. Anda dapat membuat brankas baru sekarang.",
+      "doneTitle": "Selesai dibersihkan",
+      "errorBody": "Terjadi kesalahan. Tutup aplikasi dan coba lagi.",
+      "errorTitle": "Pembersihan gagal",
+      "foundBody_other": "{{count}} berkas sisa dari penghapusan sebelumnya yang tidak selesai. Berkas itu sudah tidak terbaca — Anda tidak akan kehilangan apa pun yang dapat dipulihkan.",
+      "foundTitle": "Berkas sisa dari penghapusan yang tidak lengkap",
+      "partialBody_other": "{{count}} berkas mungkin dikunci oleh aplikasi lain (antivirus, sinkronisasi berkas, atau pengindeksan pencarian). Tutup aplikasi dan coba lagi sebentar, atau hapus folder brankas secara manual.",
+      "partialTitle": "Beberapa berkas tidak dapat dihapus"
+    },
+    "restoreCta": "Pulihkan dari cadangan",
+    "subtitle": "Catatan Anda dienkripsi di perangkat ini sebelum meninggalkannya. Server hanya menyimpan ciphertext."
+  }
+}

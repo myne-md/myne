@@ -41,6 +41,7 @@
 //! | [`SubkeyRole::VaultIndicesKey`]        | `vault-indices-key`       |
 //! | [`SubkeyRole::VaultHeadMac`]           | `vault-head-mac`          |
 //! | [`SubkeyRole::ServerAuth`]             | `server-auth`             |
+//! | [`SubkeyRole::AttachmentTextKey`]      | `attachment-text-key`     |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -123,6 +124,15 @@ const ROLE_STR_VAULT_HEAD_MAC: &[u8] = b"vault-head-mac";
 /// is a 256-bit high-entropy SCRAM-SHA-256-PLUS credential proven at device-enroll
 /// (never transmitted). Derived but unused until sync auth ships. NOT a blob KEK.
 const ROLE_STR_SERVER_AUTH: &[u8] = b"server-auth";
+/// Registered role string for the v0.1 attachment-text blob KEK
+/// (MYND-328; encrypts the per-attachment extracted-text cache blobs —
+/// `attachment_text_blob.rs`, `MYE1`, `protocol.md` § 9.15 + § 3.4).
+/// Load-bearing: drift silently changes the KEK. `root_key`-derived (like
+/// prefs/search/dictionary), so it is `itemsKey`-independent and survives a
+/// v005 epoch rotation. ONE KEK serves every attachment-text blob; per-blob
+/// separation comes from the `attachment_id` AAD binding (§ 9.15.3), not a
+/// distinct subkey. DISTINCT from the AAD role string `"attachment-text-blob"`.
+const ROLE_STR_ATTACHMENT_TEXT_KEY: &[u8] = b"attachment-text-key";
 
 /// Identifies which subkey is being derived from `root_key`.
 ///
@@ -188,6 +198,13 @@ pub enum SubkeyRole {
     /// but unused until sync auth ships. NOT a blob KEK; domain-separated from every
     /// other role.
     ServerAuth,
+    /// KEK for the v0.1 attachment-text blobs (`attachments-text/<id>`,
+    /// `MYE1`, MYND-328). Encrypts the per-attachment extracted-text cache
+    /// (PDF/DOCX/text-like) under XChaCha20-Poly1305 (CTX commitment outer).
+    /// One KEK for all such blobs; per-blob safety comes from the
+    /// `attachment_id` AAD binding (§ 9.15.3). Distinct from every other
+    /// `root_key`-derived blob KEK so the families stay domain-separated.
+    AttachmentTextKey,
 }
 
 impl SubkeyRole {
@@ -206,6 +223,7 @@ impl SubkeyRole {
             SubkeyRole::VaultIndicesKey => ROLE_STR_VAULT_INDICES_KEY,
             SubkeyRole::VaultHeadMac => ROLE_STR_VAULT_HEAD_MAC,
             SubkeyRole::ServerAuth => ROLE_STR_SERVER_AUTH,
+            SubkeyRole::AttachmentTextKey => ROLE_STR_ATTACHMENT_TEXT_KEY,
         }
     }
 }
@@ -388,6 +406,36 @@ mod tests {
             0x44, 0x62, 0x9A, 0x4B,
         ];
         assert_eq!(*derived, expected, "HKDF golden mismatch — regenerate");
+    }
+
+    #[test]
+    fn attachment_text_key_role_string_matches_spec_registry() {
+        // MYND-328 registry entry "myne.v0.1 attachment-text-key" (§ 9.15).
+        // Frozen + load-bearing: drift silently changes the MYE1 KEK.
+        assert_eq!(
+            SubkeyRole::AttachmentTextKey.role_str(),
+            b"attachment-text-key"
+        );
+    }
+
+    #[test]
+    fn attachment_text_key_is_distinct_from_other_root_key_blobs() {
+        // The attachment-text KEK must differ from EVERY other root_key-derived
+        // blob KEK so the blob families stay domain-separated (HKDF info-string
+        // property). Most load-bearing: distinctness from search-index-key,
+        // since extracted text feeds the search index but the cache is its own
+        // blob family.
+        let root = [0u8; 32];
+        let at = derive_subkey(&root, SubkeyRole::AttachmentTextKey);
+        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
+        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
+        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
+        assert_ne!(
+            *at,
+            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
+        );
+        assert_ne!(*at, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
     }
 
     #[test]
@@ -594,6 +642,7 @@ mod tests {
                 SubkeyRole::VaultIndicesKey => "vault-indices-key",
                 SubkeyRole::VaultHeadMac => "vault-head-mac",
                 SubkeyRole::ServerAuth => "server-auth",
+                SubkeyRole::AttachmentTextKey => "attachment-text-key",
             }
         }
 
@@ -604,7 +653,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 22] = [
+        let cases: [Case<'_>; 24] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -757,6 +806,20 @@ mod tests {
                 "Pseudorandom alpha root with the PersonalDictKey role. The informational_info_utf8_hex field carries the canonical 33-byte HKDF info bytes ('myne.v0.1 personal-dictionary-key') so independent implementers can verify the eighth registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'personal-dictionary-key' is DISTINCT from the AAD role string 'personal-dictionary-blob' (aad_personal_dictionary_blob, ctx-aead vectors) — they are different load-bearing constants.",
                 &alpha,
                 SubkeyRole::PersonalDictKey,
+                true,
+            ),
+            (
+                "zero-root-attachment-text-key",
+                "All-zero root_key with the AttachmentTextKey role (MYND-328, §9.15). KEK for the per-attachment MYE1 extracted-text cache blobs; role string 'attachment-text-key' (19 ASCII bytes). Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the attachment-text lineage onto another role's info string.",
+                &zero_root,
+                SubkeyRole::AttachmentTextKey,
+                false,
+            ),
+            (
+                "prn-alpha-attachment-text-key",
+                "Pseudorandom alpha root with the AttachmentTextKey role. The informational_info_utf8_hex field carries the canonical 29-byte HKDF info bytes ('myne.v0.1 attachment-text-key') so independent implementers can verify the ninth registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'attachment-text-key' is DISTINCT from the AAD role string 'attachment-text-blob' (aad_attachment_text_blob, ctx-aead / aad-construction vectors) — they are different load-bearing constants. One KEK serves all attachment-text blobs; per-blob separation is via the attachment_id AAD binding, not a distinct subkey.",
+                &alpha,
+                SubkeyRole::AttachmentTextKey,
                 true,
             ),
         ];

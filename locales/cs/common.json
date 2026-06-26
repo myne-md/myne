@@ -1,0 +1,2093 @@
+{
+  "attachments": {
+    "cleanUnused": {
+      "cancel": "Zrušit",
+      "cleaning": "Uklízí se…",
+      "close": "Zavřít",
+      "completeTitle": "Vyčištění dokončeno",
+      "deleteCta_few": "Smazat {{count}} nepoužité",
+      "deleteCta_one": "Smazat {{count}} nepoužitou",
+      "deleteCta_other": "Smazat {{count}} nepoužitých",
+      "error": "Vyčištění se nezdařilo. Některé poznámky mohou být nečitelné — nic nebylo smazáno.",
+      "intro_few": "Tyto {{count}} přílohy se nepoužívají v žádné poznámce. Smazání je trvalé a nelze ho vrátit zpět.",
+      "intro_one": "Tato příloha se nepoužívá v žádné poznámce. Smazání je trvalé a nelze ho vrátit zpět.",
+      "intro_other": "Těchto {{count}} příloh se nepoužívá v žádné poznámce. Smazání je trvalé a nelze ho vrátit zpět.",
+      "summaryFreed": " · uvolněno {{size}}",
+      "summaryPeriod": ".",
+      "summaryRemoved_few": "Odstraněny {{count}} přílohy",
+      "summaryRemoved_one": "Odstraněna {{count}} příloha",
+      "summaryRemoved_other": "Odstraněno {{count}} příloh",
+      "summarySkipped_few": " · {{count}} přeskočeny (nyní se používají)",
+      "summarySkipped_one": " · {{count}} přeskočena (nyní se používá)",
+      "summarySkipped_other": " · {{count}} přeskočeno (nyní se používají)",
+      "title": "Vyčistit nepoužité přílohy",
+      "willBeReclaimed": "Uvolní se {{size}}."
+    },
+    "coverPicker": {
+      "close": "Zavřít",
+      "dropHint": "Přetáhněte sem obrázek a použijte ho jako obálku.",
+      "empty": "V tomto trezoru zatím nejsou žádné obrázky. Nahrajte nějaký nebo sem přetáhněte obrázek.",
+      "loading": "Načítá se…",
+      "removeCover": "Odebrat obálku",
+      "title": "Vyberte obrázek obálky",
+      "upload": "Nahrát"
+    },
+    "deleteDialog": {
+      "cancel": "Zrušit",
+      "confirmPrompt": "Smazat tuto přílohu natrvalo? Tuto akci nelze vrátit zpět.",
+      "delete": "Smazat",
+      "deleting": "Maže se…",
+      "error": "Přílohu se nepodařilo smazat. Zkuste to znovu.",
+      "notUsed": "Nepoužívá se v žádné poznámce.",
+      "stillUsed_few": "Stále se používá v {{count}} poznámkách. Smazáním zůstane na místě vložení zástupný symbol:",
+      "stillUsed_one": "Stále se používá v {{count}} poznámce. Smazáním zůstane na místě vložení zástupný symbol:",
+      "stillUsed_other": "Stále se používá v {{count}} poznámkách. Smazáním zůstane na místě vložení zástupný symbol:",
+      "title": "Smazat přílohu",
+      "untitled": "Bez názvu"
+    },
+    "library": {
+      "actionsAriaLabel": "Akce s přílohou",
+      "actionsTitle": "Akce",
+      "checking": "Kontroluje se…",
+      "checkUnusedFailedNotice": "Nepodařilo se zkontrolovat nepoužité přílohy. Zkuste to znovu.",
+      "cleanUnused": "Vyčistit nepoužité",
+      "cleanUnusedTitle": "Smazat přílohy, které se nepoužívají v žádné poznámce",
+      "colCreated": "Vytvořeno",
+      "colName": "Název",
+      "colSize": "Velikost",
+      "colType": "Typ",
+      "colUsedIn": "Použito v",
+      "decrypting": "Dešifrují se přílohy…",
+      "emptyImportHint": "Naimportujte soubor, aby zůstal ve vašem trezoru.",
+      "emptyLoadError": "Katalog příloh se nepodařilo přečíst.",
+      "emptyNoAttachments": "Zatím žádné přílohy.",
+      "filterAriaLabel": "Filtrovat podle typu",
+      "gridView": "Zobrazení mřížky",
+      "import": "Importovat",
+      "importDialogTitle": "Importovat přílohu",
+      "importFile": "Importovat soubor",
+      "importing": "Importuje se…",
+      "listView": "Zobrazení seznamu",
+      "menuDelete": "Smazat",
+      "menuExport": "Exportovat",
+      "menuPreview": "Náhled",
+      "menuRename": "Přejmenovat",
+      "noMatch": "Vašemu hledání neodpovídají žádné přílohy.",
+      "noUnusedNotice": "Žádné nepoužité přílohy k vyčištění.",
+      "preview": "Náhled",
+      "previewAttachment": "Náhled přílohy",
+      "searchAriaLabel": "Hledat přílohy podle názvu souboru",
+      "searchPlaceholder": "Hledat podle názvu souboru",
+      "sort": {
+        "createdAsc": "Nejstarší první",
+        "createdDesc": "Nejnovější první",
+        "nameAsc": "Název A–Z",
+        "nameDesc": "Název Z–A"
+      },
+      "sortAriaLabel": "Seřadit přílohy",
+      "supportedFilesFilter": "Podporované soubory",
+      "title": "Přílohy",
+      "typeFilter": {
+        "all": "Všechny typy",
+        "audio": "Zvuk",
+        "image": "Obrázky",
+        "other": "Ostatní",
+        "pdf": "PDF"
+      },
+      "usedInCount_few": "Použito v {{count}} poznámkách",
+      "usedInCount_one": "Použito v {{count}} poznámce",
+      "usedInCount_other": "Použito v {{count}} poznámkách",
+      "usedInLoading": "…"
+    },
+    "thumbnail": {
+      "audioLabel": "Zvuk: {{filename}}",
+      "file": "Soubor",
+      "pause": "Pozastavit",
+      "pdfDocument": "Dokument PDF",
+      "pdfFirstPage": "První strana PDF",
+      "play": "Přehrát"
+    },
+    "usedInNotesPopover": {
+      "empty": "Nepoužívá se v žádné poznámce.",
+      "untitled": "Bez názvu"
+    }
+  },
+  "backup": {
+    "errors": {
+      "export": {
+        "authOperationInProgress": "Probíhá jiná operace s trezorem. Počkejte, až skončí, a zkuste to znovu.",
+        "cancelled": "Zálohování zrušeno. Žádný soubor nezůstal.",
+        "invalidDestination": "Tuto cílovou složku nelze použít.",
+        "ioGeneric": "Soubor zálohy se nepodařilo zapsat.",
+        "ioNoSpace": "V cíli není dostatek místa.",
+        "ioPermissionDenied": "Chybí oprávnění k zápisu do cíle.",
+        "joinFailure": "Zálohování neočekávaně selhalo. Žádný soubor nezůstal.",
+        "memberTooLarge": "Soubor v tomto trezoru je větší, než formát zálohy umožňuje.",
+        "vaultNotFound": "Nebyl nalezen žádný trezor k zálohování.",
+        "verifyFailed": "Zapsaná záloha se neověřila, a proto byla zahozena. Zkuste to znovu — pokud se to opakuje, na jiné médium."
+      },
+      "restore": {
+        "authOperationInProgress": "Probíhá jiná operace s trezorem. Počkejte, až skončí, a zkuste to znovu.",
+        "cancelled": "Obnovení zrušeno. Nic se nezměnilo.",
+        "damagedBackup": "Soubor zálohy je poškozený.",
+        "futureVersionBackup": "Tato záloha byla vytvořena novější verzí aplikace Myne. Aktualizujte Myne a poté ji obnovte.",
+        "invalidVaultMeta": "Metadata trezoru v této záloze jsou nečitelná, takže její obnovení by nevytvořilo funkční trezor.",
+        "ioGeneric": "Soubor zálohy se nepodařilo přečíst.",
+        "ioPermissionDenied": "Chybí oprávnění ke čtení souboru zálohy.",
+        "joinFailure": "Obnovení neočekávaně selhalo. Nic se nezměnilo.",
+        "missingVaultMeta": "Této záloze chybí metadata trezoru a nelze ji obnovit.",
+        "notABackupFile": "Tento soubor není zálohou aplikace Myne.",
+        "vaultAlreadyExists": "Trezor z této zálohy už na tomto zařízení existuje."
+      }
+    },
+    "export": {
+      "cancel": "Zrušit",
+      "close": "Zavřít",
+      "copying": "Kopíruje se {{done}} z {{total}}…",
+      "preparing": "Připravuje se…",
+      "successToast": "Záloha ověřena a uložena.",
+      "title": "Zálohovat trezor",
+      "verifying": "Ověřuje se {{done}} z {{total}}…"
+    }
+  },
+  "clipper": {
+    "pairing": {
+      "accept": "Přijmout",
+      "close": "Zavřít",
+      "codeAriaLabel": "Párovací kód",
+      "intro": "Potvrďte, že tento kód odpovídá kódu zobrazenému v rozšíření, a poté spárujte tlačítkem Přijmout.",
+      "reject": "Odmítnout",
+      "rejected": "Párování odmítnuto.",
+      "title": "Rozšíření prohlížeče se chce připojit"
+    }
+  },
+  "commandPalette": {
+    "archivedBadge": "Archiv",
+    "archivedBadgeTitle": "Archivováno",
+    "dialogLabel": "Příkazová paleta",
+    "matchedInBody": "↳ nalezeno v textu",
+    "noMatches": "Žádné shody",
+    "searchPlaceholder": "Hledejte poznámky nebo spusťte příkaz — Esc pro zavření",
+    "sectionCommands": "Příkazy",
+    "sectionNotes": "Poznámky",
+    "untitledNote": "Bez názvu"
+  },
+  "commands": {
+    "actions": {
+      "backupVault": {
+        "label": "Zálohovat trezor…"
+      },
+      "category": {
+        "app": "Aplikace",
+        "editor": "Editor",
+        "vault": "Trezor",
+        "view": "Zobrazení"
+      },
+      "convertWikilinks": {
+        "label": "Převést importované wikiodkazy v této poznámce…"
+      },
+      "deleteWorkspace": {
+        "label": "Smazat pracovní prostor…"
+      },
+      "exportNoteHtml": {
+        "label": "Exportovat poznámku jako HTML…"
+      },
+      "exportNoteMarkdown": {
+        "label": "Exportovat poznámku jako Markdown…"
+      },
+      "exportNotePdf": {
+        "label": "Exportovat poznámku jako PDF…"
+      },
+      "exportNoteTxt": {
+        "label": "Exportovat poznámku jako prostý text…"
+      },
+      "exportVaultMarkdown": {
+        "label": "Exportovat trezor jako Markdown…"
+      },
+      "foldAll": {
+        "label": "Sbalit vše"
+      },
+      "importBaseView": {
+        "label": "Importovat zobrazení .base…"
+      },
+      "importObsidian": {
+        "label": "Importovat trezor Obsidian…"
+      },
+      "lockVault": {
+        "label": "Zamknout trezor"
+      },
+      "manageTemplates": {
+        "label": "Spravovat šablony…"
+      },
+      "newNoteFromTemplate": {
+        "label": "Nová poznámka ze šablony…"
+      },
+      "openAttachments": {
+        "label": "Otevřít přílohy…"
+      },
+      "openSettings": {
+        "label": "Otevřít nastavení…"
+      },
+      "openSnapshots": {
+        "label": "Snímky…"
+      },
+      "openTodayNote": {
+        "label": "Otevřít dnešní poznámku"
+      },
+      "randomNote": {
+        "label": "Otevřít náhodnou poznámku"
+      },
+      "renameWorkspace": {
+        "label": "Přejmenovat pracovní prostor…"
+      },
+      "saveWorkspaceAs": {
+        "label": "Uložit pracovní prostor jako…"
+      },
+      "showGraph": {
+        "label": "Zobrazit graf…"
+      },
+      "showTags": {
+        "label": "Procházet značky…"
+      },
+      "showViews": {
+        "label": "Procházet zobrazení…"
+      },
+      "switchWorkspace": {
+        "label": "Přepnout pracovní prostor…"
+      },
+      "toggleFocus": {
+        "label": "Přepnout režim soustředění"
+      },
+      "toggleLeftSidebar": {
+        "label": "Přepnout postranní panel poznámek"
+      },
+      "toggleReading": {
+        "label": "Přepnout režim čtení"
+      },
+      "toggleRightSidebar": {
+        "label": "Přepnout postranní panel zpětných odkazů"
+      },
+      "toggleSource": {
+        "label": "Přepnout režim zdroje"
+      },
+      "toggleStackedTabs": {
+        "label": "Přepnout naskládané karty"
+      },
+      "unfoldAll": {
+        "label": "Rozbalit vše"
+      }
+    },
+    "hotkeys": {
+      "command": {
+        "bold": "Tučné",
+        "closeTab": "Zavřít kartu",
+        "cycleHeadingLevel": "Procházet úrovně nadpisu",
+        "cycleTabs": "Procházet karty",
+        "deleteWorkspace": "Smazat pracovní prostor",
+        "focusNextPane": "Přejít na další panel",
+        "focusPrevPane": "Přejít na předchozí panel",
+        "foldAll": "Sbalit vše",
+        "inlineCode": "Vložený kód",
+        "insertWikilink": "Vložit wikiodkaz",
+        "italic": "Kurzíva",
+        "navigateBack": "Přejít zpět",
+        "navigateForward": "Přejít vpřed",
+        "newNote": "Nová poznámka",
+        "openSettings": "Otevřít nastavení",
+        "paletteToggle": "Otevřít příkazovou paletu",
+        "renameWorkspace": "Přejmenovat pracovní prostor",
+        "saveWorkspaceAs": "Uložit pracovní prostor jako",
+        "selectAllScoped": "Vybrat vše (v rozsahu)",
+        "showGraphView": "Zobrazit graf",
+        "splitPaneDown": "Rozdělit panel (dolů)",
+        "splitPaneRight": "Rozdělit panel (vpravo)",
+        "switchWorkspace": "Přepnout pracovní prostor",
+        "toggleBulletList": "Přepnout odrážkový seznam",
+        "toggleFocusMode": "Přepnout režim soustředění",
+        "toggleNumberedList": "Přepnout číslovaný seznam",
+        "toggleReadingView": "Přepnout režim čtení",
+        "toggleSourceMode": "Přepnout režim zdroje",
+        "toggleTaskList": "Přepnout seznam úkolů",
+        "unfoldAll": "Rozbalit vše"
+      }
+    },
+    "rebind": {
+      "invalidChordReason": "Přidejte modifikátor (⌘, Ctrl nebo Alt) — samotná klávesa nemůže být zkratkou."
+    }
+  },
+  "common": {
+    "prompt": {
+      "cancel": "Zrušit",
+      "confirmDefault": "OK"
+    },
+    "spinner": {
+      "loadingLabel": "Načítání"
+    }
+  },
+  "editor": {
+    "attachment": {
+      "actions": {
+        "exported": "Exportováno: {{filename}}.",
+        "exportFailed": "Soubor {{filename}} se nepodařilo exportovat.",
+        "renamed": "Přejmenováno na {{name}}.",
+        "renameFailed": "Přílohu se nepodařilo přejmenovat.",
+        "saveDialogFailed": "Dialog pro uložení se nepodařilo otevřít."
+      },
+      "convert": {
+        "cancel": "Zrušit",
+        "confirm": "Převést",
+        "skipped": "přeskočeno — {{note}}",
+        "subtitle_few": "Budou přepsány {{count}} odkazy. Před potvrzením zkontrolujte.",
+        "subtitle_one": "Bude přepsán 1 odkaz. Před potvrzením zkontrolujte.",
+        "subtitle_other": "Bude přepsáno {{count}} odkazů. Před potvrzením zkontrolujte.",
+        "subtitleEmpty": "Není co převádět — nenalezeny žádné zdrojové soubory.",
+        "title": "Převést importované přílohy"
+      },
+      "convertCommand": {
+        "pickerSourceFilter": "Zdroj přílohy"
+      },
+      "convertCore": {
+        "converted_few": "{{count}} převedeny",
+        "converted_one": "{{count}} převedena",
+        "converted_other": "{{count}} převedeno",
+        "noneToConvert": "V této poznámce nejsou žádné importované přílohy k převedení.",
+        "skipNote": {
+          "failed": "import selhal",
+          "locked": "trezor uzamčen",
+          "notFound": "zdroj nenalezen",
+          "tooLarge": "příliš velké (max. 64 MiB)",
+          "unsupported": "nepodporovaný typ"
+        },
+        "skippedSuffix_few": " · {{count}} přeskočeny",
+        "skippedSuffix_one": " · {{count}} přeskočena",
+        "skippedSuffix_other": " · {{count}} přeskočeno"
+      },
+      "fileKind": {
+        "generic": "Soubor",
+        "label": {
+          "archive": "Archiv",
+          "audio": "Zvuk",
+          "cHeader": "Hlavička C",
+          "cppSource": "Zdroj C++",
+          "cSource": "Zdroj C",
+          "css": "CSS",
+          "csv": "CSV",
+          "document": "Dokument",
+          "ebook": "E-kniha",
+          "go": "Go",
+          "html": "HTML",
+          "image": "Obrázek",
+          "java": "Java",
+          "javascript": "JavaScript",
+          "json": "JSON",
+          "keynote": "Keynote",
+          "log": "Soubor protokolu",
+          "markdown": "Markdown",
+          "numbers": "Tabulka Numbers",
+          "pages": "Dokument Pages",
+          "pdf": "PDF",
+          "presentation": "Prezentace",
+          "python": "Python",
+          "richText": "Dokument s formátovaným textem",
+          "rust": "Rust",
+          "shell": "Shellový skript",
+          "spreadsheet": "Tabulka",
+          "svg": "Obrázek SVG",
+          "text": "Textový dokument",
+          "toml": "TOML",
+          "tsv": "TSV",
+          "typescript": "TypeScript",
+          "video": "Video",
+          "word": "Dokument Word",
+          "xml": "XML",
+          "yaml": "YAML"
+        },
+        "unknown": "Soubor {{ext}}"
+      },
+      "lightbox": {
+        "close": "Zavřít náhled",
+        "export": "Exportovat",
+        "exportAria": "Exportovat přílohu",
+        "imagePreview": "Náhled obrázku",
+        "pdfFallback": "PDF",
+        "pdfPreview": "Náhled PDF"
+      },
+      "menu": {
+        "actionsAria": "Akce s přílohou"
+      },
+      "pdf": {
+        "loading": "Načítá se…"
+      },
+      "picker": {
+        "openFailed": "Výběr souboru se nepodařilo otevřít."
+      },
+      "progress": {
+        "encrypting": "Šifruje se…",
+        "importing": "Importuje se…",
+        "loading": "Načítá se…"
+      },
+      "recording": {
+        "barAria": "Nahrávání hlasové poznámky",
+        "cancel": "Zrušit",
+        "noAudio": "Nebyl zachycen žádný zvuk — zkontrolujte mikrofon.",
+        "saving": "Ukládá se…",
+        "stop": "Zastavit"
+      },
+      "rename": {
+        "cancel": "Zrušit",
+        "confirm": "Přejmenovat",
+        "title": "Přejmenovat přílohu"
+      },
+      "summary": {
+        "added_few": "{{count}} přidány",
+        "added_one": "{{count}} přidána",
+        "added_other": "{{count}} přidáno",
+        "reason": {
+          "failed": "selhalo",
+          "locked": "trezor uzamčen",
+          "tooLarge": "příliš velké",
+          "unsupported": "nepodporovaný typ"
+        },
+        "skipped_few": "{{count}} přeskočeny: {{noun}}",
+        "skipped_one": "{{count}} přeskočena: {{noun}}",
+        "skipped_other": "{{count}} přeskočeno: {{noun}}"
+      },
+      "voice": {
+        "startError": {
+          "alreadyRecording": "Nahrávání už probíhá.",
+          "captureFailed": "Nahrávání se nepodařilo spustit — zkontrolujte přístup k mikrofonu v Nastavení systému.",
+          "generic": "Nahrávání se nepodařilo spustit.",
+          "locked": "Pro nahrání hlasové poznámky odemkněte trezor.",
+          "noInputDevice": "Nebyl nalezen žádný mikrofon. Připojte ho a zkuste to znovu."
+        },
+        "stopError": {
+          "captureFailed": "Nahrávání selhalo — zkontrolujte mikrofon.",
+          "emptyRecording": "Nic nebylo nahráno.",
+          "generic": "Nahrávku se nepodařilo uložit.",
+          "silentRecording": "Nahrávka byla tichá a byla zahozena — zkontrolujte mikrofon."
+        }
+      },
+      "widget": {
+        "audio": {
+          "pause": "Pozastavit",
+          "play": "Přehrát",
+          "seek": "Posunout"
+        },
+        "menu": {
+          "export": "Exportovat",
+          "remove": "Odebrat",
+          "rename": "Přejmenovat",
+          "reveal": "Zobrazit v knihovně"
+        },
+        "pdfFallback": "PDF",
+        "tombstone": {
+          "brokenAria": "Neplatný odkaz na přílohu: {{filename}}",
+          "brokenLabel": "neplatné",
+          "deletedAria": "Smazaná příloha: {{filename}}",
+          "deletedLabel": "smazáno"
+        },
+        "urlImageFallback": "obrázek"
+      }
+    },
+    "callout": {
+      "label": {
+        "attention": "Pozor",
+        "bug": "Chyba",
+        "caution": "Upozornění",
+        "danger": "Nebezpečí",
+        "done": "Hotovo",
+        "error": "Chyba",
+        "example": "Příklad",
+        "failure": "Selhání",
+        "faq": "Časté dotazy",
+        "hint": "Nápověda",
+        "important": "Důležité",
+        "info": "Informace",
+        "missing": "Chybí",
+        "note": "Poznámka",
+        "question": "Otázka",
+        "quote": "Citát",
+        "success": "Úspěch",
+        "tip": "Tip",
+        "todo": "Úkol",
+        "warning": "Varování"
+      }
+    },
+    "chrome": {
+      "backlinks": {
+        "archivedBadge": "Archivováno",
+        "empty": "Zatím žádné zpětné odkazy.",
+        "linkedFrom_few": "Odkazováno z {{count}}",
+        "linkedFrom_one": "Odkazováno z {{count}}",
+        "linkedFrom_other": "Odkazováno z {{count}}",
+        "untitled": "Bez názvu"
+      },
+      "barItems": {
+        "graph": "Graf",
+        "lock": "Zamknout",
+        "saveStatus": "Stav uložení",
+        "settings": "Nastavení",
+        "syncStatus": "Stav synchronizace",
+        "tags": "Značky",
+        "viewMode": "Režim zobrazení",
+        "views": "Zobrazení",
+        "wordCount": "Počet slov",
+        "workspace": "Pracovní prostor"
+      },
+      "baseImport": {
+        "droppedFiltersSuffix_few": " · {{count}} filtry vynechány",
+        "droppedFiltersSuffix_one": " · {{count}} filtr vynechán",
+        "droppedFiltersSuffix_other": " · {{count}} filtrů vynecháno",
+        "failed": "Import selhal.",
+        "fileFilterName": "Obsidian Base",
+        "imported_few": "Importována {{count}} zobrazení",
+        "imported_one": "Importováno {{count}} zobrazení",
+        "imported_other": "Importováno {{count}} zobrazení",
+        "notValid": "Není to platný soubor .base.",
+        "skippedSuffix_few": " · {{count}} přeskočeny",
+        "skippedSuffix_one": " · {{count}} přeskočeno",
+        "skippedSuffix_other": " · {{count}} přeskočeno",
+        "stoppedAfter_few": "Import zastaven po {{count}} zobrazeních.",
+        "stoppedAfter_one": "Import zastaven po {{count}} zobrazení.",
+        "stoppedAfter_other": "Import zastaven po {{count}} zobrazeních."
+      },
+      "bottomBar": {
+        "browseTags": "Procházet značky",
+        "browseViews": "Procházet zobrazení",
+        "cycleViewMode": "Procházet režimy zobrazení",
+        "docStats": {
+          "summary_few": "{{count}} slova · {{characters}} znaků",
+          "summary_one": "{{count}} slovo · {{characters}} znaků",
+          "summary_other": "{{count}} slov · {{characters}} znaků",
+          "summarySelectionSuffix": " (výběr)",
+          "title_few": "{{characters}} znaků · {{words}} slov · {{spaces}} mezer · {{count}} odstavce",
+          "title_one": "{{characters}} znaků · {{words}} slov · {{spaces}} mezer · {{count}} odstavec",
+          "title_other": "{{characters}} znaků · {{words}} slov · {{spaces}} mezer · {{count}} odstavců",
+          "titleSelectionSuffix": " (výběr)"
+        },
+        "graphTitle": "Graf (⌘⇧G)",
+        "lock": "Zamknout",
+        "lockVault": "Zamknout trezor",
+        "openSettings": "Otevřít nastavení",
+        "settingsTitle": "Nastavení (⌘,)",
+        "showGraph": "Zobrazit graf",
+        "syncStatus": "Pouze místně · nesynchronizováno",
+        "tagsTitle": "Značky",
+        "togglePreview": "Přepnout náhled vedle sebe",
+        "viewModeTitle": "Režim zobrazení: {{mode}} (klikněte pro přepnutí)",
+        "viewsTitle": "Zobrazení"
+      },
+      "import": {
+        "imported_few": "Importovány {{count}} poznámky{{skipped}}",
+        "imported_one": "Importována {{count}} poznámka{{skipped}}",
+        "imported_other": "Importováno {{count}} poznámek{{skipped}}",
+        "skippedSuffix_few": " · {{count}} přeskočeny",
+        "skippedSuffix_one": " · {{count}} přeskočena",
+        "skippedSuffix_other": " · {{count}} přeskočeno"
+      },
+      "nav": {
+        "goBack": "Přejít zpět",
+        "goForward": "Přejít vpřed"
+      },
+      "noNotesToOpen": "Žádné poznámky k otevření.",
+      "resizeBacklinksSidebar": "Změnit velikost panelu zpětných odkazů",
+      "resizeNotesSidebar": "Změnit velikost panelu poznámek",
+      "sidebarToggle": {
+        "hideBacklinks": "Skrýt panel zpětných odkazů",
+        "hideNotes": "Skrýt panel poznámek",
+        "showBacklinks": "Zobrazit panel zpětných odkazů",
+        "showNotes": "Zobrazit panel poznámek"
+      },
+      "switchingOverlay": {
+        "saving": "Ukládá se…"
+      },
+      "viewMode": {
+        "live": "Živé",
+        "reading": "Čtení",
+        "source": "Zdroj"
+      },
+      "workspacePrompt": {
+        "namePlaceholder": "Název pracovního prostoru",
+        "renameConfirm": "Přejmenovat",
+        "renameTitle": "Přejmenovat pracovní prostor",
+        "saveAsTitle": "Uložit pracovní prostor jako",
+        "saveConfirm": "Uložit"
+      },
+      "workspaceSwitcher": {
+        "defaultName": "Pracovní prostor",
+        "renameItemLabel": "Přejmenovat pracovní prostor {{name}}",
+        "renameTitle": "Přejmenovat pracovní prostor",
+        "saveCurrentAs": "Uložit aktuální jako…",
+        "switchLabel": "Přepnout pracovní prostor",
+        "toggleTitle": "Pracovní prostor: {{name}}"
+      }
+    },
+    "codeBlock": {
+      "copyCode": "Kopírovat kód",
+      "defaultBadge": "kód"
+    },
+    "find": {
+      "close": "Zavřít hledání",
+      "matchCase": "Rozlišovat velikost písmen",
+      "matchCount": "{{current}} z {{total}}",
+      "nextMatch": "Další shoda",
+      "noMatches": "Žádné shody",
+      "placeholder": "Hledat v poznámce",
+      "previousMatch": "Předchozí shoda",
+      "replaceAll": "Nahradit vše",
+      "replaceAllCount": "Nahradit vše ({{total}})",
+      "replaceOne": "Nahradit",
+      "replacePlaceholder": "Nahradit za",
+      "toggleReplace": "Přepnout nahrazování"
+    },
+    "folding": {
+      "clickToUnfold": "Kliknutím rozbalíte",
+      "unfold": "Rozbalit"
+    },
+    "footnote": {
+      "heading": "Poznámky pod čarou",
+      "unreferenced": "bez odkazu"
+    },
+    "frontmatter": {
+      "addProperty": "+ Přidat vlastnost",
+      "propertiesLabel": "Vlastnosti",
+      "titleAriaLabel": "Název poznámky",
+      "titlePlaceholder": "Bez názvu"
+    },
+    "mermaid": {
+      "rendering": "Vykresluje se diagram…"
+    },
+    "slash": {
+      "attachFile": "Připojit soubor",
+      "bulletList": "Odrážkový seznam",
+      "callout": "Vyzdvižení",
+      "date": "Datum",
+      "day": "Den",
+      "divider": "Oddělovač",
+      "heading1": "Nadpis 1",
+      "heading2": "Nadpis 2",
+      "heading3": "Nadpis 3",
+      "heading4": "Nadpis 4",
+      "heading5": "Nadpis 5",
+      "heading6": "Nadpis 6",
+      "link": "Odkaz",
+      "now": "Teď",
+      "numberedList": "Číslovaný seznam",
+      "quote": "Citát",
+      "table": "Tabulka",
+      "time": "Čas",
+      "todoList": "Seznam úkolů",
+      "voiceNote": "Hlasová poznámka",
+      "wikiLink": "Wikiodkaz"
+    },
+    "spell": {
+      "menu": {
+        "addToDictionary": "Přidat do slovníku",
+        "ignoreInVault": "Ignorovat v tomto trezoru",
+        "ignoreThisSession": "Ignorovat v této relaci",
+        "noSuggestions": "Žádné návrhy"
+      }
+    },
+    "table": {
+      "addColumn": "Přidat sloupec vpravo",
+      "addRow": "Přidat řádek níže",
+      "cellAriaLabel": "Buňka tabulky",
+      "deleteColumn": "Smazat sloupec",
+      "deleteRow": "Smazat řádek",
+      "reorderColumn": "Změnit pořadí sloupce",
+      "reorderRow": "Změnit pořadí řádku"
+    },
+    "toolbar": {
+      "apply": "Použít",
+      "heading": {
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4",
+        "h5": "H5",
+        "h6": "H6",
+        "paragraph": "Odstavec"
+      },
+      "highlight": {
+        "blue": "Modrá",
+        "green": "Zelená",
+        "pink": "Růžová",
+        "purple": "Fialová",
+        "yellow": "Žlutá"
+      },
+      "urlPlaceholder": "Vložte adresu URL"
+    },
+    "typography": {
+      "contentWidth": {
+        "full": "Plná",
+        "narrow": "Úzká",
+        "normal": "Normální",
+        "wide": "Široká"
+      },
+      "font": {
+        "mono": "Mono",
+        "sans": "Sans"
+      },
+      "lineSpacing": {
+        "normal": "Normální",
+        "relaxed": "Volné",
+        "tight": "Těsné"
+      },
+      "textSize": {
+        "lg": "Velké",
+        "md": "Výchozí",
+        "sm": "Malé",
+        "xl": "Extra velké"
+      }
+    },
+    "wikilink": {
+      "chip": {
+        "embed": "Vložit: {{label}}"
+      },
+      "convert": {
+        "cancel": "Zrušit",
+        "choiceClause_few": " · {{count}} vyžadují volbu.",
+        "choiceClause_one": " · {{count}} vyžaduje volbu.",
+        "choiceClause_other": " · {{count}} vyžaduje volbu.",
+        "chooseTarget": "Vyberte cíl…",
+        "convert": "Převést",
+        "convertedToast_few": "{{count}} wikiodkazy převedeny",
+        "convertedToast_one": "{{count}} wikiodkaz převeden",
+        "convertedToast_other": "{{count}} wikiodkazů převedeno",
+        "noneToConvert": "V této poznámce nejsou žádné importované wikiodkazy k převedení.",
+        "nothingToConvert": "Není co převádět — žádné importované wikiodkazy se nepodařilo vyřešit.",
+        "rewriteCount_few": "Budou přepsány {{count}} odkazy",
+        "rewriteCount_one": "Bude přepsán {{count}} odkaz",
+        "rewriteCount_other": "Bude přepsáno {{count}} odkazů",
+        "skipped": "přeskočeno — {{reason}}",
+        "title": "Převést importované wikiodkazy v této poznámce"
+      },
+      "convertCore": {
+        "noMatch": "žádná shoda"
+      }
+    }
+  },
+  "export": {
+    "note": {
+      "documentTitleFallback": "Poznámka",
+      "errors": {
+        "attachmentCorrupt": "Přílohu, na kterou tato poznámka odkazuje, nelze přečíst, takže nic nebylo exportováno.",
+        "attachmentMissing": "Příloha, na kterou tato poznámka odkazuje, chybí, takže nic nebylo exportováno.",
+        "cannotDecrypt": "Tuto poznámku nelze přečíst.",
+        "destinationUnusable": "Tuto cílovou složku nelze použít.",
+        "fallback": "Export neočekávaně selhal. Zkuste to znovu.",
+        "invalidAttachmentCatalog": "Katalog příloh trezoru nelze přečíst, takže nic nebylo exportováno.",
+        "invalidNoteFilename": "Tento název souboru nelze použít, takže nic nebylo exportováno.",
+        "invalidNoteId": "Tuto poznámku nelze identifikovat, takže nic nebylo exportováno.",
+        "invalidPlaintextEncoding": "Obsah této poznámky se zdá poškozený, takže nic nebylo exportováno. Obnovte ji ze zálohy.",
+        "ioNoSpace": "V cíli není dostatek místa.",
+        "ioPermissionDenied": "Chybí oprávnění k zápisu do cíle.",
+        "ioWriteDefault": "Exportovaný soubor se nepodařilo zapsat.",
+        "noteNotFound": "Tato poznámka už neexistuje — možná byla smazána.",
+        "pdfCaptureFailed": "PDF se nepodařilo vytvořit, takže nic nebylo exportováno.",
+        "pdfExportInProgress": "Export PDF už probíhá. Počkejte, až skončí, a zkuste to znovu.",
+        "pdfPayloadMissing": "Export byl přerušen — pokud se trezor uzamkl, odemkněte ho a zkuste to znovu.",
+        "pdfRenderTimeout": "Vykreslení poznámky trvalo příliš dlouho, takže nic nebylo exportováno.",
+        "pdfWindowCreateFailed": "Okno pro export se nepodařilo otevřít, takže nic nebylo exportováno.",
+        "targetExists": "Soubor s tímto názvem už v cíli existuje.",
+        "vaultLocked": "Trezor je uzamčený. Odemkněte ho a zkuste to znovu."
+      },
+      "flow": {
+        "couldNotRead": "Tuto poznámku nelze přečíst.",
+        "exportedTo": "Exportováno do {{filename}}",
+        "exportedToWithAttachments_few": "Exportováno do {{filename}} + {{count}} přílohy",
+        "exportedToWithAttachments_one": "Exportováno do {{filename}} + {{count}} příloha",
+        "exportedToWithAttachments_other": "Exportováno do {{filename}} + {{count}} příloh",
+        "exportedToWithImages_few": "Exportováno do {{filename}} + {{count}} obrázky",
+        "exportedToWithImages_one": "Exportováno do {{filename}} + {{count}} obrázek",
+        "exportedToWithImages_other": "Exportováno do {{filename}} + {{count}} obrázků",
+        "filterHtml": "HTML",
+        "filterMarkdown": "Markdown",
+        "filterPdf": "PDF",
+        "filterPlainText": "Prostý text",
+        "showInFolder": "Zobrazit ve složce"
+      },
+      "modal": {
+        "cancel": "Zrušit",
+        "export": "Exportovat…",
+        "includeAttachments_few": "Zahrnout {{count}} přílohy",
+        "includeAttachments_one": "Zahrnout {{count}} přílohu",
+        "includeAttachments_other": "Zahrnout {{count}} příloh",
+        "title": "Exportovat jako Markdown"
+      }
+    },
+    "pdf": {
+      "cancel": "Zrušit",
+      "continue": "Pokračovat…",
+      "title": "Exportovat jako PDF"
+    },
+    "vault": {
+      "chooseDestinationDialogTitle": "Vyberte, kam export umístit",
+      "errors": {
+        "attachmentCorrupt": "Přílohu, na kterou některá poznámka odkazuje, nelze přečíst, takže nic nebylo exportováno.",
+        "attachmentMissing": "Příloha, na kterou některá poznámka odkazuje, chybí, takže nic nebylo exportováno.",
+        "authOperationInProgress": "Probíhá jiná operace s trezorem. Počkejte, až skončí, a zkuste to znovu.",
+        "cancelled": "Export zrušen. V cíli nic nezůstalo.",
+        "cannotDecrypt": "Některou poznámku nelze přečíst, takže nic nebylo exportováno.",
+        "destinationAlreadyExists": "Na tomto místě už něco existuje. Vyberte pro export prázdné místo.",
+        "destinationNotAllowed": "Toto místo je uvnitř vlastního úložiště aplikace Myne. Vyberte složku mimo něj.",
+        "invalidPlaintextEncoding": "Obsah některé poznámky se zdá poškozený, takže nic nebylo exportováno. Obnovte ji ze zálohy.",
+        "invalidVaultMeta": "Metadata trezoru nelze přečíst, takže nic nebylo exportováno.",
+        "ioWriteDefault": "Export se nepodařilo zapsat.",
+        "joinFailure": "Export neočekávaně selhal. V cíli nic nezůstalo.",
+        "vaultLocked": "Trezor je uzamčený. Odemkněte ho a zkuste to znovu.",
+        "vaultNotFound": "Nebyl nalezen žádný trezor k exportu."
+      },
+      "flow": {
+        "countAttachments_few": "{{count}} přílohy",
+        "countAttachments_one": "{{count}} příloha",
+        "countAttachments_other": "{{count}} příloh",
+        "countFolders_few": "{{count}} složky",
+        "countFolders_one": "{{count}} složka",
+        "countFolders_other": "{{count}} složek",
+        "countNotes_few": "{{count}} poznámky",
+        "countNotes_one": "{{count}} poznámka",
+        "countNotes_other": "{{count}} poznámek",
+        "exclusionsHistory": "Historie verzí není zahrnuta.",
+        "exclusionsTrashed_few": "{{count}} poznámky v koši nejsou zahrnuty.",
+        "exclusionsTrashed_one": "{{count}} poznámka v koši není zahrnuta.",
+        "exclusionsTrashed_other": "{{count}} poznámek v koši není zahrnuto.",
+        "exclusionsTrashedAndHistory_few": "{{count}} poznámky v koši a historie verzí nejsou zahrnuty.",
+        "exclusionsTrashedAndHistory_one": "{{count}} poznámka v koši a historie verzí nejsou zahrnuty.",
+        "exclusionsTrashedAndHistory_other": "{{count}} poznámek v koši a historie verzí nejsou zahrnuty.",
+        "phaseAttachments": "přílohy",
+        "phaseNotes": "poznámky",
+        "preparing": "Připravuje se…",
+        "runningCounts": "{{done}} / {{total}} {{phase}}"
+      },
+      "running": {
+        "cancel": "Zrušit",
+        "cancelling": "Ruší se…",
+        "title": "Exportuje se…"
+      },
+      "setup": {
+        "cancel": "Zrušit",
+        "choose": "Vybrat…",
+        "chooseFolder": "Vyberte složku…",
+        "destinationLabel": "Cíl",
+        "export": "Exportovat…",
+        "folderSelectAriaLabel": "Složka k exportu",
+        "noFolderChosen": "Nebyla vybrána žádná složka",
+        "noFoldersInVault": "V tomto trezoru nejsou žádné složky",
+        "scopeFolder": "Jedna složka",
+        "scopeLabel": "Rozsah",
+        "scopeWhole": "Celý trezor",
+        "title": "Exportovat trezor jako Markdown"
+      },
+      "summary": {
+        "done": "Hotovo",
+        "showInFolder": "Zobrazit ve složce",
+        "title": "Export dokončen"
+      }
+    }
+  },
+  "failClosed": {
+    "corrupted": {
+      "body": "Pokud máte zálohu, můžete ji obnovit — vaše současné soubory zůstanou nedotčené; záloha se nejprve obnoví jako samostatný trezor.",
+      "cta": "Zavřít aplikaci",
+      "title": "Soubor trezoru je poškozený."
+    },
+    "invalidState": {
+      "body": "Restartujte prosím aplikaci.",
+      "cta": "Zamknout",
+      "title": "Neočekávaný stav."
+    },
+    "ioError": {
+      "body": "Může jít o chybu disku nebo souborového systému.",
+      "cta": "Zavřít aplikaci",
+      "title": "Soubor trezoru nelze přečíst."
+    },
+    "permissionDenied": {
+      "body": "Zkontrolujte oprávnění souboru.",
+      "cta": "Zavřít aplikaci",
+      "title": "Chybí oprávnění k přístupu k souboru trezoru."
+    },
+    "restoreFromBackup": "Obnovit ze zálohy…"
+  },
+  "notes": {
+    "archive": {
+      "close": "Zavřít",
+      "count_few": "{{count}} poznámky",
+      "count_one": "{{count}} poznámka",
+      "count_other": "{{count}} poznámek",
+      "countEmpty": "Prázdné",
+      "delete": "Smazat",
+      "deleteError": "Tuto poznámku se nepodařilo smazat. Zkuste to znovu.",
+      "emptyState": "Archiv je prázdný.",
+      "restore": "Obnovit",
+      "restoreError": "Tuto poznámku se nepodařilo obnovit. Zkuste to znovu.",
+      "title": "Archiv",
+      "untitled": "Bez názvu"
+    },
+    "cardMenu": {
+      "copyLink": "Kopírovat odkaz",
+      "open": "Otevřít",
+      "openInNewTab": "Otevřít v nové kartě",
+      "revealInFolder": "Zobrazit ve složce"
+    },
+    "colorLabels": {
+      "clay": "Hlína",
+      "moss": "Mech",
+      "ochre": "Okr",
+      "plum": "Švestková",
+      "slate": "Břidlicová",
+      "stone": "Kámen"
+    },
+    "decoration": {
+      "colorSection": "Barva",
+      "default": "Výchozí",
+      "defaultFolderIcon": "Výchozí ikona složky",
+      "iconSection": "Ikona",
+      "menuLabel": "Barevný štítek",
+      "noColor": "Žádná barva",
+      "none": "Žádná"
+    },
+    "deleteConfirm": {
+      "cancel": "Zrušit",
+      "delete": "Smazat",
+      "title": "Smazat tuto poznámku?",
+      "untitled": "Bez názvu",
+      "warning": "Tuto akci nelze vrátit zpět."
+    },
+    "filterBuilder": {
+      "addCondition": "Přidat podmínku",
+      "addFilterGroup": "Přidat skupinu filtrů",
+      "cancel": "Zrušit",
+      "combinator": {
+        "all": "všechny",
+        "any": "kterékoli"
+      },
+      "match": "Odpovídá",
+      "negate": {
+        "is": "je",
+        "isNot": "není"
+      },
+      "noConditions": "Zatím žádné podmínky — toto zobrazení ukazuje všechny stránky.",
+      "noteCount_few": "{{count}} poznámky",
+      "noteCount_one": "{{count}} poznámka",
+      "noteCount_other": "{{count}} poznámek",
+      "of": "z:",
+      "ofTheGroups": "ze skupin:",
+      "removeCondition": "Odebrat podmínku",
+      "replaceFilter": "Nahradit filtr",
+      "save": "Uložit",
+      "searchTextPlaceholder": "hledaný text",
+      "selectFolderPlaceholder": "vyberte složku…",
+      "selectTagPlaceholder": "vyberte značku…",
+      "type": {
+        "folder": "Složka",
+        "search": "Hledání",
+        "tag": "Značka"
+      },
+      "unrepresentable": "Tento filtr byl vytvořen v pokročilém editoru a zde ho nelze upravit.",
+      "unresolved": "nevyřešeno"
+    },
+    "folderManagement": {
+      "illegalSegment": "Název složky nemůže obsahovat / \\ | # ^ [ ] ani začínat či končit mezerou.",
+      "tooLong": "Tato cesta ke složce je příliš dlouhá."
+    },
+    "folderNote": {
+      "defaultTitle": "Index"
+    },
+    "folderRow": {
+      "createFolderNote": "Vytvořit poznámku ke složce",
+      "empty": "prázdné",
+      "folderNote": "poznámka ke složce",
+      "openFolderNote": "Otevřít poznámku ke složce"
+    },
+    "graph": {
+      "allConnected": "Vše je propojené — žádné izolované poznámky.",
+      "building": "Sestavuje se graf…",
+      "depthToggleTitle": "Přepnout hloubku okolí (1 ↔ 2 skoky)",
+      "filterAll": "Vše",
+      "filterAroundNote": "Kolem této poznámky",
+      "filterByTag": "Filtrovat podle značky",
+      "filterIsolated": "Izolované",
+      "hop": "{{depth}} skok",
+      "loading": "Načítá se graf…",
+      "noNotes": "Zatím žádné poznámky k zobrazení v grafu.",
+      "overCap": "Tento trezor je rozsáhlý — graf celého trezoru je omezený. Filtrujte podle značky nebo zobrazte izolované poznámky pro prozkoumání.",
+      "refresh": "Obnovit",
+      "refreshTitle": "Trezor se změnil — znovu sestavit graf",
+      "tagPlaceholder": "Značka…"
+    },
+    "import": {
+      "base": {
+        "untitledView": "Zobrazení bez názvu"
+      },
+      "modal": {
+        "cancel": "Zrušit",
+        "cancelledNotImported_few": "{{count}} neimportovány",
+        "cancelledNotImported_one": "{{count}} neimportována",
+        "cancelledNotImported_other": "{{count}} neimportováno",
+        "cancelling": "Ruší se…",
+        "chooseFolder": "Vyberte složku…",
+        "close": "Zavřít",
+        "closeAriaLabel": "Zavřít",
+        "copied": "Zkopírováno",
+        "copy": "Kopírovat",
+        "done": "Hotovo",
+        "errorBody": "Import se nepodařilo dokončit. Všechny již importované poznámky byly zachovány a je bezpečné je ponechat nebo smazat.",
+        "flagDetail": "{{kind}} „{{segment}}“ {{reason}}.",
+        "flagKindFolder": "Složka",
+        "flagKindTitle": "Název",
+        "folderPickerTitle": "Vyberte složku svého trezoru Obsidian",
+        "hiddenIgnoredPrefix_few": "{{count}} konfigurační / skryté položky ignorovány (např. ",
+        "hiddenIgnoredPrefix_one": "{{count}} konfigurační / skrytá položka ignorována (např. ",
+        "hiddenIgnoredPrefix_other": "{{count}} konfiguračních / skrytých položek ignorováno (např. ",
+        "hiddenIgnoredSuffix": ", soubory s tečkou).",
+        "ifNoteExistsLabel": "Pokud poznámka už existuje",
+        "import": "Importovat",
+        "importFailed": "Import selhal.",
+        "importing": "Importuje se váš trezor…",
+        "markDone": "Označit jako hotové",
+        "markedDone": "Označeno jako hotové",
+        "mediaImported_few": "{{count}} importovány",
+        "mediaImported_one": "{{count}} importováno",
+        "mediaImported_other": "{{count}} importováno",
+        "mediaOmittedSuffix_few": " · {{count}} vynechány",
+        "mediaOmittedSuffix_one": " · {{count}} vynecháno",
+        "mediaOmittedSuffix_other": " · {{count}} vynecháno",
+        "needsAttention": "Vyžaduje pozornost",
+        "needsAttentionHelp": "Tyto poznámky byly importovány beze změny. Navrhované opravy jsou výchozím bodem — jednu zkopírujte a poté poznámku po otevření přejmenujte.",
+        "noFolderChosen": "Nebyla vybrána žádná složka",
+        "notesImported_few": "poznámky importovány",
+        "notesImported_one": "poznámka importována",
+        "notesImported_other": "poznámek importováno",
+        "policyCopyHint": "Vložte ji vedle existující poznámky.",
+        "policyCopyLabel": "Importovat jako kopii",
+        "policySkipHint": "Doporučeno — opětovné spuštění importu nikdy nic neduplikuje ani nepřepíše.",
+        "policySkipLabel": "Přeskočit ji",
+        "preexistingDetail": "Tato poznámka už měla vlastní složku: „{{existing}}“, kterou Myne zachoval — její složka se může lišit od umístění na disku.",
+        "preparing": "Připravuje se…",
+        "progressNotes": " poznámek",
+        "progressOf": " z ",
+        "reasonIllegalChar": "obsahuje znak, který Myne nemůže v názvu použít",
+        "reasonPathTooLong": "cesta složka + název je příliš dlouhá",
+        "reasonSegmentTooLong": "název je delší, než Myne umožňuje",
+        "scanning": "Prohledává se váš trezor…",
+        "setupIntro": "Nasměrujte Myne na svou stávající složku trezoru Obsidian. Každá poznámka v Markdownu se na místě naimportuje a zašifruje — nic neopustí toto zařízení a vaše původní soubory zůstanou nedotčené.",
+        "statCancelled": "Zrušeno",
+        "statCanvasSkipped": "soubory .canvas přeskočeny",
+        "statEmptyFoldersKept": "Prázdné složky zachovány",
+        "statMedia": "Média",
+        "statOtherSkipped": "Ostatní soubory přeskočeny",
+        "statSkipped": "Přeskočeno (již existují)",
+        "suggestedNameAriaLabel": "Navrhovaný název",
+        "titleComplete": "Import dokončen",
+        "titleFailed": "Import selhal",
+        "titleSetup": "Importovat trezor Obsidian",
+        "vaultFolderLabel": "Složka trezoru",
+        "vaultRoot": "(kořen trezoru)"
+      },
+      "offer": {
+        "body": "Přeneste své stávající poznámky do Myne. Každá se při importu zašifruje — nic neopustí toto zařízení a vaše původní soubory zůstanou přesně tam, kde jsou.",
+        "chooseFolder": "Vyberte složku…",
+        "laterHint": "Importovat můžete kdykoli později z Nastavení → Úložiště.",
+        "notNow": "Teď ne",
+        "title": "Importovat váš trezor Obsidian?"
+      }
+    },
+    "list": {
+      "addToFavorites": "Přidat do oblíbených",
+      "archive": "Archiv",
+      "archiveBulkError": "Poznámky se nepodařilo archivovat.",
+      "archiveNote": "Archivovat",
+      "archiveSingleError": "Poznámku se nepodařilo archivovat.",
+      "attachments": "Přílohy",
+      "bulkArchive_few": "Archivovat {{count}} poznámky",
+      "bulkArchive_one": "Archivovat {{count}} poznámku",
+      "bulkArchive_other": "Archivovat {{count}} poznámek",
+      "bulkDelete_few": "Smazat {{count}} poznámky",
+      "bulkDelete_one": "Smazat {{count}} poznámku",
+      "bulkDelete_other": "Smazat {{count}} poznámek",
+      "bulkMove_few": "Přesunout {{count}} poznámky do…",
+      "bulkMove_one": "Přesunout {{count}} poznámku do…",
+      "bulkMove_other": "Přesunout {{count}} poznámek do…",
+      "caseMergeBody": "Složka s názvem „{{name}}“ už existuje. Tyto se sloučí — chcete jednu přejmenovat, aby zůstaly oddělené?",
+      "color": "Barva…",
+      "createFirstNote": "+ Vytvořte si první poznámku",
+      "createFolderNote": "Vytvořit poznámku ke složce",
+      "customize": "Přizpůsobit…",
+      "delete": "Smazat",
+      "deleteFolderBody_few": "„{{name}}“ a její {{count}} poznámky",
+      "deleteFolderBody_one": "„{{name}}“ a její {{count}} poznámka",
+      "deleteFolderBody_other": "„{{name}}“ a jejích {{count}} poznámek",
+      "deleteFolderConfirm": "Smazat složku",
+      "deleteFolderTitle": "Smazat tuto složku?",
+      "deleteFolderWarning": "Poznámky se přesunou do koše — později je můžete obnovit.",
+      "duplicate": "Duplikovat",
+      "editFilterTitle": "Upravit filtr",
+      "emptyState": "Zatím žádné poznámky.",
+      "exportHtml": "Exportovat jako HTML…",
+      "exportMarkdown": "Exportovat jako Markdown…",
+      "exportPdf": "Exportovat jako PDF…",
+      "exportTxt": "Exportovat jako prostý text…",
+      "favoritesHeading": "Oblíbené",
+      "mergeAnyway": "Přesto sloučit",
+      "newFolder": "Nová složka",
+      "newFolderInPlaceholder": "Nová složka v {{path}}",
+      "newFolderPlaceholder": "Nová složka",
+      "newNote": "Nová poznámka",
+      "newNoteFromTemplate": "Nová poznámka ze šablony…",
+      "newNoteHere": "Nová poznámka zde",
+      "newNoteMenu": "Nová poznámka",
+      "newNoteShortcut": "Nová poznámka (⌘N)",
+      "newSubfolder": "Nová podsložka",
+      "newViewTitle": "Nové zobrazení",
+      "noteMovedToTrash": "Poznámka přesunuta do koše",
+      "notesHeading": "Poznámky",
+      "notesMovedToTrash_few": "{{count}} poznámky přesunuty do koše",
+      "notesMovedToTrash_one": "{{count}} poznámka přesunuta do koše",
+      "notesMovedToTrash_other": "{{count}} poznámek přesunuto do koše",
+      "openArchive": "Otevřít archiv",
+      "openAttachments": "Otevřít přílohy",
+      "openFolderNote": "Otevřít poznámku ke složce",
+      "openInNewTab": "Otevřít v nové kartě",
+      "openToSide": "Otevřít vedle",
+      "openTrash": "Otevřít koš",
+      "removeAsFolderNote": "Zrušit jako poznámku ke složce",
+      "removeFromFavorites": "Odebrat z oblíbených",
+      "rename": "Přejmenovat",
+      "setAsFolderNote": "Nastavit jako poznámku ke složce",
+      "trash": "Koš",
+      "trashBulkError": "Poznámky se nepodařilo přesunout do koše.",
+      "trashSingleError": "Poznámku se nepodařilo přesunout do koše.",
+      "undo": "Vrátit zpět",
+      "vaultRoot": "Kořen trezoru",
+      "viewSettingsTitle": "Nastavení zobrazení"
+    },
+    "newFromTemplate": {
+      "back": "Zpět",
+      "blankNote": "Prázdná poznámka",
+      "createNote": "Vytvořit poznámku",
+      "emptyState": "Zatím jste nevytvořili žádné šablony.",
+      "listLabel": "Šablony",
+      "loading": "Načítá se…",
+      "nameLabel": "Název poznámky (ze šablony „{{templateName}}“)",
+      "namePlaceholder": "Bez názvu",
+      "nameStepTitle": "Pojmenujte tuto poznámku",
+      "pickStepTitle": "Nová poznámka ze šablony",
+      "untitledTemplate": "Šablona bez názvu"
+    },
+    "newTab": {
+      "createNote": "Vytvořit novou poznámku",
+      "noNotesMatch": "Žádné poznámky neodpovídají.",
+      "noNotesYet": "Zatím žádné poznámky.",
+      "searchAriaLabel": "Hledat poznámky k otevření",
+      "searchPlaceholder": "Hledat poznámky…",
+      "untitled": "Bez názvu"
+    },
+    "pane": {
+      "graphTab": "Graf",
+      "loading": "Načítá se…",
+      "untitledView": "Zobrazení bez názvu"
+    },
+    "relativeTime": {
+      "daysAgo": "před {{d}} dny",
+      "hoursAgo": "před {{h}} h",
+      "justNow": "právě teď",
+      "minutesAgo": "před {{m}} min",
+      "oneWeekAgo": "před 1 týdnem",
+      "weeksAgo": "před {{w}} týdny",
+      "yesterday": "včera"
+    },
+    "row": {
+      "addToFavorites": "Přidat do oblíbených",
+      "folderIndexBadgeLabel": "Poznámka ke složce",
+      "folderIndexBadgeTitle": "Poznámka ke složce — index této složky",
+      "folderIndexConflictLabel": "Složka už má indexovou poznámku",
+      "folderIndexConflictTitle": "Tato složka už má indexovou poznámku",
+      "loadError": "Tuto poznámku se nepodařilo načíst",
+      "removeFromFavorites": "Odebrat z oblíbených",
+      "renameAriaLabel": "Přejmenovat poznámku",
+      "untitled": "Bez názvu"
+    },
+    "savedView": {
+      "defaultName": "Filtrované zobrazení"
+    },
+    "saveStatus": {
+      "editing": "Upravuje se",
+      "editingEllipsis": "Upravuje se…",
+      "editingTitle": "Upravuje se — automatické ukládání je aktivní",
+      "justNow": "právě teď",
+      "retry": "Zkusit znovu",
+      "saved": "Uloženo",
+      "savedRelative": "Uloženo {{rel}}",
+      "saveFailed": "Uložení selhalo",
+      "saveFailedTitle": "Uložení selhalo — klikněte na Zkusit znovu",
+      "saving": "Ukládá se",
+      "savingEllipsis": "Ukládá se…"
+    },
+    "snapshotFailed": {
+      "dismiss": "Zavřít",
+      "message": "Snímek se nepodařilo uložit — vaše poznámka je uložená, ale její historie verzí může být neúplná (disk může být plný)."
+    },
+    "snapshots": {
+      "cancel": "Zrušit",
+      "changeCount_few": "{{count}} změny od tohoto snímku",
+      "changeCount_one": "{{count}} změna od tohoto snímku",
+      "changeCount_other": "{{count}} změn od tohoto snímku",
+      "close": "Zavřít",
+      "confirmBody": "Vaše současná poznámka se nejprve uloží jako snímek, takže tuto akci budete moci vrátit zpět.",
+      "confirmTitle": "Obnovit tento snímek?",
+      "decrypting": "Dešifruje se…",
+      "emptyState": "Zatím žádné snímky. Snímky se ukládají automaticky během úprav a uchovávají se přibližně 7 dní. Jsou zašifrované a zmizí, když je poznámka trvale smazána.",
+      "encryptedSize": "Zašifrováno · {{size}}",
+      "errorCannotDecrypt": "Tento snímek se nepodařilo dešifrovat.",
+      "errorGeneric": "Něco se pokazilo. Zkuste to znovu.",
+      "errorIo": "Došlo k chybě disku — disk může být plný nebo do něj nelze zapisovat.",
+      "errorNotFound": "Tento snímek už není k dispozici.",
+      "errorStorageAccess": "Nepodařilo se získat přístup k úložišti snímků trezoru.",
+      "errorVaultLocked": "Trezor je uzamčený. Pro zobrazení snímků ho odemkněte.",
+      "justNow": "právě teď",
+      "listLabel": "Seznam snímků",
+      "loading": "Načítá se…",
+      "restore": "Obnovit",
+      "restoreCta": "Obnovit tento snímek",
+      "restoredStatus": "Obnoveno. Verze, kterou jste měli, je uložena jako snímek.",
+      "selectPlaceholder": "Vyberte snímek a zobrazte, co se od té doby změnilo.",
+      "title": "Snímky",
+      "untitled": "Bez názvu"
+    },
+    "tabStrip": {
+      "closeNewTab": "Zavřít novou kartu",
+      "closeTab": "Zavřít {{title}}",
+      "newTab": "Nová karta",
+      "openNotes": "Otevřít poznámky",
+      "pin": "Připnout",
+      "pinned": "Připnuto",
+      "pinnedTitle": "Připnuto — pro zavření odepněte",
+      "unpin": "Odepnout",
+      "untitled": "Bez názvu"
+    },
+    "tagBrowser": {
+      "cancel": "Zrušit",
+      "clear": "Vymazat",
+      "combineTagsWith": "Kombinovat značky pomocí",
+      "filtering": "Filtruje se…",
+      "modeAll": "Všechny",
+      "modeAny": "Kterékoli",
+      "noNotesForFilter": "Žádné poznámky pro tento filtr.",
+      "noTagsMatch": "Dotazu „{{query}}“ neodpovídají žádné značky.",
+      "noTagsYet": "Zatím žádné značky.",
+      "noteCount_few": "{{count}} poznámky",
+      "noteCount_one": "{{count}} poznámka",
+      "noteCount_other": "{{count}} poznámek",
+      "notes": "Poznámky",
+      "pickTag": "Vyberte značku pro filtrování.",
+      "save": "Uložit",
+      "saveAsView": "Uložit jako zobrazení",
+      "searchPlaceholder": "Hledat značky…",
+      "title": "Značky",
+      "untitled": "Bez názvu",
+      "viewNamePlaceholder": "Název zobrazení"
+    },
+    "trash": {
+      "close": "Zavřít",
+      "count_few": "{{count}} poznámky",
+      "count_one": "{{count}} poznámka",
+      "count_other": "{{count}} poznámek",
+      "countEmpty": "Prázdný",
+      "delete": "Smazat",
+      "deleteError": "Tuto poznámku se nepodařilo smazat. Zkuste to znovu.",
+      "empty": "Vyprázdnit koš",
+      "emptyConfirmBody_few": "{{count}} poznámky budou trvale smazány.",
+      "emptyConfirmBody_one": "{{count}} poznámka bude trvale smazána.",
+      "emptyConfirmBody_other": "{{count}} poznámek bude trvale smazáno.",
+      "emptyConfirmCta": "Vyprázdnit koš",
+      "emptyConfirmTitle": "Vyprázdnit koš?",
+      "emptyPartialFailure_few": "{{count}} poznámky nebylo možné smazat a zůstávají v koši.",
+      "emptyPartialFailure_one": "{{count}} poznámku nebylo možné smazat a zůstává v koši.",
+      "emptyPartialFailure_other": "{{count}} poznámek nebylo možné smazat a zůstávají v koši.",
+      "emptyState": "Koš je prázdný.",
+      "purgeConfirmCta": "Smazat trvale",
+      "purgeConfirmTitle": "Smazat trvale?",
+      "restore": "Obnovit",
+      "restoreError": "Tuto poznámku se nepodařilo obnovit. Zkuste to znovu.",
+      "title": "Koš",
+      "untitled": "Bez názvu"
+    },
+    "unlinkedMentions": {
+      "empty": "Žádné nepropojené zmínky.",
+      "heading": "Nepropojené zmínky",
+      "link": "Propojit",
+      "linkTooltip": "Propojit tuto zmínku s {{title}}",
+      "refresh": "Zmínky se možná změnily — obnovit",
+      "searching": "Hledá se…",
+      "thisNote": "tato poznámka",
+      "untitled": "Bez názvu"
+    },
+    "views": {
+      "cards": {
+        "changeCover": "Změnit obálku",
+        "changeCoverImage": "Změnit obrázek obálky",
+        "empty": "Žádné poznámky neodpovídají tomuto zobrazení",
+        "noValue": "Žádná hodnota",
+        "setCover": "Nastavit obálku",
+        "setCoverImage": "Nastavit obrázek obálky",
+        "untitled": "Bez názvu"
+      },
+      "collapseViews": "Sbalit zobrazení",
+      "empty": "Zatím žádná zobrazení. Uložte aktuální seznam poznámek jako zobrazení.",
+      "expandViews": "Rozbalit zobrazení",
+      "heading": "Zobrazení",
+      "host": {
+        "unsupported": "Tento typ zobrazení dorazí v pozdější aktualizaci."
+      },
+      "menu": {
+        "deleteView": "Smazat zobrazení",
+        "editFilter": "Upravit filtr…",
+        "moveDown": "Přesunout dolů",
+        "moveUp": "Přesunout nahoru",
+        "rename": "Přejmenovat",
+        "viewSettings": "Nastavení zobrazení…"
+      },
+      "newView": "Nové zobrazení",
+      "untitledView": "Zobrazení bez názvu"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Výchozí (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (čtverec)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (široký)"
+      },
+      "cancel": "Zrušit",
+      "cardSize": "Velikost karty",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Vlastnost z frontmatteru, jejíž hodnotou je obrázek — zobrazí se jako obálka každé karty. Ponechte prázdné, pokud nechcete obálku.",
+      "coverImagePlaceholder": "např. cover",
+      "coverImageProperty": "Vlastnost obrázku obálky",
+      "imageAspectRatio": "Poměr stran obrázku",
+      "reset": "Obnovit výchozí",
+      "save": "Uložit"
+    },
+    "welcome": {
+      "body": "Vítejte v Myne, vašem soukromém prostoru pro přemýšlení a psaní.\n\nVšechno, co sem uložíte, je zašifrované a zůstává na vašem zařízení. Vaše **heslo** a **fráze pro obnovení** jsou jediné klíče k němu, takže je uchovejte na bezpečném místě. Pokud se obojí někdy ztratí, nikdo vám poznámky nevrátí, ani my.\n\nToto je jen běžná poznámka, tak si ji upravte k obrazu svému. Upravte ji, přejmenujte nebo smažte, kdykoli budete chtít, a přidávejte nové poznámky, jak vaše nápady porostou.\n\nJsme rádi, že jste tady. Chcete-li se o Myne dozvědět více, navštivte https://myne.md\n",
+      "title": "Vítejte v Myne"
+    },
+    "workspace": {
+      "defaultSlotName": "Výchozí"
+    }
+  },
+  "password": {
+    "createForm": {
+      "checkingStrength": "Kontroluje se síla…",
+      "confirmLabel": "Potvrďte hlavní heslo",
+      "defaultEmptyCaption": "Používá se jako vstup do Argon2id (m=256 MiB, t=3, p=2). Zvolte něco, co si zapamatujete; nelze ho resetovat.",
+      "mismatch": "Hesla se neshodují.",
+      "passwordLabel": "Hlavní heslo",
+      "suggestPassword": "Navrhnout heslo",
+      "tooShort": "Použijte alespoň {{n}} znaků."
+    },
+    "input": {
+      "hide": "Skrýt heslo",
+      "show": "Zobrazit heslo"
+    }
+  },
+  "primitives": {
+    "searchableSelect": {
+      "emptyText": "Žádné shody.",
+      "placeholder": "Vybrat…",
+      "searchPlaceholder": "Hledat…"
+    }
+  },
+  "recover": {
+    "errors": {
+      "cancelledVaultLocked": "Obnovení zrušeno: trezor byl uzamčen.",
+      "operationInProgress": "Probíhá operace. Počkejte prosím.",
+      "unexpected": "Neočekávaná chyba. Zkuste to prosím znovu.",
+      "vaultNotFound": "Soubor trezoru nebyl nalezen. Restartujte prosím aplikaci."
+    }
+  },
+  "restore": {
+    "backLabel": "Zpět",
+    "cancelLabel": "Zrušit",
+    "collision": {
+      "body": "Trezor z této zálohy už na tomto zařízení existuje. Můžete si ponechat obojí — obnovená kopie se zobrazí jako samostatný trezor ve vašem seznamu trezorů — nebo obnovit nyní a poté existující trezor ze seznamu trezorů sami odebrat (odebrání vás požádá o napsání slova DELETE a má smysl až poté, co potvrdíte, že se obnovený trezor otevře).",
+      "keepBoth": "Ponechat obojí",
+      "replaceExisting": "Obnovit, poté nahradit stávající…"
+    },
+    "damaged": {
+      "body": "Soubor zálohy je poškozený, takže nic nebylo obnoveno. Pokud je to jediná kopie, kterou máte, záchrana může obnovit neporušené poznámky a vypsat přesně to, co nebylo možné přečíst — výsledek je vždy označen jako částečné obnovení.",
+      "close": "Zavřít",
+      "salvage": "Zachránit neporušené poznámky…"
+    },
+    "error": {
+      "tryAnotherFile": "Zkusit jiný soubor"
+    },
+    "pick": {
+      "body": "Vyberte soubor <code>.myne-backup</code>. Záloha se před jakýmkoli obnovením ověří; obnovený trezor se odemkne heslem nebo frází pro obnovení daného trezoru — přesně jako při odemykání.",
+      "chooseFile": "Vyberte soubor zálohy…",
+      "corruptedSuffix": "Váš současný trezor zůstane nedotčený: záloha se nejprve obnoví jako samostatný trezor."
+    },
+    "summary": {
+      "attachments": "Přílohy: {{n}}",
+      "collidedNote": "Předchozí kopie tohoto trezoru je stále ve vašem seznamu trezorů. Jakmile potvrdíte, že se obnovený trezor otevře, můžete tu starou ze seznamu trezorů odebrat (budete požádáni o napsání slova DELETE).",
+      "notes": "Poznámky: {{n}}",
+      "openVaultList": "Otevřít seznam trezorů",
+      "partialHeader_few": "Obnoveno částečně — {{count}} položky nebylo možné přečíst.",
+      "partialHeader_one": "Obnoveno částečně — {{count}} položku nebylo možné přečíst.",
+      "partialHeader_other": "Obnoveno částečně — {{count}} položek nebylo možné přečíst.",
+      "restored": "Trezor obnoven.",
+      "versionHistory": "Záznamy historie verzí: {{n}}"
+    },
+    "title": "Obnovit ze zálohy",
+    "working": {
+      "cancel": "Zrušit",
+      "restoringProgress": "Obnovuje se… {{done}} z {{total}}",
+      "verifying": "Ověřuje se záloha…",
+      "verifyingProgress": "Ověřuje se záloha… {{done}} z {{total}}"
+    }
+  },
+  "settings": {
+    "about": {
+      "buildChannelDevelopment": "Vývojové sestavení",
+      "buildChannelLabel": "Kanál sestavení",
+      "buildChannelStable": "Stabilní",
+      "changelogButton": "Zobrazit seznam změn…",
+      "changelogHelper": "Poznámky k jednotlivým verzím. Objeví se, až přistane MYND-119.",
+      "changelogLabel": "Seznam změn",
+      "licenseBody": "Pre-alfa · dokumentace CC0 · kód aplikace AGPL-3.0 při vydání 1. fáze.",
+      "licenseLabel": "Licence",
+      "tagline": "Pre-alfa · desktopový klient 1. fáze",
+      "threatModelHelper": "Otevřete veřejný dokument modelu hrozeb ve svém prohlížeči.",
+      "threatModelLabel": "Model hrozeb"
+    },
+    "account": {
+      "argon2idHeading": "Parametry Argon2id",
+      "changePasswordButton": "Změnit heslo",
+      "changePasswordError": {
+        "invalidCredentialOrVault": "Nesprávné aktuální heslo nebo je soubor trezoru poškozený.",
+        "ioError": "Chyba disku, zkuste to prosím znovu.",
+        "joinFailure": "Něco se pokazilo, zkuste to prosím znovu.",
+        "samePasswordRejected": "Nové heslo se shoduje se současným.",
+        "weakNewPassword": "Nové heslo musí mít alespoň 12 znaků."
+      },
+      "changePasswordHeading": "Změnit heslo",
+      "changePasswordHelper": "Změňte své hlavní heslo a zachovejte stejný trezor. Fráze pro obnovení zůstává stejná.",
+      "dangerZoneHeading": "Nebezpečná zóna",
+      "dangerZoneHelper": "Trvale smaže tento trezor a všechny poznámky. Nelze vrátit zpět. Fráze pro obnovení trezor neobnoví.",
+      "deleteVaultButton": "Smazat trezor…",
+      "memoryCost": "Náklady na paměť",
+      "parallelism": "Paralelismus",
+      "timeCost": "Časové náklady",
+      "vaultLabelEyebrow": "ŠTÍTEK TREZORU",
+      "vaultLabelHelper": "Název tohoto trezoru zobrazený v přepínači v aplikaci. Ukládá se zašifrovaný uvnitř trezoru; nikdy neopustí vaše zařízení v nešifrované podobě.",
+      "vaultLabelPlaceholder": "Přidat štítek…",
+      "vaultLabelSave": "Uložit"
+    },
+    "appearance": {
+      "showEditTimesAria": "Zobrazit časy úprav v postranním panelu",
+      "showEditTimesHelper": "Zobrazí čas poslední úpravy každé poznámky pod jejím názvem v postranním panelu.",
+      "showEditTimesLabel": "Zobrazit časy úprav",
+      "theme": {
+        "amoled": "AMOLED",
+        "dark": "Tmavé",
+        "light": "Světlé",
+        "system": "Systémové"
+      },
+      "themeHelper": "Přepínejte mezi světlým a tmavým motivem nebo se řiďte předvolbou systému.",
+      "themeLabel": "Motiv",
+      "themeOptionAria": "Motiv {{label}}",
+      "themeSaveError": "Motiv se nepodařilo uložit. Zkuste to prosím znovu.",
+      "timestampsSaveError": "Předvolbu se nepodařilo uložit. Zkuste to prosím znovu."
+    },
+    "archive": {
+      "helper": "Umožní přesouvat poznámky do archivu mimo hlavní seznam. Vypnutím se každá archivovaná poznámka obnoví do své složky a ovládací prvky archivu se skryjí.",
+      "label": "Archivace",
+      "off": "Vypnuto",
+      "on": "Zapnuto",
+      "saveError": "Nastavení archivace se nepodařilo aktualizovat."
+    },
+    "autoBackup": {
+      "backupFolder": "Složka zálohy",
+      "chooseFolder": "Vyberte složku…",
+      "chooseFolderDialogTitle": "Vyberte složku pro automatické zálohy",
+      "frequency": "Frekvence",
+      "frequencyAriaLabel": "Frekvence zálohování",
+      "helper": "Zapíše zašifrovaný soubor .myne-backup do složky podle plánu, dokud je aplikace otevřená a trezor odemčený. Zálohy zůstávají stejně zašifrované jako váš trezor; Myne uchovává jen několik posledních a nikdy nic neposílá mimo vaše zařízení.",
+      "intervalDaily": "Denně",
+      "intervalEveryUnlock": "Při každém odemknutí",
+      "intervalWeekly": "Týdně",
+      "keepLast": "Zachovat posledních",
+      "noFolderChosen": "Zatím nebyla vybrána žádná složka.",
+      "saveFailedToast": "Nastavení zálohování se nepodařilo uložit.",
+      "searchEmpty": "Žádná shoda.",
+      "searchPlaceholder": "Hledat…",
+      "statusFailed": "Automatická záloha selhala — {{stamp}}",
+      "statusLastBackup": "Poslední záloha: {{stamp}}",
+      "statusNever": "Zatím žádná automatická záloha.",
+      "title": "Automatické zálohy"
+    },
+    "changePassword": {
+      "cancel": "Zrušit",
+      "checkingStrength": "Kontroluje se síla…",
+      "confirmLabel": "Potvrďte nové heslo",
+      "currentLabel": "Aktuální heslo",
+      "mismatch": "Hesla se neshodují.",
+      "newLabel": "Nové heslo",
+      "submit": "Změnit heslo",
+      "submitting": "Mění se heslo…",
+      "title": "Změnit heslo",
+      "tooShort": "Použijte alespoň {{n}} znaků."
+    },
+    "connectedExtensions": {
+      "browser": {
+        "chromium": "Chrome / Edge",
+        "firefox": "Firefox",
+        "generic": "Rozšíření prohlížeče"
+      },
+      "when": {
+        "bare": "Připojeno",
+        "daysAgo_few": "Připojeno před {{count}} dny",
+        "daysAgo_one": "Připojeno před {{count}} dnem",
+        "daysAgo_other": "Připojeno před {{count}} dny",
+        "hoursAgo_few": "Připojeno před {{count}} h",
+        "hoursAgo_one": "Připojeno před {{count}} h",
+        "hoursAgo_other": "Připojeno před {{count}} h",
+        "justNow": "Připojeno právě teď",
+        "minutesAgo_few": "Připojeno před {{count}} min",
+        "minutesAgo_one": "Připojeno před {{count}} min",
+        "minutesAgo_other": "Připojeno před {{count}} min",
+        "onDate": "Připojeno {{date}}"
+      }
+    },
+    "customThemes": {
+      "appliedBadge": "Použito",
+      "apply": "Použít",
+      "applyError": "Tento motiv se nepodařilo použít. Zkuste to prosím znovu.",
+      "cancel": "Zrušit",
+      "confirm": "Potvrdit",
+      "delete": "Smazat",
+      "deleteError": "Tento motiv se nepodařilo smazat. Zkuste to prosím znovu.",
+      "empty": "Zatím žádné vlastní motivy. Naimportujte nějaký nebo otevřete složku motivů a přidejte soubor motivu.",
+      "error": {
+        "aColorFallback": "barva",
+        "invalidFile": "Neplatný soubor motivu.",
+        "invalidName": "Nebezpečný název motivu",
+        "invalidValue": "Neplatná hodnota pro {{key}}",
+        "invalidValueWithLine": "Neplatná hodnota pro {{key}} (řádek {{line}})",
+        "missingKey": "Chybí požadovaná barva {{key}}",
+        "parseError": "Neplatný JSON",
+        "parseErrorWithLine": "Neplatný JSON (řádek {{line}})"
+      },
+      "fileFilterName": "Motiv Myne",
+      "helper": "Použijte vlastní barevnou paletu. Motivy se před použitím ověří na tomto zařízení — nic se nenahrává.",
+      "importButton": "Importovat motiv…",
+      "importError": "Tento soubor není platným motivem. Otevřete referenci a zobrazte formát.",
+      "label": "Vlastní motivy",
+      "openFolderButton": "Otevřít složku motivů",
+      "openFolderError": "Složku motivů se nepodařilo otevřít.",
+      "readError": "Vaši složku motivů se nepodařilo přečíst."
+    },
+    "dailyNotes": {
+      "blankTemplate": "Prázdná (bez šablony)",
+      "dateFormatHelper": "Název každé denní poznámky. Podporuje YYYY, MM, DD. Výchozí hodnota je {{default}}.",
+      "dateFormatLabel": "Formát data denní poznámky",
+      "dateFormatSaveError": "Formát data se nepodařilo uložit. Zkuste to prosím znovu.",
+      "folderHelper": "Kam se ukládají nové denní poznámky. Výchozí hodnota je {{default}} — složka se zachová, i když je prázdná.",
+      "folderLabel": "Složka denních poznámek",
+      "folderSaveError": "Složku denních poznámek se nepodařilo uložit. Zkuste to prosím znovu.",
+      "searchEmpty": "Žádné šablony neodpovídají.",
+      "searchPlaceholder": "Hledat šablony…",
+      "templateHelper": "Vyberte šablonu, ze které se má každá denní poznámka zakládat, nebo ponechte prázdné pro prázdnou poznámku pojmenovanou datem.",
+      "templateLabel": "Šablona denní poznámky",
+      "templateSaveError": "Šablonu denní poznámky se nepodařilo uložit. Zkuste to prosím znovu.",
+      "untitledTemplate": "Šablona bez názvu"
+    },
+    "deleteVault": {
+      "cancel": "Zrušit",
+      "caseSensitiveHint": "Rozlišuje velikost písmen. Napište slovo přesně, abyste umožnili smazání.",
+      "continue": "Pokračovat",
+      "copyPrimary": "Tímto se trvale smaže tento trezor a každá poznámka v něm. Akci nelze vrátit zpět a vaše fráze pro obnovení data neobnoví.",
+      "copySecondary": "Klíče trezoru se před odpojením souborů vynulují z paměti; jakýkoli osiřelý šifrovaný text, který na disku zůstane, zůstává neobnovitelným balastem zabaleným pomocí Argon2id.",
+      "eyebrow": "NEVRATNÉ",
+      "heading": "Smazat trezor",
+      "ioFailBody": "K souborům trezoru se pro smazání nepodařilo získat přístup. Klíče trezoru jsou již vynulovány z paměti; jakákoli data trezoru, která na disku zůstanou, jsou neobnovitelný balast zabalený pomocí Argon2id.",
+      "ioFailTitle": "Chyba disku během mazání",
+      "partialFailBody_few": "{{count}} soubory se nepodařilo smazat z disku. Klíče trezoru jsou již vynulovány z paměti, takže jakýkoli osiřelý šifrovaný text, který zůstane, je neobnovitelný balast zabalený pomocí Argon2id.",
+      "partialFailBody_one": "{{count}} soubor se nepodařilo smazat z disku. Klíče trezoru jsou již vynulovány z paměti, takže jakýkoli osiřelý šifrovaný text, který zůstane, je neobnovitelný balast zabalený pomocí Argon2id.",
+      "partialFailBody_other": "{{count}} souborů se nepodařilo smazat z disku. Klíče trezoru jsou již vynulovány z paměti, takže jakýkoli osiřelý šifrovaný text, který zůstane, je neobnovitelný balast zabalený pomocí Argon2id.",
+      "partialFailTitle": "Smazání trezoru částečně selhalo",
+      "submit": "Smazat trezor",
+      "submitInFlight": "Maže se trezor…",
+      "typeToConfirmLabel": "Pro potvrzení napište DELETE",
+      "vaultPath": "Cesta k trezoru: {{path}}"
+    },
+    "focusMode": {
+      "dimAria": "Ztlumit neaktivní řádky",
+      "dimHelper": "V režimu soustředění (⇧⌘F) ztlumte každý řádek kromě toho, který upravujete.",
+      "dimLabel": "Režim soustředění · ztlumit neaktivní řádky",
+      "off": "Vypnuto",
+      "on": "Zapnuto",
+      "saveError": "Nastavení režimu soustředění se nepodařilo uložit.",
+      "typewriterAria": "Posun jako u psacího stroje",
+      "typewriterHelper": "V režimu soustředění (⇧⌘F) udržujte aktivní řádek během psaní svisle vystředěný.",
+      "typewriterLabel": "Režim soustředění · posun jako u psacího stroje"
+    },
+    "hotkeys": {
+      "addBindingAria": "Přidat zkratku pro {{command}}",
+      "cancel": "Zrušit",
+      "capturePrompt": "Stiskněte klávesu…",
+      "conflictIndicator": "⚠ konflikt",
+      "conflictTitle": "Používá také {{commands}}",
+      "fixed": "pevné",
+      "group": {
+        "editorFormatting": "Formátování editoru",
+        "general": "Obecné",
+        "navigation": "Navigace",
+        "notes": "Poznámky",
+        "panesTabs": "Panely a karty",
+        "view": "Zobrazení"
+      },
+      "helper": "Zobrazte a změňte klávesové zkratky. Formátování editoru a zkratka pro procházení karet jsou pevné.",
+      "notSet": "Nenastaveno",
+      "removeBindingAria": "Odebrat {{chord}}",
+      "resetAll": "Obnovit všechny zkratky…",
+      "resetAllConfirm": "Obnovit všechny vlastní zkratky na výchozí?",
+      "resetAllYes": "Obnovit vše",
+      "restoreDefaultAria": "Obnovit výchozí pro {{command}}",
+      "searchAriaLabel": "Hledat zkratky",
+      "searchPlaceholder": "Hledat zkratky…",
+      "warnAlreadyUsed": "Již používá {{commands}} — přesto přidáno."
+    },
+    "language": {
+      "helper": "Vyberte jazyk zobrazení aplikace.",
+      "label": "Jazyk"
+    },
+    "lineNumbers": {
+      "errorSaveSetting": "Nastavení čísel řádků se nepodařilo uložit.",
+      "helper": "Zobrazí v editoru sloupec s čísly řádků. Jedno číslo na řádek; ve výchozím nastavení vypnuto.",
+      "label": "Čísla řádků",
+      "off": "Vypnuto",
+      "on": "Zapnuto"
+    },
+    "prefs": {
+      "saveError": "Předvolbu se nepodařilo uložit — zkuste to znovu"
+    },
+    "privacy": {
+      "autoLockHelper": "Zamknout trezor po této době nečinnosti.",
+      "autoLockLabel": "Automatické zamykání",
+      "autoLockSearchEmpty": "Žádná doba neodpovídá.",
+      "autoLockSearchPlaceholder": "Hledat doby…",
+      "screenCaptureHelperOff": "Ochrana platí vždy před odemknutím. Po odemknutí se řídí touto předvolbou.",
+      "screenCaptureHelperOn": "Aktivní na macOS a Windows 10 (aktualizace z května 2020 nebo novější). Podpora pro Linux přijde v budoucím vydání.",
+      "screenCaptureLabel": "Ochrana proti snímání obrazovky"
+    },
+    "quickUnlock": {
+      "errorCancelled": "Zrušeno.",
+      "errorGeneric": "Rychlé odemknutí se nepodařilo nakonfigurovat.",
+      "errorHardwareUnavailable": "Touch ID není na tomto zařízení dostupné.",
+      "errorNotUnlocked": "Nejprve odemkněte trezor.",
+      "errorPinNotDigits": "PIN smí obsahovat pouze číslice.",
+      "errorPinTooShort_few": "PIN musí mít alespoň {{count}} číslice.",
+      "errorPinTooShort_one": "PIN musí mít alespoň {{count}} číslici.",
+      "errorPinTooShort_other": "PIN musí mít alespoň {{count}} číslic.",
+      "helperConfigured": "Nakonfigurováno pomocí {{method}}. Opětovné zadání po automatickém zamknutí přeskočí hlavní heslo. Hlavní heslo je po restartu stále vyžadováno.",
+      "helperNotConfigured": "Po automatickém zamknutí zadejte místo celého hlavního hesla PIN nebo Touch ID. Pohodlí oproti zašifrovanému trezoru — hlavní heslo zůstává po restartu vyžadováno.",
+      "methodPin": "PIN",
+      "methodTouchId": "Touch ID",
+      "pinAriaLabel": "PIN pro rychlé odemknutí",
+      "pinPlaceholder_few": "PIN (alespoň {{count}} číslice)",
+      "pinPlaceholder_one": "PIN (alespoň {{count}} číslice)",
+      "pinPlaceholder_other": "PIN (alespoň {{count}} číslic)",
+      "setPin": "Nastavit PIN",
+      "setupHelper": "Touch ID je dostupné pouze na macOS a je momentálně experimentální (čeká se na ověření hardwaru). PIN funguje všude.",
+      "title": "Rychlé odemknutí",
+      "useTouchId": "Použít Touch ID"
+    },
+    "shell": {
+      "closeLabel": "Zavřít nastavení",
+      "navLabel": "Panely nastavení",
+      "panels": {
+        "about": "O aplikaci",
+        "account": "Účet",
+        "appearance": "Vzhled",
+        "editor": "Editor",
+        "hotkeys": "Klávesové zkratky",
+        "privacy": "Soukromí",
+        "storage": "Úložiště"
+      },
+      "passwordUpdatedToast": "Heslo aktualizováno",
+      "title": "Nastavení"
+    },
+    "spell": {
+      "errorSaveLanguages": "Jazyky kontroly pravopisu se nepodařilo uložit.",
+      "errorSaveSetting": "Nastavení kontroly pravopisu se nepodařilo uložit.",
+      "helper": "Podtrhává chybně napsaná slova během psaní. Plně offline — vaše poznámky nikdy neopustí zařízení.",
+      "label": "Kontrola pravopisu",
+      "languagesAriaLabel": "Jazyky kontroly pravopisu",
+      "languagesHelper": "Slovo je správné, pokud je platné v kterémkoli vybraném jazyce — užitečné pro míchání anglických výrazů do poznámek v jiných jazycích.",
+      "languagesLabel": "Jazyky",
+      "languagesPlaceholder": "Vyberte jazyky…",
+      "languagesSearchEmpty": "Žádné jazyky neodpovídají.",
+      "languagesSearchPlaceholder": "Hledat jazyky…",
+      "off": "Vypnuto",
+      "on": "Zapnuto"
+    },
+    "storage": {
+      "backupHelper": "Zálohy zůstávají přesně tak zašifrované jako váš trezor, v jediném ověřeném souboru .myne-backup. Obnovení funguje s heslem nebo frází pro obnovení daného trezoru — přesně jako při odemykání.",
+      "backupLabel": "Záloha",
+      "backUpVault": "Zálohovat trezor…",
+      "exportAction": "Exportovat…",
+      "exportBody": "Exportovat trezor jako Markdown",
+      "exportHelper": "Prostý strom Markdownu — není zašifrovaný.",
+      "exportLabel": "Export",
+      "importHelper": "Přeneste existující trezor Obsidian do Myne. Každá poznámka v Markdownu se na místě naimportuje a zašifruje; vaše původní soubory zůstanou nedotčené.",
+      "importLabel": "Import",
+      "importObsidian": "Importovat trezor Obsidian…",
+      "locationHelper": "Každý trezor je složka zašifrovaných souborů pod touto cestou. Dejte přednost tlačítku Záloha níže před ručními kopiemi — ověřuje zapsaný soubor.",
+      "locationLabel": "Umístění trezoru",
+      "openInFiles": "Otevřít v souborech",
+      "pathUnavailable": "Cesta není k dispozici",
+      "restoreBackup": "Obnovit ze zálohy…"
+    },
+    "typography": {
+      "contentWidthHelper": "Maximální šířka editačního sloupce. Plná umožní textu zabrat celý panel.",
+      "contentWidthLabel": "Šířka obsahu",
+      "errorSave": "Předvolbu se nepodařilo uložit. Zkuste to prosím znovu.",
+      "fontHelper": "Neproporcionální nebo proporcionální (bezpatkový) text.",
+      "fontLabel": "Písmo",
+      "lineSpacingHelper": "Svislý prostor mezi řádky.",
+      "lineSpacingLabel": "Řádkování",
+      "textSizeHelper": "Základní velikost textu editoru. Nadpisy se podle ní škálují.",
+      "textSizeLabel": "Velikost textu"
+    },
+    "viewMode": {
+      "errorSave": "Výchozí režim zobrazení se nepodařilo uložit.",
+      "helper": "Jak se poznámka otevře: Živý náhled (výchozí), Čtení jen pro čtení nebo nezpracovaný Zdroj. Přepněte poznámku pomocí ⇧⌘E.",
+      "label": "Výchozí režim zobrazení",
+      "optionLive": "Živý náhled",
+      "optionReading": "Čtení",
+      "optionSource": "Zdroj"
+    }
+  },
+  "templates": {
+    "manager": {
+      "closeLabel": "Zavřít šablony",
+      "deleteRowLabel": "Smazat šablonu {{name}} (přesunout do koše)",
+      "editTemplateLabel": "Upravit šablonu {{name}}",
+      "emptyBody": "Vytvořte šablonu pro opětovné použití kostry poznámky — poznámka ze schůzky, denní záznam, čtenářská poznámka. Vyberte ji při vytváření nové poznámky.",
+      "emptyTitle": "Zatím žádné šablony",
+      "listLabel": "Šablony",
+      "loading": "Načítá se…",
+      "newTemplate": "Nová šablona",
+      "newTemplateName": "Šablona bez názvu",
+      "removeFromTemplates": "Odebrat ze šablon",
+      "removeRowLabel": "Odebrat {{name}} ze šablon (poznámku zachová)",
+      "title": "Šablony poznámek"
+    }
+  },
+  "unlock": {
+    "backToPicker": "Vyberte jiný trezor",
+    "continue": "Pokračovat",
+    "decrypting": "Dešifruje se…",
+    "deleteLink": "Ztratili jste heslo i frázi pro obnovení? Smazat trezor a začít znovu",
+    "errors": {
+      "alreadyUnlocked": "Trezor je už odemčený.",
+      "inProgress": "Probíhá operace.",
+      "unexpected": "Neočekávaná chyba. Zkuste to prosím znovu.",
+      "vaultNotFound": "Soubor trezoru nebyl nalezen. Restartujte prosím aplikaci."
+    },
+    "passwordLabel": "Heslo",
+    "passwordPlaceholder": "Heslo",
+    "quickUnlock": {
+      "failed": "Rychlé odemknutí selhalo. Použijte své heslo.",
+      "pinAriaLabel": "PIN pro rychlé odemknutí",
+      "pinPlaceholder": "PIN",
+      "unlockWithPin": "Odemknout pomocí PINu",
+      "unlockWithTouchId": "Odemknout pomocí Touch ID",
+      "usePasswordBelow": "nebo použijte své heslo níže",
+      "wrongCredential": "Nesprávné. Zbývá pokusů: {{remaining}}."
+    },
+    "recoveryInterruptedBanner": "Proces obnovení byl přerušen. Nejprve nastavte nové heslo.",
+    "recoveryInterruptedBody": "Nejprve nastavte nové heslo a poté svůj trezor znovu zapečeťte.",
+    "recoveryInterruptedTitle": "Proces obnovení byl přerušen.",
+    "recoveryLink": "Zapomněli jste heslo? Odemknout pomocí fráze pro obnovení",
+    "submit": "Odemknout",
+    "subtitle": "Pro pokračování zadejte své heslo.",
+    "suspicion": {
+      "lockedDuringChange": "Změna hesla zrušena: trezor byl uzamčen.",
+      "metaChangedExternally": "Trezor byl upraven v jiné relaci — odemkněte prosím znovu."
+    },
+    "title": "Odemkněte svůj trezor."
+  },
+  "vault": {
+    "ioBanner": {
+      "cannotRead": "Soubor trezoru nelze přečíst.",
+      "notFound": "Soubor trezoru nebyl nalezen. Restartujte prosím aplikaci.",
+      "permissionDenied": "Chybí oprávnění k přístupu k souboru trezoru. Zkontrolujte oprávnění souboru."
+    }
+  },
+  "vaultCreation": {
+    "account": {
+      "ackLabel": "Uložil jsem si své číslo účtu na místo, kde ho později najdu.",
+      "back": "Zpět",
+      "commit": "Vytvořit trezor",
+      "committing": "Ukládá se…",
+      "copied": "Zkopírováno",
+      "copy": "Kopírovat",
+      "eyebrow": "Krok 4 ze 4 — číslo účtu",
+      "heading": "Uložte si své číslo účtu.",
+      "intro": "Toto je váš přístupový token — zacházejte s ním jako s hotovostí.",
+      "saveAsFile": "Uložit jako soubor",
+      "shownOnceBody": "Uložte si ho teď — Myne ho za vás nemůže obnovit. Je nutný pro pozdější registraci k synchronizaci.",
+      "shownOnceEmphasis": "Toto se zobrazí pouze jednou."
+    },
+    "briefing": {
+      "back": "Zpět",
+      "continue": "Pokračovat k vytvoření trezoru",
+      "eyebrow": "Než vytvoříte svůj trezor",
+      "heading": "Než vytvoříte svůj trezor",
+      "intro": "Myne šifruje vaše poznámky tak, aby je mohli otevřít jen vy. Z toho vyplývají tři věci — přečtěte si je a poté pokračujte.",
+      "statements": {
+        "no-email": {
+          "ackLabel": "Rozumím, že neexistuje obnovení e-mailem.",
+          "statement": "Neexistuje žádné obnovení e-mailem. Nikdy nebude.",
+          "why": "Nikdy se vás neptáme na e-mail, takže neexistuje žádný resetovací odkaz ani účet, který by podpora mohla odemknout. Není to chybějící funkce — je to záruka. Obnovení e-mailem by znamenalo, že bychom mohli číst vaše poznámky, a Myne je postavena tak, abychom nemohli."
+        },
+        "no-store": {
+          "ackLabel": "Rozumím, že Myne nemůže obnovit moje heslo.",
+          "statement": "Vaše heslo odemyká váš trezor. My ho neukládáme.",
+          "why": "Vaše heslo je vstupem ke klíči, který dešifruje vaše poznámky. Nikdy neopustí toto zařízení a nic na našich serverech ho nedokáže reprodukovat. To je to, co udržuje vaše poznámky soukromé — a proč ho za vás nemůžeme resetovat."
+        },
+        "phrase-backup": {
+          "ackLabel": "Rozumím, že má fráze pro obnovení je jediná záloha.",
+          "statement": "Vaše fráze pro obnovení je vaše jediná záloha.",
+          "why": "Pokud zapomenete heslo, 24slovná fráze pro obnovení je jediná cesta zpět. {{lostBothSecrets}} Frázi si zapište a uchovejte na bezpečném místě."
+        }
+      },
+      "why": "Proč?"
+    },
+    "confirm": {
+      "back": "Zpět",
+      "continue": "Pokračovat",
+      "eyebrow": "Krok 3 ze 4 — potvrzení fráze",
+      "heading": "Napište zpět čtyři slova z vaší fráze.",
+      "intro": "Zeptáme se na konkrétní pozice, abychom ověřili, že jste si ji uložili.",
+      "mismatch": "Neodpovídá slovu č. {{pos}}.",
+      "wordAtPosition": "Slovo na pozici {{pos}}"
+    },
+    "encrypting": {
+      "caption": "Chvíli to potrvá.",
+      "footerHint": "Pokud to trvá déle než 30 sekund, zavřete okno a zkuste to znovu.",
+      "heading": "Šifruje se váš trezor"
+    },
+    "errors": {
+      "accountNumberInvalid": {
+        "body": "Zkuste to znovu.",
+        "title": "Neplatné číslo účtu"
+      },
+      "aeadFailure": {
+        "body": "Zkuste to znovu.",
+        "title": "Šifrování selhalo"
+      },
+      "csprng": {
+        "body": "Zkuste to znovu.",
+        "title": "Nepodařilo se vygenerovat bezpečná náhodná data"
+      },
+      "invalidPassword": {
+        "body": "Zkuste to znovu.",
+        "title": "Neplatné heslo"
+      },
+      "invalidVaultMeta": {
+        "body": "Zkuste to znovu.",
+        "title": "Chyba formátu trezoru"
+      },
+      "ioOther": {
+        "body": "Zkuste to znovu.",
+        "title": "Trezor se nepodařilo uložit"
+      },
+      "joinFailure": {
+        "body": "Zkuste to znovu.",
+        "title": "Něco se pokazilo"
+      },
+      "kdfFailure": {
+        "body": "Zkuste to znovu. Pokud se to opakuje, váš systém může mít nedostatek paměti.",
+        "title": "Šifrování se nepodařilo nastavit"
+      },
+      "noSpace": {
+        "body": "Uvolněte místo na disku a zkuste to znovu.",
+        "title": "Nedostatek místa na disku"
+      },
+      "notFound": {
+        "body": "Zkuste to znovu.",
+        "title": "Složka trezoru chybí"
+      },
+      "passwordTooShort": {
+        "body": "Použijte alespoň 12 znaků.",
+        "title": "Heslo je příliš krátké"
+      },
+      "permissionDenied": {
+        "body": "Ujistěte se, že Myne má oprávnění k zápisu do složky dat vaší aplikace.",
+        "title": "Nepodařilo se zapsat do složky trezoru"
+      },
+      "sessionExpired": {
+        "body": "Z bezpečnostních důvodů vytvoření trezoru vyprší po 10 minutách. Začněte znovu.",
+        "title": "Relace vypršela"
+      },
+      "sessionNotFound": {
+        "body": "Začněte znovu od začátku.",
+        "title": "Relace nenalezena"
+      },
+      "tooManyConcurrentSessions": {
+        "body": "Zavřete ostatní okna aplikace Myne a zkuste to znovu.",
+        "title": "Příliš mnoho vytváření trezorů najednou"
+      },
+      "vaultArtifactsPresent": {
+        "body": "Nový trezor nelze vytvořit, protože data trezoru už na tomto zařízení existují. Zavřete aplikaci a restartujte ji — úvodní obrazovka vás přesměruje na odemykání.",
+        "title": "Trezor už existuje"
+      },
+      "vaultBusyAuth": {
+        "body": "Probíhá jiná operace s trezorem. Zkuste to za chvíli znovu.",
+        "title": "Trezor je zaneprázdněn"
+      }
+    },
+    "orchestrator": {
+      "closePrompt": {
+        "cancelLabel": "Zrušit",
+        "message": "Zavřením zahodíte svou frázi pro obnovení. Pokračovat v zavírání?",
+        "okLabel": "Přesto zavřít",
+        "title": "Zahodit vytváření trezoru?"
+      },
+      "genericError": {
+        "body": "Zkuste to znovu.",
+        "title": "Něco se pokazilo"
+      }
+    },
+    "password": {
+      "back": "Zpět",
+      "eyebrow": "Krok 1 ze 4 — hlavní heslo",
+      "heading": "Vytvořit trezor",
+      "helperLead": "Myne neukládá vaše heslo ani frázi pro obnovení.",
+      "submit": "Vygenerovat frázi pro obnovení"
+    },
+    "phrase": {
+      "back": "Zpět",
+      "continue": "Uložil jsem si to — potvrdit frázi",
+      "copy": "Kopírovat",
+      "eyebrow": "Krok 2 ze 4 — fráze pro obnovení",
+      "heading": "Zapište si těchto 24 slov.",
+      "intro": "Tato fráze je spolu s vaším heslem jediný způsob, jak obnovit váš trezor. Uchovejte ji offline — papír, správce hesel, hardwarová peněženka. Zacházejte s ní jako s hotovostí.",
+      "reveal": "Odhalit frázi",
+      "saveAsFile": "Uložit jako soubor"
+    },
+    "ready": {
+      "backedUp": "Zálohováno ✓",
+      "backingUp": "Zálohuje se…",
+      "backupDefaultFilename": "Myne backup.myne-backup",
+      "backupError": "Zálohování se nedokončilo — žádný soubor nezůstal. Zálohovat můžete kdykoli z Nastavení → Úložiště.",
+      "backupFilterName": "Záloha Myne",
+      "backUpNow": "Zálohovat tento trezor hned",
+      "body": "Myne zapsal váš trezor do složky dat vaší aplikace. Vaše hlavní heslo a fráze pro obnovení jsou jediná cesta zpět — ujistěte se, že máte obojí uložené na bezpečném místě.",
+      "decrypting": "Dešifruje se…",
+      "done": "Hotovo",
+      "heading": "Váš trezor je připraven.",
+      "showFolder": "Zobrazit složku trezoru"
+    },
+    "sessionLost": {
+      "startOver": "Začít znovu"
+    }
+  },
+  "vaultPicker": {
+    "createAnother": "Vytvořit další trezor",
+    "heading": "Vyberte trezor",
+    "loading": "Načítají se vaše trezory…",
+    "noneLoaded": "Žádné trezory se teď nepodařilo načíst.",
+    "openedRelative": "otevřeno {{rel}}",
+    "restoreFromBackup": "Obnovit ze zálohy",
+    "subline": "Na tomto zařízení máte více než jeden trezor. Vyberte jeden k odemknutí.",
+    "vaultFallback": "Trezor {{n}}"
+  },
+  "vaultRecover": {
+    "decrypting": {
+      "caption": "Chvíli to potrvá.",
+      "eyebrow": "OBNOVENÍ · DEŠIFROVÁNÍ",
+      "footerHint": "Pokud to trvá déle než 30 sekund, zavřete okno a zkuste to znovu.",
+      "heading": "Dešifruje se váš trezor",
+      "subCaption": "Pracuje se… Argon2id m=256 MiB, t=3, p=2"
+    },
+    "passwordReset": {
+      "errors": {
+        "cancelledVaultLocked": "Obnovení zrušeno: trezor byl uzamčen.",
+        "operationInProgress": "Probíhá operace. Počkejte prosím.",
+        "unexpected": "Neočekávaná chyba. Zkuste to prosím znovu.",
+        "weakPassword": "Nové heslo musí mít alespoň 12 znaků."
+      },
+      "eyebrow": "Obnovení · nové heslo",
+      "helperBody": "Otevřeno pomocí vaší fráze pro obnovení. Vaše staré heslo už nefunguje — nastavte si nyní nové hlavní heslo.",
+      "helperEmphasis": "Vaše fráze pro obnovení zůstává stejná.",
+      "submit": "Nastavit nové heslo",
+      "title": "Nastavte nové hlavní heslo"
+    },
+    "phrase": {
+      "back": "← Zpět",
+      "body": "Zadejte svou frázi pro obnovení. 24 slov BIP-39.",
+      "cellLabel": "Slovo {{index}}",
+      "deleteLink": "Smazat trezor a začít znovu",
+      "eyebrow": "Obnovení",
+      "submit": "Odemknout",
+      "title": "Obnovte svůj trezor."
+    },
+    "select": {
+      "accountInvalid": "Neplatné číslo účtu. Zkontrolujte ho prosím a zkuste to znovu.",
+      "accountLabel": "Číslo účtu (nepovinné)",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (nepovinné)",
+      "body": "Vyberte trezor, který chcete obnovit pomocí své 24slovné fráze pro obnovení. Můžete také zadat číslo účtu a přejít přímo k němu.",
+      "cancel": "Zrušit",
+      "checking": "Kontroluje se…",
+      "loadFailed": "Žádné trezory se teď nepodařilo načíst.",
+      "loading": "Načítají se vaše trezory…",
+      "openedRelative": "otevřeno {{rel}}",
+      "or": "nebo",
+      "title": "Vyberte trezor k obnovení",
+      "useAccountNumber": "Použít číslo účtu",
+      "vaultFallback": "Trezor {{index}}"
+    }
+  },
+  "vaultSwitcher": {
+    "chipFallback": "Trezor",
+    "createAnother": "Vytvořit další trezor",
+    "switching": "přepíná se…",
+    "switchVaultLabel": "Přepnout trezor",
+    "vaultFallback": "Trezor {{n}}"
+  },
+  "welcome": {
+    "createCta": "Vytvořit nový trezor",
+    "headlineLine1": "Šifrované poznámky v Markdownu.",
+    "headlineLine2": "Žádný e-mail při registraci.",
+    "repairResidue": {
+      "cancel": "Zrušit",
+      "cleaningUp": "Uklízí se…",
+      "cleanUp": "Vyčistit",
+      "confirmBody_few": "{{count}} soubory budou odstraněny. Jsou už nečitelné; nic obnovitelného se neztratí.",
+      "confirmBody_one": "{{count}} soubor bude odstraněn. Je už nečitelný; nic obnovitelného se neztratí.",
+      "confirmBody_other": "{{count}} souborů bude odstraněno. Jsou už nečitelné; nic obnovitelného se neztratí.",
+      "confirmTitle": "Vyčistit zbylé soubory?",
+      "doneBody_few": "Odstraněny {{count}} zbylé soubory. Nyní můžete vytvořit nový trezor.",
+      "doneBody_one": "Odstraněn {{count}} zbylý soubor. Nyní můžete vytvořit nový trezor.",
+      "doneBody_other": "Odstraněno {{count}} zbylých souborů. Nyní můžete vytvořit nový trezor.",
+      "doneTitle": "Vyčištěno",
+      "errorBody": "Něco se pokazilo. Zavřete aplikaci a zkuste to znovu.",
+      "errorTitle": "Vyčištění selhalo",
+      "foundBody_few": "{{count}} zbylé soubory z předchozího mazání, které se nedokončilo. Jsou už nečitelné — nepřijdete o nic obnovitelného.",
+      "foundBody_one": "{{count}} zbylý soubor z předchozího mazání, které se nedokončilo. Je už nečitelný — nepřijdete o nic obnovitelného.",
+      "foundBody_other": "{{count}} zbylých souborů z předchozího mazání, které se nedokončilo. Jsou už nečitelné — nepřijdete o nic obnovitelného.",
+      "foundTitle": "Zbylé soubory z neúplného mazání",
+      "partialBody_few": "{{count}} soubory mohou být uzamčeny jinou aplikací (antivirus, synchronizace souborů nebo indexování vyhledávání). Zavřete aplikaci a za chvíli to zkuste znovu, nebo složku trezoru odeberte ručně.",
+      "partialBody_one": "{{count}} soubor může být uzamčen jinou aplikací (antivirus, synchronizace souborů nebo indexování vyhledávání). Zavřete aplikaci a za chvíli to zkuste znovu, nebo složku trezoru odeberte ručně.",
+      "partialBody_other": "{{count}} souborů může být uzamčeno jinou aplikací (antivirus, synchronizace souborů nebo indexování vyhledávání). Zavřete aplikaci a za chvíli to zkuste znovu, nebo složku trezoru odeberte ručně.",
+      "partialTitle": "Některé soubory se nepodařilo odebrat"
+    },
+    "restoreCta": "Obnovit ze zálohy",
+    "subtitle": "Vaše poznámky se na tomto zařízení zašifrují, než ho opustí. Server ukládá pouze šifrovaný text."
+  }
+}

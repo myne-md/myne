@@ -21,6 +21,7 @@ import {
   type CSSProperties,
   type RefObject,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import type { NoteId } from "../../notes/sidebarState";
 import type { TitleRecord } from "../../notes/loadNoteBatch";
@@ -78,6 +79,7 @@ export function UsedInNotesPopover({
   onClose,
   anchorRef,
 }: UsedInNotesPopoverProps) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(
     null,
@@ -138,12 +140,14 @@ export function UsedInNotesPopover({
       role="menu"
     >
       {noteIds.length === 0 ? (
-        <div style={EMPTY_STYLE}>Not used in any note.</div>
+        <div style={EMPTY_STYLE}>{t("attachments.usedInNotesPopover.empty")}</div>
       ) : (
         noteIds.map((id) => {
           const title = cache.get(id as NoteId)?.title ?? null;
           const label =
-            title === null || title.trim() === "" ? "Untitled" : title;
+            title === null || title.trim() === ""
+              ? t("attachments.usedInNotesPopover.untitled")
+              : title;
           return (
             <button
               key={id}

@@ -19,6 +19,8 @@ import {
   type ConversionRow,
 } from "./convert";
 import type { ByteRange } from "../../dialect/types";
+import i18n from "../../i18n";
+import { trapFocus } from "../../lib/imperative-focus-trap";
 
 interface Rewrite {
   readonly byteRange: ByteRange;
@@ -54,11 +56,11 @@ export function showWikilinkConvertPreview(
     modal.className = "cm-attach-diff";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-label", "Convert imported wikilinks in this note");
+    modal.setAttribute("aria-label", i18n.t("editor.wikilink.convert.title"));
 
     const title = document.createElement("div");
     title.className = "cm-attach-diff-title";
-    title.textContent = "Convert imported wikilinks in this note";
+    title.textContent = i18n.t("editor.wikilink.convert.title");
     modal.appendChild(title);
 
     const subtitle = document.createElement("div");
@@ -66,10 +68,10 @@ export function showWikilinkConvertPreview(
     const needsChoice = ambiguousIdx.length;
     subtitle.textContent =
       rewriteableCount === 0
-        ? "Nothing to convert — no imported wikilinks resolve."
-        : `${rewriteableCount} link${rewriteableCount === 1 ? "" : "s"} will be rewritten` +
+        ? i18n.t("editor.wikilink.convert.nothingToConvert")
+        : i18n.t("editor.wikilink.convert.rewriteCount", { count: rewriteableCount }) +
           (needsChoice > 0
-            ? ` · ${needsChoice} need${needsChoice === 1 ? "s" : ""} a choice.`
+            ? i18n.t("editor.wikilink.convert.choiceClause", { count: needsChoice })
             : ".");
     modal.appendChild(subtitle);
 
@@ -97,7 +99,7 @@ export function showWikilinkConvertPreview(
       } else if (row.kind === "skipped") {
         const skipped = document.createElement("div");
         skipped.className = "cm-attach-diff-skipped";
-        skipped.textContent = `skipped — ${row.reason}`;
+        skipped.textContent = i18n.t("editor.wikilink.convert.skipped", { reason: row.reason });
         rowEl.append(skipped);
       } else {
         // ambiguous — inline candidate picker (WL-10). Confirm gated until chosen.
@@ -108,7 +110,7 @@ export function showWikilinkConvertPreview(
         select.style.maxWidth = "100%";
         const placeholder = document.createElement("option");
         placeholder.value = "";
-        placeholder.textContent = "Choose target…";
+        placeholder.textContent = i18n.t("editor.wikilink.convert.chooseTarget");
         placeholder.disabled = true;
         placeholder.selected = true;
         select.appendChild(placeholder);
@@ -134,11 +136,11 @@ export function showWikilinkConvertPreview(
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "cm-attach-diff-btn";
-    cancelBtn.textContent = "Cancel";
+    cancelBtn.textContent = i18n.t("editor.wikilink.convert.cancel");
     const commitBtn = document.createElement("button");
     commitBtn.type = "button";
     commitBtn.className = "cm-attach-diff-btn cm-attach-diff-btn-primary";
-    commitBtn.textContent = "Convert";
+    commitBtn.textContent = i18n.t("editor.wikilink.convert.convert");
     actions.append(cancelBtn, commitBtn);
     modal.appendChild(actions);
     backdrop.appendChild(modal);
@@ -161,7 +163,9 @@ export function showWikilinkConvertPreview(
       return out;
     };
 
+    let releaseTrap: (() => void) | null = null;
     const cleanup = (confirmed: boolean): void => {
+      releaseTrap?.();
       document.removeEventListener("keydown", onKey, true);
       backdrop.remove();
       resolve({ confirmed, rewrites: confirmed ? buildRewrites() : [] });
@@ -183,7 +187,10 @@ export function showWikilinkConvertPreview(
     commitBtn.addEventListener("click", () => {
       if (!commitBtn.disabled) cleanup(true);
     });
-    (rewriteableCount === 0 ? cancelBtn : commitBtn).focus();
+    // Trap + restore focus (MYND-93).
+    releaseTrap = trapFocus(modal, {
+      initialFocus: rewriteableCount === 0 ? cancelBtn : commitBtn,
+    });
   });
 }
 
@@ -209,7 +216,7 @@ export async function runWikilinkConvert(): Promise<void> {
   if (view === null) return;
   const rows = planWikilinkConversion(view.state.doc.toString(), readNoteSet(view.state));
   if (rows.length === 0) {
-    showAttachmentToast("No imported wikilinks to convert in this note.");
+    showAttachmentToast(i18n.t("editor.wikilink.convert.noneToConvert"));
     return;
   }
   const { confirmed, rewrites } = await showWikilinkConvertPreview(rows);
@@ -217,5 +224,5 @@ export async function runWikilinkConvert(): Promise<void> {
   applyWikilinkRewrites(view, rewrites);
   view.focus();
   const n = rewrites.length;
-  showAttachmentToast(`${n} wikilink${n === 1 ? "" : "s"} converted`);
+  showAttachmentToast(i18n.t("editor.wikilink.convert.convertedToast", { count: n }));
 }

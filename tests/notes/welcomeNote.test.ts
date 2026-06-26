@@ -9,9 +9,15 @@
 import { describe, it, expect } from "vitest";
 import { readTitleFromFmBody } from "../../src/dialect";
 import {
-  WELCOME_NOTE_MARKDOWN,
-  WELCOME_NOTE_TITLE,
+  welcomeNoteMarkdown,
+  welcomeNoteTitle,
 } from "../../src/notes/welcomeNote";
+
+// The seed copy is resolved from the i18n runtime at call time; under Vitest's
+// default boot language (English) these getters yield the English source, so
+// the structural assertions below hold exactly as they did for the old consts.
+const WELCOME_NOTE_MARKDOWN = welcomeNoteMarkdown();
+const WELCOME_NOTE_TITLE = welcomeNoteTitle();
 
 /** The frontmatter body (between the leading `---` delimiters) — the slice
  *  shape loadNoteBatch reads `title:` from. */

@@ -60,6 +60,14 @@ export interface BulkArchiveResult {
   failed: Array<{ noteId: string; error: unknown }>;
 }
 
+/** Outcome of a {@link bulkUnarchiveNotes} call — restored IDs + per-note failures. */
+export interface BulkUnarchiveResult {
+  /** Note IDs that were restored from the Archive successfully. */
+  unarchived: string[];
+  /** Note IDs that failed, with the propagated IPC error. */
+  failed: Array<{ noteId: string; error: unknown }>;
+}
+
 /**
  * Archive many notes at once (the bulk-selection "Arşivle N not" action). Each
  * note is an independent {@link archiveNote} fired via `Promise.allSettled` —
@@ -81,4 +89,29 @@ export async function bulkArchiveNotes(
     else failed.push({ noteId, error: outcome.reason });
   });
   return { archived, failed };
+}
+
+/**
+ * Restore many notes from the Archive at once — the bulk operation behind the
+ * "disable archiving" settings toggle, which empties the Archive so no note is
+ * left inaccessible once its entry points are hidden. Each note is an independent
+ * {@link unarchiveNote} fired via `Promise.allSettled`; like {@link bulkArchiveNotes}
+ * a partial failure is benign (successful restores stand, failures are reported so
+ * the caller can decide whether to still persist the disable flag). Never rejects;
+ * surfaces results via {@link BulkUnarchiveResult}.
+ */
+export async function bulkUnarchiveNotes(
+  noteIds: string[],
+): Promise<BulkUnarchiveResult> {
+  const settled = await Promise.allSettled(
+    noteIds.map((id) => unarchiveNote(id)),
+  );
+  const unarchived: string[] = [];
+  const failed: Array<{ noteId: string; error: unknown }> = [];
+  settled.forEach((outcome, i) => {
+    const noteId = noteIds[i] ?? "";
+    if (outcome.status === "fulfilled") unarchived.push(noteId);
+    else failed.push({ noteId, error: outcome.reason });
+  });
+  return { unarchived, failed };
 }

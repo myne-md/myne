@@ -6,14 +6,18 @@
 // always present as the escape hatch — this component never replaces it, so
 // the (security-critical) password path is untouched.
 //
-// Spring-loaded gate: on a fresh process (app restart) the backend returns
-// `RequiresFullPassword` until one full-password unlock has happened this
-// session. This component self-hides on that (and on `AttemptsExhausted` /
-// `NotConfigured`) so the user simply uses the password form below.
+// Spring-loaded gate: on a fresh process (app restart) quick-unlock is
+// suppressed until one full-password unlock has happened this session. The
+// status call reports `available: false` in that window, so this component
+// stays hidden on a cold start and the user simply types their password — the
+// PIN field returns after the first full unlock + an auto-lock in the same
+// session. The `RequiresFullPassword` / `AttemptsExhausted` / `NotConfigured`
+// error self-hide below is the redeem-time backstop for the same states.
 //
 // ⚠️ Touch ID is HARDWARE-UNVERIFIED (see `quick_unlock/macos.rs`).
 
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import {
   quickUnlockStatus,
   quickUnlockWithBiometric,
@@ -22,6 +26,13 @@ import {
 import { isQuickUnlockError } from "../types/quick-unlock-error";
 
 interface QuickUnlockEntryProps {
+  /**
+   * The vault this Unlock screen targets. Threaded into every quick-unlock IPC
+   * call because no vault is unlocked here, so the backend can't infer the
+   * target from the active slot — without it, status/redeem mis-resolve to the
+   * wrong directory once more than one vault exists and the PIN field hides.
+   */
+  vaultId?: string;
   /** Called on a successful quick-unlock — same effect as a password unlock. */
   onUnlocked: () => void;
 }
@@ -66,7 +77,8 @@ const HINT_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
-export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
+export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps) {
+  const { t } = useTranslation();
   const [method, setMethod] = useState<Method | null>(null);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,10 +87,15 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
 
   useEffect(() => {
     let alive = true;
-    quickUnlockStatus()
+    quickUnlockStatus(vaultId)
       .then((s) => {
         if (!alive) return;
-        if (s.configured && (s.method === "pin" || s.method === "biometric")) {
+        // `available` (not `configured`) gates the affordance: on a cold start
+        // the credential exists but the spring-loaded session gate is closed,
+        // so redeeming would fail `RequiresFullPassword`. Hiding here means a
+        // fresh launch shows only the password form — the PIN field returns
+        // after the first full unlock + an auto-lock in the same session.
+        if (s.available && (s.method === "pin" || s.method === "biometric")) {
           setMethod(s.method);
         } else {
           setHidden(true);
@@ -90,7 +107,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [vaultId]);
 
   function handleError(e: unknown) {
     if (isQuickUnlockError(e)) {
@@ -103,17 +120,21 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
           setHidden(true);
           return;
         case "WrongCredential":
-          setNote(`Incorrect. ${e.detail.remaining} attempt(s) left.`);
+          setNote(
+            t("unlock.quickUnlock.wrongCredential", {
+              remaining: e.detail.remaining,
+            }),
+          );
           return;
         case "Cancelled":
           setNote(null);
           return;
         default:
-          setNote("Quick unlock failed. Use your password.");
+          setNote(t("unlock.quickUnlock.failed"));
           return;
       }
     }
-    setNote("Quick unlock failed. Use your password.");
+    setNote(t("unlock.quickUnlock.failed"));
   }
 
   async function attemptPin(ev: FormEvent) {
@@ -122,7 +143,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
     setBusy(true);
     setNote(null);
     try {
-      await quickUnlockWithPin(pin);
+      await quickUnlockWithPin(pin, vaultId);
       onUnlocked();
     } catch (e) {
       setPin("");
@@ -137,7 +158,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
     setBusy(true);
     setNote(null);
     try {
-      await quickUnlockWithBiometric();
+      await quickUnlockWithBiometric(vaultId);
       onUnlocked();
     } catch (e) {
       handleError(e);
@@ -158,7 +179,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
           style={BTN_STYLE}
           data-testid="unlock.quick-touchid"
         >
-          Unlock with Touch ID
+          {t("unlock.quickUnlock.unlockWithTouchId")}
         </button>
       ) : (
         <form
@@ -168,12 +189,12 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
           <input
             type="password"
             inputMode="numeric"
-            placeholder="PIN"
+            placeholder={t("unlock.quickUnlock.pinPlaceholder")}
             value={pin}
             onChange={(e) => setPin(e.currentTarget.value)}
             disabled={busy}
             autoComplete="off"
-            aria-label="Quick-unlock PIN"
+            aria-label={t("unlock.quickUnlock.pinAriaLabel")}
             style={INPUT_STYLE}
             data-testid="unlock.quick-pin-input"
           />
@@ -183,7 +204,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
             style={BTN_STYLE}
             data-testid="unlock.quick-pin-submit"
           >
-            Unlock with PIN
+            {t("unlock.quickUnlock.unlockWithPin")}
           </button>
         </form>
       )}
@@ -192,7 +213,7 @@ export function QuickUnlockEntry({ onUnlocked }: QuickUnlockEntryProps) {
           {note}
         </p>
       )}
-      <p style={HINT_STYLE}>or use your password below</p>
+      <p style={HINT_STYLE}>{t("unlock.quickUnlock.usePasswordBelow")}</p>
     </div>
   );
 }

@@ -29,6 +29,7 @@
 //    partition.
 //  - **`focusedPaneId` always references an existing leaf.**
 
+import i18n from "../i18n";
 import type { NoteId } from "./sidebarState";
 
 /** Opaque identifier for a pane (leaf or split node). */
@@ -889,8 +890,13 @@ export type NamedWorkspaces = {
 /** Caller-supplied slot-id factory (the app wires `crypto.randomUUID`). */
 export type SlotIdFactory = () => SlotId;
 
-/** The default fresh-slot name (used when the last slot is deleted). */
-export const DEFAULT_SLOT_NAME = "Default";
+/** The default fresh-slot name (used when the last slot is deleted). Resolved
+ *  at call time via i18n (NOT a module-frozen const) so a fresh slot minted
+ *  after a language switch carries the active-language name; the name is then
+ *  ordinary stored data the user can rename. */
+export function defaultSlotName(): string {
+  return i18n.t("notes.workspace.defaultSlotName");
+}
 
 /**
  * A fresh container holding a single "Default" slot. `paneId` seeds that slot's
@@ -899,7 +905,7 @@ export const DEFAULT_SLOT_NAME = "Default";
 export function emptyNamedWorkspaces(
   paneId: PaneId,
   slotId: SlotId = crypto.randomUUID(),
-  name: string = DEFAULT_SLOT_NAME,
+  name: string = defaultSlotName(),
 ): NamedWorkspaces {
   return {
     slots: [{ id: slotId, name, state: emptyWorkspace(paneId) }],
@@ -912,7 +918,7 @@ export function emptyNamedWorkspaces(
 export function wrapAsSingleSlot(
   state: WorkspaceState,
   slotId: SlotId = crypto.randomUUID(),
-  name: string = DEFAULT_SLOT_NAME,
+  name: string = defaultSlotName(),
 ): NamedWorkspaces {
   return { slots: [{ id: slotId, name, state }], activeId: slotId };
 }

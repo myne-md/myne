@@ -21,6 +21,7 @@
 // hooks the shared `emitNoteHtml` this composes over, so HTML inherits the
 // strip for free once #5 lands.
 
+import i18n from "../../i18n";
 import { emitNoteHtml, type EmitNoteHtmlOptions } from "./emitNoteHtml";
 import { composePrintStylesheet } from "./page-geometry";
 import { FONT_FACE_CSS } from "./font-face";
@@ -73,7 +74,7 @@ export async function emitStandaloneHtml(
     if (katexCss !== null) css += `\n${katexCss}`;
   }
 
-  const titleText = emitted.title ?? "Note";
+  const titleText = emitted.title ?? i18n.t("export.note.documentTitleFallback");
   const document =
     "<!DOCTYPE html>\n" +
     '<html lang="en">\n' +

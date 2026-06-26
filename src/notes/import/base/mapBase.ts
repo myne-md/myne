@@ -27,6 +27,7 @@ import type {
   ViewSort,
   ViewType,
 } from "../../../lib/prefs";
+import i18n from "../../../i18n";
 
 /** A minimal, structured import warning. Tasks 4/5 extend (more `kind`s) and
  *  consume (surface counts to the user) it — kept small + forward-compatible:
@@ -369,7 +370,7 @@ export function mapBaseView(
   }
 
   const warnings: BaseImportWarning[] = [];
-  const name = view.name ?? "Untitled view";
+  const name = view.name ?? i18n.t("notes.import.base.untitledView");
 
   const filter = mapBaseFilter(view.filters);
   warnings.push(...filter.warnings);

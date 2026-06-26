@@ -34,6 +34,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Input } from "./primitives/Input";
 import { Icon } from "./primitives/Icon";
 
@@ -121,6 +122,7 @@ export function PasswordInput({
   disabled,
   testId,
 }: PasswordInputProps) {
+  const { t } = useTranslation();
   const captionColor =
     captionTone === "danger" ? "var(--danger)" : "var(--fg-3)";
   const captionFontStyle = captionTone === "pending" ? "italic" : "normal";
@@ -154,7 +156,7 @@ export function PasswordInput({
         <button
           type="button"
           onClick={onToggleShow}
-          aria-label={show ? "Hide password" : "Show password"}
+          aria-label={show ? t("password.input.hide") : t("password.input.show")}
           disabled={disabled}
           style={{
             position: "absolute",

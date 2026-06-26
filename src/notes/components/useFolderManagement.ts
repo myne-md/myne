@@ -24,6 +24,7 @@ import {
   validateFolderNameInput,
   type FolderInputRejection,
 } from "../../dialect/folderPath";
+import i18n from "../../i18n";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
   setDeliberateFolders,
@@ -99,8 +100,8 @@ function folderInputRejectionMessage(
   rejection: Exclude<FolderInputRejection, "empty">,
 ): string {
   return rejection === "too-long"
-    ? "That folder path is too long."
-    : "A folder name can't contain / \\ | # ^ [ ] or start/end with a space.";
+    ? i18n.t("notes.folderManagement.tooLong")
+    : i18n.t("notes.folderManagement.illegalSegment");
 }
 
 function findByFoldedKey(

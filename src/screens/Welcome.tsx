@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
@@ -13,6 +14,7 @@ interface WelcomeProps {
 }
 
 export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomeProps) {
+  const { t } = useTranslation();
   const [joinOpen, setJoinOpen] = useState(false);
   return (
     <div
@@ -57,9 +59,9 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomePro
             color: "var(--fg-display)",
           }}
         >
-          Encrypted markdown notes.
+          {t("welcome.headlineLine1")}
           <br />
-          No email at signup.
+          {t("welcome.headlineLine2")}
         </div>
 
         <div
@@ -70,8 +72,7 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomePro
             maxWidth: 360,
           }}
         >
-          Your notes are encrypted on this device before they leave it. The
-          server only stores ciphertext.
+          {t("welcome.subtitle")}
         </div>
 
         {/* Orphan-residue cleanup (MYND-159). Renders nothing unless a
@@ -93,14 +94,14 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoined }: WelcomePro
             onClick={onCreateVault}
             data-testid="welcome.create-cta"
           >
-            Create new vault
+            {t("welcome.createCta")}
           </Button>
           <Button
             variant="secondary"
             onClick={onRestoreBackup}
             data-testid="welcome.restore-cta"
           >
-            Restore from backup
+            {t("welcome.restoreCta")}
           </Button>
           <Button
             variant="secondary"

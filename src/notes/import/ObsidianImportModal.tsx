@@ -26,7 +26,10 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
@@ -98,6 +101,10 @@ const MONO: CSSProperties = {
 };
 
 export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImportModalProps) {
+  const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
   const [phase, setPhase] = useState<Phase>("setup");
   const [folder, setFolder] = useState<string | null>(null);
   const [policy, setPolicy] = useState<DuplicatePolicy>(DEFAULT_DUPLICATE_POLICY);
@@ -164,7 +171,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
       const picked = await openDialog({
         directory: true,
         multiple: false,
-        title: "Choose your Obsidian vault folder",
+        title: t("notes.import.modal.folderPickerTitle"),
       });
       if (typeof picked === "string") setFolder(picked);
     } catch {
@@ -188,19 +195,19 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
         onImported?.(r);
       })
       .catch((err) => {
-        setErrorMsg(err instanceof Error ? err.message : "Import failed.");
+        setErrorMsg(err instanceof Error ? err.message : t("notes.import.modal.importFailed"));
         setPhase("error");
       });
-  }, [folder, policy, onImported]);
+  }, [folder, policy, onImported, t]);
 
   if (!open) return null;
 
   const title =
     phase === "summary"
-      ? "Import complete"
+      ? t("notes.import.modal.titleComplete")
       : phase === "error"
-        ? "Import failed"
-        : "Import Obsidian vault";
+        ? t("notes.import.modal.titleFailed")
+        : t("notes.import.modal.titleSetup");
 
   return (
     <div
@@ -211,6 +218,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
       onClick={handleBackdrop}
     >
       <div
+        ref={dialogRef}
         style={{
           width: 560,
           maxWidth: "calc(100vw - var(--space-7))",
@@ -234,7 +242,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
           {dismissable && (
             <button
               type="button"
-              aria-label="Close"
+              aria-label={t("notes.import.modal.closeAriaLabel")}
               onClick={handleClose}
               style={{
                 background: "none",
@@ -276,7 +284,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
           <SummaryBody result={result} onDone={handleClose} />
         )}
         {phase === "error" && (
-          <ErrorBody message={errorMsg ?? "Import failed."} onClose={handleClose} />
+          <ErrorBody message={errorMsg ?? t("notes.import.modal.importFailed")} onClose={handleClose} />
         )}
       </div>
     </div>
@@ -300,18 +308,17 @@ function SetupBody({
   onStart: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <div style={BODY_STYLE}>
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-          Point Myne at your existing Obsidian vault folder. Every Markdown note
-          is imported and encrypted on the spot — nothing leaves this device, and
-          your original files are left untouched.
+          {t("notes.import.modal.setupIntro")}
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}>
-            Vault folder
+            {t("notes.import.modal.vaultFolderLabel")}
           </span>
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
             <code
@@ -329,38 +336,38 @@ function SetupBody({
                 textOverflow: "ellipsis",
               }}
             >
-              {folder ?? "No folder chosen"}
+              {folder ?? t("notes.import.modal.noFolderChosen")}
             </code>
             <Button variant="secondary" icon="folder" onClick={onChooseFolder}>
-              Choose folder…
+              {t("notes.import.modal.chooseFolder")}
             </Button>
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}>
-            If a note already exists
+            {t("notes.import.modal.ifNoteExistsLabel")}
           </span>
           <RadioRow
             checked={policy === "skip"}
-            label="Skip it"
-            hint="Recommended — re-running an import never duplicates or overwrites."
+            label={t("notes.import.modal.policySkipLabel")}
+            hint={t("notes.import.modal.policySkipHint")}
             onSelect={() => onPolicyChange("skip")}
           />
           <RadioRow
             checked={policy === "import-as-copy"}
-            label="Import as a copy"
-            hint="Bring it in alongside the existing note."
+            label={t("notes.import.modal.policyCopyLabel")}
+            hint={t("notes.import.modal.policyCopyHint")}
             onSelect={() => onPolicyChange("import-as-copy")}
           />
         </div>
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="ghost" onClick={onCancel}>
-          Cancel
+          {t("notes.import.modal.cancel")}
         </Button>
         <Button variant="primary" onClick={onStart} disabled={folder === null}>
-          Import
+          {t("notes.import.modal.import")}
         </Button>
       </div>
     </>
@@ -445,13 +452,14 @@ function RunningBody({
   cancelling: boolean;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const preparing = total === 0;
   const pct = preparing ? 0 : Math.min(100, Math.round((done / total) * 100));
   return (
     <>
       <div style={BODY_STYLE}>
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-          {preparing ? "Scanning your vault…" : "Importing your vault…"}
+          {preparing ? t("notes.import.modal.scanning") : t("notes.import.modal.importing")}
         </p>
         <div
           style={{
@@ -474,20 +482,20 @@ function RunningBody({
         </div>
         {preparing ? (
           <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
-            Preparing…
+            {t("notes.import.modal.preparing")}
           </div>
         ) : (
           <div style={{ fontSize: "var(--text-md)", color: "var(--fg-1)" }}>
             <span style={{ ...MONO, fontWeight: 600 }}>{done}</span>
-            <span style={{ color: "var(--fg-3)" }}> of </span>
+            <span style={{ color: "var(--fg-3)" }}>{t("notes.import.modal.progressOf")}</span>
             <span style={MONO}>{total}</span>
-            <span style={{ color: "var(--fg-3)" }}> notes</span>
+            <span style={{ color: "var(--fg-3)" }}>{t("notes.import.modal.progressNotes")}</span>
           </div>
         )}
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="secondary" onClick={onCancel} disabled={cancelling}>
-          {cancelling ? "Cancelling…" : "Cancel"}
+          {cancelling ? t("notes.import.modal.cancelling") : t("notes.import.modal.cancel")}
         </Button>
       </div>
     </>
@@ -501,6 +509,7 @@ function totalByType(t: MediaByType): number {
 }
 
 function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => void }) {
+  const { t } = useTranslation();
   const mediaIngested = totalByType(result.media.ingested);
   const mediaOmitted = totalByType(result.media.omitted);
   const hasMedia = mediaIngested > 0 || mediaOmitted > 0;
@@ -522,33 +531,33 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
             {result.imported}
           </span>
           <span style={{ fontSize: "var(--text-md)", color: "var(--fg-2)" }}>
-            {result.imported === 1 ? "note imported" : "notes imported"}
+            {t("notes.import.modal.notesImported", { count: result.imported })}
           </span>
         </div>
 
         {/* secondary counts */}
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          <StatRow label="Skipped (already exist)" value={result.skippedExisting} />
+          <StatRow label={t("notes.import.modal.statSkipped")} value={result.skippedExisting} />
           {hasMedia && (
             <StatRow
-              label="Media"
+              label={t("notes.import.modal.statMedia")}
               valueNode={
                 <span style={{ ...MONO, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-                  {mediaIngested} imported
-                  {mediaOmitted > 0 ? ` · ${mediaOmitted} omitted` : ""}
+                  {t("notes.import.modal.mediaImported", { count: mediaIngested })}
+                  {mediaOmitted > 0 ? t("notes.import.modal.mediaOmittedSuffix", { count: mediaOmitted }) : ""}
                 </span>
               }
             />
           )}
-          <StatRow label=".canvas files skipped" value={result.ignore.canvasSkipped} muted />
-          <StatRow label="Other files skipped" value={result.ignore.nonMarkdownSkipped} muted />
-          <StatRow label="Empty folders kept" value={result.emptyFoldersPreserved} muted />
+          <StatRow label={t("notes.import.modal.statCanvasSkipped")} value={result.ignore.canvasSkipped} muted />
+          <StatRow label={t("notes.import.modal.statOtherSkipped")} value={result.ignore.nonMarkdownSkipped} muted />
+          <StatRow label={t("notes.import.modal.statEmptyFoldersKept")} value={result.emptyFoldersPreserved} muted />
           {result.cancelled !== null && (
             <StatRow
-              label="Cancelled"
+              label={t("notes.import.modal.statCancelled")}
               valueNode={
                 <span style={{ fontSize: "var(--text-sm)", color: "var(--warning)" }}>
-                  {result.cancelled} not imported
+                  {t("notes.import.modal.cancelledNotImported", { count: result.cancelled })}
                 </span>
               }
             />
@@ -573,15 +582,15 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
               paddingTop: "var(--space-3)",
             }}
           >
-            {result.ignore.hiddenIgnored} config / hidden{" "}
-            {result.ignore.hiddenIgnored === 1 ? "item" : "items"} ignored
-            (e.g. <span style={MONO}>.obsidian/</span>, dotfiles).
+            {t("notes.import.modal.hiddenIgnoredPrefix", { count: result.ignore.hiddenIgnored })}
+            <span style={MONO}>.obsidian/</span>
+            {t("notes.import.modal.hiddenIgnoredSuffix")}
           </p>
         )}
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="primary" onClick={onDone}>
-          Done
+          {t("notes.import.modal.done")}
         </Button>
       </div>
     </>
@@ -619,11 +628,22 @@ function StatRow({
   );
 }
 
-const ILLEGAL_REASON_LABEL: Record<IllegalSegmentFlag["reason"], string> = {
-  "illegal-char": "contains a character Myne can’t use in a name",
-  "segment-too-long": "name is longer than Myne allows",
-  "path-too-long": "the folder + title path is too long",
-};
+/** Resolve the user-facing reason label at call time (NOT a module-frozen map —
+ *  it must re-resolve on language switch). `t` is passed from the consuming
+ *  component's `useTranslation()` so the subtree re-renders on a language change. */
+function illegalReasonLabel(
+  reason: IllegalSegmentFlag["reason"],
+  t: TFunction,
+): string {
+  switch (reason) {
+    case "illegal-char":
+      return t("notes.import.modal.reasonIllegalChar");
+    case "segment-too-long":
+      return t("notes.import.modal.reasonSegmentTooLong");
+    case "path-too-long":
+      return t("notes.import.modal.reasonPathTooLong");
+  }
+}
 
 /** Replace the characters Myne never allows in a path segment with "-" — a
  *  starting suggestion the user edits, NOT an auto-applied rename (C1: the note
@@ -645,6 +665,7 @@ function NeedsAttention({
   flags: readonly IllegalSegmentFlag[];
   preexisting: readonly PreexistingFolder[];
 }) {
+  const { t } = useTranslation();
   const [resolved, setResolved] = useState<Set<string>>(new Set());
   const markResolved = (key: string) =>
     setResolved((prev) => {
@@ -658,7 +679,7 @@ function NeedsAttention({
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <Icon name="circle-alert" size={15} />
         <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--fg-1)" }}>
-          Needs attention
+          {t("notes.import.modal.needsAttention")}
         </span>
         <span
           style={{
@@ -674,8 +695,7 @@ function NeedsAttention({
         </span>
       </div>
       <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
-        These notes were imported unchanged. Suggested fixes are starting points
-        — copy one, then rename the note when you open it.
+        {t("notes.import.modal.needsAttentionHelp")}
       </p>
 
       {flags.map((flag, i) => {
@@ -684,7 +704,14 @@ function NeedsAttention({
           <AttentionRow
             key={key}
             path={flag.relativePath}
-            detail={`${flag.kind === "folder" ? "Folder" : "Title"} “${flag.segment}” ${ILLEGAL_REASON_LABEL[flag.reason]}.`}
+            detail={t("notes.import.modal.flagDetail", {
+              kind:
+                flag.kind === "folder"
+                  ? t("notes.import.modal.flagKindFolder")
+                  : t("notes.import.modal.flagKindTitle"),
+              segment: flag.segment,
+              reason: illegalReasonLabel(flag.reason, t),
+            })}
             suggestion={suggestName(flag.segment)}
             resolved={resolved.has(key)}
             onResolve={() => markResolved(key)}
@@ -697,8 +724,8 @@ function NeedsAttention({
         return (
           <AttentionRow
             key={key}
-            path={pf.derivedFromPath ?? "(vault root)"}
-            detail={`This note already had its own folder: “${pf.existing}”, which Myne kept — its folder may differ from where it sat on disk.`}
+            path={pf.derivedFromPath ?? t("notes.import.modal.vaultRoot")}
+            detail={t("notes.import.modal.preexistingDetail", { existing: pf.existing })}
             suggestion={pf.existing}
             resolved={resolved.has(key)}
             onResolve={() => markResolved(key)}
@@ -722,6 +749,7 @@ function AttentionRow({
   resolved: boolean;
   onResolve: () => void;
 }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(suggestion);
   const [copied, setCopied] = useState(false);
 
@@ -767,7 +795,7 @@ function AttentionRow({
             color: "var(--success)",
           }}
         >
-          <Icon name="check" size={13} /> Marked done
+          <Icon name="check" size={13} /> {t("notes.import.modal.markedDone")}
         </span>
       ) : (
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "stretch" }}>
@@ -777,7 +805,7 @@ function AttentionRow({
               setDraft(e.target.value);
               setCopied(false);
             }}
-            aria-label="Suggested name"
+            aria-label={t("notes.import.modal.suggestedNameAriaLabel")}
             style={{
               flex: 1,
               ...MONO,
@@ -791,10 +819,10 @@ function AttentionRow({
             }}
           />
           <Button variant="secondary" icon={copied ? "check" : "copy"} onClick={copy}>
-            {copied ? "Copied" : "Copy"}
+            {copied ? t("notes.import.modal.copied") : t("notes.import.modal.copy")}
           </Button>
           <Button variant="ghost" onClick={onResolve}>
-            Mark done
+            {t("notes.import.modal.markDone")}
           </Button>
         </div>
       )}
@@ -805,14 +833,14 @@ function AttentionRow({
 // ---- error -------------------------------------------------------------------
 
 function ErrorBody({ message, onClose }: { message: string; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <>
       <div style={BODY_STYLE}>
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-start" }}>
           <Icon name="circle-alert" size={18} />
           <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>
-            The import couldn’t complete. Any notes already imported were kept and
-            are safe to keep or delete.
+            {t("notes.import.modal.errorBody")}
           </p>
         </div>
         <code
@@ -832,7 +860,7 @@ function ErrorBody({ message, onClose }: { message: string; onClose: () => void 
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="secondary" onClick={onClose}>
-          Close
+          {t("notes.import.modal.close")}
         </Button>
       </div>
     </>

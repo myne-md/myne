@@ -15,6 +15,8 @@
 // callers are unchanged. Only one lightbox is ever open; opening a second
 // replaces the first (and tears down any open PDF reader first).
 
+import i18n from "../../i18n";
+import { trapFocus } from "../../lib/imperative-focus-trap";
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 import { mountPdfScroller } from "./pdf-reader";
 import { exportAttachment } from "./fileCardActions";
@@ -65,12 +67,15 @@ export interface LightboxOptions {
 
 let activeBackdrop: HTMLDivElement | null = null;
 let activeOnKey: ((e: KeyboardEvent) => void) | null = null;
+let activeReleaseTrap: (() => void) | null = null;
 // Cleanup for an open PDF reader (task.destroy + observer disconnect). Null for
 // image mode / when nothing is open.
 let activePdfCleanup: (() => void) | null = null;
 
 /** Tear down any open lightbox (Esc / backdrop click / replace / test cleanup). */
 export function dismissAttachmentLightbox(): void {
+  activeReleaseTrap?.();
+  activeReleaseTrap = null;
   if (activeOnKey !== null && typeof document !== "undefined") {
     document.removeEventListener("keydown", activeOnKey, true);
     activeOnKey = null;
@@ -106,7 +111,10 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   backdrop.setAttribute("aria-modal", "true");
   backdrop.setAttribute(
     "aria-label",
-    opts.alt || (kind === "pdf" ? "PDF preview" : "Image preview"),
+    opts.alt ||
+      (kind === "pdf"
+        ? i18n.t("editor.attachment.lightbox.pdfPreview")
+        : i18n.t("editor.attachment.lightbox.imagePreview")),
   );
 
   // The PDF reader is mounted AFTER the backdrop is attached to the document
@@ -138,9 +146,9 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     exportBtn.type = "button";
     exportBtn.className = "cm-attach-lightbox-export";
     exportBtn.setAttribute("data-testid", "attachment-lightbox.export");
-    exportBtn.setAttribute("aria-label", "Export attachment");
-    exportBtn.title = "Export";
-    exportBtn.textContent = "Export";
+    exportBtn.setAttribute("aria-label", i18n.t("editor.attachment.lightbox.exportAria"));
+    exportBtn.title = i18n.t("editor.attachment.lightbox.export");
+    exportBtn.textContent = i18n.t("editor.attachment.lightbox.export");
     const exportId = opts.id;
     exportBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -154,8 +162,8 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "cm-attach-lightbox-close";
-  closeBtn.setAttribute("aria-label", "Close preview");
-  closeBtn.title = "Close preview";
+  closeBtn.setAttribute("aria-label", i18n.t("editor.attachment.lightbox.close"));
+  closeBtn.title = i18n.t("editor.attachment.lightbox.close");
   closeBtn.appendChild(makeCloseIcon());
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -178,7 +186,7 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
         // the lightbox isn't an empty box. DENY-list-safe; already warned.
         const fb = document.createElement("div");
         fb.className = "cm-attach-lightbox-pdf-fallback";
-        fb.textContent = "PDF";
+        fb.textContent = i18n.t("editor.attachment.lightbox.pdfFallback");
         surface.replaceChildren(fb);
       },
     });
@@ -192,6 +200,9 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   };
   activeOnKey = onKey;
   document.addEventListener("keydown", onKey, true);
+
+  // Trap + restore focus (MYND-93).
+  activeReleaseTrap = trapFocus(backdrop, { initialFocus: closeBtn });
 
   backdrop.addEventListener("mousedown", (e) => {
     // Click on the dimmed backdrop (not the image itself) closes the preview.

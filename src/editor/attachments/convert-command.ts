@@ -15,6 +15,7 @@
 
 import { EditorView } from "@codemirror/view";
 import { open } from "@tauri-apps/plugin-dialog";
+import i18n from "../../i18n";
 import {
   type ImportSource,
   type ImportedAttachment,
@@ -23,18 +24,24 @@ import {
 } from "./insert";
 import { type RefImporter, convertImportedRefs, importSkipNote } from "./convert";
 
-const PICKER_FILTERS = [
-  {
-    name: "Attachment source",
-    extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"],
-  },
-];
+const PICKER_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"];
 
 /** Single-file picker seam (tests override). Returns the chosen path or null. */
 type PickOneFn = (ref: ImportedImageRef) => Promise<string | null>;
 
 let pickOneFn: PickOneFn = async () => {
-  const picked = await open({ multiple: false, directory: false, filters: PICKER_FILTERS });
+  // Resolve the filter label at usage time so a mid-session language switch is
+  // reflected in the native picker (never frozen at module load).
+  const picked = await open({
+    multiple: false,
+    directory: false,
+    filters: [
+      {
+        name: i18n.t("editor.attachment.convertCommand.pickerSourceFilter"),
+        extensions: PICKER_EXTENSIONS,
+      },
+    ],
+  });
   return typeof picked === "string" ? picked : null;
 };
 

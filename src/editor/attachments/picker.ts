@@ -17,6 +17,7 @@
 
 import { EditorView } from "@codemirror/view";
 import { open } from "@tauri-apps/plugin-dialog";
+import i18n from "../../i18n";
 import { type ImportSource, importMany, summarizeBatch } from "./insert";
 import { insertEmbedsForOutcomes } from "./paste-drop";
 import { showAttachmentToast } from "./toast";
@@ -46,7 +47,7 @@ export async function pickAndInsert(view: EditorView, insertAt?: number): Promis
   try {
     selected = await openFn();
   } catch {
-    showAttachmentToast("Couldn't open the file picker.");
+    showAttachmentToast(i18n.t("editor.attachment.picker.openFailed"));
     return;
   }
   if (selected === null || selected.length === 0) return; // cancelled

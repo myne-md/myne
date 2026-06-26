@@ -21,7 +21,9 @@
 // (`NotePdfExportNotice.tsx`, MYND-255; `VaultExportModal.tsx`, MYND-211,
 // which widens the card to 480) — one modal skin, three surfaces.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
 import {
   EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL,
@@ -117,6 +119,10 @@ export function NoteExportModal({
   onCancel,
   onConfirm,
 }: NoteExportModalProps) {
+  const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open (MYND-93).
+  useFocusTrap(dialogRef, { enabled: open });
   // Opt-in default (the backend command is the "opt-in attachments-
   // included export"): the toggle starts OFF on every open.
   const [include, setInclude] = useState(false);
@@ -148,9 +154,9 @@ export function NoteExportModal({
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div style={CARD_STYLE} data-testid="export.modal">
+      <div ref={dialogRef} style={CARD_STYLE} data-testid="export.modal">
         <h2 id="note-export-title" style={TITLE_STYLE}>
-          Export as Markdown
+          {t("export.note.modal.title")}
         </h2>
         <p style={SENTENCE_STYLE}>{EXPORT_PLAIN_MARKDOWN_SENTENCE}</p>
         <div style={SUB_PANEL_STYLE}>
@@ -163,8 +169,9 @@ export function NoteExportModal({
               data-testid="export.include-attachments-toggle"
             />
             <span>
-              Include {attachmentCount} attachment
-              {attachmentCount === 1 ? "" : "s"}
+              {t("export.note.modal.includeAttachments", {
+                count: attachmentCount,
+              })}
             </span>
           </label>
           <p style={SUB_LABEL_STYLE}>{EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL}</p>
@@ -176,7 +183,7 @@ export function NoteExportModal({
             onClick={onCancel}
             data-testid="export.cancel"
           >
-            Cancel
+            {t("export.note.modal.cancel")}
           </Button>
           <Button
             variant="primary"
@@ -184,7 +191,7 @@ export function NoteExportModal({
             onClick={() => onConfirm(include)}
             data-testid="export.confirm"
           >
-            Export…
+            {t("export.note.modal.export")}
           </Button>
         </div>
       </div>

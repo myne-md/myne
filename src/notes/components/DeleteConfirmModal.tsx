@@ -20,6 +20,8 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 // Shared modal backdrop envelope — also imported by `<TrashPanel>` so the two
 // trash-related modals don't re-declare the same fixed-inset dim layer.
@@ -120,14 +122,15 @@ export type DeleteConfirmModalProps = {
 };
 
 export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
+  const { t } = useTranslation();
   const { noteTitle, title, body, warning, confirmLabel, onCancel, onConfirm } =
     props;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-
-  // Default-focus on Cancel (safer destructive UX).
-  useEffect(() => {
-    cancelRef.current?.focus();
-  }, []);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Trap + restore focus while open; default-focus on Cancel (safer
+  // destructive UX). The modal only mounts while shown, so always enabled
+  // (MYND-93).
+  useFocusTrap(dialogRef, { enabled: true, initialFocusRef: cancelRef });
 
   // Esc → Cancel.
   useEffect(() => {
@@ -151,25 +154,28 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
 
   const displayTitle =
     noteTitle === null || noteTitle === undefined || noteTitle.trim() === ""
-      ? "Untitled"
+      ? t("notes.deleteConfirm.untitled")
       : noteTitle;
   const bodyLine = body ?? `“${displayTitle}”`;
 
   return (
     <div style={BACKDROP_STYLE} onClick={handleBackdropClick} role="presentation">
       <div
+        ref={dialogRef}
         style={MODAL_STYLE}
         role="alertdialog"
         aria-labelledby="delete-confirm-title"
         aria-describedby="delete-confirm-body"
       >
         <h2 id="delete-confirm-title" style={TITLE_STYLE}>
-          {title ?? "Delete this note?"}
+          {title ?? t("notes.deleteConfirm.title")}
         </h2>
         <p id="delete-confirm-body" style={BODY_TITLE_STYLE}>
           {bodyLine}
         </p>
-        <p style={BODY_WARNING_STYLE}>{warning ?? "This cannot be undone."}</p>
+        <p style={BODY_WARNING_STYLE}>
+          {warning ?? t("notes.deleteConfirm.warning")}
+        </p>
         <div style={BUTTON_ROW_STYLE}>
           <button
             ref={cancelRef}
@@ -178,7 +184,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             onClick={onCancel}
             style={CANCEL_BUTTON_STYLE}
           >
-            Cancel
+            {t("notes.deleteConfirm.cancel")}
           </button>
           <button
             type="button"
@@ -186,7 +192,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             onClick={onConfirm}
             style={DELETE_BUTTON_STYLE}
           >
-            {confirmLabel ?? "Delete"}
+            {confirmLabel ?? t("notes.deleteConfirm.delete")}
           </button>
         </div>
       </div>

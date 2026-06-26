@@ -9,6 +9,7 @@
 // the handlers + renders these via the shared `ContextMenu`.
 
 import type { ContextMenuItem } from "../components/ContextMenu";
+import i18n from "../../i18n";
 
 /** Handlers the host binds (workspace open seam + sidebar select + clipboard). */
 export type CardMenuHandlers = {
@@ -33,13 +34,17 @@ export const CARD_MENU_ITEM_IDS = [
  */
 export function buildCardMenuItems(h: CardMenuHandlers): ContextMenuItem[] {
   return [
-    { id: "open", label: "Open", onSelect: h.open },
-    { id: "open-in-new-tab", label: "Open in new tab", onSelect: h.openInNewTab },
+    { id: "open", label: i18n.t("notes.cardMenu.open"), onSelect: h.open },
+    {
+      id: "open-in-new-tab",
+      label: i18n.t("notes.cardMenu.openInNewTab"),
+      onSelect: h.openInNewTab,
+    },
     {
       id: "reveal-in-folder",
-      label: "Reveal in folder",
+      label: i18n.t("notes.cardMenu.revealInFolder"),
       onSelect: h.revealInFolder,
     },
-    { id: "copy-link", label: "Copy link", onSelect: h.copyLink },
+    { id: "copy-link", label: i18n.t("notes.cardMenu.copyLink"), onSelect: h.copyLink },
   ];
 }

@@ -6,6 +6,8 @@
 // and any future consumer can't drift. The custom-folder-icon glyph set
 // (MYND-185) is a sibling concern landing in `src/notes/folderIcons.ts`.
 
+import i18n from "../i18n";
+
 /** The six color-label slots, in picker display order (MYND-184). */
 export const LABEL_SLOTS = [
   "clay",
@@ -18,15 +20,12 @@ export const LABEL_SLOTS = [
 
 export type LabelSlot = (typeof LABEL_SLOTS)[number];
 
-/** Human-facing slot names — the swatch `aria-label` / tooltip. */
-export const LABEL_SLOT_NAMES: Record<LabelSlot, string> = {
-  clay: "Clay",
-  ochre: "Ochre",
-  moss: "Moss",
-  slate: "Slate",
-  plum: "Plum",
-  stone: "Stone",
-};
+/** Human-facing slot name — the swatch `aria-label` / tooltip. Resolved at
+ *  call time via i18n (NOT a module-frozen map) so a language switch re-renders
+ *  the display name; the slot key itself is the stable identifier. */
+export function labelSlotName(slot: LabelSlot): string {
+  return i18n.t(`notes.colorLabels.${slot}`);
+}
 
 /** CSS color value for a slot — the themed `--label-*` token (resolves per
  *  theme via `:root` / `[data-theme="dark"]` / the `prefers-color-scheme`

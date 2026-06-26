@@ -29,6 +29,10 @@ uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
 getrandom = "0.2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
+# Constant-time comparison for the clipper pairing-token bearer value
+# (`clipper::token::TokenRegistry::validate`) — same blessed RustCrypto primitive
+# the protocol crate uses for AEAD tag verification; already in the shared lock.
+subtle = { version = "2", default-features = false }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
 # `tracing` for structured ops-side logging (stage tags + bounded
 # variant-name fields only; see src-tauri/CLAUDE.md
@@ -113,6 +117,20 @@ rustls-pki-types = "1"
 # conveniences) disabled: the stamper needs parse + content append + full
 # rewrite save only. MIT.
 lopdf = { version = "0.41.0", default-features = false }
+
+# Attachment text extraction for search (MYND-328). DOCX is an OOXML zip whose
+# text lives in `word/document.xml`; `zip` unpacks that one member and
+# `quick-xml` streams the `<w:t>` runs out. PDF reuses the lopdf above
+# (`Document::extract_text`, zero new deps) and text-like files use std UTF-8 —
+# so these two are the ONLY new crates this feature adds. Chosen over
+# `pdf-extract` (+61 transitive incl. a duplicate lopdf 0.36) and `docx-rs`
+# (+44 transitive) after the MYND-328 dependency spike — see
+# `docs/dependency-policy.md` ledger ("Attachment text extraction"). Both
+# pure-Rust, command-path only (`plugins/attachments/extract.rs`), never on the
+# boot path. `zip` default features off (only `deflate` — the OOXML storage
+# method). zip MIT, quick-xml MIT.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+quick-xml = "0.37"
 
 # Native microphone capture for voice notes (MYND-259). Pure-Rust cross-
 # platform audio I/O over the OS backends (CoreAudio / WASAPI / ALSA); chosen

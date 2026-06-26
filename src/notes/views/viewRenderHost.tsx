@@ -9,6 +9,7 @@
 // beside CardsView here — one dispatch site, never crash on an unhandled type.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import type { SavedView } from "../../lib/prefs";
 import type { ViewResult } from "../queryEngine";
 import {
@@ -41,6 +42,7 @@ export function ViewRenderHost({
   onCardContextMenu?: CardContextMenuHandler;
   onSetCover?: SetCoverHandler;
 }) {
+  const { t } = useTranslation();
   switch (def.view_type) {
     case "cards":
       return (
@@ -56,7 +58,7 @@ export function ViewRenderHost({
     case "list":
       return (
         <div data-testid="view.unsupported" style={FALLBACK_STYLE}>
-          This view type arrives in a later update.
+          {t("notes.views.host.unsupported")}
         </div>
       );
   }
