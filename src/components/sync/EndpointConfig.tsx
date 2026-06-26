@@ -6,6 +6,7 @@
 // TLS, so no fingerprint. Built against design tokens; no Penpot (owner directive).
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 
 const ROW: CSSProperties = {
@@ -52,6 +53,7 @@ const FP: CSSProperties = {
 };
 
 export function EndpointConfig() {
+  const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -82,18 +84,12 @@ export function EndpointConfig() {
       .then((fp) => {
         if (fp) {
           setFingerprint(fp);
-          setMsg(
-            "Connected. Check that this fingerprint matches on your other device.",
-          );
+          setMsg(t("sync.endpoint.connectedTls"));
         } else {
-          setMsg("Connected (local, no TLS).");
+          setMsg(t("sync.endpoint.connectedLocal"));
         }
       })
-      .catch(() =>
-        setMsg(
-          "Couldn’t reach that server — check the URL and that it’s running.",
-        ),
-      )
+      .catch(() => setMsg(t("sync.endpoint.unreachable")))
       .finally(() => setBusy(false));
   };
 
@@ -106,7 +102,7 @@ export function EndpointConfig() {
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://your-server.example   ·   http://127.0.0.1:8080"
+          placeholder={t("sync.endpoint.placeholder")}
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
@@ -120,7 +116,7 @@ export function EndpointConfig() {
           style={{ ...BTN, opacity: busy ? 0.6 : 1 }}
           data-testid="sync.endpoint-connect"
         >
-          {busy ? "Connecting…" : "Connect"}
+          {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
         </button>
       </div>
       {msg && (
@@ -130,7 +126,7 @@ export function EndpointConfig() {
       )}
       {fingerprint && (
         <p style={HELP}>
-          Server certificate fingerprint:
+          {t("sync.endpoint.fingerprintLabel")}
           <br />
           <span style={FP} data-testid="sync.cert-fingerprint">
             {fingerprint}

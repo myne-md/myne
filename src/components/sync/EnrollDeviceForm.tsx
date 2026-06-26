@@ -18,6 +18,8 @@ import {
   type ChangeEvent,
   type ClipboardEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { Input } from "../primitives/Input";
 import { Segmented } from "../primitives/Segmented";
 import { PasswordInput } from "../PasswordInput";
@@ -125,10 +127,7 @@ function submitStyle(disabled: boolean): CSSProperties {
   };
 }
 
-const MODE_OPTIONS = [
-  { value: "password", label: "Password" },
-  { value: "recovery", label: "Recovery phrase" },
-] as const;
+const MODE_VALUES = ["password", "recovery"] as const;
 
 /** Map a non-secret `SyncDeviceError` kind to honest, non-distinguishing copy.
  *  Configuration + transport faults get their own (non-leaking) message; every
@@ -136,17 +135,26 @@ const MODE_OPTIONS = [
 function failureMessage(kind: string): string {
   switch (kind) {
     case "NotConfigured":
-      return "Set a sync server in settings before adding this device.";
+      return i18n.t("sync.enroll.error.notConfigured");
     case "Transport":
-      return "Couldn’t reach the sync server. Check your connection and try again.";
+      return i18n.t("sync.enroll.error.transport");
     default:
       return ENROLL_NON_DISTINGUISHING_BANNER;
   }
 }
 
 export function EnrollDeviceForm() {
+  const { t } = useTranslation();
   const baseId = useId();
   const { busy, outcome, enroll, reset } = useEnroll();
+
+  const modeOptions = MODE_VALUES.map((value) => ({
+    value,
+    label:
+      value === "password"
+        ? t("sync.enroll.mode.password")
+        : t("sync.enroll.mode.recovery"),
+  }));
 
   const [accountNumber, setAccountNumber] = useState("");
   const [mode, setMode] = useState<EnrollCredentialKind>("password");
@@ -208,7 +216,7 @@ export function EnrollDeviceForm() {
     <div style={ROOT} data-testid="sync.enroll">
       <div style={FIELD}>
         <label style={LABEL} htmlFor={`${baseId}-account`}>
-          Account number
+          {t("sync.enroll.accountNumberLabel")}
         </label>
         <Input
           id={`${baseId}-account`}
@@ -217,7 +225,7 @@ export function EnrollDeviceForm() {
             clearOutcome();
             setAccountNumber(e.target.value);
           }}
-          placeholder="MY-XXXX-XXXX-XXXX-XXXX-X"
+          placeholder={t("sync.enroll.accountNumberPlaceholder")}
           autoComplete="off"
           spellCheck={false}
           autoCapitalize="characters"
@@ -226,22 +234,22 @@ export function EnrollDeviceForm() {
       </div>
 
       <div style={FIELD}>
-        <span style={LABEL}>Sign in with</span>
+        <span style={LABEL}>{t("sync.enroll.signInWith")}</span>
         <Segmented
-          options={MODE_OPTIONS}
+          options={modeOptions}
           value={mode}
           onChange={(v) => {
             clearOutcome();
             setMode(v as EnrollCredentialKind);
           }}
-          ariaLabel="Credential type"
+          ariaLabel={t("sync.enroll.credentialTypeAria")}
           testId="sync.enroll.mode"
         />
       </div>
 
       {mode === "password" ? (
         <PasswordInput
-          label="Password"
+          label={t("sync.enroll.passwordLabel")}
           value={password}
           onChange={(next) => {
             clearOutcome();
@@ -253,8 +261,8 @@ export function EnrollDeviceForm() {
         />
       ) : (
         <div style={FIELD}>
-          <span style={LABEL}>Recovery phrase</span>
-          <p style={HINT}>Enter your 24-word recovery phrase.</p>
+          <span style={LABEL}>{t("sync.enroll.recoveryPhraseLabel")}</span>
+          <p style={HINT}>{t("sync.enroll.recoveryPhraseHint")}</p>
           <div style={GRID} data-testid="sync.enroll.phrase-grid">
             {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => {
               const inputId = `${baseId}-cell-${i}`;
@@ -273,7 +281,7 @@ export function EnrollDeviceForm() {
                     autoCorrect="off"
                     inputMode="text"
                     style={CELL_INPUT}
-                    aria-label={`Word ${i + 1}`}
+                    aria-label={t("sync.enroll.wordAria", { number: i + 1 })}
                     data-testid="sync.enroll.phrase-cell"
                     data-index={i + 1}
                   />
@@ -307,7 +315,7 @@ export function EnrollDeviceForm() {
         style={submitStyle(!canSubmit)}
         data-testid="sync.enroll.submit"
       >
-        {busy ? "Connecting…" : "Add this device"}
+        {busy ? t("sync.enroll.connecting") : t("sync.enroll.submit")}
       </button>
     </div>
   );

@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Mégse",
       "confirmDefault": "OK"
@@ -323,19 +324,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Nem sikerült exportálni: {{filename}}.",
         "exported": "Exportálva: {{filename}}.",
-        "renameFailed": "Nem sikerült átnevezni a mellékletet.",
+        "exportFailed": "Nem sikerült exportálni: {{filename}}.",
         "renamed": "Átnevezve erre: {{name}}.",
+        "renameFailed": "Nem sikerült átnevezni a mellékletet.",
         "saveDialogFailed": "Nem sikerült megnyitni a mentési párbeszédablakot."
       },
       "convert": {
         "cancel": "Mégse",
         "confirm": "Konvertálás",
         "skipped": "kihagyva — {{note}}",
-        "subtitleEmpty": "Nincs mit konvertálni — egyetlen forrásfájl sem oldódott fel.",
         "subtitle_one": "1 hivatkozás lesz átírva. Ellenőrizd a véglegesítés előtt.",
         "subtitle_other": "{{count}} hivatkozás lesz átírva. Ellenőrizd a véglegesítés előtt.",
+        "subtitleEmpty": "Nincs mit konvertálni — egyetlen forrásfájl sem oldódott fel.",
         "title": "Importált mellékletek konvertálása"
       },
       "convertCommand": {
@@ -363,8 +364,8 @@
           "archive": "Archívum",
           "audio": "Hang",
           "cHeader": "C fejléc",
-          "cSource": "C forrás",
           "cppSource": "C++ forrás",
+          "cSource": "C forrás",
           "css": "CSS",
           "csv": "CSV",
           "document": "Dokumentum",
@@ -1735,6 +1736,127 @@
       "optionLive": "Élő előnézet",
       "optionReading": "Olvasás",
       "optionSource": "Forrás"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {

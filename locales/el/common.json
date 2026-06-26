@@ -43,8 +43,8 @@
     "library": {
       "actionsAriaLabel": "Ενέργειες συνημμένου",
       "actionsTitle": "Ενέργειες",
-      "checkUnusedFailedNotice": "Δεν ήταν δυνατός ο έλεγχος για αχρησιμοποίητα συνημμένα. Δοκιμάστε ξανά.",
       "checking": "Έλεγχος…",
+      "checkUnusedFailedNotice": "Δεν ήταν δυνατός ο έλεγχος για αχρησιμοποίητα συνημμένα. Δοκιμάστε ξανά.",
       "cleanUnused": "Καθαρισμός αχρησιμοποίητων",
       "cleanUnusedTitle": "Διαγραφή συνημμένων που δεν χρησιμοποιούνται σε καμία σημείωση",
       "colCreated": "Δημιουργήθηκε",
@@ -310,6 +310,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Ακύρωση",
       "confirmDefault": "OK"
@@ -321,19 +322,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Δεν ήταν δυνατή η εξαγωγή του {{filename}}.",
         "exported": "Εξήχθη το {{filename}}.",
-        "renameFailed": "Δεν ήταν δυνατή η μετονομασία του συνημμένου.",
+        "exportFailed": "Δεν ήταν δυνατή η εξαγωγή του {{filename}}.",
         "renamed": "Μετονομάστηκε σε {{name}}.",
+        "renameFailed": "Δεν ήταν δυνατή η μετονομασία του συνημμένου.",
         "saveDialogFailed": "Δεν ήταν δυνατό το άνοιγμα του παραθύρου αποθήκευσης."
       },
       "convert": {
         "cancel": "Ακύρωση",
         "confirm": "Μετατροπή",
         "skipped": "παραλείφθηκε — {{note}}",
-        "subtitleEmpty": "Δεν υπάρχει τίποτα προς μετατροπή — δεν εντοπίστηκαν πηγαία αρχεία.",
         "subtitle_one": "1 αναφορά θα ξαναγραφτεί. Ελέγξτε πριν την οριστικοποίηση.",
         "subtitle_other": "{{count}} αναφορές θα ξαναγραφτούν. Ελέγξτε πριν την οριστικοποίηση.",
+        "subtitleEmpty": "Δεν υπάρχει τίποτα προς μετατροπή — δεν εντοπίστηκαν πηγαία αρχεία.",
         "title": "Μετατροπή εισαγόμενων συνημμένων"
       },
       "convertCommand": {
@@ -359,8 +360,8 @@
           "archive": "Συμπιεσμένο αρχείο",
           "audio": "Ήχος",
           "cHeader": "Κεφαλίδα C",
-          "cSource": "Πηγαίος κώδικας C",
           "cppSource": "Πηγαίος κώδικας C++",
+          "cSource": "Πηγαίος κώδικας C",
           "css": "CSS",
           "csv": "CSV",
           "document": "Έγγραφο",
@@ -540,12 +541,12 @@
         "browseViews": "Περιήγηση προβολών",
         "cycleViewMode": "Εναλλαγή λειτουργίας προβολής",
         "docStats": {
-          "summarySelectionSuffix": " (επιλ.)",
           "summary_one": "{{count}} λέξη · {{characters}} χαρακτήρες",
           "summary_other": "{{count}} λέξεις · {{characters}} χαρακτήρες",
-          "titleSelectionSuffix": " (επιλογή)",
+          "summarySelectionSuffix": " (επιλ.)",
           "title_one": "{{characters}} χαρακτήρες · {{words}} λέξεις · {{spaces}} κενά · {{count}} παράγραφος",
-          "title_other": "{{characters}} χαρακτήρες · {{words}} λέξεις · {{spaces}} κενά · {{count}} παράγραφοι"
+          "title_other": "{{characters}} χαρακτήρες · {{words}} λέξεις · {{spaces}} κενά · {{count}} παράγραφοι",
+          "titleSelectionSuffix": " (επιλογή)"
         },
         "graphTitle": "Γράφημα (⌘⇧G)",
         "lock": "Κλείδωμα",
@@ -820,10 +821,10 @@
         "countNotes_one": "{{count}} σημείωση",
         "countNotes_other": "{{count}} σημειώσεις",
         "exclusionsHistory": "Το ιστορικό εκδόσεων δεν περιλαμβάνεται.",
-        "exclusionsTrashedAndHistory_one": "{{count}} διαγραμμένη σημείωση και το ιστορικό εκδόσεων δεν περιλαμβάνονται.",
-        "exclusionsTrashedAndHistory_other": "{{count}} διαγραμμένες σημειώσεις και το ιστορικό εκδόσεων δεν περιλαμβάνονται.",
         "exclusionsTrashed_one": "{{count}} διαγραμμένη σημείωση δεν περιλαμβάνεται.",
         "exclusionsTrashed_other": "{{count}} διαγραμμένες σημειώσεις δεν περιλαμβάνονται.",
+        "exclusionsTrashedAndHistory_one": "{{count}} διαγραμμένη σημείωση και το ιστορικό εκδόσεων δεν περιλαμβάνονται.",
+        "exclusionsTrashedAndHistory_other": "{{count}} διαγραμμένες σημειώσεις και το ιστορικό εκδόσεων δεν περιλαμβάνονται.",
         "phaseAttachments": "συνημμένα",
         "phaseNotes": "σημειώσεις",
         "preparing": "Προετοιμασία…",
@@ -881,9 +882,9 @@
   "notes": {
     "archive": {
       "close": "Κλείσιμο",
-      "countEmpty": "Κενό",
       "count_one": "{{count}} σημείωση",
       "count_other": "{{count}} σημειώσεις",
+      "countEmpty": "Κενό",
       "delete": "Διαγραφή",
       "deleteError": "Δεν ήταν δυνατή η διαγραφή αυτής της σημείωσης. Δοκιμάστε ξανά.",
       "emptyState": "Το αρχείο είναι κενό.",
@@ -1165,21 +1166,21 @@
       "renameAriaLabel": "Μετονομασία σημείωσης",
       "untitled": "Χωρίς τίτλο"
     },
+    "savedView": {
+      "defaultName": "Φιλτραρισμένη προβολή"
+    },
     "saveStatus": {
       "editing": "Επεξεργασία",
       "editingEllipsis": "Επεξεργασία…",
       "editingTitle": "Επεξεργασία — η αυτόματη αποθήκευση είναι ενεργή",
       "justNow": "μόλις τώρα",
       "retry": "Επανάληψη",
-      "saveFailed": "Η αποθήκευση απέτυχε",
-      "saveFailedTitle": "Η αποθήκευση απέτυχε — κάντε κλικ στο Επανάληψη",
       "saved": "Αποθηκεύτηκε",
       "savedRelative": "Αποθηκεύτηκε {{rel}}",
+      "saveFailed": "Η αποθήκευση απέτυχε",
+      "saveFailedTitle": "Η αποθήκευση απέτυχε — κάντε κλικ στο Επανάληψη",
       "saving": "Αποθήκευση",
       "savingEllipsis": "Αποθήκευση…"
-    },
-    "savedView": {
-      "defaultName": "Φιλτραρισμένη προβολή"
     },
     "snapshotFailed": {
       "dismiss": "Παράβλεψη",
@@ -1245,9 +1246,9 @@
     },
     "trash": {
       "close": "Κλείσιμο",
-      "countEmpty": "Κενό",
       "count_one": "{{count}} σημείωση",
       "count_other": "{{count}} σημειώσεις",
+      "countEmpty": "Κενό",
       "delete": "Διαγραφή",
       "deleteError": "Δεν ήταν δυνατή η διαγραφή αυτής της σημείωσης. Δοκιμάστε ξανά.",
       "empty": "Άδειασμα Κάδου",
@@ -1274,24 +1275,6 @@
       "searching": "Αναζήτηση…",
       "thisNote": "αυτή τη σημείωση",
       "untitled": "Χωρίς τίτλο"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Προεπιλογή (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (τετράγωνο)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (ευρύ)"
-      },
-      "cancel": "Ακύρωση",
-      "cardSize": "Μέγεθος κάρτας",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Η ιδιότητα frontmatter της οποίας η τιμή είναι μια εικόνα — εμφανίζεται ως το εξώφυλλο κάθε κάρτας. Αφήστε το κενό για να μην υπάρχει εξώφυλλο.",
-      "coverImagePlaceholder": "π.χ. cover",
-      "coverImageProperty": "Ιδιότητα εικόνας εξωφύλλου",
-      "imageAspectRatio": "Αναλογία διαστάσεων εικόνας",
-      "reset": "Επαναφορά",
-      "save": "Αποθήκευση"
     },
     "views": {
       "cards": {
@@ -1320,6 +1303,24 @@
       },
       "newView": "Νέα προβολή",
       "untitledView": "Προβολή χωρίς τίτλο"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Προεπιλογή (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (τετράγωνο)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (ευρύ)"
+      },
+      "cancel": "Ακύρωση",
+      "cardSize": "Μέγεθος κάρτας",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Η ιδιότητα frontmatter της οποίας η τιμή είναι μια εικόνα — εμφανίζεται ως το εξώφυλλο κάθε κάρτας. Αφήστε το κενό για να μην υπάρχει εξώφυλλο.",
+      "coverImagePlaceholder": "π.χ. cover",
+      "coverImageProperty": "Ιδιότητα εικόνας εξωφύλλου",
+      "imageAspectRatio": "Αναλογία διαστάσεων εικόνας",
+      "reset": "Επαναφορά",
+      "save": "Αποθήκευση"
     },
     "welcome": {
       "body": "Καλώς ήρθατε στο Myne, τον ιδιωτικό σας χώρο για να σκέφτεστε και να γράφετε.\n\nΌ,τι αποθηκεύετε εδώ είναι κρυπτογραφημένο και παραμένει στη συσκευή σας. Ο **κωδικός πρόσβασής** σας και η **φράση ανάκτησής** σας είναι τα μόνα κλειδιά γι' αυτό, γι' αυτό κρατήστε τα κάπου ασφαλή. Αν χαθούν και τα δύο, κανείς δεν μπορεί να επαναφέρει τις σημειώσεις σας, ούτε καν εμείς.\n\nΑυτή είναι απλώς μια κανονική σημείωση, οπότε κάντε την δική σας. Επεξεργαστείτε την, μετονομάστε την ή διαγράψτε την όποτε θέλετε και προσθέστε νέες σημειώσεις καθώς αναπτύσσονται οι ιδέες σας.\n\nΧαιρόμαστε που είστε εδώ. Για να μάθετε περισσότερα για το Myne, επισκεφθείτε το https://myne.md\n",
@@ -1679,9 +1680,9 @@
       "on": "Ενεργό"
     },
     "storage": {
-      "backUpVault": "Δημιουργία αντιγράφου ασφαλείας θησαυροφυλακίου…",
       "backupHelper": "Τα αντίγραφα ασφαλείας παραμένουν τόσο κρυπτογραφημένα όσο και το θησαυροφυλάκιό σας, σε ένα μόνο επαληθευμένο αρχείο .myne-backup. Η επαναφορά λειτουργεί με τον κωδικό πρόσβασης ή τη φράση ανάκτησης εκείνου του θησαυροφυλακίου — ακριβώς όπως το ξεκλείδωμα.",
       "backupLabel": "Αντίγραφο ασφαλείας",
+      "backUpVault": "Δημιουργία αντιγράφου ασφαλείας θησαυροφυλακίου…",
       "exportAction": "Εξαγωγή…",
       "exportBody": "Εξαγωγή θησαυροφυλακίου ως Markdown",
       "exportHelper": "Απλό δέντρο Markdown — μη κρυπτογραφημένο.",
@@ -1713,6 +1714,127 @@
       "optionLive": "Ζωντανή προεπισκόπηση",
       "optionReading": "Ανάγνωση",
       "optionSource": "Πηγαίος κώδικας"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1926,12 +2048,12 @@
       "saveAsFile": "Αποθήκευση ως αρχείο"
     },
     "ready": {
-      "backUpNow": "Δημιουργήστε αντίγραφο ασφαλείας αυτού του θησαυροφυλακίου τώρα",
       "backedUp": "Δημιουργήθηκε αντίγραφο ασφαλείας ✓",
       "backingUp": "Δημιουργία αντιγράφου ασφαλείας…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Το αντίγραφο ασφαλείας δεν ολοκληρώθηκε — δεν δημιουργήθηκε κανένα αρχείο. Μπορείτε να δημιουργήσετε αντίγραφο ασφαλείας οποτεδήποτε από τις Ρυθμίσεις → Αποθήκευση.",
       "backupFilterName": "Αντίγραφο ασφαλείας Myne",
+      "backUpNow": "Δημιουργήστε αντίγραφο ασφαλείας αυτού του θησαυροφυλακίου τώρα",
       "body": "Το Myne έγραψε το θησαυροφυλάκιό σας στον φάκελο δεδομένων εφαρμογής σας. Ο κύριος κωδικός πρόσβασης και η φράση ανάκτησής σας είναι ο μόνος τρόπος για να επιστρέψετε — βεβαιωθείτε ότι και τα δύο έχουν αποθηκευτεί κάπου ασφαλή.",
       "decrypting": "Αποκρυπτογράφηση…",
       "done": "Ολοκληρώθηκε",
@@ -2001,8 +2123,8 @@
   "vaultSwitcher": {
     "chipFallback": "Θησαυροφυλάκιο",
     "createAnother": "Δημιουργία άλλου θησαυροφυλακίου",
-    "switchVaultLabel": "Εναλλαγή θησαυροφυλακίου",
     "switching": "εναλλαγή…",
+    "switchVaultLabel": "Εναλλαγή θησαυροφυλακίου",
     "vaultFallback": "Θησαυροφυλάκιο {{n}}"
   },
   "welcome": {
@@ -2011,8 +2133,8 @@
     "headlineLine2": "Χωρίς email κατά την εγγραφή.",
     "repairResidue": {
       "cancel": "Ακύρωση",
-      "cleanUp": "Καθαρισμός",
       "cleaningUp": "Καθαρισμός…",
+      "cleanUp": "Καθαρισμός",
       "confirmBody_one": "{{count}} αρχείο θα αφαιρεθεί. Είναι ήδη δυσανάγνωστα· δεν χάνεται τίποτα ανακτήσιμο.",
       "confirmBody_other": "{{count}} αρχεία θα αφαιρεθούν. Είναι ήδη δυσανάγνωστα· δεν χάνεται τίποτα ανακτήσιμο.",
       "confirmTitle": "Καθαρισμός των υπολειπόμενων αρχείων;",

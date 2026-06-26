@@ -7,10 +7,13 @@
 //
 // Five states (mirroring the Rust `SyncRuntimeStatus`): disabled / idle /
 // syncing / error / conflicts. The "Sync now" button is hidden when sync is
-// disabled (no endpoint configured) — there is nothing to trigger. All copy is
-// inline EN, like the rest of the app (no i18n layer yet).
+// disabled (no endpoint configured) — there is nothing to trigger. Copy is
+// resolved through react-i18next (module-level labels resolved at usage time via
+// i18n.t() so a language switch is picked up, never frozen at module load).
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { useSyncStatus, type SyncStatus } from "../../hooks/useSyncStatus";
 
 const ROOT_STYLE: CSSProperties = {
@@ -50,32 +53,30 @@ interface Presentation {
 }
 
 function present(status: SyncStatus | null): Presentation {
-  if (!status) return { dotColor: "var(--fg-3)", label: "Sync status…" };
+  if (!status) return { dotColor: "var(--fg-3)", label: i18n.t("sync.status.loading") };
   switch (status.state) {
     case "disabled":
-      return { dotColor: "var(--fg-3)", label: "Sync off" };
+      return { dotColor: "var(--fg-3)", label: i18n.t("sync.status.off") };
     case "not_enrolled":
-      return { dotColor: "var(--fg-3)", label: "Not enrolled" };
+      return { dotColor: "var(--fg-3)", label: i18n.t("sync.status.notEnrolled") };
     case "pending":
-      return { dotColor: "var(--accent)", label: "Awaiting approval" };
+      return { dotColor: "var(--accent)", label: i18n.t("sync.status.awaitingApproval") };
     case "idle":
-      return { dotColor: "var(--success)", label: "Synced" };
+      return { dotColor: "var(--success)", label: i18n.t("sync.status.synced") };
     case "syncing":
-      return { dotColor: "var(--accent)", label: "Syncing…" };
+      return { dotColor: "var(--accent)", label: i18n.t("sync.status.syncing") };
     case "error":
-      return { dotColor: "var(--danger)", label: "Sync error" };
+      return { dotColor: "var(--danger)", label: i18n.t("sync.status.error") };
     case "conflicts":
       return {
         dotColor: "var(--warning)",
-        label:
-          status.count === 1
-            ? "1 conflict to review"
-            : `${status.count} conflicts to review`,
+        label: i18n.t("sync.status.conflicts", { count: status.count }),
       };
   }
 }
 
 export function SyncStatusIndicator() {
+  const { t } = useTranslation();
   const { status, syncNow, busy } = useSyncStatus();
   const { dotColor, label } = present(status);
   // Hide "Sync now" when there is nothing to trigger: no endpoint (disabled) OR this
@@ -100,7 +101,7 @@ export function SyncStatusIndicator() {
           disabled={busy}
           data-testid="sync.sync-now"
         >
-          {busy ? "Syncing…" : "Sync now"}
+          {busy ? t("sync.status.syncing") : t("sync.status.syncNow")}
         </button>
       )}
     </div>

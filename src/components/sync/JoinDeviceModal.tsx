@@ -6,6 +6,7 @@
 // Built against design tokens; Penpot skipped per the owner directive.
 
 import { useId, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
@@ -92,6 +93,7 @@ interface JoinDeviceModalProps {
 }
 
 export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
+  const { t } = useTranslation();
   const baseId = useId();
   const [url, setUrl] = useState("");
   const [account, setAccount] = useState("");
@@ -116,11 +118,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       password,
     })
       .then((res) => onJoined(res.vault_id))
-      .catch(() =>
-        setError(
-          "Couldn’t add this device. Check the server URL, account number, and password — and that the server is reachable.",
-        ),
-      )
+      .catch(() => setError(t("sync.join.error")))
       .finally(() => setBusy(false));
   };
 
@@ -137,23 +135,19 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
     >
       <div style={CARD} onClick={(e) => e.stopPropagation()}>
         <h2 id={`${baseId}-title`} style={TITLE}>
-          Add this device to an account
+          {t("sync.join.title")}
         </h2>
-        <p style={HELP}>
-          Sign in with your account number and password. This device will sync
-          your notes once an existing device approves it. No recovery phrase
-          needed.
-        </p>
+        <p style={HELP}>{t("sync.join.help")}</p>
 
         <div style={FIELD}>
           <label style={LABEL} htmlFor={`${baseId}-url`}>
-            Sync server
+            {t("sync.join.serverLabel")}
           </label>
           <Input
             id={`${baseId}-url`}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://your-server.example"
+            placeholder={t("sync.join.serverPlaceholder")}
             autoComplete="off"
             spellCheck={false}
             data-testid="join.server-input"
@@ -162,7 +156,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
 
         <div style={FIELD}>
           <label style={LABEL} htmlFor={`${baseId}-account`}>
-            Account number
+            {t("sync.join.accountLabel")}
           </label>
           <Input
             id={`${baseId}-account`}
@@ -177,7 +171,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
         </div>
 
         <PasswordInput
-          label="Password"
+          label={t("sync.join.passwordLabel")}
           value={password}
           onChange={setPassword}
           show={showPassword}
@@ -195,7 +189,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
             style={btn(false, busy)}
             data-testid="join.cancel"
           >
-            Cancel
+            {t("sync.join.cancel")}
           </button>
           <button
             type="button"
@@ -204,7 +198,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
             style={btn(true, !canSubmit)}
             data-testid="join.submit"
           >
-            {busy ? "Adding…" : "Add device"}
+            {busy ? t("sync.join.submitting") : t("sync.join.submit")}
           </button>
         </div>
       </div>

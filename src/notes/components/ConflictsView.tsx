@@ -6,6 +6,8 @@
 // design tokens. Mirrors the Trash/Templates panel shape.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import type { TitleRecord } from "../loadNoteBatch";
 
 const ROOT: CSSProperties = {
@@ -67,14 +69,17 @@ export interface ConflictsViewProps {
 }
 
 function displayTitle(r: TitleRecord): string {
-  return r.title && r.title.length > 0 ? r.title : `Untitled (${r.noteUuid.slice(0, 6)})`;
+  return r.title && r.title.length > 0
+    ? r.title
+    : i18n.t("sync.conflicts.untitled", { hex: r.noteUuid.slice(0, 6) });
 }
 
 export function ConflictsView({ groups, onKeepBoth, onDiscard }: ConflictsViewProps) {
+  const { t } = useTranslation();
   if (groups.size === 0) {
     return (
       <div style={EMPTY} data-testid="conflicts.empty">
-        No conflicts — your devices are in sync.
+        {t("sync.conflicts.empty")}
       </div>
     );
   }
@@ -83,10 +88,10 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard }: ConflictsViewPr
       {[...groups.entries()].map(([originalUuid, copies]) => (
         <div key={originalUuid} style={GROUP} data-testid="conflicts.group" data-conflict-of={originalUuid}>
           <div style={GROUP_TITLE}>
-            {copies.length === 1
-              ? "1 conflicting copy"
-              : `${copies.length} conflicting copies`}{" "}
-            of {originalUuid.slice(0, 8)}
+            {t("sync.conflicts.groupTitle", {
+              count: copies.length,
+              original: originalUuid.slice(0, 8),
+            })}
           </div>
           {copies.map((c) => (
             <div key={c.noteUuid} style={ROW} data-testid="conflicts.copy" data-note-id={c.noteUuid}>
@@ -98,7 +103,7 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard }: ConflictsViewPr
                   onClick={() => onKeepBoth(c.noteUuid)}
                   data-testid="conflicts.keep-both"
                 >
-                  Keep as separate
+                  {t("sync.conflicts.keepAsSeparate")}
                 </button>
                 <button
                   type="button"
@@ -106,7 +111,7 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard }: ConflictsViewPr
                   onClick={() => onDiscard(c.noteUuid)}
                   data-testid="conflicts.discard"
                 >
-                  Discard
+                  {t("sync.conflicts.discard")}
                 </button>
               </div>
             </div>

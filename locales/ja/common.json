@@ -6,12 +6,14 @@
       "close": "閉じる",
       "completeTitle": "クリーンアップ完了",
       "deleteCta": "未使用の{{count}}件を削除",
+      "deleteCta_other": "",
       "error": "クリーンアップできませんでした。一部のノートが読み取れない可能性があります — 何も削除されていません。",
       "intro_other": "これら{{count}}件の添付ファイルはどのノートでも使用されていません。削除すると元に戻せません。",
       "summaryFreed": " · {{size}}を解放",
       "summaryPeriod": "。",
       "summaryRemoved_other": "{{count}}件の添付ファイルを削除しました",
       "summarySkipped": " · {{count}}件をスキップ（現在使用中）",
+      "summarySkipped_other": "",
       "title": "未使用の添付ファイルを整理",
       "willBeReclaimed": "{{size}}が解放されます。"
     },
@@ -38,8 +40,8 @@
     "library": {
       "actionsAriaLabel": "添付ファイルの操作",
       "actionsTitle": "操作",
-      "checkUnusedFailedNotice": "未使用の添付ファイルを確認できませんでした。もう一度お試しください。",
       "checking": "確認中…",
+      "checkUnusedFailedNotice": "未使用の添付ファイルを確認できませんでした。もう一度お試しください。",
       "cleanUnused": "未使用を整理",
       "cleanUnusedTitle": "どのノートでも使用されていない添付ファイルを削除",
       "colCreated": "作成日",
@@ -303,6 +305,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "キャンセル",
       "confirmDefault": "OK"
@@ -314,18 +317,18 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "{{filename}}をエクスポートできませんでした。",
         "exported": "{{filename}}をエクスポートしました。",
-        "renameFailed": "添付ファイルの名前を変更できませんでした。",
+        "exportFailed": "{{filename}}をエクスポートできませんでした。",
         "renamed": "{{name}}に名前を変更しました。",
+        "renameFailed": "添付ファイルの名前を変更できませんでした。",
         "saveDialogFailed": "保存ダイアログを開けませんでした。"
       },
       "convert": {
         "cancel": "キャンセル",
         "confirm": "変換",
         "skipped": "スキップ — {{note}}",
-        "subtitleEmpty": "変換するものがありません — ソースファイルが見つかりませんでした。",
         "subtitle_other": "{{count}}件の参照が書き換えられます。実行前に確認してください。",
+        "subtitleEmpty": "変換するものがありません — ソースファイルが見つかりませんでした。",
         "title": "インポートされた添付ファイルを変換"
       },
       "convertCommand": {
@@ -333,6 +336,7 @@
       },
       "convertCore": {
         "converted": "{{count}}件を変換",
+        "converted_other": "",
         "noneToConvert": "このノートには変換するインポート済み添付ファイルがありません。",
         "skipNote": {
           "failed": "インポート失敗",
@@ -341,7 +345,8 @@
           "tooLarge": "サイズ超過（最大64 MiB）",
           "unsupported": "非対応の種類"
         },
-        "skippedSuffix": " · {{count}}件をスキップ"
+        "skippedSuffix": " · {{count}}件をスキップ",
+        "skippedSuffix_other": ""
       },
       "fileKind": {
         "generic": "ファイル",
@@ -349,8 +354,8 @@
           "archive": "アーカイブ",
           "audio": "オーディオ",
           "cHeader": "Cヘッダー",
-          "cSource": "Cソース",
           "cppSource": "C++ソース",
+          "cSource": "Cソース",
           "css": "CSS",
           "csv": "CSV",
           "document": "ドキュメント",
@@ -427,7 +432,8 @@
           "tooLarge": "サイズが大きすぎます",
           "unsupported": "非対応の種類"
         },
-        "skipped": "{{count}}件をスキップ：{{noun}}"
+        "skipped": "{{count}}件をスキップ：{{noun}}",
+        "skipped_other": ""
       },
       "voice": {
         "startError": {
@@ -494,6 +500,7 @@
         "archivedBadge": "アーカイブ済み",
         "empty": "バックリンクはまだありません。",
         "linkedFrom": "{{count}}件からリンク",
+        "linkedFrom_other": "",
         "untitled": "無題"
       },
       "barItems": {
@@ -509,22 +516,26 @@
       },
       "baseImport": {
         "droppedFiltersSuffix": " · {{count}}件のフィルタを削除",
+        "droppedFiltersSuffix_other": "",
         "failed": "インポートに失敗しました。",
         "fileFilterName": "Obsidian Base",
         "imported": "{{count}}件のビューをインポートしました",
+        "imported_other": "",
         "notValid": "有効な.baseファイルではありません。",
         "skippedSuffix": " · {{count}}件をスキップ",
-        "stoppedAfter": "{{count}}件のビューでインポートを停止しました。"
+        "skippedSuffix_other": "",
+        "stoppedAfter": "{{count}}件のビューでインポートを停止しました。",
+        "stoppedAfter_other": ""
       },
       "bottomBar": {
         "browseTags": "タグを参照",
         "browseViews": "ビューを参照",
         "cycleViewMode": "表示モードを循環",
         "docStats": {
-          "summarySelectionSuffix": "（選択）",
           "summary_other": "{{count}}語 · {{characters}}文字",
-          "titleSelectionSuffix": "（選択範囲）",
-          "title_other": "{{characters}}文字 · {{words}}語 · {{spaces}}スペース · {{count}}段落"
+          "summarySelectionSuffix": "（選択）",
+          "title_other": "{{characters}}文字 · {{words}}語 · {{spaces}}スペース · {{count}}段落",
+          "titleSelectionSuffix": "（選択範囲）"
         },
         "graphTitle": "グラフ（⌘⇧G）",
         "lock": "ロック",
@@ -540,7 +551,8 @@
       },
       "import": {
         "imported_other": "{{count}}件のノートをインポートしました{{skipped}}",
-        "skippedSuffix": " · {{count}}件をスキップ"
+        "skippedSuffix": " · {{count}}件をスキップ",
+        "skippedSuffix_other": ""
       },
       "nav": {
         "goBack": "戻る",
@@ -788,8 +800,8 @@
         "countFolders_other": "フォルダ{{count}}件",
         "countNotes_other": "ノート{{count}}件",
         "exclusionsHistory": "バージョン履歴は含まれていません。",
-        "exclusionsTrashedAndHistory_other": "ゴミ箱内のノート{{count}}件とバージョン履歴は含まれていません。",
         "exclusionsTrashed_other": "ゴミ箱内のノート{{count}}件は含まれていません。",
+        "exclusionsTrashedAndHistory_other": "ゴミ箱内のノート{{count}}件とバージョン履歴は含まれていません。",
         "phaseAttachments": "添付ファイル",
         "phaseNotes": "ノート",
         "preparing": "準備中…",
@@ -847,8 +859,8 @@
   "notes": {
     "archive": {
       "close": "閉じる",
-      "countEmpty": "空",
       "count_other": "{{count}}件のノート",
+      "countEmpty": "空",
       "delete": "削除",
       "deleteError": "そのノートを削除できませんでした。もう一度お試しください。",
       "emptyState": "アーカイブは空です。",
@@ -954,6 +966,7 @@
       "modal": {
         "cancel": "キャンセル",
         "cancelledNotImported": "{{count}}件がインポートされませんでした",
+        "cancelledNotImported_other": "",
         "cancelling": "キャンセル中…",
         "chooseFolder": "フォルダを選択…",
         "close": "閉じる",
@@ -975,7 +988,9 @@
         "markDone": "完了にする",
         "markedDone": "完了済み",
         "mediaImported": "{{count}}件をインポート",
+        "mediaImported_other": "",
         "mediaOmittedSuffix": " · {{count}}件を除外",
+        "mediaOmittedSuffix_other": "",
         "needsAttention": "要対応",
         "needsAttentionHelp": "これらのノートはそのままインポートされました。提案された修正はあくまで出発点です — 1つをコピーし、ノートを開いて名前を変更してください。",
         "noFolderChosen": "フォルダが選択されていません",
@@ -1022,8 +1037,11 @@
       "archiveSingleError": "ノートをアーカイブできませんでした。",
       "attachments": "添付ファイル",
       "bulkArchive": "{{count}}件のノートをアーカイブ",
+      "bulkArchive_other": "",
       "bulkDelete": "{{count}}件のノートを削除",
+      "bulkDelete_other": "",
       "bulkMove": "{{count}}件のノートを移動…",
+      "bulkMove_other": "",
       "caseMergeBody": "「{{name}}」という名前のフォルダがすでに存在します。これらは統合されます — 別々に保つには、いずれかの名前を変更しますか？",
       "color": "色…",
       "createFirstNote": "+ 最初のノートを作成",
@@ -1119,21 +1137,21 @@
       "renameAriaLabel": "ノートの名前を変更",
       "untitled": "無題"
     },
+    "savedView": {
+      "defaultName": "絞り込みビュー"
+    },
     "saveStatus": {
       "editing": "編集中",
       "editingEllipsis": "編集中…",
       "editingTitle": "編集中 — 自動保存が有効です",
       "justNow": "たった今",
       "retry": "再試行",
-      "saveFailed": "保存に失敗しました",
-      "saveFailedTitle": "保存に失敗しました — 「再試行」をクリック",
       "saved": "保存済み",
       "savedRelative": "{{rel}}に保存",
+      "saveFailed": "保存に失敗しました",
+      "saveFailedTitle": "保存に失敗しました — 「再試行」をクリック",
       "saving": "保存中",
       "savingEllipsis": "保存中…"
-    },
-    "savedView": {
-      "defaultName": "絞り込みビュー"
     },
     "snapshotFailed": {
       "dismiss": "閉じる",
@@ -1197,8 +1215,8 @@
     },
     "trash": {
       "close": "閉じる",
-      "countEmpty": "空",
       "count_other": "{{count}}件のノート",
+      "countEmpty": "空",
       "delete": "削除",
       "deleteError": "そのノートを削除できませんでした。もう一度お試しください。",
       "empty": "ゴミ箱を空にする",
@@ -1223,24 +1241,6 @@
       "searching": "検索中…",
       "thisNote": "このノート",
       "untitled": "無題"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "デフォルト（16:9）",
-        "fourThree": "4:3",
-        "square": "1:1（正方形）",
-        "threeTwo": "3:2",
-        "wide": "16:9（ワイド）"
-      },
-      "cancel": "キャンセル",
-      "cardSize": "カードサイズ",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "値が画像であるフロントマターのプロパティ — 各カードのカバーとして表示されます。カバーを表示しない場合は空のままにしてください。",
-      "coverImagePlaceholder": "例：cover",
-      "coverImageProperty": "カバー画像のプロパティ",
-      "imageAspectRatio": "画像のアスペクト比",
-      "reset": "リセット",
-      "save": "保存"
     },
     "views": {
       "cards": {
@@ -1269,6 +1269,24 @@
       },
       "newView": "新規ビュー",
       "untitledView": "無題のビュー"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "デフォルト（16:9）",
+        "fourThree": "4:3",
+        "square": "1:1（正方形）",
+        "threeTwo": "3:2",
+        "wide": "16:9（ワイド）"
+      },
+      "cancel": "キャンセル",
+      "cardSize": "カードサイズ",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "値が画像であるフロントマターのプロパティ — 各カードのカバーとして表示されます。カバーを表示しない場合は空のままにしてください。",
+      "coverImagePlaceholder": "例：cover",
+      "coverImageProperty": "カバー画像のプロパティ",
+      "imageAspectRatio": "画像のアスペクト比",
+      "reset": "リセット",
+      "save": "保存"
     },
     "welcome": {
       "body": "Myneへようこそ。ここはあなたが考え、書くためのプライベートな空間です。\n\nここに保存したものはすべて暗号化され、あなたのデバイスにとどまります。**パスワード**と**復元フレーズ**だけがその鍵なので、安全な場所に保管してください。両方とも失ってしまうと、私たちを含め誰もあなたのノートを取り戻すことはできません。\n\nこれはごく普通のノートなので、自由に使ってください。いつでも編集、名前変更、削除でき、アイデアが広がるたびに新しいノートを追加できます。\n\nお越しいただきありがとうございます。Myneについて詳しくは https://myne.md をご覧ください。\n",
@@ -1448,8 +1466,10 @@
         "bare": "接続済み",
         "daysAgo_other": "{{count}}日前に接続",
         "hoursAgo": "{{count}}時間前に接続",
+        "hoursAgo_other": "",
         "justNow": "たった今接続",
         "minutesAgo": "{{count}}分前に接続",
+        "minutesAgo_other": "",
         "onDate": "{{date}}に接続"
       }
     },
@@ -1580,12 +1600,14 @@
       "errorNotUnlocked": "先に保管庫のロックを解除してください。",
       "errorPinNotDigits": "PINは数字のみで入力してください。",
       "errorPinTooShort": "PINは{{count}}桁以上にしてください。",
+      "errorPinTooShort_other": "",
       "helperConfigured": "{{method}}で設定済みです。自動ロック後の再入力ではマスターパスワードが不要になります。再起動後はマスターパスワードが必要です。",
       "helperNotConfigured": "自動ロック後の再入力を、完全なマスターパスワードの代わりにPINまたはTouch IDで行えます。暗号化された保管庫を補完する利便性のための機能で、再起動後はマスターパスワードが必要です。",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "クイックロック解除PIN",
       "pinPlaceholder": "PIN（{{count}}桁以上）",
+      "pinPlaceholder_other": "",
       "setPin": "PINを設定",
       "setupHelper": "Touch IDはmacOS専用で、現在は実験的機能です（ハードウェア検証は保留中）。PINはどの環境でも使用できます。",
       "title": "クイックロック解除",
@@ -1621,9 +1643,9 @@
       "on": "オン"
     },
     "storage": {
-      "backUpVault": "保管庫をバックアップ…",
       "backupHelper": "バックアップは保管庫と同じく暗号化されたまま、単一の検証済み.myne-backupファイルに保存されます。復元はその保管庫のパスワードまたは復元フレーズで行います — ロック解除とまったく同じです。",
       "backupLabel": "バックアップ",
+      "backUpVault": "保管庫をバックアップ…",
       "exportAction": "エクスポート…",
       "exportBody": "保管庫をMarkdownとしてエクスポート",
       "exportHelper": "プレーンなMarkdownのツリー — 暗号化されません。",
@@ -1655,6 +1677,124 @@
       "optionLive": "ライブプレビュー",
       "optionReading": "読み取り",
       "optionSource": "ソース"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1868,12 +2008,12 @@
       "saveAsFile": "ファイルとして保存"
     },
     "ready": {
-      "backUpNow": "今すぐこの保管庫をバックアップ",
       "backedUp": "バックアップ済み ✓",
       "backingUp": "バックアップ中…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "バックアップが完了しませんでした — ファイルは残されていません。設定 → ストレージからいつでもバックアップできます。",
       "backupFilterName": "Myneバックアップ",
+      "backUpNow": "今すぐこの保管庫をバックアップ",
       "body": "Myneは保管庫をアプリケーションデータフォルダに書き込みました。マスターパスワードと復元フレーズが唯一の戻る手段です — どちらも安全な場所に保存されていることを確認してください。",
       "decrypting": "復号中…",
       "done": "完了",
@@ -1943,8 +2083,8 @@
   "vaultSwitcher": {
     "chipFallback": "保管庫",
     "createAnother": "別の保管庫を作成",
-    "switchVaultLabel": "保管庫を切り替え",
     "switching": "切り替え中…",
+    "switchVaultLabel": "保管庫を切り替え",
     "vaultFallback": "保管庫{{n}}"
   },
   "welcome": {
@@ -1953,8 +2093,8 @@
     "headlineLine2": "登録時にメール不要。",
     "repairResidue": {
       "cancel": "キャンセル",
-      "cleanUp": "クリーンアップ",
       "cleaningUp": "クリーンアップ中…",
+      "cleanUp": "クリーンアップ",
       "confirmBody_other": "{{count}}件のファイルが削除されます。すでに読み取れない状態であり、復元可能なものは何も失われません。",
       "confirmTitle": "残ったファイルをクリーンアップしますか？",
       "doneBody_other": "{{count}}件の残ったファイルを削除しました。新しい保管庫を作成できます。",

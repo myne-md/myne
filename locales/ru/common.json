@@ -5,21 +5,25 @@
       "cleaning": "Очистка…",
       "close": "Закрыть",
       "completeTitle": "Очистка завершена",
+      "deleteCta_one": "Удалить {{count}} неиспользуемое",
       "deleteCta_few": "Удалить {{count}} неиспользуемых",
       "deleteCta_many": "Удалить {{count}} неиспользуемых",
-      "deleteCta_one": "Удалить {{count}} неиспользуемое",
+      "deleteCta_other": "",
       "error": "Не удалось выполнить очистку. Некоторые заметки могут быть нечитаемыми — ничего не удалено.",
+      "intro_one": "Это вложение не используется ни в одной заметке. Удаление необратимо.",
       "intro_few": "Эти {{count}} вложения не используются ни в одной заметке. Удаление необратимо.",
       "intro_many": "Эти {{count}} вложений не используются ни в одной заметке. Удаление необратимо.",
-      "intro_one": "Это вложение не используется ни в одной заметке. Удаление необратимо.",
+      "intro_other": "",
       "summaryFreed": " · освобождено {{size}}",
       "summaryPeriod": ".",
+      "summaryRemoved_one": "Удалено {{count}} вложение",
       "summaryRemoved_few": "Удалено {{count}} вложения",
       "summaryRemoved_many": "Удалено {{count}} вложений",
-      "summaryRemoved_one": "Удалено {{count}} вложение",
+      "summaryRemoved_other": "",
+      "summarySkipped_one": " · {{count}} пропущено (сейчас используется)",
       "summarySkipped_few": " · {{count}} пропущено (сейчас используются)",
       "summarySkipped_many": " · {{count}} пропущено (сейчас используются)",
-      "summarySkipped_one": " · {{count}} пропущено (сейчас используется)",
+      "summarySkipped_other": "",
       "title": "Очистить неиспользуемые вложения",
       "willBeReclaimed": "Будет освобождено {{size}}."
     },
@@ -39,17 +43,18 @@
       "deleting": "Удаление…",
       "error": "Не удалось удалить вложение. Попробуйте ещё раз.",
       "notUsed": "Не используется ни в одной заметке.",
+      "stillUsed_one": "Оно всё ещё используется в {{count}} заметке. После удаления на месте вставки останется метка-заглушка:",
       "stillUsed_few": "Оно всё ещё используется в {{count}} заметках. После удаления на месте вставки останется метка-заглушка:",
       "stillUsed_many": "Оно всё ещё используется в {{count}} заметках. После удаления на месте вставки останется метка-заглушка:",
-      "stillUsed_one": "Оно всё ещё используется в {{count}} заметке. После удаления на месте вставки останется метка-заглушка:",
+      "stillUsed_other": "",
       "title": "Удалить вложение",
       "untitled": "Без названия"
     },
     "library": {
       "actionsAriaLabel": "Действия с вложением",
       "actionsTitle": "Действия",
-      "checkUnusedFailedNotice": "Не удалось проверить неиспользуемые вложения. Попробуйте ещё раз.",
       "checking": "Проверка…",
+      "checkUnusedFailedNotice": "Не удалось проверить неиспользуемые вложения. Попробуйте ещё раз.",
       "cleanUnused": "Очистить неиспользуемые",
       "cleanUnusedTitle": "Удалить вложения, не используемые ни в одной заметке",
       "colCreated": "Создано",
@@ -94,9 +99,10 @@
         "other": "Другое",
         "pdf": "PDF"
       },
+      "usedInCount_one": "Используется в {{count}} заметке",
       "usedInCount_few": "Используется в {{count}} заметках",
       "usedInCount_many": "Используется в {{count}} заметках",
-      "usedInCount_one": "Используется в {{count}} заметке",
+      "usedInCount_other": "",
       "usedInLoading": "…"
     },
     "thumbnail": {
@@ -316,6 +322,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Отмена",
       "confirmDefault": "ОК"
@@ -327,29 +334,31 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Не удалось экспортировать {{filename}}.",
         "exported": "{{filename}} экспортирован.",
-        "renameFailed": "Не удалось переименовать вложение.",
+        "exportFailed": "Не удалось экспортировать {{filename}}.",
         "renamed": "Переименовано в {{name}}.",
+        "renameFailed": "Не удалось переименовать вложение.",
         "saveDialogFailed": "Не удалось открыть диалог сохранения."
       },
       "convert": {
         "cancel": "Отмена",
         "confirm": "Преобразовать",
         "skipped": "пропущено — {{note}}",
-        "subtitleEmpty": "Нечего преобразовывать — исходные файлы не найдены.",
+        "subtitle_one": "Будет переписана 1 ссылка. Проверьте перед применением.",
         "subtitle_few": "Будет переписано {{count}} ссылки. Проверьте перед применением.",
         "subtitle_many": "Будет переписано {{count}} ссылок. Проверьте перед применением.",
-        "subtitle_one": "Будет переписана 1 ссылка. Проверьте перед применением.",
+        "subtitle_other": "",
+        "subtitleEmpty": "Нечего преобразовывать — исходные файлы не найдены.",
         "title": "Преобразовать импортированные вложения"
       },
       "convertCommand": {
         "pickerSourceFilter": "Источник вложения"
       },
       "convertCore": {
+        "converted_one": "{{count}} преобразовано",
         "converted_few": "{{count}} преобразовано",
         "converted_many": "{{count}} преобразовано",
-        "converted_one": "{{count}} преобразовано",
+        "converted_other": "",
         "noneToConvert": "В этой заметке нет импортированных вложений для преобразования.",
         "skipNote": {
           "failed": "не удалось импортировать",
@@ -358,9 +367,10 @@
           "tooLarge": "слишком большой (макс. 64 МиБ)",
           "unsupported": "неподдерживаемый тип"
         },
+        "skippedSuffix_one": " · {{count}} пропущено",
         "skippedSuffix_few": " · {{count}} пропущено",
         "skippedSuffix_many": " · {{count}} пропущено",
-        "skippedSuffix_one": " · {{count}} пропущено"
+        "skippedSuffix_other": ""
       },
       "fileKind": {
         "generic": "Файл",
@@ -368,8 +378,8 @@
           "archive": "Архив",
           "audio": "Аудио",
           "cHeader": "Заголовок C",
-          "cSource": "Исходный код C",
           "cppSource": "Исходный код C++",
+          "cSource": "Исходный код C",
           "css": "CSS",
           "csv": "CSV",
           "document": "Документ",
@@ -439,18 +449,20 @@
         "title": "Переименовать вложение"
       },
       "summary": {
+        "added_one": "{{count}} добавлено",
         "added_few": "{{count}} добавлено",
         "added_many": "{{count}} добавлено",
-        "added_one": "{{count}} добавлено",
+        "added_other": "",
         "reason": {
           "failed": "ошибка",
           "locked": "хранилище заблокировано",
           "tooLarge": "слишком большой",
           "unsupported": "неподдерживаемый тип"
         },
+        "skipped_one": "{{count}} пропущено: {{noun}}",
         "skipped_few": "{{count}} пропущено: {{noun}}",
         "skipped_many": "{{count}} пропущено: {{noun}}",
-        "skipped_one": "{{count}} пропущено: {{noun}}"
+        "skipped_other": ""
       },
       "voice": {
         "startError": {
@@ -517,9 +529,10 @@
       "backlinks": {
         "archivedBadge": "В архиве",
         "empty": "Обратных ссылок пока нет.",
+        "linkedFrom_one": "Ссылается из {{count}}",
         "linkedFrom_few": "Ссылаются из {{count}}",
         "linkedFrom_many": "Ссылаются из {{count}}",
-        "linkedFrom_one": "Ссылается из {{count}}",
+        "linkedFrom_other": "",
         "untitled": "Без названия"
       },
       "barItems": {
@@ -535,35 +548,41 @@
         "workspace": "Рабочая область"
       },
       "baseImport": {
+        "droppedFiltersSuffix_one": " · {{count}} фильтр отброшен",
         "droppedFiltersSuffix_few": " · {{count}} фильтра отброшено",
         "droppedFiltersSuffix_many": " · {{count}} фильтров отброшено",
-        "droppedFiltersSuffix_one": " · {{count}} фильтр отброшен",
+        "droppedFiltersSuffix_other": "",
         "failed": "Импорт не удался.",
         "fileFilterName": "Obsidian Base",
+        "imported_one": "Импортировано {{count}} представление",
         "imported_few": "Импортировано {{count}} представления",
         "imported_many": "Импортировано {{count}} представлений",
-        "imported_one": "Импортировано {{count}} представление",
+        "imported_other": "",
         "notValid": "Недопустимый файл .base.",
+        "skippedSuffix_one": " · {{count}} пропущено",
         "skippedSuffix_few": " · {{count}} пропущено",
         "skippedSuffix_many": " · {{count}} пропущено",
-        "skippedSuffix_one": " · {{count}} пропущено",
+        "skippedSuffix_other": "",
+        "stoppedAfter_one": "Импорт остановлен после {{count}} представления.",
         "stoppedAfter_few": "Импорт остановлен после {{count}} представлений.",
         "stoppedAfter_many": "Импорт остановлен после {{count}} представлений.",
-        "stoppedAfter_one": "Импорт остановлен после {{count}} представления."
+        "stoppedAfter_other": ""
       },
       "bottomBar": {
         "browseTags": "Просмотр тегов",
         "browseViews": "Просмотр представлений",
         "cycleViewMode": "Сменить режим просмотра",
         "docStats": {
-          "summarySelectionSuffix": " (выд.)",
+          "summary_one": "{{count}} слово · {{characters}} симв.",
           "summary_few": "{{count}} слова · {{characters}} симв.",
           "summary_many": "{{count}} слов · {{characters}} симв.",
-          "summary_one": "{{count}} слово · {{characters}} симв.",
-          "titleSelectionSuffix": " (выделение)",
+          "summary_other": "",
+          "summarySelectionSuffix": " (выд.)",
+          "title_one": "{{characters}} символов · {{words}} слов · {{spaces}} пробелов · {{count}} абзац",
           "title_few": "{{characters}} символов · {{words}} слов · {{spaces}} пробелов · {{count}} абзаца",
           "title_many": "{{characters}} символов · {{words}} слов · {{spaces}} пробелов · {{count}} абзацев",
-          "title_one": "{{characters}} символов · {{words}} слов · {{spaces}} пробелов · {{count}} абзац"
+          "title_other": "",
+          "titleSelectionSuffix": " (выделение)"
         },
         "graphTitle": "Граф (⌘⇧G)",
         "lock": "Заблокировать",
@@ -578,12 +597,14 @@
         "viewsTitle": "Представления"
       },
       "import": {
+        "imported_one": "Импортирована {{count}} заметка{{skipped}}",
         "imported_few": "Импортировано {{count}} заметки{{skipped}}",
         "imported_many": "Импортировано {{count}} заметок{{skipped}}",
-        "imported_one": "Импортирована {{count}} заметка{{skipped}}",
+        "imported_other": "",
+        "skippedSuffix_one": " · {{count}} пропущено",
         "skippedSuffix_few": " · {{count}} пропущено",
         "skippedSuffix_many": " · {{count}} пропущено",
-        "skippedSuffix_one": " · {{count}} пропущено"
+        "skippedSuffix_other": ""
       },
       "nav": {
         "goBack": "Назад",
@@ -746,19 +767,22 @@
       },
       "convert": {
         "cancel": "Отмена",
+        "choiceClause_one": " · для {{count}} нужно выбрать вариант.",
         "choiceClause_few": " · для {{count}} нужно выбрать вариант.",
         "choiceClause_many": " · для {{count}} нужно выбрать вариант.",
-        "choiceClause_one": " · для {{count}} нужно выбрать вариант.",
+        "choiceClause_other": "",
         "chooseTarget": "Выберите цель…",
         "convert": "Преобразовать",
+        "convertedToast_one": "Преобразована {{count}} вики-ссылка",
         "convertedToast_few": "Преобразовано {{count}} вики-ссылки",
         "convertedToast_many": "Преобразовано {{count}} вики-ссылок",
-        "convertedToast_one": "Преобразована {{count}} вики-ссылка",
+        "convertedToast_other": "",
         "noneToConvert": "В этой заметке нет импортированных вики-ссылок для преобразования.",
         "nothingToConvert": "Нечего преобразовывать — ни одна импортированная вики-ссылка не разрешается.",
+        "rewriteCount_one": "Будет переписана {{count}} ссылка",
         "rewriteCount_few": "Будет переписано {{count}} ссылки",
         "rewriteCount_many": "Будет переписано {{count}} ссылок",
-        "rewriteCount_one": "Будет переписана {{count}} ссылка",
+        "rewriteCount_other": "",
         "skipped": "пропущено — {{reason}}",
         "title": "Преобразовать импортированные вики-ссылки в этой заметке"
       },
@@ -795,12 +819,14 @@
       "flow": {
         "couldNotRead": "Не удалось прочитать эту заметку.",
         "exportedTo": "Экспортировано в {{filename}}",
+        "exportedToWithAttachments_one": "Экспортировано в {{filename}} + {{count}} вложение",
         "exportedToWithAttachments_few": "Экспортировано в {{filename}} + {{count}} вложения",
         "exportedToWithAttachments_many": "Экспортировано в {{filename}} + {{count}} вложений",
-        "exportedToWithAttachments_one": "Экспортировано в {{filename}} + {{count}} вложение",
+        "exportedToWithAttachments_other": "",
+        "exportedToWithImages_one": "Экспортировано в {{filename}} + {{count}} изображение",
         "exportedToWithImages_few": "Экспортировано в {{filename}} + {{count}} изображения",
         "exportedToWithImages_many": "Экспортировано в {{filename}} + {{count}} изображений",
-        "exportedToWithImages_one": "Экспортировано в {{filename}} + {{count}} изображение",
+        "exportedToWithImages_other": "",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
@@ -810,9 +836,10 @@
       "modal": {
         "cancel": "Отмена",
         "export": "Экспорт…",
+        "includeAttachments_one": "Включить {{count}} вложение",
         "includeAttachments_few": "Включить {{count}} вложения",
         "includeAttachments_many": "Включить {{count}} вложений",
-        "includeAttachments_one": "Включить {{count}} вложение",
+        "includeAttachments_other": "",
         "title": "Экспорт как Markdown"
       }
     },
@@ -839,22 +866,27 @@
         "vaultNotFound": "Хранилище для экспорта не найдено."
       },
       "flow": {
+        "countAttachments_one": "{{count}} вложение",
         "countAttachments_few": "{{count}} вложения",
         "countAttachments_many": "{{count}} вложений",
-        "countAttachments_one": "{{count}} вложение",
+        "countAttachments_other": "",
+        "countFolders_one": "{{count}} папка",
         "countFolders_few": "{{count}} папки",
         "countFolders_many": "{{count}} папок",
-        "countFolders_one": "{{count}} папка",
+        "countFolders_other": "",
+        "countNotes_one": "{{count}} заметка",
         "countNotes_few": "{{count}} заметки",
         "countNotes_many": "{{count}} заметок",
-        "countNotes_one": "{{count}} заметка",
+        "countNotes_other": "",
         "exclusionsHistory": "История версий не включена.",
-        "exclusionsTrashedAndHistory_few": "{{count}} заметки из корзины и история версий не включены.",
-        "exclusionsTrashedAndHistory_many": "{{count}} заметок из корзины и история версий не включены.",
-        "exclusionsTrashedAndHistory_one": "{{count}} заметка из корзины и история версий не включены.",
+        "exclusionsTrashed_one": "{{count}} заметка из корзины не включена.",
         "exclusionsTrashed_few": "{{count}} заметки из корзины не включены.",
         "exclusionsTrashed_many": "{{count}} заметок из корзины не включены.",
-        "exclusionsTrashed_one": "{{count}} заметка из корзины не включена.",
+        "exclusionsTrashed_other": "",
+        "exclusionsTrashedAndHistory_one": "{{count}} заметка из корзины и история версий не включены.",
+        "exclusionsTrashedAndHistory_few": "{{count}} заметки из корзины и история версий не включены.",
+        "exclusionsTrashedAndHistory_many": "{{count}} заметок из корзины и история версий не включены.",
+        "exclusionsTrashedAndHistory_other": "",
         "phaseAttachments": "вложения",
         "phaseNotes": "заметки",
         "preparing": "Подготовка…",
@@ -912,10 +944,11 @@
   "notes": {
     "archive": {
       "close": "Закрыть",
-      "countEmpty": "Пусто",
+      "count_one": "{{count}} заметка",
       "count_few": "{{count}} заметки",
       "count_many": "{{count}} заметок",
-      "count_one": "{{count}} заметка",
+      "count_other": "",
+      "countEmpty": "Пусто",
       "delete": "Удалить",
       "deleteError": "Не удалось удалить эту заметку. Попробуйте ещё раз.",
       "emptyState": "Архив пуст.",
@@ -968,9 +1001,10 @@
         "isNot": "не равно"
       },
       "noConditions": "Условий пока нет — это представление показывает все страницы.",
+      "noteCount_one": "{{count}} заметка",
       "noteCount_few": "{{count}} заметки",
       "noteCount_many": "{{count}} заметок",
-      "noteCount_one": "{{count}} заметка",
+      "noteCount_other": "",
       "of": "из:",
       "ofTheGroups": "из групп:",
       "removeCondition": "Удалить условие",
@@ -1022,9 +1056,10 @@
       },
       "modal": {
         "cancel": "Отмена",
+        "cancelledNotImported_one": "{{count}} не импортировано",
         "cancelledNotImported_few": "{{count}} не импортировано",
         "cancelledNotImported_many": "{{count}} не импортировано",
-        "cancelledNotImported_one": "{{count}} не импортировано",
+        "cancelledNotImported_other": "",
         "cancelling": "Отмена…",
         "chooseFolder": "Выберите папку…",
         "close": "Закрыть",
@@ -1037,9 +1072,10 @@
         "flagKindFolder": "Папка",
         "flagKindTitle": "Заголовок",
         "folderPickerTitle": "Выберите папку вашего хранилища Obsidian",
+        "hiddenIgnoredPrefix_one": "Пропущен {{count}} элемент конфигурации / скрытый (например, ",
         "hiddenIgnoredPrefix_few": "Пропущено {{count}} элемента конфигурации / скрытых (например, ",
         "hiddenIgnoredPrefix_many": "Пропущено {{count}} элементов конфигурации / скрытых (например, ",
-        "hiddenIgnoredPrefix_one": "Пропущен {{count}} элемент конфигурации / скрытый (например, ",
+        "hiddenIgnoredPrefix_other": "",
         "hiddenIgnoredSuffix": ", файлы с точкой).",
         "ifNoteExistsLabel": "Если заметка уже существует",
         "import": "Импорт",
@@ -1047,18 +1083,21 @@
         "importing": "Импорт вашего хранилища…",
         "markDone": "Отметить выполненным",
         "markedDone": "Отмечено выполненным",
+        "mediaImported_one": "{{count}} импортировано",
         "mediaImported_few": "{{count}} импортировано",
         "mediaImported_many": "{{count}} импортировано",
-        "mediaImported_one": "{{count}} импортировано",
+        "mediaImported_other": "",
+        "mediaOmittedSuffix_one": " · {{count}} пропущено",
         "mediaOmittedSuffix_few": " · {{count}} пропущено",
         "mediaOmittedSuffix_many": " · {{count}} пропущено",
-        "mediaOmittedSuffix_one": " · {{count}} пропущено",
+        "mediaOmittedSuffix_other": "",
         "needsAttention": "Требует внимания",
         "needsAttentionHelp": "Эти заметки импортированы без изменений. Предлагаемые исправления — это лишь отправная точка: скопируйте одно из них, а затем переименуйте заметку, открыв её.",
         "noFolderChosen": "Папка не выбрана",
+        "notesImported_one": "заметка импортирована",
         "notesImported_few": "заметки импортированы",
         "notesImported_many": "заметок импортировано",
-        "notesImported_one": "заметка импортирована",
+        "notesImported_other": "",
         "policyCopyHint": "Добавить рядом с существующей заметкой.",
         "policyCopyLabel": "Импортировать как копию",
         "policySkipHint": "Рекомендуется — повторный запуск импорта никогда не дублирует и не перезаписывает.",
@@ -1100,24 +1139,28 @@
       "archiveNote": "Архивировать",
       "archiveSingleError": "Не удалось заархивировать заметку.",
       "attachments": "Вложения",
+      "bulkArchive_one": "Архивировать {{count}} заметку",
       "bulkArchive_few": "Архивировать {{count}} заметки",
       "bulkArchive_many": "Архивировать {{count}} заметок",
-      "bulkArchive_one": "Архивировать {{count}} заметку",
+      "bulkArchive_other": "",
+      "bulkDelete_one": "Удалить {{count}} заметку",
       "bulkDelete_few": "Удалить {{count}} заметки",
       "bulkDelete_many": "Удалить {{count}} заметок",
-      "bulkDelete_one": "Удалить {{count}} заметку",
+      "bulkDelete_other": "",
+      "bulkMove_one": "Переместить {{count}} заметку в…",
       "bulkMove_few": "Переместить {{count}} заметки в…",
       "bulkMove_many": "Переместить {{count}} заметок в…",
-      "bulkMove_one": "Переместить {{count}} заметку в…",
+      "bulkMove_other": "",
       "caseMergeBody": "Папка с именем «{{name}}» уже существует. Они будут объединены — переименовать одну, чтобы оставить их отдельно?",
       "color": "Цвет…",
       "createFirstNote": "+ Создайте свою первую заметку",
       "createFolderNote": "Создать заметку папки",
       "customize": "Настроить…",
       "delete": "Удалить",
+      "deleteFolderBody_one": "«{{name}}» и её {{count}} заметка",
       "deleteFolderBody_few": "«{{name}}» и её {{count}} заметки",
       "deleteFolderBody_many": "«{{name}}» и её {{count}} заметок",
-      "deleteFolderBody_one": "«{{name}}» и её {{count}} заметка",
+      "deleteFolderBody_other": "",
       "deleteFolderConfirm": "Удалить папку",
       "deleteFolderTitle": "Удалить эту папку?",
       "deleteFolderWarning": "Заметки переместятся в корзину — позже их можно восстановить.",
@@ -1142,9 +1185,10 @@
       "newViewTitle": "Новое представление",
       "noteMovedToTrash": "Заметка перемещена в корзину",
       "notesHeading": "Заметки",
+      "notesMovedToTrash_one": "{{count}} заметка перемещена в корзину",
       "notesMovedToTrash_few": "{{count}} заметки перемещены в корзину",
       "notesMovedToTrash_many": "{{count}} заметок перемещено в корзину",
-      "notesMovedToTrash_one": "{{count}} заметка перемещена в корзину",
+      "notesMovedToTrash_other": "",
       "openArchive": "Открыть архив",
       "openAttachments": "Открыть вложения",
       "openFolderNote": "Открыть заметку папки",
@@ -1208,21 +1252,21 @@
       "renameAriaLabel": "Переименовать заметку",
       "untitled": "Без названия"
     },
+    "savedView": {
+      "defaultName": "Отфильтрованное представление"
+    },
     "saveStatus": {
       "editing": "Редактирование",
       "editingEllipsis": "Редактирование…",
       "editingTitle": "Редактирование — автосохранение активно",
       "justNow": "только что",
       "retry": "Повторить",
-      "saveFailed": "Не удалось сохранить",
-      "saveFailedTitle": "Не удалось сохранить — нажмите «Повторить»",
       "saved": "Сохранено",
       "savedRelative": "Сохранено {{rel}}",
+      "saveFailed": "Не удалось сохранить",
+      "saveFailedTitle": "Не удалось сохранить — нажмите «Повторить»",
       "saving": "Сохранение",
       "savingEllipsis": "Сохранение…"
-    },
-    "savedView": {
-      "defaultName": "Отфильтрованное представление"
     },
     "snapshotFailed": {
       "dismiss": "Закрыть",
@@ -1230,9 +1274,10 @@
     },
     "snapshots": {
       "cancel": "Отмена",
+      "changeCount_one": "{{count}} изменение с момента этого снимка",
       "changeCount_few": "{{count}} изменения с момента этого снимка",
       "changeCount_many": "{{count}} изменений с момента этого снимка",
-      "changeCount_one": "{{count}} изменение с момента этого снимка",
+      "changeCount_other": "",
       "close": "Закрыть",
       "confirmBody": "Текущая заметка сначала будет сохранена как снимок, чтобы вы могли отменить это действие.",
       "confirmTitle": "Восстановить этот снимок?",
@@ -1276,9 +1321,10 @@
       "noNotesForFilter": "Нет заметок для этого фильтра.",
       "noTagsMatch": "Нет тегов, соответствующих «{{query}}».",
       "noTagsYet": "Тегов пока нет.",
+      "noteCount_one": "{{count}} заметка",
       "noteCount_few": "{{count}} заметки",
       "noteCount_many": "{{count}} заметок",
-      "noteCount_one": "{{count}} заметка",
+      "noteCount_other": "",
       "notes": "Заметки",
       "pickTag": "Выберите тег для фильтрации.",
       "save": "Сохранить",
@@ -1290,21 +1336,24 @@
     },
     "trash": {
       "close": "Закрыть",
-      "countEmpty": "Пусто",
+      "count_one": "{{count}} заметка",
       "count_few": "{{count}} заметки",
       "count_many": "{{count}} заметок",
-      "count_one": "{{count}} заметка",
+      "count_other": "",
+      "countEmpty": "Пусто",
       "delete": "Удалить",
       "deleteError": "Не удалось удалить эту заметку. Попробуйте ещё раз.",
       "empty": "Очистить корзину",
+      "emptyConfirmBody_one": "{{count}} заметка будет удалена навсегда.",
       "emptyConfirmBody_few": "{{count}} заметки будут удалены навсегда.",
       "emptyConfirmBody_many": "{{count}} заметок будут удалены навсегда.",
-      "emptyConfirmBody_one": "{{count}} заметка будет удалена навсегда.",
+      "emptyConfirmBody_other": "",
       "emptyConfirmCta": "Очистить корзину",
       "emptyConfirmTitle": "Очистить корзину?",
+      "emptyPartialFailure_one": "{{count}} заметку не удалось удалить, и она остаётся в корзине.",
       "emptyPartialFailure_few": "{{count}} заметки не удалось удалить, и они остаются в корзине.",
       "emptyPartialFailure_many": "{{count}} заметок не удалось удалить, и они остаются в корзине.",
-      "emptyPartialFailure_one": "{{count}} заметку не удалось удалить, и она остаётся в корзине.",
+      "emptyPartialFailure_other": "",
       "emptyState": "Корзина пуста.",
       "purgeConfirmCta": "Удалить навсегда",
       "purgeConfirmTitle": "Удалить навсегда?",
@@ -1322,24 +1371,6 @@
       "searching": "Поиск…",
       "thisNote": "эта заметка",
       "untitled": "Без названия"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "По умолчанию (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (квадрат)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (широкое)"
-      },
-      "cancel": "Отмена",
-      "cardSize": "Размер карточки",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Свойство frontmatter, значение которого — изображение, показывается как обложка каждой карточки. Оставьте пустым, чтобы обложки не было.",
-      "coverImagePlaceholder": "например, cover",
-      "coverImageProperty": "Свойство обложки",
-      "imageAspectRatio": "Соотношение сторон изображения",
-      "reset": "Сбросить",
-      "save": "Сохранить"
     },
     "views": {
       "cards": {
@@ -1368,6 +1399,24 @@
       },
       "newView": "Новое представление",
       "untitledView": "Представление без названия"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "По умолчанию (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (квадрат)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (широкое)"
+      },
+      "cancel": "Отмена",
+      "cardSize": "Размер карточки",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Свойство frontmatter, значение которого — изображение, показывается как обложка каждой карточки. Оставьте пустым, чтобы обложки не было.",
+      "coverImagePlaceholder": "например, cover",
+      "coverImageProperty": "Свойство обложки",
+      "imageAspectRatio": "Соотношение сторон изображения",
+      "reset": "Сбросить",
+      "save": "Сохранить"
     },
     "welcome": {
       "body": "Добро пожаловать в Myne — ваше личное пространство, чтобы думать и писать.\n\nВсё, что вы здесь сохраняете, шифруется и остаётся на вашем устройстве. Ваш **пароль** и **фраза восстановления** — единственные ключи к нему, поэтому храните их в надёжном месте. Если вы потеряете и то, и другое, никто не сможет вернуть ваши заметки, даже мы.\n\nЭто обычная заметка, так что сделайте её своей. Редактируйте её, переименовывайте или удаляйте, когда захотите, и добавляйте новые заметки по мере появления идей.\n\nМы рады, что вы здесь. Чтобы узнать больше о Myne, посетите https://myne.md\n",
@@ -1433,9 +1482,10 @@
       "collidedNote": "Ранее существовавшая копия этого хранилища всё ещё в вашем списке. Убедившись, что восстановленное хранилище открывается, вы можете удалить старое из списка (нужно будет ввести DELETE).",
       "notes": "Заметки: {{n}}",
       "openVaultList": "Открыть список хранилищ",
+      "partialHeader_one": "Восстановлено частично — {{count}} элемент не удалось прочитать.",
       "partialHeader_few": "Восстановлено частично — {{count}} элемента не удалось прочитать.",
       "partialHeader_many": "Восстановлено частично — {{count}} элементов не удалось прочитать.",
-      "partialHeader_one": "Восстановлено частично — {{count}} элемент не удалось прочитать.",
+      "partialHeader_other": "",
       "restored": "Хранилище восстановлено.",
       "versionHistory": "Записей истории версий: {{n}}"
     },
@@ -1547,16 +1597,19 @@
       },
       "when": {
         "bare": "Подключено",
+        "daysAgo_one": "Подключено {{count}} день назад",
         "daysAgo_few": "Подключено {{count}} дня назад",
         "daysAgo_many": "Подключено {{count}} дней назад",
-        "daysAgo_one": "Подключено {{count}} день назад",
+        "daysAgo_other": "",
+        "hoursAgo_one": "Подключено {{count}} ч назад",
         "hoursAgo_few": "Подключено {{count}} ч назад",
         "hoursAgo_many": "Подключено {{count}} ч назад",
-        "hoursAgo_one": "Подключено {{count}} ч назад",
+        "hoursAgo_other": "",
         "justNow": "Подключено только что",
+        "minutesAgo_one": "Подключено {{count}} мин назад",
         "minutesAgo_few": "Подключено {{count}} мин назад",
         "minutesAgo_many": "Подключено {{count}} мин назад",
-        "minutesAgo_one": "Подключено {{count}} мин назад",
+        "minutesAgo_other": "",
         "onDate": "Подключено {{date}}"
       }
     },
@@ -1613,9 +1666,10 @@
       "heading": "Удалить хранилище",
       "ioFailBody": "Не удалось получить доступ к файлам хранилища для удаления. Ключи хранилища уже обнулены в памяти; любые данные хранилища, оставшиеся на диске, — это невосстановимый мусор, обёрнутый Argon2id.",
       "ioFailTitle": "Ошибка диска при удалении",
+      "partialFailBody_one": "{{count}} файл не удалось удалить с диска. Ключи хранилища уже обнулены в памяти, поэтому любой оставшийся шифротекст — это невосстановимый мусор, обёрнутый Argon2id.",
       "partialFailBody_few": "{{count}} файла не удалось удалить с диска. Ключи хранилища уже обнулены в памяти, поэтому любой оставшийся шифротекст — это невосстановимый мусор, обёрнутый Argon2id.",
       "partialFailBody_many": "{{count}} файлов не удалось удалить с диска. Ключи хранилища уже обнулены в памяти, поэтому любой оставшийся шифротекст — это невосстановимый мусор, обёрнутый Argon2id.",
-      "partialFailBody_one": "{{count}} файл не удалось удалить с диска. Ключи хранилища уже обнулены в памяти, поэтому любой оставшийся шифротекст — это невосстановимый мусор, обёрнутый Argon2id.",
+      "partialFailBody_other": "",
       "partialFailTitle": "Удаление хранилища выполнено частично",
       "submit": "Удалить хранилище",
       "submitInFlight": "Удаление хранилища…",
@@ -1688,17 +1742,19 @@
       "errorHardwareUnavailable": "Touch ID недоступен на этом устройстве.",
       "errorNotUnlocked": "Сначала разблокируйте хранилище.",
       "errorPinNotDigits": "PIN-код должен состоять только из цифр.",
+      "errorPinTooShort_one": "PIN-код должен содержать не менее {{count}} цифры.",
       "errorPinTooShort_few": "PIN-код должен содержать не менее {{count}} цифр.",
       "errorPinTooShort_many": "PIN-код должен содержать не менее {{count}} цифр.",
-      "errorPinTooShort_one": "PIN-код должен содержать не менее {{count}} цифры.",
+      "errorPinTooShort_other": "",
       "helperConfigured": "Настроено через {{method}}. Повторный вход после автоблокировки не требует мастер-пароля. Мастер-пароль по-прежнему нужен после перезапуска.",
       "helperNotConfigured": "Повторный вход после автоблокировки по PIN-коду или Touch ID вместо полного мастер-пароля. Это удобство поверх зашифрованного хранилища — мастер-пароль остаётся обязательным после перезапуска.",
       "methodPin": "PIN-код",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "PIN-код быстрой разблокировки",
+      "pinPlaceholder_one": "PIN-код (не менее {{count}} цифры)",
       "pinPlaceholder_few": "PIN-код (не менее {{count}} цифр)",
       "pinPlaceholder_many": "PIN-код (не менее {{count}} цифр)",
-      "pinPlaceholder_one": "PIN-код (не менее {{count}} цифры)",
+      "pinPlaceholder_other": "",
       "setPin": "Задать PIN-код",
       "setupHelper": "Touch ID доступен только на macOS и пока экспериментален (в ожидании проверки оборудования). PIN-код работает везде.",
       "title": "Быстрая разблокировка",
@@ -1734,9 +1790,9 @@
       "on": "Вкл."
     },
     "storage": {
-      "backUpVault": "Резервная копия хранилища…",
       "backupHelper": "Резервные копии остаются настолько же зашифрованными, как и ваше хранилище, в одном проверенном файле .myne-backup. Восстановление работает с паролем или фразой восстановления того хранилища — точно так же, как при разблокировке.",
       "backupLabel": "Резервная копия",
+      "backUpVault": "Резервная копия хранилища…",
       "exportAction": "Экспорт…",
       "exportBody": "Экспортировать хранилище как Markdown",
       "exportHelper": "Простое дерево Markdown — без шифрования.",
@@ -1768,6 +1824,133 @@
       "optionLive": "Живой предпросмотр",
       "optionReading": "Чтение",
       "optionSource": "Исходный код"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_few": "",
+      "groupTitle_many": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_few": "",
+      "awaitingApproval_many": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_few": "",
+      "conflicts_many": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1981,12 +2164,12 @@
       "saveAsFile": "Сохранить как файл"
     },
     "ready": {
-      "backUpNow": "Создать резервную копию этого хранилища сейчас",
       "backedUp": "Резервная копия создана ✓",
       "backingUp": "Создание резервной копии…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Резервное копирование не завершилось — файл не создан. Сделать копию можно в любой момент в разделе «Настройки → Хранилище».",
       "backupFilterName": "Резервная копия Myne",
+      "backUpNow": "Создать резервную копию этого хранилища сейчас",
       "body": "Myne записал ваше хранилище в папку данных приложения. Мастер-пароль и фраза восстановления — единственный способ вернуться, так что убедитесь, что оба сохранены в надёжном месте.",
       "decrypting": "Расшифровка…",
       "done": "Готово",
@@ -2056,8 +2239,8 @@
   "vaultSwitcher": {
     "chipFallback": "Хранилище",
     "createAnother": "Создать ещё одно хранилище",
-    "switchVaultLabel": "Переключить хранилище",
     "switching": "переключение…",
+    "switchVaultLabel": "Переключить хранилище",
     "vaultFallback": "Хранилище {{n}}"
   },
   "welcome": {
@@ -2066,25 +2249,29 @@
     "headlineLine2": "Без электронной почты при регистрации.",
     "repairResidue": {
       "cancel": "Отмена",
-      "cleanUp": "Очистить",
       "cleaningUp": "Очистка…",
+      "cleanUp": "Очистить",
+      "confirmBody_one": "Будет удалён {{count}} файл. Он уже нечитаем; ничего восстановимого не теряется.",
       "confirmBody_few": "Будет удалено {{count}} файла. Они уже нечитаемы; ничего восстановимого не теряется.",
       "confirmBody_many": "Будет удалено {{count}} файлов. Они уже нечитаемы; ничего восстановимого не теряется.",
-      "confirmBody_one": "Будет удалён {{count}} файл. Он уже нечитаем; ничего восстановимого не теряется.",
+      "confirmBody_other": "",
       "confirmTitle": "Очистить оставшиеся файлы?",
+      "doneBody_one": "Удалён {{count}} оставшийся файл. Теперь можно создать новое хранилище.",
       "doneBody_few": "Удалено {{count}} оставшихся файла. Теперь можно создать новое хранилище.",
       "doneBody_many": "Удалено {{count}} оставшихся файлов. Теперь можно создать новое хранилище.",
-      "doneBody_one": "Удалён {{count}} оставшийся файл. Теперь можно создать новое хранилище.",
+      "doneBody_other": "",
       "doneTitle": "Очищено",
       "errorBody": "Что-то пошло не так. Закройте приложение и попробуйте ещё раз.",
       "errorTitle": "Очистка не удалась",
+      "foundBody_one": "{{count}} оставшийся файл от предыдущего незавершённого удаления. Он уже нечитаем — вы не потеряете ничего восстановимого.",
       "foundBody_few": "{{count}} оставшихся файла от предыдущего незавершённого удаления. Они уже нечитаемы — вы не потеряете ничего восстановимого.",
       "foundBody_many": "{{count}} оставшихся файлов от предыдущего незавершённого удаления. Они уже нечитаемы — вы не потеряете ничего восстановимого.",
-      "foundBody_one": "{{count}} оставшийся файл от предыдущего незавершённого удаления. Он уже нечитаем — вы не потеряете ничего восстановимого.",
+      "foundBody_other": "",
       "foundTitle": "Оставшиеся файлы от незавершённого удаления",
+      "partialBody_one": "{{count}} файл может быть заблокирован другим приложением (антивирусом, синхронизацией файлов или индексацией поиска). Закройте приложение и попробуйте снова через мгновение или удалите папку хранилища вручную.",
       "partialBody_few": "{{count}} файла могут быть заблокированы другим приложением (антивирусом, синхронизацией файлов или индексацией поиска). Закройте приложение и попробуйте снова через мгновение или удалите папку хранилища вручную.",
       "partialBody_many": "{{count}} файлов могут быть заблокированы другим приложением (антивирусом, синхронизацией файлов или индексацией поиска). Закройте приложение и попробуйте снова через мгновение или удалите папку хранилища вручную.",
-      "partialBody_one": "{{count}} файл может быть заблокирован другим приложением (антивирусом, синхронизацией файлов или индексацией поиска). Закройте приложение и попробуйте снова через мгновение или удалите папку хранилища вручную.",
+      "partialBody_other": "",
       "partialTitle": "Некоторые файлы не удалось удалить"
     },
     "restoreCta": "Восстановить из резервной копии",

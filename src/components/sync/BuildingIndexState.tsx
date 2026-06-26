@@ -6,6 +6,7 @@
 // Penpot skipped per the owner directive; built against design tokens.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { Spinner } from "../Spinner";
 
 const STYLE: CSSProperties = {
@@ -25,11 +26,12 @@ interface BuildingIndexStateProps {
 }
 
 export function BuildingIndexState({ building }: BuildingIndexStateProps) {
+  const { t } = useTranslation();
   if (!building) return null;
   return (
     <div role="status" data-testid="sync.building-index" style={STYLE}>
       <Spinner />
-      <span>Building search index…</span>
+      <span>{t("sync.buildingIndex.label")}</span>
     </div>
   );
 }

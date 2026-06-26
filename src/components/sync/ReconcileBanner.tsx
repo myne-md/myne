@@ -5,6 +5,7 @@
 // editor. Penpot skipped per the owner directive; built against design tokens.
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 
 const STYLE: CSSProperties = {
   display: "flex",
@@ -30,9 +31,6 @@ const DISMISS_STYLE: CSSProperties = {
   padding: "0 var(--space-1)",
 };
 
-// Reassuring, non-alarming — re-syncing is routine, not a problem.
-const MESSAGE = "This device was offline for a while — catching up on sync. Your notes are safe.";
-
 interface ReconcileBannerProps {
   /** Whether a background reconcile is in progress. */
   active: boolean;
@@ -41,14 +39,16 @@ interface ReconcileBannerProps {
 }
 
 export function ReconcileBanner({ active, onDismiss }: ReconcileBannerProps) {
+  const { t } = useTranslation();
   if (!active) return null;
+  // Reassuring, non-alarming — re-syncing is routine, not a problem.
   return (
     <div role="status" data-testid="sync.reconcile-banner" style={STYLE}>
-      <span>{MESSAGE}</span>
+      <span>{t("sync.reconcile.message")}</span>
       {onDismiss && (
         <button
           type="button"
-          aria-label="Dismiss"
+          aria-label={t("common.dismiss")}
           onClick={onDismiss}
           style={DISMISS_STYLE}
           data-testid="sync.reconcile-banner-dismiss"

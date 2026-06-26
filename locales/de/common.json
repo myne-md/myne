@@ -43,8 +43,8 @@
     "library": {
       "actionsAriaLabel": "Anhang-Aktionen",
       "actionsTitle": "Aktionen",
-      "checkUnusedFailedNotice": "Suche nach ungenutzten Anhängen nicht möglich. Versuchen Sie es erneut.",
       "checking": "Wird geprüft…",
+      "checkUnusedFailedNotice": "Suche nach ungenutzten Anhängen nicht möglich. Versuchen Sie es erneut.",
       "cleanUnused": "Ungenutzte bereinigen",
       "cleanUnusedTitle": "Anhänge löschen, die in keiner Notiz verwendet werden",
       "colCreated": "Erstellt",
@@ -310,6 +310,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Abbrechen",
       "confirmDefault": "OK"
@@ -321,19 +322,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "{{filename}} konnte nicht exportiert werden.",
         "exported": "{{filename}} exportiert.",
-        "renameFailed": "Der Anhang konnte nicht umbenannt werden.",
+        "exportFailed": "{{filename}} konnte nicht exportiert werden.",
         "renamed": "Umbenannt in {{name}}.",
+        "renameFailed": "Der Anhang konnte nicht umbenannt werden.",
         "saveDialogFailed": "Der Speichern-Dialog konnte nicht geöffnet werden."
       },
       "convert": {
         "cancel": "Abbrechen",
         "confirm": "Umwandeln",
         "skipped": "übersprungen – {{note}}",
-        "subtitleEmpty": "Nichts umzuwandeln – keine Quelldateien aufgelöst.",
         "subtitle_one": "1 Verweis wird neu geschrieben. Prüfen Sie ihn vor dem Übernehmen.",
         "subtitle_other": "{{count}} Verweise werden neu geschrieben. Prüfen Sie sie vor dem Übernehmen.",
+        "subtitleEmpty": "Nichts umzuwandeln – keine Quelldateien aufgelöst.",
         "title": "Importierte Anhänge umwandeln"
       },
       "convertCommand": {
@@ -359,8 +360,8 @@
           "archive": "Archiv",
           "audio": "Audio",
           "cHeader": "C-Header",
-          "cSource": "C-Quelltext",
           "cppSource": "C++-Quelltext",
+          "cSource": "C-Quelltext",
           "css": "CSS",
           "csv": "CSV",
           "document": "Dokument",
@@ -540,12 +541,12 @@
         "browseViews": "Ansichten durchsuchen",
         "cycleViewMode": "Ansichtsmodus durchschalten",
         "docStats": {
-          "summarySelectionSuffix": " (Ausw.)",
           "summary_one": "{{count}} Wort · {{characters}} Zeichen",
           "summary_other": "{{count}} Wörter · {{characters}} Zeichen",
-          "titleSelectionSuffix": " (Auswahl)",
+          "summarySelectionSuffix": " (Ausw.)",
           "title_one": "{{characters}} Zeichen · {{words}} Wörter · {{spaces}} Leerzeichen · {{count}} Absatz",
-          "title_other": "{{characters}} Zeichen · {{words}} Wörter · {{spaces}} Leerzeichen · {{count}} Absätze"
+          "title_other": "{{characters}} Zeichen · {{words}} Wörter · {{spaces}} Leerzeichen · {{count}} Absätze",
+          "titleSelectionSuffix": " (Auswahl)"
         },
         "graphTitle": "Graph (⌘⇧G)",
         "lock": "Sperren",
@@ -820,10 +821,10 @@
         "countNotes_one": "{{count}} Notiz",
         "countNotes_other": "{{count}} Notizen",
         "exclusionsHistory": "Versionsverlauf nicht enthalten.",
-        "exclusionsTrashedAndHistory_one": "{{count}} gelöschte Notiz und Versionsverlauf nicht enthalten.",
-        "exclusionsTrashedAndHistory_other": "{{count}} gelöschte Notizen und Versionsverlauf nicht enthalten.",
         "exclusionsTrashed_one": "{{count}} gelöschte Notiz nicht enthalten.",
         "exclusionsTrashed_other": "{{count}} gelöschte Notizen nicht enthalten.",
+        "exclusionsTrashedAndHistory_one": "{{count}} gelöschte Notiz und Versionsverlauf nicht enthalten.",
+        "exclusionsTrashedAndHistory_other": "{{count}} gelöschte Notizen und Versionsverlauf nicht enthalten.",
         "phaseAttachments": "Anhänge",
         "phaseNotes": "Notizen",
         "preparing": "Wird vorbereitet…",
@@ -881,9 +882,9 @@
   "notes": {
     "archive": {
       "close": "Schließen",
-      "countEmpty": "Leer",
       "count_one": "{{count}} Notiz",
       "count_other": "{{count}} Notizen",
+      "countEmpty": "Leer",
       "delete": "Löschen",
       "deleteError": "Diese Notiz konnte nicht gelöscht werden. Versuchen Sie es erneut.",
       "emptyState": "Das Archiv ist leer.",
@@ -1165,21 +1166,21 @@
       "renameAriaLabel": "Notiz umbenennen",
       "untitled": "Ohne Titel"
     },
+    "savedView": {
+      "defaultName": "Gefilterte Ansicht"
+    },
     "saveStatus": {
       "editing": "Bearbeitung",
       "editingEllipsis": "Bearbeitung…",
       "editingTitle": "Bearbeitung – automatisches Speichern aktiv",
       "justNow": "gerade eben",
       "retry": "Erneut versuchen",
-      "saveFailed": "Speichern fehlgeschlagen",
-      "saveFailedTitle": "Speichern fehlgeschlagen – auf „Erneut versuchen“ klicken",
       "saved": "Gespeichert",
       "savedRelative": "Gespeichert {{rel}}",
+      "saveFailed": "Speichern fehlgeschlagen",
+      "saveFailedTitle": "Speichern fehlgeschlagen – auf „Erneut versuchen“ klicken",
       "saving": "Wird gespeichert",
       "savingEllipsis": "Wird gespeichert…"
-    },
-    "savedView": {
-      "defaultName": "Gefilterte Ansicht"
     },
     "snapshotFailed": {
       "dismiss": "Verwerfen",
@@ -1245,9 +1246,9 @@
     },
     "trash": {
       "close": "Schließen",
-      "countEmpty": "Leer",
       "count_one": "{{count}} Notiz",
       "count_other": "{{count}} Notizen",
+      "countEmpty": "Leer",
       "delete": "Löschen",
       "deleteError": "Diese Notiz konnte nicht gelöscht werden. Versuchen Sie es erneut.",
       "empty": "Papierkorb leeren",
@@ -1274,24 +1275,6 @@
       "searching": "Wird gesucht…",
       "thisNote": "diese Notiz",
       "untitled": "Ohne Titel"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Standard (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (quadratisch)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (breit)"
-      },
-      "cancel": "Abbrechen",
-      "cardSize": "Kartengröße",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Die Frontmatter-Eigenschaft, deren Wert ein Bild ist – wird als Titelbild jeder Karte angezeigt. Für kein Titelbild leer lassen.",
-      "coverImagePlaceholder": "z. B. cover",
-      "coverImageProperty": "Titelbild-Eigenschaft",
-      "imageAspectRatio": "Bildseitenverhältnis",
-      "reset": "Zurücksetzen",
-      "save": "Speichern"
     },
     "views": {
       "cards": {
@@ -1320,6 +1303,24 @@
       },
       "newView": "Neue Ansicht",
       "untitledView": "Ansicht ohne Titel"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Standard (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (quadratisch)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (breit)"
+      },
+      "cancel": "Abbrechen",
+      "cardSize": "Kartengröße",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Die Frontmatter-Eigenschaft, deren Wert ein Bild ist – wird als Titelbild jeder Karte angezeigt. Für kein Titelbild leer lassen.",
+      "coverImagePlaceholder": "z. B. cover",
+      "coverImageProperty": "Titelbild-Eigenschaft",
+      "imageAspectRatio": "Bildseitenverhältnis",
+      "reset": "Zurücksetzen",
+      "save": "Speichern"
     },
     "welcome": {
       "body": "Willkommen bei Myne, Ihrem privaten Raum zum Denken und Schreiben.\n\nAlles, was Sie hier speichern, ist verschlüsselt und bleibt auf Ihrem Gerät. Ihr **Passwort** und Ihre **Wiederherstellungsphrase** sind die einzigen Schlüssel dazu, bewahren Sie sie also an einem sicheren Ort auf. Wenn beide jemals verloren gehen, kann niemand Ihre Notizen zurückholen, nicht einmal wir.\n\nDies ist nur eine ganz normale Notiz, also machen Sie sie zu Ihrer eigenen. Bearbeiten Sie sie, benennen Sie sie um oder löschen Sie sie, wann immer Sie möchten, und fügen Sie neue Notizen hinzu, wenn Ihre Ideen wachsen.\n\nWir freuen uns, dass Sie hier sind. Um mehr über Myne zu erfahren, besuchen Sie https://myne.md\n",
@@ -1679,9 +1680,9 @@
       "on": "Ein"
     },
     "storage": {
-      "backUpVault": "Tresor sichern…",
       "backupHelper": "Sicherungen bleiben genauso verschlüsselt wie Ihr Tresor, in einer einzigen verifizierten .myne-backup-Datei. Die Wiederherstellung funktioniert mit dem Passwort oder der Wiederherstellungsphrase dieses Tresors – genau wie beim Entsperren.",
       "backupLabel": "Sicherung",
+      "backUpVault": "Tresor sichern…",
       "exportAction": "Exportieren…",
       "exportBody": "Tresor als Markdown exportieren",
       "exportHelper": "Reiner Markdown-Baum – nicht verschlüsselt.",
@@ -1713,6 +1714,127 @@
       "optionLive": "Live-Vorschau",
       "optionReading": "Lesen",
       "optionSource": "Quelltext"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1926,12 +2048,12 @@
       "saveAsFile": "Als Datei speichern"
     },
     "ready": {
-      "backUpNow": "Diesen Tresor jetzt sichern",
       "backedUp": "Gesichert ✓",
       "backingUp": "Wird gesichert…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Die Sicherung wurde nicht abgeschlossen – es wurde keine Datei hinterlassen. Sie können jederzeit über Einstellungen → Speicher sichern.",
       "backupFilterName": "Myne-Sicherung",
+      "backUpNow": "Diesen Tresor jetzt sichern",
       "body": "Myne hat Ihren Tresor in Ihren Anwendungsdatenordner geschrieben. Ihr Master-Passwort und Ihre Wiederherstellungsphrase sind der einzige Weg zurück – stellen Sie sicher, dass beide an einem sicheren Ort gespeichert sind.",
       "decrypting": "Wird entschlüsselt…",
       "done": "Fertig",
@@ -2001,8 +2123,8 @@
   "vaultSwitcher": {
     "chipFallback": "Tresor",
     "createAnother": "Weiteren Tresor erstellen",
-    "switchVaultLabel": "Tresor wechseln",
     "switching": "wird gewechselt…",
+    "switchVaultLabel": "Tresor wechseln",
     "vaultFallback": "Tresor {{n}}"
   },
   "welcome": {
@@ -2011,8 +2133,8 @@
     "headlineLine2": "Keine E-Mail bei der Anmeldung.",
     "repairResidue": {
       "cancel": "Abbrechen",
-      "cleanUp": "Bereinigen",
       "cleaningUp": "Wird bereinigt…",
+      "cleanUp": "Bereinigen",
       "confirmBody_one": "{{count}} Datei wird entfernt. Sie ist bereits unlesbar; es geht nichts Wiederherstellbares verloren.",
       "confirmBody_other": "{{count}} Dateien werden entfernt. Sie sind bereits unlesbar; es geht nichts Wiederherstellbares verloren.",
       "confirmTitle": "Übrig gebliebene Dateien bereinigen?",

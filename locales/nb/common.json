@@ -45,8 +45,8 @@
     "library": {
       "actionsAriaLabel": "Vedleggshandlinger",
       "actionsTitle": "Handlinger",
-      "checkUnusedFailedNotice": "Kunne ikke se etter ubrukte vedlegg. Prøv igjen.",
       "checking": "Sjekker…",
+      "checkUnusedFailedNotice": "Kunne ikke se etter ubrukte vedlegg. Prøv igjen.",
       "cleanUnused": "Rydd opp i ubrukte",
       "cleanUnusedTitle": "Slett vedlegg som ikke brukes i noe notat",
       "colCreated": "Opprettet",
@@ -312,6 +312,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Avbryt",
       "confirmDefault": "OK"
@@ -323,19 +324,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Kunne ikke eksportere {{filename}}.",
         "exported": "Eksporterte {{filename}}.",
-        "renameFailed": "Kunne ikke endre navn på vedlegget.",
+        "exportFailed": "Kunne ikke eksportere {{filename}}.",
         "renamed": "Endret navn til {{name}}.",
+        "renameFailed": "Kunne ikke endre navn på vedlegget.",
         "saveDialogFailed": "Kunne ikke åpne lagringsdialogen."
       },
       "convert": {
         "cancel": "Avbryt",
         "confirm": "Konverter",
         "skipped": "hoppet over — {{note}}",
-        "subtitleEmpty": "Ingenting å konvertere — ingen kildefiler ble funnet.",
         "subtitle_one": "1 referanse blir skrevet om. Se gjennom før du bekrefter.",
         "subtitle_other": "{{count}} referanser blir skrevet om. Se gjennom før du bekrefter.",
+        "subtitleEmpty": "Ingenting å konvertere — ingen kildefiler ble funnet.",
         "title": "Konverter importerte vedlegg"
       },
       "convertCommand": {
@@ -363,8 +364,8 @@
           "archive": "Arkiv",
           "audio": "Lyd",
           "cHeader": "C-header",
-          "cSource": "C-kildekode",
           "cppSource": "C++-kildekode",
+          "cSource": "C-kildekode",
           "css": "CSS",
           "csv": "CSV",
           "document": "Dokument",
@@ -551,12 +552,12 @@
         "browseViews": "Bla gjennom visninger",
         "cycleViewMode": "Bla gjennom visningsmodus",
         "docStats": {
-          "summarySelectionSuffix": " (utvalg)",
           "summary_one": "{{count}} ord · {{characters}} tegn",
           "summary_other": "{{count}} ord · {{characters}} tegn",
-          "titleSelectionSuffix": " (utvalg)",
+          "summarySelectionSuffix": " (utvalg)",
           "title_one": "{{characters}} tegn · {{words}} ord · {{spaces}} mellomrom · {{count}} avsnitt",
-          "title_other": "{{characters}} tegn · {{words}} ord · {{spaces}} mellomrom · {{count}} avsnitt"
+          "title_other": "{{characters}} tegn · {{words}} ord · {{spaces}} mellomrom · {{count}} avsnitt",
+          "titleSelectionSuffix": " (utvalg)"
         },
         "graphTitle": "Graf (⌘⇧G)",
         "lock": "Lås",
@@ -832,10 +833,10 @@
         "countNotes_one": "{{count}} notat",
         "countNotes_other": "{{count}} notater",
         "exclusionsHistory": "Versjonshistorikk er ikke inkludert.",
-        "exclusionsTrashedAndHistory_one": "{{count}} slettet notat og versjonshistorikk er ikke inkludert.",
-        "exclusionsTrashedAndHistory_other": "{{count}} slettede notater og versjonshistorikk er ikke inkludert.",
         "exclusionsTrashed_one": "{{count}} slettet notat er ikke inkludert.",
         "exclusionsTrashed_other": "{{count}} slettede notater er ikke inkludert.",
+        "exclusionsTrashedAndHistory_one": "{{count}} slettet notat og versjonshistorikk er ikke inkludert.",
+        "exclusionsTrashedAndHistory_other": "{{count}} slettede notater og versjonshistorikk er ikke inkludert.",
         "phaseAttachments": "vedlegg",
         "phaseNotes": "notater",
         "preparing": "Forbereder…",
@@ -893,9 +894,9 @@
   "notes": {
     "archive": {
       "close": "Lukk",
-      "countEmpty": "Tomt",
       "count_one": "{{count}} notat",
       "count_other": "{{count}} notater",
+      "countEmpty": "Tomt",
       "delete": "Slett",
       "deleteError": "Kunne ikke slette det notatet. Prøv igjen.",
       "emptyState": "Arkivet er tomt.",
@@ -1183,21 +1184,21 @@
       "renameAriaLabel": "Endre navn på notat",
       "untitled": "Uten tittel"
     },
+    "savedView": {
+      "defaultName": "Filtrert visning"
+    },
     "saveStatus": {
       "editing": "Redigerer",
       "editingEllipsis": "Redigerer…",
       "editingTitle": "Redigerer — autolagring er klar",
       "justNow": "akkurat nå",
       "retry": "Prøv igjen",
-      "saveFailed": "Lagring mislyktes",
-      "saveFailedTitle": "Lagring mislyktes — klikk Prøv igjen",
       "saved": "Lagret",
       "savedRelative": "Lagret {{rel}}",
+      "saveFailed": "Lagring mislyktes",
+      "saveFailedTitle": "Lagring mislyktes — klikk Prøv igjen",
       "saving": "Lagrer",
       "savingEllipsis": "Lagrer…"
-    },
-    "savedView": {
-      "defaultName": "Filtrert visning"
     },
     "snapshotFailed": {
       "dismiss": "Lukk",
@@ -1263,9 +1264,9 @@
     },
     "trash": {
       "close": "Lukk",
-      "countEmpty": "Tom",
       "count_one": "{{count}} notat",
       "count_other": "{{count}} notater",
+      "countEmpty": "Tom",
       "delete": "Slett",
       "deleteError": "Kunne ikke slette det notatet. Prøv igjen.",
       "empty": "Tøm papirkurven",
@@ -1292,24 +1293,6 @@
       "searching": "Søker…",
       "thisNote": "dette notatet",
       "untitled": "Uten tittel"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Standard (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (kvadratisk)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (bredt)"
-      },
-      "cancel": "Avbryt",
-      "cardSize": "Kortstørrelse",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Frontmatter-egenskapen hvis verdi er et bilde — vises som omslaget for hvert kort. La stå tomt for å droppe omslag.",
-      "coverImagePlaceholder": "f.eks. cover",
-      "coverImageProperty": "Egenskap for omslagsbilde",
-      "imageAspectRatio": "Bildeforhold",
-      "reset": "Nullstill",
-      "save": "Lagre"
     },
     "views": {
       "cards": {
@@ -1338,6 +1321,24 @@
       },
       "newView": "Ny visning",
       "untitledView": "Visning uten tittel"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Standard (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kvadratisk)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (bredt)"
+      },
+      "cancel": "Avbryt",
+      "cardSize": "Kortstørrelse",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Frontmatter-egenskapen hvis verdi er et bilde — vises som omslaget for hvert kort. La stå tomt for å droppe omslag.",
+      "coverImagePlaceholder": "f.eks. cover",
+      "coverImageProperty": "Egenskap for omslagsbilde",
+      "imageAspectRatio": "Bildeforhold",
+      "reset": "Nullstill",
+      "save": "Lagre"
     },
     "welcome": {
       "body": "Velkommen til Myne, ditt private rom for å tenke og skrive.\n\nAlt du lagrer her er kryptert og forblir på enheten din. **Passordet** og **gjenopprettingsfrasen** din er de eneste nøklene til det, så oppbevar dem et trygt sted. Hvis begge går tapt, kan ingen hente notatene dine tilbake, ikke engang vi.\n\nDette er bare et vanlig notat, så gjør det til ditt eget. Rediger det, gi det nytt navn eller slett det når du vil, og legg til nye notater etter hvert som ideene dine vokser.\n\nVi er glade for at du er her. For å lære mer om Myne, besøk https://myne.md\n",
@@ -1701,9 +1702,9 @@
       "on": "På"
     },
     "storage": {
-      "backUpVault": "Sikkerhetskopier hvelv…",
       "backupHelper": "Sikkerhetskopier forblir nøyaktig like krypterte som hvelvet ditt, i én enkelt verifisert .myne-backup-fil. Gjenoppretting fungerer med dette hvelvets passord eller gjenopprettingsfrase — akkurat som ved opplåsing.",
       "backupLabel": "Sikkerhetskopi",
+      "backUpVault": "Sikkerhetskopier hvelv…",
       "exportAction": "Eksporter…",
       "exportBody": "Eksporter hvelv som Markdown",
       "exportHelper": "Ren markdown-mappestruktur — ikke kryptert.",
@@ -1735,6 +1736,127 @@
       "optionLive": "Live forhåndsvisning",
       "optionReading": "Lesing",
       "optionSource": "Kilde"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1948,12 +2070,12 @@
       "saveAsFile": "Lagre som fil"
     },
     "ready": {
-      "backUpNow": "Sikkerhetskopier dette hvelvet nå",
       "backedUp": "Sikkerhetskopiert ✓",
       "backingUp": "Sikkerhetskopierer…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Sikkerhetskopieringen ble ikke fullført — ingen fil ble igjen. Du kan sikkerhetskopiere når som helst fra Innstillinger → Lagring.",
       "backupFilterName": "Myne-sikkerhetskopi",
+      "backUpNow": "Sikkerhetskopier dette hvelvet nå",
       "body": "Myne skrev hvelvet ditt til appdatamappen din. Hovedpassordet og gjenopprettingsfrasen din er den eneste veien tilbake — sørg for at begge er lagret et trygt sted.",
       "decrypting": "Dekrypterer…",
       "done": "Fullført",
@@ -2023,8 +2145,8 @@
   "vaultSwitcher": {
     "chipFallback": "Hvelv",
     "createAnother": "Opprett et nytt hvelv",
-    "switchVaultLabel": "Bytt hvelv",
     "switching": "bytter…",
+    "switchVaultLabel": "Bytt hvelv",
     "vaultFallback": "Hvelv {{n}}"
   },
   "welcome": {
@@ -2033,8 +2155,8 @@
     "headlineLine2": "Ingen e-post ved registrering.",
     "repairResidue": {
       "cancel": "Avbryt",
-      "cleanUp": "Rydd opp",
       "cleaningUp": "Rydder opp…",
+      "cleanUp": "Rydd opp",
       "confirmBody_one": "{{count}} fil blir fjernet. De er allerede uleselige; ingenting gjenopprettbart går tapt.",
       "confirmBody_other": "{{count}} filer blir fjernet. De er allerede uleselige; ingenting gjenopprettbart går tapt.",
       "confirmTitle": "Rydde opp i restfiler?",

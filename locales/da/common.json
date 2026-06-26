@@ -43,8 +43,8 @@
     "library": {
       "actionsAriaLabel": "Handlinger for vedhæftet fil",
       "actionsTitle": "Handlinger",
-      "checkUnusedFailedNotice": "Kunne ikke tjekke for ubrugte vedhæftede filer. Prøv igen.",
       "checking": "Tjekker…",
+      "checkUnusedFailedNotice": "Kunne ikke tjekke for ubrugte vedhæftede filer. Prøv igen.",
       "cleanUnused": "Ryd op i ubrugte",
       "cleanUnusedTitle": "Slet vedhæftede filer, der ikke bruges i nogen note",
       "colCreated": "Oprettet",
@@ -310,6 +310,7 @@
     }
   },
   "common": {
+    "dismiss": "",
     "prompt": {
       "cancel": "Annullér",
       "confirmDefault": "OK"
@@ -321,19 +322,19 @@
   "editor": {
     "attachment": {
       "actions": {
-        "exportFailed": "Kunne ikke eksportere {{filename}}.",
         "exported": "Eksporterede {{filename}}.",
-        "renameFailed": "Kunne ikke omdøbe den vedhæftede fil.",
+        "exportFailed": "Kunne ikke eksportere {{filename}}.",
         "renamed": "Omdøbt til {{name}}.",
+        "renameFailed": "Kunne ikke omdøbe den vedhæftede fil.",
         "saveDialogFailed": "Kunne ikke åbne dialogen Gem."
       },
       "convert": {
         "cancel": "Annullér",
         "confirm": "Konvertér",
         "skipped": "sprunget over — {{note}}",
-        "subtitleEmpty": "Intet at konvertere — ingen kildefiler blev fundet.",
         "subtitle_one": "1 henvisning bliver omskrevet. Gennemgå, før du bekræfter.",
         "subtitle_other": "{{count}} henvisninger bliver omskrevet. Gennemgå, før du bekræfter.",
+        "subtitleEmpty": "Intet at konvertere — ingen kildefiler blev fundet.",
         "title": "Konvertér importerede vedhæftede filer"
       },
       "convertCommand": {
@@ -359,8 +360,8 @@
           "archive": "Arkiv",
           "audio": "Lyd",
           "cHeader": "C-header",
-          "cSource": "C-kildekode",
           "cppSource": "C++-kildekode",
+          "cSource": "C-kildekode",
           "css": "CSS",
           "csv": "CSV",
           "document": "Dokument",
@@ -540,12 +541,12 @@
         "browseViews": "Gennemse visninger",
         "cycleViewMode": "Skift visningstilstand",
         "docStats": {
-          "summarySelectionSuffix": " (markeret)",
           "summary_one": "{{count}} ord · {{characters}} tegn",
           "summary_other": "{{count}} ord · {{characters}} tegn",
-          "titleSelectionSuffix": " (markering)",
+          "summarySelectionSuffix": " (markeret)",
           "title_one": "{{characters}} tegn · {{words}} ord · {{spaces}} mellemrum · {{count}} afsnit",
-          "title_other": "{{characters}} tegn · {{words}} ord · {{spaces}} mellemrum · {{count}} afsnit"
+          "title_other": "{{characters}} tegn · {{words}} ord · {{spaces}} mellemrum · {{count}} afsnit",
+          "titleSelectionSuffix": " (markering)"
         },
         "graphTitle": "Graf (⌘⇧G)",
         "lock": "Lås",
@@ -820,10 +821,10 @@
         "countNotes_one": "{{count}} note",
         "countNotes_other": "{{count}} noter",
         "exclusionsHistory": "Versionshistorik er ikke medtaget.",
-        "exclusionsTrashedAndHistory_one": "{{count}} slettet note og versionshistorik er ikke medtaget.",
-        "exclusionsTrashedAndHistory_other": "{{count}} slettede noter og versionshistorik er ikke medtaget.",
         "exclusionsTrashed_one": "{{count}} slettet note er ikke medtaget.",
         "exclusionsTrashed_other": "{{count}} slettede noter er ikke medtaget.",
+        "exclusionsTrashedAndHistory_one": "{{count}} slettet note og versionshistorik er ikke medtaget.",
+        "exclusionsTrashedAndHistory_other": "{{count}} slettede noter og versionshistorik er ikke medtaget.",
         "phaseAttachments": "vedhæftede filer",
         "phaseNotes": "noter",
         "preparing": "Forbereder…",
@@ -881,9 +882,9 @@
   "notes": {
     "archive": {
       "close": "Luk",
-      "countEmpty": "Tom",
       "count_one": "{{count}} note",
       "count_other": "{{count}} noter",
+      "countEmpty": "Tom",
       "delete": "Slet",
       "deleteError": "Kunne ikke slette den note. Prøv igen.",
       "emptyState": "Arkivet er tomt.",
@@ -1165,21 +1166,21 @@
       "renameAriaLabel": "Omdøb note",
       "untitled": "Uden titel"
     },
+    "savedView": {
+      "defaultName": "Filtreret visning"
+    },
     "saveStatus": {
       "editing": "Redigerer",
       "editingEllipsis": "Redigerer…",
       "editingTitle": "Redigerer — automatisk gem er aktivt",
       "justNow": "lige nu",
       "retry": "Prøv igen",
-      "saveFailed": "Gem mislykkedes",
-      "saveFailedTitle": "Gem mislykkedes — klik på Prøv igen",
       "saved": "Gemt",
       "savedRelative": "Gemt {{rel}}",
+      "saveFailed": "Gem mislykkedes",
+      "saveFailedTitle": "Gem mislykkedes — klik på Prøv igen",
       "saving": "Gemmer",
       "savingEllipsis": "Gemmer…"
-    },
-    "savedView": {
-      "defaultName": "Filtreret visning"
     },
     "snapshotFailed": {
       "dismiss": "Afvis",
@@ -1245,9 +1246,9 @@
     },
     "trash": {
       "close": "Luk",
-      "countEmpty": "Tom",
       "count_one": "{{count}} note",
       "count_other": "{{count}} noter",
+      "countEmpty": "Tom",
       "delete": "Slet",
       "deleteError": "Kunne ikke slette den note. Prøv igen.",
       "empty": "Tøm papirkurv",
@@ -1274,24 +1275,6 @@
       "searching": "Søger…",
       "thisNote": "denne note",
       "untitled": "Uden titel"
-    },
-    "viewSettings": {
-      "aspect": {
-        "default": "Standard (16:9)",
-        "fourThree": "4:3",
-        "square": "1:1 (kvadratisk)",
-        "threeTwo": "3:2",
-        "wide": "16:9 (bred)"
-      },
-      "cancel": "Annullér",
-      "cardSize": "Kortstørrelse",
-      "cardSizeValue": "{{size}} px",
-      "coverImageHint": "Den frontmatter-egenskab, hvis værdi er et billede — vises som hvert korts forside. Lad være tom for ingen forside.",
-      "coverImagePlaceholder": "fx cover",
-      "coverImageProperty": "Egenskab for forsidebillede",
-      "imageAspectRatio": "Billedformat",
-      "reset": "Nulstil",
-      "save": "Gem"
     },
     "views": {
       "cards": {
@@ -1320,6 +1303,24 @@
       },
       "newView": "Ny visning",
       "untitledView": "Visning uden titel"
+    },
+    "viewSettings": {
+      "aspect": {
+        "default": "Standard (16:9)",
+        "fourThree": "4:3",
+        "square": "1:1 (kvadratisk)",
+        "threeTwo": "3:2",
+        "wide": "16:9 (bred)"
+      },
+      "cancel": "Annullér",
+      "cardSize": "Kortstørrelse",
+      "cardSizeValue": "{{size}} px",
+      "coverImageHint": "Den frontmatter-egenskab, hvis værdi er et billede — vises som hvert korts forside. Lad være tom for ingen forside.",
+      "coverImagePlaceholder": "fx cover",
+      "coverImageProperty": "Egenskab for forsidebillede",
+      "imageAspectRatio": "Billedformat",
+      "reset": "Nulstil",
+      "save": "Gem"
     },
     "welcome": {
       "body": "Velkommen til Myne, dit private sted til at tænke og skrive.\n\nAlt, du gemmer her, er krypteret og bliver på din enhed. Din **adgangskode** og **gendannelsessætning** er de eneste nøgler til det, så opbevar dem et sikkert sted. Hvis begge går tabt, kan ingen få dine noter tilbage — heller ikke os.\n\nDette er bare en helt almindelig note, så gør den til din egen. Redigér den, omdøb den eller slet den, når du vil, og tilføj nye noter, efterhånden som dine idéer vokser.\n\nVi er glade for, at du er her. Besøg https://myne.md for at lære mere om Myne.\n",
@@ -1679,9 +1680,9 @@
       "on": "Til"
     },
     "storage": {
-      "backUpVault": "Sikkerhedskopiér boks…",
       "backupHelper": "Sikkerhedskopier forbliver præcis lige så krypterede som din boks, i en enkelt verificeret .myne-backup-fil. Gendannelse fungerer med den boks' adgangskode eller gendannelsessætning — præcis som ved oplåsning.",
       "backupLabel": "Sikkerhedskopi",
+      "backUpVault": "Sikkerhedskopiér boks…",
       "exportAction": "Eksportér…",
       "exportBody": "Eksportér boks som Markdown",
       "exportHelper": "Almindeligt markdown-træ — ikke krypteret.",
@@ -1713,6 +1714,127 @@
       "optionLive": "Live-forhåndsvisning",
       "optionReading": "Læsning",
       "optionSource": "Kilde"
+    }
+  },
+  "sync": {
+    "attachments": {
+      "aria": {
+        "downloading": "",
+        "uploading": ""
+      },
+      "empty": "",
+      "heading": "",
+      "status": {
+        "done": "",
+        "failedWillRetry": "",
+        "paused": ""
+      }
+    },
+    "buildingIndex": {
+      "label": ""
+    },
+    "conflicts": {
+      "discard": "",
+      "empty": "",
+      "groupTitle_one": "",
+      "groupTitle_other": "",
+      "keepAsSeparate": "",
+      "untitled": ""
+    },
+    "devices": {
+      "approve": "",
+      "awaitingApproval_one": "",
+      "awaitingApproval_other": "",
+      "loading": "",
+      "noDevices": "",
+      "notEnrolled": "",
+      "remove": "",
+      "removedElsewhere": "",
+      "resetAndReAdd": "",
+      "resetSyncOnThisDevice": "",
+      "shortName": "",
+      "syncedHere": "",
+      "thisDevice": "",
+      "transportHint": "",
+      "unreachable": "",
+      "yourDevices": ""
+    },
+    "endpoint": {
+      "connect": "",
+      "connectedLocal": "",
+      "connectedTls": "",
+      "connecting": "",
+      "fingerprintLabel": "",
+      "placeholder": "",
+      "unreachable": ""
+    },
+    "enroll": {
+      "accountNumberLabel": "",
+      "accountNumberPlaceholder": "",
+      "connecting": "",
+      "credentialTypeAria": "",
+      "error": {
+        "notConfigured": "",
+        "transport": ""
+      },
+      "mode": {
+        "password": "",
+        "recovery": ""
+      },
+      "passwordLabel": "",
+      "recoveryPhraseHint": "",
+      "recoveryPhraseLabel": "",
+      "signInWith": "",
+      "submit": "",
+      "wordAria": ""
+    },
+    "join": {
+      "accountLabel": "",
+      "cancel": "",
+      "error": "",
+      "help": "",
+      "passwordLabel": "",
+      "serverLabel": "",
+      "serverPlaceholder": "",
+      "submit": "",
+      "submitting": "",
+      "title": ""
+    },
+    "panel": {
+      "addDevice": {
+        "helper": "",
+        "label": ""
+      },
+      "conflicts": {
+        "helper": "",
+        "label": ""
+      },
+      "devices": {
+        "label": ""
+      },
+      "server": {
+        "helper": "",
+        "label": ""
+      },
+      "status": {
+        "helper": "",
+        "label": ""
+      }
+    },
+    "reconcile": {
+      "message": ""
+    },
+    "status": {
+      "awaitingApproval": "",
+      "conflicts_one": "",
+      "conflicts_other": "",
+      "error": "",
+      "loading": "",
+      "notEnrolled": "",
+      "off": "",
+      "synced": "",
+      "syncing": "",
+      "syncNow": ""
     }
   },
   "templates": {
@@ -1926,12 +2048,12 @@
       "saveAsFile": "Gem som fil"
     },
     "ready": {
-      "backUpNow": "Sikkerhedskopiér denne boks nu",
       "backedUp": "Sikkerhedskopieret ✓",
       "backingUp": "Sikkerhedskopierer…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Sikkerhedskopiering blev ikke fuldført — der blev ikke efterladt nogen fil. Du kan sikkerhedskopiere når som helst fra Indstillinger → Opbevaring.",
       "backupFilterName": "Myne-sikkerhedskopi",
+      "backUpNow": "Sikkerhedskopiér denne boks nu",
       "body": "Myne skrev din boks til din mappe med programdata. Din hovedadgangskode og gendannelsessætning er den eneste vej tilbage — sørg for, at begge er gemt et sikkert sted.",
       "decrypting": "Dekrypterer…",
       "done": "Færdig",
@@ -2001,8 +2123,8 @@
   "vaultSwitcher": {
     "chipFallback": "Boks",
     "createAnother": "Opret en anden boks",
-    "switchVaultLabel": "Skift boks",
     "switching": "skifter…",
+    "switchVaultLabel": "Skift boks",
     "vaultFallback": "Boks {{n}}"
   },
   "welcome": {
@@ -2011,8 +2133,8 @@
     "headlineLine2": "Ingen e-mail ved tilmelding.",
     "repairResidue": {
       "cancel": "Annullér",
-      "cleanUp": "Ryd op",
       "cleaningUp": "Rydder op…",
+      "cleanUp": "Ryd op",
       "confirmBody_one": "{{count}} fil bliver fjernet. De er allerede ulæselige; intet, der kan gendannes, går tabt.",
       "confirmBody_other": "{{count}} filer bliver fjernet. De er allerede ulæselige; intet, der kan gendannes, går tabt.",
       "confirmTitle": "Ryd op i tiloversblevne filer?",
