@@ -322,7 +322,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Закрыть",
     "prompt": {
       "cancel": "Отмена",
       "confirmDefault": "ОК"
@@ -1770,7 +1770,8 @@
         "editor": "Редактор",
         "hotkeys": "Сочетания клавиш",
         "privacy": "Конфиденциальность",
-        "storage": "Хранилище"
+        "storage": "Хранилище",
+        "sync": "Синхронизация"
       },
       "passwordUpdatedToast": "Пароль обновлён",
       "title": "Настройки"
@@ -1829,128 +1830,128 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Загрузка {{name}}",
+        "uploading": "Выгрузка {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Активных передач нет.",
+      "heading": "Синхронизация вложений",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "готово",
+        "failedWillRetry": "ошибка — будет повторная попытка",
+        "paused": "приостановлено"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Построение поискового индекса…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_few": "",
-      "groupTitle_many": "",
+      "discard": "Отклонить",
+      "empty": "Конфликтов нет — ваши устройства синхронизированы.",
+      "groupTitle_one": "{{count}} конфликтующая копия заметки «{{original}}»",
+      "groupTitle_few": "{{count}} конфликтующие копии заметки «{{original}}»",
+      "groupTitle_many": "{{count}} конфликтующих копий заметки «{{original}}»",
       "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "keepAsSeparate": "Оставить отдельно",
+      "untitled": "Без названия ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_few": "",
-      "awaitingApproval_many": "",
+      "approve": "Принять",
+      "awaitingApproval_one": "{{count}} устройство ожидает подтверждения",
+      "awaitingApproval_few": "{{count}} устройства ожидают подтверждения",
+      "awaitingApproval_many": "{{count}} устройств ожидают подтверждения",
       "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "loading": "Загрузка…",
+      "noDevices": "Пока нет синхронизированных устройств.",
+      "notEnrolled": "Это устройство ещё не подключено. Если вы только что его добавили, дождитесь подтверждения с другого устройства; иначе добавьте его через форму «Добавить устройство» выше.",
+      "remove": "Удалить",
+      "removedElsewhere": "Это устройство было удалено из вашей учётной записи на другом устройстве.",
+      "resetAndReAdd": "Сбросить и добавить это устройство заново",
+      "resetSyncOnThisDevice": "Сбросить синхронизацию на этом устройстве",
+      "shortName": "Устройство {{hex}}",
+      "syncedHere": "Синхронизировано здесь",
+      "thisDevice": "Это устройство",
+      "transportHint": "Если сервер сменил адрес или его сертификат изменился, заново введите URL сервера в разделе «Сервер синхронизации» выше, чтобы снова ему доверять.",
+      "unreachable": "Не удалось подключиться к синхронизации ({{error}}).",
+      "yourDevices": "Ваши устройства"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Подключиться",
+      "connectedLocal": "Подключено (локально, без TLS).",
+      "connectedTls": "Подключено. Убедитесь, что этот отпечаток совпадает на другом вашем устройстве.",
+      "connecting": "Подключение…",
+      "fingerprintLabel": "Отпечаток сертификата сервера:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Не удалось подключиться к этому серверу — проверьте URL и убедитесь, что он запущен."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Номер учётной записи",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Подключение…",
+      "credentialTypeAria": "Тип учётных данных",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Прежде чем добавлять это устройство, укажите сервер синхронизации в настройках.",
+        "transport": "Не удалось подключиться к серверу синхронизации. Проверьте соединение и попробуйте ещё раз."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Пароль",
+        "recovery": "Фраза восстановления"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Пароль",
+      "recoveryPhraseHint": "Введите свою фразу восстановления из 24 слов.",
+      "recoveryPhraseLabel": "Фраза восстановления",
+      "signInWith": "Войти с помощью",
+      "submit": "Добавить это устройство",
+      "wordAria": "Слово {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Номер учётной записи",
+      "cancel": "Отмена",
+      "error": "Не удалось добавить это устройство. Проверьте URL сервера, номер учётной записи и пароль, а также доступность сервера.",
+      "help": "Войдите с помощью номера учётной записи и пароля. Это устройство начнёт синхронизировать ваши заметки, как только его подтвердит одно из существующих устройств. Фраза восстановления не нужна.",
+      "passwordLabel": "Пароль",
+      "serverLabel": "Сервер синхронизации",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Добавить устройство",
+      "submitting": "Добавление…",
+      "title": "Добавить это устройство в учётную запись"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Войдите на новом устройстве с помощью номера учётной записи и пароля или фразы восстановления. Устройство остаётся в ожидании, пока его не подтвердит одно из существующих устройств.",
+        "label": "Добавить устройство"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Когда одна и та же заметка одновременно изменена на двух устройствах, Myne сохраняет обе копии, чтобы ничего не потерялось. Разберитесь с ними здесь.",
+        "label": "Конфликты"
       },
       "devices": {
-        "label": ""
+        "label": "Устройства"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Введите один и тот же URL сервера на каждом устройстве. Для своего сервера используйте его адрес <1>https://</1>; убедитесь, что отпечаток сертификата совпадает на всех ваших устройствах.",
+        "label": "Сервер синхронизации"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne синхронизирует ваши зашифрованные заметки между устройствами. Сервер хранит только шифротекст, который не может прочитать.",
+        "label": "Состояние синхронизации"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Это устройство какое-то время было офлайн — идёт догоняющая синхронизация. Ваши заметки в безопасности."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_few": "",
-      "conflicts_many": "",
+      "awaitingApproval": "Ожидает подтверждения",
+      "conflicts_one": "{{count}} конфликт для разбора",
+      "conflicts_few": "{{count}} конфликта для разбора",
+      "conflicts_many": "{{count}} конфликтов для разбора",
       "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "error": "Ошибка синхронизации",
+      "loading": "Состояние синхронизации…",
+      "notEnrolled": "Не подключено",
+      "off": "Синхронизация выключена",
+      "synced": "Синхронизировано",
+      "syncing": "Синхронизация…",
+      "syncNow": "Синхронизировать сейчас"
     }
   },
   "templates": {

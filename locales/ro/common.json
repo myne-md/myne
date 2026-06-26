@@ -316,7 +316,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Închide",
     "prompt": {
       "cancel": "Anulează",
       "confirmDefault": "OK"
@@ -1715,7 +1715,8 @@
         "editor": "Editor",
         "hotkeys": "Scurtături",
         "privacy": "Confidențialitate",
-        "storage": "Stocare"
+        "storage": "Stocare",
+        "sync": "Sincronizare"
       },
       "passwordUpdatedToast": "Parolă actualizată",
       "title": "Setări"
@@ -1774,125 +1775,125 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Se descarcă {{name}}",
+        "uploading": "Se încarcă {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Niciun transfer în curs.",
+      "heading": "Sincronizarea atașamentelor",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "finalizat",
+        "failedWillRetry": "eșuat — se reîncearcă",
+        "paused": "în pauză"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Se construiește indexul de căutare…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_few": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Renunță",
+      "empty": "Niciun conflict — dispozitivele tale sunt sincronizate.",
+      "groupTitle_one": "{{count}} copie a {{original}} aflată în conflict",
+      "groupTitle_few": "{{count}} copii ale {{original}} aflate în conflict",
+      "groupTitle_other": "{{count}} de copii ale {{original}} aflate în conflict",
+      "keepAsSeparate": "Păstrează separat",
+      "untitled": "Fără titlu ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_few": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Aprobă",
+      "awaitingApproval_one": "{{count}} dispozitiv în așteptarea aprobării",
+      "awaitingApproval_few": "{{count}} dispozitive în așteptarea aprobării",
+      "awaitingApproval_other": "{{count}} de dispozitive în așteptarea aprobării",
+      "loading": "Se încarcă…",
+      "noDevices": "Niciun dispozitiv sincronizat încă.",
+      "notEnrolled": "Acest dispozitiv nu este încă conectat. Dacă tocmai l-ai adăugat, așteaptă aprobarea de pe alt dispozitiv; altfel, adaugă-l cu formularul „Adaugă un dispozitiv” de mai sus.",
+      "remove": "Elimină",
+      "removedElsewhere": "Acest dispozitiv a fost eliminat din contul tău de pe alt dispozitiv.",
+      "resetAndReAdd": "Resetează și readaugă acest dispozitiv",
+      "resetSyncOnThisDevice": "Resetează sincronizarea pe acest dispozitiv",
+      "shortName": "Dispozitivul {{hex}}",
+      "syncedHere": "Sincronizat aici",
+      "thisDevice": "Acest dispozitiv",
+      "transportHint": "Dacă serverul s-a mutat sau certificatul lui s-a schimbat, reintrodu adresa serverului la „Server de sincronizare” de mai sus pentru a-l considera din nou de încredere.",
+      "unreachable": "Sincronizarea nu a putut fi accesată ({{error}}).",
+      "yourDevices": "Dispozitivele tale"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Conectează",
+      "connectedLocal": "Conectat (local, fără TLS).",
+      "connectedTls": "Conectat. Verifică dacă această amprentă corespunde pe celălalt dispozitiv.",
+      "connecting": "Se conectează…",
+      "fingerprintLabel": "Amprenta certificatului serverului:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Acel server nu a putut fi accesat — verifică adresa și dacă serverul rulează."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Număr de cont",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Se conectează…",
+      "credentialTypeAria": "Tip de credențial",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Setează un server de sincronizare în setări înainte de a adăuga acest dispozitiv.",
+        "transport": "Serverul de sincronizare nu a putut fi accesat. Verifică-ți conexiunea și încearcă din nou."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Parolă",
+        "recovery": "Frază de recuperare"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Parolă",
+      "recoveryPhraseHint": "Introdu fraza ta de recuperare din 24 de cuvinte.",
+      "recoveryPhraseLabel": "Frază de recuperare",
+      "signInWith": "Conectează-te cu",
+      "submit": "Adaugă acest dispozitiv",
+      "wordAria": "Cuvântul {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Număr de cont",
+      "cancel": "Anulează",
+      "error": "Acest dispozitiv nu a putut fi adăugat. Verifică adresa serverului, numărul de cont și parola — și dacă serverul este accesibil.",
+      "help": "Conectează-te cu numărul de cont și parola ta. Acest dispozitiv îți va sincroniza notele după ce un dispozitiv existent îl aprobă. Nu este nevoie de fraza de recuperare.",
+      "passwordLabel": "Parolă",
+      "serverLabel": "Server de sincronizare",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Adaugă dispozitiv",
+      "submitting": "Se adaugă…",
+      "title": "Adaugă acest dispozitiv la un cont"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Conectează-te pe un dispozitiv nou cu numărul de cont și parola sau fraza ta de recuperare. Un dispozitiv rămâne în așteptare până când un dispozitiv existent îl aprobă.",
+        "label": "Adaugă un dispozitiv"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Când aceeași notă este editată simultan pe două dispozitive, Myne păstrează ambele copii ca să nu se piardă nimic. Rezolvă-le aici.",
+        "label": "Conflicte"
       },
       "devices": {
-        "label": ""
+        "label": "Dispozitive"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Introdu aceeași adresă de server pe fiecare dispozitiv. Pentru un server găzduit de tine, folosește adresa lui <1>https://</1>; verifică dacă amprenta certificatului corespunde pe toate dispozitivele tale.",
+        "label": "Server de sincronizare"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne îți sincronizează notele criptate pe toate dispozitivele tale. Serverul stochează doar text cifrat pe care nu îl poate citi.",
+        "label": "Stare sincronizare"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Acest dispozitiv a fost offline o vreme — se recuperează sincronizarea. Notele tale sunt în siguranță."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_few": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "În așteptarea aprobării",
+      "conflicts_one": "{{count}} conflict de examinat",
+      "conflicts_few": "{{count}} conflicte de examinat",
+      "conflicts_other": "{{count}} de conflicte de examinat",
+      "error": "Eroare de sincronizare",
+      "loading": "Stare sincronizare…",
+      "notEnrolled": "Neînregistrat",
+      "off": "Sincronizare dezactivată",
+      "synced": "Sincronizat",
+      "syncing": "Se sincronizează…",
+      "syncNow": "Sincronizează acum"
     }
   },
   "templates": {

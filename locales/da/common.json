@@ -310,7 +310,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Afvis",
     "prompt": {
       "cancel": "Annullér",
       "confirmDefault": "OK"
@@ -1660,7 +1660,8 @@
         "editor": "Editor",
         "hotkeys": "Genveje",
         "privacy": "Privatliv",
-        "storage": "Opbevaring"
+        "storage": "Opbevaring",
+        "sync": "Synkronisering"
       },
       "passwordUpdatedToast": "Adgangskode opdateret",
       "title": "Indstillinger"
@@ -1719,122 +1720,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Henter {{name}}",
+        "uploading": "Uploader {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Ingen overførsler i gang.",
+      "heading": "Synkronisering af vedhæftede filer",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "færdig",
+        "failedWillRetry": "mislykkedes — prøver igen",
+        "paused": "sat på pause"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Bygger søgeindeks…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Kassér",
+      "empty": "Ingen konflikter — dine enheder er synkroniserede.",
+      "groupTitle_one": "{{count}} modstridende kopi af {{original}}",
+      "groupTitle_other": "{{count}} modstridende kopier af {{original}}",
+      "keepAsSeparate": "Behold som separate",
+      "untitled": "Uden titel ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Godkend",
+      "awaitingApproval_one": "{{count}} enhed afventer godkendelse",
+      "awaitingApproval_other": "{{count}} enheder afventer godkendelse",
+      "loading": "Indlæser…",
+      "noDevices": "Ingen enheder synkroniseret endnu.",
+      "notEnrolled": "Denne enhed er ikke tilsluttet endnu. Hvis du lige har tilføjet den, så vent på godkendelse fra en anden enhed; ellers kan du tilføje den med formularen “Tilføj en enhed” ovenfor.",
+      "remove": "Fjern",
+      "removedElsewhere": "Denne enhed blev fjernet fra din konto på en anden enhed.",
+      "resetAndReAdd": "Nulstil og tilføj denne enhed igen",
+      "resetSyncOnThisDevice": "Nulstil synkronisering på denne enhed",
+      "shortName": "Enhed {{hex}}",
+      "syncedHere": "Synkroniseret her",
+      "thisDevice": "Denne enhed",
+      "transportHint": "Hvis serveren er flyttet, eller dens certifikat er ændret, så indtast serverens URL igen under “Synkroniseringsserver” ovenfor for at stole på den igen.",
+      "unreachable": "Kunne ikke nå synkronisering ({{error}}).",
+      "yourDevices": "Dine enheder"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Forbind",
+      "connectedLocal": "Forbundet (lokalt, uden TLS).",
+      "connectedTls": "Forbundet. Tjek, at dette fingeraftryk stemmer overens på din anden enhed.",
+      "connecting": "Forbinder…",
+      "fingerprintLabel": "Fingeraftryk for servercertifikat:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Kunne ikke nå den server — tjek URL'en, og at den kører."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Kontonummer",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Forbinder…",
+      "credentialTypeAria": "Legitimationstype",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Angiv en synkroniseringsserver i indstillinger, før du tilføjer denne enhed.",
+        "transport": "Kunne ikke nå synkroniseringsserveren. Tjek din forbindelse, og prøv igen."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Adgangskode",
+        "recovery": "Gendannelsessætning"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Adgangskode",
+      "recoveryPhraseHint": "Indtast din gendannelsessætning på 24 ord.",
+      "recoveryPhraseLabel": "Gendannelsessætning",
+      "signInWith": "Log ind med",
+      "submit": "Tilføj denne enhed",
+      "wordAria": "Ord {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Kontonummer",
+      "cancel": "Annullér",
+      "error": "Kunne ikke tilføje denne enhed. Tjek serverens URL, kontonummeret og adgangskoden — og at serveren kan nås.",
+      "help": "Log ind med dit kontonummer og din adgangskode. Denne enhed synkroniserer dine noter, så snart en eksisterende enhed godkender den. Ingen gendannelsessætning nødvendig.",
+      "passwordLabel": "Adgangskode",
+      "serverLabel": "Synkroniseringsserver",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Tilføj enhed",
+      "submitting": "Tilføjer…",
+      "title": "Tilføj denne enhed til en konto"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Log ind på en ny enhed med dit kontonummer og din adgangskode eller gendannelsessætning. En enhed forbliver afventende, indtil en eksisterende enhed godkender den.",
+        "label": "Tilføj en enhed"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Når den samme note redigeres på to enheder samtidig, beholder Myne begge kopier, så intet går tabt. Løs dem her.",
+        "label": "Konflikter"
       },
       "devices": {
-        "label": ""
+        "label": "Enheder"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Indtast den samme server-URL på hver enhed. Til en selvhostet server skal du bruge dens <1>https://</1>-adresse; bekræft, at certifikatets fingeraftryk stemmer overens på tværs af dine enheder.",
+        "label": "Synkroniseringsserver"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Myne synkroniserer dine krypterede noter på tværs af dine enheder. Serveren gemmer kun krypteret tekst, den ikke kan læse.",
+        "label": "Synkroniseringsstatus"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Denne enhed var offline et stykke tid — indhenter synkronisering. Dine noter er i sikkerhed."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Afventer godkendelse",
+      "conflicts_one": "{{count}} konflikt at gennemgå",
+      "conflicts_other": "{{count}} konflikter at gennemgå",
+      "error": "Synkroniseringsfejl",
+      "loading": "Synkroniseringsstatus…",
+      "notEnrolled": "Ikke tilmeldt",
+      "off": "Synkronisering fra",
+      "synced": "Synkroniseret",
+      "syncing": "Synkroniserer…",
+      "syncNow": "Synkronisér nu"
     }
   },
   "templates": {

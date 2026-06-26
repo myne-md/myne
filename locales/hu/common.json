@@ -312,7 +312,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Elvetés",
     "prompt": {
       "cancel": "Mégse",
       "confirmDefault": "OK"
@@ -1682,7 +1682,8 @@
         "editor": "Szerkesztő",
         "hotkeys": "Gyorsbillentyűk",
         "privacy": "Adatvédelem",
-        "storage": "Tárhely"
+        "storage": "Tárhely",
+        "sync": "Szinkronizálás"
       },
       "passwordUpdatedToast": "Jelszó frissítve",
       "title": "Beállítások"
@@ -1741,122 +1742,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "{{name}} letöltése",
+        "uploading": "{{name}} feltöltése"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Nincs folyamatban lévő átvitel.",
+      "heading": "Mellékletek szinkronizálása",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "kész",
+        "failedWillRetry": "sikertelen — újrapróbálkozás következik",
+        "paused": "szüneteltetve"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Keresési index építése…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Elvetés",
+      "empty": "Nincs ütközés — az eszközeid szinkronban vannak.",
+      "groupTitle_one": "A(z) {{original}} {{count}} ütköző példánya",
+      "groupTitle_other": "A(z) {{original}} {{count}} ütköző példánya",
+      "keepAsSeparate": "Megtartás különállóként",
+      "untitled": "Névtelen ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Jóváhagyás",
+      "awaitingApproval_one": "{{count}} eszköz vár jóváhagyásra",
+      "awaitingApproval_other": "{{count}} eszköz vár jóváhagyásra",
+      "loading": "Betöltés…",
+      "noDevices": "Még nincs szinkronizált eszköz.",
+      "notEnrolled": "Ez az eszköz még nincs csatlakoztatva. Ha most adtad hozzá, várd meg, amíg egy másik eszköz jóváhagyja; egyébként add hozzá a fenti „Eszköz hozzáadása” űrlappal.",
+      "remove": "Eltávolítás",
+      "removedElsewhere": "Ezt az eszközt egy másik eszközről eltávolították a fiókodból.",
+      "resetAndReAdd": "Az eszköz visszaállítása és újbóli hozzáadása",
+      "resetSyncOnThisDevice": "Szinkronizálás visszaállítása ezen az eszközön",
+      "shortName": "{{hex}} eszköz",
+      "syncedHere": "Itt szinkronizálva",
+      "thisDevice": "Ez az eszköz",
+      "transportHint": "Ha a szerver áthelyeződött, vagy megváltozott a tanúsítványa, írd be újra a szerver URL-jét fent a „Szinkronszerver” mezőbe, hogy ismét megbízhass benne.",
+      "unreachable": "Nem sikerült elérni a szinkronizálást ({{error}}).",
+      "yourDevices": "Az eszközeid"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Csatlakozás",
+      "connectedLocal": "Csatlakozva (helyi, TLS nélkül).",
+      "connectedTls": "Csatlakozva. Ellenőrizd, hogy ez az ujjlenyomat megegyezik-e a másik eszközödön.",
+      "connecting": "Csatlakozás…",
+      "fingerprintLabel": "A szervertanúsítvány ujjlenyomata:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Nem sikerült elérni a szervert — ellenőrizd az URL-t, és hogy fut-e."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Fiókszám",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Csatlakozás…",
+      "credentialTypeAria": "Hitelesítő adat típusa",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Az eszköz hozzáadása előtt állíts be egy szinkronszervert a beállításokban.",
+        "transport": "Nem sikerült elérni a szinkronszervert. Ellenőrizd a kapcsolatot, és próbáld újra."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Jelszó",
+        "recovery": "Helyreállító mondat"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Jelszó",
+      "recoveryPhraseHint": "Add meg a 24 szavas helyreállító mondatodat.",
+      "recoveryPhraseLabel": "Helyreállító mondat",
+      "signInWith": "Bejelentkezés ezzel:",
+      "submit": "Az eszköz hozzáadása",
+      "wordAria": "{{number}}. szó"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Fiókszám",
+      "cancel": "Mégse",
+      "error": "Nem sikerült hozzáadni az eszközt. Ellenőrizd a szerver URL-jét, a fiókszámot és a jelszót — és hogy a szerver elérhető-e.",
+      "help": "Jelentkezz be a fiókszámoddal és a jelszavaddal. Ez az eszköz akkor kezdi el szinkronizálni a jegyzeteidet, amikor egy meglévő eszköz jóváhagyja. Helyreállító mondatra nincs szükség.",
+      "passwordLabel": "Jelszó",
+      "serverLabel": "Szinkronszerver",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Eszköz hozzáadása",
+      "submitting": "Hozzáadás…",
+      "title": "Az eszköz hozzáadása egy fiókhoz"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Egy új eszközön a fiókszámoddal és a jelszavaddal vagy a helyreállító mondatoddal jelentkezz be. Az eszköz mindaddig függőben marad, amíg egy meglévő eszköz jóvá nem hagyja.",
+        "label": "Eszköz hozzáadása"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Ha ugyanazt a jegyzetet egyszerre két eszközön szerkesztik, a Myne mindkét példányt megtartja, hogy semmi se vesszen el. Itt oldhatod fel őket.",
+        "label": "Ütközések"
       },
       "devices": {
-        "label": ""
+        "label": "Eszközök"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Add meg ugyanazt a szerver URL-t minden eszközön. Saját üzemeltetésű szerver esetén használd a <1>https://</1> címét; ellenőrizd, hogy a tanúsítvány ujjlenyomata megegyezik-e az eszközeiden.",
+        "label": "Szinkronszerver"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "A Myne szinkronizálja a titkosított jegyzeteidet az eszközeid között. A szerver csak titkosított szöveget tárol, amelyet nem tud elolvasni.",
+        "label": "Szinkron állapota"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Ez az eszköz egy ideig offline volt — most behozza a szinkronizálás lemaradását. A jegyzeteid biztonságban vannak."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Jóváhagyásra vár",
+      "conflicts_one": "{{count}} áttekintendő ütközés",
+      "conflicts_other": "{{count}} áttekintendő ütközés",
+      "error": "Szinkronizálási hiba",
+      "loading": "Szinkron állapota…",
+      "notEnrolled": "Nincs regisztrálva",
+      "off": "Szinkronizálás kikapcsolva",
+      "synced": "Szinkronizálva",
+      "syncing": "Szinkronizálás…",
+      "syncNow": "Szinkronizálás most"
     }
   },
   "templates": {

@@ -310,7 +310,7 @@
     }
   },
   "common": {
-    "dismiss": "",
+    "dismiss": "Παράβλεψη",
     "prompt": {
       "cancel": "Ακύρωση",
       "confirmDefault": "OK"
@@ -1660,7 +1660,8 @@
         "editor": "Επεξεργαστής",
         "hotkeys": "Συντομεύσεις",
         "privacy": "Απόρρητο",
-        "storage": "Αποθήκευση"
+        "storage": "Αποθήκευση",
+        "sync": "Συγχρονισμός"
       },
       "passwordUpdatedToast": "Ο κωδικός πρόσβασης ενημερώθηκε",
       "title": "Ρυθμίσεις"
@@ -1719,122 +1720,122 @@
   "sync": {
     "attachments": {
       "aria": {
-        "downloading": "",
-        "uploading": ""
+        "downloading": "Λήψη του {{name}}",
+        "uploading": "Μεταφόρτωση του {{name}}"
       },
-      "empty": "",
-      "heading": "",
+      "empty": "Καμία μεταφορά σε εξέλιξη.",
+      "heading": "Συγχρονισμός συνημμένων",
       "status": {
-        "done": "",
-        "failedWillRetry": "",
-        "paused": ""
+        "done": "ολοκληρώθηκε",
+        "failedWillRetry": "απέτυχε — θα επαναληφθεί",
+        "paused": "σε παύση"
       }
     },
     "buildingIndex": {
-      "label": ""
+      "label": "Δημιουργία ευρετηρίου αναζήτησης…"
     },
     "conflicts": {
-      "discard": "",
-      "empty": "",
-      "groupTitle_one": "",
-      "groupTitle_other": "",
-      "keepAsSeparate": "",
-      "untitled": ""
+      "discard": "Απόρριψη",
+      "empty": "Καμία σύγκρουση — οι συσκευές σας είναι συγχρονισμένες.",
+      "groupTitle_one": "{{count}} αντίγραφο του {{original}} σε σύγκρουση",
+      "groupTitle_other": "{{count}} αντίγραφα του {{original}} σε σύγκρουση",
+      "keepAsSeparate": "Διατήρηση ως ξεχωριστού",
+      "untitled": "Χωρίς τίτλο ({{hex}})"
     },
     "devices": {
-      "approve": "",
-      "awaitingApproval_one": "",
-      "awaitingApproval_other": "",
-      "loading": "",
-      "noDevices": "",
-      "notEnrolled": "",
-      "remove": "",
-      "removedElsewhere": "",
-      "resetAndReAdd": "",
-      "resetSyncOnThisDevice": "",
-      "shortName": "",
-      "syncedHere": "",
-      "thisDevice": "",
-      "transportHint": "",
-      "unreachable": "",
-      "yourDevices": ""
+      "approve": "Έγκριση",
+      "awaitingApproval_one": "{{count}} συσκευή σε αναμονή έγκρισης",
+      "awaitingApproval_other": "{{count}} συσκευές σε αναμονή έγκρισης",
+      "loading": "Φόρτωση…",
+      "noDevices": "Καμία συσκευή δεν έχει συγχρονιστεί ακόμη.",
+      "notEnrolled": "Αυτή η συσκευή δεν έχει συνδεθεί ακόμη. Αν μόλις την προσθέσατε, περιμένετε την έγκριση από μια άλλη συσκευή· διαφορετικά, προσθέστε την με τη φόρμα «Προσθήκη συσκευής» παραπάνω.",
+      "remove": "Αφαίρεση",
+      "removedElsewhere": "Αυτή η συσκευή αφαιρέθηκε από τον λογαριασμό σας μέσω μιας άλλης συσκευής.",
+      "resetAndReAdd": "Επαναφορά και επανασύνδεση αυτής της συσκευής",
+      "resetSyncOnThisDevice": "Επαναφορά συγχρονισμού σε αυτή τη συσκευή",
+      "shortName": "Συσκευή {{hex}}",
+      "syncedHere": "Συγχρονισμένη εδώ",
+      "thisDevice": "Αυτή η συσκευή",
+      "transportHint": "Αν ο διακομιστής μετακινήθηκε ή άλλαξε το πιστοποιητικό του, εισαγάγετε ξανά τη διεύθυνση του διακομιστή στο «Διακομιστής συγχρονισμού» παραπάνω για να τον εμπιστευτείτε ξανά.",
+      "unreachable": "Δεν ήταν δυνατή η σύνδεση με τον συγχρονισμό ({{error}}).",
+      "yourDevices": "Οι συσκευές σας"
     },
     "endpoint": {
-      "connect": "",
-      "connectedLocal": "",
-      "connectedTls": "",
-      "connecting": "",
-      "fingerprintLabel": "",
-      "placeholder": "",
-      "unreachable": ""
+      "connect": "Σύνδεση",
+      "connectedLocal": "Συνδεδεμένο (τοπικά, χωρίς TLS).",
+      "connectedTls": "Συνδεδεμένο. Βεβαιωθείτε ότι αυτό το αποτύπωμα ταιριάζει στην άλλη σας συσκευή.",
+      "connecting": "Σύνδεση…",
+      "fingerprintLabel": "Αποτύπωμα πιστοποιητικού διακομιστή:",
+      "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
+      "unreachable": "Δεν ήταν δυνατή η σύνδεση με τον διακομιστή — ελέγξτε τη διεύθυνση και ότι λειτουργεί."
     },
     "enroll": {
-      "accountNumberLabel": "",
-      "accountNumberPlaceholder": "",
-      "connecting": "",
-      "credentialTypeAria": "",
+      "accountNumberLabel": "Αριθμός λογαριασμού",
+      "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
+      "connecting": "Σύνδεση…",
+      "credentialTypeAria": "Τύπος διαπιστευτηρίου",
       "error": {
-        "notConfigured": "",
-        "transport": ""
+        "notConfigured": "Ορίστε έναν διακομιστή συγχρονισμού στις ρυθμίσεις πριν προσθέσετε αυτή τη συσκευή.",
+        "transport": "Δεν ήταν δυνατή η σύνδεση με τον διακομιστή συγχρονισμού. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
       },
       "mode": {
-        "password": "",
-        "recovery": ""
+        "password": "Κωδικός πρόσβασης",
+        "recovery": "Φράση ανάκτησης"
       },
-      "passwordLabel": "",
-      "recoveryPhraseHint": "",
-      "recoveryPhraseLabel": "",
-      "signInWith": "",
-      "submit": "",
-      "wordAria": ""
+      "passwordLabel": "Κωδικός πρόσβασης",
+      "recoveryPhraseHint": "Εισαγάγετε τη φράση ανάκτησής σας των 24 λέξεων.",
+      "recoveryPhraseLabel": "Φράση ανάκτησης",
+      "signInWith": "Σύνδεση με",
+      "submit": "Προσθήκη αυτής της συσκευής",
+      "wordAria": "Λέξη {{number}}"
     },
     "join": {
-      "accountLabel": "",
-      "cancel": "",
-      "error": "",
-      "help": "",
-      "passwordLabel": "",
-      "serverLabel": "",
-      "serverPlaceholder": "",
-      "submit": "",
-      "submitting": "",
-      "title": ""
+      "accountLabel": "Αριθμός λογαριασμού",
+      "cancel": "Ακύρωση",
+      "error": "Δεν ήταν δυνατή η προσθήκη αυτής της συσκευής. Ελέγξτε τη διεύθυνση του διακομιστή, τον αριθμό λογαριασμού και τον κωδικό πρόσβασης — και ότι ο διακομιστής είναι προσβάσιμος.",
+      "help": "Συνδεθείτε με τον αριθμό λογαριασμού και τον κωδικό πρόσβασής σας. Αυτή η συσκευή θα συγχρονίσει τις σημειώσεις σας μόλις την εγκρίνει μια υπάρχουσα συσκευή. Δεν χρειάζεται φράση ανάκτησης.",
+      "passwordLabel": "Κωδικός πρόσβασης",
+      "serverLabel": "Διακομιστής συγχρονισμού",
+      "serverPlaceholder": "https://your-server.example",
+      "submit": "Προσθήκη συσκευής",
+      "submitting": "Προσθήκη…",
+      "title": "Προσθήκη αυτής της συσκευής σε έναν λογαριασμό"
     },
     "panel": {
       "addDevice": {
-        "helper": "",
-        "label": ""
+        "helper": "Συνδεθείτε σε μια νέα συσκευή με τον αριθμό λογαριασμού σας και τον κωδικό πρόσβασης ή τη φράση ανάκτησής σας. Μια συσκευή παραμένει σε εκκρεμότητα μέχρι να την εγκρίνει μια υπάρχουσα συσκευή.",
+        "label": "Προσθήκη συσκευής"
       },
       "conflicts": {
-        "helper": "",
-        "label": ""
+        "helper": "Όταν η ίδια σημείωση επεξεργαστεί ταυτόχρονα σε δύο συσκευές, το Myne διατηρεί και τα δύο αντίγραφα ώστε να μη χαθεί τίποτα. Επιλύστε τις εδώ.",
+        "label": "Συγκρούσεις"
       },
       "devices": {
-        "label": ""
+        "label": "Συσκευές"
       },
       "server": {
-        "helper": "",
-        "label": ""
+        "helper": "Εισαγάγετε την ίδια διεύθυνση διακομιστή σε κάθε συσκευή. Για αυτοφιλοξενούμενο διακομιστή χρησιμοποιήστε τη διεύθυνσή του <1>https://</1>· επιβεβαιώστε ότι το αποτύπωμα του πιστοποιητικού ταιριάζει σε όλες τις συσκευές σας.",
+        "label": "Διακομιστής συγχρονισμού"
       },
       "status": {
-        "helper": "",
-        "label": ""
+        "helper": "Το Myne συγχρονίζει τις κρυπτογραφημένες σημειώσεις σας σε όλες τις συσκευές σας. Ο διακομιστής αποθηκεύει μόνο κρυπτογραφημένο κείμενο, το οποίο δεν μπορεί να διαβάσει.",
+        "label": "Κατάσταση συγχρονισμού"
       }
     },
     "reconcile": {
-      "message": ""
+      "message": "Αυτή η συσκευή ήταν εκτός σύνδεσης για λίγο — ενημερώνεται μέσω συγχρονισμού. Οι σημειώσεις σας είναι ασφαλείς."
     },
     "status": {
-      "awaitingApproval": "",
-      "conflicts_one": "",
-      "conflicts_other": "",
-      "error": "",
-      "loading": "",
-      "notEnrolled": "",
-      "off": "",
-      "synced": "",
-      "syncing": "",
-      "syncNow": ""
+      "awaitingApproval": "Σε αναμονή έγκρισης",
+      "conflicts_one": "{{count}} σύγκρουση προς εξέταση",
+      "conflicts_other": "{{count}} συγκρούσεις προς εξέταση",
+      "error": "Σφάλμα συγχρονισμού",
+      "loading": "Κατάσταση συγχρονισμού…",
+      "notEnrolled": "Μη εγγεγραμμένη",
+      "off": "Συγχρονισμός ανενεργός",
+      "synced": "Συγχρονισμένο",
+      "syncing": "Συγχρονισμός…",
+      "syncNow": "Συγχρονισμός τώρα"
     }
   },
   "templates": {
