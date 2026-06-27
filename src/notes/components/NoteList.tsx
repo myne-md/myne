@@ -34,6 +34,7 @@ import { ArchivePanel } from "./ArchivePanel";
 import { TrashPanel } from "./TrashPanel";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deriveFolderTree, type FolderNode } from "../folderTree";
+import { folderKey } from "../../dialect/folderPath";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import {
   noteExportOptions,
@@ -760,6 +761,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         Array.from(live.values()).map((r) => ({
           noteUuid: r.noteUuid,
           folder: r.folder,
+          folderIndex: r.folderIndex,
         })),
         fm.deliberate,
       ),
@@ -819,6 +821,20 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       for (const n of nodes) {
         if (n.indexNoteId !== null) map.set(n.indexNoteId, "index");
         for (const id of n.indexConflictIds) map.set(id, "conflict");
+        walk(n.children);
+      }
+    };
+    walk(tree.roots);
+    return map;
+  }, [tree]);
+  // Folder-key → its index note id (MYND-370). Drives the single-folder-note
+  // guard: the per-note "Set as folder note" action is offered only when the
+  // note's folder has NO index yet, so a second one can never be designated.
+  const folderIndexByKey = useMemo(() => {
+    const map = new Map<string, NoteId>();
+    const walk = (nodes: readonly FolderNode[]): void => {
+      for (const n of nodes) {
+        if (n.indexNoteId !== null) map.set(n.key, n.indexNoteId);
         walk(n.children);
       }
     };
@@ -915,6 +931,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           treeAnimRows={treeAnimRows}
           folderOptions={folderOptions}
           folderIndexRoles={folderIndexRoles}
+          folderIndexByKey={folderIndexByKey}
           onToggleFolder={toggleFolder}
           onCreate={handleCreate}
           fm={fm}
@@ -1127,6 +1144,7 @@ function PopulatedList({
   treeAnimRows,
   folderOptions,
   folderIndexRoles,
+  folderIndexByKey,
   onToggleFolder,
   onCreate,
   fm,
@@ -1144,6 +1162,10 @@ function PopulatedList({
    *  "conflict" = a claimant that lost the tiebreak. Drives the NoteRow badge +
    *  conflict indicator. Computed in the parent off the derived tree. */
   folderIndexRoles: ReadonlyMap<NoteId, "index" | "conflict">;
+  /** Folder-key → its index note id (MYND-370). Drives the single-folder-note
+   *  guard: the per-note "Set as folder note" action is offered only when the
+   *  note's folder is absent from this map. Computed in the parent off the tree. */
+  folderIndexByKey: ReadonlyMap<string, NoteId>;
   /** Per-row folder disclosure-animation descriptors, keyed by VirtualList row
    *  key (empty when no expand/collapse is animating). Computed in the parent so
    *  it shares `treeAnim` state with the toggle handler; each entry's `mode` +
@@ -1469,6 +1491,17 @@ function PopulatedList({
     [openNote],
   );
 
+  // Double-click a folder row: open its folder note, or create one if it has
+  // none (MYND-370). The single creation path — gated on `indexNoteId === null`
+  // here and in the affordance/menu — is what keeps it to exactly one per folder.
+  const handleFolderActivate = useCallback(
+    (node: FolderNode) => {
+      if (node.indexNoteId !== null) handleOpenIndexNote(node.indexNoteId);
+      else void handleCreateFolderNote(node.path);
+    },
+    [handleOpenIndexNote, handleCreateFolderNote],
+  );
+
   // Designate / undesignate a note as its folder's index, then refresh its
   // record so the derived tree + badge update. The flag flip writes through the
   // dedicated `folderNote` orchestrators (no `updated:` bump); `refreshOne`
@@ -1684,27 +1717,23 @@ function PopulatedList({
           : t("notes.list.addToFavorites"),
         onSelect: () => fm.toggleFavorite(menu.id),
       },
-      // Folder note (MYND-370): only for a note that lives IN a folder — a
-      // root/unfiled note can't index anything, so it gets neither entry. The
-      // current index note offers "Remove"; any other in-folder note offers
-      // "Set".
-      ...(ctx.cache.get(menu.id)?.folder != null
-        ? folderIndexRoles.get(menu.id) === "index"
-          ? [
-              {
-                id: "note.unset-index",
-                label: t("notes.list.removeAsFolderNote"),
-                onSelect: () => void handleUnsetIndex(menu.id),
-              },
-            ]
-          : [
-              {
-                id: "note.set-index",
-                label: t("notes.list.setAsFolderNote"),
-                onSelect: () => void handleSetIndex(menu.id),
-              },
-            ]
-        : []),
+      // Folder note (MYND-370): promote this note to its folder's index note —
+      // offered ONLY for an in-folder note whose folder has NO index note yet, so
+      // a second one can never be designated (exactly one per folder). The "Remove
+      // as folder note" inverse is NOT here: the index note is hidden from the tree
+      // (its row is unreachable), so undesignate lives on the FOLDER menu instead.
+      ...(() => {
+        const rec = ctx.cache.get(menu.id);
+        if (rec?.folder == null) return [];
+        if (folderIndexByKey.get(folderKey(rec.folder)) != null) return [];
+        return [
+          {
+            id: "note.set-index",
+            label: t("notes.list.setAsFolderNote"),
+            onSelect: () => void handleSetIndex(menu.id),
+          },
+        ];
+      })(),
       {
         id: "color",
         label: t("notes.list.color"),
@@ -1802,9 +1831,8 @@ function PopulatedList({
     favSet,
     openNote,
     exportHooks,
-    folderIndexRoles,
+    folderIndexByKey,
     handleSetIndex,
-    handleUnsetIndex,
     t,
   ]);
 
@@ -1836,6 +1864,18 @@ function PopulatedList({
             label: t("notes.list.createFolderNote"),
             onSelect: () => void handleCreateFolderNote(node.path),
           },
+      // Undesignate the folder note (MYND-370): the only reachable "remove" path
+      // now that the index note is hidden from the tree. Non-destructive — the
+      // note returns to an ordinary, visible note (re-appears as a row).
+      ...(node.indexNoteId !== null
+        ? [
+            {
+              id: "folder.remove-index",
+              label: t("notes.list.removeFolderNote"),
+              onSelect: () => void handleUnsetIndex(node.indexNoteId as string),
+            },
+          ]
+        : []),
       {
         id: "new-subfolder",
         label: t("notes.list.newSubfolder"),
@@ -1859,7 +1899,7 @@ function PopulatedList({
         onSelect: () => void fm.deleteFolderAction(node),
       },
     ];
-  }, [fm, handleOpenIndexNote, handleCreateFolderNote, t]);
+  }, [fm, handleOpenIndexNote, handleCreateFolderNote, handleUnsetIndex, t]);
 
   // Background (root-level) context-menu items — Story F2.
   const bgMenuItems: ContextMenuItem[] = useMemo(
@@ -2088,6 +2128,7 @@ function PopulatedList({
                     onCreateFolderNote={(folderPath) =>
                       void handleCreateFolderNote(folderPath)
                     }
+                    onActivate={handleFolderActivate}
                   />
                 </DisclosureWrapper>
               );

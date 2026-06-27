@@ -91,19 +91,26 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
     expect(root.indexConflictIds).toEqual([]);
   });
 
-  it("keeps the index note in noteIds, pinned to the front (not hidden)", () => {
+  it("excludes the index note from noteIds (hidden from the sidebar tree)", () => {
     const tree = deriveFolderTree(
       [note("a-note", "Projects/"), idxNote("z-index", "Projects/", true)],
       [],
     );
     const root = tree.roots[0]!;
-    // z-index is the index note → pinned first despite insertion order.
-    expect(root.noteIds[0]).toBe("z-index");
-    expect(root.noteIds).toContain("a-note");
-    expect(root.noteIds).toHaveLength(2);
+    // z-index is the index note → hidden from noteIds (opened by double-click).
+    expect(root.indexNoteId).toBe("z-index");
+    expect(root.noteIds).toEqual(["a-note"]);
+    expect(root.noteIds).not.toContain("z-index");
   });
 
-  it("resolves a two-claim conflict to the smallest-uuid winner, rest as conflicts", () => {
+  it("a folder whose only note is its index note has empty noteIds but a set indexNoteId", () => {
+    const tree = deriveFolderTree([idxNote("only", "Solo/", true)], []);
+    const root = find(tree.roots, "Solo/")!;
+    expect(root.indexNoteId).toBe("only");
+    expect(root.noteIds).toEqual([]);
+  });
+
+  it("resolves a two-claim conflict to the smallest-uuid winner; only the winner is hidden", () => {
     const tree = deriveFolderTree(
       [
         idxNote("n-b", "Projects/", true),
@@ -115,7 +122,10 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
     const root = tree.roots[0]!;
     expect(root.indexNoteId).toBe("n-a");
     expect(root.indexConflictIds).toEqual(["n-b", "n-c"]);
-    expect(root.noteIds[0]).toBe("n-a");
+    // Only the winner is excluded; the conflict losers stay visible rows so the
+    // user can see and resolve the dupes.
+    expect(root.noteIds).not.toContain("n-a");
+    expect(root.noteIds.sort()).toEqual(["n-b", "n-c"]);
   });
 
   it("does not treat a root/unfiled note's folder_index flag as an index", () => {

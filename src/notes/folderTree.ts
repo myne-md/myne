@@ -31,10 +31,14 @@ export interface FolderNode {
   noteIds: string[];
   /**
    * The note ID of this folder's **index note** (MYND-370) — the in-folder note
-   * carrying `folder_index: true`, or `null` if the folder has none. Always a
-   * member of `noteIds` and pinned to its front (see ordering below). When more
-   * than one in-folder note claims the flag, the deterministic winner (smallest
-   * `noteUuid`) is chosen and the rest land in {@link indexConflictIds}.
+   * carrying `folder_index: true`, or `null` if the folder has none. **Excluded
+   * from `noteIds`**: the index note is hidden from the sidebar folder tree (no
+   * separate row), opened instead by double-clicking the folder. It stays in
+   * `liveCache` so search / backlinks / graph / saved views still enumerate it —
+   * the hiding is sidebar-tree-only (2026-06-27 decision). When more than one
+   * in-folder note claims the flag, the deterministic winner (smallest `noteUuid`)
+   * is chosen and the rest land in {@link indexConflictIds} (they DO stay in
+   * `noteIds` — only the winner is hidden).
    */
   indexNoteId: string | null;
   /**
@@ -169,9 +173,13 @@ export function deriveFolderTree(
     // Index-note selection (MYND-370). Multiple in-folder notes may claim
     // `folder_index: true`; pick the deterministic winner (smallest noteUuid,
     // stable across reloads) and report the rest as conflicts. The winner is
-    // pinned to the FRONT of `noteIds` so the render layer shows it first; it
-    // stays a member of `noteIds` (the index note is NOT hidden, unlike
-    // trashed/template notes).
+    // REMOVED from `noteIds` so it does not render as a sidebar row — the folder
+    // note is hidden from the folder tree and opened by double-clicking the
+    // folder (2026-06-27 decision, supersedes the original "pinned + visible"
+    // behaviour). It stays in `liveCache`, so search / backlinks / graph / saved
+    // views still enumerate it — the hiding is sidebar-tree-only. Conflict losers
+    // are NOT removed (only the winner is hidden) so legacy multi-claimant dupes
+    // stay visible for the user to resolve.
     const indexNoteId = pickIndexNote(b.indexClaimantIds);
     const indexConflictIds =
       indexNoteId === null
@@ -180,7 +188,7 @@ export function deriveFolderTree(
     const orderedNoteIds =
       indexNoteId === null
         ? b.noteIds
-        : [indexNoteId, ...b.noteIds.filter((id) => id !== indexNoteId)];
+        : b.noteIds.filter((id) => id !== indexNoteId);
 
     nodeByKey.set(key, {
       path: displayPath,

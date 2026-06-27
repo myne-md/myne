@@ -88,6 +88,37 @@ export class Element {
     return this.session.send("POST", this.path("/click"));
   }
 
+  /** Double-click via the W3C Actions API — pointer move to the in-view centre,
+   *  then two button-0 down/up pairs in one action sequence (synthesizes
+   *  `dblclick`). Drives the folder-row open gesture (`FolderRow.onActivate`,
+   *  MYND-370). The single `click` between the pairs toggles disclosure twice
+   *  (nets to no fold change), exactly as a real double-click does. */
+  async doubleClick(): Promise<void> {
+    await this.session.send("POST", "/actions", {
+      actions: [
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: { [ELEMENT_KEY]: this.elementId },
+              x: 0,
+              y: 0,
+            },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 0 },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+      ],
+    });
+  }
+
   /** Types text into the element (W3C "element send keys"). */
   sendKeys(text: string): Promise<void> {
     return this.session.send("POST", this.path("/value"), { text });
