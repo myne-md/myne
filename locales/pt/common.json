@@ -525,7 +525,10 @@
       },
       "barItems": {
         "graph": "Gráfico",
+        "hide": "",
         "lock": "Bloquear",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Estado de gravação",
         "settings": "Definições",
         "syncStatus": "Estado de sincronização",

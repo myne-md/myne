@@ -311,6 +311,17 @@ export interface PrefsView {
    */
   hidden_bar_items: string[];
   /**
+   * Bottom-bar item display order (bottom-bar customization) — the right-cluster
+   * {@link BottomBar} element ids in the order the user arranged them by dragging
+   * or via the bar's right-click "move left / move right" actions. A sequence:
+   * the backend preserves element order verbatim (not sorted/deduped, unlike
+   * {@link PrefsView.hidden_bar_items}; unknown ids are the caller's to prune and
+   * a known id absent from the array falls back to its canonical default
+   * position). Empty (the default — canonical bar order) is byte-identical to a
+   * pre-feature vault. Serialized from Rust `Vec<String>`; absent → `[]`.
+   */
+  bar_items_order: string[];
+  /**
    * Per-item color label (MYND-184) — a map from a sidebar item key (a note UUID
    * **or** a canonical trailing-slash folder path, discriminated by the trailing
    * `/`) to a color-slot name. Notes and folders both take a color (folders also
@@ -397,6 +408,20 @@ export async function setAutoLockTimeout(seconds: number): Promise<void> {
  */
 export async function setItemOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_item_order", { order });
+}
+
+/**
+ * Persist the full bottom-bar item display order — the right-cluster
+ * {@link BottomBar} element ids in the order the user arranged them by drag-to-
+ * reorder or the bar's right-click move actions. The caller passes the entire
+ * desired order; the backend preserves element order verbatim (the sequence IS
+ * the payload, unlike the sorted+deduped `hidden_bar_items`). No native
+ * side-effect; a rejected promise means the disk write failed and the caller's
+ * optimistic UI must revert. The IPC payload key (`order`) matches the Rust
+ * command's `order: Vec<String>` parameter.
+ */
+export async function setBarItemsOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_bar_items_order", { order });
 }
 
 /**

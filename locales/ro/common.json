@@ -525,7 +525,10 @@
       },
       "barItems": {
         "graph": "Grafic",
+        "hide": "",
         "lock": "Blochează",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Stare salvare",
         "settings": "Setări",
         "syncStatus": "Stare sincronizare",

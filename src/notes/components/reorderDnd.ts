@@ -39,3 +39,32 @@ export function insertionLineStyle(edge: "above" | "below"): CSSProperties {
     pointerEvents: "none",
   };
 }
+
+/**
+ * Horizontal sibling of {@link dragEdge}: which half of the hovered item the
+ * cursor is over along the X axis — the insertion edge for a left/right reorder
+ * (the bottom-bar item drag, MYND bottom-bar customization).
+ */
+export function dragEdgeX(e: DragEvent<HTMLElement>): "before" | "after" {
+  const rect = e.currentTarget.getBoundingClientRect();
+  return e.clientX < rect.left + rect.width / 2 ? "before" : "after";
+}
+
+/**
+ * Horizontal sibling of {@link insertionLineStyle}: a left/right 2px accent bar
+ * marking a horizontal reorder insertion point (inset vertically so it reads as
+ * a caret between two short bar items).
+ */
+export function insertionLineStyleX(edge: "before" | "after"): CSSProperties {
+  return {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    left: edge === "before" ? -7 : undefined,
+    right: edge === "after" ? -7 : undefined,
+    width: 2,
+    background: "var(--accent)",
+    borderRadius: 1,
+    pointerEvents: "none",
+  };
+}

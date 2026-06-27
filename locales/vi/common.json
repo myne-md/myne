@@ -520,7 +520,10 @@
       },
       "barItems": {
         "graph": "Đồ thị",
+        "hide": "",
         "lock": "Khóa",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Trạng thái lưu",
         "settings": "Cài đặt",
         "syncStatus": "Trạng thái đồng bộ",

@@ -507,6 +507,27 @@ pub struct PrefsView {
     #[serde(default)]
     pub hidden_bar_items: Vec<String>,
 
+    /// User-chosen bottom-bar item display order (MYND bottom-bar
+    /// customization, drag-to-reorder twin of [`PrefsView::hidden_bar_items`]).
+    /// A `sequence`-semantics array of right-cluster `BottomBar` element ids
+    /// (e.g. `view-mode`, `tags`, `graph`) in the order the user arranged them
+    /// by dragging or via the bar's right-click "move left / move right"
+    /// actions. Order is MEANINGFUL, so the array is preserved **verbatim** —
+    /// NOT sorted, NOT deduped — exactly like [`PrefsView::favorites`] /
+    /// [`PrefsView::item_order`] / [`PrefsView::view_order`]. NFC-normalized per
+    /// element and **omitted entirely when empty** so a vault that never
+    /// reordered its bar (the default) is byte-identical to a pre-feature
+    /// `vault.prefs` (existing golden vectors unaffected — migration-less
+    /// additive field on `MYP1`, the `view_order` precedent class). An id not in
+    /// the host's known set is ignored at render and pruned on the next write
+    /// (no codec-level GC); a known id absent from the array falls back to its
+    /// canonical default position. **Non-load-bearing** (a tampered / replayed
+    /// value can at worst reorder a bar affordance) — no protective-envelope
+    /// clamp. Canonical key 'b' — sorts after `auto_lock_seconds` (`au` < `b`),
+    /// before `custom_theme` (`b` < `c`).
+    #[serde(default)]
+    pub bar_items_order: Vec<String>,
+
     /// Per-item color label (MYND-184) — a map from a sidebar item key to a
     /// color-slot name. Keys are heterogeneous: a note UUID **or** a canonical
     /// trailing-slash folder path, discriminated by the trailing `/` exactly as
@@ -671,6 +692,7 @@ impl Default for PrefsView {
     fn default() -> Self {
         Self {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -864,6 +886,19 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if let Some(secs) = prefs.auto_lock_seconds {
         out.extend_from_slice(b"\"auto_lock_seconds\":");
         push_json_uint(&mut out, secs);
+        out.push(b',');
+    }
+
+    // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b],
+    // before custom_theme [b < c]). The bottom-bar display sequence (MYND
+    // bottom-bar customization); same order-preserving discipline as favorites /
+    // item_order / view_order — preserved verbatim, NOT sorted/deduped. Trailing
+    // comma (a pre-screen_capture_protection field); omitted entirely when empty
+    // so a vault that never reordered its bar is byte-identical to a pre-feature
+    // vault.prefs.
+    if !prefs.bar_items_order.is_empty() {
+        out.extend_from_slice(b"\"bar_items_order\":");
+        push_ordered_string_array(&mut out, &prefs.bar_items_order);
         out.push(b',');
     }
 
@@ -1399,6 +1434,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // already prevents a marker from appearing inside a string value, but the
     // cursor keeps the canonical key-order discipline visible + robust).
     let mut cursor = 0usize;
+    // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b],
+    // before custom_theme [b < c], so it is the FIRST cursor-located field). A
+    // sequence array parsed from the monotonic cursor so a later field's key
+    // marker is never matched inside its content. Absent → empty; order
+    // preserved verbatim (sort/dedup is encode-side and this field is a
+    // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
+    let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
     // custom_theme (canonical key 'c' — before the daily_* block 'd'). The active
     // custom-theme name; takes precedence over `theme` host-side. Optional.
     let custom_theme = parse_optional_string_field(rest, &mut cursor, b"\"custom_theme\":")?;
@@ -1543,6 +1585,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         show_note_timestamps,
         folder_icons,
         hidden_bar_items,
+        bar_items_order,
         item_colors,
         deliberate_folders,
         auto_lock_seconds,
@@ -2274,6 +2317,7 @@ mod tests {
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -2315,6 +2359,7 @@ mod tests {
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -2479,6 +2524,7 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: true,
+                bar_items_order: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -2522,6 +2568,7 @@ mod tests {
             parsed,
             PrefsView {
                 screen_capture_protection: false,
+                bar_items_order: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -3225,6 +3272,7 @@ mod tests {
     fn encode_emits_theme_last_dark_with_scp_false() {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3243,6 +3291,7 @@ mod tests {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3521,6 +3570,7 @@ mod tests {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3568,6 +3618,7 @@ mod tests {
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3618,6 +3669,7 @@ mod tests {
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3663,6 +3715,7 @@ mod tests {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3768,6 +3821,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3837,6 +3891,7 @@ mod tests {
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3891,6 +3946,7 @@ mod tests {
         // which does both). The duplicate "zzz" must survive verbatim.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3974,6 +4030,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: alloc::vec![
@@ -4042,6 +4099,7 @@ mod tests {
         // (graph/word-count out of order + a duplicate collapse to a clean set).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: map_of(&[("Projects/", "book")]),
             hidden_bar_items: alloc::vec![
@@ -4094,6 +4152,53 @@ mod tests {
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
     }
 
+    // ---- bar_items_order canonical field (MYND bottom-bar reorder) ------
+
+    #[test]
+    fn encode_omits_bar_items_order_when_empty() {
+        // Empty (the default — canonical bar order) → byte-identical to a
+        // pre-feature vault.prefs (preserves existing KAT vectors + vaults).
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_bar_items_order_in_canonical_position() {
+        // Canonical key order: auto_lock_seconds (au) < bar_items_order (b) <
+        // custom_theme (c) < screen_capture_protection (s). Pin the position
+        // between auto_lock_seconds and custom_theme with all three present.
+        let prefs = PrefsView {
+            auto_lock_seconds: Some(300),
+            bar_items_order: alloc::vec!["graph".into(), "tags".into()],
+            custom_theme: Some("midnight".into()),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"auto_lock_seconds":300,"bar_items_order":["graph","tags"],"custom_theme":"midnight","screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn bar_items_order_round_trips_verbatim_not_sorted() {
+        // Sequence semantics: order is the payload, so a non-sorted input must
+        // survive encode→decode VERBATIM (unlike the set-array hidden_bar_items).
+        let order: alloc::vec::Vec<String> = alloc::vec![
+            "word-count".into(),
+            "graph".into(),
+            "tags".into(),
+            "view-mode".into(),
+        ];
+        let prefs = PrefsView {
+            bar_items_order: order.clone(),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.bar_items_order, order);
+    }
+
     // ---- auto_lock_seconds canonical field (MYND-121) -----------------
 
     #[test]
@@ -4109,6 +4214,7 @@ mod tests {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4154,6 +4260,7 @@ mod tests {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4201,6 +4308,7 @@ mod tests {
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4316,6 +4424,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4405,6 +4514,7 @@ mod tests {
         // right_width.
         let prefs = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4684,6 +4794,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4733,6 +4844,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             screen_capture_protection: false,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5043,6 +5155,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: true,
+                bar_items_order: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -5085,6 +5198,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 screen_capture_protection: false,
+                bar_items_order: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -5129,6 +5243,7 @@ mod tests {
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
             screen_capture_protection: true,
+            bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),

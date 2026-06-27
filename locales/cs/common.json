@@ -537,7 +537,10 @@
       },
       "barItems": {
         "graph": "Graf",
+        "hide": "",
         "lock": "Zamknout",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Stav uložení",
         "settings": "Nastavení",
         "syncStatus": "Stav synchronizace",

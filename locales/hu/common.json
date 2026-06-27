@@ -520,7 +520,10 @@
       },
       "barItems": {
         "graph": "Gráf",
+        "hide": "",
         "lock": "Zárolás",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Mentés állapota",
         "settings": "Beállítások",
         "syncStatus": "Szinkron állapota",

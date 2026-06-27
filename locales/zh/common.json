@@ -508,7 +508,10 @@
       },
       "barItems": {
         "graph": "关系图",
+        "hide": "",
         "lock": "锁定",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "保存状态",
         "settings": "设置",
         "syncStatus": "同步状态",

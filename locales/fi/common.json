@@ -513,7 +513,10 @@
       },
       "barItems": {
         "graph": "Kaavio",
+        "hide": "",
         "lock": "Lukitse",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Tallennustila",
         "settings": "Asetukset",
         "syncStatus": "Synkronoinnin tila",

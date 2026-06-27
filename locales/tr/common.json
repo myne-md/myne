@@ -520,7 +520,10 @@
       },
       "barItems": {
         "graph": "Grafik",
+        "hide": "",
         "lock": "Kilitle",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Kayıt durumu",
         "settings": "Ayarlar",
         "syncStatus": "Eşitleme durumu",

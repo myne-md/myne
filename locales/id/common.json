@@ -508,7 +508,10 @@
       },
       "barItems": {
         "graph": "Grafik",
+        "hide": "",
         "lock": "Kunci",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Status simpan",
         "settings": "Pengaturan",
         "syncStatus": "Status sinkronisasi",

@@ -513,7 +513,10 @@
       },
       "barItems": {
         "graph": "Γράφημα",
+        "hide": "",
         "lock": "Κλείδωμα",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Κατάσταση αποθήκευσης",
         "settings": "Ρυθμίσεις",
         "syncStatus": "Κατάσταση συγχρονισμού",

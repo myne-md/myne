@@ -536,7 +536,10 @@
       },
       "barItems": {
         "graph": "Graf",
+        "hide": "",
         "lock": "Zablokuj",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Stan zapisu",
         "settings": "Ustawienia",
         "tags": "Tagi",

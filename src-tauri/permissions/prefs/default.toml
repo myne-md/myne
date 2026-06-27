@@ -22,6 +22,7 @@ permissions = [
   "allow-set-auto-lock-timeout",
   "allow-set-item-order",
   "allow-set-hidden-bar-items",
+  "allow-set-bar-items-order",
   "allow-set-favorites",
   "allow-set-editor-layout",
   "allow-set-theme",
@@ -93,6 +94,17 @@ commands.allow = ["set_item_order"]
 identifier = "allow-set-hidden-bar-items"
 description = "Allow invoking prefs:set_hidden_bar_items (Slot::Unlocked-gated setter for the hidden_bar_items set — the bottom-bar element ids the user chose to hide; codec NFC-sorts+dedupes; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_hidden_bar_items"]
+
+# Bottom-bar customization: a write setter for the bar_items_order sequence —
+# the right-cluster BottomBar element ids in the order the user arranged them by
+# drag-to-reorder or the bar's right-click move actions. Inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-bar-items-order"
+description = "Allow invoking prefs:set_bar_items_order (Slot::Unlocked-gated setter for the bar_items_order sequence — the bottom-bar item display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids)."
+commands.allow = ["set_bar_items_order"]
 
 [[permission]]
 identifier = "allow-set-favorites"

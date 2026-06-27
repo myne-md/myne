@@ -1665,6 +1665,7 @@ mod tests {
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
                     screen_capture_protection: false,
+                    bar_items_order: Vec::new(),
                     show_note_timestamps: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),
@@ -1790,6 +1791,7 @@ mod tests {
             &account_hash,
             &protocol::PrefsView {
                 screen_capture_protection: false,
+                bar_items_order: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
