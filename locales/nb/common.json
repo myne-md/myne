@@ -588,6 +588,13 @@
       "noNotesToOpen": "Ingen notater å åpne.",
       "resizeBacklinksSidebar": "Endre størrelse på tilbakekoblingsfeltet",
       "resizeNotesSidebar": "Endre størrelse på notatfeltet",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Skjul tilbakekoblingsfelt",
         "hideNotes": "Skjul notatfelt",

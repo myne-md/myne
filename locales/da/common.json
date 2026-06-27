@@ -576,6 +576,13 @@
       "noNotesToOpen": "Ingen noter at åbne.",
       "resizeBacklinksSidebar": "Ændr størrelse på tilbagelinkspanelet",
       "resizeNotesSidebar": "Ændr størrelse på notepanelet",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Skjul tilbagelinkspanel",
         "hideNotes": "Skjul notepanel",

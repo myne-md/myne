@@ -576,6 +576,13 @@
       "noNotesToOpen": "Δεν υπάρχουν σημειώσεις προς άνοιγμα.",
       "resizeBacklinksSidebar": "Αλλαγή μεγέθους πλαϊνής στήλης συνδέσμων προς τα πίσω",
       "resizeNotesSidebar": "Αλλαγή μεγέθους πλαϊνής στήλης σημειώσεων",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Απόκρυψη πλαϊνής στήλης συνδέσμων προς τα πίσω",
         "hideNotes": "Απόκρυψη πλαϊνής στήλης σημειώσεων",

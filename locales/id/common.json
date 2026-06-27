@@ -568,6 +568,13 @@
       "noNotesToOpen": "Tidak ada catatan untuk dibuka.",
       "resizeBacklinksSidebar": "Ubah ukuran bilah sisi backlink",
       "resizeNotesSidebar": "Ubah ukuran bilah sisi catatan",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Sembunyikan bilah sisi backlink",
         "hideNotes": "Sembunyikan bilah sisi catatan",

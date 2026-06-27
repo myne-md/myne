@@ -576,6 +576,13 @@
       "noNotesToOpen": "Ei avattavia muistiinpanoja.",
       "resizeBacklinksSidebar": "Muuta paluuviittausten sivupalkin kokoa",
       "resizeNotesSidebar": "Muuta muistiinpanojen sivupalkin kokoa",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Piilota paluuviittausten sivupalkki",
         "hideNotes": "Piilota muistiinpanojen sivupalkki",

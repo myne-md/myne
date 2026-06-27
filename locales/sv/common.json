@@ -582,6 +582,13 @@
       "noNotesToOpen": "Inga anteckningar att öppna.",
       "resizeBacklinksSidebar": "Ändra storlek på bakåtlänkssidofältet",
       "resizeNotesSidebar": "Ändra storlek på anteckningssidofältet",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Dölj bakåtlänkssidofältet",
         "hideNotes": "Dölj anteckningssidofältet",

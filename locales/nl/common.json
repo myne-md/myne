@@ -588,6 +588,13 @@
       "noNotesToOpen": "Geen notities om te openen.",
       "resizeBacklinksSidebar": "Backlinkszijbalk vergroten/verkleinen",
       "resizeNotesSidebar": "Notitiezijbalk vergroten/verkleinen",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Backlinkszijbalk verbergen",
         "hideNotes": "Notitiezijbalk verbergen",

@@ -588,6 +588,13 @@
       "noNotesToOpen": "Açılacak not yok.",
       "resizeBacklinksSidebar": "Geri bağlantılar kenar çubuğunu yeniden boyutlandır",
       "resizeNotesSidebar": "Notlar kenar çubuğunu yeniden boyutlandır",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Geri bağlantılar kenar çubuğunu gizle",
         "hideNotes": "Notlar kenar çubuğunu gizle",

@@ -588,6 +588,13 @@
       "noNotesToOpen": "Nincs megnyitható jegyzet.",
       "resizeBacklinksSidebar": "Visszahivatkozások oldalsáv átméretezése",
       "resizeNotesSidebar": "Jegyzetek oldalsáv átméretezése",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Visszahivatkozások oldalsáv elrejtése",
         "hideNotes": "Jegyzetek oldalsáv elrejtése",

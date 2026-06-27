@@ -42,6 +42,11 @@ type Props = {
    *  on a no-op; both `false` and a rejection restore the optimistically-removed
    *  row so the panel never lies. */
   onLinkMention: (mention: UnlinkedMention) => Promise<boolean>;
+  /** Render as a full right-panel tab body (right-panel tabs) rather than a
+   *  collapse-by-default sub-section: drop the chevron + collapse affordance
+   *  (the tab's active state IS the disclosure) and auto-expand on mount so the
+   *  two-tier cost gate runs its verify. Default `false` (legacy nested mode). */
+  asTab?: boolean;
 };
 
 /**
@@ -53,6 +58,7 @@ function useUnlinkedMentions(
   openNoteId: string | null,
   openTitle: string | null,
   notes: ReadonlyArray<ResolverNote>,
+  autoExpand: boolean,
 ) {
   const [state, setState] = useState<MentionsState>(initialMentionsState);
   const [mentions, setMentions] = useState<UnlinkedMention[]>([]);
@@ -145,6 +151,15 @@ function useUnlinkedMentions(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indexNonce]);
 
+  // asTab mode (right-panel tabs): the tab's active state IS the disclosure, so
+  // expand on mount and after every note switch — driving the verify tier the
+  // way a manual chevron-expand would. Runs AFTER the note-switch reset effect
+  // above (which collapsed back to initial), so the expand is honoured fresh.
+  useEffect(() => {
+    if (autoExpand) dispatch({ type: "expand" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExpand, openNoteId]);
+
   const toggle = useCallback(() => {
     dispatch({ type: stateRef.current.expanded ? "collapse" : "expand" });
   }, [dispatch]);
@@ -180,6 +195,7 @@ export function UnlinkedMentionsSection({
   notes,
   onNavigate,
   onLinkMention,
+  asTab = false,
 }: Props) {
   const { t } = useTranslation();
   const {
@@ -191,7 +207,7 @@ export function UnlinkedMentionsSection({
     refresh,
     removeOptimistically,
     restore,
-  } = useUnlinkedMentions(openNoteId, openTitle, notes);
+  } = useUnlinkedMentions(openNoteId, openTitle, notes, asTab);
 
   const handleLink = useCallback(
     (mention: UnlinkedMention) => {
@@ -219,41 +235,55 @@ export function UnlinkedMentionsSection({
         display: "flex",
         flexDirection: "column",
         gap: 8,
-        marginTop: 18,
-        paddingTop: 14,
-        borderTop: "1px solid var(--line-1)",
+        // As a full tab body the section owns the whole pane, so it drops the
+        // nested top border + offset it carried below the backlinks list.
+        ...(asTab
+          ? {}
+          : { marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--line-1)" }),
       }}
     >
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={expanded}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          background: "transparent",
-          border: "none",
-          padding: 0,
-          margin: 0,
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
-      >
-        <Icon
-          name={expanded ? "chevron-down" : "chevron-right"}
-          size={14}
-          style={{ color: "var(--fg-3)" }}
-        />
-        <span style={SECTION_HEADING_STYLE}>
-          {t("notes.unlinkedMentions.heading")}
-        </span>
-        {expanded && mentions.length > 0 && (
-          <span style={{ fontSize: 12, color: "var(--fg-3)" }}>
-            {mentions.length}
+      {asTab ? (
+        // Tab mode: a plain header (no chevron — the active tab IS the disclosure).
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={SECTION_HEADING_STYLE}>
+            {t("notes.unlinkedMentions.heading")}
           </span>
-        )}
-      </button>
+          {mentions.length > 0 && (
+            <span style={{ fontSize: 12, color: "var(--fg-3)" }}>{mentions.length}</span>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={expanded}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          <Icon
+            name={expanded ? "chevron-down" : "chevron-right"}
+            size={14}
+            style={{ color: "var(--fg-3)" }}
+          />
+          <span style={SECTION_HEADING_STYLE}>
+            {t("notes.unlinkedMentions.heading")}
+          </span>
+          {expanded && mentions.length > 0 && (
+            <span style={{ fontSize: 12, color: "var(--fg-3)" }}>
+              {mentions.length}
+            </span>
+          )}
+        </button>
+      )}
 
       {expanded && (
         <>

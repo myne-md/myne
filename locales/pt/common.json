@@ -596,6 +596,13 @@
       "noNotesToOpen": "Não há notas para abrir.",
       "resizeBacklinksSidebar": "Redimensionar barra lateral de backlinks",
       "resizeNotesSidebar": "Redimensionar barra lateral de notas",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Ocultar barra lateral de backlinks",
         "hideNotes": "Ocultar barra lateral de notas",

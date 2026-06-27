@@ -614,6 +614,13 @@
       "noNotesToOpen": "Brak notatek do otwarcia.",
       "resizeBacklinksSidebar": "Zmień rozmiar panelu odnośników zwrotnych",
       "resizeNotesSidebar": "Zmień rozmiar panelu notatek",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Ukryj panel odnośników zwrotnych",
         "hideNotes": "Ukryj panel notatek",

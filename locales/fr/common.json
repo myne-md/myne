@@ -596,6 +596,13 @@
       "noNotesToOpen": "Aucune note à ouvrir.",
       "resizeBacklinksSidebar": "Redimensionner la barre des rétroliens",
       "resizeNotesSidebar": "Redimensionner la barre des notes",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Masquer la barre des rétroliens",
         "hideNotes": "Masquer la barre des notes",

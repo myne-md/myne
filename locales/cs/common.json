@@ -616,6 +616,13 @@
       "noNotesToOpen": "Žádné poznámky k otevření.",
       "resizeBacklinksSidebar": "Změnit velikost panelu zpětných odkazů",
       "resizeNotesSidebar": "Změnit velikost panelu poznámek",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Skrýt panel zpětných odkazů",
         "hideNotes": "Skrýt panel poznámek",

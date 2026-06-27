@@ -576,6 +576,13 @@
       "noNotesToOpen": "Keine Notizen zum Öffnen.",
       "resizeBacklinksSidebar": "Größe der Backlinks-Seitenleiste ändern",
       "resizeNotesSidebar": "Größe der Notizen-Seitenleiste ändern",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Backlinks-Seitenleiste ausblenden",
         "hideNotes": "Notizen-Seitenleiste ausblenden",

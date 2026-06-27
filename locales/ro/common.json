@@ -596,6 +596,13 @@
       "noNotesToOpen": "Nicio notă de deschis.",
       "resizeBacklinksSidebar": "Redimensionează bara laterală cu legături inverse",
       "resizeNotesSidebar": "Redimensionează bara laterală cu note",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Ascunde bara laterală cu legături inverse",
         "hideNotes": "Ascunde bara laterală cu note",

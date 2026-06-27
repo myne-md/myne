@@ -588,6 +588,18 @@
       "noNotesToOpen": "No notes to open.",
       "resizeBacklinksSidebar": "Resize backlinks sidebar",
       "resizeNotesSidebar": "Resize notes sidebar",
+      "rightPanel": {
+        "allHidden": "All tabs are hidden — right-click to restore.",
+        "outline": {
+          "empty": "No headings",
+          "heading": "Outline"
+        },
+        "tabs": {
+          "backlinks": "Backlinks",
+          "outline": "Outline",
+          "unlinked": "Unlinked mentions"
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Hide backlinks sidebar",
         "hideNotes": "Hide notes sidebar",

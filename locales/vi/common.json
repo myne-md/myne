@@ -588,6 +588,13 @@
       "noNotesToOpen": "Không có ghi chú nào để mở.",
       "resizeBacklinksSidebar": "Đổi cỡ thanh bên liên kết ngược",
       "resizeNotesSidebar": "Đổi cỡ thanh bên ghi chú",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Ẩn thanh bên liên kết ngược",
         "hideNotes": "Ẩn thanh bên ghi chú",
