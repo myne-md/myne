@@ -29,6 +29,7 @@ import {
   setEditorFontFamily,
   setEditorLineSpacing,
   setEditorTextSize,
+  setBarItemsOrder as persistBarItemsOrder,
   setHiddenBarItems as persistHiddenBarItems,
   setKeymapBinding as persistKeymapBinding,
   setScreenCaptureProtection,
@@ -65,6 +66,7 @@ const DEFAULT_PREFS: PrefsView = {
   theme: null,
   folder_icons: {},
   hidden_bar_items: [],
+  bar_items_order: [],
   item_colors: {},
   keymap: {},
   label: null,
@@ -100,6 +102,13 @@ interface UsePrefsResult {
    * {@link setAutoLock}.
    */
   setHiddenBarItems: (items: string[]) => Promise<void>;
+  /**
+   * Persist the bottom-bar item display order (drag-to-reorder / right-click
+   * move). Optimistically patches the cache so the open bar re-renders without a
+   * round-trip. On IPC rejection, the cache is re-read from disk and `onError`
+   * is called. Same pattern as {@link setHiddenBarItems}.
+   */
+  setBarItemsOrder: (order: string[]) => Promise<void>;
   /**
    * Editor-typography preset setters (editor-typography). Each takes the chosen
    * preset string, or `null` to clear back to that field's canonical default.
@@ -230,6 +239,28 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  const setBarItemsOrder = useCallback(
+    async (order: string[]) => {
+      // Optimistic via functional update — same convergence discipline as
+      // `setHiddenBarItems`. The backend preserves element order verbatim.
+      setPrefs((p) => ({ ...p, bar_items_order: order }));
+      try {
+        await persistBarItemsOrder(order);
+      } catch {
+        // Re-read disk truth instead of rolling back to a captured value.
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
   // Shared optimistic-then-reread-on-error core for the editor-typography
   // setters: patch the cache immediately (so the open editor re-renders live),
   // persist, and on failure re-read disk truth — same convergence discipline as
@@ -326,6 +357,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     toggleScreenCapture,
     setAutoLock,
     setHiddenBarItems,
+    setBarItemsOrder,
     setEditorTextSize: setEditorTextSizePref,
     setEditorLineSpacing: setEditorLineSpacingPref,
     setEditorContentWidth: setEditorContentWidthPref,

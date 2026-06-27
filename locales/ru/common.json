@@ -537,7 +537,10 @@
       },
       "barItems": {
         "graph": "Граф",
+        "hide": "",
         "lock": "Заблокировать",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Статус сохранения",
         "settings": "Настройки",
         "syncStatus": "Статус синхронизации",

@@ -508,7 +508,10 @@
       },
       "barItems": {
         "graph": "그래프",
+        "hide": "",
         "lock": "잠그기",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "저장 상태",
         "settings": "설정",
         "syncStatus": "동기화 상태",

@@ -520,7 +520,10 @@
       },
       "barItems": {
         "graph": "Graph",
+        "hide": "Hide",
         "lock": "Lock",
+        "moveLeft": "Move left",
+        "moveRight": "Move right",
         "saveStatus": "Save status",
         "settings": "Settings",
         "syncStatus": "Sync status",

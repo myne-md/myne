@@ -519,7 +519,10 @@
       },
       "barItems": {
         "graph": "Graf",
+        "hide": "",
         "lock": "Lås",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Sparstatus",
         "settings": "Inställningar",
         "syncStatus": "Synkstatus",

@@ -505,7 +505,10 @@
       },
       "barItems": {
         "graph": "グラフ",
+        "hide": "",
         "lock": "ロック",
+        "moveLeft": "",
+        "moveRight": "",
         "settings": "設定",
         "syncStatus": "同期ステータス",
         "tags": "タグ",

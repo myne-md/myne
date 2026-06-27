@@ -520,7 +520,10 @@
       },
       "barItems": {
         "graph": "Grafiek",
+        "hide": "",
         "lock": "Vergrendelen",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Opslagstatus",
         "settings": "Instellingen",
         "syncStatus": "Synchronisatiestatus",

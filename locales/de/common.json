@@ -513,7 +513,10 @@
       },
       "barItems": {
         "graph": "Graph",
+        "hide": "",
         "lock": "Sperren",
+        "moveLeft": "",
+        "moveRight": "",
         "saveStatus": "Speicherstatus",
         "settings": "Einstellungen",
         "syncStatus": "Sync-Status",

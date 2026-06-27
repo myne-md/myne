@@ -97,6 +97,14 @@ import {
 import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
 import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
+import { dragEdgeX, insertionLineStyleX } from "../notes/components/reorderDnd";
+import {
+  RIGHT_CLUSTER_DEFAULT_ORDER,
+  resolveBarOrder,
+  reorderByDrop,
+  moveBarItem,
+  canMoveBarItem,
+} from "../notes/barItemsOrder";
 import { vaultIndicesPersist } from "../notes/vaultIndices";
 import {
   SECTION_HEADING_STYLE,
@@ -676,9 +684,19 @@ function EditorChrome({
   // its right-click menu anchor. `usePrefs` reads the set reactively (and
   // re-reads on the cross-surface prefs nonce); `setHiddenBarItems` persists
   // optimistically. `barMenu` holds the click coords while the menu is open.
-  const { prefs: barPrefs, setHiddenBarItems } = usePrefs();
+  const { prefs: barPrefs, setHiddenBarItems, setBarItemsOrder } = usePrefs();
   const hiddenBarItems = barPrefs.hidden_bar_items;
-  const [barMenu, setBarMenu] = useState<{ x: number; y: number } | null>(null);
+  // `barMenu` holds the open menu's anchor coords + which mode it is in: a
+  // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
+  // empty bar space); an entry with `itemId` opens the per-item menu (move
+  // left / move right / hide) for that specific dragged-or-clicked item, with
+  // `visibleIds` (the currently-rendered ordered ids) for move-availability.
+  const [barMenu, setBarMenu] = useState<{
+    x: number;
+    y: number;
+    itemId?: string;
+    visibleIds?: string[];
+  } | null>(null);
 
   // MYND-192 — transient responsive auto-collapse. When the window gets too
   // narrow to fit the center editor + sidebars, the backlinks (right) pane
@@ -1405,32 +1423,89 @@ function EditorChrome({
         onSaveWorkspaceAs={handleSaveWorkspaceAs}
         onRenameWorkspace={handleRenameWorkspaceById}
         hiddenItems={hiddenBarItems}
+        barItemsOrder={barPrefs.bar_items_order}
+        onReorder={(o) => void setBarItemsOrder(o)}
+        onItemContextMenu={(e, itemId, visibleIds) =>
+          setBarMenu({ x: e.clientX, y: e.clientY, itemId, visibleIds })
+        }
         onContextMenu={(e) => {
           e.preventDefault();
           setBarMenu({ x: e.clientX, y: e.clientY });
         }}
       />
-      {barMenu && (
-        <ContextMenu
-          x={barMenu.x}
-          y={barMenu.y}
-          onClose={() => setBarMenu(null)}
-          items={BAR_ITEMS.map(
-            (it): ContextMenuItem => ({
-              id: it.id,
-              label: t(it.labelKey),
-              checked: !hiddenBarItems.includes(it.id),
-              closeOnSelect: false,
-              onSelect: () =>
-                void setHiddenBarItems(
-                  hiddenBarItems.includes(it.id)
-                    ? hiddenBarItems.filter((x) => x !== it.id)
-                    : [...hiddenBarItems, it.id],
-                ),
-            }),
-          )}
-        />
-      )}
+      {barMenu &&
+        (barMenu.itemId !== undefined ? (
+          // Per-item menu (right-clicked a specific bar item): move left / move
+          // right (a11y fallback for drag) + hide. A boundary move is OMITTED
+          // (the flat ContextMenu has no disabled state).
+          <ContextMenu
+            x={barMenu.x}
+            y={barMenu.y}
+            onClose={() => setBarMenu(null)}
+            items={((): ContextMenuItem[] => {
+              const itemId = barMenu.itemId!;
+              const visibleIds = barMenu.visibleIds ?? [];
+              const resolved = resolveBarOrder(
+                barPrefs.bar_items_order,
+                RIGHT_CLUSTER_DEFAULT_ORDER,
+              );
+              const items: ContextMenuItem[] = [];
+              if (canMoveBarItem(visibleIds, itemId, -1)) {
+                items.push({
+                  id: "move-left",
+                  label: t("editor.chrome.barItems.moveLeft"),
+                  onSelect: () =>
+                    void setBarItemsOrder(
+                      moveBarItem(resolved, visibleIds, itemId, -1),
+                    ),
+                });
+              }
+              if (canMoveBarItem(visibleIds, itemId, 1)) {
+                items.push({
+                  id: "move-right",
+                  label: t("editor.chrome.barItems.moveRight"),
+                  onSelect: () =>
+                    void setBarItemsOrder(
+                      moveBarItem(resolved, visibleIds, itemId, 1),
+                    ),
+                });
+              }
+              items.push({
+                id: "hide",
+                label: t("editor.chrome.barItems.hide"),
+                onSelect: () =>
+                  void setHiddenBarItems(
+                    hiddenBarItems.includes(itemId)
+                      ? hiddenBarItems
+                      : [...hiddenBarItems, itemId],
+                  ),
+              });
+              return items;
+            })()}
+          />
+        ) : (
+          // Bar-wide menu (right-clicked empty bar space): the visibility
+          // checklist — the only path to restore a hidden item.
+          <ContextMenu
+            x={barMenu.x}
+            y={barMenu.y}
+            onClose={() => setBarMenu(null)}
+            items={BAR_ITEMS.map(
+              (it): ContextMenuItem => ({
+                id: it.id,
+                label: t(it.labelKey),
+                checked: !hiddenBarItems.includes(it.id),
+                closeOnSelect: false,
+                onSelect: () =>
+                  void setHiddenBarItems(
+                    hiddenBarItems.includes(it.id)
+                      ? hiddenBarItems.filter((x) => x !== it.id)
+                      : [...hiddenBarItems, it.id],
+                  ),
+              }),
+            )}
+          />
+        ))}
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -2678,6 +2753,20 @@ interface BottomBarProps {
    *  `EditorChrome`). Set on the bar root so even a fully-hidden bar stays
    *  right-clickable — the only restore path. */
   onContextMenu?: (e: ReactMouseEvent) => void;
+  /** Bottom-bar reorder: the user's stored right-cluster display order
+   *  (`prefs.bar_items_order`). Resolved against the canonical default at
+   *  render so a partial/empty order still renders every visible item. */
+  barItemsOrder: string[];
+  /** Persist a new right-cluster order after a drag-drop reorder. */
+  onReorder: (order: string[]) => void;
+  /** Right-click handler for a SPECIFIC bar item — opens the per-item menu
+   *  (move left / move right / hide). `visibleIds` is the currently-rendered
+   *  ordered id list, used for the move-availability checks. */
+  onItemContextMenu: (
+    e: ReactMouseEvent,
+    itemId: string,
+    visibleIds: string[],
+  ) => void;
 }
 
 function BottomBar({
@@ -2703,14 +2792,242 @@ function BottomBar({
   onRenameWorkspace,
   hiddenItems,
   onContextMenu,
+  barItemsOrder,
+  onReorder,
+  onItemContextMenu,
 }: BottomBarProps) {
   const { t } = useTranslation();
+  // Drag-to-reorder state (right cluster only). `draggedId` is the item being
+  // dragged; `dropTarget` is the hovered insertion point (an item id + which
+  // side the caret sits on). Both reset on drop / dragend.
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    edge: "before" | "after";
+  } | null>(null);
   const handleLockClick = () => {
     void onLockFlushed().catch(() => {
       /* lock flush failures already routed through saveStatus */
     });
   };
   const isHidden = (id: string) => hiddenItems.includes(id);
+
+  // One renderer per right-cluster bar-item id. Each returns the item's node,
+  // or `null` when its pre-existing data condition is unmet (e.g. `view-mode`
+  // with no active note tab). The `isHidden` check + the canonical ordering are
+  // applied in the loop below, so a renderer only encodes data availability.
+  const renderers: Record<string, () => ReactNode> = {
+    "save-status": () =>
+      hideSaveStatus ? null : (
+        <SaveStatusBadge status={saveStatus} onRetry={onRetry} />
+      ),
+    workspace: () =>
+      onSwitchWorkspace !== undefined && activeWorkspaceId !== undefined ? (
+        <WorkspaceSwitcherControl
+          slots={workspaceSlots}
+          activeId={activeWorkspaceId}
+          onSwitch={onSwitchWorkspace}
+          onSaveAs={onSaveWorkspaceAs}
+          onRename={onRenameWorkspace}
+        />
+      ) : null,
+    "view-mode": () =>
+      viewMode !== null && onCycleViewMode ? (
+        <button
+          type="button"
+          onClick={onCycleViewMode}
+          aria-label={t("editor.chrome.bottomBar.cycleViewMode")}
+          data-testid="editor.view-mode-cta"
+          data-view-mode={viewMode}
+          title={t("editor.chrome.bottomBar.viewModeTitle", {
+            mode: t(VIEW_MODE_LABEL_KEY[viewMode]),
+          })}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "2px 8px",
+            background: "transparent",
+            border: 0,
+            borderRadius: "var(--radius-1)",
+            color: "var(--fg-3)",
+            cursor: "pointer",
+            fontFamily: "var(--font-sans)",
+            fontSize: 12,
+            fontWeight: 500,
+          }}
+        >
+          {t(VIEW_MODE_LABEL_KEY[viewMode])}
+        </button>
+      ) : null,
+    tags: () =>
+      onShowTags ? (
+        <button
+          type="button"
+          onClick={onShowTags}
+          aria-label={t("editor.chrome.bottomBar.browseTags")}
+          data-testid="editor.tags-cta"
+          title={t("editor.chrome.bottomBar.tagsTitle")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "4px 8px",
+            background: "transparent",
+            border: 0,
+            borderRadius: "var(--radius-1)",
+            color: "var(--fg-3)",
+            cursor: "pointer",
+          }}
+        >
+          <Icon name="hash" size={14} />
+        </button>
+      ) : null,
+    views: () =>
+      onShowViews ? (
+        <button
+          type="button"
+          onClick={onShowViews}
+          aria-label={t("editor.chrome.bottomBar.browseViews")}
+          data-testid="editor.views-cta"
+          title={t("editor.chrome.bottomBar.viewsTitle")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "4px 8px",
+            background: "transparent",
+            border: 0,
+            borderRadius: "var(--radius-1)",
+            color: "var(--fg-3)",
+            cursor: "pointer",
+          }}
+        >
+          <Icon name="layout-grid" size={14} />
+        </button>
+      ) : null,
+    graph: () =>
+      onShowGraph ? (
+        <button
+          type="button"
+          data-testid="editor.graph-button"
+          onClick={onShowGraph}
+          aria-label={t("editor.chrome.bottomBar.showGraph")}
+          title={t("editor.chrome.bottomBar.graphTitle")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "4px 8px",
+            background: "transparent",
+            border: 0,
+            borderRadius: "var(--radius-1)",
+            color: "var(--fg-3)",
+            cursor: "pointer",
+          }}
+        >
+          <Icon name="share-2" size={14} />
+        </button>
+      ) : null,
+    settings: () => (
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        aria-label={t("editor.chrome.bottomBar.openSettings")}
+        data-testid="editor.settings-cta"
+        title={t("editor.chrome.bottomBar.settingsTitle")}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "4px 8px",
+          background: "transparent",
+          border: 0,
+          borderRadius: "var(--radius-1)",
+          color: "var(--fg-3)",
+          cursor: "pointer",
+        }}
+      >
+        <Icon name="settings" size={12} />
+      </button>
+    ),
+    lock: () => (
+      <button
+        type="button"
+        onClick={handleLockClick}
+        aria-label={t("editor.chrome.bottomBar.lockVault")}
+        data-testid="editor.lock-cta"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "4px 8px",
+          background: "transparent",
+          border: 0,
+          borderRadius: "var(--radius-1)",
+          color: "var(--fg-3)",
+          fontFamily: "var(--font-sans)",
+          fontSize: 12,
+          fontWeight: 500,
+          cursor: "pointer",
+        }}
+      >
+        <Icon name="lock" size={12} />
+        <span>{t("editor.chrome.bottomBar.lock")}</span>
+      </button>
+    ),
+    "word-count": () => {
+      // Combined statistics readout (MYND-339), reusing the `word-count`
+      // bar-item id (one toggle). Shows the selection figures when a non-empty
+      // selection exists, else the whole-note figures; the full four-stat
+      // breakdown is in the hover title.
+      const shown = selectionStats ?? stats;
+      if (shown === null) return null;
+      const isSel = selectionStats !== null;
+      return (
+        <span
+          data-testid="editor.doc-stats"
+          data-scope={isSel ? "selection" : "document"}
+          title={
+            t("editor.chrome.bottomBar.docStats.title", {
+              characters: shown.characters,
+              words: shown.words,
+              spaces: shown.spaces,
+              count: shown.paragraphs,
+            }) +
+            (isSel
+              ? t("editor.chrome.bottomBar.docStats.titleSelectionSuffix")
+              : "")
+          }
+          style={{
+            ...STATUS_TEXT_STYLE,
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          {t("editor.chrome.bottomBar.docStats.summary", {
+            characters: shown.characters,
+            count: shown.words,
+          })}
+          {isSel
+            ? t("editor.chrome.bottomBar.docStats.summarySelectionSuffix")
+            : ""}
+        </span>
+      );
+    },
+  };
+
+  // Resolve the user's stored order against the canonical default, drop hidden +
+  // data-unavailable items, and keep the rendered (id, node) pairs. `visibleIds`
+  // (the ids that actually rendered) drives the per-item move-availability.
+  const order = resolveBarOrder(barItemsOrder, RIGHT_CLUSTER_DEFAULT_ORDER);
+  const rendered: { id: string; node: ReactNode }[] = [];
+  for (const id of order) {
+    if (isHidden(id)) continue;
+    const node = renderers[id]?.() ?? null;
+    if (node === null) continue;
+    rendered.push({ id, node });
+  }
+  const visibleIds = rendered.map((r) => r.id);
 
   return (
     <div
@@ -2730,48 +3047,9 @@ function BottomBar({
       {!isHidden("sync-status") && <SyncStatusIndicator />}
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {!hideSaveStatus && !isHidden("save-status") && (
-          <SaveStatusBadge status={saveStatus} onRetry={onRetry} />
-        )}
-        {!isHidden("workspace") &&
-          onSwitchWorkspace !== undefined &&
-          activeWorkspaceId !== undefined && (
-            <WorkspaceSwitcherControl
-              slots={workspaceSlots}
-              activeId={activeWorkspaceId}
-              onSwitch={onSwitchWorkspace}
-              onSaveAs={onSaveWorkspaceAs}
-              onRename={onRenameWorkspace}
-            />
-          )}
-        {viewMode !== null && onCycleViewMode && !isHidden("view-mode") && (
-          <button
-            type="button"
-            onClick={onCycleViewMode}
-            aria-label={t("editor.chrome.bottomBar.cycleViewMode")}
-            data-testid="editor.view-mode-cta"
-            data-view-mode={viewMode}
-            title={t("editor.chrome.bottomBar.viewModeTitle", {
-              mode: t(VIEW_MODE_LABEL_KEY[viewMode]),
-            })}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "2px 8px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-3)",
-              cursor: "pointer",
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              fontWeight: 500,
-            }}
-          >
-            {t(VIEW_MODE_LABEL_KEY[viewMode])}
-          </button>
-        )}
+        {/* Preview-companion toggle is pinned (contextual, not a BAR_ITEMS id):
+            it is never reorderable and anchors at the start of the right
+            cluster. */}
         {showPreview && onTogglePreview && (
           <button
             type="button"
@@ -2795,157 +3073,57 @@ function BottomBar({
             <Icon name="panel-right" size={14} />
           </button>
         )}
-        {onShowTags && !isHidden("tags") && (
-          <button
-            type="button"
-            onClick={onShowTags}
-            aria-label={t("editor.chrome.bottomBar.browseTags")}
-            data-testid="editor.tags-cta"
-            title={t("editor.chrome.bottomBar.tagsTitle")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 8px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-3)",
-              cursor: "pointer",
+        {rendered.map(({ id, node }) => (
+          <div
+            key={id}
+            draggable
+            data-testid="editor.bar-item"
+            data-bar-item-id={id}
+            data-dragging={draggedId === id ? "true" : undefined}
+            onDragStart={(e) => {
+              setDraggedId(id);
+              e.dataTransfer.effectAllowed = "move";
             }}
-          >
-            <Icon name="hash" size={14} />
-          </button>
-        )}
-        {onShowViews && !isHidden("views") && (
-          <button
-            type="button"
-            onClick={onShowViews}
-            aria-label={t("editor.chrome.bottomBar.browseViews")}
-            data-testid="editor.views-cta"
-            title={t("editor.chrome.bottomBar.viewsTitle")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 8px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-3)",
-              cursor: "pointer",
+            onDragOver={(e) => {
+              if (draggedId === null || draggedId === id) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              const edge = dragEdgeX(e);
+              setDropTarget((prev) =>
+                prev?.id === id && prev.edge === edge ? prev : { id, edge },
+              );
             }}
-          >
-            <Icon name="layout-grid" size={14} />
-          </button>
-        )}
-        {onShowGraph && !isHidden("graph") && (
-          <button
-            type="button"
-            data-testid="editor.graph-button"
-            onClick={onShowGraph}
-            aria-label={t("editor.chrome.bottomBar.showGraph")}
-            title={t("editor.chrome.bottomBar.graphTitle")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 8px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-3)",
-              cursor: "pointer",
-            }}
-          >
-            <Icon name="share-2" size={14} />
-          </button>
-        )}
-        {!isHidden("settings") && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            aria-label={t("editor.chrome.bottomBar.openSettings")}
-            data-testid="editor.settings-cta"
-            title={t("editor.chrome.bottomBar.settingsTitle")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 8px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-3)",
-              cursor: "pointer",
-            }}
-          >
-            <Icon name="settings" size={12} />
-          </button>
-        )}
-        {!isHidden("lock") && (
-          <button
-            type="button"
-            onClick={handleLockClick}
-            aria-label={t("editor.chrome.bottomBar.lockVault")}
-            data-testid="editor.lock-cta"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "4px 8px",
-              background: "transparent",
-              border: 0,
-              borderRadius: "var(--radius-1)",
-              color: "var(--fg-3)",
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
-          >
-            <Icon name="lock" size={12} />
-            <span>{t("editor.chrome.bottomBar.lock")}</span>
-          </button>
-        )}
-        {(() => {
-          // Combined statistics readout (MYND-339), reusing the `word-count`
-          // bar-item id (one toggle). Shows the selection figures when a
-          // non-empty selection exists, else the whole-note figures; the full
-          // four-stat breakdown is in the hover title.
-          const shown = selectionStats ?? stats;
-          if (shown === null || isHidden("word-count")) return null;
-          const isSel = selectionStats !== null;
-          return (
-            <span
-              data-testid="editor.doc-stats"
-              data-scope={isSel ? "selection" : "document"}
-              title={
-                t("editor.chrome.bottomBar.docStats.title", {
-                  characters: shown.characters,
-                  words: shown.words,
-                  spaces: shown.spaces,
-                  count: shown.paragraphs,
-                }) +
-                (isSel
-                  ? t("editor.chrome.bottomBar.docStats.titleSelectionSuffix")
-                  : "")
+            onDrop={(e) => {
+              e.preventDefault();
+              if (draggedId !== null && draggedId !== id) {
+                onReorder(reorderByDrop(order, draggedId, id, dragEdgeX(e)));
               }
-              style={{
-                ...STATUS_TEXT_STYLE,
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              {t("editor.chrome.bottomBar.docStats.summary", {
-                characters: shown.characters,
-                count: shown.words,
-              })}
-              {isSel
-                ? t("editor.chrome.bottomBar.docStats.summarySelectionSuffix")
-                : ""}
-            </span>
-          );
-        })()}
+              setDraggedId(null);
+              setDropTarget(null);
+            }}
+            onDragEnd={() => {
+              setDraggedId(null);
+              setDropTarget(null);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onItemContextMenu(e, id, visibleIds);
+            }}
+            style={{
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              cursor: "grab",
+              opacity: draggedId === id ? 0.4 : 1,
+            }}
+          >
+            {dropTarget?.id === id && (
+              <div style={insertionLineStyleX(dropTarget.edge)} />
+            )}
+            {node}
+          </div>
+        ))}
       </div>
     </div>
   );

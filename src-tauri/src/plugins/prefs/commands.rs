@@ -1100,6 +1100,57 @@ pub(crate) async fn set_view_order_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `bar_items_order` sequence (MYND
+/// bottom-bar customization) — the bottom-bar item display order. Read-modify-
+/// write under the per-plugin write mutex; **no native side-effect** (same shape
+/// as `set_view_order`). The caller passes the full desired sequence of
+/// right-cluster bar element ids; the codec preserves element order VERBATIM
+/// (the sequence is the payload). Unknown-id pruning is the caller's job; the
+/// codec performs no GC. Logs the COUNT only.
+#[tauri::command]
+pub async fn set_bar_items_order<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_bar_items_order_with_dir(&dir, state.inner(), order).await
+}
+
+/// Testable core of [`set_bar_items_order`].
+pub(crate) async fn set_bar_items_order_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = order.len();
+    prefs.bar_items_order = order;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — the bar element ids are fixed UI affordance names, but keep
+    // the count-only discipline uniform with the other prefs setters.
+    tracing::info!(event = "prefs_written", field = "bar_items_order", count);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `daily_date_format` field (MYND-191) —
 /// the daily-notes date-format string (e.g. `YYYY-MM-DD`). Read-modify-write
 /// under the per-plugin write mutex; no native side-effect. Disk-first. The
@@ -1961,6 +2012,7 @@ mod tests {
                 &account_hash,
                 &PrefsView {
                     screen_capture_protection: false,
+                    bar_items_order: Vec::new(),
                     show_note_timestamps: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),
@@ -2592,6 +2644,47 @@ mod tests {
                 .expect("set order");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
             assert_eq!(view.view_order, alloc_vec(["v3", "v1", "v3"]));
+        });
+    }
+
+    // ---- bar_items_order setter (bottom-bar reorder) ------------------
+
+    #[test]
+    fn set_bar_items_order_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-bar-order-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_bar_items_order_with_dir(tmp.path(), &state, alloc_vec(["graph"])).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_bar_items_order_preserves_sequence_verbatim() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x49).await;
+            // Sequence semantics — order is the payload, preserved verbatim
+            // (NOT sorted/deduped, unlike the hidden_bar_items set).
+            set_bar_items_order_with_dir(
+                tmp.path(),
+                &state,
+                alloc_vec(["word-count", "graph", "tags", "view-mode"]),
+            )
+            .await
+            .expect("set order");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert_eq!(
+                view.bar_items_order,
+                alloc_vec(["word-count", "graph", "tags", "view-mode"])
+            );
+
+            // Clearing round-trips back to empty.
+            set_bar_items_order_with_dir(tmp.path(), &state, Vec::new())
+                .await
+                .expect("clear order");
+            let cleared = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert!(cleared.bar_items_order.is_empty());
         });
     }
 
