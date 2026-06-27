@@ -200,6 +200,15 @@ describeE2E("bl1 backlinks render → click → navigate (MYND-195)", () => {
           { label: "Note A opened" },
         );
 
+        // Right-panel tabs (right-panel tabs): backlinks now lives behind its
+        // tab. It is the default-active tab, but activate it explicitly so this
+        // scenario stays robust to a default-tab change.
+        await (
+          await s.waitForElement(
+            testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "backlinks" }),
+          )
+        ).click();
+
         // B's backlink source card is visible on A.
         const card = await s.waitForElement(
           testIdSelector("editor.backlink-row", { "data-source-id": bId }),

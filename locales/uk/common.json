@@ -616,6 +616,13 @@
       "noNotesToOpen": "Немає нотаток для відкриття.",
       "resizeBacklinksSidebar": "Змінити розмір панелі зворотних посилань",
       "resizeNotesSidebar": "Змінити розмір панелі нотаток",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Сховати панель зворотних посилань",
         "hideNotes": "Сховати панель нотаток",

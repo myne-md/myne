@@ -564,6 +564,13 @@
       "noNotesToOpen": "開けるノートがありません。",
       "resizeBacklinksSidebar": "バックリンクサイドバーのサイズを変更",
       "resizeNotesSidebar": "ノートサイドバーのサイズを変更",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "バックリンクサイドバーを非表示",
         "hideNotes": "ノートサイドバーを非表示",

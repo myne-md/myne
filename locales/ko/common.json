@@ -568,6 +568,13 @@
       "noNotesToOpen": "열 노트가 없습니다.",
       "resizeBacklinksSidebar": "백링크 사이드바 크기 조절",
       "resizeNotesSidebar": "노트 사이드바 크기 조절",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "백링크 사이드바 숨기기",
         "hideNotes": "노트 사이드바 숨기기",

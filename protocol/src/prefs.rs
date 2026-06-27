@@ -706,6 +706,54 @@ pub struct PrefsView {
     #[serde(default)]
     pub paired_extensions: Vec<crate::paired_extension::PairedExtension>,
 
+    /// Active right-panel tab id (right-panel tabs) — the id of the right
+    /// sidebar tab the editor should restore (e.g. `backlinks`, `unlinked`,
+    /// `outline`). `None` ≡ unset → the host applies its default (the first
+    /// visible tab in canonical order). A free `Option<String>` stored verbatim
+    /// (NFC-normalized at encode time); no codec-level value validation (the
+    /// `active_workspace` precedent class — the client owns the tab-id
+    /// interpretation + unknown→default fallback). Omitted entirely from the
+    /// canonical JSON when `None`, so a vault that never switched the right-panel
+    /// tab is byte-identical to a pre-feature `vault.prefs` (existing golden
+    /// vectors unaffected — migration-less additive field on `MYP1`).
+    /// **Non-load-bearing** (a tampered / replayed value can at worst restore the
+    /// wrong tab) — no protective-envelope clamp. Canonical key
+    /// `right_panel_active_tab` — sorts after `paired_extensions` (`p` < `r`),
+    /// before `right_panel_hidden_tabs`.
+    #[serde(default)]
+    pub right_panel_active_tab: Option<alloc::string::String>,
+
+    /// Hidden right-panel tab ids (right-panel tabs) — the **set** of right
+    /// sidebar tab ids the user chose to hide via the panel's right-click menu.
+    /// A `set`-semantics array: NFC-normalized, lexicographically sorted,
+    /// exact-deduped (`canonical_folder_list`, the `hidden_bar_items` precedent
+    /// class), and **omitted entirely when empty** so a vault whose right panel
+    /// shows every tab (the default) is byte-identical to a pre-feature
+    /// `vault.prefs`. An unknown id is ignored at render and pruned on the next
+    /// write (no codec-level GC). **Non-load-bearing** (a tampered / replayed
+    /// value can at worst hide or reveal a tab) — no protective-envelope clamp.
+    /// Canonical key `right_panel_hidden_tabs` — sorts after
+    /// `right_panel_active_tab`, before `right_panel_tab_order`.
+    #[serde(default)]
+    pub right_panel_hidden_tabs: Vec<String>,
+
+    /// User-chosen right-panel tab display order (right-panel tabs, drag-to-reorder
+    /// twin of [`PrefsView::right_panel_hidden_tabs`]). A `sequence`-semantics
+    /// array of right sidebar tab ids in the order the user arranged them by
+    /// dragging or via the panel's "move left / move right" actions. Order is
+    /// MEANINGFUL, so the array is preserved **verbatim** — NOT sorted, NOT
+    /// deduped — exactly like [`PrefsView::bar_items_order`]. NFC-normalized per
+    /// element and **omitted entirely when empty** so a vault that never reordered
+    /// its right-panel tabs (the default) is byte-identical to a pre-feature
+    /// `vault.prefs`. An id not in the host's known set is ignored at render and
+    /// pruned on the next write (no codec-level GC); a known id absent from the
+    /// array falls back to its canonical default position. **Non-load-bearing**
+    /// (a tampered / replayed value can at worst reorder a tab) — no
+    /// protective-envelope clamp. Canonical key `right_panel_tab_order` — sorts
+    /// after `right_panel_hidden_tabs`, before `saved_views` (`r` < `sav`).
+    #[serde(default)]
+    pub right_panel_tab_order: Vec<String>,
+
     /// Saved-view definitions (MYND-273, Saved Views epic) — authored content
     /// (a hand-built filter / sort / group projection), persisted as a nested
     /// array of canonical [`crate::saved_view::SavedView`] objects. **Authored,
@@ -779,6 +827,9 @@ impl Default for PrefsView {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -1228,6 +1279,47 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // right_panel_active_tab (canonical key 'right_panel_a…' — after
+    // paired_extensions ['p' < 'r'], before right_panel_hidden_tabs). A free
+    // enum string; omitted entirely when None so a vault that never switched the
+    // right-panel tab is byte-identical to a pre-feature vault.prefs (preserves
+    // existing KAT vectors). NFC-normalized like active_workspace.
+    if let Some(ref tab) = prefs.right_panel_active_tab {
+        out.extend_from_slice(b"\"right_panel_active_tab\":");
+        push_json_string(&mut out, &tab.nfc().collect::<String>());
+        out.push(b',');
+    }
+
+    // right_panel_hidden_tabs (canonical key 'right_panel_h…' — after
+    // right_panel_active_tab, before right_panel_tab_order ['h' < 't']). A
+    // set-semantics array: NFC-normalized, sorted, exact-deduped
+    // (canonical_folder_list, shared with hidden_bar_items); omitted entirely
+    // when empty so a vault whose right panel shows every tab (the default) is
+    // byte-identical to a pre-feature vault.prefs.
+    let right_panel_hidden = canonical_folder_list(&prefs.right_panel_hidden_tabs);
+    if !right_panel_hidden.is_empty() {
+        out.extend_from_slice(b"\"right_panel_hidden_tabs\":[");
+        for (i, id) in right_panel_hidden.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, id);
+        }
+        out.extend_from_slice(b"],");
+    }
+
+    // right_panel_tab_order (canonical key 'right_panel_t…' — after
+    // right_panel_hidden_tabs, before saved_views ['r' < 'sav']). The
+    // right-panel tab display sequence; same order-preserving discipline as
+    // bar_items_order — preserved verbatim, NOT sorted/deduped. Omitted entirely
+    // when empty so a vault that never reordered its right-panel tabs is
+    // byte-identical to a pre-feature vault.prefs.
+    if !prefs.right_panel_tab_order.is_empty() {
+        out.extend_from_slice(b"\"right_panel_tab_order\":");
+        push_ordered_string_array(&mut out, &prefs.right_panel_tab_order);
+        out.push(b',');
+    }
+
     // saved_views (canonical key 'sav' — after last_backup_at, before
     // screen_capture_protection ['sav' < 'scr']). A nested array of canonical
     // SavedView objects, sorted by id (MYND-273); omitted entirely when empty so
@@ -1632,6 +1724,17 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // a token value or extension id that literally contains a later marker text.
     let paired_extensions =
         parse_optional_paired_extensions_field(rest, &mut cursor, b"\"paired_extensions\":")?;
+    // right_panel_* (keys 'r' — after paired_extensions ['p' < 'r'], before
+    // saved_views ['r' < 'sav']). Parsed from the same monotonic cursor in
+    // canonical order (active < hidden < tab_order) so the following saved_views /
+    // screen_capture_protection finds are never fooled by a tab id that literally
+    // contains a later marker text. All three are optional / omit-when-default.
+    let right_panel_active_tab =
+        parse_optional_string_field(rest, &mut cursor, b"\"right_panel_active_tab\":")?;
+    let right_panel_hidden_tabs =
+        parse_optional_array_field(rest, &mut cursor, b"\"right_panel_hidden_tabs\":")?;
+    let right_panel_tab_order =
+        parse_optional_array_field(rest, &mut cursor, b"\"right_panel_tab_order\":")?;
     // saved_views (key 'sav' — after last_backup_at, before
     // screen_capture_protection ['sav' < 'scr'], MYND-273). A nested array of
     // canonical SavedView objects; parsed from the same monotonic cursor so the
@@ -1731,6 +1834,9 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         startup_open,
         startup_open_note,
         paired_extensions,
+        right_panel_active_tab,
+        right_panel_hidden_tabs,
+        right_panel_tab_order,
         spell_enabled,
         spell_languages,
         saved_views,
@@ -2482,6 +2588,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -2528,6 +2637,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -2697,6 +2809,9 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                right_panel_active_tab: None,
+                right_panel_hidden_tabs: Vec::new(),
+                right_panel_tab_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -2745,6 +2860,9 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                right_panel_active_tab: None,
+                right_panel_hidden_tabs: Vec::new(),
+                right_panel_tab_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -3423,6 +3541,9 @@ mod tests {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -3438,6 +3559,9 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -3454,6 +3578,9 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -3542,6 +3669,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -3823,6 +3953,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -3876,6 +4009,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -3927,6 +4063,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -3977,6 +4116,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4090,6 +4232,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4168,6 +4313,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4225,6 +4373,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4317,6 +4468,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4385,6 +4539,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4500,6 +4657,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4550,6 +4710,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4602,6 +4765,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4722,6 +4888,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4816,6 +4985,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5100,6 +5272,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5154,6 +5329,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5469,6 +5647,9 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                right_panel_active_tab: None,
+                right_panel_hidden_tabs: Vec::new(),
+                right_panel_tab_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -5516,6 +5697,9 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                right_panel_active_tab: None,
+                right_panel_hidden_tabs: Vec::new(),
+                right_panel_tab_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -5582,6 +5766,9 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -6340,6 +6527,9 @@ mod tests {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
             paired_extensions: Vec::new(),
+            right_panel_active_tab: None,
+            right_panel_hidden_tabs: Vec::new(),
+            right_panel_tab_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -6866,6 +7056,126 @@ mod tests {
 
         std::fs::write("/tmp/myne_vault_prefs_keymap_vectors.json", dump.as_bytes())
             .expect("write vault-prefs keymap vectors dump");
+    }
+
+    /// Generator for the right-panel-tabs vault-prefs vectors (right-panel tabs;
+    /// per-feature-generator pattern of [`emit_keymap_prefs_vectors`]). Emits a
+    /// 2-case JSON **array fragment** (encrypt + decrypt_ok) at
+    /// `/tmp/myne_vault_prefs_right_panel_vectors.json`, spliced by hand into the
+    /// existing `cases` array. Exercises the three additive fields
+    /// `right_panel_active_tab` (Option<String> pointer) / `right_panel_hidden_tabs`
+    /// (set-canonical: sorted+deduped) / `right_panel_tab_order` (sequence:
+    /// verbatim). Same fixed vault-A inputs as the sibling generators;
+    /// prefs_nonce=0xF6 (the next free entry in the family's nonce registry —
+    /// 0x77/0x88/0x99/0xAA/0xBB/0xCC/0xDD/0xEE/0xF1..0xF5 are taken).
+    ///
+    /// `cargo test -p protocol --lib emit_right_panel_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_right_panel_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_rp: [u8; AEAD_NONCE_LEN] = [0xF6; AEAD_NONCE_LEN];
+        let prefs_rp = PrefsView {
+            right_panel_active_tab: Some(String::from("backlinks")),
+            right_panel_hidden_tabs: alloc::vec![String::from("outline")],
+            right_panel_tab_order: alloc::vec![
+                String::from("backlinks"),
+                String::from("unlinked"),
+                String::from("outline"),
+            ],
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs_rp);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"right_panel_active_tab":"backlinks","right_panel_hidden_tabs":["outline"],"right_panel_tab_order":["backlinks","unlinked","outline"],"screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin right_panel_active_tab < right_panel_hidden_tabs < right_panel_tab_order < screen_capture_protection (all between paired_extensions and saved_views), set-canonical hidden tabs, verbatim tab order",
+        );
+        let blob_rp = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_rp, &nonce_rp)
+            .expect("encode right-panel");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_rp).expect("decode");
+        assert_eq!(
+            decoded, prefs_rp,
+            "right-panel blob must round-trip exactly"
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-right-panel-tabs
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-right-panel-tabs\",\n");
+        dump.push_str("      \"description\": \"Right-panel tabs. PrefsView carries right_panel_active_tab (an Option<String> pointer) + right_panel_hidden_tabs (set-canonical: sorted+deduped) + right_panel_tab_order (sequence: verbatim), pinning the canonical key order right_panel_active_tab (r-a) < right_panel_hidden_tabs (r-h) < right_panel_tab_order (r-t) < screen_capture_protection (s), all sorting between paired_extensions (p) and saved_views (sav). Same vault-A inputs as the sibling cases; prefs_nonce=0xF6x24. Generated by emit_right_panel_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_rp)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_rp)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-right-panel-tabs
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-right-panel-tabs\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-right-panel-tabs: the blob decodes back to a PrefsView carrying the active-tab pointer + the hidden-tabs set + the tab-order sequence under the same root_key + account_number_hash. Verifies decoders surface the three right-panel fields from their canonical positions between paired_extensions and saved_views, canonicalize the hidden set (sorted+deduped), and preserve the order sequence verbatim.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_rp)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"right_panel_active_tab\": \"backlinks\",\n");
+        dump.push_str("        \"right_panel_hidden_tabs\": [\"outline\"],\n");
+        dump.push_str(
+            "        \"right_panel_tab_order\": [\"backlinks\", \"unlinked\", \"outline\"]\n",
+        );
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_right_panel_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs right-panel vectors dump");
     }
 
     /// Generator for the MYND-227 structural `parse_fail` vector cases

@@ -26,6 +26,7 @@ import { asViewMode, type ViewMode } from "../../editor/view-mode";
 const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
+import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
 import { createNote } from "../createNote";
 import { useSelectedNote, type NoteId } from "../sidebarState";
 import { useResolverNotes } from "../resolverNotes";
@@ -210,6 +211,21 @@ export function PaneView({
     },
     [ctx],
   );
+  // Outline tab → editor scroll bridge (right-panel tabs): the panel-level
+  // Outline tab emits a heading-reveal request through the module-level signal
+  // (a separate render subtree), and the FOCUSED pane converts it into the SAME
+  // `setScrollAnchor` call a `[[#heading]]` chip click uses. Self-gated on the
+  // monotonic nonce (like CMEditor's applied-scroll-nonce) so a non-focused or
+  // stale pane never scrolls, and re-clicking the same heading re-fires.
+  const revealHeadingNonce = useRevealHeadingNonce();
+  useEffect(() => {
+    const req = peekRevealHeading();
+    if (req === null || !focused || activeId === null) return;
+    if (req.paneId !== null && req.paneId !== leaf.id) return;
+    pendingAnchorTargetRef.current = activeId;
+    setScrollAnchor({ anchor: { heading: req.heading }, nonce: req.nonce });
+  }, [revealHeadingNonce, focused, activeId, leaf.id]);
+
   // Only feed the pending scroll into the editor once THIS pane is actually
   // showing the deep-link target (the body-load effect keys on `activeId`); a
   // stale request for a different note is dropped so we never scroll the wrong

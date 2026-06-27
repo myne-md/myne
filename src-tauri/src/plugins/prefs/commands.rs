@@ -1151,6 +1151,132 @@ pub(crate) async fn set_bar_items_order_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `right_panel_active_tab` slot id
+/// (right-panel tabs) — the right sidebar tab the editor restores, or `None` to
+/// clear back to the host default. Read-modify-write under the per-plugin write
+/// mutex; no native side-effect. A free `Option<String>` stored verbatim (the
+/// `set_active_workspace` precedent class); non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_right_panel_active_tab<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(&dir, state.inner(), "right_panel_active_tab", |p| {
+        p.right_panel_active_tab = value;
+    })
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the `right_panel_hidden_tabs` set (right-panel
+/// tabs). Read-modify-write under the per-plugin write mutex; **no native
+/// side-effect** (same shape as `set_hidden_bar_items`). The caller passes the
+/// full desired set; the codec canonicalizes it (sorted + exact-deduped) on
+/// encode. An empty set is the default (every tab visible) and encodes to
+/// byte-identical-to-pre-feature.
+#[tauri::command]
+pub async fn set_right_panel_hidden_tabs<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_right_panel_hidden_tabs_with_dir(&dir, state.inner(), items).await
+}
+
+/// Testable core of [`set_right_panel_hidden_tabs`].
+pub(crate) async fn set_right_panel_hidden_tabs_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = items.len();
+    prefs.right_panel_hidden_tabs = items;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — the tab ids are a non-secret closed UI vocabulary, but stay
+    // consistent with the other prefs setters' count-only discipline.
+    tracing::info!(
+        event = "prefs_written",
+        field = "right_panel_hidden_tabs",
+        count,
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `right_panel_tab_order` sequence
+/// (right-panel tabs) — the right sidebar tab display order. Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** (same shape as
+/// `set_bar_items_order`). The caller passes the full desired sequence of tab
+/// ids; the codec preserves element order VERBATIM. Unknown-id pruning is the
+/// caller's job; the codec performs no GC. Logs the COUNT only.
+#[tauri::command]
+pub async fn set_right_panel_tab_order<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_right_panel_tab_order_with_dir(&dir, state.inner(), order).await
+}
+
+/// Testable core of [`set_right_panel_tab_order`].
+pub(crate) async fn set_right_panel_tab_order_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = order.len();
+    prefs.right_panel_tab_order = order;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // COUNT only — the tab ids are fixed UI affordance names, but keep the
+    // count-only discipline uniform with the other prefs setters.
+    tracing::info!(
+        event = "prefs_written",
+        field = "right_panel_tab_order",
+        count
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `daily_date_format` field (MYND-191) —
 /// the daily-notes date-format string (e.g. `YYYY-MM-DD`). Read-modify-write
 /// under the per-plugin write mutex; no native side-effect. Disk-first. The
@@ -2138,6 +2264,9 @@ mod tests {
                     new_note_location: None,
                     new_note_location_folder: None,
                     paired_extensions: Vec::new(),
+                    right_panel_active_tab: None,
+                    right_panel_hidden_tabs: Vec::new(),
+                    right_panel_tab_order: Vec::new(),
                     spell_enabled: None,
                     spell_languages: Vec::new(),
                     startup_open: None,

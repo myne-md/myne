@@ -398,6 +398,36 @@ export interface PrefsView {
    */
   bar_items_order: string[];
   /**
+   * Active right-panel tab id (right-panel tabs) — the right-sidebar tab the
+   * editor restores (e.g. `backlinks`, `unlinked`, `outline`). `null` ≡ unset →
+   * the host applies its default (the first visible tab in canonical order). A
+   * free pointer the client interprets (unknown id → host default), the
+   * {@link PrefsView.active_workspace} precedent class. Absent in pre-feature
+   * vaults → the Rust decoder defaults it to `null`. Serialized from Rust
+   * `Option<String>` (null | string).
+   */
+  right_panel_active_tab: string | null;
+  /**
+   * Hidden right-panel tab ids (right-panel tabs) — the **set** of right-sidebar
+   * tab ids the user hid via the panel's right-click menu. The backend encodes
+   * the array as a canonical set (NFC-normalized, sorted, deduped); empty (the
+   * default — every tab visible) is byte-identical to a pre-feature vault. An
+   * unknown id is ignored at render. The {@link PrefsView.hidden_bar_items}
+   * twin. Absent → the Rust decoder defaults it to `[]`.
+   */
+  right_panel_hidden_tabs: string[];
+  /**
+   * Right-panel tab display order (right-panel tabs) — the right-sidebar tab ids
+   * in the order the user arranged them by dragging or via the panel's "move
+   * left / move right" actions. A sequence: the backend preserves element order
+   * verbatim (not sorted/deduped, unlike {@link PrefsView.right_panel_hidden_tabs};
+   * unknown ids are the caller's to prune and a known id absent from the array
+   * falls back to its canonical default position). The
+   * {@link PrefsView.bar_items_order} twin. Empty (the default — canonical tab
+   * order) is byte-identical to a pre-feature vault. Absent → `[]`.
+   */
+  right_panel_tab_order: string[];
+  /**
    * Per-item color label (MYND-184) — a map from a sidebar item key (a note UUID
    * **or** a canonical trailing-slash folder path, discriminated by the trailing
    * `/`) to a color-slot name. Notes and folders both take a color (folders also
@@ -510,6 +540,43 @@ export async function setBarItemsOrder(order: string[]): Promise<void> {
  */
 export async function setHiddenBarItems(items: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_hidden_bar_items", { items });
+}
+
+/**
+ * Persist the active right-panel tab id (right-panel tabs) — the right-sidebar
+ * tab the editor restores, or `null` to clear to the host default. The backend
+ * stores it verbatim; the client owns the unknown-id → default fallback. No
+ * native side-effect; a rejected promise means the disk write failed and the
+ * caller's optimistic UI must revert. The IPC payload key (`value`) matches the
+ * Rust command's `value: Option<String>` parameter.
+ */
+export async function setRightPanelActiveTab(value: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_right_panel_active_tab", { value });
+}
+
+/**
+ * Persist the full hidden-right-panel-tabs set — the right-sidebar tab ids the
+ * user chose to hide via the panel's right-click menu. The backend canonicalizes
+ * it (sorted + deduped); an empty array is the default (every tab visible). No
+ * native side-effect; a rejected promise means the disk write failed and the
+ * caller's optimistic UI must revert. The IPC payload key (`items`) matches the
+ * Rust command's `items: Vec<String>` parameter.
+ */
+export async function setRightPanelHiddenTabs(items: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_right_panel_hidden_tabs", { items });
+}
+
+/**
+ * Persist the full right-panel tab display order — the right-sidebar tab ids in
+ * the order the user arranged them by drag-to-reorder or the panel's right-click
+ * move actions. The caller passes the entire desired order; the backend preserves
+ * element order verbatim (the sequence IS the payload). No native side-effect; a
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert. The IPC payload key (`order`) matches the Rust command's
+ * `order: Vec<String>` parameter.
+ */
+export async function setRightPanelTabOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_right_panel_tab_order", { order });
 }
 
 /**

@@ -32,6 +32,9 @@ import {
   setBarItemsOrder as persistBarItemsOrder,
   setHiddenBarItems as persistHiddenBarItems,
   setKeymapBinding as persistKeymapBinding,
+  setRightPanelActiveTab as persistRightPanelActiveTab,
+  setRightPanelHiddenTabs as persistRightPanelHiddenTabs,
+  setRightPanelTabOrder as persistRightPanelTabOrder,
   setScreenCaptureProtection,
 } from "../lib/prefs";
 import { subscribePrefsNonce } from "../notes/prefsNonce";
@@ -67,6 +70,9 @@ const DEFAULT_PREFS: PrefsView = {
   folder_icons: {},
   hidden_bar_items: [],
   bar_items_order: [],
+  right_panel_active_tab: null,
+  right_panel_hidden_tabs: [],
+  right_panel_tab_order: [],
   item_colors: {},
   keymap: {},
   label: null,
@@ -113,6 +119,25 @@ interface UsePrefsResult {
    * is called. Same pattern as {@link setHiddenBarItems}.
    */
   setBarItemsOrder: (order: string[]) => Promise<void>;
+  /**
+   * Persist the active right-panel tab id (right-panel tabs). Optimistic: the
+   * cache updates immediately so the panel re-renders without a round-trip. On
+   * IPC rejection, the cache is re-read from disk and `onError` is called. Same
+   * pattern as {@link setBarItemsOrder}. `null` clears to the host default.
+   */
+  setRightPanelActiveTab: (value: string | null) => Promise<void>;
+  /**
+   * Persist the full hidden-right-panel-tabs set (right-panel tabs). The backend
+   * canonicalizes it (sorted + deduped). Optimistic with the same disk-re-read-
+   * on-error convergence as {@link setHiddenBarItems}.
+   */
+  setRightPanelHiddenTabs: (items: string[]) => Promise<void>;
+  /**
+   * Persist the right-panel tab display order (drag-to-reorder / right-click
+   * move). The backend preserves element order verbatim. Optimistic with the same
+   * convergence as {@link setBarItemsOrder}.
+   */
+  setRightPanelTabOrder: (order: string[]) => Promise<void>;
   /**
    * Editor-typography preset setters (editor-typography). Each takes the chosen
    * preset string, or `null` to clear back to that field's canonical default.
@@ -265,6 +290,66 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  const setRightPanelActiveTab = useCallback(
+    async (value: string | null) => {
+      // Optimistic via functional update — same convergence discipline as
+      // `setBarItemsOrder`. `null` clears to the host default.
+      setPrefs((p) => ({ ...p, right_panel_active_tab: value }));
+      try {
+        await persistRightPanelActiveTab(value);
+      } catch {
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend tracing
+          // logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  const setRightPanelHiddenTabs = useCallback(
+    async (items: string[]) => {
+      // Optimistic via functional update — same convergence discipline as
+      // `setHiddenBarItems`. The backend canonicalizes (sorted + deduped).
+      setPrefs((p) => ({ ...p, right_panel_hidden_tabs: items }));
+      try {
+        await persistRightPanelHiddenTabs(items);
+      } catch {
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend tracing
+          // logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  const setRightPanelTabOrder = useCallback(
+    async (order: string[]) => {
+      // Optimistic via functional update — same convergence discipline as
+      // `setBarItemsOrder`. The backend preserves element order verbatim.
+      setPrefs((p) => ({ ...p, right_panel_tab_order: order }));
+      try {
+        await persistRightPanelTabOrder(order);
+      } catch {
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend tracing
+          // logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
   // Shared optimistic-then-reread-on-error core for the editor-typography
   // setters: patch the cache immediately (so the open editor re-renders live),
   // persist, and on failure re-read disk truth — same convergence discipline as
@@ -362,6 +447,9 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setAutoLock,
     setHiddenBarItems,
     setBarItemsOrder,
+    setRightPanelActiveTab,
+    setRightPanelHiddenTabs,
+    setRightPanelTabOrder,
     setEditorTextSize: setEditorTextSizePref,
     setEditorLineSpacing: setEditorLineSpacingPref,
     setEditorContentWidth: setEditorContentWidthPref,

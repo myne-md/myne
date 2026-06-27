@@ -106,20 +106,16 @@ import {
   canMoveBarItem,
 } from "../notes/barItemsOrder";
 import { vaultIndicesPersist } from "../notes/vaultIndices";
-import {
-  SECTION_HEADING_STYLE,
-  SIDEBAR_CARD_STYLE,
-} from "../notes/components/sharedStyles";
-import {
-  backlinkRows,
-  backlinkRowsEqual,
-  type BacklinkRow,
-} from "../notes/backlinkRows";
-import { useIndexNonce } from "../notes/indexNonce";
 import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
-import { backlinks } from "../notes/vaultIndices";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
+import { BacklinksTab } from "../notes/components/BacklinksTab";
+import { OutlineTab } from "../notes/components/OutlineTab";
+import {
+  RIGHT_PANEL_TABS,
+  RIGHT_PANEL_DEFAULT_ORDER,
+  resolveActiveTab,
+} from "../notes/rightPanelTabs";
 import { linkMention } from "../notes/linkMention";
 import type { UnlinkedMention } from "../notes/unlinkedMentions";
 import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
@@ -2471,12 +2467,26 @@ function WorkspaceHotkeys({
  * covers the race. Stays live via the vault-wide index-changed nonce (SYNC-5):
  * any note's save/rename/move re-queries; the reference-equal bail guards renders.
  */
+/**
+ * The right panel — a multi-tab surface (right-panel tabs) modeled on the bottom
+ * bar: multiple NON-closable tabs (Backlinks / Unlinked mentions / Outline) that
+ * drag-reorder and right-click hide/restore, with ONE active tab at a time. The
+ * WHOLE-panel show/hide stays the existing `rightCollapsed` toggle (title-bar
+ * button + palette command) — unchanged. Each tab body is its own component
+ * (`BacklinksTab`, `UnlinkedMentionsSection` in `asTab` mode, `OutlineTab`); this
+ * container owns only the strip, the active-tab/order/hidden prefs, and the two
+ * right-click menus (the per-tab move/hide + the strip-wide restore checklist).
+ */
 function RightSidebar() {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const notes = useResolverNotes();
-  const indexNonce = useIndexNonce();
-  const [rows, setRows] = useState<BacklinkRow[]>([]);
+  const {
+    prefs,
+    setRightPanelActiveTab,
+    setRightPanelHiddenTabs,
+    setRightPanelTabOrder,
+  } = usePrefs();
 
   const selectedId = ctx.selectedId;
   const openTitle = useMemo(
@@ -2501,110 +2511,231 @@ function RightSidebar() {
     [selectedId, openTitle],
   );
 
-  useEffect(() => {
-    const noteId = ctx.selectedId;
-    if (noteId === null) {
-      setRows((prev) => (prev.length === 0 ? prev : []));
-      return;
-    }
-    let cancelled = false;
-    void backlinks(noteId, notes).then(
-      (groups) => {
-        if (cancelled) return;
-        const next = backlinkRows(groups, noteId);
-        // SYNC-5 condition 2: keep the previous reference when the result is
-        // unchanged, so a no-op re-query (e.g. a vault-wide reindex burst)
-        // bails the React render.
-        setRows((prev) => (backlinkRowsEqual(prev, next) ? prev : next));
-      },
-      () => {
-        // Best-effort — a transient query failure shows the empty state.
-        if (!cancelled) setRows((prev) => (prev.length === 0 ? prev : []));
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-    // `indexNonce` re-runs the cheap (decrypt-free) re-query on every vault
-    // index mutation (SYNC-5); the reference-equal bail above guards renders.
-  }, [ctx.selectedId, notes, indexNonce]);
+  const tabOrder = prefs.right_panel_tab_order;
+  const hidden = prefs.right_panel_hidden_tabs;
+  const order = useMemo(
+    () => resolveBarOrder(tabOrder, RIGHT_PANEL_DEFAULT_ORDER),
+    [tabOrder],
+  );
+  const visible = useMemo(() => order.filter((id) => !hidden.includes(id)), [order, hidden]);
+  // Healed-on-read: a stored pointer to a now-hidden/unknown tab is reinterpreted
+  // (first visible), never rewritten to disk.
+  const active = resolveActiveTab(prefs.right_panel_active_tab, order, hidden);
+
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; edge: "before" | "after" } | null>(
+    null,
+  );
+  // Right-click menu anchor: `{x,y}` opens the strip-wide restore checklist;
+  // `{x,y,itemId}` opens the per-tab move/hide menu for that tab.
+  const [tabMenu, setTabMenu] = useState<{ x: number; y: number; itemId?: string } | null>(null);
 
   return (
-    <aside
+    <div
       style={{
         // Fills the layout-seam wrapper, which owns the resizable width.
         // `flex: 1` fills the height below the ribbon header (MYND-166).
         width: "100%",
         flex: 1,
         minHeight: 0,
-        overflowY: "auto",
-        background: "var(--paper-2)",
-        borderLeft: "1px solid var(--line-1)",
-        padding: "16px 18px",
         display: "flex",
         flexDirection: "column",
-        gap: 8,
+        background: "var(--paper-2)",
+        borderLeft: "1px solid var(--line-1)",
       }}
     >
-      <div style={SECTION_HEADING_STYLE}>
-        {t("editor.chrome.backlinks.linkedFrom", { count: rows.length })}
-      </div>
-      {rows.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
-          {t("editor.chrome.backlinks.empty")}
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {rows.map((row) => (
+      {/* Tab strip — drag-reorder + right-click hide/restore (bottom-bar
+          pattern), single active tab. Right-clicking empty strip space opens the
+          restore checklist even when every tab is hidden (the only restore path). */}
+      <div
+        data-testid="editor.right-panel-tabs"
+        role="tablist"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setTabMenu({ x: e.clientX, y: e.clientY });
+        }}
+        style={{
+          display: "flex",
+          alignItems: "stretch",
+          gap: 2,
+          padding: "0 8px",
+          minHeight: 34,
+          borderBottom: "1px solid var(--line-1)",
+        }}
+      >
+        {visible.map((id) => {
+          const tab = RIGHT_PANEL_TABS.find((tt) => tt.id === id);
+          if (tab === undefined) return null;
+          const isActive = id === active;
+          const label = t(tab.labelKey);
+          return (
+            // Icon-only tabs (the dar-sağ-panel convention — Obsidian/Logseq):
+            // the label rides the tooltip + aria-label so three tabs always fit a
+            // 280px panel and the strip keeps a right-click-able empty area.
             <button
-              key={row.sourceUuid}
+              key={id}
               type="button"
-              data-testid="editor.backlink-row"
-              data-source-id={row.sourceUuid}
-              onClick={() => void ctx.open(row.sourceUuid)}
-              style={SIDEBAR_CARD_STYLE}
+              role="tab"
+              draggable
+              aria-selected={isActive}
+              aria-label={label}
+              title={label}
+              data-testid="editor.right-panel-tab"
+              data-panel-tab-id={id}
+              data-active={isActive ? "true" : undefined}
+              data-dragging={draggedId === id ? "true" : undefined}
+              onClick={() => void setRightPanelActiveTab(id)}
+              onDragStart={(e) => {
+                setDraggedId(id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (draggedId === null || draggedId === id) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                const edge = dragEdgeX(e);
+                setDropTarget((prev) =>
+                  prev?.id === id && prev.edge === edge ? prev : { id, edge },
+                );
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedId !== null && draggedId !== id) {
+                  void setRightPanelTabOrder(reorderByDrop(order, draggedId, id, dragEdgeX(e)));
+                }
+                setDraggedId(null);
+                setDropTarget(null);
+              }}
+              onDragEnd={() => {
+                setDraggedId(null);
+                setDropTarget(null);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setTabMenu({ x: e.clientX, y: e.clientY, itemId: id });
+              }}
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: "0 0 auto",
+                width: 32,
+                background: "transparent",
+                border: "none",
+                borderBottom: isActive ? "2px solid var(--accent)" : "2px solid transparent",
+                marginBottom: -1,
+                color: isActive ? "var(--fg-1)" : "var(--fg-3)",
+                cursor: draggedId === id ? "grabbing" : "pointer",
+                opacity: draggedId === id ? 0.4 : 1,
+              }}
             >
-              <span
-                style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}
-              >
-                {row.sourceTitle ?? t("editor.chrome.backlinks.untitled")}
-              </span>
-              {row.count > 1 && (
-                <span
-                  style={{ fontSize: 12, color: "var(--fg-3)", marginLeft: 6 }}
-                >
-                  ({row.count})
-                </span>
-              )}
-              {/* Archived source (MYND-331): a backlink from an archived note
-                  still resolves (archive ≠ soft-trash) — a small badge tells the
-                  user the source lives in the Archive, not the working tree. */}
-              {ctx.cache.get(row.sourceUuid)?.archived != null && (
-                <span
-                  data-testid="editor.backlink-archived-badge"
-                  title={t("editor.chrome.backlinks.archivedBadge")}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    marginLeft: 6,
-                    color: "var(--fg-3)",
-                  }}
-                >
-                  <Icon name="archive" size={12} />
-                </span>
-              )}
+              {dropTarget?.id === id && <div style={insertionLineStyleX(dropTarget.edge)} />}
+              <Icon name={tab.icon} size={16} />
             </button>
-          ))}
-        </div>
-      )}
-      <UnlinkedMentionsSection
-        openNoteId={selectedId}
-        openTitle={openTitle}
-        notes={notes}
-        onNavigate={(noteId) => void ctx.open(noteId)}
-        onLinkMention={handleLinkMention}
-      />
-    </aside>
+          );
+        })}
+        {/* Trailing flex spacer — keeps tabs left-aligned and gives the
+            strip-wide restore checklist a reliable empty right-click target (it
+            has no onContextMenu of its own, so the event bubbles to the strip). */}
+        <div data-testid="editor.right-panel-tabs-rest" style={{ flex: 1, alignSelf: "stretch" }} />
+      </div>
+
+      {/* Active tab body */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          padding: "16px 18px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        {active === null ? (
+          <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>
+            {t("editor.chrome.rightPanel.allHidden")}
+          </div>
+        ) : active === "backlinks" ? (
+          <BacklinksTab />
+        ) : active === "unlinked" ? (
+          <UnlinkedMentionsSection
+            asTab
+            openNoteId={selectedId}
+            openTitle={openTitle}
+            notes={notes}
+            onNavigate={(noteId) => void ctx.open(noteId)}
+            onLinkMention={handleLinkMention}
+          />
+        ) : active === "outline" ? (
+          <OutlineTab />
+        ) : null}
+      </div>
+
+      {/* Right-click menus (clone of the bottom-bar two-menu pattern). */}
+      {tabMenu &&
+        (tabMenu.itemId !== undefined ? (
+          // Per-tab menu: move left / move right (a11y fallback for drag,
+          // boundary moves omitted) + hide.
+          <ContextMenu
+            x={tabMenu.x}
+            y={tabMenu.y}
+            onClose={() => setTabMenu(null)}
+            items={((): ContextMenuItem[] => {
+              const itemId = tabMenu.itemId!;
+              const items: ContextMenuItem[] = [];
+              if (canMoveBarItem(visible, itemId, -1)) {
+                items.push({
+                  id: "move-left",
+                  label: t("editor.chrome.barItems.moveLeft"),
+                  onSelect: () =>
+                    void setRightPanelTabOrder(moveBarItem(order, visible, itemId, -1)),
+                });
+              }
+              if (canMoveBarItem(visible, itemId, 1)) {
+                items.push({
+                  id: "move-right",
+                  label: t("editor.chrome.barItems.moveRight"),
+                  onSelect: () =>
+                    void setRightPanelTabOrder(moveBarItem(order, visible, itemId, 1)),
+                });
+              }
+              items.push({
+                id: "hide",
+                label: t("editor.chrome.barItems.hide"),
+                onSelect: () =>
+                  void setRightPanelHiddenTabs(
+                    hidden.includes(itemId) ? hidden : [...hidden, itemId],
+                  ),
+              });
+              return items;
+            })()}
+          />
+        ) : (
+          // Strip-wide checklist: the only path to restore a hidden tab.
+          <ContextMenu
+            x={tabMenu.x}
+            y={tabMenu.y}
+            onClose={() => setTabMenu(null)}
+            items={RIGHT_PANEL_TABS.map(
+              (tab): ContextMenuItem => ({
+                id: tab.id,
+                label: t(tab.labelKey),
+                checked: !hidden.includes(tab.id),
+                closeOnSelect: false,
+                onSelect: () =>
+                  void setRightPanelHiddenTabs(
+                    hidden.includes(tab.id)
+                      ? hidden.filter((x) => x !== tab.id)
+                      : [...hidden, tab.id],
+                  ),
+              }),
+            )}
+          />
+        ))}
+    </div>
   );
 }
 

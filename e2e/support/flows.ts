@@ -148,6 +148,22 @@ export async function dismissImporterOffer(session: Session): Promise<void> {
   await session.waitForGone(testIdSelector("importer.offer-root"));
 }
 
+/** Dismiss the importer onboarding offer if it is showing, otherwise return
+ *  immediately. The offer is a fresh-vault first-editor overlay; after a
+ *  lock → unlock round-trip on a vault that already has notes it does NOT
+ *  re-appear, so a hard `dismissImporterOffer` would time out. Use this on the
+ *  second-and-later editor mounts of a scenario. */
+export async function dismissImporterOfferIfPresent(session: Session): Promise<void> {
+  let dismiss;
+  try {
+    dismiss = await session.byTestId("importer.offer-dismiss", { timeoutMs: 2_000 });
+  } catch {
+    return; // no offer this mount — nothing to dismiss
+  }
+  await dismiss.click();
+  await session.waitForGone(testIdSelector("importer.offer-root"));
+}
+
 /** Open the Settings modal from the editor's gear button and wait for
  *  the dialog root. Optionally switch to a rail tab (the modal always
  *  opens on Account). */

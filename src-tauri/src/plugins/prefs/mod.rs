@@ -98,6 +98,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::upsert_saved_view,
             commands::delete_saved_view,
             commands::set_view_order,
+            commands::set_right_panel_active_tab,
+            commands::set_right_panel_hidden_tabs,
+            commands::set_right_panel_tab_order,
         ])
         .build()
 }

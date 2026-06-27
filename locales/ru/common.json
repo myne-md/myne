@@ -616,6 +616,13 @@
       "noNotesToOpen": "Нет заметок для открытия.",
       "resizeBacklinksSidebar": "Изменить размер панели обратных ссылок",
       "resizeNotesSidebar": "Изменить размер панели заметок",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Скрыть панель обратных ссылок",
         "hideNotes": "Скрыть панель заметок",

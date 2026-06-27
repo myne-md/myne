@@ -568,6 +568,13 @@
       "noNotesToOpen": "没有可打开的笔记。",
       "resizeBacklinksSidebar": "调整反向链接侧边栏大小",
       "resizeNotesSidebar": "调整笔记侧边栏大小",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "隐藏反向链接侧边栏",
         "hideNotes": "隐藏笔记侧边栏",

@@ -596,6 +596,13 @@
       "noNotesToOpen": "No hay notas que abrir.",
       "resizeBacklinksSidebar": "Cambiar el tamaño de la barra lateral de retroenlaces",
       "resizeNotesSidebar": "Cambiar el tamaño de la barra lateral de notas",
+      "rightPanel": {
+        "allHidden": "",
+        "outline": {
+          "empty": "",
+          "heading": ""
+        }
+      },
       "sidebarToggle": {
         "hideBacklinks": "Ocultar barra lateral de retroenlaces",
         "hideNotes": "Ocultar barra lateral de notas",
