@@ -1574,6 +1574,31 @@
       "typeToConfirmLabel": "Vahvista kirjoittamalla DELETE",
       "vaultPath": "Holvin polku: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Himmennä ei-aktiiviset rivit",
       "dimHelper": "Tarkennustilassa (⇧⌘F) himmennä kaikki rivit paitsi se, jota muokkaat.",

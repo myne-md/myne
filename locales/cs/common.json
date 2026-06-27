@@ -1680,6 +1680,31 @@
       "typeToConfirmLabel": "Pro potvrzení napište DELETE",
       "vaultPath": "Cesta k trezoru: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Ztlumit neaktivní řádky",
       "dimHelper": "V režimu soustředění (⇧⌘F) ztlumte každý řádek kromě toho, který upravujete.",

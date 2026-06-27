@@ -1541,6 +1541,31 @@
       "typeToConfirmLabel": "확인하려면 DELETE를 입력하세요",
       "vaultPath": "보관함 경로: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "비활성 줄 흐리게",
       "dimHelper": "집중 모드(⇧⌘F)에서 편집 중인 줄을 제외한 모든 줄을 흐리게 표시합니다.",

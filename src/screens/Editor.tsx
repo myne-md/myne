@@ -81,7 +81,7 @@ import {
   createBlankNamedNote,
   resolveTodayNote,
 } from "../notes";
-import { prefsRead } from "../lib/prefs";
+import { prefsRead, normalizeStartupOpen } from "../lib/prefs";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import {
   exportToastAction,
@@ -155,11 +155,15 @@ import { STRIP_HEIGHT } from "../notes/components/TabStrip";
 import type { PaneReadout } from "../notes/components/PaneView";
 import type { DocStats } from "../notes/documentStats";
 import {
+  defaultSlotName,
+  emptyWorkspace,
   findItemPane,
+  openInFocusedTab,
   resolveActiveSlot,
   sameItem,
   shouldFlushWorkspace,
   switchToSlot,
+  wrapAsSingleSlot,
   type SlotId,
   type WorkspaceSlot,
 } from "../notes/workspaceState";
@@ -923,6 +927,13 @@ function EditorChrome({
   // consistency fallback to the first slot when the pointer is stale/missing).
   const restoreContainer = ws.restoreContainer;
   const restoredRef = useRef(false);
+  // MYND-462 — set when the "Default file to open" preference is "empty" or
+  // "specific", i.e. we deliberately did NOT restore the saved workspace this
+  // session. The staging effect reads this to suppress its workspace-blob writes
+  // until the user actively changes the layout, so opening with a non-default
+  // startup and then quitting never clobbers the saved "Last opened" layout on
+  // disk (toggling back to "Last opened" must restore it intact).
+  const nonDefaultStartupRef = useRef(false);
   // Gates the staging effect: until the restore IO settles, staging would
   // push the DEFAULT empty layout, so an immediate post-unlock quit could
   // clobber the saved layout. Holding off means such a quit is a no-op that
@@ -933,19 +944,53 @@ function EditorChrome({
     restoredRef.current = true;
     void (async () => {
       try {
+        // MYND-462 — read the "Default file to open" preference first; it decides
+        // whether we restore the saved workspace at all. `prefsRead` also carries
+        // the MYP1 `active_workspace` pointer used by the "last" branch below.
+        let startupMode = "last";
+        let startupNote: string | null = null;
+        let activePref: SlotId | null = null;
+        try {
+          const prefs = await prefsRead();
+          startupMode = normalizeStartupOpen(prefs.startup_open);
+          startupNote = prefs.startup_open_note;
+          activePref = prefs.active_workspace;
+        } catch {
+          // Pref read failure → fall back to "last" (restore as before).
+        }
+
+        if (startupMode === "empty") {
+          // Ignore the saved workspace; keep the component's default single empty
+          // pane. The blob is NOT cleared — the staging guard below stops a quit
+          // from overwriting it, so toggling back to "Last opened" restores it.
+          nonDefaultStartupRef.current = true;
+          return;
+        }
+
+        if (startupMode === "specific" && startupNote) {
+          // Open just the chosen note in a fresh single-slot workspace (the same
+          // shape `seedWelcomeNote` produces). A deleted / unreadable note simply
+          // surfaces the pane's own missing-note state; we never auto-clear the
+          // pref. The saved workspace blob is preserved (staging guard).
+          nonDefaultStartupRef.current = true;
+          const single = openInFocusedTab(emptyWorkspace(crypto.randomUUID()), {
+            kind: "note",
+            id: startupNote,
+          });
+          restoreContainer(
+            wrapAsSingleSlot(single, crypto.randomUUID(), defaultSlotName()),
+          );
+          return;
+        }
+
+        // "last" (or "specific" with no note set) → restore the saved workspace.
         const descriptor = await workspaceRead();
         if (descriptor === null) return;
         const container = deserializeWorkspaces(descriptor);
         if (container === null) return; // malformed → keep the default container
         // Apply the persisted active-slot pointer (MYP1) against the loaded
         // slots; `resolveActiveSlot` self-heals a stale/missing pointer to the
-        // first slot. `prefsRead` defaults the field to null on any read miss.
-        let activePref: SlotId | null = null;
-        try {
-          activePref = (await prefsRead()).active_workspace;
-        } catch {
-          // Pref read failure → fall back to the container's own activeId.
-        }
+        // first slot.
         const resolvedId = resolveActiveSlot(container.slots, activePref);
         restoreContainer(switchToSlot(container, resolvedId));
       } catch {
@@ -1011,6 +1056,14 @@ function EditorChrome({
   // quit), and the staged change marks the coalesced-flush path dirty.
   useEffect(() => {
     if (!restoreSettled) return; // don't stage the pre-restore default layout
+    // MYND-462 — for a non-default startup ("empty" / "specific") the layout we
+    // mounted is NOT the saved workspace, so skip the FIRST staging pass (which
+    // would overwrite the saved blob on quit), then clear the guard so genuine
+    // user layout edits this session still stage + persist as usual.
+    if (nonDefaultStartupRef.current) {
+      nonDefaultStartupRef.current = false;
+      return;
+    }
     workspaceDirtyRef.current = true;
     void workspaceStage(serializeWorkspaces(ws.workspacesSnapshot())).catch(() => {
       // Best-effort; outside Tauri (browser dev shim) the invoke rejects.

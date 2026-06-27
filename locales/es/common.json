@@ -1627,6 +1627,31 @@
       "typeToConfirmLabel": "Escribe DELETE para confirmar",
       "vaultPath": "Ruta de la bóveda: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Atenuar las líneas inactivas",
       "dimHelper": "En el modo de enfoque (⇧⌘F), atenúa todas las líneas excepto la que estás editando.",

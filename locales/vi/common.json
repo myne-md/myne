@@ -1594,6 +1594,31 @@
       "typeToConfirmLabel": "Gõ DELETE để xác nhận",
       "vaultPath": "Đường dẫn kho: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Làm mờ các dòng không hoạt động",
       "dimHelper": "Trong chế độ tập trung (⇧⌘F), làm mờ mọi dòng trừ dòng bạn đang chỉnh sửa.",

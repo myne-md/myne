@@ -30,6 +30,8 @@ permissions = [
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
+  "allow-set-new-note-location",
+  "allow-set-startup-open",
   "allow-set-editor-text-size",
   "allow-set-editor-line-numbers",
   "allow-set-archive-disabled",
@@ -157,6 +159,21 @@ commands.allow = ["set_daily_folder"]
 identifier = "allow-set-daily-template"
 description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_daily_template"]
+
+# MYND-462 "Files" settings panel: two write setters for the new-note default
+# location pair + the startup-open pair. Both inherit the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
+# grant these to any non-main window. Both atomic-write vault.prefs with no
+# native side-effect; non-load-bearing (no clamp).
+[[permission]]
+identifier = "allow-set-new-note-location"
+description = "Allow invoking prefs:set_new_note_location (Slot::Unlocked-gated setter for the new_note_location mode + new_note_location_folder target pair — root/current/specific, the folder also registered as a deliberate folder when mode is specific; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_new_note_location"]
+
+[[permission]]
+identifier = "allow-set-startup-open"
+description = "Allow invoking prefs:set_startup_open (Slot::Unlocked-gated setter for the startup_open mode + startup_open_note target pair — last/empty/specific; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_startup_open"]
 
 # MYND-184 / MYND-185 sidebar decorations: two write setters for the
 # decoration maps (item_colors = per-item color labels; folder_icons =

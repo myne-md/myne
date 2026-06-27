@@ -1594,6 +1594,31 @@
       "typeToConfirmLabel": "Onaylamak için DELETE yazın",
       "vaultPath": "Kasa yolu: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Etkin olmayan satırları soluklaştır",
       "dimHelper": "Odak modunda (⇧⌘F), düzenlediğiniz satır dışındaki her satırı soluklaştırır.",

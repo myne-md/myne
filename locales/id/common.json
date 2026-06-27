@@ -1541,6 +1541,31 @@
       "typeToConfirmLabel": "Ketik DELETE untuk mengonfirmasi",
       "vaultPath": "Jalur brankas: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Redupkan baris tidak aktif",
       "dimHelper": "Dalam mode fokus (⇧⌘F), redupkan setiap baris kecuali baris yang sedang Anda sunting.",

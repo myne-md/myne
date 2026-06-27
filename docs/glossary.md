@@ -435,6 +435,12 @@ An ordinary `.myn` note representing one calendar day, identified by **folder + 
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07 (MYND-182 / MYND-191)
 
+### **default new-note location** &nbsp; 📦 *Product*
+
+The user preference, exposed in Settings → **Files**, controlling where a newly-created note is filed. Two `vault.prefs` fields carry it (`spec/protocol.md` §9.5.2): **`new_note_location`** — a mode of `root` (the vault root, the default), `current` (the same folder as the currently-active note, derived from its `folder:` frontmatter, falling back to root when no note is selected), or `specific` — and **`new_note_location_folder`**, the canonical trailing-slash target folder used only in `specific` mode (also registered as a [deliberate folder](#deliberate-folder) so it survives empty). The preference applies only to the root-level create paths (⌘N, the palette, "+ New Note", a new tab); an explicit folder target (the folder context-menu "New note here") is authoritative and bypasses it. Non-load-bearing. See [decisions.md](decisions.md) 2026-06-27 (MYND-462).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-27 (MYND-462)
+
 ### **deleted field** &nbsp; 📋 *Protocol*
 
 The Myne-managed canonical frontmatter field `deleted:` — a **value-strict** RFC 3339 UTC timestamp marking a note as a **sync deletion tombstone** (the exact twin of `trashed:`; any non-timestamp value leaves the note live). Under sync a delete is rerouted (`src/notes/deleteNote.ts::deleteNoteRouted` → `tombstoneNote` via `patchDeletedField`) to a `deleted: <now>` version the [vault head](#vault-head) commits, so the deletion **propagates** to other devices and cannot be silently resurrected by the blind server; a local-only delete stays the hard cryptographic-erase `unlink`. Excluded from sidebar / folder-tree / search like `trashed:`; GC'd at the [tombstone horizon](#tombstone-horizon). Rides the existing `.myn` AEAD envelope — no `protocol.md` magic-byte / AAD / version change (MYND-426). Phase 2. See [markdown-dialect.md](spec/markdown-dialect.md) §3.6.1.
@@ -1402,6 +1408,12 @@ Used in: `spec/sync-protocol.md` §11
 The raw-markdown [view mode](#view-mode) of a note tab (MYND-299): the [decoration layer](#decoration-layer) is emptied, so the editor shows the exact on-disk markdown with no rendering — headings keep their `#`s, links show their brackets, nothing is hidden. Because §6 C1 guarantees the editor buffer is byte-identical to the stored `.myn`, Source mode displays exactly the stored bytes. It is editable (unlike [Reading view](#reading-view)) — the writer's surface for inspecting or hand-editing raw syntax. Reached via the command palette or the bottom-bar [view-mode switcher](#view-mode), **not** a default chord (the secondary live ↔ source toggle is deliberately chord-free; `Mod-Shift-E` is reserved for Edit ⇄ Reading). Contrast live preview (cursor-aware reveal) and [Reading view](#reading-view) (rendered, read-only). See also [view mode](#view-mode), [Reading view](#reading-view).
 
 Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
+
+### **startup open** &nbsp; 📦 *Product*
+
+The user preference, exposed in Settings → **Files**, controlling which file opens when the app launches. Two `vault.prefs` fields carry it (`spec/protocol.md` §9.5.2): **`startup_open`** — a mode of `last` (restore the last [workspace slot](#workspace-slot) layout, the default and pre-feature behaviour), `empty` (open a fresh empty editor), or `specific` — and **`startup_open_note`**, the target note UUID used only in `specific` mode. Crucially, choosing `empty`/`specific` does **not** destroy the saved [workspace-state blob](#workspace-state-blob): the session skips restoring it and suppresses workspace staging, so toggling back to `last` restores the prior layout intact. A deleted/unreadable `startup_open_note` falls back to the empty editor; the pref is never auto-cleared. Non-load-bearing. Note: semantically overlaps the (currently mock) Privacy "Continue where you left off" toggle — a flagged follow-up. See [decisions.md](decisions.md) 2026-06-27 (MYND-462).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-27 (MYND-462)
 
 ### **state-level actor** &nbsp; ⚠️ *Threat*
 

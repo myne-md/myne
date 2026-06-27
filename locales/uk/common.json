@@ -1680,6 +1680,31 @@
       "typeToConfirmLabel": "Введіть DELETE для підтвердження",
       "vaultPath": "Шлях до сейфа: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Притлумлювати неактивні рядки",
       "dimHelper": "У режимі фокусування (⇧⌘F) притлумлювати кожен рядок, окрім того, який ви редагуєте.",

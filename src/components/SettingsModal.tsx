@@ -32,6 +32,7 @@ import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import { AppearancePanel } from "./settings/AppearancePanel";
 import { EditorPanel } from "./settings/EditorPanel";
+import { FilesPanel } from "./settings/FilesPanel";
 import { HotkeysPanel } from "./settings/HotkeysPanel";
 import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
@@ -39,15 +40,17 @@ import { SyncPanel } from "./settings/SyncPanel";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 
 /**
- * Six-panel taxonomy. The Editor panel was added (and Appearance scoped down
- * to purely-visual controls) by the `decisions.md` entry superseding the
- * 2026-05-08 5-panel lock.
+ * Panel taxonomy. The Editor panel was added (and Appearance scoped down to
+ * purely-visual controls) by the `decisions.md` entry superseding the
+ * 2026-05-08 5-panel lock; the Files panel (note-storage + startup behaviour,
+ * MYND-462) was added by a further superseding `decisions.md` entry.
  */
 type PanelId =
   | "account"
   | "privacy"
   | "sync"
   | "editor"
+  | "files"
   | "hotkeys"
   | "appearance"
   | "storage"
@@ -65,6 +68,7 @@ const PANELS: readonly PanelMeta[] = [
   { id: "privacy", labelKey: "settings.shell.panels.privacy" },
   { id: "sync", labelKey: "settings.shell.panels.sync" },
   { id: "editor", labelKey: "settings.shell.panels.editor" },
+  { id: "files", labelKey: "settings.shell.panels.files" },
   { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys" },
   { id: "appearance", labelKey: "settings.shell.panels.appearance" },
   { id: "storage", labelKey: "settings.shell.panels.storage" },
@@ -245,6 +249,7 @@ export function SettingsModal({
     privacy: null,
     sync: null,
     editor: null,
+    files: null,
     hotkeys: null,
     appearance: null,
     storage: null,
@@ -315,6 +320,7 @@ export function SettingsModal({
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     sync: <SyncPanel />,
     editor: <EditorPanel />,
+    files: <FilesPanel />,
     hotkeys: <HotkeysPanel />,
     appearance: <AppearancePanel />,
     storage: (

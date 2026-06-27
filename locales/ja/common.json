@@ -1537,6 +1537,31 @@
       "typeToConfirmLabel": "確認のためDELETEと入力",
       "vaultPath": "保管庫のパス：{{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "非アクティブな行を暗くする",
       "dimHelper": "フォーカスモード（⇧⌘F）では、編集中の行以外をすべて暗く表示します。",

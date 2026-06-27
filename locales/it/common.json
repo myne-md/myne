@@ -1627,6 +1627,31 @@
       "typeToConfirmLabel": "Digita DELETE per confermare",
       "vaultPath": "Percorso della cassaforte: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Attenua le righe inattive",
       "dimHelper": "In modalità concentrazione (⇧⌘F), attenua ogni riga tranne quella che stai modificando.",

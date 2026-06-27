@@ -1675,6 +1675,31 @@
       "typeToConfirmLabel": "Wpisz DELETE, aby potwierdzić",
       "vaultPath": "Ścieżka skarbca: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Przyciemnij nieaktywne wiersze",
       "dimHelper": "W trybie skupienia (⇧⌘F) przyciemniaj każdy wiersz oprócz tego, który edytujesz.",

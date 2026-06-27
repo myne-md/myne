@@ -1574,6 +1574,31 @@
       "typeToConfirmLabel": "Πληκτρολογήστε DELETE για επιβεβαίωση",
       "vaultPath": "Διαδρομή θησαυροφυλακίου: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Αμυδρές ανενεργές γραμμές",
       "dimHelper": "Στη λειτουργία εστίασης (⇧⌘F), κάντε αμυδρή κάθε γραμμή εκτός από αυτή που επεξεργάζεστε.",

@@ -35,6 +35,44 @@ export interface EditorLayout {
  */
 export type ThemeChoice = "light" | "dark" | "amoled";
 
+/**
+ * New-note default-location mode (MYND-462, "Files" settings panel). Mirrors the
+ * free `Option<String>` stored in `new_note_location`; the client owns the
+ * closed enum + unknown→default mapping ({@link normalizeNewNoteLocation}).
+ * `"root"` = vault root, `"current"` = the active note's folder, `"specific"` =
+ * the folder in {@link PrefsView.new_note_location_folder}.
+ */
+export type NewNoteLocation = "root" | "current" | "specific";
+
+/** Canonical default for {@link PrefsView.new_note_location} when unset. */
+export const DEFAULT_NEW_NOTE_LOCATION: NewNoteLocation = "root";
+
+/** Map a stored / unknown `new_note_location` value to a valid mode. */
+export function normalizeNewNoteLocation(value: string | null): NewNoteLocation {
+  return value === "current" || value === "specific" || value === "root"
+    ? value
+    : DEFAULT_NEW_NOTE_LOCATION;
+}
+
+/**
+ * Startup-open mode (MYND-462, "Files" settings panel). Mirrors the free
+ * `Option<String>` stored in `startup_open`; the client owns the closed enum +
+ * unknown→default mapping ({@link normalizeStartupOpen}). `"last"` = restore the
+ * last workspace layout, `"empty"` = fresh empty editor, `"specific"` = open the
+ * note in {@link PrefsView.startup_open_note}.
+ */
+export type StartupOpen = "last" | "empty" | "specific";
+
+/** Canonical default for {@link PrefsView.startup_open} when unset. */
+export const DEFAULT_STARTUP_OPEN: StartupOpen = "last";
+
+/** Map a stored / unknown `startup_open` value to a valid mode. */
+export function normalizeStartupOpen(value: string | null): StartupOpen {
+  return value === "empty" || value === "specific" || value === "last"
+    ? value
+    : DEFAULT_STARTUP_OPEN;
+}
+
 /** Mirrors `protocol::PrefsView` (Rust side). */
 /** View render type (MYND-273, Saved Views). `map` is deliberately absent —
  *  it needs a Maps plugin and is not representable in v1. Mirrors Rust
@@ -140,6 +178,44 @@ export interface PrefsView {
    * locked-export wrinkle). Serialized from Rust `Option<u64>`.
    */
   last_backup_at: number | null;
+  /**
+   * New-note default-location MODE (MYND-462, "Files" settings panel) —
+   * {@link NewNoteLocation}: `"root"` (vault root), `"current"` (the active
+   * note's folder), or `"specific"` (the folder named by
+   * {@link PrefsView.new_note_location_folder}). `null` ≡ the default `"root"`,
+   * applied client-side. A free enum string on the wire (Rust `Option<String>`);
+   * the client validates + maps an unknown value to the default. Omitted from the
+   * encrypted blob when `null`. Non-load-bearing. Write via
+   * {@link setNewNoteLocation}.
+   */
+  new_note_location: string | null;
+  /**
+   * Target folder (canonical trailing-slash form) for new notes when
+   * {@link PrefsView.new_note_location} is `"specific"` (MYND-462). `null`
+   * otherwise. Designating it also registers the folder in `deliberate_folders`
+   * so it survives empty. Serialized from Rust `Option<String>`; omitted when
+   * `null`.
+   */
+  new_note_location_folder: string | null;
+  /**
+   * Startup-open MODE (MYND-462, "Files" settings panel) — {@link StartupOpen}:
+   * `"last"` (restore the last workspace layout — the pre-feature behaviour),
+   * `"empty"` (open a fresh empty editor), or `"specific"` (open the note named
+   * by {@link PrefsView.startup_open_note}). `null` ≡ the default `"last"`,
+   * applied client-side. A free enum string on the wire (Rust `Option<String>`);
+   * the client validates + maps an unknown value to the default. Omitted from the
+   * encrypted blob when `null`. Non-load-bearing. Write via
+   * {@link setStartupOpen}.
+   */
+  startup_open: string | null;
+  /**
+   * Target note UUID for startup when {@link PrefsView.startup_open} is
+   * `"specific"` (MYND-462). `null` otherwise. A stale / deleted UUID falls back
+   * to the empty editor client-side (the pref is never auto-cleared on a
+   * transient read miss). Serialized from Rust `Option<String>`; omitted when
+   * `null`.
+   */
+  startup_open_note: string | null;
   /**
    * Deliberately-created folder paths (canonical trailing-slash form) that
    * persist independently of whether any note carries them — the carrier for
@@ -511,6 +587,42 @@ export async function setDailyFolder(folder: string): Promise<void> {
  */
 export async function setDailyTemplate(templateId: string | null): Promise<void> {
   await invoke<void>("plugin:prefs|set_daily_template", { templateId });
+}
+
+/**
+ * Set the new-note default-location pair (MYND-462, "Files" settings panel) —
+ * `location` is the mode ({@link NewNoteLocation}: `"root"`/`"current"`/
+ * `"specific"`, or `null` to clear to the `"root"` default), and `folder` is the
+ * canonical trailing-slash target folder used only when `location === "specific"`
+ * (pass `null` otherwise). When a folder is given the backend also registers it
+ * in `deliberate_folders` so it survives empty. Disk-first, no native
+ * side-effect; a rejected promise means the write failed.
+ *
+ * Bumps the prefs nonce after a successful write so the sidebar's note-creation
+ * path — which reads the location pref through its OWN `usePrefs` instance,
+ * separate from the Settings modal's — sees the new value immediately.
+ */
+export async function setNewNoteLocation(
+  location: string | null,
+  folder: string | null,
+): Promise<void> {
+  await invoke<void>("plugin:prefs|set_new_note_location", { location, folder });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set the startup-open pair (MYND-462, "Files" settings panel) — `mode` is the
+ * startup behaviour ({@link StartupOpen}: `"last"`/`"empty"`/`"specific"`, or
+ * `null` to clear to the `"last"` default), and `note` is the target note UUID
+ * used only when `mode === "specific"` (pass `null` otherwise). Disk-first, no
+ * native side-effect; a rejected promise means the write failed.
+ */
+export async function setStartupOpen(
+  mode: string | null,
+  note: string | null,
+): Promise<void> {
+  await invoke<void>("plugin:prefs|set_startup_open", { mode, note });
+  bumpPrefsNonce();
 }
 
 /**

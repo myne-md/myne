@@ -1297,6 +1297,68 @@ pub(crate) async fn set_daily_template_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the new-note default-location pair (MYND-462,
+/// "Files" settings panel) — `new_note_location` (the mode: root/current/specific)
+/// + `new_note_location_folder` (the target folder when mode == "specific"). Set
+/// atomically in one disk write so the mode and target never desync. When a
+/// folder is supplied it is ALSO registered as a deliberate folder (union,
+/// exact-dedup) so the target survives empty (the `set_daily_folder` discipline,
+/// MYND-144). The caller passes `folder = None` whenever `location != "specific"`.
+/// Read-modify-write under the write mutex; no native side-effect; disk-first;
+/// non-load-bearing.
+#[tauri::command]
+pub async fn set_new_note_location<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    location: Option<String>,
+    folder: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_new_note_location_with_dir(&dir, state.inner(), location, folder).await
+}
+
+/// Testable core of [`set_new_note_location`].
+pub(crate) async fn set_new_note_location_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    location: Option<String>,
+    folder: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.new_note_location = location;
+    prefs.new_note_location_folder = folder.clone();
+    // When a specific target folder is named, register it as a deliberate folder
+    // so it survives empty (MYND-144) — exactly like set_daily_folder.
+    if let Some(folder) = folder {
+        if !prefs.deliberate_folders.contains(&folder) {
+            prefs.deliberate_folders.push(folder);
+        }
+    }
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Field name only — never the path (folder structure is AS3 Sensitive; see
+    // ../../CLAUDE.md "Secret-handling logging discipline").
+    tracing::info!(event = "prefs_written", field = "new_note_location");
+    Ok(())
+}
+
 /// Shared read-modify-write core for the four editor-typography string presets
 /// (editor-typography: `editor_text_size` / `editor_line_spacing` /
 /// `editor_content_width` / `editor_font_family`). Each is a free
@@ -1395,6 +1457,39 @@ pub async fn set_editor_font_family<R: Runtime>(
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_typography_field_with_dir(&dir, state.inner(), "editor_font_family", |p| {
         p.editor_font_family = value;
+    })
+    .await
+}
+
+/// Slot::Unlocked-gated setter for the startup-open pair (MYND-462, "Files"
+/// settings panel) — `startup_open` (the mode: last/empty/specific) +
+/// `startup_open_note` (the target note UUID when mode == "specific"). Set
+/// atomically in one disk write (via the shared typography core) so the mode and
+/// target never desync. No deliberate-folder side-effect (a note pointer, not a
+/// folder). The caller passes `note = None` whenever `mode != "specific"`.
+/// Disk-first; non-load-bearing.
+#[tauri::command]
+pub async fn set_startup_open<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    mode: Option<String>,
+    note: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_startup_open_with_dir(&dir, state.inner(), mode, note).await
+}
+
+/// Testable core of [`set_startup_open`]. Writes the `startup_open` mode +
+/// `startup_open_note` target atomically via the shared typography core.
+pub(crate) async fn set_startup_open_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    mode: Option<String>,
+    note: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_typography_field_with_dir(vault_dir, state, "startup_open", |p| {
+        p.startup_open = mode;
+        p.startup_open_note = note;
     })
     .await
 }
@@ -2040,9 +2135,13 @@ mod tests {
                     editor_text_size: None,
                     label: None,
                     last_backup_at: None,
+                    new_note_location: None,
+                    new_note_location_folder: None,
                     paired_extensions: Vec::new(),
                     spell_enabled: None,
                     spell_languages: Vec::new(),
+                    startup_open: None,
+                    startup_open_note: None,
                     saved_views: Vec::new(),
                     view_order: Vec::new(),
                 },
@@ -2269,6 +2368,104 @@ mod tests {
                 .await
                 .expect("read after clear");
             assert!(cleared.deliberate_folders.is_empty());
+        });
+    }
+
+    // ---- "Files" panel setters (MYND-462) -----------------------------
+
+    #[test]
+    fn set_new_note_location_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-newnote-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_new_note_location_with_dir(tmp.path(), &state, Some("root".to_string()), None)
+                    .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_startup_open_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-startup-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_startup_open_with_dir(tmp.path(), &state, Some("last".to_string()), None).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn new_note_location_specific_registers_deliberate_folder() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
+
+            // "specific" mode with a target folder: the pair round-trips AND the
+            // folder is registered as a deliberate folder so it survives empty.
+            set_new_note_location_with_dir(
+                tmp.path(),
+                &state,
+                Some("specific".to_string()),
+                Some("Inbox/".to_string()),
+            )
+            .await
+            .expect("write must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read must succeed after write");
+            assert_eq!(view.new_note_location.as_deref(), Some("specific"));
+            assert_eq!(view.new_note_location_folder.as_deref(), Some("Inbox/"));
+            assert!(view.deliberate_folders.contains(&"Inbox/".to_string()));
+
+            // Switching back to "root" clears the target (caller passes None).
+            set_new_note_location_with_dir(tmp.path(), &state, Some("root".to_string()), None)
+                .await
+                .expect("second write must succeed");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after second write");
+            assert_eq!(view.new_note_location.as_deref(), Some("root"));
+            assert_eq!(view.new_note_location_folder, None);
+            // The deliberate folder persists (designating then un-designating a
+            // folder does not delete it — the daily_folder discipline).
+            assert!(view.deliberate_folders.contains(&"Inbox/".to_string()));
+        });
+    }
+
+    #[test]
+    fn startup_open_specific_round_trips_through_disk() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
+
+            set_startup_open_with_dir(
+                tmp.path(),
+                &state,
+                Some("specific".to_string()),
+                Some("0192f1a0-0000-7000-8000-000000000000".to_string()),
+            )
+            .await
+            .expect("write must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read must succeed after write");
+            assert_eq!(view.startup_open.as_deref(), Some("specific"));
+            assert_eq!(
+                view.startup_open_note.as_deref(),
+                Some("0192f1a0-0000-7000-8000-000000000000")
+            );
+
+            // "empty" mode clears the note pointer (caller passes None).
+            set_startup_open_with_dir(tmp.path(), &state, Some("empty".to_string()), None)
+                .await
+                .expect("second write must succeed");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after second write");
+            assert_eq!(view.startup_open.as_deref(), Some("empty"));
+            assert_eq!(view.startup_open_note, None);
         });
     }
 

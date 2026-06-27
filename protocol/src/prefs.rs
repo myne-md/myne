@@ -604,6 +604,35 @@ pub struct PrefsView {
     #[serde(default)]
     pub last_backup_at: Option<u64>,
 
+    /// Default location for newly-created notes (MYND-462, "Files" settings
+    /// panel) — the MODE: `root` (vault root), `current` (the active note's
+    /// folder), or `specific` (the folder named by
+    /// [`PrefsView::new_note_location_folder`]). `None` ≡ the canonical default
+    /// `root`, applied host-side. A closed enum string stored as a free
+    /// `Option<String>` — the enum interpretation + unknown→default fallback live
+    /// on the client (the `editor_default_view_mode` precedent class, no
+    /// codec-level validation). Omitted entirely from the canonical JSON when
+    /// `None`, so a vault that never customized the new-note location is
+    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
+    /// unaffected — migration-less additive field on `MYP1`). **Non-load-bearing**
+    /// (a tampered / replayed value can at worst place a new note in the wrong
+    /// folder) — no protective-envelope clamp. Canonical key `new_note_location` —
+    /// sorts after `last_backup_at` (`l` < `n`), before `new_note_location_folder`
+    /// (prefix) and `paired_extensions` (`n` < `p`).
+    #[serde(default)]
+    pub new_note_location: Option<alloc::string::String>,
+
+    /// Target folder (canonical trailing-slash form) for new notes when
+    /// [`PrefsView::new_note_location`] is `specific` (MYND-462). `None` otherwise
+    /// (and `None` ≡ no target → the host falls back to root). Designating a
+    /// folder here also registers it as a deliberate folder host-side (the
+    /// `daily_folder` discipline) so it survives empty. Omitted entirely from the
+    /// canonical JSON when `None`. **Non-load-bearing** — no clamp. Canonical key
+    /// `new_note_location_folder` — sorts immediately after `new_note_location`
+    /// (prefix extension), before `paired_extensions` (`n` < `p`).
+    #[serde(default)]
+    pub new_note_location_folder: Option<alloc::string::String>,
+
     /// Spell-check enabled toggle (MYND-267, spell-checker epic). `None` ≡
     /// unset → the host applies the default-ON policy (SYNC-15) at read time.
     /// Omitted entirely from the canonical JSON when `None`, so a vault that
@@ -625,6 +654,33 @@ pub struct PrefsView {
     /// key `spell_languages` — sorts after `spell_enabled`, before `theme`.
     #[serde(default)]
     pub spell_languages: Vec<String>,
+
+    /// Which file opens on app startup (MYND-462, "Files" settings panel) — the
+    /// MODE: `last` (restore the last workspace layout — the pre-feature
+    /// behaviour), `empty` (open a fresh empty editor), or `specific` (open the
+    /// note named by [`PrefsView::startup_open_note`]). `None` ≡ the canonical
+    /// default `last`, applied host-side. A closed enum string stored as a free
+    /// `Option<String>` — the enum interpretation + unknown→default fallback live
+    /// on the client (the `editor_default_view_mode` precedent class). Omitted
+    /// entirely from the canonical JSON when `None`, so a vault that never changed
+    /// the startup behaviour is byte-identical to a pre-feature `vault.prefs`.
+    /// **Non-load-bearing** (a tampered / replayed value can at worst open the
+    /// wrong note or an empty editor; the saved workspace is never destroyed) — no
+    /// protective-envelope clamp. Canonical key `startup_open` — sorts after
+    /// `spell_languages` (`spe` < `sta`), before `startup_open_note` (prefix) and
+    /// `theme` (`sta` < `the`).
+    #[serde(default)]
+    pub startup_open: Option<alloc::string::String>,
+
+    /// Target note UUID for startup when [`PrefsView::startup_open`] is `specific`
+    /// (MYND-462). `None` otherwise. A stale / deleted UUID falls back to the
+    /// empty editor host-side (the pref is never auto-cleared on a transient read
+    /// miss). Omitted entirely from the canonical JSON when `None`.
+    /// **Non-load-bearing** — no clamp. Canonical key `startup_open_note` — sorts
+    /// immediately after `startup_open` (prefix extension), before `theme`
+    /// (`sta` < `the`).
+    #[serde(default)]
+    pub startup_open_note: Option<alloc::string::String>,
 
     /// Browser-clipper paired-extension records (MYND-443,
     /// `ext-foundation-handoff` task 7) — the on-disk projection of the
@@ -720,9 +776,13 @@ impl Default for PrefsView {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         }
@@ -1133,6 +1193,28 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // new_note_location (canonical key 'n' — after last_backup_at [l < n], before
+    // new_note_location_folder [prefix] and paired_extensions [n < p], MYND-462).
+    // The new-note default-location MODE (root/current/specific); omitted entirely
+    // when None so a vault that never set it is byte-identical to a pre-feature
+    // vault.prefs (preserves existing KAT vectors). Trailing comma like
+    // last_backup_at (screen_capture_protection is mandatory and canonically
+    // later).
+    if let Some(ref v) = prefs.new_note_location {
+        out.extend_from_slice(b"\"new_note_location\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+
+    // new_note_location_folder (canonical key 'new_note_location_f…' — immediately
+    // after new_note_location, before paired_extensions, MYND-462). The target
+    // folder when new_note_location == "specific"; omitted entirely when None.
+    if let Some(ref v) = prefs.new_note_location_folder {
+        out.extend_from_slice(b"\"new_note_location_folder\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+
     // paired_extensions (canonical key 'p' — after last_backup_at [l < p], before
     // saved_views [p < sav]). A nested array of canonical PairedExtension objects,
     // sorted by (extension_id, token_value) (MYND-443); omitted entirely when empty
@@ -1199,6 +1281,24 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
             push_json_string(&mut out, lang);
         }
         out.push(b']');
+    }
+
+    // startup_open (canonical key 'sta…' — after spell_languages [spl < sta],
+    // before startup_open_note [prefix] and theme [sta < the], MYND-462). The
+    // startup-open MODE (last/empty/specific); leading comma like theme. Omitted
+    // entirely when None so a vault that never changed startup behaviour is
+    // byte-identical to a pre-feature vault.prefs (preserves existing KAT vectors).
+    if let Some(ref v) = prefs.startup_open {
+        out.extend_from_slice(b",\"startup_open\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
+    }
+
+    // startup_open_note (canonical key 'startup_open_n…' — immediately after
+    // startup_open, before theme, MYND-462). The target note UUID when
+    // startup_open == "specific"; leading comma; omitted entirely when None.
+    if let Some(ref v) = prefs.startup_open_note {
+        out.extend_from_slice(b",\"startup_open_note\":");
+        push_json_string(&mut out, &v.nfc().collect::<String>());
     }
 
     // theme (canonical key 't' — LAST, after 's'). Omitted entirely when
@@ -1517,6 +1617,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // spec § 9.5.2 float ban (screen_capture_protection is mandatory and
     // canonically later, so a comma always follows a well-formed value).
     let last_backup_at = parse_optional_uint64_field(rest, &mut cursor, b"\"last_backup_at\":")?;
+    // new_note_location + new_note_location_folder (keys 'n' — after
+    // last_backup_at [l < n], before paired_extensions [n < p], MYND-462). Parsed
+    // from the same monotonic cursor so a later field's key marker is never
+    // matched inside a folder path value.
+    let new_note_location =
+        parse_optional_string_field(rest, &mut cursor, b"\"new_note_location\":")?;
+    let new_note_location_folder =
+        parse_optional_string_field(rest, &mut cursor, b"\"new_note_location_folder\":")?;
     // paired_extensions (key 'p' — after last_backup_at [l < p], before
     // saved_views [p < sav], MYND-443). A nested array of canonical
     // PairedExtension objects; parsed from the same monotonic cursor so the
@@ -1579,6 +1687,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // array located by marker in the post-screen_capture_protection region, like
     // theme/spell. Absent → empty; present-but-malformed → PlaintextParseFailed.
     let view_order = parse_optional_array_marker(after_key, b"\"view_order\":")?;
+    // startup_open + startup_open_note (keys 'sta…' — between spell_languages and
+    // theme in canonical order, MYND-462). Located by marker in the
+    // post-screen_capture_protection region like theme/spell. Tolerant: an absent
+    // key OR a non-string value decodes to None (the editor_default_view_mode /
+    // theme forward-compat discipline — both are non-load-bearing, None ≡ host
+    // default).
+    let startup_open = parse_optional_string_marker(after_key, b"\"startup_open\":");
+    let startup_open_note = parse_optional_string_marker(after_key, b"\"startup_open_note\":");
 
     Ok(PrefsView {
         screen_capture_protection,
@@ -1610,6 +1726,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         theme,
         label,
         last_backup_at,
+        new_note_location,
+        new_note_location_folder,
+        startup_open,
+        startup_open_note,
         paired_extensions,
         spell_enabled,
         spell_languages,
@@ -1685,6 +1805,20 @@ fn parse_optional_bool_marker(region: &[u8], marker: &[u8]) -> Option<bool> {
     let idx = find_subslice(region, marker)?;
     let after = &region[idx + marker.len()..];
     parse_json_bool(after).map(|(v, _rest)| v)
+}
+
+/// Tolerant OPTIONAL string field located by `marker` in `region` (the
+/// post-screen_capture_protection sibling of [`parse_optional_string_field`], for
+/// the `startup_open*` fields, MYND-462). Returns `None` when the key is absent
+/// or the value is not a well-formed JSON string — treated as an unknown / unset
+/// field (forward-compat, spec § 9.5.2) rather than a parse failure, because the
+/// startup fields are non-load-bearing (`None` ≡ host default `last`). Located by
+/// `find_subslice` so a future field sorting between
+/// `screen_capture_protection` and this key cannot hide it.
+fn parse_optional_string_marker(region: &[u8], marker: &[u8]) -> Option<String> {
+    let idx = find_subslice(region, marker)?;
+    let after = &region[idx + marker.len()..];
+    parse_json_string(after).map(|(v, _consumed)| v)
 }
 
 /// OPTIONAL set-semantics string-array field located by `marker` in `region`
@@ -2345,9 +2479,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -2387,9 +2525,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -2552,9 +2694,13 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                new_note_location: None,
+                new_note_location_folder: None,
                 paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                startup_open: None,
+                startup_open_note: None,
                 saved_views: Vec::new(),
                 view_order: Vec::new(),
             }
@@ -2596,9 +2742,13 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                new_note_location: None,
+                new_note_location_folder: None,
                 paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                startup_open: None,
+                startup_open_note: None,
                 saved_views: Vec::new(),
                 view_order: Vec::new(),
             }
@@ -2863,6 +3013,71 @@ mod tests {
         assert!(
             cw < ff && ff < el && el < ln && ln < ls && ls < ts,
             "canonical order: {s}"
+        );
+    }
+
+    #[test]
+    fn files_panel_fields_round_trip_through_decode() {
+        // MYND-462 — new_note_location(+folder) and startup_open(+note) round-trip
+        // through a full encode/decode, both the mode-only and mode+target forms.
+        let original = PrefsView {
+            new_note_location: Some(alloc::string::String::from("specific")),
+            new_note_location_folder: Some(alloc::string::String::from("Inbox/")),
+            startup_open: Some(alloc::string::String::from("specific")),
+            startup_open_note: Some(alloc::string::String::from(
+                "0192f1a0-0000-7000-8000-000000000000",
+            )),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn files_panel_fields_omitted_when_none_byte_identical_to_pre_feature() {
+        // A vault that never touched the Files-panel settings encodes byte-
+        // identically to the bare pre-feature form (migration-less additive
+        // fields — existing golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView {
+            new_note_location: None,
+            new_note_location_folder: None,
+            startup_open: None,
+            startup_open_note: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn files_panel_fields_canonical_key_positions() {
+        // new_note_location(+folder) sort after last_backup_at, before
+        // paired_extensions (before screen_capture_protection); startup_open(+note)
+        // sort after spell_languages, before theme (after screen_capture_protection).
+        let prefs = PrefsView {
+            last_backup_at: Some(42),
+            new_note_location: Some(alloc::string::String::from("current")),
+            new_note_location_folder: Some(alloc::string::String::from("Notes/")),
+            spell_languages: alloc::vec![alloc::string::String::from("en-US")],
+            startup_open: Some(alloc::string::String::from("empty")),
+            startup_open_note: Some(alloc::string::String::from("x")),
+            theme: Some(ThemeChoice::Dark),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        let s = core::str::from_utf8(&encoded).unwrap();
+        let lba = s.find("last_backup_at").unwrap();
+        let nnl = s.find("new_note_location\"").unwrap();
+        let nnf = s.find("new_note_location_folder").unwrap();
+        let scp = s.find("screen_capture_protection").unwrap();
+        let spl = s.find("spell_languages").unwrap();
+        let sto = s.find("startup_open\"").unwrap();
+        let stn = s.find("startup_open_note").unwrap();
+        let thm = s.find("theme").unwrap();
+        assert!(lba < nnl && nnl < nnf && nnf < scp, "new_note_* order: {s}");
+        assert!(
+            scp < spl && spl < sto && sto < stn && stn < thm,
+            "startup_* order: {s}"
         );
     }
 
@@ -3324,9 +3539,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -3601,9 +3820,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -3650,9 +3873,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -3697,9 +3924,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -3743,9 +3974,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -3852,9 +4087,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -3926,9 +4165,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -3979,9 +4222,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4067,9 +4314,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4131,9 +4382,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4242,9 +4497,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4288,9 +4547,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4336,9 +4599,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4452,9 +4719,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4542,9 +4813,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4822,9 +5097,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -4872,9 +5151,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
@@ -5183,9 +5466,13 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                new_note_location: None,
+                new_note_location_folder: None,
                 paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                startup_open: None,
+                startup_open_note: None,
                 saved_views: Vec::new(),
                 view_order: Vec::new(),
             },
@@ -5226,9 +5513,13 @@ mod tests {
                 editor_text_size: None,
                 label: None,
                 last_backup_at: None,
+                new_note_location: None,
+                new_note_location_folder: None,
                 paired_extensions: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
+                startup_open: None,
+                startup_open_note: None,
                 saved_views: Vec::new(),
                 view_order: Vec::new(),
             },
@@ -5288,9 +5579,13 @@ mod tests {
             editor_text_size: None,
             label: None,
             last_backup_at: None,
+            new_note_location: None,
+            new_note_location_folder: None,
             paired_extensions: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
+            startup_open: None,
+            startup_open_note: None,
             saved_views: Vec::new(),
             view_order: Vec::new(),
         };
