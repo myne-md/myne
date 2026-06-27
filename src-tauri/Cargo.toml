@@ -116,7 +116,7 @@ rustls-pki-types = "1"
 # features (chrono/jiff/rayon/time — date-object + parallel-parse
 # conveniences) disabled: the stamper needs parse + content append + full
 # rewrite save only. MIT.
-lopdf = { version = "0.41.0", default-features = false }
+lopdf = { version = "0.42.0", default-features = false }
 
 # Attachment text extraction for search (MYND-328). DOCX is an OOXML zip whose
 # text lives in `word/document.xml`; `zip` unpacks that one member and
