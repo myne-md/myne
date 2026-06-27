@@ -12,6 +12,10 @@ when:
   - event: push
     branch: [develop, main]
   - event: pull_request
+  # Allow re-triggering the whole pipeline by hand from the Woodpecker UI
+  # ("Run pipeline" / manual trigger). Without a matching `manual` event the
+  # UI submits an empty pipeline (no step matches) and the run is rejected.
+  - event: manual
 
 steps:
   # ─── Rust formatting ─────────────────────────────────────────
