@@ -29,9 +29,16 @@ export type VisibleRow =
     }
   | { kind: "note"; key: string; id: NoteId; depth: number };
 
-/** A folder is "empty" (rendered dimmed, no disclosure) when it has no children and no notes. */
+/** A folder is "empty" (rendered dimmed, no disclosure) when it has no children,
+ *  no notes, and no folder note. A folder whose only content is its (hidden,
+ *  excluded-from-`noteIds`) index note is NOT empty — it stays a normal,
+ *  double-clickable row (MYND-370). */
 function isEmptyFolder(node: FolderNode): boolean {
-  return node.children.length === 0 && node.noteIds.length === 0;
+  return (
+    node.children.length === 0 &&
+    node.noteIds.length === 0 &&
+    node.indexNoteId === null
+  );
 }
 
 /**

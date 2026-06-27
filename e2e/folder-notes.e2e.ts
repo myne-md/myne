@@ -1,21 +1,29 @@
 // Folder notes (index notes) end-to-end suite (MYND-370).
 //
-// Pins the folder-note lifecycle against the production binary, exercising the
-// real chain a user walks: designate an in-folder note as that folder's index
-// via the note context menu → an index badge marks its sidebar row → the folder
-// row's affordance opens the index note → a folder-target wikilink `[[Folder/]]`
-// resolves to a live (non-broken) chip → removing the designation drops the
-// badge. These are the integrations that can only be checked against the running
-// binary: the `setFolderIndex` / `unsetFolderIndex` IPC round-trip, the derived
-// folder tree's index wiring, and the editor's live wikilink resolution over the
-// real note-set.
+// Pins the REWORKED folder-note lifecycle (decisions.md 2026-06-27) against the
+// production binary:
+//   • the folder note is HIDDEN from the sidebar tree — designating an in-folder
+//     note its folder's index makes its row disappear (no separate row, no badge);
+//   • DOUBLE-CLICKING the folder opens the (hidden) index note, and double-clicking
+//     a folder that has none CREATES + opens one — exactly one per folder;
+//   • a folder-target wikilink `[[Folder/]]` still resolves to the hidden index
+//     note (resolver projects from `resolverCache`, which keeps folder notes);
+//   • undesignate now lives on the FOLDER context menu (`folder.remove-index`) —
+//     the note's own row is unreachable once hidden — and re-reveals the row;
+//   • the per-note "Set as folder note" action is gated to a folder with no index
+//     yet (single-enforcement), so a sibling note can't designate a second.
+//
+// These are the integrations that can only be checked against the running binary:
+// the `setFolderIndex`/`unsetFolderIndex`/`createFolderNote` IPC round-trips, the
+// derived folder tree's index wiring + row hiding, the double-click open gesture,
+// and the editor's live wikilink resolution over the real note-set.
 //
 // Note titles / bodies here are in-source scenario constants (accepted SYNC-13
 // exception — note content, never a credential; no password or phrase appears in
 // any assert below).
 //
-// Vault-count precondition: 1 (weak KDF generator fixture — legal: unlock reads
-// params from vault.meta).
+// Vault-count precondition: 1 per scenario (weak KDF generator fixture — legal:
+// unlock reads params from vault.meta).
 //
 // VERIFICATION STATUS: authored to the harness conventions but NOT yet run on
 // this dev platform (macOS; the suite is Linux/tauri-driver only — `pnpm
@@ -27,6 +35,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  createNote,
   dismissImporterOffer,
   editorText,
   typeIntoEditor,
@@ -55,6 +64,30 @@ async function contextMenuPick(
   ).click();
 }
 
+/** Open `target`'s context menu, return whether it offers `itemId`, then dismiss
+ *  the menu via an outside click (CodeMirror content — far from the sidebar menu,
+ *  so the document-level outside-mousedown handler closes it). Waits on an
+ *  always-present anchor item first so the check never races menu mount. */
+async function contextMenuOffers(
+  s: Session,
+  target: { rightClick(): Promise<void> },
+  itemId: string,
+  anchorItemId: string,
+): Promise<boolean> {
+  await target.rightClick();
+  await s.waitForElement(
+    testIdSelector("notes.context-menu-item", { "data-item-id": anchorItemId }),
+  );
+  const hits = await s.findElements(
+    testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+  );
+  await (await s.waitForElement(CM_CONTENT)).click(); // outside click → dismiss
+  await s.waitForGone(
+    testIdSelector("notes.context-menu-item", { "data-item-id": anchorItemId }),
+  );
+  return hits.length > 0;
+}
+
 /** Create a folder via the sidebar "New folder" CTA + its inline input (the
  *  `nc4`/`ms1` flow — the input commits on blur/Enter as `notes.folder-row`
  *  materializes). Lowercase-only name: WebKitWebDriver's Send Keys drops the
@@ -63,10 +96,10 @@ async function contextMenuPick(
  *  product one). */
 async function createFolder(s: Session, name: string): Promise<void> {
   await (await s.byTestId("notes.new-folder")).click();
-  // `\uE007` is the W3C Enter code point — it commits the inline new-folder
+  // `` is the W3C Enter code point — it commits the inline new-folder
   // input. Without it the input never materializes `notes.folder-row` and the
   // next line times out (the nc4 site in notes.e2e.ts carries the same key).
-  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}\uE007`);
+  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}`);
   await s.byTestId("notes.folder-row");
 }
 
@@ -79,134 +112,12 @@ async function createNoteInFolder(
   title: string,
 ): Promise<void> {
   await contextMenuPick(s, folder, "new-note");
-  // Trailing `` (W3C Enter) commits the inline rename; without it the
+  // Trailing `` (W3C Enter) commits the inline rename; without it the
   // rename input never closes and `waitForGone` below times out. Mirrors the
   // canonical `flows.ts::createNote`, which carries the same commit key.
-  await (await s.byTestId("notes.rename-input")).sendKeys(`${title}\uE007`);
+  await (await s.byTestId("notes.rename-input")).sendKeys(`${title}`);
   await s.waitForGone(testIdSelector("notes.rename-input"));
 }
-
-/** Resolve the `data-note-id` of the row that visually contains the index badge.
- *  The badge carries no id of its own (it's an inline marker), so this matches
- *  the single `notes.row` whose subtree holds a `notes.row-folder-index-badge`. */
-async function resolveBadgedRowId(s: Session): Promise<string> {
-  const id = await s.execute<string | null>(
-    "var b = document.querySelector('[data-testid=\"notes.row-folder-index-badge\"]');" +
-      "if (b === null) return null;" +
-      "var row = b.closest('[data-testid=\"notes.row\"]');" +
-      "return row === null ? null : row.getAttribute('data-note-id');",
-  );
-  if (id === null || id === "") {
-    throw new Error("no notes.row carried the index badge");
-  }
-  return id;
-}
-
-describeE2E("fn1 folder index note designate / open / link-resolve / undesignate (MYND-370)", () => {
-  // Vault-count precondition: 1 (weak KDF).
-  it("designates a folder index, opens it via the affordance, resolves [[Folder/]], then undesignates", async () => {
-    // Unique tail tokens pin WHICH note the editor navigated to (random-note's
-    // idiom). Leading space gives the inline content a clean word boundary after
-    // typeIntoEditor's sacrificial probe char.
-    const INDEX_BODY = " indextailx9k2vd";
-    const OTHER_BODY = " othertailm7w5qp";
-    // Folder name == index-note title: the chip's broken-styling key folds the
-    // wikilink's last path segment ("projects"), so `[[projects/]]` reads as
-    // RESOLVED (non-broken) exactly when a note titled "projects" is present.
-    // Titling the index note after its folder is both the realistic UX and what
-    // makes the chip resolve.
-    const FOLDER = "projects";
-    let password = "";
-    await scenario(
-      "fn1-folder-notes",
-      { seed: (dir) => void (password = seedVault(dir).password) },
-      async (app) => {
-        const s = app.session;
-        await unlockToEditor(s, password);
-        await dismissImporterOffer(s);
-
-        // ── Step 2: a folder + an index-candidate note inside it. ──
-        await createFolder(s, FOLDER);
-        await createNoteInFolder(s, await s.byTestId("notes.folder-row"), FOLDER);
-        await typeIntoEditor(s, INDEX_BODY);
-        await waitForSaved(s);
-        const indexNoteId = await selectedNoteId(s);
-
-        // A second note (also in the folder, so the folder stays the same) gives
-        // the affordance somewhere to navigate FROM when it opens the index note.
-        await createNoteInFolder(s, await s.byTestId("notes.folder-row"), "scratch");
-        await typeIntoEditor(s, OTHER_BODY);
-        await waitForSaved(s);
-        const otherNoteId = await selectedNoteId(s);
-        expect(indexNoteId).not.toBe(otherNoteId);
-
-        // ── Step 3: designate the index note via its context menu. ──
-        await contextMenuPick(
-          s,
-          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": indexNoteId })),
-          "note.set-index",
-        );
-        // The index badge appears on the designated note's row.
-        await s.byTestId("notes.row-folder-index-badge");
-        expect(await resolveBadgedRowId(s)).toBe(indexNoteId);
-
-        // ── Step 4: the folder-row affordance OPENS the index note. ──
-        // (We're currently on `scratch`/OTHER_BODY; the affordance must navigate.)
-        await (
-          await s.waitForElement(
-            testIdSelector("notes.folder-index-affordance", { "data-folder-path": `${FOLDER}/` }),
-          )
-        ).click();
-        await s.waitUntil(
-          async () => ((await editorText(s)).includes("indextailx9k2vd") ? true : null),
-          { label: "affordance opened the index note" },
-        );
-        expect((await editorText(s)).includes("othertailm7w5qp")).toBe(false);
-        expect(await selectedNoteId(s)).toBe(indexNoteId);
-
-        // ── Step 5: a folder-target wikilink resolves (chip NOT broken). ──
-        // Author `[[projects/]]` via the picker — deterministic insertion of the
-        // canonical trailing-slash form (`emitFolderWikilink`), avoiding the
-        // closeBrackets ambiguity of typing the literal `]]`. We're in the index
-        // note's editor; establish the keystroke pipeline first (typeIntoEditor's
-        // probe), then drive the `[[` picker directly.
-        await typeIntoEditor(s, " "); // settle the cursor + prove the key pipeline
-        const content = await s.waitForElement(CM_CONTENT);
-        await content.sendKeys(`[[${FOLDER}`);
-        await (
-          await s.waitForElement(
-            testIdSelector("picker.folder-row"),
-            { timeoutMs: 10_000 },
-          )
-        ).click();
-        // The chip widget replaces the `[[…]]` span. It carries no testid, so it
-        // is matched by its CodeMirror class — `.cm-wikilink-chip` present, and the
-        // §5.3 broken modifier `.cm-wikilink-chip-broken` ABSENT (resolved link).
-        await s.waitForElement(".cm-wikilink-chip");
-        expect((await s.findElements(".cm-wikilink-chip-broken")).length).toBe(0);
-
-        // ── Step 6 (GAP — flagged, not scripted): folder rename + inbound
-        // `[[Old/]]` → `[[New/]]` rewrite. The product DOES rewrite inbound
-        // folder-target links on rename (planFolderRenameBatch / MYND-370), but
-        // the folder inline-rename input carries NO data-testid — it is a bare
-        // <input> inside notes.folder-row, addressable only by a CSS-descendant /
-        // text selector, which the harness forbids (byTestId-only, SYNC-8) and
-        // which would be flaky. Driving it is deferred until the folder rename
-        // input gains a testid; asserting it here would mean writing the very
-        // brittle step the task warned against. The rewrite itself is covered by
-        // the renameWikilinks unit tests (src/notes/renameWikilinks.ts). ──
-
-        // ── Step 7: undesignate via the note context menu; badge disappears. ──
-        await contextMenuPick(
-          s,
-          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": indexNoteId })),
-          "note.unset-index",
-        );
-        await s.waitForGone(testIdSelector("notes.row-folder-index-badge"));
-      },
-    );
-  });
-});
 
 /** Read the `data-note-id` of the currently-selected sidebar row — the row
  *  `createNote`/`createNoteInFolder` just left selected, or the row a navigation
@@ -220,3 +131,137 @@ async function selectedNoteId(s: Session): Promise<string> {
   }
   return id;
 }
+
+describeE2E("fn1 folder index: designate → hidden → double-click open → link-resolve → undesignate (MYND-370)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("hides the designated index note, opens it by double-clicking the folder, blocks a second, resolves [[Folder/]], then undesignates from the folder menu", async () => {
+    // Unique tail tokens pin WHICH note the editor navigated to (random-note's
+    // idiom). Leading space gives the inline content a clean word boundary after
+    // typeIntoEditor's sacrificial probe char.
+    const INDEX_BODY = " indextailx9k2vd";
+    const OTHER_BODY = " othertailm7w5qp";
+    // Folder name == index-note title: the chip's broken-styling key folds the
+    // wikilink's last path segment ("projects"), so `[[projects/]]` reads as
+    // RESOLVED (non-broken) exactly when the folder's index note is present.
+    const FOLDER = "projects";
+    let password = "";
+    await scenario(
+      "fn1-folder-notes",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // ── A folder + two notes inside it. ──
+        await createFolder(s, FOLDER);
+        await createNoteInFolder(s, await s.byTestId("notes.folder-row"), FOLDER);
+        await typeIntoEditor(s, INDEX_BODY);
+        await waitForSaved(s);
+        const indexNoteId = await selectedNoteId(s);
+
+        await createNoteInFolder(s, await s.byTestId("notes.folder-row"), "scratch");
+        await typeIntoEditor(s, OTHER_BODY);
+        await waitForSaved(s);
+        const otherNoteId = await selectedNoteId(s);
+        expect(indexNoteId).not.toBe(otherNoteId);
+
+        // ── Designate the first note as the folder's index via its row menu. ──
+        await contextMenuPick(
+          s,
+          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": indexNoteId })),
+          "note.set-index",
+        );
+        // The index note is now HIDDEN: its sidebar row disappears, and no badge
+        // is rendered anywhere (the old visible-pinned-badge behaviour is gone).
+        await s.waitForGone(testIdSelector("notes.row", { "data-note-id": indexNoteId }));
+        expect((await s.byTestIdAll("notes.row-folder-index-badge")).length).toBe(0);
+        // The sibling note stays a visible row.
+        await s.waitForElement(testIdSelector("notes.row", { "data-note-id": otherNoteId }));
+
+        // ── Single-enforcement: the sibling can no longer be made a 2nd index. ──
+        expect(
+          await contextMenuOffers(
+            s,
+            await s.waitForElement(testIdSelector("notes.row", { "data-note-id": otherNoteId })),
+            "note.set-index",
+            "color", // always present in a note row menu
+          ),
+        ).toBe(false);
+
+        // ── Double-clicking the folder OPENS the hidden index note. ──
+        // (We're on the sibling/OTHER_BODY; the open gesture must navigate.)
+        await (await s.byTestId("notes.folder-row")).doubleClick();
+        await s.waitUntil(
+          async () => ((await editorText(s)).includes("indextailx9k2vd") ? true : null),
+          { label: "double-click opened the index note" },
+        );
+        expect((await editorText(s)).includes("othertailm7w5qp")).toBe(false);
+
+        // ── A folder-target wikilink resolves (chip NOT broken) even though the
+        // index note is no longer a visible sidebar row. ──
+        await typeIntoEditor(s, " "); // settle the cursor + prove the key pipeline
+        const content = await s.waitForElement(CM_CONTENT);
+        await content.sendKeys(`[[${FOLDER}`);
+        await (
+          await s.waitForElement(testIdSelector("picker.folder-row"), { timeoutMs: 10_000 })
+        ).click();
+        await s.waitForElement(".cm-wikilink-chip");
+        expect((await s.findElements(".cm-wikilink-chip-broken")).length).toBe(0);
+
+        // ── Undesignate from the FOLDER menu; the note re-appears as a row. ──
+        await contextMenuPick(s, await s.byTestId("notes.folder-row"), "folder.remove-index");
+        await s.waitForElement(testIdSelector("notes.row", { "data-note-id": indexNoteId }));
+      },
+    );
+  });
+});
+
+describeE2E("fn2 folder index: double-click a folder with none creates exactly one, hidden, reopened on the next double-click (MYND-370)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("creates the folder note on first double-click, keeps it off the sidebar, and reopens the same note (never a second) on the next", async () => {
+    const MARKER = " folderidxmkr8t3z";
+    const FOLDER = "ideas";
+    let password = "";
+    await scenario(
+      "fn2-folder-notes",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // An empty (deliberate) folder with no index note.
+        await createFolder(s, FOLDER);
+
+        // ── First double-click CREATES + opens the folder note. ──
+        await (await s.byTestId("notes.folder-row")).doubleClick();
+        await typeIntoEditor(s, MARKER);
+        await waitForSaved(s);
+        // The folder note is NOT a sidebar row: zero visible note rows exist
+        // (the folder's only note is its hidden index note).
+        expect((await s.byTestIdAll("notes.row")).length).toBe(0);
+        // The folder now exposes the OPEN affordance (it has an index note).
+        await s.waitForElement(
+          testIdSelector("notes.folder-index-affordance", { "data-folder-path": `${FOLDER}/` }),
+        );
+
+        // ── Navigate away (a loose root note), so reopening must re-navigate. ──
+        await createNote(s, "loose");
+        await typeIntoEditor(s, " looseonlyzzq4n7");
+        await waitForSaved(s);
+
+        // ── Second double-click REOPENS the same note (MARKER present) — proof it
+        // did not create a second folder note. The loose note stays the only
+        // visible row (folder note still hidden → exactly one per folder). ──
+        await (await s.byTestId("notes.folder-row")).doubleClick();
+        await s.waitUntil(
+          async () => ((await editorText(s)).includes("folderidxmkr8t3z") ? true : null),
+          { label: "double-click reopened the existing folder note" },
+        );
+        expect((await editorText(s)).includes("looseonlyzzq4n7")).toBe(false);
+        expect((await s.byTestIdAll("notes.row")).length).toBe(1);
+      },
+    );
+  });
+});

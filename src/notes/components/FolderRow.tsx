@@ -233,6 +233,10 @@ export type FolderRowProps = {
   /** Create a new index note for this folder (MYND-370) — wired only when the
    *  folder has NO index note. Mints + opens the note. */
   onCreateFolderNote?: (folderPath: string) => void;
+  /** Double-click activation (MYND-370): open this folder's index note, or create
+   *  one if the folder has none. The folder note is hidden from the tree, so the
+   *  double-click on the folder row is its primary open gesture. */
+  onActivate?: (node: FolderNode) => void;
 };
 
 export function FolderRow({
@@ -259,6 +263,7 @@ export function FolderRow({
   iconName,
   onOpenIndexNote,
   onCreateFolderNote,
+  onActivate,
 }: FolderRowProps) {
   const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
@@ -305,6 +310,13 @@ export function FolderRow({
       onMouseLeave={() => setHovering(false)}
       onClick={() => {
         if (!empty && !renaming) onToggle(node.key);
+      }}
+      onDoubleClick={() => {
+        // Double-click opens (or creates) the folder note — its primary gesture
+        // now that the note is hidden from the tree (MYND-370). Single-click still
+        // toggles disclosure; the two clicks of a double-click net to no fold
+        // change.
+        if (!renaming) onActivate?.(node);
       }}
       onContextMenu={(e) => {
         if (renaming) return;

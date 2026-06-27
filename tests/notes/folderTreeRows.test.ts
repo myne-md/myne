@@ -19,19 +19,29 @@ import {
 } from "../../src/notes/components/folderTreeRows";
 import type { TitleRecord } from "../../src/notes/loadNoteBatch";
 
-const rec = (id: string, folder: string | null, ms = 0): TitleRecord => ({
+const rec = (
+  id: string,
+  folder: string | null,
+  ms = 0,
+  folderIndex = false,
+): TitleRecord => ({
   noteUuid: id,
   title: id,
   folder,
   updatedAt: new Date(ms),
   trashed: null,
   template: false,
+  folderIndex,
 });
 
 function build(records: TitleRecord[], deliberate: string[] = []) {
   const cache = new Map(records.map((r) => [r.noteUuid, r] as const));
   const tree = deriveFolderTree(
-    records.map((r) => ({ noteUuid: r.noteUuid, folder: r.folder })),
+    records.map((r) => ({
+      noteUuid: r.noteUuid,
+      folder: r.folder,
+      folderIndex: r.folderIndex,
+    })),
     deliberate,
   );
   return { cache, tree };
@@ -96,6 +106,26 @@ describe("flattenVisibleRows", () => {
     const rows = flattenVisibleRows(tree, cache, new Set());
     expect(kinds(rows)).toEqual(["folder"]);
     expect(rows[0]).toMatchObject({ kind: "folder", empty: true });
+  });
+
+  it("hides the folder note row but keeps the folder non-empty (MYND-370)", () => {
+    // A folder whose only note is its index note: the index note is NOT a row,
+    // yet the folder is not "empty" (it has a folder note, opened by double-click).
+    const { cache, tree } = build([rec("idx", "Notes/", 0, true)]);
+    const rows = flattenVisibleRows(tree, cache, new Set());
+    expect(kinds(rows)).toEqual(["folder"]);
+    expect(rows[0]).toMatchObject({ kind: "folder", empty: false });
+    expect(visibleNoteIds(rows)).toEqual([]); // the index note is not a row
+  });
+
+  it("renders sibling notes but never the folder note as a row (MYND-370)", () => {
+    const { cache, tree } = build([
+      rec("idx", "Notes/", 2, true),
+      rec("sib", "Notes/", 1),
+    ]);
+    const rows = flattenVisibleRows(tree, cache, new Set());
+    expect(kinds(rows)).toEqual(["folder", "note"]);
+    expect(visibleNoteIds(rows)).toEqual(["sib"]);
   });
 
   it("default (no item_order): folders sort before loose notes at root", () => {
