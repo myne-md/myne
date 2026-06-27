@@ -84,8 +84,31 @@ export class Element {
     return `/element/${this.elementId}${suffix}`;
   }
 
-  click(): Promise<void> {
-    return this.session.send("POST", this.path("/click"));
+  /** Click the element, retrying while WebKit reports it is in the DOM but
+   *  not yet hit-testable — a menu/portal animating in, an overlay
+   *  mid-transition, or a layout that has not settled (the switcher
+   *  `vault-row`, the Settings select rows, etc.). "element not interactable"
+   *  / "element click intercepted" both mean the click did NOT dispatch, so
+   *  a retry cannot double-fire. Any other error surfaces immediately. */
+  async click(): Promise<void> {
+    await this.session.waitUntil(
+      async () => {
+        try {
+          await this.session.send("POST", this.path("/click"));
+          return true;
+        } catch (e) {
+          if (
+            e instanceof WebDriverError &&
+            (e.code === "element not interactable" ||
+              e.code === "element click intercepted")
+          ) {
+            return null; // not hit-testable yet — keep polling
+          }
+          throw e;
+        }
+      },
+      { label: "element interactable + clicked", timeoutMs: 10_000 },
+    );
   }
 
   /** Double-click via the W3C Actions API — pointer move to the in-view centre,

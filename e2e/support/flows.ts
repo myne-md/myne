@@ -245,15 +245,29 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
     },
     { label: "keystroke pipeline established", timeoutMs: 10_000 },
   );
-  const landed = async () => (await editorText(session)).includes(text) || null;
-  await content.sendKeys(text);
+  // `editorText()` reads `.cm-content`'s textContent, which concatenates CM6's
+  // per-line `<div class="cm-line">` blocks WITHOUT a separator (textContent
+  // omits block boundaries). A multi-line payload's "\n" therefore never shows
+  // up in the readout, so an `includes(text)` check on raw text can never pass
+  // for multi-line input even though every character landed. Compare with
+  // newlines stripped — a true "did the text land" proof, not a layout artifact.
+  const flat = text.replace(/\n/g, "");
+  const landed = async () => (await editorText(session)).includes(flat) || null;
+  // A literal "\n" in a sendKeys payload is delivered as U+000A, which WebKit's
+  // driver does NOT translate into an Enter keypress — CM6 stays on one line
+  // (cm-line count = 1), breaking every multi-line scenario (vertical
+  // multi-cursor, heading folding, …). Send the W3C ENTER key (U+E007) for line
+  // breaks so real cm-lines are created; `landed` still compares newline-free
+  // (textContent omits block boundaries either way).
+  const keys = text.replace(/\n/g, "");
+  await content.sendKeys(keys);
   try {
     await session.waitUntil(landed, {
       label: "typed text landed in the document",
       timeoutMs: 5_000,
     });
   } catch {
-    await content.sendKeys(text);
+    await content.sendKeys(keys);
     await session.waitUntil(landed, {
       label: "typed text landed in the document (after re-send)",
     });

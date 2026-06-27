@@ -110,13 +110,16 @@ function workspaceBlob(appDataDir: string, vaultId: string): Buffer {
   return readFileSync(join(appDataDir, "vaults", vaultId, "vault.workspace"));
 }
 
-/** MYW1 header contract — magic + UNCHANGED version bytes (§9.7.1). The
- *  format byte staying 0x01 is the SYNC-4 "no version bump" proof. */
+/** MYW1 header contract — magic + version bytes (§9.7.1). protocol_version
+ *  stays 0x01; workspace_format_version is 0x02 (the named-workspaces
+ *  descriptor, bumped 0x01→0x02 in MYW1 — protocol/src/workspace_blob.rs
+ *  WORKSPACE_BLOB_FORMAT_VERSION). The pin/stacked tab modes ride that same
+ *  descriptor and do NOT bump it further. */
 function assertWorkspaceHeader(blob: Buffer): void {
   expect(blob.subarray(0, 4).toString("latin1")).toBe("MYW1");
   expect(blob.length).toBeGreaterThan(34);
   expect(blob[4]).toBe(0x01); // protocol_version
-  expect(blob[5]).toBe(0x01); // workspace_format_version — NOT bumped (SYNC-4)
+  expect(blob[5]).toBe(0x02); // workspace_format_version (named-workspaces descriptor)
 }
 
 // ── tm1: pin → new-tab-on-nav + close-guard + persistence ────────────────────
