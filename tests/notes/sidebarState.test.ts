@@ -10,6 +10,7 @@ import {
   applyOptimisticCreate,
   applyOptimisticDelete,
   applyOptimisticRename,
+  currentNoteFolder,
   rollbackOptimisticCreate,
   rollbackOptimisticDelete,
   rollbackOptimisticRename,
@@ -32,6 +33,42 @@ function stateWith(
     contentReloadNonce: 0,
   };
 }
+
+describe("currentNoteFolder (MYND-462)", () => {
+  function stateWithFolder(
+    selectedId: string | null,
+    entries: Array<[string, string | null]>,
+  ): SidebarState {
+    const cache = new Map();
+    for (const [id, folder] of entries) {
+      cache.set(id, { noteUuid: id, title: id, folder, updatedAt: null });
+    }
+    return {
+      selectedId,
+      renamingId: null,
+      cache,
+      contentReloadNonce: 0,
+    } as SidebarState;
+  }
+
+  it("returns null when no note is selected", () => {
+    expect(currentNoteFolder(stateWithFolder(null, [["a", "Foo/"]]))).toBeNull();
+  });
+
+  it("returns the selected note's folder", () => {
+    expect(currentNoteFolder(stateWithFolder("a", [["a", "Foo/"]]))).toBe("Foo/");
+  });
+
+  it("returns null for an unfiled (root) selected note", () => {
+    expect(currentNoteFolder(stateWithFolder("a", [["a", null]]))).toBeNull();
+  });
+
+  it("returns null when the selected note is not cached", () => {
+    expect(
+      currentNoteFolder(stateWithFolder("missing", [["a", "Foo/"]])),
+    ).toBeNull();
+  });
+});
 
 describe("EMPTY_SIDEBAR_STATE", () => {
   it("has null selection and an empty Map cache", () => {

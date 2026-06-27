@@ -1627,6 +1627,31 @@
       "typeToConfirmLabel": "Tastează DELETE pentru a confirma",
       "vaultPath": "Calea seifului: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Estompează liniile inactive",
       "dimHelper": "În modul de concentrare (⇧⌘F), estompează fiecare linie cu excepția celei pe care o editezi.",

@@ -1627,6 +1627,31 @@
       "typeToConfirmLabel": "Tapez DELETE pour confirmer",
       "vaultPath": "Chemin du coffre-fort : {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Atténuer les lignes inactives",
       "dimHelper": "En mode focus (⇧⌘F), atténue toutes les lignes sauf celle que vous éditez.",

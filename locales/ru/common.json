@@ -1680,6 +1680,31 @@
       "typeToConfirmLabel": "Введите DELETE для подтверждения",
       "vaultPath": "Путь к хранилищу: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Затемнять неактивные строки",
       "dimHelper": "В режиме фокусировки (⇧⌘F) затемнять все строки, кроме той, которую вы редактируете.",

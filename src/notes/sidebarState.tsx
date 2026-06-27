@@ -24,6 +24,7 @@ import {
   type ReactNode,
 } from "react";
 import { createNote } from "./createNote";
+import { prefsRead, normalizeNewNoteLocation } from "../lib/prefs";
 import { deleteNote } from "./deleteNote";
 import {
   archiveNote,
@@ -300,6 +301,19 @@ export function templateRecords(
     return (a.title ?? "").localeCompare(b.title ?? "");
   });
   return out;
+}
+
+/**
+ * The canonical folder (trailing-slash form) of the currently-selected note, or
+ * `null` when no note is selected or the selected note is unfiled / not cached
+ * (MYND-462 "Same folder as current note"). Used by `createAndStartRename` to
+ * resolve the `new_note_location: "current"` preference at create time. A `null`
+ * result means "fall back to vault root".
+ */
+export function currentNoteFolder(state: SidebarState): string | null {
+  const id = state.selectedId;
+  if (id === null) return null;
+  return state.cache.get(id)?.folder ?? null;
 }
 
 /**
@@ -874,7 +888,27 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
 
   const createAndStartRename = useCallback(
     async (folder: string | null = null): Promise<NoteId> => {
-      const newId = await createNote(folder);
+      // MYND-462 — resolve the configured "Default location for new notes" when
+      // the caller did NOT name a folder. An explicit `folder` argument (the
+      // right-click "New note here" path) is AUTHORITATIVE and bypasses the pref:
+      // "here" means here, regardless of the default. The pref only applies to
+      // the root-level create entry points (Cmd+N, palette, "+ New Note", new tab).
+      let target = folder;
+      if (target === null) {
+        try {
+          const prefs = await prefsRead();
+          const mode = normalizeNewNoteLocation(prefs.new_note_location);
+          if (mode === "specific") {
+            target = prefs.new_note_location_folder ?? null;
+          } else if (mode === "current") {
+            target = currentNoteFolder(stateRef.current);
+          }
+          // "root" → target stays null (vault root).
+        } catch {
+          // Pref read failure → fall back to root (target stays null).
+        }
+      }
+      const newId = await createNote(target);
       // MYND-31: register the new note in the index (live).
       void reindexNote(newId);
       setState((prev) => {
@@ -883,7 +917,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       });
       // A foldered create writes `folder:` at create (a2); settle it into the
       // cache so the new row appears under its folder while still in rename mode.
-      if (folder !== null) void refreshOne(newId);
+      if (target !== null) void refreshOne(newId);
       return newId;
     },
     [refreshOne],

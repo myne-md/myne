@@ -1594,6 +1594,31 @@
       "typeToConfirmLabel": "Typ DELETE om te bevestigen",
       "vaultPath": "Kluispad: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Inactieve regels dimmen",
       "dimHelper": "Dim in de focusmodus (⇧⌘F) elke regel behalve de regel die je bewerkt.",

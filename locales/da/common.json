@@ -1574,6 +1574,31 @@
       "typeToConfirmLabel": "Skriv DELETE for at bekræfte",
       "vaultPath": "Boks-sti: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Dæmp inaktive linjer",
       "dimHelper": "I fokustilstand (⇧⌘F) dæmpes alle linjer undtagen den, du redigerer.",

@@ -57,6 +57,8 @@ interface SelectProps<T extends string> {
   "aria-label"?: string;
   /** Optional style overrides merged onto the trigger button. */
   style?: CSSProperties;
+  /** Optional `data-testid` on the trigger button (E2E observability). */
+  testId?: string;
 }
 
 const TRIGGER_STYLE: CSSProperties = {
@@ -110,6 +112,7 @@ export function Select<T extends string>({
   onChange,
   "aria-label": ariaLabel,
   style,
+  testId,
 }: SelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -228,6 +231,7 @@ export function Select<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        data-testid={testId}
         style={{ ...TRIGGER_STYLE, ...style }}
         onClick={(e) => {
           e.stopPropagation();
@@ -262,6 +266,8 @@ export function Select<T extends string>({
                   type="button"
                   role="option"
                   aria-selected={selected}
+                  data-testid={testId ? `${testId}-option` : undefined}
+                  data-value={opt.value}
                   style={{
                     ...OPTION_STYLE,
                     background: active ? "var(--paper-2)" : "transparent",

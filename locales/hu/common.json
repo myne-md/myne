@@ -1594,6 +1594,31 @@
       "typeToConfirmLabel": "Írd be: DELETE a megerősítéshez",
       "vaultPath": "Széf útvonala: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Inaktív sorok halványítása",
       "dimHelper": "Fókuszmódban (⇧⌘F) halványíts minden sort azon kívül, amelyiket éppen szerkeszted.",

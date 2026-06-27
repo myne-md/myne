@@ -1593,6 +1593,31 @@
       "typeToConfirmLabel": "Type DELETE to confirm",
       "vaultPath": "Vault path: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "Folder for new notes",
+        "folderPlaceholder": "e.g. Inbox/",
+        "helper": "Where newly created notes are placed.",
+        "label": "Default location for new notes",
+        "optionCurrent": "Same folder as current note",
+        "optionRoot": "Vault folder",
+        "optionSpecific": "In the folder specified below",
+        "saveError": "Could not save the new-note location."
+      },
+      "startup": {
+        "helper": "Choose which file to open when the app starts.",
+        "label": "Default file to open",
+        "noteLabel": "Note to open on startup",
+        "notePlaceholder": "Select a note…",
+        "optionEmpty": "New note",
+        "optionLast": "Last opened",
+        "optionSpecific": "Specific note",
+        "saveError": "Could not save the startup setting.",
+        "searchEmpty": "No notes found.",
+        "searchPlaceholder": "Search notes…",
+        "untitledNote": "Untitled"
+      }
+    },
     "focusMode": {
       "dimAria": "Dim inactive lines",
       "dimHelper": "In focus mode (⇧⌘F), dim every line except the one you're editing.",
@@ -1683,6 +1708,7 @@
         "account": "Account",
         "appearance": "Appearance",
         "editor": "Editor",
+        "files": "Files",
         "hotkeys": "Hotkeys",
         "privacy": "Privacy",
         "storage": "Storage",

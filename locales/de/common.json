@@ -1574,6 +1574,31 @@
       "typeToConfirmLabel": "Geben Sie zur Bestätigung DELETE ein",
       "vaultPath": "Tresorpfad: {{path}}"
     },
+    "files": {
+      "newNote": {
+        "folderLabel": "",
+        "folderPlaceholder": "",
+        "helper": "",
+        "label": "",
+        "optionCurrent": "",
+        "optionRoot": "",
+        "optionSpecific": "",
+        "saveError": ""
+      },
+      "startup": {
+        "helper": "",
+        "label": "",
+        "noteLabel": "",
+        "notePlaceholder": "",
+        "optionEmpty": "",
+        "optionLast": "",
+        "optionSpecific": "",
+        "saveError": "",
+        "searchEmpty": "",
+        "searchPlaceholder": "",
+        "untitledNote": ""
+      }
+    },
     "focusMode": {
       "dimAria": "Inaktive Zeilen abdunkeln",
       "dimHelper": "Im Fokusmodus (⇧⌘F) jede Zeile außer der, die Sie gerade bearbeiten, abdunkeln.",
