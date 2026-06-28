@@ -117,13 +117,19 @@ async function openPalette(session: Session): Promise<void> {
       }
       // W3C key actions only dispatch to a focused element. After a flow that
       // leaves focus detached (createNote's rename-input commit, a just-closed
-      // dialog) the chord lands nowhere and window's keydown listener never
-      // fires. Re-anchor focus on the editor surface before firing. Best-effort:
-      // some palette entrypoints (cards view, settings) have no editor.content.
+      // dialog, or notes created via IPC so no note is open) the chord lands
+      // nowhere and window's keydown listener never fires. Re-anchor focus on a
+      // real editor surface before firing — prefer the note content, fall back
+      // to the editor pane (always present once unlocked, even with no note
+      // open). Best-effort.
       try {
-        await (await session.byTestId("editor.content", { timeoutMs: 500 })).click();
+        await (await session.byTestId("editor.content", { timeoutMs: 400 })).click();
       } catch {
-        /* no editor surface here — the chord may still reach window */
+        try {
+          await (await session.byTestId("editor.pane", { timeoutMs: 400 })).click();
+        } catch {
+          /* no editor surface here — the chord may still reach window */
+        }
       }
       await sendPaletteChord(session);
       try {

@@ -137,6 +137,13 @@ describeE2E("attachments library (MYND-230)", () => {
         assertAttachmentBlobMagic(app.appDataDir, seeded.vaultId, genericId);
         assertCatalogMagic(app.appDataDir, seeded.vaultId);
 
+        // The referencing note was created via page-seat IPC, so the frontend
+        // note cache hasn't seen it. Reload the WebView (slot stays Unlocked →
+        // editor) so the used-in-notes surface — which resolves the attachment's
+        // referencing note-ids to titles through that cache — can list it.
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+
         // ---- open the library via the real command palette ----
         await runPaletteAction(s, "attachments.open", "attach");
 
