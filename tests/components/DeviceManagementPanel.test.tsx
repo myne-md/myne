@@ -28,6 +28,15 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 import { DeviceManagementPanel } from "../../src/components/sync/DeviceManagementPanel";
+import { useDevices } from "../../src/hooks/useDevices";
+
+// The panel now takes the `useDevices` result as a prop (the hook is lifted to
+// SyncPanel in production). This harness re-creates the panel+hook integration
+// the tests exercise: it owns the hook so `invoke` mocking still drives the
+// full roster→render path end-to-end.
+function Harness() {
+  return <DeviceManagementPanel hook={useDevices()} />;
+}
 
 /** Make the roster load reject with a given non-secret error kind. */
 function listRejects(kind: string) {
@@ -49,7 +58,7 @@ afterEach(() => {
 describe("DeviceManagementPanel — error-state branching", () => {
   it("NotEnrolled shows the informational message, no reset button, and no 'Loading…'", async () => {
     listRejects("NotEnrolled");
-    render(<DeviceManagementPanel />);
+    render(<Harness />);
 
     await waitFor(() =>
       expect(screen.queryByTestId("sync.device-not-enrolled")).toBeTruthy(),
@@ -62,7 +71,7 @@ describe("DeviceManagementPanel — error-state branching", () => {
 
   it("Unauthenticated shows the error line WITH the reset button", async () => {
     listRejects("Unauthenticated");
-    render(<DeviceManagementPanel />);
+    render(<Harness />);
 
     await waitFor(() => expect(screen.queryByTestId("sync.device-error")).toBeTruthy());
     expect(screen.getByTestId("sync.device-error").textContent).toMatch(
@@ -73,7 +82,7 @@ describe("DeviceManagementPanel — error-state branching", () => {
 
   it("a transient transport error shows the error line + a re-pin hint, but NO reset button", async () => {
     listRejects("Transport");
-    render(<DeviceManagementPanel />);
+    render(<Harness />);
 
     await waitFor(() => expect(screen.queryByTestId("sync.device-error")).toBeTruthy());
     // A network blip is not a reason to drop the baseline → no reset CTA, but a hint
@@ -92,7 +101,7 @@ describe("DeviceManagementPanel — error-state branching", () => {
       }
       return undefined;
     });
-    render(<DeviceManagementPanel />);
+    render(<Harness />);
 
     await waitFor(() =>
       expect(screen.queryByTestId("sync.device-retired-self")).toBeTruthy(),
@@ -104,7 +113,7 @@ describe("DeviceManagementPanel — error-state branching", () => {
 describe("DeviceManagementPanel — reset recovery arc", () => {
   it("clicking reset invokes sync_reset_local, then the refresh reports NotEnrolled → flips to 'add above'", async () => {
     listRejects("Unauthenticated");
-    render(<DeviceManagementPanel />);
+    render(<Harness />);
     await waitFor(() => expect(screen.queryByTestId("sync.reset-local")).toBeTruthy());
 
     invokeMock.mockClear();
@@ -137,7 +146,7 @@ describe("DeviceManagementPanel — loading", () => {
       if (cmd === "plugin:sync|sync_list_devices") return new Promise(() => {});
       return Promise.resolve(undefined);
     });
-    render(<DeviceManagementPanel />);
+    render(<Harness />);
     await waitFor(() => expect(screen.queryByText("Loading…")).toBeTruthy());
   });
 });
