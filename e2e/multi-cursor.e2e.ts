@@ -53,6 +53,7 @@ const ALT = "\uE00A";
 const ESCAPE = "\uE00C";
 const HOME = "\uE011";
 const ARROW_RIGHT = "\uE014";
+const ARROW_UP = String.fromCharCode(0xe013);
 const ARROW_DOWN = "\uE015";
 
 const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
@@ -119,11 +120,15 @@ describeE2E("mc1 vertical add-cursor types in lockstep + Escape collapses (MYND-
         await typeIntoEditor(s, ".aaa mctaila\n.bbb mctailb\n.ccc mctailc");
         await waitForSaved(s);
 
-        const content = await s.waitForElement(CM_CONTENT);
-        await content.click();
-        // Move to document start so addCursorBelow stacks down from line 1
-        // (the payload above left the caret at the end of line 3).
-        await pressChord(s, [CONTROL], HOME);
+        await s.waitForElement(CM_CONTENT);
+        // The caret sits at the end of the typed body (line ".ccc"). Notes carry
+        // editable YAML frontmatter (title/updated) ABOVE the body, so Ctrl+Home
+        // would stack cursors in the frontmatter — step UP within the body to its
+        // first line (".aaa") instead. typeIntoEditor leaves focus in the editor,
+        // so no click is needed (a click would re-place the caret arbitrarily).
+        await pressChord(s, [], ARROW_UP);
+        await pressChord(s, [], ARROW_UP);
+        await pressChord(s, [], HOME);
         await waitForSelectionCount(s, 1);
 
         // Two cursors below → cursors on all three lines (count 3).
@@ -132,12 +137,14 @@ describeE2E("mc1 vertical add-cursor types in lockstep + Escape collapses (MYND-
         await waitForSelectionCount(s, 3);
 
         // Type a marker at all three cursors in lockstep (story 4): each line
-        // gains the SAME leading edit.
-        await tapKey(s, "Z");
+        // gains the SAME leading edit. Lowercase "z": WebKitWebDriver's Send Keys
+        // does NOT apply the shift modifier, so an uppercase char arrives
+        // lowercased — assert the char the driver actually types.
+        await tapKey(s, "z");
         await s.waitUntil(
           async () => {
             const text = await editorText(s);
-            return text.includes("Z.aaa") && text.includes("Z.bbb") && text.includes("Z.ccc")
+            return text.includes("z.aaa") && text.includes("z.bbb") && text.includes("z.ccc")
               ? true
               : null;
           },
@@ -169,13 +176,14 @@ describeE2E("mc2 Mod-d extends to the next occurrence (MYND-306)", () => {
         await typeIntoEditor(s, "widget widget widget mctaild");
         await waitForSaved(s);
 
-        const content = await s.waitForElement(CM_CONTENT);
-        await content.click();
-        // Document start, then select the first word "widget" (6 chars) via
-        // Shift+ArrowRight x6 → one range selecting "widget". The selection must
-        // be exactly "widget" for Mod-d to find its next runs (typeIntoEditor
-        // now removes its probe char, so offset 0 is the real first letter).
-        await pressChord(s, [CONTROL], HOME);
+        await s.waitForElement(CM_CONTENT);
+        // The body is one line ("widget …") and the caret is at its end. Use Home
+        // (line-relative) — NOT Ctrl+Home, which lands in the note's frontmatter
+        // above the body — to reach the body line start, then select the first
+        // word "widget" (6 chars) via Shift+ArrowRight x6. The selection must be
+        // exactly "widget" for Mod-d to find its next runs (typeIntoEditor removed
+        // its probe char, so the body line really starts with "widget").
+        await pressChord(s, [], HOME);
         await waitForSelectionCount(s, 1);
         for (let i = 0; i < 6; i++) {
           await pressChord(s, [SHIFT], ARROW_RIGHT);
