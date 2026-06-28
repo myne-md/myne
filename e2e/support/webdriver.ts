@@ -384,7 +384,16 @@ export interface FindOptions {
   intervalMs?: number;
 }
 
-const DEFAULT_TIMEOUT_MS = 10_000;
+// Default wait budget. Held at 20 s (not a snappier 10) deliberately: the whole
+// e2e suite drives ~60 real tauri-driver + production-binary launches through a
+// SINGLE container + xvfb, sequentially, so back-to-back files run under
+// cumulative host pressure that an isolated spec never sees — element mounts,
+// editor re-mounts, and async engine work (spell tokenize, view re-query) that
+// land in <1 s alone routinely need several seconds under that load. Every
+// element-appearance/poll wait inherits this headroom, which (with the config's
+// retry: 2) is what closes the full-suite "different test flakes each run" tail.
+// A real never-appears bug still fails — just 20 s later instead of 10.
+const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_INTERVAL_MS = 100;
 
 /** One WebDriver session against a running tauri-driver. */
