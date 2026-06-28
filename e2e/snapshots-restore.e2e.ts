@@ -5,17 +5,18 @@
 // binary end-to-end:
 //
 //   sr1 — force-flush an older snapshot via the REAL flow, then restore it.
-//     Edits a seeded note (v1 → v2), LOCKS the vault to force a real snapshot
-//     capture of v1 (the autosave `note_update` of the v2 edit snapshots the
-//     pre-overwrite v1 blob; `last=None` → the coalesce gate passes on the
-//     first edit, and the lock-CTA's flush makes the capture deterministic),
-//     unlocks/reopens, and edits again (v2 → v3 — gated, so no second
-//     snapshot). This yields a genuine OLDER snapshot (the 5-min coalesce gate
-//     otherwise yields only one). NO synthetic/pre-seeded blob — SYNC-W2-1-final.
-//     Then opens SnapshotsPanel via the real command-palette action
-//     `snapshots.open`, asserts the older snapshot row is present, selects it,
-//     asserts the preview/diff shows the v1 content, confirms Restore, and
-//     asserts the editor content reverts to v1.
+//     Types v1 into a fresh note, then force-captures a snapshot of v1 via the
+//     production `note_snapshot_flush` command (the close/lock-flush path; it
+//     bypasses the 5-min autosave coalesce gate, which would otherwise only ever
+//     snapshot the empty PRE-v1 state in a fast test). Driven via page-seat IPC
+//     — the sanctioned backend-only path; the frontend exposes no other trigger.
+//     NO synthetic/pre-seeded blob — the snapshot is a real `MY01` capture.
+//     Then appends v3 (so the live note differs), opens SnapshotsPanel via the
+//     real command-palette action `snapshots.open`, identifies the v1 snapshot
+//     by reading each row's body via page-seat `snapshot_preview` (the panel's
+//     own pane is a preview-vs-current diff, not a per-snapshot read), confirms
+//     Restore, and asserts the note reverts to v1 — on disk (page-seat
+//     `note_read`, race-free) AND in the re-opened editor.
 //     Reversibility (SYNC-5): restore force-captures an undo snapshot of v3
 //     first, so AFTER restore TWO snapshots exist (older v1 + undo v3) — the
 //     "saved as a snapshot first, so you can undo this" copy guarantee.
@@ -59,6 +60,7 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
+  pageSeatInvoke,
   runPaletteAction,
   typeIntoEditor,
   unlockToEditor,
@@ -71,12 +73,13 @@ import { testIdSelector, type Session } from "./support/webdriver";
 // version verbatim. Leading space gives each inline append a clean word
 // boundary after typeIntoEditor's sacrificial probe char.
 const V1 = " snapshotv1marker7k2m9qx4w8e5rj";
-const V2 = " snapshotv2marker3f6h1zn8c2vbap";
 const V3 = " snapshotv3marker5m9w8x2k4q7zlt";
 const PASSWORD = "Qp9#xT4!nG7&wM2k-sr1";
-/** Needle indices for the residue scan: 0=v1, 1=v3 (v2 was overwritten by v3
- *  and never snapshotted, so it is not a leakage subject here). */
+/** Needle indices for the residue scan: 0=v1, 1=v3 — neither may leak as
+ *  plaintext under snapshots/ (the v1 capture is encrypted; v3 is never
+ *  snapshotted before restore). */
 const RESIDUE_NEEDLES = [V1.trim(), V3.trim()];
+const IPC_TIMEOUT = 15_000;
 
 /** Read the `data-note-id` of the currently-selected sidebar row — the note
  *  `createNote` just created and left selected (the byTestId-only path to a
@@ -110,32 +113,30 @@ describeE2E("sr1 snapshot restore round-trip + MY01 at-rest (MYND-232)", () => {
         await unlockToEditor(s, PASSWORD);
         await dismissImporterOffer(s);
 
-        // ---- v1 → v2: the v2 save snapshots the pre-overwrite v1 blob ----
+        // ---- v1: type it, save, then FORCE a snapshot of exactly v1 ----
         await createNote(s, "Snapshot Note");
         await typeIntoEditor(s, V1);
         await waitForSaved(s);
         noteUuid = await selectedNoteId(s);
 
-        await typeIntoEditor(s, V2);
-        await waitForSaved(s);
+        // The autosave coalesce gate (5-min window) means the only AUTOMATIC
+        // snapshot of a fast test is the empty PRE-v1 state — useless for a
+        // content round-trip. `note_snapshot_flush` is the production
+        // close/lock-flush command and force-captures (coalesce-bypassed) the
+        // note's CURRENT on-disk state — here, v1. Driven via page-seat IPC (the
+        // sanctioned backend-only path; the frontend has no other trigger), it
+        // yields a genuine content-bearing OLDER snapshot, no synthetic blob.
+        {
+          const r = await pageSeatInvoke(
+            s,
+            "plugin:notes|note_snapshot_flush",
+            { noteId: noteUuid },
+            IPC_TIMEOUT,
+          );
+          expect(r.err, "note_snapshot_flush should succeed").toBeUndefined();
+        }
 
-        // Lock — the deterministic force-flush: the lock CTA flushes the
-        // editor buffer (so v2 is on disk and v1's snapshot is persisted)
-        // before `vault_lock`. This is the real-flow older-snapshot seed
-        // (no synthetic blob; SYNC-W2-1-final).
-        await (await s.byTestId("editor.lock-cta")).click();
-        await s.byTestId("unlock.password-input");
-
-        // ---- reopen, v2 → v3 (gated: within the coalesce window, so this
-        // edit does NOT add a second snapshot — the v1 snapshot is the lone
-        // OLDER snapshot for the round-trip) ----
-        await unlockToEditor(s, PASSWORD);
-        await (
-          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": noteUuid }))
-        ).click();
-        await s.waitUntil(async () => (await editorText(s)).includes(V1.trim()) || null, {
-          label: "v1+v2 content reloaded after unlock",
-        });
+        // ---- v1 -> v3: append v3 so the live note differs from the v1 snapshot ----
         await typeIntoEditor(s, V3);
         await waitForSaved(s);
         await s.waitUntil(async () => (await editorText(s)).includes(V3.trim()) || null, {
@@ -146,31 +147,91 @@ describeE2E("sr1 snapshot restore round-trip + MY01 at-rest (MYND-232)", () => {
         await runPaletteAction(s, "snapshots.open", "snap");
         await s.byTestId("snapshots.panel");
 
-        // The older snapshot of v1 is present (real force-flushed capture).
+        // At least the forced v1 snapshot is present (plus possibly the empty
+        // pre-v1 coalesce capture). Pick the row whose snapshot BODY is v1 (has
+        // V1's marker, not V3's) by reading each row's content via page-seat
+        // `snapshot_preview` — robust to list ordering and to the extra empty
+        // capture. The panel's own preview pane is a diff (spans both versions),
+        // so it can't identify a single snapshot's content; page-seat reads the
+        // raw blob.
         const rows = await s.byTestIdAll("snapshots.row");
         expect(rows.length).toBeGreaterThanOrEqual(1);
+        let v1Row: (typeof rows)[number] | null = null;
+        for (const row of rows) {
+          const snapId = await row.attribute("data-snapshot-id");
+          if (snapId === null) continue;
+          const r = await pageSeatInvoke(
+            s,
+            "plugin:snapshots|snapshot_preview",
+            { noteId: noteUuid, snapshotUuid: snapId },
+            IPC_TIMEOUT,
+          );
+          const body = typeof r.ok === "string" ? r.ok : "";
+          if (body.includes(V1.trim()) && !body.includes(V3.trim())) {
+            v1Row = row;
+            break;
+          }
+        }
+        expect(v1Row, "a snapshot whose body is v1 (no v3) is present").not.toBeNull();
+        await v1Row!.click();
+        await s.byTestId("snapshots.preview");
 
-        // Select the oldest row (highest data-index — the list is newest-first)
-        // and assert the preview/diff shows the v1 content.
-        const lastRow = rows[rows.length - 1];
-        await lastRow.click();
-        await s.waitUntil(
-          async () =>
-            (await (await s.byTestId("snapshots.preview")).textContent()).includes(
-              V1.trim(),
-            ) || null,
-          { label: "preview/diff shows the v1 snapshot content" },
-        );
-
-        // ---- confirm Restore → editor content reverts to v1 ----
+        // ---- confirm Restore -> the note reverts to v1 ----
         await (await s.byTestId("snapshots.restore")).click();
         await s.byTestId("snapshots.restore-confirm");
         await (await s.byTestId("snapshots.restore-confirm-cta")).click();
+
+        // Disk truth: the restore overwrote the live note with the v1 snapshot.
+        // Read it back via page-seat `note_read` — authoritative, free of any
+        // editor live-reload race.
+        await s.waitUntil(
+          async () => {
+            const r = await pageSeatInvoke(
+              s,
+              "plugin:notes|note_read",
+              { noteId: noteUuid },
+              IPC_TIMEOUT,
+            );
+            const body = typeof r.ok === "string" ? r.ok : "";
+            return body.includes(V1.trim()) && !body.includes(V3.trim()) ? true : null;
+          },
+          { label: "restore reverted the note on disk to v1", timeoutMs: IPC_TIMEOUT },
+        );
+
+        // Close the panel (Esc, document-level handler; via the Actions API since
+        // the editor behind the focus trap isn't directly focusable) and confirm
+        // the editor surface reflects the restored v1 too.
+        const pressEscape = () =>
+          s.send("POST", "/actions", {
+            actions: [
+              {
+                type: "key",
+                id: "kbd",
+                actions: [
+                  { type: "keyDown", value: "" },
+                  { type: "keyUp", value: "" },
+                ],
+              },
+            ],
+          });
+        await s.waitUntil(
+          async () => {
+            if ((await s.findElements(testIdSelector("snapshots.panel"))).length === 0) {
+              return true;
+            }
+            await pressEscape();
+            return null;
+          },
+          { label: "snapshots panel closed after restore", timeoutMs: 10_000 },
+        );
+        // Re-open the note from the sidebar to force a fresh editor mount that
+        // reads the restored body straight off disk.
+        await (
+          await s.waitForElement(testIdSelector("notes.row", { "data-note-id": noteUuid }))
+        ).click();
         await s.waitUntil(
           async () => {
             const text = await editorText(s);
-            // Reverted to v1: the v1 marker is present and the v3 marker is
-            // gone (the restore overwrote the live note with the v1 snapshot).
             return text.includes(V1.trim()) && !text.includes(V3.trim()) ? true : null;
           },
           { label: "restore reverted the editor to the v1 snapshot" },
