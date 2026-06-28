@@ -91,6 +91,43 @@ async function clickChipByText(s: Session, needle: string): Promise<void> {
   );
 }
 
+/** Click the first element matching `selector` via a native DOM `click()`,
+ *  re-querying the DOM at click time. Avoids the stale-element-reference churn of
+ *  a captured WebDriver handle for volatile, frequently-re-rendering elements
+ *  (the bottom-bar view-mode CTA, sidebar rows). Returns true if one was found. */
+async function jsClick(s: Session, selector: string): Promise<boolean> {
+  return (
+    (await s.execute<number>(
+      "var e = document.querySelector(" +
+        JSON.stringify(selector) +
+        "); if (e) { e.click(); return 1; } return 0;",
+    )) === 1
+  );
+}
+
+/** A REAL WebDriver pointer click (mousedown+up+click — needed for components
+ *  that insert on `mousedown`, e.g. the wikilink picker rows, where a bare DOM
+ *  `click()` never fires) that re-FETCHES the element on every attempt. Unlike
+ *  `Element.click()` (whose internal retry loops on a single captured handle and
+ *  so spins for its full timeout once that handle goes stale), this re-queries
+ *  each poll, so a row that re-renders as the query filters is clicked freshly.
+ *  Returns once a fresh element was clicked without error. */
+async function realClickFresh(s: Session, selector: string): Promise<void> {
+  await s.waitUntil(
+    async () => {
+      const els = await s.findElements(selector);
+      if (els.length === 0) return null;
+      try {
+        await s.send("POST", `/element/${els[0].elementId}/click`);
+        return true;
+      } catch {
+        return null; // stale / not-interactable → re-fetch next poll
+      }
+    },
+    { label: `clicked ${selector}`, timeoutMs: 10_000 },
+  );
+}
+
 // A LONG target note: a unique-tail H1 at the top + a target heading pushed far
 // down by filler so a scroll-to-heading visibly moves the scroller. The unique
 // tails pin which note the editor shows.
@@ -161,36 +198,6 @@ describeE2E("wd1 click [[Note#Heading]] scrolls to the heading; not-found → no
           sourceId,
           "intro wdintro\n[[Target#Deep Section wddeep]]\n[[Target#Ghost Heading]]\n",
         );
-        await s.refresh();
-        await s.byTestId("editor.root", { timeoutMs: 30_000 });
-        await (
-          await s.waitForElement(`[data-testid="notes.row"][data-note-id="${sourceId}"]`)
-        ).click();
-
-        // Switch the pane to READING view (live → reading via the bottom-bar
-        // cycle CTA). Reading view hard-disables the cursor-aware reveal, so the
-        // links ALWAYS render as chips and a click on one navigates instead of
-        // lifting it to raw text under the caret (the live-mode reveal otherwise
-        // turns the clicked chip into editable text before the click handler runs,
-        // so the navigation never fires). View mode is per-tab + persisted, so
-        // Source stays in reading view across the round-trip.
-        const enterReading = async () => {
-          await s.waitUntil(
-            async () => {
-              // The CTA only mounts once the note tab + bottom bar are live; poll
-              // with findElements (no throw) so a not-yet-mounted editor retries
-              // instead of failing.
-              const ctas = await s.findElements('[data-testid="editor.view-mode-cta"]');
-              if (ctas.length === 0) return null;
-              if ((await ctas[0].attribute("data-view-mode")) === "reading") return true;
-              await ctas[0].click();
-              return null;
-            },
-            { label: "pane in reading view", timeoutMs: 15_000 },
-          );
-        };
-        // Find a chip by its display text (chips carry no testid; the resolved
-        // form is "Target › <Heading>"). Returns null until present.
         // The active editor tab's note-id ("note:<id>") — the race-free "which
         // note is open" signal (editorText would false-match the Source link text).
         const activeNoteId = async (): Promise<string | null> => {
@@ -200,6 +207,56 @@ describeE2E("wd1 click [[Note#Heading]] scrolls to the heading; not-found → no
           return raw.startsWith("note:") ? raw.slice("note:".length) : null;
         };
 
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+        // Open Source and WAIT until it is the active tab before touching the
+        // bottom-bar view-mode CTA (which only mounts for a live note tab).
+        await s.waitUntil(
+          async () => {
+            await jsClick(s, `[data-testid="notes.row"][data-note-id="${sourceId}"]`);
+            return (await activeNoteId()) === sourceId ? true : null;
+          },
+          { label: "Source note opened", timeoutMs: 20_000 },
+        );
+
+        // Switch the pane to READING view (live → reading via the bottom-bar
+        // cycle CTA). Reading view hard-disables the cursor-aware reveal, so the
+        // links ALWAYS render as chips and a click on one navigates instead of
+        // lifting it to raw text under the caret (the live-mode reveal otherwise
+        // turns the clicked chip into editable text before the click handler runs,
+        // so the navigation never fires). View mode is per-tab + persisted, so
+        // Source stays in reading view across the round-trip.
+        const CTA = '[data-testid="editor.view-mode-cta"]';
+        const viewMode = async (): Promise<string | null> => {
+          const ctas = await s.findElements(CTA);
+          return ctas.length === 0 ? null : await ctas[0].attribute("data-view-mode");
+        };
+        const enterReading = async () => {
+          // Cycle live → reading → source → live. Click ONCE per step and WAIT for
+          // the mode to actually change before clicking again — a poll that
+          // re-clicks before the re-render lands overshoots past "reading" (the
+          // CTA also mounts a beat after the row click, so poll for it first).
+          for (let i = 0; i < 4; i++) {
+            const mode = await s.waitUntil(viewMode, {
+              label: "view-mode CTA mounted",
+              timeoutMs: 15_000,
+            });
+            if (mode === "reading") return;
+            // JS-click the CTA (re-queries the DOM, so no stale handle as it
+            // re-renders on each mode change), then wait for the mode to leave its
+            // current value WITHOUT re-clicking (re-clicking before the re-render
+            // lands would overshoot past "reading").
+            await jsClick(s, CTA);
+            await s.waitUntil(
+              async () => ((await viewMode()) !== mode ? true : null),
+              { label: "view mode advanced one step", timeoutMs: 8_000 },
+            );
+          }
+          await s.waitUntil(async () => ((await viewMode()) === "reading" ? true : null), {
+            label: "pane in reading view",
+            timeoutMs: 8_000,
+          });
+        };
         await enterReading();
         await s.waitUntil(
           async () => ((await s.findElements(".cm-wikilink-chip")).length >= 2 ? true : null),
@@ -219,13 +276,13 @@ describeE2E("wd1 click [[Note#Heading]] scrolls to the heading; not-found → no
 
         // ── Back to Source, click the GHOST chip → opens Target at the TOP
         // (anchor not found → §5.6 note-top fallback). ──
-        await (
-          await s.waitForElement(`[data-testid="notes.row"][data-note-id="${sourceId}"]`)
-        ).click();
-        await s.waitUntil(async () => ((await activeNoteId()) === sourceId ? true : null), {
-          label: "back on Source",
-          timeoutMs: 10_000,
-        });
+        await s.waitUntil(
+          async () => {
+            await jsClick(s, `[data-testid="notes.row"][data-note-id="${sourceId}"]`);
+            return (await activeNoteId()) === sourceId ? true : null;
+          },
+          { label: "back on Source", timeoutMs: 20_000 },
+        );
         await enterReading();
         await clickChipByText(s, "Ghost Heading");
         await s.waitUntil(async () => ((await activeNoteId()) === targetId ? true : null), {
@@ -266,14 +323,11 @@ describeE2E("wd2 [[# / [[## heading autocomplete inserts the hybrid form (MYND-3
 
         const content = await s.waitForElement(CM_CONTENT);
 
-        // ── `[[#` current-note heading → compact `[[#Heading]]`. ──
+        // ── `[[#` current-note heading → compact `[[#Heading]]`. ── A real pointer
+        // click (the picker inserts on mousedown — a DOM click() never fires it),
+        // re-fetched so the row re-rendering as the query filters doesn't stale it.
         await content.sendKeys("[[#setup");
-        await (
-          await s.waitForElement(
-            '[data-testid="picker.heading-row"]',
-            { timeoutMs: 10_000 },
-          )
-        ).click();
+        await realClickFresh(s, '[data-testid="picker.heading-row"]');
         await s.waitUntil(
           async () => ((await editorText(s)).includes("[[#Setup wdsetup]]") ? true : null),
           { label: "[[# inserted the compact heading-anchor form", timeoutMs: 10_000 },
@@ -281,18 +335,9 @@ describeE2E("wd2 [[# / [[## heading autocomplete inserts the hybrid form (MYND-3
 
         // ── `[[##` vault-wide heading → full path form. ──
         await content.sendKeys("\n[[##goals");
-        await (
-          await s.waitForElement(
-            '[data-testid="picker.vault-heading-row"]',
-            { timeoutMs: 10_000 },
-          )
-        ).click();
+        await realClickFresh(s, '[data-testid="picker.vault-heading-row"]');
         await s.waitUntil(
-          async () => {
-            const text = await editorText(s);
-            // The full path form: a `.md#` anchor + the `|` alias divider.
-            return text.includes("Spec.md#Goals wdgoals|") ? true : null;
-          },
+          async () => ((await editorText(s)).includes("Spec.md#Goals wdgoals|") ? true : null),
           { label: "[[## inserted the full path heading form", timeoutMs: 10_000 },
         );
       },
