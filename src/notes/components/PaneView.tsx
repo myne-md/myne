@@ -270,9 +270,15 @@ export function PaneView({
   }, [activeId]);
 
   const autosave = useAutosave(activeId, content, undefined, setContent);
+  // Latest autosave handle for the reload effect, which keys only on the reload
+  // nonce (so it must NOT take `autosave` as a dep — its identity changes every
+  // render). Read through the ref at fire time.
+  const autosaveRef = useRef(autosave);
+  autosaveRef.current = autosave;
 
-  // Re-sync this pane's body when the open note is renamed on disk
-  // (MYND-140) — only relevant when this pane shows the note the sidebar
+  // Re-sync this pane's body when the open note's `.myn` changed out of band —
+  // a rename (MYND-140), a snapshot restore, OR a sync pull (`sync://changed` →
+  // `reloadOpenNote`). Only relevant when this pane shows the note the sidebar
   // acted on (`selectedId`). Skips the initial mount.
   const reloadNonce = ctx.contentReloadNonce;
   const reloadInit = useRef(true);
@@ -282,11 +288,24 @@ export function PaneView({
       return;
     }
     if (activeId === null || activeId !== ctx.selectedId) return;
+    // Never clobber unsaved local edits: a dirty buffer means the engine kept
+    // OUR on-disk version (it skips a locally-dirty blob on pull), so reloading
+    // would either resurrect stale bytes or discard the user's work. Leave the
+    // dirty buffer alone; its edit pushes on the next sync.
+    const st = autosaveRef.current.status.status;
+    if (st === "editing" || st === "saving" || st === "error") return;
     let cancelled = false;
     void (async () => {
       try {
         const body = await noteRead(activeId);
-        if (!cancelled) setContent((prev) => (prev === body ? prev : body));
+        if (cancelled) return;
+        // Re-baseline autosave to the reloaded body BEFORE swapping it in, so the
+        // content change registers as freshly-loaded content, not a user edit.
+        // Without this, a sync-pulled reload looks locally-dirty and the next
+        // sync stages a spurious keep-both conflict for a note the user never
+        // touched (the false-conflict bug, sync Bug 1).
+        autosaveRef.current.acceptReloadedBody(body);
+        setContent((prev) => (prev === body ? prev : body));
       } catch {
         /* re-sync failure is non-fatal */
       }

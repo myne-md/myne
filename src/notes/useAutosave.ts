@@ -41,6 +41,9 @@ export type UseAutosaveReturn = {
   retry: () => void;
   /** Flush any pending save synchronously (awaitable). No-op when clean. */
   flushIfDirty: () => Promise<void>;
+  /** Adopt an externally-reloaded body as loaded content (not a user edit).
+   *  Caller must ensure the buffer is clean first. See the impl docstring. */
+  acceptReloadedBody: (reloadedBody: string) => void;
 };
 
 /**
@@ -224,6 +227,32 @@ export function useAutosave(
     }
   }, [body, clearTimers, fireSave]);
 
+  /**
+   * Adopt an externally-reloaded body (a sync pull / snapshot-restore wrote a
+   * new `.myn` and the pane re-read it) as freshly-LOADED content — NOT a user
+   * edit. Re-baselines `savedBodyRef` to it so the body-change effect takes its
+   * "matches last-saved" clean branch instead of marking the buffer dirty.
+   *
+   * Without this, a sync-pulled reload looks identical to a local edit: the next
+   * sync then sees the note as locally-changed while the server also advanced,
+   * and stages a spurious keep-both conflict for a note the user never touched
+   * (the false-conflict bug, MYND sync Bug 1). Callers MUST invoke this ONLY
+   * when the buffer is clean — re-baselining over real unsaved edits would lose
+   * them.
+   */
+  const acceptReloadedBody = useCallback(
+    (reloadedBody: string) => {
+      clearTimers();
+      inFlightRef.current = null;
+      dirtyRef.current = false;
+      hasEditedRef.current = true;
+      savedBodyRef.current = reloadedBody;
+      latestBodyRef.current = reloadedBody;
+      setStatus({ status: "clean" });
+    },
+    [clearTimers],
+  );
+
   const flushIfDirty = useCallback(async (): Promise<void> => {
     if (!dirtyRef.current && inFlightRef.current === null) return;
     if (inFlightRef.current !== null) {
@@ -274,7 +303,7 @@ export function useAutosave(
   }, []);
 
   return useMemo(
-    () => ({ status, retry, flushIfDirty }),
-    [status, retry, flushIfDirty],
+    () => ({ status, retry, flushIfDirty, acceptReloadedBody }),
+    [status, retry, flushIfDirty, acceptReloadedBody],
   );
 }

@@ -369,4 +369,52 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     expect(saveImpl).toHaveBeenCalledTimes(1);
     expect(onSaved).not.toHaveBeenCalled();
   });
+
+  // ── Sync Bug 1 fix: acceptReloadedBody ──────────────────────────────
+  // A `sync://changed` pull rewrites the open note's `.myn`; the pane re-reads
+  // it and must register the swap as freshly-LOADED content, not a user edit.
+  // Otherwise the buffer looks locally-dirty and the next sync stages a spurious
+  // keep-both conflict for a note the user never touched.
+
+  it("acceptReloadedBody adopts a sync-reloaded body as clean — no dirty, no save", async () => {
+    const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "v1" } },
+    );
+    expect(result.current.status).toEqual({ status: "clean" });
+
+    // A peer's edit arrived: re-baseline to the reloaded body, THEN swap it in
+    // (the PaneView reload-effect order).
+    act(() => result.current.acceptReloadedBody("v2 from peer"));
+    rerender({ body: "v2 from peer" });
+
+    // The reload must NOT look like a user edit — the buffer is non-dirty
+    // (settles to "saved"/in-sync, not "editing"/"saving") and no save fires.
+    expect(result.current.status.status).toBe("saved");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_MAX_MS);
+    });
+    expect(saveImpl).not.toHaveBeenCalled();
+  });
+
+  it("a real user edit AFTER acceptReloadedBody still autosaves (re-baseline isn't permanent)", async () => {
+    const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "v1" } },
+    );
+
+    act(() => result.current.acceptReloadedBody("v2"));
+    rerender({ body: "v2" });
+    expect(result.current.status.status).toBe("saved"); // non-dirty after reload
+
+    // Now the user actually types over the reloaded content.
+    rerender({ body: "v2 + user edit" });
+    expect(result.current.status).toEqual({ status: "editing" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    expect(saveImpl).toHaveBeenCalledWith("note-1", "v2 + user edit");
+  });
 });
