@@ -124,12 +124,16 @@ async function createNoteInFolder(
  *  landed on (`aria-selected="true"` + `data-note-id`, the byTestId-only handle;
  *  the random-note suite's idiom). */
 async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
+  // Read the OPEN note from the active editor tab, not the sidebar row: a note
+  // filed into a folder lives under a collapsible folder row that may be folded
+  // shut (hiding its row), but the just-created/opened note is always the active
+  // editor tab. The tab carries `data-tab-id="note:<id>"` (Saved Views #4).
+  const tab = await s.waitForElement('[data-testid="editor.tab"][data-active="true"]');
+  const raw = (await tab.attribute("data-tab-id")) ?? "";
+  if (!raw.startsWith("note:")) {
+    throw new Error(`active editor tab is not a note tab: "${raw}"`);
   }
-  return id;
+  return raw.slice("note:".length);
 }
 
 describeE2E("fn1 folder index: designate → hidden → double-click open → link-resolve → undesignate (MYND-370)", () => {
@@ -165,6 +169,14 @@ describeE2E("fn1 folder index: designate → hidden → double-click open → li
         await waitForSaved(s);
         const otherNoteId = await selectedNoteId(s);
         expect(indexNoteId).not.toBe(otherNoteId);
+
+        // Ensure the folder is expanded so the notes' sidebar rows are
+        // addressable for the designate/undesignate operations below (a single
+        // click on the folder row toggles its disclosure — FolderRow.onToggle).
+        const folderRow = await s.byTestId("notes.folder-row");
+        if ((await folderRow.attribute("aria-expanded")) === "false") {
+          await folderRow.click();
+        }
 
         // ── Designate the first note as the folder's index via its row menu. ──
         await contextMenuPick(
@@ -206,6 +218,12 @@ describeE2E("fn1 folder index: designate → hidden → double-click open → li
         await (
           await s.waitForElement(testIdSelector("picker.folder-row"), { timeoutMs: 10_000 })
         ).click();
+        // The chip lifts to raw `[[…]]` text while the caret is on its line
+        // (cursor-line reveal — chip-widget.ts `isWikilinkRevealed`). Move the
+        // caret off the link's line with a newline so the link re-renders as a
+        // chip. U+E007 is the W3C Enter code point (never a literal newline; the
+        // invisible-key hazard — built via fromCharCode so it survives editing).
+        await content.sendKeys(String.fromCharCode(0xe007));
         await s.waitForElement(".cm-wikilink-chip");
         expect((await s.findElements(".cm-wikilink-chip-broken")).length).toBe(0);
 
