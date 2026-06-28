@@ -48,7 +48,17 @@ export async function unlockToEditor(
   password: string,
   timeoutMs = 30_000,
 ): Promise<void> {
-  await (await session.byTestId("unlock.password-input")).sendKeys(password);
+  const input = await session.byTestId("unlock.password-input");
+  await input.sendKeys(password);
+  // WebKit's driver can silently swallow the leading keystrokes sent during the
+  // input's focus-settle (the same settle-drop the editor's q-probe guards
+  // against) — a truncated password then fails the unlock and the run is stuck
+  // on the lock screen. If the field doesn't hold the exact password, re-enter
+  // it. Boolean compare only: the value never reaches a log or assertion diff
+  // (SYNC-13).
+  if ((await input.property<string>("value")) !== password) {
+    await input.replaceText(password);
+  }
   await (await session.byTestId("unlock.submit")).click();
   await session.byTestId("editor.root", { timeoutMs });
 }
@@ -71,17 +81,11 @@ export async function switchToVault(session: Session, vaultId: string): Promise<
   ).click();
 }
 
-/** Open the command palette via its Ctrl+K hotkey (the Linux-container
- *  modifier — the `palette.toggle` keybind defaults to Mod-k / Mod-p) and
- *  wait for the palette input. Pure-key chord through the W3C Actions API:
- *  Control DOWN → k DOWN → k UP → Control UP. Then optionally filter by
- *  typing `query` and run the matching action row by its `data-action-id`. */
-export async function runPaletteAction(
-  session: Session,
-  actionId: string,
-  query: string,
-): Promise<void> {
-  const CONTROL = "\uE009"; // W3C Actions API code point for Control
+/** Fire the bare Ctrl+K chord via the W3C Actions API (Control DOWN → k DOWN →
+ *  k UP → Control UP). `palette.toggle` defaults to Mod-k / Mod-p; Mod is
+ *  Control on the Linux container. */
+async function sendPaletteChord(session: Session): Promise<void> {
+  const CONTROL = String.fromCharCode(0xe009); // W3C Actions API code point for Control
   await session.send("POST", "/actions", {
     actions: [
       {
@@ -96,6 +100,50 @@ export async function runPaletteAction(
       },
     ],
   });
+}
+
+/** Open the command palette and wait for `palette.input`. The Ctrl+K chord can
+ *  be dropped when the keybind engine isn't focused yet (right after an
+ *  attachment dialog, a view switch, …), so re-send until the input mounts.
+ *  A chord sent while the palette is already open would toggle it shut, so each
+ *  round checks for an open palette BEFORE re-firing. */
+async function openPalette(session: Session): Promise<void> {
+  await session.waitUntil(
+    async () => {
+      try {
+        return await session.byTestId("palette.input", { timeoutMs: 400 });
+      } catch {
+        /* not open yet — fall through and fire the chord */
+      }
+      // W3C key actions only dispatch to a focused element. After a flow that
+      // leaves focus detached (createNote's rename-input commit, a just-closed
+      // dialog) the chord lands nowhere and window's keydown listener never
+      // fires. Re-anchor focus on the editor surface before firing. Best-effort:
+      // some palette entrypoints (cards view, settings) have no editor.content.
+      try {
+        await (await session.byTestId("editor.content", { timeoutMs: 500 })).click();
+      } catch {
+        /* no editor surface here — the chord may still reach window */
+      }
+      await sendPaletteChord(session);
+      try {
+        return await session.byTestId("palette.input", { timeoutMs: 1_500 });
+      } catch {
+        return null;
+      }
+    },
+    { label: "command palette open (Ctrl+K)", timeoutMs: 12_000 },
+  );
+}
+
+/** Open the command palette via Ctrl+K (retrying the chord), then filter by
+ *  typing `query` and run the matching action row by its `data-action-id`. */
+export async function runPaletteAction(
+  session: Session,
+  actionId: string,
+  query: string,
+): Promise<void> {
+  await openPalette(session);
   await (await session.byTestId("palette.input")).sendKeys(query);
   await (
     await session.waitForElement(
@@ -116,21 +164,7 @@ export async function searchAndOpenNote(
   query: string,
   noteId: string,
 ): Promise<void> {
-  const CONTROL = "\uE009"; // W3C Actions API code point for Control
-  await session.send("POST", "/actions", {
-    actions: [
-      {
-        type: "key",
-        id: "kbd",
-        actions: [
-          { type: "keyDown", value: CONTROL },
-          { type: "keyDown", value: "k" },
-          { type: "keyUp", value: "k" },
-          { type: "keyUp", value: CONTROL },
-        ],
-      },
-    ],
-  });
+  await openPalette(session);
   await (await session.byTestId("palette.input")).sendKeys(query);
   await (
     await session.waitForElement(
@@ -245,6 +279,27 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
     },
     { label: "keystroke pipeline established", timeoutMs: 10_000 },
   );
+  // The probe leaves stray "q"(s) at the document start, which shift every
+  // position-sensitive payload — word selection (Mod-d next-occurrence),
+  // multi-cursor columns, heading offsets. Clear the document before the real
+  // payload: select-all (Ctrl+A) + Backspace. typeIntoEditor writes into a
+  // fresh note, so wiping is safe and leaves the caret at offset 0.
+  const CONTROL = String.fromCharCode(0xe009);
+  await session.send("POST", "/actions", {
+    actions: [
+      {
+        type: "key",
+        id: "kbd",
+        actions: [
+          { type: "keyDown", value: CONTROL },
+          { type: "keyDown", value: "a" },
+          { type: "keyUp", value: "a" },
+          { type: "keyUp", value: CONTROL },
+        ],
+      },
+    ],
+  });
+  await content.sendKeys(String.fromCharCode(0xe003)); // BACKSPACE deletes the selection
   // `editorText()` reads `.cm-content`'s textContent, which concatenates CM6's
   // per-line `<div class="cm-line">` blocks WITHOUT a separator (textContent
   // omits block boundaries). A multi-line payload's "\n" therefore never shows
@@ -259,7 +314,7 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
   // multi-cursor, heading folding, …). Send the W3C ENTER key (U+E007) for line
   // breaks so real cm-lines are created; `landed` still compares newline-free
   // (textContent omits block boundaries either way).
-  const keys = text.replace(/\n/g, "");
+  const keys = text.replace(/\n/g, String.fromCharCode(0xe007));
   await content.sendKeys(keys);
   try {
     await session.waitUntil(landed, {
