@@ -14,7 +14,12 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { createNote, dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  createNote,
+  dismissImporterOffer,
+  dismissImporterOfferIfPresent,
+  unlockToEditor,
+} from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
 /** The right-cluster bar item ids in current DOM (display) order. */
@@ -81,7 +86,10 @@ describeE2E("br1 bottom-bar item reorder persists (bottom-bar customization)", (
         await (await s.byTestId("editor.lock-cta")).click();
         await s.byTestId("unlock.password-input");
         await unlockToEditor(s, password);
-        await dismissImporterOffer(s);
+        // Second editor mount on a vault that already has notes: the importer
+        // offer does NOT re-appear (its dismissal persisted), so a hard dismiss
+        // would time out — use the present-or-skip variant.
+        await dismissImporterOfferIfPresent(s);
         await s.byTestId("editor.bottom-bar");
         const after = await barOrder(s);
         expect(after.indexOf("graph")).toBeGreaterThan(after.indexOf("settings"));
