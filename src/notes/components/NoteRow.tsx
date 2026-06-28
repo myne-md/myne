@@ -299,8 +299,24 @@ export function NoteRow(props: NoteRowProps) {
 
   const subtitleText = effectiveDate !== null ? formatRelativeTime(effectiveDate) : "";
 
+  // Timestamp of the last contextmenu on this row. Some engines synthesise a
+  // primary-button `click` (button === 0) immediately after a right-click; that
+  // phantom click must NOT run the plain-open path, or it would clear an
+  // in-progress multi-selection just as the bulk context menu opens (the menu
+  // would then see a single selection). A right-click sets this; handleClick
+  // ignores a click that lands within a tick of it.
+  const lastContextMenuAt = useRef<number>(0);
+
   const handleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
+      // Primary button only — a non-primary press (right-click → context menu,
+      // middle-click → new tab via onAuxClick) must not also open the note.
+      if (e.button !== 0) return;
+      // Suppress a phantom primary-button click synthesised right after a
+      // right-click (observed under WebKit: the contextmenu's trailing click
+      // reports button 0). 300 ms covers the synth latency without affecting a
+      // genuine later left-click.
+      if (performance.now() - lastContextMenuAt.current < 300) return;
       // Modifier matrix (MYND-166 + MYND-367). Shift / Cmd-Ctrl are
       // multi-select gestures that must NOT open the note; Alt splits; plain
       // opens in the focused pane. Shift takes precedence over Cmd/Ctrl so a
@@ -341,6 +357,7 @@ export function NoteRow(props: NoteRowProps) {
   const handleContextMenu = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
       e.preventDefault();
+      lastContextMenuAt.current = performance.now();
       onContextMenu(record.noteUuid, { x: e.clientX, y: e.clientY });
     },
     [onContextMenu, record.noteUuid],
