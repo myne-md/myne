@@ -264,6 +264,27 @@ export async function createNote(session: Session, title: string): Promise<void>
   await session.waitForGone(testIdSelector("notes.rename-input"));
 }
 
+/** Re-open the FIRST sidebar note after a `refresh()` and wait until its editor
+ *  body actually mounts. A WebView reload re-renders the sidebar AND remounts the
+ *  editor; a single `notes.row` click can land before the row is wired (or race
+ *  the editor mount) and silently NOT open the note, leaving the empty
+ *  note-switcher up (no `.cm-content`) — which makes any absence-assertion (e.g.
+ *  "no squiggle") pass vacuously and the next presence-assertion fail. Re-click
+ *  (native DOM click, re-queried so no stale handle) until `.cm-content` is
+ *  present. Generous budget for full-suite cumulative load. */
+export async function reopenNoteAfterReload(session: Session): Promise<void> {
+  await session.waitUntil(
+    async () => {
+      await session.execute(
+        "var r = document.querySelector('[data-testid=\"notes.row\"]');" +
+          "if (r) r.click(); return 1;",
+      );
+      return (await session.findElements(CM_CONTENT)).length > 0 ? true : null;
+    },
+    { label: "note reopened after reload", timeoutMs: 30_000 },
+  );
+}
+
 /** Type into the live CodeMirror document. A plain element click does
  *  NOT focus CM under this driver (activeElement stays put); sendKeys'
  *  implicit focus does, but keys sent during that focus settle drop

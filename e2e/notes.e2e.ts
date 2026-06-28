@@ -27,6 +27,7 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
+  reopenNoteAfterReload,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -106,14 +107,10 @@ describeE2E("nc2 reload mid-edit (MYND-223)", () => {
 
         await s.refresh();
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
-        await (await s.byTestId("notes.row")).click();
-        // Wait for the CM content to actually MOUNT before asserting the marker.
-        // Post-reload the editor re-mounts and re-reads the note from disk; under
-        // full-suite cumulative load that can exceed `editorText`'s own 10 s
-        // `.cm-content` wait, which would otherwise throw out of the assertion.
-        await s.waitForElement('[data-testid="editor.content"] .cm-content', {
-          timeoutMs: 30_000,
-        });
+        // Reopen the note + wait for the editor body to MOUNT before asserting —
+        // the post-reload row click can race the editor remount under load and
+        // silently not open the note (empty note-switcher), failing the marker.
+        await reopenNoteAfterReload(s);
         await s.waitUntil(async () => (await editorText(s)).includes(MARKER) || null, {
           label: "marker survives the reload",
           timeoutMs: 15_000,
