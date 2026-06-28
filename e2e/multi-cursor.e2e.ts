@@ -152,8 +152,20 @@ describeE2E("mc1 vertical add-cursor types in lockstep + Escape collapses (MYND-
         );
 
         // Escape collapses the multi-selection back to a single cursor (story 6).
-        await tapKey(s, ESCAPE);
-        await waitForSelectionCount(s, 1);
+        // Escape is LAYERED: typing the lockstep marker can leave a word/auto-
+        // complete tooltip open at the cursors, and CM6's closeCompletion claims
+        // the first Escape to dismiss it (higher precedence than the collapse
+        // command) — so press Escape until the selection actually collapses
+        // (a no-op once it's a single range: collapseMultiSelection returns false
+        // and the key falls through harmlessly).
+        await s.waitUntil(
+          async () => {
+            if ((await selectionCount(s)) === 1) return true;
+            await tapKey(s, ESCAPE);
+            return null;
+          },
+          { label: "Escape collapses the multi-selection to one", timeoutMs: 10_000 },
+        );
       },
     );
   });
