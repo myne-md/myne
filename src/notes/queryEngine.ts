@@ -523,6 +523,39 @@ export async function runView(
 /** Value-equality of two view results (groups in order; rows by noteId + order;
  *  group key/type). Pure — the consumer (#5) holds the previous-result ref and
  *  bails the render on a reference-equal outcome (mirrors `stabilizeResult`). */
+/** Structural equality of one displayed property cell (type + scalar value +
+ *  list elements). `undefined` cells (absent column) compare equal. */
+function sameStoredProperty(
+  a: StoredProperty | undefined,
+  b: StoredProperty | undefined,
+): boolean {
+  if (a === b) return true;
+  if (a === undefined || b === undefined) return false;
+  if (a.type !== b.type || a.value !== b.value) return false;
+  const ea = a.elements;
+  const eb = b.elements;
+  if (ea === eb) return true;
+  if (ea === undefined || eb === undefined || ea.length !== eb.length) return false;
+  for (let i = 0; i < ea.length; i++) if (ea[i] !== eb[i]) return false;
+  return true;
+}
+
+/** Whether two rows render identically — same note AND same displayed column
+ *  values. The values comparison is load-bearing: a property edit (e.g. setting
+ *  a card cover, which adds a `cover` column value to the SAME note-set) must
+ *  invalidate the stabilised result, or the cards would keep the stale,
+ *  cover-less rows and never paint the new cover. */
+function sameRow(a: ViewRow, b: ViewRow): boolean {
+  if (a.noteId !== b.noteId) return false;
+  const ka = Object.keys(a.values);
+  const kb = Object.keys(b.values);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (!sameStoredProperty(a.values[k], b.values[k])) return false;
+  }
+  return true;
+}
+
 export function sameViewResult(a: ViewResult, b: ViewResult): boolean {
   if (a === b) return true;
   if (a.groups.length !== b.groups.length) return false;
@@ -532,7 +565,7 @@ export function sameViewResult(a: ViewResult, b: ViewResult): boolean {
     if (ga.key !== gb.key || ga.type !== gb.type) return false;
     if (ga.rows.length !== gb.rows.length) return false;
     for (let j = 0; j < ga.rows.length; j++) {
-      if (ga.rows[j].noteId !== gb.rows[j].noteId) return false;
+      if (!sameRow(ga.rows[j], gb.rows[j])) return false;
     }
   }
   return true;
