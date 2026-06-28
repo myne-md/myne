@@ -63,7 +63,11 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
         await s.byTestId("views.empty");
 
         // Create a view → it opens as a view tab AND appears as a sidebar row.
+        // "+ New view" opens the filter builder empty (MYND-282); saving with no
+        // conditions creates an all-pages view that opens as a tab.
         await (await s.byTestId("views.new-button")).click();
+        await (await s.byTestId("view-filter.save")).click();
+        await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host"); // the new view opened as a tab
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 1 ? true : null),
@@ -93,8 +97,10 @@ describeE2E("sv1 views sidebar create / open / rename / reorder / delete (MYND-2
           { label: "row renamed to reading" },
         );
 
-        // Create a second view → two rows.
+        // Create a second view → two rows (builder opens empty, save creates it).
         await (await s.byTestId("views.new-button")).click();
+        await (await s.byTestId("view-filter.save")).click();
+        await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.waitUntil(
           async () => ((await s.byTestIdAll("views.row")).length === 2 ? true : null),
           { label: "second view row appears" },

@@ -161,10 +161,23 @@ export class Element {
     await this.sendKeys("\uE003".repeat((current ?? "").length) + text);
   }
 
+  /** W3C "Get Element Rect" — the element's viewport position + size
+   *  (`{ x, y, width, height }`). Used to right-click a specific region of a
+   *  wide element (e.g. the bottom-bar's empty LEFT zone vs its affordances). */
+  async rect(): Promise<{ x: number; y: number; width: number; height: number }> {
+    return this.session.send<{ x: number; y: number; width: number; height: number }>(
+      "GET",
+      this.path("/rect"),
+    );
+  }
+
   /** Right-click via the W3C Actions API (context-menu affordances —
    *  e.g. note/folder rows). Element-origin pointer move targets the
-   *  in-view center; button 2 down+up synthesizes `contextmenu`. */
-  async rightClick(): Promise<void> {
+   *  in-view center by default; pass `offsetX`/`offsetY` (pixels from center)
+   *  to hit a specific region — e.g. the bottom-bar's empty area, which opens
+   *  the bar's list menu rather than a per-affordance menu. Button 2 down+up
+   *  synthesizes `contextmenu`. */
+  async rightClick(offsetX = 0, offsetY = 0): Promise<void> {
     await this.session.send("POST", "/actions", {
       actions: [
         {
@@ -176,8 +189,8 @@ export class Element {
               type: "pointerMove",
               duration: 0,
               origin: { [ELEMENT_KEY]: this.elementId },
-              x: 0,
-              y: 0,
+              x: offsetX,
+              y: offsetY,
             },
             { type: "pointerDown", button: 2 },
             { type: "pointerUp", button: 2 },

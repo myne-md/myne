@@ -18,7 +18,12 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { createNote, dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  createNote,
+  dismissImporterOffer,
+  dismissImporterOfferIfPresent,
+  unlockToEditor,
+} from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
 /** Count of `editor.graph-button` affordances currently in the bottom bar. */
@@ -26,9 +31,15 @@ async function graphButtonCount(session: Session): Promise<number> {
   return (await session.byTestIdAll("editor.graph-button")).length;
 }
 
-/** Open the bottom-bar context menu and return the menu item for `itemId`. */
+/** Open the bottom-bar LIST menu (per-item visibility toggles) and return the
+ *  menu item for `itemId`. The bar's affordances sit in a RIGHT cluster after a
+ *  `flex:1` spacer; right-clicking the bar CENTER lands on an affordance and
+ *  opens its per-item (move/hide) menu instead. Right-click the empty LEFT
+ *  spacer so the bar-root `onContextMenu` (list menu) fires. */
 async function openBarMenuItem(session: Session, itemId: string) {
-  await (await session.byTestId("editor.bottom-bar")).rightClick();
+  const bar = await session.byTestId("editor.bottom-bar");
+  const r = await bar.rect();
+  await bar.rightClick(-(Math.floor(r.width / 2) - 24), 0);
   return await session.waitForElement(
     testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
   );
@@ -74,7 +85,9 @@ describeE2E("bb1 bottom-bar item hide/show persists (bottom-bar customization)",
         await (await s.byTestId("editor.lock-cta")).click();
         await s.byTestId("unlock.password-input");
         await unlockToEditor(s, password);
-        await dismissImporterOffer(s);
+        // Second mount on a vault that already has notes: the importer offer's
+        // dismissal persisted, so it does NOT re-appear — present-or-skip.
+        await dismissImporterOfferIfPresent(s);
         await s.byTestId("editor.bottom-bar");
         expect(await graphButtonCount(s)).toBe(0);
 

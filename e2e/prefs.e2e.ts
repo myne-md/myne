@@ -22,6 +22,7 @@ import {
   closeSettings,
   createNote,
   dismissImporterOffer,
+  dismissImporterOfferIfPresent,
   openSettings,
   selectPickerRow,
   switchToVault,
@@ -224,7 +225,9 @@ describeE2E("pf4 sidebar note-timestamp visibility round-trip (sidebar-note-time
         // re-read from the MYP1 blob, so the subtitle stays hidden (persisted).
         await s.refresh();
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
-        await dismissImporterOffer(s);
+        // After a reload the importer offer's dismissal persisted (localStorage),
+        // so it does NOT re-appear — present-or-skip, not a hard dismiss.
+        await dismissImporterOfferIfPresent(s);
         await s.byTestId("notes.row");
         await s.waitForGone(testIdSelector("notes.row-subtitle"));
 

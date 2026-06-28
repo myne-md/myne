@@ -57,9 +57,12 @@ describeE2E("svc1 cards view renders live notes as image-less cards (MYND-275)",
         await createNote(s, "Sapiens");
         await createNote(s, "Hyperion");
 
-        // Create a blank cards view from the Views section header → it opens as
-        // a view tab (filters: all, view_type: cards).
+        // Create a blank view from the Views section header. "+ New view" opens
+        // the filter builder empty (MYND-282); saving with no conditions creates
+        // a view that opens as a tab.
         await (await s.byTestId("views.new-button")).click();
+        await (await s.byTestId("view-filter.save")).click();
+        await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host"); // the new view opened as a tab
 
         // The cards surface is present and renders one card per live note.
