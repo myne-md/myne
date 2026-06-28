@@ -33,11 +33,13 @@ import {
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
-/** Whether the editor root currently carries `data-focus-active="true"`. The
- *  attribute is omitted (null) when focus is off (the component renders
- *  `undefined`), so an exact "true" check is the on-signal. */
+/** Whether focus mode is on, i.e. some element carries `data-focus-active="true"`.
+ *  The attribute lives on the editor's center container (a descendant of the
+ *  `editor.root` display:contents wrapper, NOT on editor.root itself), and it is
+ *  omitted entirely when focus is off (the component renders `undefined`) — so
+ *  the presence of a `[data-focus-active="true"]` node is the on-signal. */
 async function focusActive(s: Session): Promise<boolean> {
-  return (await (await s.byTestId("editor.root")).attribute("data-focus-active")) === "true";
+  return (await s.findElements('[data-focus-active="true"]')).length > 0;
 }
 
 describeE2E("fm1 focus mode flips data-focus-active (focus-mode, MYND-348)", () => {
