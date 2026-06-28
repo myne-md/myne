@@ -121,7 +121,7 @@ export class Element {
    *  pause lets the opacity transition settle before the press. Use for
    *  hover-gated affordances `/click` rejects; prefer `click()` (which retries on
    *  transient non-interactability) for ordinary buttons/rows. */
-  async actionClick(): Promise<void> {
+  async actionClick(offsetX = 0, offsetY = 0): Promise<void> {
     await this.session.send("POST", "/actions", {
       actions: [
         {
@@ -133,8 +133,8 @@ export class Element {
               type: "pointerMove",
               duration: 0,
               origin: { [ELEMENT_KEY]: this.elementId },
-              x: 0,
-              y: 0,
+              x: offsetX,
+              y: offsetY,
             },
             { type: "pause", duration: 200 },
             { type: "pointerDown", button: 0 },
