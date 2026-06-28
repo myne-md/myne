@@ -44,6 +44,27 @@ export function driverBinary(): string {
   return process.env.TAURI_DRIVER ?? "tauri-driver";
 }
 
+/** Signal the whole process GROUP led by `proc` (it is spawned `detached`, so its
+ *  pid is the group id), reaping tauri-driver + WebKitWebDriver + the app binary
+ *  together. Falls back to signalling just `proc` if the group send fails (e.g.
+ *  the process already exited, or a platform without process groups). */
+function killTree(proc: ChildProcess, signal: NodeJS.Signals): void {
+  const pid = proc.pid;
+  if (pid !== undefined) {
+    try {
+      process.kill(-pid, signal);
+      return;
+    } catch {
+      // group gone / unsupported — fall through to the single-process kill
+    }
+  }
+  try {
+    proc.kill(signal);
+  } catch {
+    // already dead
+  }
+}
+
 /** Cheap preflight: are we even on a platform that can run the harness?
  *  Used by specs to self-skip with an honest message instead of a
  *  confusing spawn failure (the harness is Linux-only — SYNC-1). */
@@ -156,6 +177,14 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
     driverBinary(),
     ["--port", String(driverPort), "--native-port", String(nativePort)],
     {
+      // Own process GROUP: tauri-driver spawns WebKitWebDriver which spawns the
+      // app binary; `detached` makes `proc` the group leader so teardown can
+      // reap the WHOLE tree with one group signal. Without this, killing only
+      // `proc` orphans the app binary when `deleteSession` doesn't close it
+      // (e.g. it timed out under load) — and ~60 orphaned WebKit app instances
+      // accumulating across the suite are exactly the cumulative host pressure
+      // that made late tests flaky.
+      detached: true,
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
@@ -186,9 +215,12 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       } catch {
         // Session may already be gone (app crashed / window closed).
       }
-      proc.kill("SIGTERM");
+      // Reap the ENTIRE driver→WebKitWebDriver→app process group (negative pid),
+      // not just `proc` — orphaned app instances are the suite's load leak. Fall
+      // back to a plain `proc` kill if the group signal can't be sent.
+      killTree(proc, "SIGTERM");
       await sleep(200);
-      if (proc.exitCode === null) proc.kill("SIGKILL");
+      if (proc.exitCode === null) killTree(proc, "SIGKILL");
       try {
         if (!opts.keepDataDir) rmSync(dataHome, { recursive: true, force: true });
       } catch {
@@ -218,7 +250,7 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
 
     return { session, dataHome, appDataDir, appConfigDir, teardown, saveArtifacts };
   } catch (e) {
-    proc.kill("SIGKILL");
+    killTree(proc, "SIGKILL");
     if (!opts.keepDataDir) rmSync(dataHome, { recursive: true, force: true });
     throw e;
   }
