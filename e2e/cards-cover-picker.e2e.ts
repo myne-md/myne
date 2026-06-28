@@ -43,18 +43,59 @@ describeE2E("vc1 cards cover picker — choose an existing image as a card cover
         await dismissImporterOffer(s);
 
         // All-pages cards view via "+ New view" → save with no conditions.
-        await (await s.byTestId("views.new-button")).click();
-        await s.byTestId("view-filter.modal");
+        // Under full-suite load the populated exportSuite vault re-indexes after
+        // unlock, so the sidebar can remount and swallow the new-view click
+        // before its React handler is wired (a single click then never opens the
+        // modal — the line-47 timeout). Re-click until the modal actually opens;
+        // the button only OPENS the builder, so a duplicate open creates no view
+        // (the view is committed only by `view-filter.save`).
+        const MODAL_ATTEMPTS = 3;
+        for (let attempt = 1; attempt <= MODAL_ATTEMPTS; attempt++) {
+          await (await s.byTestId("views.new-button")).click();
+          try {
+            await s.byTestId("view-filter.modal", { timeoutMs: 8_000 });
+            break;
+          } catch (e) {
+            if (attempt === MODAL_ATTEMPTS) throw e;
+          }
+        }
         await (await s.byTestId("view-filter.save")).click();
         await s.waitForGone(testIdSelector("view-filter.modal"));
         await s.byTestId("editor.view-host");
 
-        // The gallery has at least one card (the seeded notes). Hover the first
-        // card to reveal its "Set cover" affordance.
-        const card = (await s.byTestIdAll("view.card"))[0];
-        if (card === undefined) throw new Error("no cards rendered");
-        await card.hover();
-        await (await s.waitForElement(testIdSelector("view.card-set-cover"))).click();
+        // The gallery renders one card per seeded note, but the cards surface is
+        // a projection of the post-unlock reindex — `byTestIdAll` is an
+        // immediate, non-waiting query, so grabbing [0] before the reindex paints
+        // is the "no cards rendered" race (the line-55 failure). Wait for the
+        // cards host AND at least one card, THEN hover the first card to reveal
+        // its "Set cover" affordance.
+        await s.byTestId("view.cards");
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("view.card")).length >= 1 ? true : null),
+          { label: "at least one card renders over the seeded notes" },
+        );
+
+        // The "Set cover" affordance is CONDITIONALLY rendered — it enters the
+        // DOM only while the card is hovered (`showCoverButton = onSetCover &&
+        // hovering`, cardsView.tsx). A single synthetic hover can miss the
+        // `onMouseEnter` if it lands during a gallery re-render, leaving the
+        // affordance unmounted; re-hover (re-fetching the card handle each pass,
+        // since a remount staleness-invalidates the old one) until it appears.
+        let setCover: Awaited<ReturnType<typeof s.waitForElement>> | undefined;
+        const HOVER_ATTEMPTS = 3;
+        for (let attempt = 1; attempt <= HOVER_ATTEMPTS; attempt++) {
+          try {
+            const card = (await s.byTestIdAll("view.card"))[0]!;
+            await card.hover();
+            setCover = await s.waitForElement(testIdSelector("view.card-set-cover"), {
+              timeoutMs: 6_000,
+            });
+            break;
+          } catch (e) {
+            if (attempt === HOVER_ATTEMPTS) throw e;
+          }
+        }
+        await setCover!.click();
 
         // The cover picker opens with the vault's existing image attachments.
         await s.byTestId("cover-picker.modal");
