@@ -27,6 +27,7 @@ import {
   dismissImporterOffer,
   editorText,
   openSettings,
+  reopenNoteAfterReload,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -203,7 +204,7 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
         // Persistence: a reload re-reads MYP1; the layer stays unmounted.
         await s.refresh();
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
-        await (await s.byTestId("notes.row")).click(); // reopen the note post-reload
+        await reopenNoteAfterReload(s); // reopen post-reload (load-robust)
         await squiggleGoneFor(s, WORD);
 
         // The toggle itself reads back Off (mount effect reads the pref).
@@ -235,7 +236,7 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
         // And the On state persists across a reload too.
         await s.refresh();
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
-        await (await s.byTestId("notes.row")).click(); // reopen the note post-reload
+        await reopenNoteAfterReload(s); // reopen post-reload (load-robust)
         await squiggleFor(s, WORD);
       },
     );
