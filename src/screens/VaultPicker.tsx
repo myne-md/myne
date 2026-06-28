@@ -22,11 +22,12 @@
 // frame `screen------unlock--vault-picker` on page "4a - Onboarding &
 // Auth": a 440px CenteredCard-family card on the `--paper` canvas, brand
 // row + "Choose a vault" heading + subline, an 8px-gap vault list of
-// 60px rows (chip + decorative dot + label/timestamp column + chevron),
-// and a divider-separated, chip-less, accent-tinted "Create another vault"
-// action. Fallback "Vault N" rows render the label italic + demoted with a
-// neutral-grey dot (SYNC-3); the real-label row carries a `--label-slate`
-// dot. Tokens only — no raw hex (`src/CLAUDE.md` design-token discipline).
+// 60px rows (label/timestamp column + chevron — the leading icon-chip + dot
+// were removed), and a divider-separated, accent-tinted "Create another
+// vault" + "Restore from backup" action pair. Fallback "Vault N" rows carry
+// the SYNC-3 demotion through the label alone (italic + secondary ink); no
+// real labels or content for never-unlocked vaults. Tokens only — no raw
+// hex (`src/CLAUDE.md` design-token discipline).
 
 import {
   useEffect,
@@ -167,7 +168,7 @@ function rowStyle(hovered: boolean): CSSProperties {
     width: "100%",
     height: 60,
     boxSizing: "border-box",
-    padding: "var(--space-3) var(--space-4) var(--space-3) 14px",
+    padding: "var(--space-3) var(--space-4)",
     borderRadius: "var(--radius-2)",
     background: hovered ? "var(--paper-3)" : "var(--paper)",
     border: `1px solid ${hovered ? "var(--line-2)" : "var(--line-1)"}`,
@@ -184,29 +185,6 @@ const ROW_LEFT_STYLE: CSSProperties = {
   gap: "var(--space-3)",
   minWidth: 0,
 };
-
-const CHIP_STYLE: CSSProperties = {
-  width: 36,
-  height: 36,
-  flexShrink: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "var(--paper-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-};
-
-function dotStyle(real: boolean): CSSProperties {
-  return {
-    width: 10,
-    height: 10,
-    borderRadius: "var(--radius-pill)",
-    // Real-label row's dot is the decorative iron blue-grey; a fallback
-    // ("Vault N") row gets a neutral grey so it reads as demoted.
-    background: real ? "var(--label-slate)" : "var(--line-2)",
-  };
-}
 
 const LABEL_COL_STYLE: CSSProperties = {
   display: "flex",
@@ -338,7 +316,7 @@ function CreateAnother({
       />
       <PickerActionLink
         onClick={onRestoreBackup}
-        icon="arrow-down"
+        icon="download"
         label={t("vaultPicker.restoreFromBackup")}
         testId="picker.restore-cta"
       />
@@ -373,9 +351,6 @@ function VaultRow({
       style={rowStyle(hovered)}
     >
       <span style={ROW_LEFT_STYLE}>
-        <span style={CHIP_STYLE}>
-          <span style={dotStyle(real)} aria-hidden="true" />
-        </span>
         <span style={LABEL_COL_STYLE}>
           <span style={rowLabelStyle(real)}>{label}</span>
           {meta !== "" && <span style={ROW_META_STYLE}>{meta}</span>}
