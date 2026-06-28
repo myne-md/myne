@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="314" viewBox="0 0 164 314" fill="none">
+  <!-- NSIS Welcome/Finish sidebar panel (164x314). The prominent brand surface:
+       Myne mark + wordmark + calm subline on a soft paper gradient, an accent
+       rule near the foot. Matches the macOS DMG installer art. -->
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="314" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fcfcfb"/>
+      <stop offset="1" stop-color="#eeede9"/>
+    </linearGradient>
+  </defs>
+  <rect width="164" height="314" fill="url(#paper)"/>
+
+  <!-- mark, centered -->
+  <g transform="translate(52 70)">
+    <rect width="60" height="60" rx="13" fill="#1a1a17"/>
+    <path d="M15 41 V19 L30 34 L45 19 V41" stroke="#fbfbfa" stroke-width="3.4"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="82" y="172" text-anchor="middle"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="30" font-weight="600" letter-spacing="-0.5" fill="#1a1a17">Myne</text>
+
+  <!-- calm subline (two centered lines for the narrow panel) -->
+  <text text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="11.5" font-weight="400" fill="#6b6a64">
+    <tspan x="82" y="198">A calm place</tspan>
+    <tspan x="82" y="214">for your notes.</tspan>
+  </text>
+
+  <!-- accent rule -->
+  <rect x="62" y="262" width="40" height="2" rx="1" fill="#2c4a7a"/>
+</svg>

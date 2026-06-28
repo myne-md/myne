@@ -29,8 +29,42 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Myne",
+    "homepage": "https://myne.md",
+    "category": "Productivity",
+    "shortDescription": "A calm place for your notes.",
+    "longDescription": "Myne is a clean, fast markdown notes app. Capture, link, and find your notes across devices — calmly, without lock-in. A markdown editor with [[wikilinks]], backlinks, a graph view, and full-text search; no email to sign up; your notes stay plaintext-readable markdown after decryption.",
     "macOS": {
-      "entitlements": "entitlements.plist"
+      "entitlements": "entitlements.plist",
+      "dmg": {
+        "background": "dmg/background.png",
+        "windowSize": { "width": 660, "height": 420 },
+        "appPosition": { "x": 170, "y": 250 },
+        "applicationFolderPosition": { "x": 490, "y": 250 }
+      }
+    },
+    "windows": {
+      "nsis": {
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp"
+      }
+    },
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/share/metainfo/md.myne.desktop.metainfo.xml": "installer/md.myne.desktop.metainfo.xml"
+        }
+      },
+      "rpm": {
+        "files": {
+          "/usr/share/metainfo/md.myne.desktop.metainfo.xml": "installer/md.myne.desktop.metainfo.xml"
+        }
+      },
+      "appimage": {
+        "files": {
+          "/usr/share/metainfo/md.myne.desktop.metainfo.xml": "installer/md.myne.desktop.metainfo.xml"
+        }
+      }
     },
     "icon": [
       "icons/32x32.png",

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="420" viewBox="0 0 660 420" fill="none">
+  <!-- Myne DMG installer background — brand palette (paper #fbfbfa, ink #1a1a17,
+       iron-blue accent #2c4a7a). Window 660x420; Finder draws the .app icon at
+       x=170 and the Applications alias at x=490, both centered y=250. This art
+       fills the header + the drag arrow in the gap; it leaves the icon spots clear. -->
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fcfcfb"/>
+      <stop offset="1" stop-color="#f3f3f0"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="262" y1="0" x2="398" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2c4a7a" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#2c4a7a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- page -->
+  <rect width="660" height="420" fill="url(#paper)"/>
+
+  <!-- header brand lockup, centered around x=330 -->
+  <g transform="translate(258 44)">
+    <!-- Myne mark (rounded square + M) -->
+    <rect width="44" height="44" rx="9" fill="#1a1a17"/>
+    <path d="M11 30 V14 L22 25 L33 14 V30" stroke="#fbfbfa" stroke-width="2.6"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- wordmark -->
+    <text x="58" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+          font-size="34" font-weight="600" letter-spacing="-0.5" fill="#1a1a17">Myne</text>
+  </g>
+
+  <!-- calm subline -->
+  <text x="330" y="124" text-anchor="middle"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="13.5" font-weight="400" letter-spacing="0.2" fill="#6b6a64">A calm place for your notes.</text>
+
+  <!-- hairline divider under the header -->
+  <rect x="120" y="150" width="420" height="1" fill="#e3e2dd"/>
+
+  <!-- drag instruction above the arrow -->
+  <text x="330" y="218" text-anchor="middle"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="11" font-weight="600" letter-spacing="2.4" fill="#9a998f">DRAG TO INSTALL</text>
+
+  <!-- arrow from the app icon (left) to the Applications alias (right), in the gap -->
+  <g transform="translate(0 250)">
+    <rect x="262" y="-2.5" width="120" height="5" rx="2.5" fill="url(#arrow)"/>
+    <path d="M382 -11 L402 0 L382 11 Z" fill="#2c4a7a"/>
+  </g>
+</svg>
