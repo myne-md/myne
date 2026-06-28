@@ -172,7 +172,9 @@ describeE2E("mc2 Mod-d extends to the next occurrence (MYND-306)", () => {
         const content = await s.waitForElement(CM_CONTENT);
         await content.click();
         // Document start, then select the first word "widget" (6 chars) via
-        // Shift+ArrowRight x6 → one range selecting "widget".
+        // Shift+ArrowRight x6 → one range selecting "widget". The selection must
+        // be exactly "widget" for Mod-d to find its next runs (typeIntoEditor
+        // now removes its probe char, so offset 0 is the real first letter).
         await pressChord(s, [CONTROL], HOME);
         await waitForSelectionCount(s, 1);
         for (let i = 0; i < 6; i++) {

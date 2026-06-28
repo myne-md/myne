@@ -279,12 +279,13 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
     },
     { label: "keystroke pipeline established", timeoutMs: 10_000 },
   );
-  // NOTE: the probe leaves a stray "q" at the document start. That is harmless
-  // for `includes`-based asserts but shifts POSITION-sensitive payloads (Mod-d
-  // word selection, multi-cursor columns). Those few scenarios account for the
-  // probe locally (e.g. select from offset 1); do NOT clear the document here —
-  // a select-all + delete reintroduces the very focus-settle drop the probe
-  // guards against and breaks plain "type then assert" flows (notes, snapshots).
+  // The pipeline probe typed "q" at offset 0 and the caret now sits right after
+  // it — delete it with a SINGLE Backspace so the document starts clean for
+  // position-sensitive callers (multi-cursor columns, Mod-d word selection).
+  // This is far less invasive than a select-all+delete (which reintroduces the
+  // focus-settle drop the probe guards against and regressed notes/snapshots);
+  // it's a no-op-safe keystroke against the just-typed char.
+  await content.sendKeys(String.fromCharCode(0xe003)); // BACKSPACE removes the probe "q"
   // `editorText()` reads `.cm-content`'s textContent, which concatenates CM6's
   // per-line `<div class="cm-line">` blocks WITHOUT a separator (textContent
   // omits block boundaries). A multi-line payload's "\n" therefore never shows
