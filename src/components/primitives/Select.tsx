@@ -79,7 +79,11 @@ const TRIGGER_STYLE: CSSProperties = {
 
 const MENU_STYLE: CSSProperties = {
   position: "fixed",
-  zIndex: 60,
+  // Above modal surfaces (ModalShell / SettingsModal use z-index 1000): a Select
+  // opened INSIDE the Settings modal must render its menu over the modal, not
+  // behind it — at z-index 60 the options were covered by the modal backdrop and
+  // could not be clicked (the menu is a body-level fixed portal).
+  zIndex: 1100,
   minWidth: 160,
   background: "var(--bg-1)",
   border: "1px solid var(--line-1)",
