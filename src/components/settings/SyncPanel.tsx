@@ -24,6 +24,7 @@ import { noteUpdate } from "../../notes/updateNote";
 import { deleteNoteRouted } from "../../notes/deleteNote";
 import { clearConflictMarkers } from "../../notes/conflictCopy";
 import { noteList } from "../../notes";
+import { useDevices } from "../../hooks/useDevices";
 import {
   PANEL_ROOT_STYLE,
   BLOCK_STYLE,
@@ -41,6 +42,22 @@ export function SyncPanel() {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const groups = conflictRecordsByOriginal(ctx.cache);
+
+  // Device roster, lifted here so its poll feeds BOTH the device list and the
+  // "Add a device" enroll gate (single source of enrollment truth).
+  const devicesHook = useDevices();
+  // "Add a device" enrolls THIS device into an account; once this device is an
+  // approved member it can never be re-added, so the form is dead UI — hide it.
+  // It stays visible while not-yet-a-member (never enrolled, pending approval,
+  // or removed-elsewhere/reset), so re-adding after a reset still works. Hidden
+  // until enrollment is positively known, to avoid flashing the form for an
+  // already-enrolled device on the first poll.
+  const enrolledHere = (devicesHook.devices ?? []).some(
+    (d) => d.is_current && d.approved && !d.retired,
+  );
+  const enrollmentKnown =
+    devicesHook.devices !== null || devicesHook.error !== null;
+  const showEnroll = enrollmentKnown && !enrolledHere;
 
   // Cold-start "building search index…" state. Producer: the MYND-426 engine
   // re-derives vault.search/vault.indices after a full-reconcile or a fresh
@@ -134,17 +151,19 @@ export function SyncPanel() {
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
       </div>
 
-      <div style={BLOCK_STYLE}>
-        <span style={SECTION_TITLE_STYLE}>
-          {t("sync.panel.addDevice.label")}
-        </span>
-        <p style={HELPER_STYLE}>{t("sync.panel.addDevice.helper")}</p>
-        <EnrollDeviceForm />
-      </div>
+      {showEnroll && (
+        <div style={BLOCK_STYLE}>
+          <span style={SECTION_TITLE_STYLE}>
+            {t("sync.panel.addDevice.label")}
+          </span>
+          <p style={HELPER_STYLE}>{t("sync.panel.addDevice.helper")}</p>
+          <EnrollDeviceForm />
+        </div>
+      )}
 
       <div style={BLOCK_STYLE}>
         <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
-        <DeviceManagementPanel />
+        <DeviceManagementPanel hook={devicesHook} />
       </div>
 
       <div style={BLOCK_STYLE}>

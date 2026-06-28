@@ -10,7 +10,7 @@
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
-import { useDevices, type DeviceEntry } from "../../hooks/useDevices";
+import { type DeviceEntry, type DevicesHook } from "../../hooks/useDevices";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -62,9 +62,12 @@ function shortName(d: DeviceEntry): string {
   return i18n.t("sync.devices.shortName", { hex: d.device_id_hex.slice(0, 6) });
 }
 
-export function DeviceManagementPanel() {
+// Takes the `useDevices` hook result as a prop (lifted to `SyncPanel`) so the
+// roster poll runs once for both the device list AND the "Add a device" enroll
+// gate above it — a single source of enrollment truth, no double-polling.
+export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   const { t } = useTranslation();
-  const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
+  const { devices, pending, error, busy, approve, remove, resetLocal } = hook;
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
   // This device, if the roster came back marking it retired — it was removed from
   // another device. It is filtered out of `approved`/`pending`, so without this it
