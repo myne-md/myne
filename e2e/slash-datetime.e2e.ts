@@ -41,7 +41,11 @@ describeE2E("sd1 /date slash insert (MYND-338)", () => {
         // start and the slash menu opens (it suppresses mid-word `/`).
         await s.waitUntil(
           async () => {
-            await content.sendKeys("x\n");
+            // A literal "\n" in sendKeys is U+000A, which WebKit's driver does
+            // NOT turn into Enter — the caret stays on the same line and the
+            // following `/` is treated as mid-word (slash menu suppressed). Send
+            // the W3C ENTER key so a real line break lands.
+            await content.sendKeys(`x${ENTER}`);
             return (await editorText(s)).includes("x") || null;
           },
           { label: "keystroke pipeline established at a line start", timeoutMs: 10_000 },
