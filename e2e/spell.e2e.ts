@@ -47,7 +47,7 @@ import type { Element, Session } from "./support/webdriver";
  *  Generous budget: re-mounting the spell layer (toggle On, or a reload) reloads
  *  the bundled en-US dictionary + re-tokenizes async, which under full-suite
  *  cumulative load can take well past a snappy isolated run. */
-function squiggleFor(s: Session, word: string, timeoutMs = 30_000): Promise<Element> {
+function squiggleFor(s: Session, word: string, timeoutMs = 45_000): Promise<Element> {
   return s.waitUntil(
     async () => {
       for (const el of await s.byTestIdAll("editor.spell-error")) {
