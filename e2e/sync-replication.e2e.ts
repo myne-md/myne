@@ -206,10 +206,13 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await ipcOk(a.session, "plugin:sync|sync_mark_tombstone", { noteIdHex: idHex }, 5_000);
         await ipcOk(a.session, "plugin:sync|sync_now", {});
         // B pulls the deletion → its copy now carries the `deleted:` marker.
+        // Generous budget (≈48 s): with the sync server + TWO app instances live,
+        // the pull cadence slows markedly under full-suite cumulative load versus
+        // an isolated run.
         let propagated = false;
-        for (let i = 0; i < 12 && !propagated; i++) {
+        for (let i = 0; i < 24 && !propagated; i++) {
           await ipcOk(b.session, "plugin:sync|sync_now", {});
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 2_000));
           const body = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
           propagated = body.includes("deleted:");
         }

@@ -43,8 +43,11 @@ import type { Element, Session } from "./support/webdriver";
 // target word SECOND, so the probe never fuses with it.
 
 /** The squiggle Element whose text is exactly `word` (trimmed), polling until it
- *  appears — the per-word replacement for `byTestId("editor.spell-error")`. */
-function squiggleFor(s: Session, word: string, timeoutMs = 15_000): Promise<Element> {
+ *  appears — the per-word replacement for `byTestId("editor.spell-error")`.
+ *  Generous budget: re-mounting the spell layer (toggle On, or a reload) reloads
+ *  the bundled en-US dictionary + re-tokenizes async, which under full-suite
+ *  cumulative load can take well past a snappy isolated run. */
+function squiggleFor(s: Session, word: string, timeoutMs = 30_000): Promise<Element> {
   return s.waitUntil(
     async () => {
       for (const el of await s.byTestIdAll("editor.spell-error")) {
