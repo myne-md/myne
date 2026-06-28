@@ -162,6 +162,53 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build runs.
       - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
+  # ─── Sync simulation harness (multi-device, real myne-server) ─
+  # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
+  # REAL ephemeral myne-server (the engine behavior only surfaces across two
+  # devices talking to the actual server). Those tests self-skip without the
+  # server binary, so cargo-test + cargo-test-tauri COMPILE them but never
+  # EXECUTE them — this step provides the binary so they run for real.
+  #
+  # myne-server is a PRIVATE companion repo (same situation as the disabled
+  # vector step below): cloned via a Woodpecker secret. Until the
+  # `myne_server_token` secret is configured the step SKIPS cleanly (exit 0) so
+  # it never blocks a merge. Add the secret in the Woodpecker UI
+  # (repo → Settings → Secrets):
+  #   name=myne_server_token  value=<Forgejo PAT with read access to Myne/myne-server>
+  #
+  # depends_on e2e: keeps the heavy compile steps serial on the shared host and
+  # reuses the warm workspace `dist/` (generate_context! embeds it at compile
+  # time). Only `sync::sim::` runs; the `#[ignore]`d RED bug-repro tests stay
+  # dormant until their fix lands and un-ignores them.
+  sync-sim:
+    image: rust:1.96.0-slim
+    depends_on: [e2e]
+    environment:
+      CI: "true"
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
+    commands:
+      - |
+        if [ -z "$MYNE_SERVER_TOKEN" ]; then
+          echo "myne_server_token secret not set -> skipping sync-sim (add it in Woodpecker to enable)";
+          exit 0;
+        fi
+      # fd soft limit -> hard cap (EMFILE guard, see tauri-compile).
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      # Sysdeps to compile/link myne-desktop's test binary (same set as
+      # cargo-test-tauri) + git for the clone. node/pnpm NOT needed: dist/ is
+      # already in the shared workspace from the pnpm-build step.
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev
+      # Go toolchain (matches myne-server go.mod 1.26.x) to build the server.
+      - curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -C /usr/local -xz
+      # Clone the private companion via the Forgejo mirror + build a static binary.
+      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server"
+      - cd "$CI_WORKSPACE/myne-server" && CGO_ENABLED=0 /usr/local/go/bin/go build -o myne-server ./cmd/myne-server
+      - cd "$CI_WORKSPACE"
+      # Point the harness at the freshly built server and run ONLY the sim suite.
+      - export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server/myne-server"
+      - cargo test -p myne-desktop --lib sync::sim:: --no-fail-fast
+
   # ─── Cross-impl vector verification (DISABLED) ───────────────
   # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
   # byte-equality of the public API; without the companion checked out those 13
