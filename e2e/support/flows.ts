@@ -285,6 +285,11 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
   // This is far less invasive than a select-all+delete (which reintroduces the
   // focus-settle drop the probe guards against and regressed notes/snapshots);
   // it's a no-op-safe keystroke against the just-typed char.
+  // Remove the probe "q" before typing the real payload. The caret sits right
+  // AFTER the just-typed probe (in the note BODY — notes carry editable YAML
+  // frontmatter, so the probe is NOT at document offset 0), so a single
+  // caret-relative Backspace deletes it regardless of the frontmatter above. A
+  // leftover probe char would shift position-sensitive payloads (multi-cursor).
   await content.sendKeys(String.fromCharCode(0xe003)); // BACKSPACE removes the probe "q"
   // `editorText()` reads `.cm-content`'s textContent, which concatenates CM6's
   // per-line `<div class="cm-line">` blocks WITHOUT a separator (textContent

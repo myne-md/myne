@@ -5,13 +5,28 @@
 // heading-cycle shortcut); Cmd+Shift+L opens the `[[` wikilink note picker
 // (MYND-38).
 
-import { type ChangeSpec, type Text } from "@codemirror/state";
+import { EditorSelection, type ChangeSpec, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { selectNextOccurrence } from "@codemirror/search";
 import { toggleWrap } from "./wrap-toggle";
 import { cachedLocateFrontmatter } from "./frontmatter-cache";
 import { openWikilinkPicker } from "./wikilink/picker";
+
+/** Escape collapses a multi-cursor / multi-range selection back to a single
+ *  cursor at the primary range's head (multi-cursor story 6, MYND-306). Returns
+ *  `false` when there is only one range, so the keystroke falls through to other
+ *  Escape handlers (close the search bar, dismiss a menu) — it never swallows a
+ *  plain Escape. */
+const collapseMultiSelection: Command = (view) => {
+  if (view.state.selection.ranges.length <= 1) return false;
+  view.dispatch({
+    selection: EditorSelection.single(view.state.selection.main.head),
+    scrollIntoView: true,
+    userEvent: "select",
+  });
+  return true;
+};
 
 function wrapCommand(open: string, close: string): Command {
   const cmd = toggleWrap(open, close);
@@ -119,4 +134,9 @@ export const myneKeyBindings: readonly KeyBinding[] = [
   // select-all-occurrences is intentionally omitted (its conventional
   // `Mod-Shift-L` chord is the `[[` wikilink picker above).
   { key: "Mod-d", run: selectNextOccurrence },
+  // Multi-cursor (MYND-306) story 6: Escape collapses a multi-selection back to a
+  // single cursor. Guarded (no-op + fall-through when already a single range) so
+  // it never shadows the search-bar/menu Escape. Listed here (before
+  // defaultKeymap in extensions.ts) so it runs while a multi-selection is live.
+  { key: "Escape", run: collapseMultiSelection },
 ];
