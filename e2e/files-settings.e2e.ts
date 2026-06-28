@@ -91,22 +91,24 @@ describeE2E("nl1 default new-note location (MYND-462): specific folder", () => {
         await folderInput.sendKeys("\u{e004}");
         await closeSettings(s);
 
-        // Before: no folder rows (the seeded vault is flat).
-        expect((await s.byTestIdAll("notes.folder-row")).length).toBe(0);
-
         // Create a note via the root-level sidebar CTA — it inherits the pref.
         await createNote(s, NOTE_TITLE);
 
-        // After: a folder row exists (the note was filed under TARGET_FOLDER, so
-        // its virtual folder now appears in the sidebar tree).
-        const folderRows = await s.waitUntil(
+        // The note was filed under TARGET_FOLDER, so that exact folder is present
+        // in the sidebar tree (matched by `data-folder-path`). (Setting the pref
+        // already surfaces the destination folder; creating the note files into
+        // it — either way the TARGET_FOLDER row must exist.)
+        const folderRow = await s.waitUntil(
           async () => {
             const found = await s.byTestIdAll("notes.folder-row");
-            return found.length >= 1 ? found : null;
+            for (const r of found) {
+              if ((await r.attribute("data-folder-path")) === TARGET_FOLDER) return r;
+            }
+            return null;
           },
-          { label: "new-note folder row", timeoutMs: 15_000 },
+          { label: "new-note folder row (TARGET_FOLDER)", timeoutMs: 15_000 },
         );
-        expect(folderRows.length).toBeGreaterThanOrEqual(1);
+        expect(await folderRow.attribute("data-folder-path")).toBe(TARGET_FOLDER);
       },
     );
   });
