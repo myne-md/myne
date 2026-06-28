@@ -277,35 +277,21 @@ export async function createNote(session: Session, title: string): Promise<void>
  *  leftover truncated fragment are harmless. */
 export async function typeIntoEditor(session: Session, text: string): Promise<void> {
   const content = await session.waitForElement(CM_CONTENT);
-  // The probe-then-Backspace dance is ONLY needed on a COLD editor (a plain
-  // click doesn't focus CM under this driver, and the first keystrokes drop
-  // during focus-settle). When the editor is ALREADY focused (a second
-  // typeIntoEditor on the same note, the caret left at the prior payload's end),
-  // the probe is not only unnecessary — its Backspace eats the BOUNDARY char of
-  // the previous edit when the click repositions the caret (observed: snapshots
-  // V1's trailing char swallowed before V2). So skip click+probe entirely when
-  // CM already holds focus (`.cm-editor.cm-focused`) and append directly.
-  const isFocused = async (): Promise<boolean> =>
-    session.execute<boolean>(
-      "return document.querySelector('[data-testid=\"editor.content\"] .cm-editor.cm-focused') !== null;",
-    );
-  if (!(await isFocused())) {
-    await content.click();
-    await session.waitUntil(
-      async () => {
-        await content.sendKeys("q");
-        return (await editorText(session)).includes("q") || null;
-      },
-      { label: "keystroke pipeline established", timeoutMs: 10_000 },
-    );
-    // The pipeline probe typed "q" and the caret sits right after it — delete it
-    // with a SINGLE Backspace so the document starts clean for position-sensitive
-    // callers (multi-cursor columns, Mod-d word selection). Far less invasive than
-    // a select-all+delete (which reintroduces the focus-settle drop the probe
-    // guards against and regressed notes/snapshots); a no-op-safe keystroke
-    // against the just-typed char.
-    await content.sendKeys(String.fromCharCode(0xe003)); // BACKSPACE removes the probe "q"
-  }
+  await content.click();
+  await session.waitUntil(
+    async () => {
+      await content.sendKeys("q");
+      return (await editorText(session)).includes("q") || null;
+    },
+    { label: "keystroke pipeline established", timeoutMs: 10_000 },
+  );
+  // The pipeline probe typed "q" and the caret sits right after it — delete it
+  // with a SINGLE Backspace so the document starts clean for position-sensitive
+  // callers (multi-cursor columns, Mod-d word selection). Far less invasive than
+  // a select-all+delete (which reintroduces the focus-settle drop the probe
+  // guards against and regressed notes/snapshots); a no-op-safe keystroke against
+  // the just-typed char.
+  await content.sendKeys(String.fromCharCode(0xe003)); // BACKSPACE removes the probe "q"
   // `editorText()` reads `.cm-content`'s textContent. Two layout artefacts make a
   // raw `includes(text)` check unreliable:
   //   1. textContent concatenates CM6's per-line `<div class="cm-line">` blocks

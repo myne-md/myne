@@ -16,6 +16,7 @@
 
 import type { Tree } from "@lezer/common";
 import { extractHeadings } from "./headings";
+import { locateFrontmatter } from "../lezer/frontmatter";
 import type { HeadingLevel } from "../types";
 
 export type HeadingSection = {
@@ -38,7 +39,19 @@ export type HeadingSection = {
  * next `# H1` (or document end) — the boundary folding collapses.
  */
 export function headingSections(source: string, tree?: Tree): HeadingSection[] {
-  const refs = extractHeadings(source, tree);
+  // Drop any heading that falls INSIDE the YAML frontmatter block. The lezer
+  // markdown grammar parses a frontmatter body line followed by the closing
+  // `---` as a Setext heading (e.g. `title: …\nupdated: …\n---`), so without
+  // this filter the `[[#` heading picker and heading folding would offer the
+  // frontmatter fields as headings. The canonical `parse.ts` already applies the
+  // same `filterOutsideFrontmatter` guard; mirror it here (single-parser rule).
+  const fm = locateFrontmatter(source);
+  const refs = extractHeadings(source, tree).filter(
+    (ref) =>
+      fm === null ||
+      ref.byteRange.end <= fm.blockStart ||
+      ref.byteRange.start >= fm.blockEnd,
+  );
   return refs.map((ref, i) => {
     let sectionTo = source.length;
     for (let j = i + 1; j < refs.length; j++) {
