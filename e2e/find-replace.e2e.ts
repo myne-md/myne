@@ -40,6 +40,7 @@ import { testIdSelector, type Session } from "./support/webdriver";
 
 const CONTROL = ""; // W3C Actions API code point for Control
 const FOLD_PLACEHOLDER = testIdSelector("editor.fold-placeholder");
+const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
 
 /** Send a single `Control+<key>` chord via the W3C Actions API (no sendKeys —
  *  sidesteps the invisible-U+E007 chord hazard, MEMORY e2e note). */
@@ -120,11 +121,20 @@ describeE2E("fr1 replace-one + replace-all + single-undo (MYND-302)", () => {
         const replaced = await editorText(s);
         expect(replaced.includes("widgetfr1")).toBe(false);
 
-        // A single undo (Ctrl+Z) reverts the WHOLE bulk replace at once. Focus the
-        // editor content first so the history command targets the document. The
-        // replace-all is one transaction → one undo restores at least one original
-        // token (the partial replace-one is a separate transaction).
-        await (await s.byTestId("editor.content")).click();
+        // A single undo (Ctrl+Z) reverts the WHOLE bulk replace at once. The undo
+        // command is a CM keymap binding, so it only fires on a key event reaching
+        // the BODY content DOM and targets that editor's own history. Two focus
+        // hazards: (a) the find input would swallow the chord — close the bar
+        // first (Escape on its input -> closeSearchPanel); (b) a /click on
+        // .cm-content does NOT move focus into it (the post-replace selection +
+        // floating format toolbar persist, so the chord would land on the TITLE
+        // editor and undo the title), but sendKeys' implicit focus does. The
+        // ArrowRight both focuses the body and collapses the leftover replace
+        // selection. Replace-all is one transaction -> one undo restores the
+        // bulk-replaced tokens (the partial replace-one is a separate transaction).
+        await (await s.byTestId("find.input")).sendKeys(String.fromCharCode(0xe00c)); // ESCAPE
+        await s.waitForGone(testIdSelector("find.input"));
+        await (await s.waitForElement(CM_CONTENT)).sendKeys(String.fromCharCode(0xe014)); // ARROW_RIGHT
         await sendCtrlChord(s, "z");
         await s.waitUntil(
           async () => ((await editorText(s)).includes("widgetfr1") ? true : null),
@@ -135,9 +145,9 @@ describeE2E("fr1 replace-one + replace-all + single-undo (MYND-302)", () => {
   });
 });
 
-describeE2E("fr2 replace reveals + rewrites folded regions (MYND-302, SYNC-6)", () => {
+describeE2E("fr2 replace rewrites the canonical buffer under folded regions (MYND-302, SYNC-6)", () => {
   // Vault-count precondition: 1 (weak KDF). Re-confirms against MYND-300 folding.
-  it("replace-all rewrites a token inside a folded heading section and un-folds it", async () => {
+  it("replace-all rewrites a token inside a folded heading section (fold state left intact)", async () => {
     // An H1 section whose body carries the replace target; fold-all collapses it.
     const DOC = [
       "# Section foldfr2head",
@@ -170,17 +180,46 @@ describeE2E("fr2 replace reveals + rewrites folded regions (MYND-302, SYNC-6)", 
         await (await s.byTestId("find.toggle-replace")).click();
         await (await s.byTestId("find.replace-input")).sendKeys("revealedfr2");
 
-        // Replace-all operates on the canonical buffer (folded text included) and
-        // the navigation un-folds the region (SYNC-6).
-        await (await s.byTestId("find.replace-all")).click();
+        // Confirm the find engine sees BOTH matches inside the folded region
+        // first (it scans the canonical buffer, folded text included — SYNC-6):
+        // the count-aware "Replace all (N)" reflects the live total.
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("revealedfr2") ? true : null),
-          { label: "replace-all rewrote the token inside the folded region" },
+          async () =>
+            (await (await s.byTestId("find.replace-all")).textContent()).includes("(2)")
+              ? true
+              : null,
+          { label: "Replace all (2) — both folded matches found" },
         );
-        // The canonical text no longer carries the original folded-region token.
-        expect((await editorText(s)).includes("foldablefr2")).toBe(false);
-        // And the region un-folded on the replace navigation (placeholders gone).
-        await s.waitForGone(FOLD_PLACEHOLDER);
+
+        // Replace-all rewrites the canonical buffer in ONE transaction, including
+        // text hidden inside folded regions. It does NOT itself un-fold (only the
+        // replace-ONE navigation rides the cursor-aware reveal); the fold state is
+        // left intact, and the rewritten text stays behind the placeholder — so it
+        // can't be read out of the DOM. Prove the under-the-fold rewrite through
+        // the find engine instead: re-querying the NEW token finds both rewritten
+        // occurrences (still folded), and the OLD token is gone.
+        await (await s.byTestId("find.replace-all")).click();
+        await (await s.byTestId("find.input")).replaceText("revealedfr2");
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("find.replace-all")).textContent()).includes("(2)")
+              ? true
+              : null,
+          { label: "the rewritten token is found twice inside the still-folded region" },
+        );
+        await (await s.byTestId("find.input")).replaceText("foldablefr2");
+        // No matches → the replace-all button disables (bare "Replace all", no
+        // count). That the original token is unfindable proves it's gone from the
+        // canonical buffer.
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestId("find.replace-all")).property<boolean>("disabled"))
+              ? true
+              : null,
+          { label: "the original token no longer exists in the canonical buffer" },
+        );
+        // The fold state is untouched by replace-all (placeholders still present).
+        expect((await s.findElements(FOLD_PLACEHOLDER)).length).toBeGreaterThan(0);
       },
     );
   });
