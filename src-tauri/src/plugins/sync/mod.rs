@@ -42,6 +42,8 @@ pub mod orchestrator;
 pub mod reconcile;
 pub mod reconcile_policy;
 pub mod rustls_transport;
+#[cfg(test)]
+mod sim;
 pub mod state;
 pub mod taxonomy;
 pub mod token_store;
