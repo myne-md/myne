@@ -279,27 +279,12 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
     },
     { label: "keystroke pipeline established", timeoutMs: 10_000 },
   );
-  // The probe leaves stray "q"(s) at the document start, which shift every
-  // position-sensitive payload — word selection (Mod-d next-occurrence),
-  // multi-cursor columns, heading offsets. Clear the document before the real
-  // payload: select-all (Ctrl+A) + Backspace. typeIntoEditor writes into a
-  // fresh note, so wiping is safe and leaves the caret at offset 0.
-  const CONTROL = String.fromCharCode(0xe009);
-  await session.send("POST", "/actions", {
-    actions: [
-      {
-        type: "key",
-        id: "kbd",
-        actions: [
-          { type: "keyDown", value: CONTROL },
-          { type: "keyDown", value: "a" },
-          { type: "keyUp", value: "a" },
-          { type: "keyUp", value: CONTROL },
-        ],
-      },
-    ],
-  });
-  await content.sendKeys(String.fromCharCode(0xe003)); // BACKSPACE deletes the selection
+  // NOTE: the probe leaves a stray "q" at the document start. That is harmless
+  // for `includes`-based asserts but shifts POSITION-sensitive payloads (Mod-d
+  // word selection, multi-cursor columns). Those few scenarios account for the
+  // probe locally (e.g. select from offset 1); do NOT clear the document here —
+  // a select-all + delete reintroduces the very focus-settle drop the probe
+  // guards against and breaks plain "type then assert" flows (notes, snapshots).
   // `editorText()` reads `.cm-content`'s textContent, which concatenates CM6's
   // per-line `<div class="cm-line">` blocks WITHOUT a separator (textContent
   // omits block boundaries). A multi-line payload's "\n" therefore never shows
