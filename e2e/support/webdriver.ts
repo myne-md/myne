@@ -178,26 +178,49 @@ export class Element {
    *  the bar's list menu rather than a per-affordance menu. Button 2 down+up
    *  synthesizes `contextmenu`. */
   async rightClick(offsetX = 0, offsetY = 0): Promise<void> {
-    await this.session.send("POST", "/actions", {
-      actions: [
-        {
-          type: "pointer",
-          id: "mouse",
-          parameters: { pointerType: "mouse" },
-          actions: [
-            {
-              type: "pointerMove",
-              duration: 0,
-              origin: { [ELEMENT_KEY]: this.elementId },
-              x: offsetX,
-              y: offsetY,
-            },
-            { type: "pointerDown", button: 2 },
-            { type: "pointerUp", button: 2 },
-          ],
-        },
-      ],
-    });
+    // Retry while WebKit reports the element is in the DOM but not yet
+    // hit-testable (a sidebar row mid expand/collapse animation — the
+    // grid-template-rows reveal — or a layout that has not settled). The
+    // pointerMove resolves the element's in-view centre first; if that throws
+    // "not interactable" NOTHING was dispatched (no contextmenu fired), so the
+    // retry cannot double-open a menu. Mirrors `click()`'s retry contract.
+    await this.session.waitUntil(
+      async () => {
+        try {
+          await this.session.send("POST", "/actions", {
+            actions: [
+              {
+                type: "pointer",
+                id: "mouse",
+                parameters: { pointerType: "mouse" },
+                actions: [
+                  {
+                    type: "pointerMove",
+                    duration: 0,
+                    origin: { [ELEMENT_KEY]: this.elementId },
+                    x: offsetX,
+                    y: offsetY,
+                  },
+                  { type: "pointerDown", button: 2 },
+                  { type: "pointerUp", button: 2 },
+                ],
+              },
+            ],
+          });
+          return true;
+        } catch (e) {
+          if (
+            e instanceof WebDriverError &&
+            (e.code === "element not interactable" ||
+              e.code === "element click intercepted")
+          ) {
+            return null; // not hit-testable yet — keep polling
+          }
+          throw e;
+        }
+      },
+      { label: "element interactable + right-clicked", timeoutMs: 10_000 },
+    );
   }
 
   /** Move the pointer over this element (no buttons) via the W3C Actions API —
