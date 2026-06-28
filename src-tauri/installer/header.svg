@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="57" viewBox="0 0 150 57" fill="none">
+  <!-- NSIS wizard header banner (150x57), shown top-right on every page.
+       Brand lockup on a paper field matching the macOS DMG art. -->
+  <rect width="150" height="57" fill="#fcfcfb"/>
+  <g transform="translate(24 14)">
+    <rect width="30" height="30" rx="6.5" fill="#1a1a17"/>
+    <path d="M7.5 20.5 V9.5 L15 17 L22.5 9.5 V20.5" stroke="#fbfbfa" stroke-width="1.9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="40" y="22" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+          font-size="23" font-weight="600" letter-spacing="-0.4" fill="#1a1a17">Myne</text>
+  </g>
+</svg>

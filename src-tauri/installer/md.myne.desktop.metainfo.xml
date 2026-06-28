@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metainfo: the listing GNOME Software / KDE Discover show for Myne.
+     This is the closest Linux analog to the macOS DMG / Windows wizard art — a
+     branded software-center presentation (deb/rpm/AppImage have no installer UI).
+     Shipped to /usr/share/metainfo/ via the bundle.linux files maps. -->
+<component type="desktop-application">
+  <id>md.myne.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+
+  <name>Myne</name>
+  <summary>A calm place for your notes</summary>
+
+  <description>
+    <p>
+      Myne is a clean, fast markdown notes app. Capture, link, and find your
+      notes across devices — calmly, without lock-in.
+    </p>
+    <p>Highlights:</p>
+    <ul>
+      <li>Markdown editor with [[wikilinks]], backlinks, and a graph view</li>
+      <li>Full-text search across your whole vault</li>
+      <li>No email required to sign up</li>
+      <li>Your notes stay plaintext-readable markdown after decryption — no proprietary format, no lock-in</li>
+      <li>Use hosted sync or run your own self-hosted server</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">md.myne.desktop.desktop</launchable>
+  <url type="homepage">https://myne.md</url>
+
+  <developer id="md.myne">
+    <name>Myne</name>
+  </developer>
+
+  <!-- Software-center banner tint: iron-blue accent (light/dark schemes). -->
+  <branding>
+    <color type="primary" scheme_preference="light">#e8edf5</color>
+    <color type="primary" scheme_preference="dark">#2c4a7a</color>
+  </branding>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-06-28"/>
+  </releases>
+</component>
