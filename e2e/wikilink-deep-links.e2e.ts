@@ -177,12 +177,16 @@ describeE2E("wd1 click [[Note#Heading]] scrolls to the heading; not-found → no
         const enterReading = async () => {
           await s.waitUntil(
             async () => {
-              const cta = await s.byTestId("editor.view-mode-cta");
-              if ((await cta.attribute("data-view-mode")) === "reading") return true;
-              await cta.click();
+              // The CTA only mounts once the note tab + bottom bar are live; poll
+              // with findElements (no throw) so a not-yet-mounted editor retries
+              // instead of failing.
+              const ctas = await s.findElements('[data-testid="editor.view-mode-cta"]');
+              if (ctas.length === 0) return null;
+              if ((await ctas[0].attribute("data-view-mode")) === "reading") return true;
+              await ctas[0].click();
               return null;
             },
-            { label: "pane in reading view", timeoutMs: 10_000 },
+            { label: "pane in reading view", timeoutMs: 15_000 },
           );
         };
         // Find a chip by its display text (chips carry no testid; the resolved
