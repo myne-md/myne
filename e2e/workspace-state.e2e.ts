@@ -44,10 +44,6 @@ import {
 } from "./support/flows";
 import { type Element, type Session, testIdSelector } from "./support/webdriver";
 
-// W3C key value for the open-to-side modifier click (escape form — never a
-// literal, per the invisible-key hazard). Alt opens to the side; the new-tab
-// affordance moved to a middle-click (MYND-367 freed Cmd/Ctrl for multi-select).
-const ALT = "\uE00A";
 
 // Distinct note titles — single lowercase-alnum tokens (the residue
 // needle-design rule: tokenizer-survivable, ≥24 chars).
@@ -128,6 +124,26 @@ async function row(session: Session, noteId: string): Promise<Element> {
   return session.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));
 }
 
+/** Right-click a note row and pick a context-menu item by `data-item-id`. The
+ *  new-tab / open-to-side gestures are driven through the row's REAL context menu
+ *  (`open-in-new-tab` / `open-to-side`) rather than middle-click / Alt-click: the
+ *  WebDriver synthetic middle-click never fires `auxclick` under WebKit, and the
+ *  Alt-modifier click doesn't establish the split — both production gestures, but
+ *  not driver-addressable. The context-menu items invoke the SAME workspace
+ *  actions (openNewTabInFocused / openToSide). */
+async function rowMenuPick(
+  session: Session,
+  noteId: string,
+  itemId: string,
+): Promise<void> {
+  await (await row(session, noteId)).rightClick();
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+    )
+  ).click();
+}
+
 // ── at-rest ──────────────────────────────────────────────────────────────
 
 function workspaceBlob(appDataDir: string, vaultId: string): Buffer {
@@ -140,7 +156,7 @@ function assertWorkspaceHeader(blob: Buffer): void {
   expect(blob.subarray(0, 4).toString("latin1")).toBe("MYW1");
   expect(blob.length).toBeGreaterThan(34);
   expect(blob[4]).toBe(0x01); // protocol_version
-  expect(blob[5]).toBe(0x01); // workspace_format_version
+  expect(blob[5]).toBe(0x02); // workspace_format_version (named-workspaces descriptor)
 }
 
 /** Count of needles found verbatim in the blob (UTF-8 or UTF-16LE). Returns
@@ -180,8 +196,8 @@ describeE2E("ws1 layout restore + at-rest (MYND-257)", () => {
         const [n0, n1, n2] = await noteRowIds(s, 3);
 
         await (await row(s, n0)).click(); // openInFocused → pane-0 = [n0]
-        await (await row(s, n1)).middleClick(); // new tab → [n0, n1] (MYND-367)
-        await (await row(s, n2)).modifierClick(ALT); // open to side → split
+        await rowMenuPick(s, n1, "open-in-new-tab"); // new tab → [n0, n1]
+        await rowMenuPick(s, n2, "open-to-side"); // open to side → split
 
         const built: LayoutSig = {
           panes: [
@@ -240,7 +256,7 @@ describeE2E("ws2 per-vault layout isolation (MYND-257)", () => {
         for (const t of WS2_A_TITLES) await createNote(s, t);
         const [a0, a1] = await noteRowIds(s, 2);
         await (await row(s, a0)).click();
-        await (await row(s, a1)).modifierClick(ALT); // open to side → split
+        await rowMenuPick(s, a1, "open-to-side"); // open to side → split
         const layoutA: LayoutSig = {
           panes: [
             { tabs: [a0], active: a0 },
@@ -261,7 +277,7 @@ describeE2E("ws2 per-vault layout isolation (MYND-257)", () => {
         for (const t of WS2_B_TITLES) await createNote(s, t);
         const [b0, b1] = await noteRowIds(s, 2);
         await (await row(s, b0)).click();
-        await (await row(s, b1)).middleClick(); // new tab (MYND-367)
+        await rowMenuPick(s, b1, "open-in-new-tab"); // new tab
         const layoutB: LayoutSig = {
           panes: [{ tabs: [b0, b1], active: b1 }],
           focusedIndex: 0,
