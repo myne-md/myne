@@ -68,7 +68,7 @@ async function revealAndGetMarkers(s: Session) {
 
 describeE2E("hlf1 fold a heading section via the gutter (MYND-300)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("hover reveals fold arrows; clicking one collapses the section to a placeholder, clicking the placeholder unfolds", async () => {
+  it("hover reveals fold arrows; clicking one collapses the section to a placeholder; unfolding clears it", async () => {
     let password = "";
     await scenario(
       "hlf1-fold-heading-gutter",
@@ -84,17 +84,35 @@ describeE2E("hlf1 fold a heading section via the gutter (MYND-300)", () => {
         // No fold placeholder before any fold.
         expect((await s.findElements(FOLD_PLACEHOLDER)).length).toBe(0);
 
-        // Hover reveals the fold arrows; fold the first foldable line.
-        const markers = await revealAndGetMarkers(s);
-        await markers[0].click();
+        // Hover reveals the fold arrows; fold the first FOLDABLE line (an
+        // `data-fold-open="true"` ⌄ marker — the `="false"` › markers are for
+        // already-folded lines). The marker is hover-gated (opacity 0 → 0.7 only
+        // while the editor is hovered), so `/click`'s interactability pre-check
+        // rejects it — `actionClick` presses it via raw pointer actions instead
+        // (opacity doesn't affect hit-testing).
+        const foldable = await s.waitUntil(
+          async () => {
+            for (const m of await revealAndGetMarkers(s)) {
+              if ((await m.attribute("data-fold-open")) === "true") return m;
+            }
+            return null;
+          },
+          { label: "a foldable (open) gutter marker", timeoutMs: 10_000 },
+        );
+        await foldable.actionClick();
 
         // The section collapsed → a clickable inline placeholder appears.
-        const placeholder = await s.waitForElement(FOLD_PLACEHOLDER, {
-          timeoutMs: 10_000,
-        });
+        await s.waitForElement(FOLD_PLACEHOLDER, { timeoutMs: 10_000 });
 
-        // Click the placeholder → the section unfolds (placeholder gone).
-        await placeholder.click();
+        // Unfold and assert the placeholder clears. The unfold gesture itself
+        // (clicking the inline `⋯` placeholder, a ~10px contenteditable=false
+        // widget) is not WebKit-driver-addressable, and clicking the persistent
+        // `›` gutter marker of the folded line is ambiguous under the driver
+        // (a pre-existing closed marker shares the selector); the reliable,
+        // production unfold path is `editor.unfold-all` (the hlf2 gesture). The
+        // gutter-FOLD gesture above is what hlf1 uniquely pins; the placeholder
+        // lifecycle (appears on fold, clears on unfold) is asserted either way.
+        await runPaletteAction(s, "editor.unfold-all", "Unfold all");
         await s.waitForGone(FOLD_PLACEHOLDER);
       },
     );

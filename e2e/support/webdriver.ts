@@ -111,6 +111,40 @@ export class Element {
     );
   }
 
+  /** Click via the W3C Actions API (pointer move to centre → button-0 down/up)
+   *  in ONE sequence — the same transport as `rightClick`, with NO interactability
+   *  pre-check. WebKit's `/click` endpoint refuses an element it deems
+   *  non-interactable (notably `opacity: 0`), but opacity does NOT affect
+   *  hit-testing — a hover-revealed gutter fold marker (opacity 0 → 0.7 only
+   *  while the editor is hovered) receives the pointer fine. Moving the pointer
+   *  ONTO the marker also satisfies the `.cm-editor:hover` reveal, and the brief
+   *  pause lets the opacity transition settle before the press. Use for
+   *  hover-gated affordances `/click` rejects; prefer `click()` (which retries on
+   *  transient non-interactability) for ordinary buttons/rows. */
+  async actionClick(): Promise<void> {
+    await this.session.send("POST", "/actions", {
+      actions: [
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: { [ELEMENT_KEY]: this.elementId },
+              x: 0,
+              y: 0,
+            },
+            { type: "pause", duration: 200 },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+      ],
+    });
+  }
+
   /** Double-click via the W3C Actions API — pointer move to the in-view centre,
    *  then two button-0 down/up pairs in one action sequence (synthesizes
    *  `dblclick`). Drives the folder-row open gesture (`FolderRow.onActivate`,

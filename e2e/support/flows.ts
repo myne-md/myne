@@ -297,14 +297,22 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
   // caret-relative Backspace deletes it regardless of the frontmatter above. A
   // leftover probe char would shift position-sensitive payloads (multi-cursor).
   await content.sendKeys(String.fromCharCode(0xe003)); // BACKSPACE removes the probe "q"
-  // `editorText()` reads `.cm-content`'s textContent, which concatenates CM6's
-  // per-line `<div class="cm-line">` blocks WITHOUT a separator (textContent
-  // omits block boundaries). A multi-line payload's "\n" therefore never shows
-  // up in the readout, so an `includes(text)` check on raw text can never pass
-  // for multi-line input even though every character landed. Compare with
-  // newlines stripped — a true "did the text land" proof, not a layout artifact.
-  const flat = text.replace(/\n/g, "");
-  const landed = async () => (await editorText(session)).includes(flat) || null;
+  // `editorText()` reads `.cm-content`'s textContent. Two layout artefacts make a
+  // raw `includes(text)` check unreliable:
+  //   1. textContent concatenates CM6's per-line `<div class="cm-line">` blocks
+  //      WITHOUT a separator, so a payload's "\n" never appears in the readout.
+  //   2. In Live preview, markdown MARKERS on non-cursor lines are decoration-
+  //      hidden — a heading's "# ", a list's "- ", a wikilink's "[[…]]" chrome —
+  //      so `# Alpha` reads back as "Alpha". A payload carrying markdown syntax
+  //      therefore never `includes`-matches verbatim, and the legacy check
+  //      double-TYPED the whole doc on the re-send path (observed: heading/list
+  //      folding + folded-replace docs typed twice, concatenated).
+  // Normalise BOTH sides to lowercase alphanumerics (drop newlines, markers,
+  // whitespace, punctuation, and any auto-inserted list bullets / indent) — a
+  // true "did the words land, in order" proof, robust to Live-mode decoration.
+  const norm = (s: string): string => s.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const flat = norm(text);
+  const landed = async () => norm(await editorText(session)).includes(flat) || null;
   // A literal "\n" in a sendKeys payload is delivered as U+000A, which WebKit's
   // driver does NOT translate into an Enter keypress — CM6 stays on one line
   // (cm-line count = 1), breaking every multi-line scenario (vertical
